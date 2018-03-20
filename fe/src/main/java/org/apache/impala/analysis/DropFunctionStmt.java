@@ -89,7 +89,7 @@ public class DropFunctionStmt extends StatementBase {
     // to drop functions.
     // TODO: this is not the right granularity but acceptable for now.
     analyzer.registerPrivReq(new PrivilegeRequest(
-        new AuthorizeableFn(desc_.signatureString()), Privilege.ALL));
+        new AuthorizeableFn(desc_.dbName(), desc_.signatureString()), Privilege.ALL));
 
     Db db =  analyzer.getDb(desc_.dbName(), Privilege.DROP, false);
     if (db == null && !ifExists_) {

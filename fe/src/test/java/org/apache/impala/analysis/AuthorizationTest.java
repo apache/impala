@@ -96,7 +96,7 @@ public class AuthorizationTest extends FrontendTestBase {
   //   No permissions on database 'functional_rc'
   //   Only column level permissions in 'functional_avro':
   //     SELECT permissions on columns ('id') on 'functional_avro.alltypessmall'
-  //   REFRESH permissions on 'functional_text_lzo' database
+  //   REFRESH, INSERT, CREATE permissions on 'functional_text_lzo' database
   public final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
   public final static User USER = new User(System.getProperty("user.name"));
 
@@ -270,6 +270,30 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege.setTable_name("view_view");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
+    // insert_functional_text_lzo
+    roleName = "insert_functional_text_lzo";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.INSERT,
+        TPrivilegeScope.DATABASE, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional_text_lzo");
+    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    // create_functional_text_lzo
+    roleName = "create_functional_text_lzo";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.CREATE,
+        TPrivilegeScope.DATABASE, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional_text_lzo");
+    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
     // all newdb w/ all on URI
     roleName = "all_newdb";
     sentryService.createRole(USER, roleName, true);
@@ -292,6 +316,13 @@ public class AuthorizationTest extends FrontendTestBase {
         false);
     privilege.setServer_name("server1");
     privilege.setUri("hdfs://localhost:20500/test-warehouse/UPPER_CASE");
+    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.URI,
+        false);
+    privilege.setServer_name("server1");
+    privilege.setUri("hdfs://localhost:20500/test-warehouse/libTestUdfs.so");
     privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
@@ -942,10 +973,22 @@ public class AuthorizationTest extends FrontendTestBase {
     } catch (AnalysisException e) {
       Assert.assertEquals(e.getMessage(), "Table already exists: tpch.lineitem");
     }
+    // User has CREATE privilege on functional_text_lzo database.
+    AuthzOk("create table functional_text_lzo.new_table (i int)");
 
     // Create table AS SELECT positive and negative cases for SELECT privilege.
     AuthzOk("create table tpch.new_table as select * from functional.alltypesagg");
+    // User has CREATE and INSERT privileges on functional_text_lzo database and SELECT
+    // privilege on functional.alltypesagg table.
+    AuthzOk("create table functional_text_lzo.new_table as " +
+        "select * from functional.alltypesagg");
     AuthzError("create table tpch.new_table as select * from functional.alltypes",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypes");
+    // User has CREATE privilege on functional_text_lzo database, SELECT privilege on
+    // functional.alltypes table but no INSERT privilege on functional_text_lzo database.
+    AuthzError("create table functional_text_lzo.new_table as " +
+        "select * from functional.alltypes",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypes");
 
@@ -1059,6 +1102,10 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("create view tpch.new_view as select * from functional.alltypesagg");
     AuthzOk("create view tpch.new_view (a, b, c) as " +
         "select int_col, string_col, timestamp_col from functional.alltypesagg");
+    // User has CREATE and INSERT privileges on functional_text_lzo database and
+    // SELECT privilege on functional.alltypesagg table.
+    AuthzOk("create view functional_text_lzo.new_view as " +
+        "select * from functional.alltypesagg");
     // Create view IF NOT EXISTS, user has permission and table exists.
     AuthzOk("create view if not exists tpch.lineitem as " +
         "select * from functional.alltypesagg");
@@ -2043,27 +2090,40 @@ public class AuthorizationTest extends FrontendTestBase {
   public void TestFunction() throws Exception {
     // First try with the less privileged user.
     AnalysisContext ctx = createAnalysisCtx(ctx_.authzConfig, USER.getName());
+
+    // User has CREATE privilege on functional_text_lzo database and ALL privilege
+    // on /test-warehouse/libTestUdfs.so URI.
+    AuthzOk(ctx, "create function functional_text_lzo.f() returns int location " +
+        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
+
     AuthzError(ctx, "show functions",
         "User '%s' does not have privileges to access: default");
     AuthzOk(ctx, "show functions in tpch");
 
     AuthzError(ctx, "create function f() returns int location " +
         "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
-        "User '%s' does not have privileges to CREATE/DROP functions.");
+        "User '%s' does not have privileges to CREATE/DROP functions in: default.f()");
 
-    AuthzError(ctx, "create function tpch.f() returns int location " +
-        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
-        "User '%s' does not have privileges to CREATE/DROP functions.");
+    // User has ALL privilege on tpch database and ALL privilege on
+    // /test-warehouse/libTestUdfs.so URI.
+    AuthzOk(ctx, "create function tpch.f() returns int location " +
+        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
 
     AuthzError(ctx, "create function notdb.f() returns int location " +
         "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
-        "User '%s' does not have privileges to CREATE/DROP functions.");
+        "User '%s' does not have privileges to CREATE/DROP functions in: notdb.f()");
 
     AuthzError(ctx, "drop function if exists f()",
-        "User '%s' does not have privileges to CREATE/DROP functions.");
+        "User '%s' does not have privileges to CREATE/DROP functions in: default.f()");
 
     AuthzError(ctx, "drop function notdb.f()",
-        "User '%s' does not have privileges to CREATE/DROP functions.");
+        "User '%s' does not have privileges to CREATE/DROP functions in: notdb.f()");
+
+    // User does not have ALL privilege on SERVER and tries to create a function with
+    // the same name as the built-in function.
+    AuthzError(ctx, "create function sin(double) returns double location " +
+        "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+        "Cannot modify system database.");
 
     // TODO: Add test support for dynamically changing privileges for
     // file-based policy.
@@ -2104,13 +2164,6 @@ public class AuthorizationTest extends FrontendTestBase {
     } finally {
       sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
       ctx_.catalog.reset();
-
-      AuthzError(ctx, "create function tpch.f() returns int location " +
-          "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
-          "User '%s' does not have privileges to CREATE/DROP functions.");
-
-      // Couldn't create tpch.f() but can run it.
-      AuthzOk("select tpch.f()");
 
       //Other tests don't expect tpch to contain functions
       //Specifically, if these functions are not cleaned up, TestDropDatabase() will fail
@@ -2278,6 +2331,45 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk(fe, ctx, "invalidate metadata");
     AuthzOk(fe, ctx, "create external table tpch.kudu_tbl stored as kudu " +
         "TBLPROPERTIES ('kudu.master_addresses'='127.0.0.1', 'kudu.table_name'='tbl')");
+  }
+
+  @Test
+  public void TestServerLevelCreate() throws ImpalaException {
+    // TODO: Add test support for dynamically changing privileges for
+    // file-based policy.
+    if (ctx_.authzConfig.isFileBasedPolicy()) return;
+
+    SentryPolicyService sentryService =
+        new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
+
+    // User has CREATE privilege on server.
+    String roleName = "create_role";
+    try {
+      sentryService.createRole(USER, roleName, true);
+      TPrivilege privilege = new TPrivilege("", TPrivilegeLevel.CREATE,
+          TPrivilegeScope.SERVER, false);
+      privilege.setServer_name("server1");
+      sentryService.grantRolePrivilege(USER, roleName, privilege);
+      sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+      ctx_.catalog.reset();
+
+      AuthzOk("create database newdb");
+      AuthzOk("create database newdb location " +
+          "'hdfs://localhost:20500/test-warehouse/new_table'");
+      AuthzOk("create table functional_avro.newtable (i int)");
+      AuthzOk("create view functional_avro.newview as " +
+          "select * from functional.alltypesagg");
+      AuthzOk("create function functional_avro.f() returns int location " +
+          "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'");
+      // User does not have INSERT privilege on functional_avro database.
+      AuthzError("create table functional_avro.newtable as " +
+          "select * from functional.alltypesagg",
+          "User '%s' does not have privileges to execute 'INSERT' on: " +
+          "functional_avro.newtable");
+    } finally {
+      sentryService.dropRole(USER, roleName, true);
+      ctx_.catalog.reset();
+    }
   }
 
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)

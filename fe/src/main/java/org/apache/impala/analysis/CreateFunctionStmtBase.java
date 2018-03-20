@@ -146,25 +146,22 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
       fn_ = createFunction(fnName_, null, null, false);
     }
 
-    // For now, if authorization is enabled, the user needs ALL on the server
-    // to create functions.
-    // TODO: this is not the right granularity but acceptable for now.
     analyzer.registerPrivReq(new PrivilegeRequest(
-        new AuthorizeableFn(fn_.signatureString()), Privilege.ALL));
+        new AuthorizeableFn(fn_.dbName(), fn_.signatureString()), Privilege.CREATE));
 
     if (ImpaladCatalog.getBuiltinsDb().containsFunction(fn_.getName())) {
       throw new AnalysisException("Function cannot have the same name as a builtin: " +
           fn_.getFunctionName().getFunction());
     }
 
-    db_ = analyzer.getDb(fn_.dbName(), Privilege.CREATE);
+    db_ = analyzer.getDb(fn_.dbName(), true);
     Function existingFn = db_.getFunction(fn_, Function.CompareMode.IS_INDISTINGUISHABLE);
     if (existingFn != null && !ifNotExists_) {
       throw new AnalysisException(Analyzer.FN_ALREADY_EXISTS_ERROR_MSG +
           existingFn.signatureString());
     }
 
-    location_.analyze(analyzer, Privilege.CREATE, FsAction.READ);
+    location_.analyze(analyzer, Privilege.ALL, FsAction.READ);
     fn_.setLocation(location_);
 
     // Check the file type from the binary type to infer the type of the UDA
