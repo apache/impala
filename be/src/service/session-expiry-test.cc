@@ -32,6 +32,7 @@ using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 using namespace impala;
 
+DECLARE_bool(abort_on_config_error);
 DECLARE_int32(idle_session_timeout);
 DECLARE_int32(be_port);
 DECLARE_int32(beeswax_port);
@@ -45,6 +46,8 @@ TEST(SessionTest, TestExpiry) {
   const int NUM_SESSIONS = 5;
   const int MAX_IDLE_TIMEOUT_MS = 4000;
   FLAGS_idle_session_timeout = 1;
+  // Skip validation checks for in-process backend.
+  FLAGS_abort_on_config_error = false;
   InProcessStatestore* ips = InProcessStatestore::StartWithEphemeralPorts();
   InProcessImpalaServer* impala =
       InProcessImpalaServer::StartWithEphemeralPorts("localhost", ips->port());
