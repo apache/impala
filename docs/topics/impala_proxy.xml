@@ -118,7 +118,7 @@ under the License.
                 long-running queries. Evaluate whether this setting is
                 appropriate for your combination of workload and client
                 applications. See <xref href="#proxy_balancing" format="dita"/>
-                for
+                for load balancing algorithm options.
               </p>
             </li>
             <li>
