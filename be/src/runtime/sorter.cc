@@ -634,7 +634,7 @@ Status Sorter::Run::Init() {
   int64_t required_mem = num_to_create * sorter_->page_len_;
   if (!sorter_->buffer_pool_client_->IncreaseReservationToFit(required_mem)) {
     return Status(Substitute(
-        "Unexpected error trying to reserve $0 bytes for a sorted run: $2",
+        "Unexpected error trying to reserve $0 bytes for a sorted run: $1",
         required_mem, sorter_->buffer_pool_client_->DebugString()));
   }
 
