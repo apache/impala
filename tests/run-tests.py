@@ -34,7 +34,7 @@ from _pytest.config import FILE_OR_DIR
 # We whitelist valid test directories. If a new test directory is added, update this.
 VALID_TEST_DIRS = ['failure', 'query_test', 'stress', 'unittests', 'aux_query_tests',
                    'shell', 'hs2', 'catalog_service', 'metadata', 'data_errors',
-                   'statestore']
+                   'statestore', 'infra']
 
 TEST_DIR = os.path.join(os.environ['IMPALA_HOME'], 'tests')
 RESULT_DIR = os.path.join(os.environ['IMPALA_EE_TEST_LOGS_DIR'], 'results')

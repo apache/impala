@@ -84,6 +84,14 @@ from tests.util.thrift_util import op_handle_to_query_id
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
+# IMPALA-6715: Every so often the stress test or the TPC workload directories get
+# changed, and the stress test loses the ability to run the full set of queries. Set
+# these constants and assert that when a workload is used, all the queries we expect to
+# use are there.
+EXPECTED_TPCDS_QUERIES_COUNT = 71
+EXPECTED_TPCH_NESTED_QUERIES_COUNT = 22
+EXPECTED_TPCH_QUERIES_COUNT = 22
+
 # Used to short circuit a binary search of the min mem limit. Values will be considered
 # equal if they are within this ratio or absolute amount of each other.
 MEM_LIMIT_EQ_THRESHOLD_PC = 0.975
@@ -1065,7 +1073,10 @@ def load_tpc_queries(workload):
   queries = list()
   query_dir = os.path.join(
       os.path.dirname(__file__), "..", "..", "testdata", "workloads", workload, "queries")
-  file_name_pattern = re.compile(r"-(q\d+).test$")
+  # IMPALA-6715 and others from the past: This pattern enforces the queries we actually
+  # find. Both workload directories contain other queries that are not part of the TPC
+  # spec.
+  file_name_pattern = re.compile(r"^{0}-(q.*).test$".format(workload))
   for query_file in os.listdir(query_dir):
     match = file_name_pattern.search(query_file)
     if not match:
@@ -1956,6 +1967,7 @@ def main():
   # the TPC queries are expected to always complete successfully.
   if args.tpcds_db:
     tpcds_queries = load_tpc_queries("tpcds")
+    assert len(tpcds_queries) == EXPECTED_TPCDS_QUERIES_COUNT
     for query in tpcds_queries:
       query.db_name = args.tpcds_db
     queries.extend(tpcds_queries)
@@ -1964,6 +1976,7 @@ def main():
         queries.extend(generate_compute_stats_queries(cursor))
   if args.tpch_db:
     tpch_queries = load_tpc_queries("tpch")
+    assert len(tpch_queries) == EXPECTED_TPCH_QUERIES_COUNT
     for query in tpch_queries:
       query.db_name = args.tpch_db
     queries.extend(tpch_queries)
@@ -1972,6 +1985,7 @@ def main():
         queries.extend(generate_compute_stats_queries(cursor))
   if args.tpch_nested_db:
     tpch_nested_queries = load_tpc_queries("tpch_nested")
+    assert len(tpch_nested_queries) == EXPECTED_TPCH_NESTED_QUERIES_COUNT
     for query in tpch_nested_queries:
       query.db_name = args.tpch_nested_db
     queries.extend(tpch_nested_queries)
@@ -1980,6 +1994,7 @@ def main():
         queries.extend(generate_compute_stats_queries(cursor))
   if args.tpch_kudu_db:
     tpch_kudu_queries = load_tpc_queries("tpch")
+    assert len(tpch_kudu_queries) == EXPECTED_TPCH_QUERIES_COUNT
     for query in tpch_kudu_queries:
       query.db_name = args.tpch_kudu_db
     queries.extend(tpch_kudu_queries)
@@ -1992,6 +2007,7 @@ def main():
         queries.extend(generate_DML_queries(cursor, args.dml_mod_values))
   if args.tpcds_kudu_db:
     tpcds_kudu_queries = load_tpc_queries("tpcds")
+    assert len(tpcds_kudu_queries) == EXPECTED_TPCDS_QUERIES_COUNT
     for query in tpcds_kudu_queries:
       query.db_name = args.tpcds_kudu_db
     queries.extend(tpcds_kudu_queries)
@@ -2049,10 +2065,17 @@ def main():
 
     # Remove any queries that would use "too many" resources. This way a larger number
     # of queries will run concurrently.
-    if query.required_mem_mb_with_spilling is None \
-        or query.required_mem_mb_with_spilling / impala.min_impalad_mem_mb \
+    if query.required_mem_mb_without_spilling is not None and \
+        query.required_mem_mb_without_spilling / float(impala.min_impalad_mem_mb) \
             > args.filter_query_mem_ratio:
-      LOG.debug("Filtered query due to mem ratio option: " + query.sql)
+      LOG.debug(
+          "Filtering non-spilling query that exceeds "
+          "--filter-query-mem-ratio: " + query.sql)
+      query.required_mem_mb_without_spilling = None
+    if query.required_mem_mb_with_spilling is None \
+        or query.required_mem_mb_with_spilling / float(impala.min_impalad_mem_mb) \
+            > args.filter_query_mem_ratio:
+      LOG.debug("Filtering query that exceeds --filter-query-mem-ratio: " + query.sql)
       del queries[idx]
 
   # Remove queries that have a nested loop join in the plan.
