@@ -181,12 +181,10 @@ export KUDU_JAVA_VERSION=1.7.0-cdh5.15.0-SNAPSHOT
 #    Sentry 2.0
 #    Parquet 1.9
 #
-# Impala 3.x should default to profile 3 and mark profile 2 deprecated,
+# Impala 3.x defaults to profile 3 and marks profile 2 deprecated,
 # so that it may be removed in the 3.x line.
-# Currently, as the profile 3 is still being developed, we retain
-# profile 2 as the default.
 
-DEFAULT_MINICLUSTER_PROFILE=2
+DEFAULT_MINICLUSTER_PROFILE=3
 : ${IMPALA_MINICLUSTER_PROFILE_OVERRIDE:=$DEFAULT_MINICLUSTER_PROFILE}
 
 if [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 2 ]]; then
