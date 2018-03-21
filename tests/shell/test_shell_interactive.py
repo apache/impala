@@ -28,6 +28,12 @@ import sys
 import tempfile
 from time import sleep
 
+# This import is the actual ImpalaShell class from impala_shell.py.
+# We rename it to ImpalaShellClass here because we later import another
+# class called ImpalaShell from tests/shell/util.py, and we don't want
+# to mask it.
+from shell.impala_shell import ImpalaShell as ImpalaShellClass
+
 from tests.common.impala_service import ImpaladService
 from tests.common.skip import SkipIfLocal
 from util import assert_var_substitution, ImpalaShell
@@ -129,6 +135,13 @@ class TestImpalaShellInteractive(object):
     assert result.stdout.count("Welcome to the Impala shell") == 1
     result = run_impala_shell_interactive('select * from non_existent_table;')
     assert result.stdout.count("Welcome to the Impala shell") == 1
+
+  @pytest.mark.execute_serially
+  def test_disconnected_shell(self):
+    """Test that the shell presents a disconnected prompt if it can't connect
+    """
+    result = run_impala_shell_interactive('asdf;', shell_args='-i foo')
+    assert ImpalaShellClass.DISCONNECTED_PROMPT in result.stdout
 
   @pytest.mark.execute_serially
   def test_bash_cmd_timing(self):
