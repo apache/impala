@@ -146,6 +146,7 @@ class ImpalaShell(object, cmd.Cmd):
     self.ca_cert = options.ca_cert
     self.user = options.user
     self.ldap_password = options.ldap_password
+    self.ldap_password_cmd = options.ldap_password_cmd
     self.use_ldap = options.use_ldap
 
     self.verbose = options.verbose
@@ -819,9 +820,9 @@ class ImpalaShell(object, cmd.Cmd):
         print_to_stderr("Socket error %s: %s" % (code, e))
         self.prompt = self.DISCONNECTED_PROMPT
     except Exception, e:
-      if options.ldap_password_cmd and \
-          options.ldap_password and \
-          options.ldap_password.endswith('\n'):
+      if self.ldap_password_cmd and \
+          self.ldap_password and \
+          self.ldap_password.endswith('\n'):
         print_to_stderr("Warning: LDAP password contains a trailing newline. "
                       "Did you use 'echo' instead of 'echo -n'?")
       print_to_stderr("Error connecting: %s, %s" % (type(e).__name__, e))
