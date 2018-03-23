@@ -43,10 +43,7 @@ Coordinator::BackendState::BackendState(
     const TUniqueId& query_id, int state_idx, TRuntimeFilterMode::type filter_mode)
   : query_id_(query_id),
     state_idx_(state_idx),
-    filter_mode_(filter_mode),
-    rpc_latency_(0),
-    rpc_sent_(false),
-    peak_consumption_(0L) {
+    filter_mode_(filter_mode) {
 }
 
 void Coordinator::BackendState::Init(
@@ -413,11 +410,7 @@ Coordinator::BackendState::InstanceStats::InstanceStats(
     const FInstanceExecParams& exec_params, FragmentStats* fragment_stats,
     ObjectPool* obj_pool)
   : exec_params_(exec_params),
-    profile_(nullptr),
-    done_(false),
-    profile_created_(false),
-    total_split_size_(0),
-    total_ranges_complete_(0) {
+    profile_(nullptr) {
   const string& profile_name = Substitute("Instance $0 (host=$1)",
       PrintId(exec_params.instance_id), lexical_cast<string>(exec_params.host));
   profile_ = RuntimeProfile::Create(obj_pool, profile_name);

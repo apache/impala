@@ -27,6 +27,7 @@
 #include "common/global-types.h"  // for PlanNodeId
 #include "runtime/client-cache-types.h"
 #include "runtime/thread-resource-mgr.h"
+#include "runtime/dml-exec-state.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
@@ -55,22 +56,6 @@ class QueryState;
 namespace io {
   class DiskIoMgr;
 }
-
-/// TODO: move the typedefs into a separate .h (and fix the includes for that)
-
-/// Counts how many rows an INSERT query has added to a particular partition
-/// (partitions are identified by their partition keys: k1=v1/k2=v2
-/// etc. Unpartitioned tables have a single 'default' partition which is
-/// identified by ROOT_PARTITION_KEY.
-typedef std::map<std::string, TInsertPartitionStatus> PartitionStatusMap;
-
-/// Stats per partition for insert queries. They key is the same as for PartitionRowCount
-typedef std::map<std::string, TInsertStats> PartitionInsertStats;
-
-/// Tracks files to move from a temporary (key) to a final destination (value) as
-/// part of query finalization. If the destination is empty, the file is to be
-/// deleted.
-typedef std::map<std::string, std::string> FileMoveMap;
 
 /// A collection of items that are part of the global state of a query and shared across
 /// all execution nodes of that query. After initialisation, callers must call
@@ -133,8 +118,6 @@ class RuntimeState {
   }
   ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
 
-  FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
-
   void set_fragment_root_id(PlanNodeId id) {
     DCHECK_EQ(root_node_id_, -1) << "Should not set this twice.";
     root_node_id_ = id;
@@ -146,7 +129,7 @@ class RuntimeState {
 
   RuntimeFilterBank* filter_bank() { return filter_bank_.get(); }
 
-  PartitionStatusMap* per_partition_status() { return &per_partition_status_; }
+  DmlExecState* dml_exec_state() { return &dml_exec_state_; }
 
   /// Returns runtime state profile
   RuntimeProfile* runtime_profile() { return profile_; }
@@ -341,12 +324,8 @@ class RuntimeState {
   /// state is responsible for returning this pool to the thread mgr.
   ThreadResourceMgr::ResourcePool* resource_pool_ = nullptr;
 
-  /// Temporary Hdfs files created, and where they should be moved to ultimately.
-  /// Mapping a filename to a blank destination causes it to be deleted.
-  FileMoveMap hdfs_files_to_move_;
-
-  /// Records summary statistics for the results of inserts into Hdfs partitions.
-  PartitionStatusMap per_partition_status_;
+  /// Execution state for DML statements.
+  DmlExecState dml_exec_state_;
 
   RuntimeProfile* const profile_;
 

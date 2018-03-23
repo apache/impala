@@ -121,69 +121,6 @@ Status DataSink::Init(const vector<TExpr>& thrift_output_exprs,
   return ScalarExpr::Create(thrift_output_exprs, *row_desc_, state, &output_exprs_);
 }
 
-void DataSink::MergeDmlStats(const TInsertStats& src_stats,
-    TInsertStats* dst_stats) {
-  dst_stats->bytes_written += src_stats.bytes_written;
-  if (src_stats.__isset.kudu_stats) {
-    if (!dst_stats->__isset.kudu_stats) dst_stats->__set_kudu_stats(TKuduDmlStats());
-    if (!dst_stats->kudu_stats.__isset.num_row_errors) {
-      dst_stats->kudu_stats.__set_num_row_errors(0);
-    }
-    dst_stats->kudu_stats.__set_num_row_errors(
-        dst_stats->kudu_stats.num_row_errors + src_stats.kudu_stats.num_row_errors);
-  }
-  if (src_stats.__isset.parquet_stats) {
-    if (dst_stats->__isset.parquet_stats) {
-      MergeMapValues<string, int64_t>(src_stats.parquet_stats.per_column_size,
-          &dst_stats->parquet_stats.per_column_size);
-    } else {
-      dst_stats->__set_parquet_stats(src_stats.parquet_stats);
-    }
-  }
-}
-
-string DataSink::OutputDmlStats(const PartitionStatusMap& stats,
-    const string& prefix) {
-  const char* indent = "  ";
-  stringstream ss;
-  ss << prefix;
-  bool first = true;
-  for (const PartitionStatusMap::value_type& val: stats) {
-    if (!first) ss << endl;
-    first = false;
-    ss << "Partition: ";
-
-    const string& partition_key = val.first;
-    if (partition_key == g_ImpalaInternalService_constants.ROOT_PARTITION_KEY) {
-      ss << "Default" << endl;
-    } else {
-      ss << partition_key << endl;
-    }
-    if (val.second.__isset.num_modified_rows) {
-      ss << "NumModifiedRows: " << val.second.num_modified_rows << endl;
-    }
-
-    if (!val.second.__isset.stats) continue;
-    const TInsertStats& stats = val.second.stats;
-    if (stats.__isset.kudu_stats) {
-      ss << "NumRowErrors: " << stats.kudu_stats.num_row_errors << endl;
-    }
-
-    ss << indent << "BytesWritten: "
-       << PrettyPrinter::Print(stats.bytes_written, TUnit::BYTES);
-    if (stats.__isset.parquet_stats) {
-      const TParquetInsertStats& parquet_stats = stats.parquet_stats;
-      ss << endl << indent << "Per Column Sizes:";
-      for (map<string, int64_t>::const_iterator i = parquet_stats.per_column_size.begin();
-           i != parquet_stats.per_column_size.end(); ++i) {
-        ss << endl << indent << indent << i->first << ": "
-           << PrettyPrinter::Print(i->second, TUnit::BYTES);
-      }
-    }
-  }
-  return ss.str();
-}
-
 Status DataSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   DCHECK(parent_mem_tracker != nullptr);
   DCHECK(profile_ != nullptr);

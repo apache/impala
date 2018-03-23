@@ -117,6 +117,7 @@ void PlanRootSink::Close(RuntimeState* state) {
   unique_lock<mutex> l(lock_);
   // No guarantee that FlushFinal() has been called, so need to mark sender_done_ here as
   // well.
+  // TODO: shouldn't this also set eos to true? do we need both eos and sender_done_?
   sender_done_ = true;
   consumer_cv_.NotifyAll();
   // Wait for consumer to be done, in case sender tries to tear-down this sink while the

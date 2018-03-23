@@ -29,6 +29,7 @@
 #include "util/metrics.h"
 #include "util/openssl-util.h"
 #include "runtime/exec-env.h"
+#include "service/frontend.h"
 #include "service/impala-server.h"
 
 #include "common/names.h"

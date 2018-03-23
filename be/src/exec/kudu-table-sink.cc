@@ -61,9 +61,6 @@ using kudu::client::KuduError;
 
 namespace impala {
 
-const static string& ROOT_PARTITION_KEY =
-    g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
-
 // Send 7MB buffers to Kudu, matching a hard-coded size in Kudu (KUDU-1693).
 const static int INDIVIDUAL_BUFFER_SIZE = 7 * 1024 * 1024;
 
@@ -92,15 +89,7 @@ Status KuduTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
       << "TableDescriptor must be an instance KuduTableDescriptor.";
   table_desc_ = static_cast<const KuduTableDescriptor*>(table_desc);
 
-  // Add a 'root partition' status in which to collect write statistics
-  TInsertPartitionStatus root_status;
-  root_status.__set_num_modified_rows(0L);
-  root_status.__set_id(-1L);
-  TKuduDmlStats kudu_dml_stats;
-  kudu_dml_stats.__set_num_row_errors(0L);
-  root_status.__set_stats(TInsertStats());
-  root_status.stats.__set_kudu_stats(kudu_dml_stats);
-  state->per_partition_status()->insert(make_pair(ROOT_PARTITION_KEY, root_status));
+  state->dml_exec_state()->InitForKuduDml();
 
   // Add counters
   total_rows_ = ADD_COUNTER(profile(), "TotalNumRows", TUnit::UNIT);
@@ -338,12 +327,9 @@ Status KuduTableSink::FlushFinal(RuntimeState* state) {
     VLOG_RPC << "Ignoring Flush() error status: " << flush_status.ToString();
   }
   Status status = CheckForErrors(state);
-  TInsertPartitionStatus& insert_status =
-      (*state->per_partition_status())[ROOT_PARTITION_KEY];
-  insert_status.__set_num_modified_rows(
-      total_rows_->value() - num_row_errors_->value());
-  insert_status.stats.kudu_stats.__set_num_row_errors(num_row_errors_->value());
-  insert_status.__set_kudu_latest_observed_ts(client_->GetLatestObservedTimestamp());
+  state->dml_exec_state()->SetKuduDmlStats(
+      total_rows_->value() - num_row_errors_->value(), num_row_errors_->value(),
+      client_->GetLatestObservedTimestamp());
   return status;
 }
 

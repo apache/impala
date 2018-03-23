@@ -38,7 +38,8 @@
 #include "common/status.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
-#include "runtime/runtime-state.h" // for PartitionStatusMap; TODO: disentangle
+#include "runtime/dml-exec-state.h"
+#include "runtime/query-state.h"
 #include "scheduling/query-schedule.h"
 #include "util/condition-variable.h"
 #include "util/progress-updater.h"
@@ -130,9 +131,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Idempotent.
   void Cancel(const Status* cause = nullptr);
 
-  /// Updates execution status of a particular backend as well as Insert-related
-  /// status (per_partition_status_ and files_to_move_). Also updates
-  /// num_remaining_backends_ and cancels execution if the backend has an error status.
+  /// Updates execution status of a particular backend as well as dml_exec_state_.
+  /// Also updates num_remaining_backends_ and cancels execution if the backend has an
+  /// error status.
   Status UpdateBackendExecStatus(const TReportExecStatusParams& params)
       WARN_UNUSED_RESULT;
 
@@ -149,17 +150,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   MemTracker* query_mem_tracker() const;
 
   /// This is safe to call only after Wait()
-  const PartitionStatusMap& per_partition_status() { return per_partition_status_; }
-
-  /// Returns the latest Kudu timestamp observed across any backends where DML into Kudu
-  /// was executed, or 0 if there were no Kudu timestamps reported.
-  /// This should only be called after Wait().
-  uint64_t GetLatestKuduInsertTimestamp() const;
-
-  /// Gathers all updates to the catalog required once this query has completed execution.
-  /// Returns true if a catalog update is required, false otherwise.
-  /// Must only be called after Wait()
-  bool PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update);
+  DmlExecState* dml_exec_state() { return &dml_exec_state_; }
 
   /// Return error log for coord and all the fragments. The error messages from the
   /// individual fragment instances are merged into a single output to retain readability.
@@ -229,12 +220,6 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// GetNext() hits eos.
   PlanRootSink* coord_sink_ = nullptr;
 
-  /// True if the query needs a post-execution step to tidy up
-  bool needs_finalization_ = false;
-
-  /// Only valid if needs_finalization is true
-  TFinalizeParams finalize_params_;
-
   /// ensures single-threaded execution of Wait(); must not hold lock_ when acquiring this
   boost::mutex wait_lock_;
 
@@ -275,6 +260,11 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   ExecSummary exec_summary_;
 
+  /// Filled in as the query completes and tracks the results of DML queries.  This is
+  /// either the union of the reports from all fragment instances, or taken from the
+  /// coordinator fragment: only one of the two can legitimately produce updates.
+  DmlExecState dml_exec_state_;
+
   /// Aggregate counters for the entire query. Lives in 'obj_pool_'.
   RuntimeProfile* query_profile_ = nullptr;
 
@@ -307,21 +297,6 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Count of the number of backends for which done != true. When this
   /// hits 0, any Wait()'ing thread is notified
   int num_remaining_backends_ = 0;
-
-  /// The following two structures, partition_row_counts_ and files_to_move_ are filled in
-  /// as the query completes, and track the results of INSERT queries that alter the
-  /// structure of tables. They are either the union of the reports from all fragment
-  /// instances, or taken from the coordinator fragment: only one of the two can
-  /// legitimately produce updates.
-
-  /// The set of partitions that have been written to or updated by all fragment
-  /// instances, along with statistics such as the number of rows written (may be 0). For
-  /// unpartitioned tables, the empty string denotes the entire table.
-  PartitionStatusMap per_partition_status_;
-
-  /// The set of files to move after an INSERT query has run, in (src, dest) form. An
-  /// empty string for the destination means that a file is to be deleted.
-  FileMoveMap files_to_move_;
 
   /// Event timeline for this query. Not owned.
   RuntimeProfile::EventSequence* query_events_ = nullptr;
@@ -357,6 +332,12 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Returns a local object pool.
   ObjectPool* obj_pool() { return obj_pool_.get(); }
 
+  /// Returns request's finalize params, or nullptr if not present. If not present, then
+  /// HDFS INSERT finalization is not required.
+  const TFinalizeParams* finalize_params() const;
+
+  const TQueryCtx& query_ctx() const { return schedule_.request().query_ctx; }
+
   /// Only valid *after* calling Exec(). Return nullptr if the running query does not
   /// produce any rows.
   RuntimeState* runtime_state();
@@ -381,9 +362,6 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   Status UpdateStatus(const Status& status, const std::string& backend_hostname,
       bool is_fragment_failure, const TUniqueId& failed_fragment) WARN_UNUSED_RESULT;
 
-  /// Update per_partition_status_ and files_to_move_.
-  void UpdateInsertExecStatus(const TInsertExecStatus& insert_exec_status);
-
   /// Returns only when either all execution backends have reported success or the query
   /// is in error. Returns the status of the query.
   /// It is safe to call this concurrently, but any calls must be made only after Exec().
@@ -403,29 +381,11 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// profiles must not be updated while this is running.
   void ComputeQuerySummary();
 
-  /// TODO: move the next 3 functions into a separate class
-
-  /// Determines what the permissions of directories created by INSERT statements should
-  /// be if permission inheritance is enabled. Populates a map from all prefixes of
-  /// path_str (including the full path itself) which is a path in Hdfs, to pairs
-  /// (does_not_exist, permissions), where does_not_exist is true if the path does not
-  /// exist in Hdfs. If does_not_exist is true, permissions is set to the permissions of
-  /// the most immediate ancestor of the path that does exist, i.e. the permissions that
-  /// the path should inherit when created. Otherwise permissions is set to the actual
-  /// permissions of the path. The PermissionCache argument is also used to cache the
-  /// output across repeated calls, to avoid repeatedly calling hdfsGetPathInfo() on the
-  /// same path.
-  typedef boost::unordered_map<std::string, std::pair<bool, short>> PermissionCache;
-  void PopulatePathPermissionCache(hdfsFS fs, const std::string& path_str,
-      PermissionCache* permissions_cache);
-
-  /// Moves all temporary staging files to their final destinations.
-  Status FinalizeSuccessfulInsert() WARN_UNUSED_RESULT;
-
-  /// Perform any post-query cleanup required. Called by Wait() only after all fragment
-  /// instances have returned, or if the query has failed, in which case it only cleans up
-  /// temporary data rather than finishing the INSERT in flight.
-  Status FinalizeQuery() WARN_UNUSED_RESULT;
+  /// Perform any post-query cleanup required for HDFS (or other Hadoop FileSystem)
+  /// INSERT. Called by Wait() only after all fragment instances have returned, or if
+  /// the query has failed, in which case it only cleans up temporary data rather than
+  /// finishing the INSERT in flight.
+  Status FinalizeHdfsInsert() WARN_UNUSED_RESULT;
 
   /// Populates backend_states_, starts query execution at all backends in parallel, and
   /// blocks until startup completes.
