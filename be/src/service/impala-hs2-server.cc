@@ -34,6 +34,7 @@
 #include "common/logging.h"
 #include "common/version.h"
 #include "rpc/thrift-util.h"
+#include "runtime/coordinator.h"
 #include "runtime/raw-value.h"
 #include "runtime/exec-env.h"
 #include "service/hs2-util.h"

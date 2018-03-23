@@ -403,8 +403,9 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   COUNTER_ADD(files_created_counter_, 1);
 
   if (!ShouldSkipStaging(state, output_partition)) {
-    // Save the ultimate destination for this file (it will be moved by the coordinator)
-    (*state->hdfs_files_to_move())[output_partition->current_file_name] = final_location;
+    // Save the ultimate destination for this file (it will be moved by the coordinator).
+    state->dml_exec_state()->AddFileToMove(
+        output_partition->current_file_name, final_location);
   }
 
   ++output_partition->num_files;
@@ -573,21 +574,15 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state, const Tuple
       return status;
     }
 
-    // Save the partition name so that the coordinator can create the partition directory
-    // structure if needed
-    DCHECK(state->per_partition_status()->find(partition->partition_name) ==
-        state->per_partition_status()->end());
-    TInsertPartitionStatus partition_status;
-    partition_status.__set_num_modified_rows(0L);
-    partition_status.__set_id(partition_descriptor->id());
-    partition_status.__set_stats(TInsertStats());
-    partition_status.__set_partition_base_dir(table_desc_->hdfs_base_dir());
-    state->per_partition_status()->insert(
-        make_pair(partition->partition_name, partition_status));
+    // Save the partition name so that the coordinator can create the partition
+    // directory structure if needed.
+    state->dml_exec_state()->AddPartition(
+        partition->partition_name, partition_descriptor->id(),
+        &table_desc_->hdfs_base_dir());
 
     if (!no_more_rows && !ShouldSkipStaging(state, partition.get())) {
-      // Indicate that temporary directory is to be deleted after execution
-      (*state->hdfs_files_to_move())[partition->tmp_hdfs_dir_name] = "";
+      // Indicate that temporary directory is to be deleted after execution.
+      state->dml_exec_state()->AddFileToMove(partition->tmp_hdfs_dir_name, "");
     }
 
     partition_keys_to_output_partitions_[key].first = std::move(partition);
@@ -643,17 +638,8 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
   // OutputPartition writer could be nullptr if there is no row to output.
   if (partition->writer.get() != nullptr) {
     RETURN_IF_ERROR(partition->writer->Finalize());
-
-    // Track total number of appended rows per partition in runtime
-    // state. partition->num_rows counts number of rows appended is per-file.
-    PartitionStatusMap::iterator it =
-        state->per_partition_status()->find(partition->partition_name);
-
-    // Should have been created in GetOutputPartition() when the partition was
-    // initialised.
-    DCHECK(it != state->per_partition_status()->end());
-    it->second.num_modified_rows += partition->num_rows;
-    DataSink::MergeDmlStats(partition->writer->stats(), &it->second.stats);
+    state->dml_exec_state()->UpdatePartition(
+        partition->partition_name, partition->num_rows, &partition->writer->stats());
   }
 
   RETURN_IF_ERROR(ClosePartitionFile(state, partition));

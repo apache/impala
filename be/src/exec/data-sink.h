@@ -85,15 +85,6 @@ class DataSink {
       const TPlanFragmentInstanceCtx& fragment_instance_ctx,
       const RowDescriptor* row_desc, RuntimeState* state, DataSink** sink);
 
-  /// Merges one update to the DML stats for a partition. dst_stats will have the
-  /// combined stats of src_stats and dst_stats after this method returns.
-  static void MergeDmlStats(const TInsertStats& src_stats,
-      TInsertStats* dst_stats);
-
-  /// Outputs the DML stats contained in the map of partition updates to a string
-  static std::string OutputDmlStats(const PartitionStatusMap& stats,
-      const std::string& prefix = "");
-
   MemTracker* mem_tracker() const { return mem_tracker_.get(); }
   RuntimeProfile* profile() const { return profile_; }
   const std::vector<ScalarExprEvaluator*>& output_expr_evals() const {
