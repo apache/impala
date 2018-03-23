@@ -16,5 +16,5 @@
 # under the License.
 
 add_custom_target(impala-parent ALL
-  COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh install -DskipTests
+  COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B install -DskipTests
 )
