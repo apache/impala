@@ -17,5 +17,5 @@
 
 add_custom_target(fe ALL DEPENDS
   thrift-deps fb-deps yarn-extras function-registry ext-data-source impala-parent
-  COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh install -DskipTests
+  COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B install -DskipTests
 )
