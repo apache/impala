@@ -322,9 +322,10 @@ class TestUdfExecution(TestUdfBase):
     create_another_fn = """create function if not exists {0}.other(float)
                            returns float location '{1}' symbol='Identity'"""
     drop_another_fn = """drop function if exists {0}.other(float)"""
+    udf_path = get_fs_path('/test-warehouse/libTestUdfs.so')
 
     setup_client = self.create_impala_client()
-    setup_query = create_fn_to_use.format(unique_database, '/test-warehouse/libTestUdfs.so')
+    setup_query = create_fn_to_use.format(unique_database, udf_path)
     try:
       setup_client.execute(setup_query)
     except Exception as e:
@@ -345,7 +346,7 @@ class TestUdfExecution(TestUdfBase):
       time.sleep(1 + random.random())
       client = self.create_impala_client()
       drop = drop_another_fn.format(unique_database)
-      create = create_another_fn.format(unique_database, '/test-warehouse/libTestUdfs.so')
+      create = create_another_fn.format(unique_database, udf_path)
       try:
         client.execute(drop)
         client.execute(create)
