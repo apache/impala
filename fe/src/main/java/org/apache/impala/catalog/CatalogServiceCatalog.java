@@ -977,7 +977,7 @@ public class CatalogServiceCatalog extends Catalog {
       // Load Java UDFs from HMS into the temporary db.
       loadJavaFunctions(tmpDb, javaFns);
 
-      Db db = dbCache_.get().get(dbName);
+      Db db = getDb(dbName);
       if (db == null) {
         throw new DatabaseNotFoundException("Database does not exist: " + dbName);
       }
