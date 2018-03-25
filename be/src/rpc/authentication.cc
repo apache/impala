@@ -67,6 +67,7 @@ using namespace apache::thrift;
 using namespace boost::filesystem;   // for is_regular()
 using namespace strings;
 
+DECLARE_bool(use_krpc);
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
 DECLARE_string(be_principal);
@@ -107,11 +108,12 @@ DEFINE_string(internal_principals_whitelist, "hdfs", "(Advanced) Comma-separated
     "'hdfs' which is the system user that in certain deployments must access "
     "catalog server APIs.");
 
-// TODO: Remove this flag and the old kerberos code in a compatibility-breaking release.
+// TODO: Remove this flag and the old kerberos code once we remove 'use_krpc' flag.
 // (IMPALA-5893)
 DEFINE_bool(use_kudu_kinit, true, "If true, Impala will programatically perform kinit "
     "by calling into the libkrb5 library using the provided APIs. If false, it will fork "
-    "off a kinit process.");
+    "off a kinit process. If use_krpc=true, this flag is treated as true regardless of "
+    "what it's set to.");
 
 namespace impala {
 
@@ -840,7 +842,12 @@ Status SaslAuthProvider::Start() {
   if (needs_kinit_) {
     DCHECK(is_internal_);
     DCHECK(!principal_.empty());
-    if (FLAGS_use_kudu_kinit) {
+    if (FLAGS_use_kudu_kinit || FLAGS_use_krpc) {
+      // With KRPC enabled, we always rely on the Kudu library to carry out the Kerberos
+      // authentication during connection negotiation.
+      if (!FLAGS_use_kudu_kinit) {
+        LOG(INFO) << "Ignoring --use_kudu_kinit=false as KRPC and Kerberos are enabled";
+      }
       // Starts a thread that periodically does a 'kinit'. The thread lives as long as the
       // process does.
       KUDU_RETURN_IF_ERROR(kudu::security::InitKerberosForServer(principal_, keytab_file_,

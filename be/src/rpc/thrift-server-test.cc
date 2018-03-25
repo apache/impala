@@ -35,6 +35,11 @@ using namespace strings;
 using namespace apache::thrift;
 using apache::thrift::transport::SSLProtocol;
 
+DECLARE_bool(use_kudu_kinit);
+DECLARE_bool(use_krpc);
+
+DECLARE_string(principal);
+DECLARE_string(be_principal);
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
@@ -44,22 +49,26 @@ DECLARE_int32(state_store_port);
 DECLARE_int32(be_port);
 DECLARE_int32(beeswax_port);
 
-string IMPALA_HOME(getenv("IMPALA_HOME"));
-const string& SERVER_CERT =
+static string IMPALA_HOME(getenv("IMPALA_HOME"));
+static const string& SERVER_CERT =
     Substitute("$0/be/src/testutil/server-cert.pem", IMPALA_HOME);
-const string& PRIVATE_KEY =
+static const string& PRIVATE_KEY =
     Substitute("$0/be/src/testutil/server-key.pem", IMPALA_HOME);
-const string& BAD_SERVER_CERT =
+static const string& BAD_SERVER_CERT =
     Substitute("$0/be/src/testutil/bad-cert.pem", IMPALA_HOME);
-const string& BAD_PRIVATE_KEY =
+static const string& BAD_PRIVATE_KEY =
     Substitute("$0/be/src/testutil/bad-key.pem", IMPALA_HOME);
-const string& PASSWORD_PROTECTED_PRIVATE_KEY =
+static const string& PASSWORD_PROTECTED_PRIVATE_KEY =
     Substitute("$0/be/src/testutil/server-key-password.pem", IMPALA_HOME);
+
+// The principal name and the realm used for creating the mini-KDC.
+static const string kdc_principal = "impala/localhost";
+static const string kdc_realm = "KRBTEST.COM";
 
 // Only use TLSv1.0 compatible ciphers, as tests might run on machines with only TLSv1.0
 // support.
-const string TLS1_0_COMPATIBLE_CIPHER = "RC4-SHA";
-const string TLS1_0_COMPATIBLE_CIPHER_2 = "RC4-MD5";
+static const string TLS1_0_COMPATIBLE_CIPHER = "RC4-SHA";
+static const string TLS1_0_COMPATIBLE_CIPHER_2 = "RC4-MD5";
 
 /// Dummy server class (chosen because it has the smallest interface to implement) that
 /// tests can use to start Thrift servers.
@@ -81,8 +90,6 @@ int GetServerPort() {
   return port;
 }
 
-static int kdc_port = GetServerPort();
-
 template <class T> class ThriftTestBase : public T {
  protected:
   virtual void SetUp() {}
@@ -95,31 +102,33 @@ static string CURRENT_EXECUTABLE_PATH;
 
 class ThriftKerberizedParamsTest :
     public ThriftTestBase<testing::TestWithParam<KerberosSwitch> > {
-  virtual void SetUp() {
-    kdc_wrapper_.reset(new MiniKdcWrapper(
-        "impala/localhost", "KRBTEST.COM", "24h", "7d", kdc_port));
-    DCHECK(kdc_wrapper_.get() != nullptr);
 
-    ASSERT_OK(kdc_wrapper_->SetupAndStartMiniKDC(GetParam()));
+  virtual void SetUp() override {
+    KerberosSwitch k = GetParam();
+    FLAGS_use_krpc = false;
+    if (k == KERBEROS_OFF) {
+      FLAGS_principal.clear();
+      FLAGS_be_principal.clear();
+    } else {
+      FLAGS_use_kudu_kinit = k == USE_THRIFT_KUDU_KERBEROS;
+      FLAGS_principal = "dummy-service/host@realm";
+      FLAGS_be_principal = strings::Substitute("$0@$1", kdc_principal, kdc_realm);
+    }
     ASSERT_OK(InitAuth(CURRENT_EXECUTABLE_PATH));
-
     ThriftTestBase::SetUp();
   }
 
-  virtual void TearDown() {
-    ASSERT_OK(kdc_wrapper_->TearDownMiniKDC(GetParam()));
-    ThriftTestBase::TearDown();
+  virtual void TearDown() override {
+    FLAGS_principal.clear();
+    FLAGS_be_principal.clear();
   }
-
- private:
-  boost::scoped_ptr<MiniKdcWrapper> kdc_wrapper_;
 };
 
 INSTANTIATE_TEST_CASE_P(KerberosOnAndOff,
                         ThriftKerberizedParamsTest,
                         ::testing::Values(KERBEROS_OFF,
-                                          USE_KUDU_KERBEROS,
-                                          USE_IMPALA_KERBEROS));
+                                          USE_THRIFT_KUDU_KERBEROS,
+                                          USE_THRIFT_IMPALA_KERBEROS));
 
 TEST(ThriftTestBase, Connectivity) {
   int port = GetServerPort();
@@ -557,7 +566,17 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
 
+  int port = impala::FindUnusedEphemeralPort(nullptr);
+  std::unique_ptr<impala::MiniKdcWrapper> kdc;
+  Status status = impala::MiniKdcWrapper::SetupAndStartMiniKDC(
+      kdc_principal, kdc_realm, "24h", "7d", port, &kdc);
+  DCHECK(status.ok());
+
   // Fill in the path of the current binary for use by the tests.
   CURRENT_EXECUTABLE_PATH = argv[0];
-  return RUN_ALL_TESTS();
+  int retval = RUN_ALL_TESTS();
+
+  status = kdc->TearDownMiniKDC();
+  DCHECK(status.ok());
+  return retval;
 }
