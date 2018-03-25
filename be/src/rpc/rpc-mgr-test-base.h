@@ -67,12 +67,6 @@ namespace impala {
 
 static int32_t SERVICE_PORT = FindUnusedEphemeralPort(nullptr);
 
-int GetServerPort() {
-  int port = FindUnusedEphemeralPort(nullptr);
-  EXPECT_FALSE(port == -1);
-  return port;
-}
-
 const static string IMPALA_HOME(getenv("IMPALA_HOME"));
 const string& SERVER_CERT =
     Substitute("$0/be/src/testutil/server-cert.pem", IMPALA_HOME);

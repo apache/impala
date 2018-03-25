@@ -30,11 +30,7 @@ using namespace impala;
 namespace filesystem = boost::filesystem;
 using filesystem::path;
 
-DECLARE_bool(use_kudu_kinit);
-
 DECLARE_string(keytab_file);
-DECLARE_string(principal);
-DECLARE_string(be_principal);
 DECLARE_string(krb5_conf);
 
 Status MiniKdcWrapper::StartKdc(string keytab_dir) {
@@ -64,46 +60,41 @@ Status MiniKdcWrapper::CreateServiceKeytab(const string& spn, string* kt_path) {
   return Status::OK();
 }
 
-Status MiniKdcWrapper::SetupAndStartMiniKDC(KerberosSwitch k) {
-  if (k != KERBEROS_OFF) {
-    // Enable the workaround for MIT krb5 1.10 bugs from krb5_realm_override.cc.
-    setenv("KUDU_ENABLE_KRB5_REALM_FIX", "true", 0);
+Status MiniKdcWrapper::SetupAndStartMiniKDC(string spn, string realm,
+    string ticket_lifetime, string renew_lifetime, int kdc_port,
+    unique_ptr<MiniKdcWrapper>* kdc_ptr) {
+  std::unique_ptr<MiniKdcWrapper> kdc(new MiniKdcWrapper(
+      spn, realm, ticket_lifetime, renew_lifetime, kdc_port));
+  DCHECK(kdc.get() != nullptr);
 
-    FLAGS_use_kudu_kinit = k == USE_KUDU_KERBEROS;
+  // Enable the workaround for MIT krb5 1.10 bugs from krb5_realm_override.cc.
+  setenv("KUDU_ENABLE_KRB5_REALM_FIX", "true", 0);
 
-    // Check if the unique directory already exists, and create it if it doesn't.
-    RETURN_IF_ERROR(FileSystemUtil::RemoveAndCreateDirectory(unique_test_dir_.string()));
-    string keytab_dir = unique_test_dir_.string() + "/krb5kdc";
+  // Check if the unique directory already exists, and create it if it doesn't.
+  RETURN_IF_ERROR(FileSystemUtil::RemoveAndCreateDirectory(kdc->unique_test_dir_.string()));
+  string keytab_dir = kdc->unique_test_dir_.string() + "/krb5kdc";
 
-    RETURN_IF_ERROR(StartKdc(keytab_dir));
+  RETURN_IF_ERROR(kdc->StartKdc(keytab_dir));
 
-    string kt_path;
-    RETURN_IF_ERROR(CreateServiceKeytab(spn_, &kt_path));
+  string kt_path;
+  RETURN_IF_ERROR(kdc->CreateServiceKeytab(kdc->spn_, &kt_path));
 
-    // Set the appropriate flags based on how we've set up the kerberos environment.
-    FLAGS_krb5_conf = strings::Substitute("$0/$1", keytab_dir, "krb5.conf");
-    FLAGS_keytab_file = kt_path;
+  // Set the appropriate flags based on how we've set up the kerberos environment.
+  FLAGS_krb5_conf = strings::Substitute("$0/$1", keytab_dir, "krb5.conf");
+  FLAGS_keytab_file = kt_path;
 
-    // We explicitly set 'principal' and 'be_principal' even though 'principal' won't be
-    // used to test IMPALA-6256.
-    FLAGS_principal = "dummy-service/host@realm";
-    FLAGS_be_principal = strings::Substitute("$0@$1", spn_, realm_);
-  }
+  *kdc_ptr = std::move(kdc);
   return Status::OK();
 }
 
-Status MiniKdcWrapper::TearDownMiniKDC(KerberosSwitch k) {
-  if (k != KERBEROS_OFF) {
-    RETURN_IF_ERROR(StopKdc());
+Status MiniKdcWrapper::TearDownMiniKDC() {
+  RETURN_IF_ERROR(StopKdc());
 
-    // Clear the flags so we don't step on other tests that may run in the same process.
-    FLAGS_keytab_file.clear();
-    FLAGS_principal.clear();
-    FLAGS_be_principal.clear();
-    FLAGS_krb5_conf.clear();
+  // Clear the flags so we don't step on other tests that may run in the same process.
+  FLAGS_keytab_file.clear();
+  FLAGS_krb5_conf.clear();
 
-    // Remove test directory.
-    RETURN_IF_ERROR(FileSystemUtil::RemovePaths({unique_test_dir_.string()}));
-  }
+  // Remove test directory.
+  RETURN_IF_ERROR(FileSystemUtil::RemovePaths({unique_test_dir_.string()}));
   return Status::OK();
 }

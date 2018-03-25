@@ -29,34 +29,26 @@ namespace impala {
 
 enum KerberosSwitch {
   KERBEROS_OFF,
-  USE_KUDU_KERBEROS,    // FLAGS_use_kudu_kinit = true
-  USE_IMPALA_KERBEROS   // FLAGS_use_kudu_kinit = false
+  USE_KRPC_KUDU_KERBEROS,    // FLAGS_use_kudu_kinit = true,  FLAGS_use_krpc = true
+  USE_KRPC_IMPALA_KERBEROS,  // FLAGS_use_kudu_kinit = false, FLAGS_use_krpc = true
+  USE_THRIFT_KUDU_KERBEROS,  // FLAGS_use_kudu_kinit = true,  FLAGS_use_krpc = false
+  USE_THRIFT_IMPALA_KERBEROS // FLAGS_use_kudu_kinit = false, FLAGS_use_krpc = false
 };
 
 /// This class allows tests to easily start and stop a KDC and configure Impala's auth
-/// layer.
-/// If the mode is USE_KUDU_KERBEROS or USE_IMPALA_KERBEROS, the MiniKdc which is a
-/// wrapper around the 'krb5kdc' process, is configured and started.
-/// If the mode is KERBEROS_OFF, Impala's auth layer is configured to use plain SASL and
-/// the KDC is not started.
+/// layer. A MiniKdc which is a wrapper around the 'krb5kdc' process, is configured and
+/// started.
 class MiniKdcWrapper {
  public:
-  MiniKdcWrapper(std::string spn, std::string realm, std::string ticket_lifetime,
-    std::string renew_lifetime,int kdc_port) :
-      spn_(spn),
-      realm_(realm),
-      ticket_lifetime_(ticket_lifetime),
-      renew_lifetime_(renew_lifetime),
-      kdc_port_(kdc_port) {
-  }
-
-  /// If 'k' is 'USE_KUDU_KERBEROS' or 'USE_IMPALA_KERBEROS', this function creates the
-  /// 'unique_test_dir_' path, starts the KDC and sets the appropriate flags that Impala
-  /// requires to run with Kerberos.
-  Status SetupAndStartMiniKDC(KerberosSwitch k);
+  /// This function creates the 'unique_test_dir_' path, starts the KDC and sets the
+  /// appropriate flags that Impala requires to run with Kerberos. The newly created
+  /// KDC is stored in 'kdc_ptr'. Return error status on failure.
+  static Status SetupAndStartMiniKDC(std::string spn, std::string realm,
+      std::string ticket_lifetime, std::string renew_lifetime, int kdc_port,
+      std::unique_ptr<MiniKdcWrapper>* kdc_ptr);
 
   /// Undoes everything done by SetupAndStartMiniKDC().
-  Status TearDownMiniKDC(KerberosSwitch k);
+  Status TearDownMiniKDC();
 
  private:
   boost::scoped_ptr<kudu::MiniKdc> kdc_;
@@ -78,6 +70,16 @@ class MiniKdcWrapper {
 
   /// Create a unique directory for this test to store its files in.
   boost::filesystem::path unique_test_dir_ = boost::filesystem::unique_path();
+
+  /// Called by SetupAndStartMiniKDC() only.
+  MiniKdcWrapper(std::string spn, std::string realm, std::string ticket_lifetime,
+    std::string renew_lifetime, int kdc_port) :
+      spn_(spn),
+      realm_(realm),
+      ticket_lifetime_(ticket_lifetime),
+      renew_lifetime_(renew_lifetime),
+      kdc_port_(kdc_port) {
+  }
 
   /// Starts the KDC and configures it to use 'keytab_dir' as the location to store the
   /// keytab. The 'keytab_dir' will not be cleaned up by this class.
