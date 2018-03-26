@@ -190,9 +190,10 @@ public class PrivilegeSpec implements ParseNode {
       case SERVER:
         if (privilegeLevel_ != TPrivilegeLevel.ALL &&
             privilegeLevel_ != TPrivilegeLevel.REFRESH &&
-            privilegeLevel_ != TPrivilegeLevel.CREATE) {
-          throw new AnalysisException("Only 'ALL', 'REFRESH', or 'CREATE' privilege " +
-              "may be applied at SERVER scope in privilege spec.");
+            privilegeLevel_ != TPrivilegeLevel.CREATE &&
+            privilegeLevel_ != TPrivilegeLevel.ALTER) {
+          throw new AnalysisException("Only 'ALL', 'REFRESH', 'CREATE', or 'ALTER' " +
+              "privilege may be applied at SERVER scope in privilege spec.");
         }
         break;
       case DATABASE:
