@@ -194,6 +194,16 @@ under the License.
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-service</artifactId>
       <version>${hive.version}</version>
+      <!--
+           hive-service pulls in an incoherent (not ${hadoop.version}) version of
+           hadoop-client via this dependency, which we don't need.
+      -->
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-llap-server</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
@@ -802,7 +812,23 @@ under the License.
                     <bannedDependencies>
                       <excludes>
                         <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
+                        <!-- Assert that we only use artifacts from only the specified
+                             version of these components. -->
+                        <exclude>org.apache.hadoop:*</exclude>
+                        <exclude>org.apache.hbase:*</exclude>
+                        <exclude>org.apache.hive:*</exclude>
+                        <exclude>org.apache.kudu:*</exclude>
+                        <exclude>org.apache.sentry:*</exclude>
+                        <exclude>org.apache.parquet:*</exclude>
                       </excludes>
+                      <includes>
+                        <include>org.apache.hadoop:*:${hadoop.version}</include>
+                        <include>org.apache.hbase:*:${hbase.version}</include>
+                        <include>org.apache.hive:*:${hive.version}</include>
+                        <include>org.apache.kudu:*:${kudu.version}</include>
+                        <include>org.apache.sentry:*:${sentry.version}</include>
+                        <include>org.apache.parquet:*:${parquet.version}</include>
+                      </includes>
                     </bannedDependencies>
                   </rules>
                   <fail>true</fail>
