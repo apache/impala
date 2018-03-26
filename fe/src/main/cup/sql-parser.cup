@@ -964,6 +964,8 @@ privilege ::=
   {: RESULT = TPrivilegeLevel.REFRESH; :}
   | KW_CREATE
   {: RESULT = TPrivilegeLevel.CREATE; :}
+  | KW_ALTER
+  {: RESULT = TPrivilegeLevel.ALTER; :}
   | KW_ALL
   {: RESULT = TPrivilegeLevel.ALL; :}
   ;

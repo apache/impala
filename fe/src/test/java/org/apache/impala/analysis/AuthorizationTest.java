@@ -81,8 +81,10 @@ public class AuthorizationTest extends FrontendTestBase {
   //   ALL permission on 'functional_seq_snap' database
   //   SELECT permissions on all tables in 'tpcds' database
   //   SELECT, REFRESH permissions on 'functional.alltypesagg' (no INSERT permissions)
+  //   ALTER permissions on 'functional.alltypeserror'
   //   SELECT permissions on 'functional.complex_view' (no INSERT permissions)
   //   SELECT, REFRESH permissions on 'functional.view_view' (no INSERT permissions)
+  //   ALTER permission on 'functional.alltypes_view'
   //   SELECT permissions on columns ('id', 'int_col', and 'year') on
   //   'functional.alltypessmall' (no SELECT permissions on 'functional.alltypessmall')
   //   SELECT permissions on columns ('id', 'int_struct_col', 'struct_array_col',
@@ -96,7 +98,7 @@ public class AuthorizationTest extends FrontendTestBase {
   //   No permissions on database 'functional_rc'
   //   Only column level permissions in 'functional_avro':
   //     SELECT permissions on columns ('id') on 'functional_avro.alltypessmall'
-  //   REFRESH, INSERT, CREATE permissions on 'functional_text_lzo' database
+  //   REFRESH, INSERT, CREATE, ALTER permissions on 'functional_text_lzo' database
   public final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
   public final static User USER = new User(System.getProperty("user.name"));
 
@@ -104,8 +106,8 @@ public class AuthorizationTest extends FrontendTestBase {
   // column-level SELECT or INSERT permission. I.e. that should be returned by
   // 'SHOW TABLES'.
   private static final List<String> FUNCTIONAL_VISIBLE_TABLES = Lists.newArrayList(
-      "allcomplextypes", "alltypes", "alltypesagg", "alltypessmall", "alltypestiny",
-      "complex_view", "view_view");
+      "allcomplextypes", "alltypes", "alltypes_view", "alltypesagg", "alltypeserror",
+      "alltypessmall", "alltypestiny", "complex_view", "view_view");
 
   /**
    * Test context whose instances are used to parameterize this test.
@@ -292,6 +294,41 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_text_lzo");
     privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    // alter_functional_text_lzo
+    roleName = "alter_functional_text_lzo";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.ALTER, TPrivilegeScope.DATABASE,
+        false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional_text_lzo");
+    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    // alter_functional_alltypeserror
+    roleName = "alter_functional_alltypeserror";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.ALTER, TPrivilegeScope.TABLE, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional");
+    privilege.setTable_name("alltypeserror");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    // alter_functional_alltypes_view
+    roleName = "alter_functional_alltypes_view";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.ALTER,
+        TPrivilegeScope.TABLE, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional");
+    privilege.setTable_name("alltypes_view");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // all newdb w/ all on URI
@@ -1352,6 +1389,8 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes REPLACE COLUMNS (c1 int)");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes CHANGE int_col c1 int");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes DROP int_col");
+    // Note: ALTER ... RENAME requires ALTER privileges at the TABLE level and
+    // CREATE privileges at the DATABASE level.
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes RENAME TO functional_seq_snap.t1");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET FILEFORMAT PARQUET");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
@@ -1362,11 +1401,28 @@ public class AuthorizationTest extends FrontendTestBase {
         "'hdfs://localhost:20500/test-warehouse/new_table'");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes PARTITION(year=2009, month=1) " +
         "SET LOCATION 'hdfs://localhost:20500/test-warehouse/new_table'");
-
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET CACHED IN 'testPool'");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes RECOVER PARTITIONS");
 
+    // User has ALTER privilege only to modify tables.
+    AuthzOk("ALTER TABLE functional.alltypeserror ADD COLUMNS (c1 int)");
+    AuthzOk("ALTER TABLE functional.alltypeserror REPLACE COLUMNS (c1 int)");
+    AuthzOk("ALTER TABLE functional.alltypeserror CHANGE id c1 int");
+    AuthzOk("ALTER TABLE functional.alltypeserror DROP id");
+    AuthzOk("ALTER TABLE functional.alltypeserror RENAME TO functional_seq_snap.t1");
+    AuthzOk("ALTER TABLE functional.alltypeserror SET FILEFORMAT PARQUET");
+    AuthzOk("ALTER TABLE functional.alltypeserror SET LOCATION " +
+        "'/test-warehouse/new_table'");
+    AuthzOk("ALTER TABLE functional.alltypeserror SET TBLPROPERTIES ('a'='b', 'c'='d')");
+    AuthzOk("ALTER TABLE functional.alltypeserror SET LOCATION " +
+        "'hdfs://localhost:20500/test-warehouse/new_table'");
+    AuthzOk("ALTER TABLE functional.alltypeserror PARTITION(year=2009, month=1) " +
+        "SET LOCATION 'hdfs://localhost:20500/test-warehouse/new_table'");
+    AuthzOk("ALTER TABLE functional.alltypeserror SET CACHED IN 'testPool'");
+    AuthzOk("ALTER TABLE functional.alltypeserror RECOVER PARTITIONS");
+
     // Alter table and set location to a path the user does not have access to.
+    // User needs ALTER on table and ALL on URI.
     AuthzError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'hdfs://localhost:20500/test-warehouse/no_access'",
         "User '%s' does not have privileges to access: " +
@@ -1377,6 +1433,19 @@ public class AuthorizationTest extends FrontendTestBase {
         "hdfs://localhost:20500/test-warehouse/no_access");
     AuthzError("ALTER TABLE functional_seq_snap.alltypes PARTITION(year=2009, month=1) " +
         "SET LOCATION '/test-warehouse/no_access'",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20500/test-warehouse/no_access");
+
+    AuthzError("ALTER TABLE functional.alltypeserror SET LOCATION " +
+        "'hdfs://localhost:20500/test-warehouse/no_access'",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20500/test-warehouse/no_access");
+    AuthzError("ALTER TABLE functional.alltypeserror SET LOCATION " +
+        "'/test-warehouse/no_access'",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20500/test-warehouse/no_access");
+    AuthzError("ALTER TABLE functional.alltypeserror " +
+        "PARTITION(year=2009, month=1) SET LOCATION '/test-warehouse/no_access'",
         "User '%s' does not have privileges to access: " +
         "hdfs://localhost:20500/test-warehouse/no_access");
 
@@ -1398,6 +1467,24 @@ public class AuthorizationTest extends FrontendTestBase {
         "User '%s' does not have privileges to access: " +
         "hdfs://localhost:20510/test-warehouse/new_table");
 
+    // ALTER privilege only. Add multiple partitions. User has access to location path.
+    AuthzOk("ALTER TABLE functional.alltypeserror ADD " +
+        "PARTITION(year=2011, month=1) PARTITION(year=2011, month=2) " +
+        "LOCATION 'hdfs://localhost:20500/test-warehouse/new_table'");
+    // ALTER privilege only. For one new partition location is set to a path the user
+    // does not have access to.
+    AuthzError("ALTER TABLE functional.alltypeserror ADD " +
+        "PARTITION(year=2011, month=3) PARTITION(year=2011, month=4) " +
+        "LOCATION '/test-warehouse/no_access'",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20500/test-warehouse/no_access");
+    // ALTER privilege only.  Different filesystem, user has permission to base path.
+    AuthzError("ALTER TABLE functional.alltypeserror SET LOCATION " +
+        "'hdfs://localhost:20510/test-warehouse/new_table'",
+        "User '%s' does not have privileges to access: " +
+        "hdfs://localhost:20510/test-warehouse/new_table");
+
+    // User does not have ALTER privilege.
     AuthzError("ALTER TABLE functional.alltypes SET FILEFORMAT PARQUET",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
     AuthzError("ALTER TABLE functional.alltypes ADD COLUMNS (c1 int)",
@@ -1438,6 +1525,11 @@ public class AuthorizationTest extends FrontendTestBase {
         "User '%s' does not have privileges to execute 'CREATE' on: " +
         "functional.alltypes");
 
+    // No privileges on target (new table).
+    AuthzError("ALTER TABLE functional_seq_snap.alltypes rename to functional.newtbl",
+        "User '%s' does not have privileges to execute 'CREATE' on: " +
+            "functional");
+
     // No privileges on target (existing view).
     AuthzError("ALTER TABLE functional_seq_snap.alltypes rename to " +
         "functional.alltypes_view",
@@ -1445,7 +1537,7 @@ public class AuthorizationTest extends FrontendTestBase {
         "functional.alltypes");
 
     // ALTER TABLE on a view does not reveal privileged information.
-    AuthzError("ALTER TABLE functional.alltypes_view rename to " +
+    AuthzError("ALTER TABLE functional.alltypes_view_sub rename to " +
         "functional_seq_snap.new_view",
         "User '%s' does not have privileges to execute 'ALTER' on: " +
         "functional.alltypes_view");
@@ -1488,6 +1580,14 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("ALTER VIEW functional_seq_snap.alltypes_view rename to " +
         "functional_seq_snap.v1");
 
+    // ALTER privilege on view only. RENAME also requires CREATE privileges on the DB.
+    AuthzOk("ALTER VIEW functional.alltypes_view rename to functional_seq_snap.view_view_1");
+
+    // No create privileges on target db
+    AuthzError("ALTER VIEW functional.alltypes_view rename to functional.newview",
+        "User '%s' does not have privileges to execute 'CREATE' on: " +
+        "functional");
+
     // No privileges on target (existing table).
     AuthzError("ALTER VIEW functional_seq_snap.alltypes_view rename to " +
         "functional.alltypes",
@@ -1527,7 +1627,7 @@ public class AuthorizationTest extends FrontendTestBase {
         "User '%s' does not have privileges to execute 'ALTER' on: default.alltypes");
 
     // No permissions on target view.
-    AuthzError("alter view functional.alltypes_view as " +
+    AuthzError("alter view functional.alltypes_view_sub as " +
         "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'ALTER' on: " +
         "functional.alltypes_view");
@@ -1611,8 +1711,8 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzError("describe functional.complextypestbl.nested_struct",
         "User '%s' does not have privileges to access: functional.complextypestbl");
     // Insufficient privileges on view.
-    AuthzError("describe functional.alltypes_view",
-        "User '%s' does not have privileges to access: functional.alltypes_view");
+    AuthzError("describe functional.alltypes_view_sub",
+        "User '%s' does not have privileges to access: functional.alltypes_view_sub");
     // Insufficient privileges on db.
     AuthzError("describe functional_rc.alltypes",
         "User '%s' does not have privileges to access: functional_rc.alltypes");
@@ -1794,7 +1894,8 @@ public class AuthorizationTest extends FrontendTestBase {
     tables = fe_.getTableNames("functional",
         PatternMatcher.createHivePatternMatcher("alltypes*|view_view"), USER);
     List<String> expectedTables = Lists.newArrayList(
-        "alltypes", "alltypesagg", "alltypessmall", "alltypestiny", "view_view");
+        "alltypes", "alltypes_view", "alltypesagg", "alltypeserror", "alltypessmall",
+        "alltypestiny", "view_view");
     Assert.assertEquals(expectedTables, tables);
   }
 
@@ -2366,6 +2467,48 @@ public class AuthorizationTest extends FrontendTestBase {
           "select * from functional.alltypesagg",
           "User '%s' does not have privileges to execute 'INSERT' on: " +
           "functional_avro.newtable");
+    } finally {
+      sentryService.dropRole(USER, roleName, true);
+      ctx_.catalog.reset();
+    }
+  }
+
+  @Test
+  public void TestServerLevelAlter() throws ImpalaException {
+    // TODO: Add test support for dynamically changing privileges for
+    // file-based policy.
+    if (ctx_.authzConfig.isFileBasedPolicy()) return;
+
+    SentryPolicyService sentryService =
+        new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
+
+    // User has ALTER privilege on server.
+    String roleName = "alter_role";
+    try {
+      sentryService.createRole(USER, roleName, true);
+      TPrivilege privilege = new TPrivilege("", TPrivilegeLevel.ALTER,
+          TPrivilegeScope.SERVER, false);
+      privilege.setServer_name("server1");
+      sentryService.grantRolePrivilege(USER, roleName, privilege);
+      sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+      ctx_.catalog.reset();
+
+      AuthzOk("ALTER TABLE functional_rc.alltypes ADD COLUMNS (c1 int)");
+      AuthzOk("ALTER TABLE functional_rc.alltypes REPLACE COLUMNS (c1 int)");
+      AuthzOk("ALTER TABLE functional_rc.alltypes CHANGE int_col c1 int");
+      AuthzOk("ALTER TABLE functional_rc.alltypes DROP int_col");
+      AuthzOk("ALTER TABLE functional_rc.alltypes RENAME TO functional_seq_snap.t1");
+      AuthzOk("ALTER TABLE functional_rc.alltypes SET FILEFORMAT PARQUET");
+      AuthzOk("ALTER TABLE functional_rc.alltypes SET LOCATION " +
+          "'/test-warehouse/new_table'");
+      AuthzOk("ALTER TABLE functional_rc.alltypes SET TBLPROPERTIES " +
+          "('a'='b', 'c'='d')");
+      AuthzOk("ALTER TABLE functional_rc.alltypes SET LOCATION " +
+          "'hdfs://localhost:20500/test-warehouse/new_table'");
+      AuthzOk("ALTER TABLE functional_rc.alltypes PARTITION(year=2009, month=1) " +
+          "SET LOCATION 'hdfs://localhost:20500/test-warehouse/new_table'");
+      AuthzOk("ALTER TABLE functional_rc.alltypes SET CACHED IN 'testPool'");
+      AuthzOk("ALTER TABLE functional_rc.alltypes RECOVER PARTITIONS");
     } finally {
       sentryService.dropRole(USER, roleName, true);
       ctx_.catalog.reset();
