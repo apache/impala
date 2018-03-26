@@ -123,7 +123,6 @@ under the License.
         </exclusion>
       </exclusions>
     </dependency>
-
     <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-provider-db</artifactId>
@@ -813,6 +812,23 @@ under the License.
           </plugin>
         </plugins>
       </build>
+      <dependencyManagement>
+        <dependencies>
+          <!--
+          Pin org.glassfish:javax.el explicitly.
+
+          HBase depends on this indirectly, and it's configured with
+          a range of versions. This causes Maven to talk to all configured
+          repositories, leading both to a lot of chattiness, and also
+          failures if one of the repositories is unavailable.
+          -->
+          <dependency>
+            <groupId>org.glassfish</groupId>
+            <artifactId>javax.el</artifactId>
+            <version>3.0.1-b08</version>
+          </dependency>
+        </dependencies>
+      </dependencyManagement>
     </profile>
   </profiles>
 </project>
