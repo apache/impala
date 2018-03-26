@@ -295,3 +295,75 @@ show analytic functions in _impala_builtins;
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
+---- QUERY
+# Create a function that has the same name as built-in function without FQN.
+CREATE FUNCTION sin(int) RETURNS int
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+====
+---- QUERY
+# Make sure the custom sin function was created successfully.
+SHOW FUNCTIONS IN $DATABASE;
+---- RESULTS: VERIFY_IS_SUBSET
+'INT','sin(INT)','NATIVE','true'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Query using custom and built-in sin functions.
+SELECT $DATABASE.sin(0), sin(0);
+---- RESULTS:
+NULL,0
+---- TYPES
+INT, DOUBLE
+====
+---- QUERY
+# Drop a function that has the same name as built-in function without FQN.
+DROP FUNCTION sin(int);
+====
+---- QUERY
+# Make sure the custom sin function was dropped successfully.
+SHOW FUNCTIONS IN $DATABASE;
+---- LABELS
+return type, signature, binary type, is persistent
+---- RESULTS: VERIFY_IS_NOT_IN
+'INT','sin(INT)','NATIVE','true'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Create a function that has the same name as built-in function with FQN.
+CREATE FUNCTION $DATABASE.sin(int) RETURNS int
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+====
+---- QUERY
+# Make sure the custom sin function was created successfully.
+SHOW FUNCTIONS IN $DATABASE;
+---- LABELS
+return type, signature, binary type, is persistent
+---- RESULTS: VERIFY_IS_SUBSET
+'INT','sin(INT)','NATIVE','true'
+---- TYPES
+STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Query using custom sin and built-in sin functions.
+SELECT $DATABASE.sin(0), sin(0);
+---- RESULTS:
+NULL,0
+---- TYPES
+INT, DOUBLE
+====
+---- QUERY
+# Drop a function that has the same name as built-in function with FQN.
+DROP FUNCTION $DATABASE.sin(int);
+====
+---- QUERY
+# Make sure the custom sin function was dropped successfully.
+SHOW FUNCTIONS IN $DATABASE;
+---- LABELS
+return type, signature, binary type, is persistent
+---- RESULTS: VERIFY_IS_NOT_IN
+'INT','sin(INT)','NATIVE','true'
+---- TYPES
+STRING, STRING, STRING, STRING
+=====

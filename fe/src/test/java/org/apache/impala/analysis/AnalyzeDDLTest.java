@@ -3114,12 +3114,32 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Could not find function FakePrepare(impala_udf::FunctionContext*, "+
         "impala_udf::FunctionContext::FunctionStateScope) in: ");
 
-    // TODO: https://issues.apache.org/jira/browse/IMPALA-6724
     // Try to create a function with the same name as a builtin
-    // AnalysisError("create function sin(double) RETURNS double" + udfSuffix,
-    //    "Function cannot have the same name as a builtin: sin");
-    // AnalysisError("create function sin() RETURNS double" + udfSuffix,
-    //    "Function cannot have the same name as a builtin: sin");
+    AnalyzesOk("create function sin(double) RETURNS double" + udfSuffix);
+    AnalyzesOk("create function sin() RETURNS double" + udfSuffix);
+    // Try to create a function in the system database.
+    AnalysisError("create function _impala_builtins.sin(double) returns double" +
+        udfSuffix, "Cannot modify system database.");
+    AnalysisError("create function sin(double) returns double" + udfSuffix,
+        createAnalysisCtx("_impala_builtins"), "Cannot modify system database.");
+    AnalysisError("create function _impala_builtins.f(double) returns double" +
+        udfSuffix, "Cannot modify system database.");
+
+    // Try to drop a function with the same name as builtin.
+    addTestFunction("sin", Lists.newArrayList(Type.DOUBLE), false);
+    // default.sin(double) function exists.
+    AnalyzesOk("drop function sin(double)");
+    // default.cos(double) does not exist.
+    AnalysisError("drop function cos(double)", "Function does not exist: cos(DOUBLE)");
+    AnalysisError("drop function _impala_builtins.sin(double)",
+        "Cannot modify system database.");
+
+    // Try to select a function with the same name as builtin.
+    // This will call _impala_builtins.sin(1).
+    AnalyzesOk("select sin(1)");
+    AnalyzesOk("select _impala_builtins.sin(1)");
+    AnalyzesOk("select default.sin(1)");
+    AnalysisError("select functional.sin(1)", "functional.sin() unknown");
 
     // Try to create with a bad location
     AnalysisError("create function foo() RETURNS int LOCATION 'bad-location' SYMBOL='c'",

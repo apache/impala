@@ -18,18 +18,21 @@
 package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.lang.reflect.Field;
 import java.util.List;
 
+import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.junit.Assert;
 import org.junit.Test;
@@ -3726,5 +3729,59 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   public void TestSetQueryOption() {
     AnalyzesOk("set foo=true");
     AnalyzesOk("set");
+  }
+
+  @Test
+  public void TestFunctionPaths() throws ImpalaException {
+    // The statement here does not matter since we just need to get a dummy analyzer
+    // to be able to call FuntionName.analyze(Analyzer, boolean) method.
+    Analyzer dummyAnalyzer = ((StatementBase) AnalyzesOk("select 1")).getAnalyzer();
+    FunctionName fnName = new FunctionName(null, "sin");
+    fnName.analyze(dummyAnalyzer, false);
+    assertFalse(fnName.isBuiltin());
+
+    fnName = new FunctionName(null, "f");
+    fnName.analyze(dummyAnalyzer, false);
+    assertFalse(fnName.isBuiltin());
+
+    fnName = new FunctionName("db", "sin");
+    fnName.analyze(dummyAnalyzer, false);
+    assertFalse(fnName.isBuiltin());
+
+    fnName = new FunctionName("db", "f");
+    fnName.analyze(dummyAnalyzer, false);
+    assertFalse(fnName.isBuiltin());
+
+    fnName = new FunctionName("_impala_builtins", "sin");
+    fnName.analyze(dummyAnalyzer, false);
+    assertTrue(fnName.isBuiltin());
+
+    fnName = new FunctionName("_impala_builtins", "f");
+    fnName.analyze(dummyAnalyzer, false);
+    assertFalse(fnName.isBuiltin());
+
+    fnName = new FunctionName(null, "sin");
+    fnName.analyze(dummyAnalyzer, true);
+    assertTrue(fnName.isBuiltin());
+
+    fnName = new FunctionName(null, "f");
+    fnName.analyze(dummyAnalyzer, true);
+    assertFalse(fnName.isBuiltin());
+
+    fnName = new FunctionName("db", "sin");
+    fnName.analyze(dummyAnalyzer, false);
+    assertFalse(fnName.isBuiltin());
+
+    fnName = new FunctionName("db", "f");
+    fnName.analyze(dummyAnalyzer, true);
+    assertFalse(fnName.isBuiltin());
+
+    fnName = new FunctionName("_impala_builtins", "sin");
+    fnName.analyze(dummyAnalyzer, false);
+    assertTrue(fnName.isBuiltin());
+
+    fnName = new FunctionName("_impala_builtins", "f");
+    fnName.analyze(dummyAnalyzer, false);
+    assertFalse(fnName.isBuiltin());
   }
 }

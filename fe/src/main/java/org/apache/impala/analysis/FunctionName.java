@@ -85,6 +85,24 @@ public class FunctionName {
   }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    analyze(analyzer, true);
+  }
+
+  /**
+   * Path resolution happens as follows.
+   *
+   * Fully-qualified function name:
+   * - Set the database name to the database name specified.
+   *
+   * Non-fully-qualified function name:
+   * - When preferBuiltinsDb is true:
+   *   - If the function name specified has the same name as a built-in function,
+   *     set the database name to _impala_builtins.
+   *   - Else, set the database name to the current session DB name.
+   * - When preferBuiltinsDb is false: set the database name to current session DB name.
+   */
+  public void analyze(Analyzer analyzer, boolean preferBuiltinsDb)
+      throws AnalysisException {
     if (isAnalyzed_) return;
     analyzeFnNamePath();
     if (fn_.isEmpty()) throw new AnalysisException("Function name cannot be empty.");
@@ -100,20 +118,15 @@ public class FunctionName {
     }
 
     // Resolve the database for this function.
+    Db builtinDb = analyzer.getCatalog().getBuiltinsDb();
     if (!isFullyQualified()) {
-      Db builtinDb = analyzer.getCatalog().getBuiltinsDb();
-      if (builtinDb.containsFunction(fn_)) {
-        // If it isn't fully qualified and is the same name as a builtin, use
-        // the builtin.
+      db_ = analyzer.getDefaultDb();
+      if (preferBuiltinsDb && builtinDb.containsFunction(fn_)) {
         db_ = Catalog.BUILTINS_DB;
-        isBuiltin_ = true;
-      } else {
-        db_ = analyzer.getDefaultDb();
-        isBuiltin_ = false;
       }
-    } else {
-      isBuiltin_ = db_.equals(Catalog.BUILTINS_DB);
     }
+    Preconditions.checkNotNull(db_);
+    isBuiltin_ = db_.equals(Catalog.BUILTINS_DB) && builtinDb.containsFunction(fn_);
     isAnalyzed_ = true;
   }
 
@@ -124,7 +137,7 @@ public class FunctionName {
           String.format("Invalid function name: '%s'. Expected [dbname].funcname.",
               Joiner.on(".").join(fnNamePath_)));
     } else if (fnNamePath_.size() > 1) {
-      db_ = fnNamePath_.get(0);
+      db_ = fnNamePath_.get(0).toLowerCase();
       fn_ = fnNamePath_.get(1).toLowerCase();
     } else {
       Preconditions.checkState(fnNamePath_.size() == 1);

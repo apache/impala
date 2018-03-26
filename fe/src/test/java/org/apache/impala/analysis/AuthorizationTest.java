@@ -2328,7 +2328,21 @@ public class AuthorizationTest extends FrontendTestBase {
     // the same name as the built-in function.
     AuthzError(ctx, "create function sin(double) returns double location " +
         "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+        "User '%s' does not have privileges to CREATE/DROP functions in: " +
+        "default.sin(DOUBLE)");
+    // User tries to create a function in the system database.
+    AuthzError(ctx, "create function _impala_builtins.sin(double) returns double " +
+        "location '/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
         "Cannot modify system database.");
+    AuthzError(ctx, "create function _impala_builtins.f(double) returns double " +
+        "location '/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
+        "Cannot modify system database.");
+    // User tries to drop a function with the same name as builtin.
+    AuthzError(ctx, "drop function _impala_builtins.sin(double)",
+        "Cannot modify system database.");
+    AuthzError(ctx, "drop function sin(double)",
+        "User '%s' does not have privileges to CREATE/DROP functions in: " +
+        "default.sin(DOUBLE)");
 
     // TODO: Add test support for dynamically changing privileges for
     // file-based policy.
@@ -2354,8 +2368,7 @@ public class AuthorizationTest extends FrontendTestBase {
       AuthzError("create function _impala_builtins.f() returns int location " +
           "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
           "Cannot modify system database.");
-      AuthzError("drop function if exists pi()",
-          "Cannot modify system database.");
+      AuthzOk("drop function if exists pi()");
 
       // Add default.f(), tpch.f()
       ctx_.catalog.addFunction(ScalarFunction.createForTesting("default", "f",

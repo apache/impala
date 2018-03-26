@@ -134,7 +134,7 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // Validate function name is legal
-    fnName_.analyze(analyzer);
+    fnName_.analyze(analyzer, false);
 
     if (hasSignature()) {
       // Validate function arguments and return type.
@@ -148,12 +148,6 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
 
     analyzer.registerPrivReq(new PrivilegeRequest(
         new AuthorizeableFn(fn_.dbName(), fn_.signatureString()), Privilege.CREATE));
-
-    Db builtinsDb = analyzer.getCatalog().getDb(Catalog.BUILTINS_DB);
-    if (builtinsDb.containsFunction(fn_.getName())) {
-      throw new AnalysisException("Function cannot have the same name as a builtin: " +
-          fn_.getFunctionName().getFunction());
-    }
 
     db_ = analyzer.getDb(fn_.dbName(), true);
     Function existingFn = db_.getFunction(fn_, Function.CompareMode.IS_INDISTINGUISHABLE);

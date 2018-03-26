@@ -74,7 +74,7 @@ public class DropFunctionStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    fnName_.analyze(analyzer);
+    fnName_.analyze(analyzer, false);
 
     if (hasSignature()) {
       fnArgs_.analyze(analyzer);
