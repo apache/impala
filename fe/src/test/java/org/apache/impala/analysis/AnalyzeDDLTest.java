@@ -535,6 +535,18 @@ public class AnalyzeDDLTest extends FrontendTestBase {
                "'sort.columns'='ID, foo')",
                "Could not find SORT BY column 'foo' in table.");
 
+    // Table is partitioned, but it has no matching partitions.
+    AnalyzesOk("alter table functional.alltypesagg partition(year=2009, month=1) " +
+        "set location 'hdfs://localhost:20500/test-warehouse/new_table'");
+    AnalyzesOk("alter table functional.alltypesagg partition(year=2009, month=1) " +
+        "set fileformat parquet");
+    AnalyzesOk("alter table functional.alltypesagg partition(year=2009, month=1) " +
+        "set tblproperties ('key'='value')");
+    AnalyzesOk("alter table functional.alltypesagg partition(year=2009, month=1) " +
+        "set serdeproperties ('key'='value')");
+    AnalyzesOk("alter table functional.alltypesagg partition(year=2009, month=1) " +
+        "set row format delimited fields terminated by '|'");
+
     {
       // Check that long_properties fail at the analysis layer
       String long_property_key = "";

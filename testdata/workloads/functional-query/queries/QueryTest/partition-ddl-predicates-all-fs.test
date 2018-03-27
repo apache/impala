@@ -153,3 +153,55 @@ show partitions p1
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
+---- QUERY
+# Tests no matching partition.
+alter table p1 partition (j=100) set location '$FILESYSTEM_PREFIX/test-warehouse/newtable';
+---- RESULTS
+# TODO: IMPALA-6775
+==== QUERY
+# Check nothing was updated.
+show partitions p1
+---- RESULTS
+'NULL','g',-1,0,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*/test-warehouse/.+/p1/j=__HIVE_DEFAULT_PARTITION__/k=g
+'2','D',-1,0,regex:.+,regex:.+,regex:.+,'TEXT',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=D
+'2','E',-1,0,regex:.+,regex:.+,regex:.+,'TEXT',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=E
+'2','F',-1,0,regex:.+,regex:.+,regex:.+,'TEXT',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=F
+'2','d',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=d
+'2','e',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=e
+'2','f',-1,0,regex:.+,regex:.+,regex:.+,'PARQUET',regex:.+,regex:.*/test-warehouse/.+/p1/j=2/k=f
+'Total','',3,0,regex:.+,regex:.+,'','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Tests no matching partition.
+alter table p1 partition (j=100) set fileformat parquet;
+---- RESULTS
+'Updated 0 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+# Tests no matching partition.
+alter table p1 partition (j=100) set tblproperties ('key'='value');
+---- RESULTS
+'Updated 0 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+# Tests no matching partition.
+alter table p1 partition (j=100) set serdeproperties ('key'='value');
+---- RESULTS
+'Updated 0 partition(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+# Tests no matching partition.
+alter table p1 partition (j=100) set row format delimited fields terminated by '|';
+---- RESULTS
+'Updated 0 partition(s).'
+---- TYPES
+STRING
+====

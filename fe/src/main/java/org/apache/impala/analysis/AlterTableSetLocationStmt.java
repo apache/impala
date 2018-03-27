@@ -59,8 +59,9 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
     params.setAlter_type(TAlterTableType.SET_LOCATION);
     TAlterTableSetLocationParams locationParams =
         new TAlterTableSetLocationParams(location_.toString());
-    if (getPartitionSet() != null) {
-      List<List<TPartitionKeyValue>> tPartitionSet = getPartitionSet().toThrift();
+    PartitionSet partitionSet = getPartitionSet();
+    if (partitionSet != null && !partitionSet.getPartitions().isEmpty()) {
+      List<List<TPartitionKeyValue>> tPartitionSet = partitionSet.toThrift();
       Preconditions.checkState(tPartitionSet.size() == 1);
       locationParams.setPartition_spec(tPartitionSet.get(0));
     }
@@ -80,6 +81,7 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
       if (getPartitionSet() != null) {
         // Targeting a partition rather than a table.
         List<HdfsPartition> partitions = getPartitionSet().getPartitions();
+        if (partitions.isEmpty()) { return; }
         if (partitions.size() != 1) {
           // Sort the partitions to get a consistent error reporting.
           List<HdfsPartition> sortedPartitions = Lists.newArrayList(partitions);
