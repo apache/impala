@@ -147,7 +147,7 @@ def exec_pip_install(args, cc="no-cc-available", env=None):
   # --no-cache-dir is used to prevent caching of compiled artifacts, which may be built
   # with different compilers or settings.
   cmd = [os.path.join(ENV_DIR, "bin", "python"), os.path.join(ENV_DIR, "bin", "pip"),
-    "install", "-v", "--no-binary", "--no-cache-dir"]
+      "install", "-v", "--no-binary", ":all:", "--no-cache-dir"]
 
   # When using a custom mirror, we also must use the index of that mirror.
   if "PYPI_MIRROR" in os.environ:
