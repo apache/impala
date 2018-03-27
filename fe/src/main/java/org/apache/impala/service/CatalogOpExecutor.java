@@ -2238,7 +2238,6 @@ public class CatalogOpExecutor {
       Reference<Long> numUpdatedPartitions)
       throws ImpalaException {
     Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
-    Preconditions.checkState(partitionSet == null || !partitionSet.isEmpty());
     boolean reloadFileMetadata = false;
     if (partitionSet == null) {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
@@ -2275,7 +2274,6 @@ public class CatalogOpExecutor {
       Reference<Long> numUpdatedPartitions)
       throws ImpalaException {
     Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
-    Preconditions.checkState(partitionSet == null || !partitionSet.isEmpty());
     Preconditions.checkArgument(tbl instanceof HdfsTable);
     boolean reloadFileMetadata = false;
     RowFormat rowFormat = RowFormat.fromThrift(tRowFormat);
