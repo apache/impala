@@ -10581,7 +10581,6 @@ under the License.
   <keydef keys="impala132"><topicmeta><keywords><keyword>Impala 1.3.2</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala130"><topicmeta><keywords><keyword>Impala 1.3.0</keyword></keywords></topicmeta></keydef>
 
-<!-- Long form of mapping from Impala release to vendor-specific releases, for use in running text. -->
   <keydef keys="impala30_full"><topicmeta><keywords><keyword>Impala 3.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala212_full"><topicmeta><keywords><keyword>Impala 2.12</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala211_full"><topicmeta><keywords><keyword>Impala 2.11</keyword></keywords></topicmeta></keydef>
