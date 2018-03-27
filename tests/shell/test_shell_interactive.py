@@ -43,6 +43,9 @@ SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
+# Regex to match the interactive shell prompt that is expected after each command.
+PROMPT_REGEX = r'\[[^:]+:2100[0-9]\]'
+
 class TestImpalaShellInteractive(object):
   """Test the impala shell interactively"""
 
@@ -226,8 +229,6 @@ class TestImpalaShellInteractive(object):
     Ensure that multiline queries are preserved when they're read back from history.
     Additionally, also test that comments are preserved.
     """
-    # regex for pexpect, a shell prompt is expected after each command..
-    prompt_regex = '\[{0}:2100[0-9]\]'.format(socket.getfqdn())
     # readline gets its input from tty, so using stdin does not work.
     child_proc = pexpect.spawn(SHELL_CMD)
     # List of (input query, expected text in output).
@@ -240,10 +241,10 @@ class TestImpalaShellInteractive(object):
         ("select /*comment*/\n1;", "[4]: select /*comment*/\n1;"),
         ("select\n/*comm\nent*/\n1;", "[5]: select\n/*comm\nent*/\n1;")]
     for query, _ in queries:
-      child_proc.expect(prompt_regex)
+      child_proc.expect(PROMPT_REGEX)
       child_proc.sendline(query)
       child_proc.expect("Fetched 1 row\(s\) in .*s")
-    child_proc.expect(prompt_regex)
+    child_proc.expect(PROMPT_REGEX)
     child_proc.sendline('quit;')
     p = ImpalaShell()
     p.send_cmd('history')
