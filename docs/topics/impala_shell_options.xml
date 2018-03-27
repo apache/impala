@@ -410,27 +410,6 @@ under the License.
             <row>
               <entry>
                 <p>
-                  -r or --refresh_after_connect
-                </p>
-              </entry>
-              <entry rev="2.0.0">
-                <p>
-                  refresh_after_connect=true
-                </p>
-              </entry>
-              <entry>
-                <p>
-                  Updates Impala metadata upon connection. Same as running the
-                  <codeph><xref href="impala_invalidate_metadata.xml#invalidate_metadata">INVALIDATE
-                  METADATA</xref></codeph> statement after connecting. (This option was originally named when the
-                  <codeph>REFRESH</codeph> statement did the extensive metadata updates now performed by
-                  <codeph>INVALIDATE METADATA</codeph>.)
-                </p>
-              </entry>
-            </row>
-            <row>
-              <entry>
-                <p>
                   -d <varname>default_db</varname> or --database=<varname>default_db</varname>
                 </p>
               </entry>

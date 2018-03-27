@@ -164,14 +164,6 @@ under the License.
       combination of Impala and Hive operations, see <xref href="impala_tutorial.xml#tutorial_impala_hive"/>.
     </p>
 
-    <p>
-      If you need to ensure that the metadata is up-to-date when you start an <cmdname>impala-shell</cmdname>
-      session, run <cmdname>impala-shell</cmdname> with the <codeph>-r</codeph> or
-      <codeph>--refresh_after_connect</codeph> command-line option. Because this operation adds a delay to the next
-      query against each table, potentially expensive for large tables with many partitions, try to avoid using
-      this option for day-to-day operations in a production environment.
-    </p>
-
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
     <p rev="">
       The user ID that the <cmdname>impalad</cmdname> daemon runs under,
