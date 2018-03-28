@@ -98,8 +98,10 @@ MEM_LIMIT_EQ_THRESHOLD_PC = 0.975
 MEM_LIMIT_EQ_THRESHOLD_MB = 50
 
 # Regex to extract the estimated memory from an explain plan.
+# The unit prefixes can be found in
+# fe/src/main/java/org/apache/impala/common/PrintUtils.java
 MEM_ESTIMATE_PATTERN = re.compile(
-    r"Per-Host Resource Estimates: Memory=(\d+.?\d*)(T|G|M|K)?B")
+    r"Per-Host Resource Estimates: Memory=(\d+.?\d*)(P|T|G|M|K)?B")
 
 PROFILES_DIR = "profiles"
 RESULT_HASHES_DIR = "result_hashes"
@@ -1359,8 +1361,8 @@ def match_memory_estimate(explain_lines):
     explain_lines: list of str
 
   Returns:
-    2-tuple str of memory limit in decimal string and units (one of 'T', 'G', 'M', 'K',
-    '' bytes)
+    2-tuple str of memory limit in decimal string and units (one of 'P', 'T', 'G', 'M',
+    'K', '' bytes)
 
   Raises:
     Exception if no match found
