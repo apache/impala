@@ -39,9 +39,6 @@ Flask == 0.10.1
   MarkupSafe == 0.23
   Werkzeug == 0.11.3
   itsdangerous == 0.24
-hdfs == 2.0.2
-  docopt == 0.6.2
-  execnet == 1.4.0
 kazoo == 2.2.1
 ordereddict == 1.1
 pexpect == 3.3
