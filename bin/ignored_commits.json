@@ -8,7 +8,9 @@
       { "hash": "588e1d46e9bd88d17676c47a0bf1237d3ebb11da",
         "comment": "Already picked, but with different Change-Id than in master." },
       { "hash": "5d57ca5da2a7ddbe7816dce19db4c11b87a90d37",
-        "comment": "Only applies to master; related to Hadoop 3.0 changes." }
+        "comment": "Only applies to master; related to Hadoop 3.0 changes." },
+      { "hash": "25218487533f6bf6959c32ff4ee38b77e0ab30b5",
+        "comment": "Accidental push to master and reverted sans Change-Id" }
     ]
   }
 ]
