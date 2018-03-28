@@ -46,7 +46,7 @@ source "${BINDIR}/bootstrap_system.sh"
 export MAX_PYTEST_FAILURES=0
 source bin/impala-config.sh
 export NUM_CONCURRENT_TESTS=$(nproc)
-time -p ./buildall.sh -noclean -format -testdata -skiptests
+time -p ./buildall.sh -format -testdata -skiptests
 
 # To then run the tests:
 # time -p bin/run-all-tests.sh
