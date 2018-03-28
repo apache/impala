@@ -39,6 +39,8 @@ public class PrintUtils {
   public static String printBytes(long bytes) {
     double result = bytes;
     // Avoid String.format() due to IMPALA-1572 which happens on JDK7 but not JDK6.
+    // IMPALA-6759: Please update tests/stress/concurrent_select.py MEM_ESTIMATE_PATTERN
+    // if you add additional unit prefixes.
     if (bytes >= PETABYTE) return new DecimalFormat(".00PB").format(result / PETABYTE);
     if (bytes >= TERABYTE) return new DecimalFormat(".00TB").format(result / TERABYTE);
     if (bytes >= GIGABYTE) return new DecimalFormat(".00GB").format(result / GIGABYTE);

@@ -56,15 +56,17 @@ def parse_mem_to_mb(mem, units):
   if units.endswith("B"):
     units = units[:-1]
   if not units:
-    mem /= 10 ** 6
+    mem /= 2 ** 20
   elif units == "K":
-    mem /= 10 ** 3
+    mem /= 2 ** 10
   elif units == "M":
     pass
   elif units == "G":
-    mem *= 10 ** 3
+    mem *= 2 ** 10
   elif units == "T":
-    mem *= 10 ** 6
+    mem *= 2 ** 20
+  elif units == "P":
+    mem *= 2 ** 30
   else:
     raise Exception('Unexpected memory unit "%s"' % units)
   return int(mem)
