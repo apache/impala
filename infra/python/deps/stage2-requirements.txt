@@ -27,6 +27,9 @@ pytest == 2.9.2
   pytest-random == 0.02
   pytest-runner == 4.2
   pytest-xdist == 1.17.1
+hdfs == 2.0.2
+  docopt == 0.6.2
+  execnet == 1.4.0
 
 # Requires pbr
 pywebhdfs == 0.3.2
