@@ -80,7 +80,7 @@ class TestCounterPlugin(object):
   # https://docs.pytest.org/en/2.9.2/writing_plugins.html#_pytest.hookspec.pytest_collection_modifyitems
   def pytest_collection_modifyitems(self, items):
       for item in items:
-          self.tests_collected.update({item.nodeid})
+          self.tests_collected.add(item.nodeid)
 
   # link to pytest_runtest_logreport
   # https://docs.pytest.org/en/2.9.2/_modules/_pytest/hookspec.html#pytest_runtest_logreport
