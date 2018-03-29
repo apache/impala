@@ -24,7 +24,7 @@
 
 namespace impala {
 
-void Validate(TupleDelimitedTextParser* parser, const string& data,
+void Validate(DelimitedTextParser* parser, const string& data,
     int expected_offset, char tuple_delim, int expected_num_tuples,
     int expected_num_fields) {
   parser->ParserReset();
@@ -72,8 +72,8 @@ TEST(DelimitedTextParser, Basic) {
   bool is_materialized_col[NUM_COLS];
   for (int i = 0; i < NUM_COLS; ++i) is_materialized_col[i] = true;
 
-  TupleDelimitedTextParser no_escape_parser(NUM_COLS, 0, is_materialized_col,
-                                            TUPLE_DELIM, FIELD_DELIM, COLLECTION_DELIM);
+  DelimitedTextParser no_escape_parser(NUM_COLS, 0, is_materialized_col,
+                                       TUPLE_DELIM, FIELD_DELIM, COLLECTION_DELIM);
   // Note that only complete tuples "count"
   Validate(&no_escape_parser, "no_delims", -1, TUPLE_DELIM, 0, 0);
   Validate(&no_escape_parser, "abc||abc", 4, TUPLE_DELIM, 1, 1);
@@ -81,9 +81,9 @@ TEST(DelimitedTextParser, Basic) {
   Validate(&no_escape_parser, "a|bcd", 2, TUPLE_DELIM, 0, 0);
 
   // Test with escape char
-  TupleDelimitedTextParser escape_parser(NUM_COLS, 0, is_materialized_col,
-                                         TUPLE_DELIM, FIELD_DELIM, COLLECTION_DELIM,
-                                         ESCAPE_CHAR);
+  DelimitedTextParser escape_parser(NUM_COLS, 0, is_materialized_col,
+                                    TUPLE_DELIM, FIELD_DELIM, COLLECTION_DELIM,
+                                    ESCAPE_CHAR);
   Validate(&escape_parser, "a@|a|bcd", 5, TUPLE_DELIM, 0, 0);
   Validate(&escape_parser, "a@@|a|bcd", 4, TUPLE_DELIM, 1, 1);
   Validate(&escape_parser, "a@@@|a|bcd", 7, TUPLE_DELIM, 0, 0);
@@ -127,8 +127,8 @@ TEST(DelimitedTextParser, Fields) {
   bool is_materialized_col[NUM_COLS];
   for (int i = 0; i < NUM_COLS; ++i) is_materialized_col[i] = true;
 
-  TupleDelimitedTextParser no_escape_parser(NUM_COLS, 0, is_materialized_col,
-                                            TUPLE_DELIM, FIELD_DELIM, COLLECTION_DELIM);
+  DelimitedTextParser no_escape_parser(NUM_COLS, 0, is_materialized_col,
+                                       TUPLE_DELIM, FIELD_DELIM, COLLECTION_DELIM);
 
   Validate(&no_escape_parser, "a,b|c,d|e,f", 4, TUPLE_DELIM, 1, 3);
   Validate(&no_escape_parser, "b|c,d|e,f", 2, TUPLE_DELIM, 1, 3);
@@ -137,9 +137,9 @@ TEST(DelimitedTextParser, Fields) {
   const string str10("a,\0|c,d|e", 9);
   Validate(&no_escape_parser, str10, 4, TUPLE_DELIM, 1, 2);
 
-  TupleDelimitedTextParser escape_parser(NUM_COLS, 0, is_materialized_col,
-                                         TUPLE_DELIM, FIELD_DELIM, COLLECTION_DELIM,
-                                         ESCAPE_CHAR);
+  DelimitedTextParser escape_parser(NUM_COLS, 0, is_materialized_col,
+                                    TUPLE_DELIM, FIELD_DELIM, COLLECTION_DELIM,
+                                    ESCAPE_CHAR);
 
   Validate(&escape_parser, "a,b|c,d|e,f", 4, TUPLE_DELIM, 1, 3);
   Validate(&escape_parser, "a,@|c|e,f", 6, TUPLE_DELIM, 0, 1);
@@ -148,19 +148,13 @@ TEST(DelimitedTextParser, Fields) {
 
 TEST(DelimitedTextParser, SpecialDelimiters) {
   const char TUPLE_DELIM = '\n'; // implies '\r' and "\r\n" are also delimiters
-  const char NUL_DELIM = '\0';
   const int NUM_COLS = 1;
 
   bool is_materialized_col[NUM_COLS];
   for (int i = 0; i < NUM_COLS; ++i) is_materialized_col[i] = true;
 
-  TupleDelimitedTextParser tuple_delim_parser(NUM_COLS, 0, is_materialized_col,
+  DelimitedTextParser tuple_delim_parser(NUM_COLS, 0, is_materialized_col,
       TUPLE_DELIM);
-
-  TupleDelimitedTextParser nul_delim_parser(NUM_COLS, 0, is_materialized_col, NUL_DELIM);
-
-  TupleDelimitedTextParser nul_field_parser(2, 0, is_materialized_col,
-                                            TUPLE_DELIM, NUL_DELIM);
 
   // Non-SSE case
   Validate(&tuple_delim_parser, "A\r\nB", 3, TUPLE_DELIM, 0, 0);
@@ -170,16 +164,6 @@ TEST(DelimitedTextParser, SpecialDelimiters) {
   Validate(&tuple_delim_parser, "A\r\nB\r\nC", 3, TUPLE_DELIM, 1, 1);
   Validate(&tuple_delim_parser, "A\rB\nC\r\nD", 2, TUPLE_DELIM, 2, 2);
   Validate(&tuple_delim_parser, "\r\r\n\n", 1, TUPLE_DELIM, 2, 2);
-
-  // NUL tuple delimiter; no field delimiter
-  const string nul1("\0\0\0", 3);
-  const string nul2("AAA\0BBB\0", 8);
-  const string nul3("\n\0\r\0\r\n\0", 7);
-  const string nul4("\n\0\r\0\r\n", 6);
-  Validate(&nul_delim_parser, nul1, 1, NUL_DELIM, 2, 2);
-  Validate(&nul_delim_parser, nul2, 4, NUL_DELIM, 1, 1);
-  Validate(&nul_delim_parser, nul3, 2, NUL_DELIM, 2, 2);
-  Validate(&nul_delim_parser, nul4, 2, NUL_DELIM, 1, 1);
 
   // SSE case
   string data = "\rAAAAAAAAAAAAAAA";
@@ -194,22 +178,6 @@ TEST(DelimitedTextParser, SpecialDelimiters) {
   data = "\r\nAAA\n\r\r\nAAAAAAA";
   DCHECK_EQ(data.size(), SSEUtil::CHARS_PER_128_BIT_REGISTER);
   Validate(&tuple_delim_parser, data, 2, TUPLE_DELIM, 3, 3);
-
-  // NUL SSE case
-  const string nulsse1("AAAAA\0AAAAAAAAAAA\0AAAAAAAAAAAA\0\0", 32);
-  const string nulsse2("AAAAA\0AAAAAAAAAAA\0AAAAAAAAAAAA\0A", 32);
-  const string nulsse3("AAA\0BBBbbbbbbbbbbbbbbbbbbb\0cccc,ddd\0", 36);
-  const string nulsse4("AAA\0BBBbbbbbbbbbbbbbbbbbbb\0cccc,dddd", 36);
-  Validate(&nul_delim_parser, nulsse1, 6, NUL_DELIM, 3, 3);
-  Validate(&nul_delim_parser, nulsse2, 6, NUL_DELIM, 2, 2);
-  Validate(&nul_delim_parser, nulsse3, 4, NUL_DELIM, 2, 2);
-  Validate(&nul_delim_parser, nulsse4, 4, NUL_DELIM, 1, 1);
-
-  // NUL Field delimiters
-  const string field1("\na\0b\0c\n", 7);
-  const string field2("aaaa\na\0b\0c\naaaaa\0b\na\0b\0c\n", 25);
-  Validate(&nul_field_parser, field1, 1, TUPLE_DELIM, 1, 2);
-  Validate(&nul_field_parser, field2, 5, TUPLE_DELIM, 3, 6);
 }
 
 // TODO: expand test for other delimited text parser functions/cases.
