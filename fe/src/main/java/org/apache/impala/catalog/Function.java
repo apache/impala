@@ -213,7 +213,8 @@ public class Function extends CatalogObjectImpl {
     }
     if (this.hasVarArgs_ && other.argTypes_.length < this.argTypes_.length) return false;
     for (int i = 0; i < this.argTypes_.length; ++i) {
-      if (!Type.isImplicitlyCastable(other.argTypes_[i], this.argTypes_[i], strict)) {
+      if (!Type.isImplicitlyCastable(
+          other.argTypes_[i], this.argTypes_[i], strict, strict)) {
         return false;
       }
     }
@@ -222,7 +223,7 @@ public class Function extends CatalogObjectImpl {
       for (int i = this.argTypes_.length; i < other.argTypes_.length; ++i) {
         if (other.argTypes_[i].matchesType(this.getVarArgsType())) continue;
         if (!Type.isImplicitlyCastable(other.argTypes_[i], this.getVarArgsType(),
-              strict)) {
+              strict, strict)) {
           return false;
         }
       }

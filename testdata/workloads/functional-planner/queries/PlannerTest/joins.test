@@ -2520,3 +2520,49 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch.customer a]
    partitions=1/1 files=1 size=23.08MB
 ====
+with
+  t1 as (select cast(0 as decimal(20, 0)) as c1),
+  t2 as (select cast(0 as decimal(19, 19)) as c2)
+select * from t1 join t2 on (c1 = c2)
+---- QUERYOPTIONS
+decimal_v2=false
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: c1 = c2
+|
+|--01:UNION
+|     constant-operands=1
+|
+00:UNION
+   constant-operands=1
+====
+# Cannot create a hash join because decimal types are incompatible due to decimal_v2.
+with
+  t1 as (select cast(0 as decimal(20, 0)) as c1),
+  t2 as (select cast(0 as decimal(19, 19)) as c2)
+select * from t1 join t2 on (c1 = c2)
+---- QUERYOPTIONS
+decimal_v2=true
+---- PLAN
+InternalException: Unable create a hash join with equi-join predicate c1 = c2 because the operands cannot be cast without loss of precision. Operand types: DECIMAL(20,0) = DECIMAL(19,19).
+====
+with
+  t1 as (select cast(0 as decimal(19, 0)) as c1),
+  t2 as (select cast(0 as decimal(19, 19)) as c2)
+select * from t1 join t2 on (c1 = c2)
+---- QUERYOPTIONS
+decimal_v2=true
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: c1 = c2
+|
+|--01:UNION
+|     constant-operands=1
+|
+00:UNION
+   constant-operands=1
+====

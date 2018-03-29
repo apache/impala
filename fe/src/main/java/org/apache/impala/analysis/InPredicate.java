@@ -168,7 +168,7 @@ public class InPredicate extends Predicate {
       }
       Preconditions.checkNotNull(fn_);
       Preconditions.checkState(fn_.getReturnType().isBoolean());
-      castForFunctionCall(false);
+      castForFunctionCall(false, analyzer.isDecimalV2());
     }
 
     // TODO: Fix selectivity_ for nested predicate

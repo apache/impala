@@ -18,12 +18,12 @@ PLAN-ROOT SINK
 # Complex types are not supported on ORC.
 select 1 from functional_orc_def.complextypes_fileformat t, t.a
 ---- PLAN
-not implemented: Scan of table 't' in format 'ORC' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of table 't' in format 'ORC' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 select s.f1 from functional_orc_def.complextypes_fileformat t, t.m
 ---- PLAN
-not implemented: Scan of table 't' in format 'ORC' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of table 't' in format 'ORC' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Complex types are not supported on ORC, however queries materializing
@@ -50,31 +50,31 @@ PLAN-ROOT SINK
 # Complex types are not supported on Avro.
 select s.f1 from functional_avro_snap.complextypes_fileformat t, t.a
 ---- PLAN
-not implemented: Scan of table 't' in format 'AVRO' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of table 't' in format 'AVRO' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Complex types are not supported on text files.
 select s.f1 from functional.complextypes_fileformat t, t.a
 ---- PLAN
-not implemented: Scan of table 't' in format 'TEXT' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of table 't' in format 'TEXT' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Complex types are not supported on text files, even if no complex-typed
 # columns are selected.
 select 1 from functional.complextypes_fileformat
 ---- PLAN
-not implemented: Scan of table 'functional.complextypes_fileformat' in format 'TEXT' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of table 'functional.complextypes_fileformat' in format 'TEXT' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Complex types are not supported on RC files.
 select 1 from functional_rc_snap.complextypes_fileformat t, t.a
 ---- PLAN
-not implemented: Scan of table 't' in format 'RC_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of table 't' in format 'RC_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 select s.f1 from functional_rc_snap.complextypes_fileformat t, t.m
 ---- PLAN
-not implemented: Scan of table 't' in format 'RC_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of table 't' in format 'RC_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Complex types are not supported on RC files, however queries materializing
@@ -101,7 +101,7 @@ PLAN-ROOT SINK
 # Complex types are not supported on sequence files.
 select s.f1 from functional_seq_snap.complextypes_fileformat t, t.a
 ---- PLAN
-not implemented: Scan of table 't' in format 'SEQUENCE_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of table 't' in format 'SEQUENCE_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Queries referencing only scalar typed columns on sequence files
@@ -119,7 +119,7 @@ PLAN-ROOT SINK
 # can be seen in tests below.
 select s.f1 from functional.complextypes_multifileformat t, t.a
 ---- PLAN
-not implemented: Scan of partition
+NotImplementedException: Scan of partition
 ====
 # Scanning an HBase table with complex-types columns is ok as long as no complex-typed
 # columns are selected.
@@ -133,14 +133,14 @@ PLAN-ROOT SINK
 # column is selected.
 select id from functional_hbase.allcomplextypes t, t.int_array_col
 ---- PLAN
-not implemented: Scan of table 't.int_array_col' is not supported because 't' references a nested field/collection.
+NotImplementedException: Scan of table 't.int_array_col' is not supported because 't' references a nested field/collection.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Scanning an HBase table with complex-types columns fails if a complex-typed
 # column is selected.
 select complex_struct_col.f1 from functional_hbase.allcomplextypes
 ---- PLAN
-not implemented: Scan of table 'functional_hbase.allcomplextypes.complex_struct_col.f1' is not supported because 'functional_hbase.allcomplextypes' references a nested field/collection.
+NotImplementedException: Scan of table 'functional_hbase.allcomplextypes.complex_struct_col.f1' is not supported because 'functional_hbase.allcomplextypes' references a nested field/collection.
 Complex types are supported for these file formats: PARQUET.
 ====
 # The complextypes_multifileformat has five partitions with different file formats:
@@ -152,7 +152,7 @@ Complex types are supported for these file formats: PARQUET.
 # Scanning a text partition of a multi-format table with complex types fails.
 select 1 from functional.complextypes_multifileformat where p = 1
 ---- PLAN
-not implemented: Scan of partition 'p=1' in format 'TEXT' of table 'functional.complextypes_multifileformat' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of partition 'p=1' in format 'TEXT' of table 'functional.complextypes_multifileformat' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Scanning a Parquet partition of a multi-format table with complex types plans ok.
@@ -175,13 +175,13 @@ PLAN-ROOT SINK
 # Scanning an Avro partition of a multi-format table with complex types fails.
 select s.f1 from functional.complextypes_multifileformat t, t.a where p = 3
 ---- PLAN
-not implemented: Scan of partition 'p=3' in format 'AVRO' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of partition 'p=3' in format 'AVRO' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Scanning an RC file partition of a multi-format table with complex types fails.
 select id from functional.complextypes_multifileformat t, t.a where p = 4
 ---- PLAN
-not implemented: Scan of partition 'p=4' in format 'RC_FILE' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of partition 'p=4' in format 'RC_FILE' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Complex types are not supported on RC files but count(*) and similar
@@ -199,7 +199,7 @@ PLAN-ROOT SINK
 # Scanning an ORC file partition of a multi-format table with complex types fails.
 select id from functional.complextypes_multifileformat t, t.a where p = 5
 ---- PLAN
-not implemented: Scan of partition 'p=5' in format 'ORC' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
+NotImplementedException: Scan of partition 'p=5' in format 'ORC' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
 Complex types are supported for these file formats: PARQUET.
 ====
 # Complex types are not supported on ORC files but count(*) and similar

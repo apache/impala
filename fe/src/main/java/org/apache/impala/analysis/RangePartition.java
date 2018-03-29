@@ -186,7 +186,7 @@ public class RangePartition implements ParseNode {
 
     org.apache.impala.catalog.Type literalType = literal.getType();
     if (!org.apache.impala.catalog.Type.isImplicitlyCastable(literalType, colType,
-        true)) {
+        true, analyzer.isDecimalV2())) {
       throw new AnalysisException(String.format("Range partition value %s " +
           "(type: %s) is not type compatible with partitioning column '%s' (type: %s).",
           literal.toSql(), literalType, pkColumn.getColName(), colType.toSql()));

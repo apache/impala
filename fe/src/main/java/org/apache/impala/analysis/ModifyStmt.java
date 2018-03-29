@@ -283,8 +283,8 @@ public abstract class ModifyStmt extends StatementBase {
             format("Duplicate value assignment to column: '%s'", lhsSlotRef.toSql()));
       }
 
-      rhsExpr = checkTypeCompatibility(
-          targetTableRef_.getDesc().getTable().getFullName(), c, rhsExpr);
+      rhsExpr = checkTypeCompatibility(targetTableRef_.getDesc().getTable().getFullName(),
+          c, rhsExpr, analyzer.isDecimalV2());
       uniqueSlots.add(lhsSlotRef.getSlotId());
       selectList.add(new SelectListItem(rhsExpr, null));
       referencedColumns.add(colIndexMap.get(c.getName()));

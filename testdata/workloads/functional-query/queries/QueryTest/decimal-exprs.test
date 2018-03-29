@@ -128,12 +128,6 @@ DECIMAL
 UDF WARNING: Decimal expression overflowed, returning NULL
 ====
 ---- QUERY
-set decimal_v2=true;
-select coalesce(1.8, cast(0 as decimal(38,38)));
----- CATCH
-UDF ERROR: Decimal expression overflowed
-====
----- QUERY
 # DECIMAL v1 sum() overflow. A negative number is incorrectly returned due to overflow.
 set decimal_v2=false;
 select sum(d6 * cast(4e37 as decimal(38,0))) from decimal_tbl;
@@ -319,6 +313,37 @@ group by l_tax having avg(l_extendedprice) > 38247.190 order by 1;
 38283.541766
 ---- TYPES
 DECIMAL
+====
+---- QUERY
+# Test AVG overflow due to DECIMAL_v2
+set decimal_v2=false;
+select avg(c) from (select cast(1e32 as decimal(38,0)) - cast(1 as decimal(38,0)) as c) t
+---- RESULTS
+99999999999999999999999999999999
+---- TYPES
+DECIMAL
+====
+---- QUERY
+set decimal_v2=false;
+select avg(c) from (select cast(1e32 as decimal(38,0)) as c) t;
+---- RESULTS
+100000000000000000000000000000000
+---- TYPES
+DECIMAL
+====
+---- QUERY
+set decimal_v2=true;
+select avg(c) from (select cast(1e32 as decimal(38,0)) - cast(1 as decimal(38,0)) as c) t
+---- RESULTS
+99999999999999999999999999999999.000000
+---- TYPES
+DECIMAL
+====
+---- QUERY
+set decimal_v2=true;
+select avg(c) from (select cast(1e32 as decimal(38,0)) as c) t;
+---- CATCH
+UDF ERROR: Avg computation overflowed
 ====
 ---- QUERY
 # Test sum() and avg() analytic fns with start bounds (tests Remove() for decimal)

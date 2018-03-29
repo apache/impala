@@ -275,7 +275,8 @@ public class ColumnDef {
         }
       }
 
-      if (!Type.isImplicitlyCastable(defaultValLiteral.getType(), type_, true)) {
+      if (!Type.isImplicitlyCastable(defaultValLiteral.getType(), type_,
+          true, analyzer.isDecimalV2())) {
         throw new AnalysisException(String.format("Default value %s (type: %s) " +
             "is not compatible with column '%s' (type: %s).", defaultValue_.toSql(),
             defaultValue_.getType().toSql(), colName_, type_.toSql()));

@@ -26,7 +26,7 @@ PLAN-ROOT SINK
    partitions=4/4 files=4 size=460B
    predicates: a.id < 10
 ---- DISTRIBUTEDPLAN
-not implemented: Error generating a valid execution plan for this query. A RIGHT OUTER JOIN type with no equi-join predicates can only be executed with a single node plan.
+NotImplementedException: Error generating a valid execution plan for this query. A RIGHT OUTER JOIN type with no equi-join predicates can only be executed with a single node plan.
 ====
 # Right semi joins with non-equi join predicates
 select straight_join *
@@ -54,7 +54,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
-not implemented: Error generating a valid execution plan for this query. A RIGHT SEMI JOIN type with no equi-join predicates can only be executed with a single node plan.
+NotImplementedException: Error generating a valid execution plan for this query. A RIGHT SEMI JOIN type with no equi-join predicates can only be executed with a single node plan.
 ====
 # Full outer joins with non-equi join predicates
 select straight_join *
@@ -91,7 +91,7 @@ PLAN-ROOT SINK
    partitions=4/4 files=4 size=460B
    predicates: a.id < 10
 ---- DISTRIBUTEDPLAN
-not implemented: Error generating a valid execution plan for this query. A FULL OUTER JOIN type with no equi-join predicates can only be executed with a single node plan.
+NotImplementedException: Error generating a valid execution plan for this query. A FULL OUTER JOIN type with no equi-join predicates can only be executed with a single node plan.
 ====
 # Right anti join with non-equi join predicates
 select straight_join count(*)
@@ -114,7 +114,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
-not implemented: Error generating a valid execution plan for this query. A RIGHT ANTI JOIN type with no equi-join predicates can only be executed with a single node plan.
+NotImplementedException: Error generating a valid execution plan for this query. A RIGHT ANTI JOIN type with no equi-join predicates can only be executed with a single node plan.
 ====
 # Inner and right joins with non-equi join predicates
 select straight_join count(*)
@@ -157,7 +157,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
-not implemented: Error generating a valid execution plan for this query. A RIGHT ANTI JOIN type with no equi-join predicates can only be executed with a single node plan.
+NotImplementedException: Error generating a valid execution plan for this query. A RIGHT ANTI JOIN type with no equi-join predicates can only be executed with a single node plan.
 ====
 # Right semi and outer joins are inverted to make them executable.
 # Same query as above but without the straight join hint.

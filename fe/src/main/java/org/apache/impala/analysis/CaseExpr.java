@@ -287,7 +287,8 @@ public class CaseExpr extends Expr {
       } else {
         // If no case expr was given, then the when exprs should always return
         // boolean or be castable to boolean.
-        if (!Type.isImplicitlyCastable(whenExpr.getType(), Type.BOOLEAN, false)) {
+        if (!Type.isImplicitlyCastable(whenExpr.getType(), Type.BOOLEAN,
+            false, analyzer.isDecimalV2())) {
           Preconditions.checkState(isCase());
           throw new AnalysisException("When expr '" + whenExpr.toSql() + "'" +
               " is not of type boolean and not castable to type boolean.");

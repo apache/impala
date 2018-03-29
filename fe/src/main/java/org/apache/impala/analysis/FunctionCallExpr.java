@@ -428,11 +428,10 @@ public class FunctionCallExpr extends Expr {
         }
         NumericLiteral scaleLiteral = (NumericLiteral) LiteralExpr.create(
             children_.get(1), analyzer.getQueryCtx());
-        digitsAfter = (int)scaleLiteral.getLongValue();
-        if (Math.abs(digitsAfter) > ScalarType.MAX_SCALE) {
-          throw new AnalysisException("Cannot round/truncate to scales greater than " +
-              ScalarType.MAX_SCALE + ".");
-        }
+        // If scale is greater than the scale of the decimal, this should be a no-op,
+        // so we do not need change the scale of the output decimal.
+        digitsAfter = Math.min(digitsAfter, (int)scaleLiteral.getLongValue());
+        Preconditions.checkState(digitsAfter <= ScalarType.MAX_SCALE);
         // Round/Truncate to a negative scale means to round to the digit before
         // the decimal e.g. round(1234.56, -2) would be 1200.
         // The resulting scale is always 0.
@@ -446,11 +445,15 @@ public class FunctionCallExpr extends Expr {
            fnName_.getFunction().equalsIgnoreCase("dround")) &&
           digitsAfter < childType.decimalScale()) {
         // If we are rounding to fewer decimal places, it's possible we need another
-        // digit before the decimal.
+        // digit before the decimal if the value gets rounded up.
         ++digitsBefore;
       }
     }
     Preconditions.checkState(returnType.isDecimal() && !returnType.isWildcardDecimal());
+    if (analyzer.isDecimalV2()) {
+      if (digitsBefore + digitsAfter > 38) return Type.INVALID;
+      return ScalarType.createDecimalType(digitsBefore + digitsAfter, digitsAfter);
+    }
     return ScalarType.createClippedDecimalType(digitsBefore + digitsAfter, digitsAfter);
   }
 
@@ -587,7 +590,7 @@ public class FunctionCallExpr extends Expr {
           "Analytic function requires an OVER clause: " + toSql());
     }
 
-    castForFunctionCall(false);
+    castForFunctionCall(false, analyzer.isDecimalV2());
     type_ = fn_.getReturnType();
     if (type_.isDecimal() && type_.isWildcardDecimal()) {
       type_ = resolveDecimalReturnType(analyzer);

@@ -47,31 +47,17 @@ public class TypesUtil {
   }
 
   /**
-   * Returns the smallest integer type that can store decType without loss
-   * of precision. decType must have scale == 0.
-   * In the case where the decimal can be bigger than BIGINT, we return
-   * BIGINT (and the execution will report it as overflows).
-   */
-  public static ScalarType getContainingIntType(ScalarType decType) {
-    Preconditions.checkState(decType.isFullySpecifiedDecimal());
-    Preconditions.checkState(decType.decimalScale() == 0);
-    // TINYINT_MAX = 128
-    if (decType.decimalPrecision() <= 2) return Type.TINYINT;
-    // SMALLINT_MAX = 32768
-    if (decType.decimalPrecision() <= 4) return Type.SMALLINT;
-    // INT_MAX = 2147483648
-    if (decType.decimalPrecision() <= 9) return Type.INT;
-    return Type.BIGINT;
-  }
-
-  /**
    * Returns the decimal type that can hold t1 and t2 without loss of precision.
    * decimal(10, 2) && decimal(12, 2) -> decimal(12, 2)
    * decimal (10, 5) && decimal(12, 3) -> decimal(14, 5)
    * Either t1 or t2 can be a wildcard decimal (but not both).
+   *
+   * If strictDecimal is true, returns a type that results in no loss of information. If
+   * this is not possible, returns INVLAID. For example,
+   * decimal(38,0) && decimal(38,38) -> INVALID.
    */
   public static ScalarType getDecimalAssignmentCompatibleType(
-      ScalarType t1, ScalarType t2) {
+      ScalarType t1, ScalarType t2, boolean strictDecimal) {
     Preconditions.checkState(t1.isDecimal());
     Preconditions.checkState(t2.isDecimal());
     Preconditions.checkState(!(t1.isWildcardDecimal() && t2.isWildcardDecimal()));
@@ -87,6 +73,10 @@ public class TypesUtil {
     int p2 = t2.decimalPrecision();
     int digitsBefore = Math.max(p1 - s1, p2 - s2);
     int digitsAfter = Math.max(s1, s2);
+    if (strictDecimal) {
+      if (digitsBefore + digitsAfter > 38) return Type.INVALID;
+      return ScalarType.createDecimalType(digitsBefore + digitsAfter, digitsAfter);
+    }
     return ScalarType.createClippedDecimalType(digitsBefore + digitsAfter, digitsAfter);
   }
 
@@ -95,7 +85,7 @@ public class TypesUtil {
    * if the operation does not make sense for the types.
    */
   public static Type getArithmeticResultType(Type t1, Type t2,
-      ArithmeticExpr.Operator op, boolean decimal_v2) throws AnalysisException {
+      ArithmeticExpr.Operator op, boolean decimalV2) throws AnalysisException {
     Preconditions.checkState(t1.isNumericType() || t1.isNull());
     Preconditions.checkState(t2.isNumericType() || t2.isNull());
 
@@ -116,7 +106,7 @@ public class TypesUtil {
       t2 = ((ScalarType) t2).getMinResolutionDecimal();
       Preconditions.checkState(t1.isDecimal());
       Preconditions.checkState(t2.isDecimal());
-      return getDecimalArithmeticResultType(t1, t2, op, decimal_v2);
+      return getDecimalArithmeticResultType(t1, t2, op, decimalV2);
     }
 
     Type type = null;
@@ -128,12 +118,12 @@ public class TypesUtil {
         // Otherwise, promote the compatible type to the next higher resolution type,
         // to ensure that that a <op> b won't overflow/underflow.
         Type compatibleType =
-            ScalarType.getAssignmentCompatibleType(t1, t2, false);
+            ScalarType.getAssignmentCompatibleType(t1, t2, false, false);
         Preconditions.checkState(compatibleType.isScalarType());
         type = ((ScalarType) compatibleType).getNextResolutionType();
         break;
       case MOD:
-        type = ScalarType.getAssignmentCompatibleType(t1, t2, false);
+        type = ScalarType.getAssignmentCompatibleType(t1, t2, false, false);
         break;
       case DIVIDE:
         type = Type.DOUBLE;
@@ -152,8 +142,8 @@ public class TypesUtil {
    * TODO: IMPALA-4924: remove DECIMAL V1 code.
    */
   private static ScalarType getDecimalArithmeticResultType(Type t1, Type t2,
-      ArithmeticExpr.Operator op, boolean decimal_v2) throws AnalysisException {
-    if (decimal_v2) return getDecimalArithmeticResultTypeV2(t1, t2, op);
+      ArithmeticExpr.Operator op, boolean decimalV2) throws AnalysisException {
+    if (decimalV2) return getDecimalArithmeticResultTypeV2(t1, t2, op);
     return getDecimalArithmeticResultTypeV1(t1, t2, op);
   }
 

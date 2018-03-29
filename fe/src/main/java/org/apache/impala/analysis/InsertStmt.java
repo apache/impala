@@ -669,7 +669,8 @@ public class InsertStmt extends StatementBase {
     for (int i = 0; i < selectListExprs.size(); ++i) {
       Column targetColumn = selectExprTargetColumns.get(i);
       Expr compatibleExpr = checkTypeCompatibility(
-          targetTableName_.toString(), targetColumn, selectListExprs.get(i));
+          targetTableName_.toString(), targetColumn, selectListExprs.get(i),
+          analyzer.getQueryOptions().isDecimal_v2());
       if (targetColumn.getPosition() < numClusteringCols) {
         // This is a dynamic clustering column
         tmpPartitionKeyExprs.add(compatibleExpr);
@@ -691,7 +692,8 @@ public class InsertStmt extends StatementBase {
           // tableColumns is guaranteed to exist after the earlier analysis checks
           Column tableColumn = table_.getColumn(pkv.getColName());
           Expr compatibleExpr = checkTypeCompatibility(
-              targetTableName_.toString(), tableColumn, pkv.getLiteralValue());
+              targetTableName_.toString(), tableColumn,
+              pkv.getLiteralValue(), analyzer.isDecimalV2());
           tmpPartitionKeyExprs.add(compatibleExpr);
           tmpPartitionKeyNames.add(pkv.getColName());
         }
