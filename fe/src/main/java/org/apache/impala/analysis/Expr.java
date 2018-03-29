@@ -426,7 +426,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   /**
    * Generates the necessary casts for the children of this expr to call fn_.
    * child(0) is cast to the function's first argument, child(1) to the second etc.
-   * This does not do any validation and the casts are assumed to be safe.
    *
    * If ignoreWildcardDecimals is true, the function will not cast arguments that
    * are wildcard decimals. This is used for builtins where the cast is done within
@@ -437,18 +436,42 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * e.g. fn(decimal(*), decimal(*))
    *      called with fn(decimal(10,2), decimal(5,3))
    * both children will be cast to (11, 3).
+   *
+   * If strictDecimal is true, we will only consider casts between decimal types that
+   * result in no loss of information. If it is not possible to come with such casts,
+   * we will throw an exception.
    */
-  protected void castForFunctionCall(boolean ignoreWildcardDecimals)
-      throws AnalysisException {
+  protected void castForFunctionCall(
+      boolean ignoreWildcardDecimals, boolean strictDecimal) throws AnalysisException {
     Preconditions.checkState(fn_ != null);
     Type[] fnArgs = fn_.getArgs();
-    Type resolvedWildcardType = getResolvedWildCardType();
+    Type resolvedWildcardType = getResolvedWildCardType(strictDecimal);
+    if (resolvedWildcardType != null) {
+      if (resolvedWildcardType.isNull()) {
+        throw new AnalysisException(String.format(
+            "Cannot resolve DECIMAL precision and scale from NULL type in %s function.",
+            fn_.getFunctionName().getFunction()));
+      }
+      if (resolvedWildcardType.isInvalid() && !ignoreWildcardDecimals) {
+        StringBuilder argTypes = new StringBuilder();
+        for (int j = 0; j < children_.size(); ++j) {
+          if (argTypes.length() > 0) argTypes.append(", ");
+          Type childType = children_.get(j).type_;
+          argTypes.append(childType.toSql());
+        }
+        throw new AnalysisException(String.format(
+            "Cannot resolve DECIMAL types of the %s(%s) function arguments. You need " +
+            "to wrap the arguments in a CAST.", fn_.getFunctionName().getFunction(),
+            argTypes.toString()));
+      }
+    }
     for (int i = 0; i < children_.size(); ++i) {
       // For varargs, we must compare with the last type in fnArgs.argTypes.
       int ix = Math.min(fnArgs.length - 1, i);
       if (fnArgs[ix].isWildcardDecimal()) {
         if (children_.get(i).type_.isDecimal() && ignoreWildcardDecimals) continue;
         Preconditions.checkState(resolvedWildcardType != null);
+        Preconditions.checkState(!resolvedWildcardType.isInvalid());
         if (!children_.get(i).type_.equals(resolvedWildcardType)) {
           castChild(resolvedWildcardType, i);
         }
@@ -460,9 +483,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   /**
    * Returns the max resolution type of all the wild card decimal types.
-   * Returns null if there are no wild card types.
+   * Returns null if there are no wild card types. If strictDecimal is enabled, will
+   * return an invalid type if it is not possible to come up with a decimal type that
+   * is guaranteed to not lose information.
    */
-  Type getResolvedWildCardType() throws AnalysisException {
+  Type getResolvedWildCardType(boolean strictDecimal) {
     Type result = null;
     Type[] fnArgs = fn_.getArgs();
     for (int i = 0; i < children_.size(); ++i) {
@@ -475,19 +500,18 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
           "Child expr should have been resolved.");
       Preconditions.checkState(childType.isScalarType(),
           "Function should not have resolved with a non-scalar child type.");
-      ScalarType decimalType = (ScalarType) childType;
       if (result == null) {
+        ScalarType decimalType = (ScalarType) childType;
         result = decimalType.getMinResolutionDecimal();
       } else {
-        result = Type.getAssignmentCompatibleType(result, childType, false);
+        Preconditions.checkState(childType.isDecimal() || result.isDecimal());
+        result = Type.getAssignmentCompatibleType(
+            result, childType, false, strictDecimal);
       }
     }
-    if (result != null) {
-      if (result.isNull()) {
-        throw new AnalysisException(
-            "Cannot resolve DECIMAL precision and scale from NULL type.");
-      }
-      Preconditions.checkState(result.isDecimal() && !result.isWildcardDecimal());
+    if (result != null && !result.isNull()) {
+      Preconditions.checkState(result.isDecimal() || result.isInvalid());
+      Preconditions.checkState(!result.isWildcardDecimal());
     }
     return result;
   }
@@ -1232,7 +1256,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *           failure to convert a string literal to a date literal
    */
   public final Expr castTo(Type targetType) throws AnalysisException {
-    Type type = Type.getAssignmentCompatibleType(this.type_, targetType, false);
+    Type type = Type.getAssignmentCompatibleType(this.type_, targetType, false, false);
     Preconditions.checkState(type.isValid(), "cast %s to %s", this.type_, targetType);
     // If the targetType is NULL_TYPE then ignore the cast because NULL_TYPE
     // is compatible with all types and no cast is necessary.

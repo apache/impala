@@ -373,8 +373,8 @@ public class AnalyticExpr extends Expr {
    * Checks that the value expr of an offset boundary of a RANGE window is compatible
    * with orderingExprs (and that there's only a single ordering expr).
    */
-  private void checkRangeOffsetBoundaryExpr(AnalyticWindow.Boundary boundary)
-      throws AnalysisException {
+  private void checkRangeOffsetBoundaryExpr(
+      AnalyticWindow.Boundary boundary) throws AnalysisException {
     Preconditions.checkState(boundary.getType().isOffset());
     if (orderByElements_.size() > 1) {
       throw new AnalysisException("Only one ORDER BY expression allowed if used with "
@@ -382,7 +382,7 @@ public class AnalyticExpr extends Expr {
     }
     Expr rangeExpr = boundary.getExpr();
     if (!Type.isImplicitlyCastable(
-        rangeExpr.getType(), orderByElements_.get(0).getExpr().getType(), false)) {
+        rangeExpr.getType(), orderByElements_.get(0).getExpr().getType(), false, true)) {
       throw new AnalysisException(
           "The value expression of a PRECEDING/FOLLOWING clause of a RANGE window must "
             + "be implicitly convertable to the ORDER BY expression's type: "

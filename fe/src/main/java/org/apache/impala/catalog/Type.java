@@ -285,17 +285,23 @@ public abstract class Type {
 
   /**
    * Returns true if t1 can be implicitly cast to t2 according to Impala's casting rules.
-   * Implicit casts are always allowed when no loss of precision would result (i.e. every
-   * value of t1 can be represented exactly by a value of t2). Implicit casts are allowed
-   * in certain other cases such as casting numeric types to floating point types and
-   * converting strings to timestamps.
-   * If strict is true, only consider casts that result in no loss of precision.
+   * Implicit casts are always allowed when no loss of information would result (i.e.
+   * every value of t1 can be represented exactly by a value of t2). Implicit casts are
+   * allowed in certain other cases such as casting numeric types to floating point types
+   * and converting strings to timestamps.
+   *
+   * If strictDecimal is true, only consider casts that result in no loss of information
+   * when casting between decimal types.
+   * If strict is true, only consider casts that result in no loss of information when
+   * casting between any two types other than both decimals.
+   *
    * TODO: Support casting of non-scalar types.
    */
-  public static boolean isImplicitlyCastable(Type t1, Type t2, boolean strict) {
+  public static boolean isImplicitlyCastable(
+      Type t1, Type t2, boolean strict, boolean strictDecimal) {
     if (t1.isScalarType() && t2.isScalarType()) {
       return ScalarType.isImplicitlyCastable(
-          (ScalarType) t1, (ScalarType) t2, strict);
+          (ScalarType) t1, (ScalarType) t2, strict, strictDecimal);
     }
     return false;
   }
@@ -305,12 +311,20 @@ public abstract class Type {
    * explicit cast. If strict, does not consider conversions that would result in loss
    * of precision (e.g. converting decimal to float). Returns INVALID_TYPE if there is
    * no such type or if any of t1 and t2 is INVALID_TYPE.
+   *
+   * If strictDecimal is true, only consider casts that result in no loss of information
+   * when casting between decimal types.
+   * If strict is true, only consider casts that result in no loss of information when
+   * casting between any two types other than both decimals.
+   *
+   *
    * TODO: Support non-scalar types.
    */
-  public static Type getAssignmentCompatibleType(Type t1, Type t2, boolean strict) {
+  public static Type getAssignmentCompatibleType(
+      Type t1, Type t2, boolean strict, boolean strictDecimal) {
     if (t1.isScalarType() && t2.isScalarType()) {
       return ScalarType.getAssignmentCompatibleType(
-          (ScalarType) t1, (ScalarType) t2, strict);
+          (ScalarType) t1, (ScalarType) t2, strict, strictDecimal);
     }
     return ScalarType.INVALID;
   }

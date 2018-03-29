@@ -200,9 +200,11 @@ public class BinaryPredicate extends Predicate {
       }
     }
 
-    // Don't perform any casting for predicates with subqueries here. Any casting
-    // required will be performed when the subquery is unnested.
-    if (!contains(Subquery.class)) castForFunctionCall(true);
+    if (!contains(Subquery.class)) {
+      // Don't perform any casting for predicates with subqueries here. Any casting
+      // required will be performed when the subquery is unnested.
+      castForFunctionCall(true, analyzer.isDecimalV2());
+    }
 
     // Determine selectivity
     // TODO: Compute selectivity for nested predicates.

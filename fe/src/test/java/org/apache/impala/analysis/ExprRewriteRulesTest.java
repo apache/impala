@@ -296,6 +296,9 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
         "TIMESTAMP '2016-11-09 00:00:00'");
     RewritesOk("cast('2016-11-09' as timestamp) + interval 1 year", rule,
         "TIMESTAMP '2017-11-09 00:00:00'");
+    // Tests that exprs that warn during their evaluation are not folded.
+    RewritesOk("CAST('9999-12-31 21:00:00' AS TIMESTAMP) + INTERVAL 1 DAYS", rule,
+        "TIMESTAMP '9999-12-31 21:00:00' + INTERVAL 1 DAYS");
 
     // Tests correct handling of strings with escape sequences.
     RewritesOk("'_' LIKE '\\\\_'", rule, "TRUE");
@@ -308,8 +311,6 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("rand()", rule, null);
     RewritesOk("random()", rule, null);
     RewritesOk("uuid()", rule, null);
-    // Tests that exprs that warn during their evaluation are not folded.
-    RewritesOk("coalesce(1.8, cast(int_col as decimal(38,38)))", rule, null);
   }
 
   @Test

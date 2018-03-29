@@ -376,7 +376,8 @@ public class ScalarType extends Type {
     } else if (isNull()) {
       return ScalarType.NULL;
     } else if (isDecimal()) {
-      return createClippedDecimalType(MAX_PRECISION, scale_);
+      Preconditions.checkState(scale_ <= MAX_PRECISION);
+      return createDecimalType(MAX_PRECISION, scale_);
     } else {
       return ScalarType.INVALID;
     }
@@ -387,7 +388,8 @@ public class ScalarType extends Type {
     if (type_ == PrimitiveType.DOUBLE || type_ == PrimitiveType.BIGINT || isNull()) {
       return this;
     } else if (type_ == PrimitiveType.DECIMAL) {
-      return createClippedDecimalType(MAX_PRECISION, scale_);
+      Preconditions.checkState(scale_ <= MAX_PRECISION);
+      return createDecimalType(MAX_PRECISION, scale_);
     }
     return createType(PrimitiveType.values()[type_.ordinal() + 1]);
   }
@@ -426,12 +428,16 @@ public class ScalarType extends Type {
 
   /**
    * Return type t such that values from both t1 and t2 can be assigned to t.
-   * If strict, only return types when there will be no loss of precision.
    * Returns INVALID_TYPE if there is no such type or if any of t1 and t2
    * is INVALID_TYPE.
+   *
+   * If strictDecimal is true, only return types that result in no loss of information
+   * when both inputs are decimal.
+   * If strict is true, only return types that result in no loss of information
+   * when at least one of the inputs is not decimal.
    */
   public static ScalarType getAssignmentCompatibleType(ScalarType t1,
-      ScalarType t2, boolean strict) {
+      ScalarType t2, boolean strict, boolean strictDecimal) {
     if (!t1.isValid() || !t2.isValid()) return INVALID;
     if (t1.equals(t2)) return t1;
     if (t1.isNull()) return t2;
@@ -489,7 +495,8 @@ public class ScalarType extends Type {
       }
       if (t1Decimal.isSupertypeOf(t2Decimal)) return t1;
       if (t2Decimal.isSupertypeOf(t1Decimal)) return t2;
-      return TypesUtil.getDecimalAssignmentCompatibleType(t1Decimal, t2Decimal);
+      return TypesUtil.getDecimalAssignmentCompatibleType(
+          t1Decimal, t2Decimal, strictDecimal);
     }
 
     PrimitiveType smallerType =
@@ -509,10 +516,14 @@ public class ScalarType extends Type {
 
   /**
    * Returns true t1 can be implicitly cast to t2, false otherwise.
-   * If strict is true, only consider casts that result in no loss of precision.
+   *
+   * If strictDecimal is true, only consider casts that result in no loss of information
+   * when casting between decimal types.
+   * If strict is true, only consider casts that result in no loss of information when
+   * casting between any two types other than both decimals.
    */
   public static boolean isImplicitlyCastable(ScalarType t1, ScalarType t2,
-      boolean strict) {
-    return getAssignmentCompatibleType(t1, t2, strict).matchesType(t2);
+      boolean strict, boolean strictDecimal) {
+    return getAssignmentCompatibleType(t1, t2, strict, strictDecimal).matchesType(t2);
   }
 }

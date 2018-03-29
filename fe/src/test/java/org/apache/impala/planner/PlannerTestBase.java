@@ -40,7 +40,6 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestFileParser;
 import org.apache.impala.testutil.TestFileParser.Section;
@@ -339,36 +338,30 @@ public class PlannerTestBase extends FrontendTestBase {
   /**
    * Extracts and returns the expected error message from expectedPlan.
    * Returns null if expectedPlan is empty or its first element is not an error message.
-   * The accepted format for error messages is 'not implemented: expected error message'
-   * Returns the empty string if expectedPlan starts with 'not implemented' but no
-   * expected error message was given.
+   * The accepted format for error messages is the exception string. We currently
+   * support only NotImplementedException and InternalException.
    */
   private String getExpectedErrorMessage(ArrayList<String> expectedPlan) {
     if (expectedPlan == null || expectedPlan.isEmpty()) return null;
-    if (!expectedPlan.get(0).toLowerCase().startsWith("not implemented")) return null;
-    // Find first ':' and extract string on right hand side as error message.
-    int ix = expectedPlan.get(0).indexOf(":");
-    if (ix + 1 > 0) {
-      return expectedPlan.get(0).substring(ix + 1).trim();
-    } else {
-      return "";
-    }
+    if (!expectedPlan.get(0).contains("NotImplementedException") &&
+        !expectedPlan.get(0).contains("InternalException")) return null;
+    return expectedPlan.get(0).trim();
   }
 
-  private void handleNotImplException(String query, String expectedErrorMsg,
+  private void handleException(String query, String expectedErrorMsg,
       StringBuilder errorLog, StringBuilder actualOutput, Throwable e) {
-    boolean isImplemented = expectedErrorMsg == null;
-    actualOutput.append("not implemented: " + e.getMessage() + "\n");
-    if (isImplemented) {
-      errorLog.append("query:\n" + query + "\nPLAN not implemented: "
-          + e.getMessage() + "\n");
+    actualOutput.append(e.toString() + "\n");
+    if (expectedErrorMsg == null) {
+      // Exception is unexpected
+      errorLog.append(String.format("Query:\n%s\nError Stack:\n%s\n", query,
+          ExceptionUtils.getStackTrace(e)));
     } else {
       // Compare actual and expected error messages.
       if (expectedErrorMsg != null && !expectedErrorMsg.isEmpty()) {
-        if (!e.getMessage().toLowerCase().startsWith(expectedErrorMsg.toLowerCase())) {
+        String actualErrorMsg = e.getClass().getSimpleName() + ": " + e.getMessage();
+        if (!actualErrorMsg.toLowerCase().startsWith(expectedErrorMsg.toLowerCase())) {
           errorLog.append("query:\n" + query + "\nExpected error message: '"
-              + expectedErrorMsg + "'\nActual error message: '"
-              + e.getMessage() + "'\n");
+              + expectedErrorMsg + "'\nActual error message: '" + actualErrorMsg + "'\n");
         }
       }
     }
@@ -513,12 +506,9 @@ public class PlannerTestBase extends FrontendTestBase {
     if (sectionExists) actualOutput.append(section.getHeader() + "\n");
     try {
       execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
-    } catch (NotImplementedException e) {
-      if (!sectionExists) return null;
-      handleNotImplException(query, expectedErrorMsg, errorLog, actualOutput, e);
     } catch (Exception e) {
-      errorLog.append(String.format("Query:\n%s\nError Stack:\n%s\n", query,
-          ExceptionUtils.getStackTrace(e)));
+      if (!sectionExists) return null;
+      handleException(query, expectedErrorMsg, errorLog, actualOutput, e);
     }
     // No expected plan was specified for section. Skip expected/actual comparison.
     if (!sectionExists) return execRequest;

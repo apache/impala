@@ -173,19 +173,23 @@ public abstract class StatementBase implements ParseNode {
 
   /**
    * Checks that 'srcExpr' is type compatible with 'dstCol' and returns a type compatible
-   * expression by applying a CAST() if needed. Throws an AnalysisException the types
+   * expression by applying a CAST() if needed. Throws an AnalysisException if the types
    * are incompatible. 'dstTableName' is only used when constructing an AnalysisException
    * message.
+   *
+   * If strictDecimal is true, only consider casts that result in no loss of information
+   * when casting between decimal types.
    */
-  protected Expr checkTypeCompatibility(String dstTableName, Column dstCol, Expr srcExpr)
-      throws AnalysisException {
+  protected Expr checkTypeCompatibility(String dstTableName, Column dstCol,
+      Expr srcExpr, boolean strictDecimal) throws AnalysisException {
     Type dstColType = dstCol.getType();
     Type srcExprType = srcExpr.getType();
 
     // Trivially compatible, unless the type is complex.
     if (dstColType.equals(srcExprType) && !dstColType.isComplexType()) return srcExpr;
 
-    Type compatType = Type.getAssignmentCompatibleType(dstColType, srcExprType, false);
+    Type compatType = Type.getAssignmentCompatibleType(
+        dstColType, srcExprType, false, strictDecimal);
     if (!compatType.isValid()) {
       throw new AnalysisException(String.format(
           "Target table '%s' is incompatible with source expressions.\nExpression '%s' " +

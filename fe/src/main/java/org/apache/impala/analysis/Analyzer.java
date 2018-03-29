@@ -2245,7 +2245,7 @@ public class Analyzer {
       newCompatibleType = expr.getType();
     } else {
       newCompatibleType = Type.getAssignmentCompatibleType(
-          lastCompatibleType, expr.getType(), false);
+          lastCompatibleType, expr.getType(), false, isDecimalV2());
     }
     if (!newCompatibleType.isValid()) {
       throw new AnalysisException(String.format(
@@ -2320,6 +2320,7 @@ public class Analyzer {
   public TQueryOptions getQueryOptions() {
     return globalState_.queryCtx.client_request.getQuery_options();
   }
+  public boolean isDecimalV2() { return getQueryOptions().isDecimal_v2(); }
   public AuthorizationConfig getAuthzConfig() { return globalState_.authzConfig; }
   public ListMap<TNetworkAddress> getHostIndex() { return globalState_.hostIndex; }
   public ColumnLineageGraph getColumnLineageGraph() { return globalState_.lineageGraph; }

@@ -1219,7 +1219,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         Type.BIGINT, Type.FLOAT, Type.DOUBLE , Type.NULL };
     for (Type type1: numericTypes) {
       for (Type type2: numericTypes) {
-        Type t = Type.getAssignmentCompatibleType(type1, type2, false);
+        Type t = Type.getAssignmentCompatibleType(type1, type2, false, false);
         assertTrue(t.isScalarType());
         ScalarType compatibleType = (ScalarType) t;
         Type promotedType = compatibleType.getNextResolutionType();
@@ -1301,9 +1301,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       for (Type type1: types) {
         for (Type type2: types) {
           // Prefer strict matching.
-          Type compatibleType = Type.getAssignmentCompatibleType(type1, type2, true);
+          Type compatibleType = Type.getAssignmentCompatibleType(
+              type1, type2, true, true);
           if (compatibleType.isInvalid()) {
-            compatibleType = Type.getAssignmentCompatibleType(type1, type2, false);
+            compatibleType = Type.getAssignmentCompatibleType(
+                type1, type2, false, false);
           }
           typeCastTest(type1, type2, false, null, cmpOp, compatibleType);
           typeCastTest(type1, type2, true, null, cmpOp, compatibleType);
@@ -2517,14 +2519,13 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     AnalysisError("select round(cast(1.123 as decimal(10,3)), 5.1)",
         "No matching function with signature: round(DECIMAL(10,3), DECIMAL(2,1))");
-    AnalysisError("select round(cast(1.123 as decimal(30,20)), 40)",
-        "Cannot round/truncate to scales greater than 38.");
+    AnalyzesOk("select round(cast(1.123 as decimal(30,20)), 40)");
     for (final String alias : aliasesOfTruncate) {
-        AnalysisError(String.format("select truncate(cast(1.123 as decimal(10,3)), 40)",
-            alias), "Cannot round/truncate to scales greater than 38.");
+        AnalyzesOk(String.format("select %s(cast(1.123 as decimal(10,3)), 40)", alias));
         AnalyzesOk(String.format("select %s(NULL)", alias));
         AnalysisError(String.format("select %s(NULL, 1)", alias),
-            "Cannot resolve DECIMAL precision and scale from NULL type.");
+            String.format("Cannot resolve DECIMAL precision and scale from NULL type " +
+                "in %s function.", alias));
     }
     AnalysisError("select round(cast(1.123 as decimal(10,3)), NULL)",
         "round() cannot be called with a NULL second argument.");
@@ -2537,18 +2538,22 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "No matching function with signature: precision(FLOAT)");
 
     AnalysisError("select precision(NULL)",
-        "Cannot resolve DECIMAL precision and scale from NULL type.");
+        "Cannot resolve DECIMAL precision and scale from NULL type in " +
+            "precision function");
     AnalysisError("select scale(NULL)",
-        "Cannot resolve DECIMAL precision and scale from NULL type.");
+        "Cannot resolve DECIMAL precision and scale from NULL type in " +
+            "scale function.");
 
     testDecimalExpr("round(1.23)", ScalarType.createDecimalType(2, 0));
     testDecimalExpr("round(1.23, 1)", ScalarType.createDecimalType(3, 1));
     testDecimalExpr("round(1.23, 0)", ScalarType.createDecimalType(2, 0));
-    testDecimalExpr("round(1.23, 3)", ScalarType.createDecimalType(4, 3));
+    testDecimalExpr("round(1.23, 3)", ScalarType.createDecimalType(3, 2));
     testDecimalExpr("round(1.23, -1)", ScalarType.createDecimalType(2, 0));
     testDecimalExpr("round(1.23, -2)", ScalarType.createDecimalType(2, 0));
     testDecimalExpr("round(cast(1.23 as decimal(3,2)), -2)",
         ScalarType.createDecimalType(2, 0));
+    testDecimalExpr("round(cast(1.23 as decimal(30, 20)), 40)",
+        ScalarType.createDecimalType(30, 20));
 
     testDecimalExpr("ceil(123.45)", ScalarType.createDecimalType(4, 0));
     testDecimalExpr("floor(12.345)", ScalarType.createDecimalType(3, 0));
@@ -2561,12 +2566,56 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         testDecimalExpr(String.format("%s(1.23, 0)", alias),
             ScalarType.createDecimalType(1, 0));
         testDecimalExpr(String.format("%s(1.23, 3)", alias),
-            ScalarType.createDecimalType(4, 3));
+            ScalarType.createDecimalType(3, 2));
         testDecimalExpr(String.format("%s(1.23, -1)", alias),
             ScalarType.createDecimalType(1, 0));
         testDecimalExpr(String.format("%s(1.23, -2)", alias),
             ScalarType.createDecimalType(1, 0));
+        testDecimalExpr(String.format("%s(cast(1.23 as decimal(30, 20)), 40)", alias),
+            ScalarType.createDecimalType(30, 20));
     }
+
+    AnalysisContext decimalV1Ctx = createAnalysisCtx();
+    decimalV1Ctx.getQueryOptions().setDecimal_v2(false);
+    AnalysisContext decimalV2Ctx = createAnalysisCtx();
+    decimalV2Ctx.getQueryOptions().setDecimal_v2(true);
+
+    testDecimalExpr("coalesce(cast(0.789 as decimal(19, 19)), " +
+        "cast(123 as decimal(19, 0)))", ScalarType.createDecimalType(38, 19));
+    AnalyzesOk("select coalesce(cast(0.789 as decimal(20, 20)), " +
+            "cast(123 as decimal(19, 0)))", decimalV1Ctx);
+    AnalysisError("select coalesce(cast(0.789 as decimal(20, 20)), " +
+        "cast(123 as decimal(19, 0)))", decimalV2Ctx,
+        "Cannot resolve DECIMAL types of the coalesce(DECIMAL(20,20), " +
+        "DECIMAL(19,0)) function arguments. You need to wrap the arguments in a CAST.");
+
+    testDecimalExpr("if(true, cast(0.789 as decimal(19, 19)), " +
+        "cast(123 as decimal(19, 0)))", ScalarType.createDecimalType(38, 19));
+    AnalyzesOk("select if(true, cast(0.789 as decimal(20, 20)), " +
+            "cast(123 as decimal(19, 0)))", decimalV1Ctx);
+    AnalysisError("select if(true, cast(0.789 as decimal(20, 20)), " +
+        "cast(123 as decimal(19, 0)))", decimalV2Ctx,
+        "Cannot resolve DECIMAL types of the if(BOOLEAN, " +
+        "DECIMAL(20,20), DECIMAL(19,0)) function arguments. " +
+        "You need to wrap the arguments in a CAST.");
+
+    testDecimalExpr("isnull(cast(0.789 as decimal(19, 19)), " +
+        "cast(123 as decimal(19, 0)))", ScalarType.createDecimalType(38, 19));
+    AnalyzesOk("select isnull(cast(0.789 as decimal(20, 20)), " +
+        "cast(123 as decimal(19, 0)))", decimalV1Ctx);
+    AnalysisError("select isnull(cast(0.789 as decimal(20, 20)), " +
+        "cast(123 as decimal(19, 0)))", decimalV2Ctx,
+        "Cannot resolve DECIMAL types of the isnull(DECIMAL(20,20), " +
+        "DECIMAL(19,0)) function arguments. You need to wrap the arguments in a CAST.");
+
+    testDecimalExpr("case 1 when 0 then cast(0.789 as decimal(19, 19)) " +
+        "else cast(123 as decimal(19, 0)) end", ScalarType.createDecimalType(38, 19));
+    AnalyzesOk("select case 1 when 0 then cast(0.789 as decimal(19, 19)) " +
+            "else cast(123 as decimal(20, 0)) end", decimalV1Ctx);
+    AnalysisError("select case 1 when 0 then cast(0.789 as decimal(19, 19)) " +
+        "else cast(123 as decimal(20, 0)) end", decimalV2Ctx,
+        "Incompatible return types 'DECIMAL(19,19)' and 'DECIMAL(20,0)' " +
+        "of exprs 'CAST(0.789 AS DECIMAL(19,19))' and 'CAST(123 AS DECIMAL(20,0))'.");
   }
 
   /**

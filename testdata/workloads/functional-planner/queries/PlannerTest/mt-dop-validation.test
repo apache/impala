@@ -3,9 +3,9 @@ select count(*) from
 functional_parquet.alltypestiny a,
 functional_parquet.alltypestiny b
 ---- PLAN
-not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
 ---- PARALLELPLANS
-not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
 ====
 # Distributed hash-join not allowed.
 select count(*) from
@@ -13,24 +13,24 @@ functional_parquet.alltypestiny a,
 functional_parquet.alltypestiny b
 where a.id = b.id
 ---- PLAN
-not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
 ---- PARALLELPLANS
-not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
 ====
 # Insert not allowed.
 insert into functional_parquet.alltypes partition(year,month)
 select * from functional_parquet.alltypessmall
 ---- PLAN
-not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
 ---- PARALLELPLANS
-not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
 ====
 # CTAS not allowed.
 create table ctas_mt_dop_test as select * from functional_parquet.alltypes
 ---- PLAN
-not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
 ---- PARALLELPLANS
-not implemented: MT_DOP not supported for plans with base table joins or table sinks.
+NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
 ====
 # Single-table scan/filter/agg/topn should work.
 select count(int_col) cnt from functional_parquet.alltypes
