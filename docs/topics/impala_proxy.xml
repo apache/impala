@@ -95,9 +95,12 @@ under the License.
 
       <ol>
         <li>
-          Download the load-balancing proxy software. It should only need to be installed and configured on a
-          single host. Pick a host other than the DataNodes where <cmdname>impalad</cmdname> is running,
-          because the intention is to protect against the possibility of one or more of these DataNodes becoming unavailable.
+          Select and download the load-balancing proxy software or other
+          load-balancing hardware appliance. It should only need to be installed
+          and configured on a single host, typically on an edge node. Pick a
+          host other than the DataNodes where <cmdname>impalad</cmdname> is
+          running, because the intention is to protect against the possibility
+          of one or more of these DataNodes becoming unavailable.
         </li>
 
         <li>
@@ -105,42 +108,27 @@ under the License.
           In particular:
           <ul>
             <li>
-              <p>
-                Set up a port that the load balancer will listen on to relay Impala requests back and forth.
-              </p>
+              Set up a port that the load balancer will listen on to relay
+              Impala requests back and forth. </li>
+            <li>
+              See <xref href="#proxy_balancing" format="dita"/> for load
+              balancing algorithm options.
             </li>
             <li>
-              <p rev="DOCS-690">
-                Consider using the <i>source affinity</i>
-                algorithm to ensure the sticky sessions. Where practical, enable
-                this setting so that stateless client applications such as
-                  <cmdname>impalad</cmdname> and Hue are not disconnected from
-                long-running queries. Evaluate whether this setting is
-                appropriate for your combination of workload and client
-                applications. See <xref href="#proxy_balancing" format="dita"/>
-                for load balancing algorithm options.
-              </p>
-            </li>
-            <li>
-              <p>
-                For Kerberized clusters, follow the instructions in <xref href="impala_proxy.xml#proxy_kerberos"/>.
-              </p>
+              For Kerberized clusters, follow the instructions in <xref
+                href="impala_proxy.xml#proxy_kerberos"/>.
             </li>
           </ul>
         </li>
 
         <li>
-          Specify the host and port settings for each Impala node. These are the hosts that the load balancer will
-          choose from when relaying each Impala query. See <xref href="impala_ports.xml#ports"/> for when to use
-          port 21000, 21050, or another value depending on what type of connections you are load balancing.
-          <note rev="">
-            <p rev="">
-              In particular, if you are using Hue or JDBC-based applications,
-              you typically set up load balancing for both ports 21000 and 21050, because
-              these client applications connect through port 21050 while the <cmdname>impala-shell</cmdname>
-              command connects through port 21000.
-            </p>
-          </note>
+          If you are using Hue or JDBC-based applications, you typically set
+          up load balancing for both ports 21000 and 21050, because these client
+          applications connect through port 21050 while the
+            <cmdname>impala-shell</cmdname> command connects through port
+          21000. See <xref href="impala_ports.xml#ports"/> for when to use port
+          21000, 21050, or another value depending on what type of connections
+          you are load balancing.
         </li>
 
         <li>
@@ -148,9 +136,11 @@ under the License.
         </li>
 
         <li>
-          For any scripts, jobs, or configuration settings for applications that formerly connected to a specific
-          datanode to run Impala SQL statements, change the connection information (such as the <codeph>-i</codeph>
-          option in <cmdname>impala-shell</cmdname>) to point to the load balancer instead.
+          For any scripts, jobs, or configuration settings for applications
+          that formerly connected to a specific DataNode to run Impala SQL
+          statements, change the connection information (such as the
+            <codeph>-i</codeph> option in <cmdname>impala-shell</cmdname>) to
+          point to the load balancer instead.
         </li>
       </ol>
 
@@ -174,49 +164,56 @@ under the License.
 
       <dl>
         <dlentry>
-          <dt>leastconn</dt>
+          <dt>Leastconn</dt>
           <dd>
             Connects sessions to the coordinator with the fewest connections,
             to balance the load evenly. Typically used for workloads consisting
             of many independent, short-running queries. In configurations with
             only a few client machines, this setting can avoid having all
-            requests go to only a small set of coordinators. Recommended for
-            Impala with F5.
+            requests go to only a small set of coordinators.
+          </dd>
+          <dd>
+            Recommended for Impala with F5.
           </dd>
         </dlentry>
         <dlentry>
-          <dt>source affinity</dt>
+          <dt>Source IP Persistence</dt>
           <dd>
-            Sessions from the same IP address always go to the same coordinator.
-            A good choice for Impala workloads containing a mix of queries and
-            DDL statements, such as <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph>.
-            Because the metadata changes from a DDL statement take time to propagate across the cluster,
-            prefer to use source affinity in this case. If necessary, run the DDL and subsequent
-            queries that depend on the results of the DDL through the same session, for example
-            by running <codeph>impala-shell -f <varname>script_file</varname></codeph> to submit
-            several statements through a single session.
-            An alternative is to set the query option <codeph>SYNC_DDL=1</codeph>
-            to hold back subsequent queries until the results of a DDL operation have propagated
-            throughout the cluster, but that is a relatively expensive setting.
+            <p>
+              Sessions from the same IP address always go to the same
+              coordinator. A good choice for Impala workloads containing a mix
+              of queries and DDL statements, such as <codeph>CREATE TABLE</codeph>
+              and <codeph>ALTER TABLE</codeph>. Because the metadata changes from
+              a DDL statement take time to propagate across the cluster, prefer
+              to use the Source IP Persistence in this case. If you are unable
+              to choose Source IP Persistence, run the DDL and subsequent queries
+              that depend on the results of the DDL through the same session,
+              for example by running <codeph>impala-shell -f <varname>script_file</varname></codeph>
+              to submit several statements through a single session.
+            </p>
           </dd>
           <dd>
-            Recommended for use with Hue.
+            <p>
+              Required for setting up high availability with Hue.
+            </p>
           </dd>
         </dlentry>
         <dlentry>
-          <dt>round-robin</dt>
+          <dt>Round-robin</dt>
           <dd>
-            Distributes connections to all coordinator nodes.
-            Typically not recommended for Impala.
+            <p>
+              Distributes connections to all coordinator nodes.
+              Typically not recommended for Impala.
+            </p>
           </dd>
         </dlentry>
       </dl>
 
       <p>
-        You might need to perform benchmarks and load testing to determine which setting is optimal for your
-        use case. If some client applications have special characteristics, such as long-running Hue queries
-        working best with source affinity, you might configure multiple virtual IP addresses with a
-        different load-balancing algorithm for each.
+        You might need to perform benchmarks and load testing to determine
+        which setting is optimal for your use case. Always set up using two
+        load-balancing algorithms: Source IP Persistence for Hue and Leastconn
+        for others.
       </p>
 
     </conbody>
