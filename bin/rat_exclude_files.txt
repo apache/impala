@@ -17,7 +17,6 @@ shell/__init__.py
 ssh_keys/id_rsa_impala
 testdata/__init__.py
 tests/__init__.py
-bin/diagnostics/__init__.py
 www/index.html
 
 # See $IMPALA_HOME/LICENSE.txt
