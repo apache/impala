@@ -103,6 +103,18 @@ create table tdata_non_existing_host
 Couldn't resolve this master's address bogus.host.name:7051
 ====
 ---- QUERY
+# Valid host with whitespace
+create table tdata_master_addresses_whitespace (id int primary key) stored as kudu
+  tblproperties('kudu.master_addresses' = '  localhost  ')
+---- RESULTS
+====
+---- QUERY
+insert into tdata_master_addresses_whitespace values (0), (1)
+---- DML_RESULTS: tdata_master_addresses_whitespace
+0
+1
+====
+---- QUERY
 # Test that string case is ignored
 create table ignore_column_case (Id int, NAME string, vAlf float, vali bigint,
   primary key (Id, NAME)) PARTITION BY RANGE (PARTITION VALUE = (1, 'Martin'))
