@@ -550,6 +550,14 @@ select instr('foo bar bletch', 'b', 1, null);
         </dd>
 
       </dlentry>
+      <dlentry id="left">
+        <dt>
+          <codeph>left(string a, int num_chars)</codeph>
+        </dt>
+        <dd>
+          See the <codeph>strleft</codeph> function.
+        </dd>
+      </dlentry>
 
       <dlentry id="length">
 
@@ -1000,6 +1008,14 @@ select replace('hello world','xyz','abc');
           </p>
         </dd>
 
+      </dlentry>
+      <dlentry id="right">
+        <dt>
+          <codeph>right(string a, int num_chars)</codeph>
+        </dt>
+        <dd>
+          See the <codeph>strright</codeph> function.
+        </dd>
       </dlentry>
 
       <dlentry id="rpad">
