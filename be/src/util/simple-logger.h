@@ -45,7 +45,7 @@ class SimpleLogger {
   Status AppendEntry(const std::string& entry);
 
   /// Flushes the log file to disk by closing and re-opening the file. This function is
-  /// thread safe and blocks while a WriteEntry() is in progress
+  /// thread safe and blocks while an AppendEntry() is in progress
   Status Flush();
 
  private:
