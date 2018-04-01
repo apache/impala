@@ -72,6 +72,8 @@ class HBaseTestDataRegionAssigment {
   // Maximum time in ms to wait for a region to be split.
   private final static int WAIT_FOR_SPLIT_TIMEOUT = 10000;
 
+  private final static int REGION_MOVE_TIMEOUT_MILLIS = 60000;
+
   public HBaseTestDataRegionAssigment() throws IOException {
     conf = new Configuration();
     connection = ConnectionFactory.createConnection(conf);
@@ -162,8 +164,9 @@ class HBaseTestDataRegionAssigment {
     }
 
     // admin.move() is an asynchronous operation. Wait for the move to complete.
-    // It should be done in 10sec.
-    int sleepCnt = 0;
+    // It should be done in 60 sec.
+    long start = System.currentTimeMillis();
+    long timeout = System.currentTimeMillis() + REGION_MOVE_TIMEOUT_MILLIS;
     while (true) {
       int matched = 0;
       List<Pair<RegionInfo, ServerName>> pairs =
@@ -182,14 +185,18 @@ class HBaseTestDataRegionAssigment {
            continue;
         }
       }
-      if (matched == regions.size()) break;
-      if (sleepCnt < 100) {
+      if (matched == regions.size()) {
+        long elapsed = System.currentTimeMillis() - start;
+        LOG.info("Regions moved after " + elapsed + " millis.");
+        break;
+      }
+      if (System.currentTimeMillis() < timeout) {
         Thread.sleep(100);
-        ++sleepCnt;
         continue;
       }
       throw new IllegalStateException(
-          String.format("Failed to assign regions to servers after 10 seconds."));
+          String.format("Failed to assign regions to servers after " +
+            REGION_MOVE_TIMEOUT_MILLIS + " millis."));
     }
 
     // Force a major compaction such that the HBase table is backed by deterministic
