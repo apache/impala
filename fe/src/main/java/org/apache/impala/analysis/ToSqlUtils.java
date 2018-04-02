@@ -45,6 +45,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
@@ -231,10 +232,8 @@ public class ToSqlUtils {
       }
     }
     RowFormat rowFormat = RowFormat.fromStorageDescriptor(msTable.getSd());
-    HdfsFileFormat format = HdfsFileFormat.fromHdfsInputFormatClass(
-        msTable.getSd().getInputFormat());
-    HdfsCompression compression = HdfsCompression.fromHdfsInputFormatClass(
-        msTable.getSd().getInputFormat());
+    HdfsFileFormat format = null;
+    HdfsCompression compression = null;
     String location = isHbaseTable ? null : msTable.getSd().getLocation();
     Map<String, String> serdeParameters = msTable.getSd().getSerdeInfo().getParameters();
 
@@ -270,6 +269,10 @@ public class ToSqlUtils {
         // We shouldn't output the columns for external tables
         colsSql = null;
       }
+    } else if (table instanceof HdfsTable) {
+      String inputFormat = msTable.getSd().getInputFormat();
+      format = HdfsFileFormat.fromHdfsInputFormatClass(inputFormat);
+      compression = HdfsCompression.fromHdfsInputFormatClass(inputFormat);
     }
     HdfsUri tableLocation = location == null ? null : new HdfsUri(location);
     return getCreateTableSql(table.getDb().getName(), table.getName(), comment, colsSql,
