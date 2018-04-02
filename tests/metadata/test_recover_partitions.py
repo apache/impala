@@ -88,13 +88,13 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
-    assert (self.has_value(PART_NAME, result.data),
-        "ALTER TABLE %s RECOVER PARTITIONS failed." % FQ_TBL_NAME)
+    assert self.has_value(PART_NAME, result.data),\
+        "ALTER TABLE %s RECOVER PARTITIONS failed." % FQ_TBL_NAME
     result = self.execute_query_expect_success(self.client,
         "select c from %s" % FQ_TBL_NAME)
-    assert (self.has_value(INSERTED_VALUE, result.data),
-        "Failed to load tables after ALTER TABLE %s RECOVER PARTITIONS."
-        % FQ_TBL_NAME)
+    assert self.has_value(INSERTED_VALUE, result.data),\
+        "Failed to load tables after ALTER TABLE %s RECOVER PARTITIONS."\
+        % FQ_TBL_NAME
 
     # Test that invalid partition values are ignored during partition recovery.
     result = self.execute_query_expect_success(self.client,
@@ -105,9 +105,9 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
-    assert (len(result.data) == old_length,
-        "ALTER TABLE %s RECOVER PARTITIONS failed to handle invalid partition values."
-        % FQ_TBL_NAME)
+    assert len(result.data) == old_length,\
+        "ALTER TABLE %s RECOVER PARTITIONS failed to handle invalid partition values."\
+        % FQ_TBL_NAME
 
     # Create a directory whose subdirectory names contain __HIVE_DEFAULT_PARTITION__
     # and check that is recovered as a NULL partition.
@@ -121,9 +121,9 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
-    assert (self.has_value("NULL", result.data),
-        "ALTER TABLE %s RECOVER PARTITIONS failed to handle null partition values."
-        % FQ_TBL_NAME)
+    assert self.has_value("NULL", result.data),\
+        "ALTER TABLE %s RECOVER PARTITIONS failed to handle null partition values."\
+        % FQ_TBL_NAME
     result = self.execute_query_expect_success(self.client,
         "select c from %s" % FQ_TBL_NAME)
     assert self.has_value(NULL_INSERTED_VALUE, result.data)
@@ -252,9 +252,9 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
-    assert ((old_length + 1) == len(result.data),
-        "ALTER TABLE %s RECOVER PARTITIONS failed to handle duplicate partition key values."
-        % FQ_TBL_NAME)
+    assert old_length + 1 == len(result.data),\
+        "ALTER TABLE %s RECOVER PARTITIONS failed to handle "\
+        "duplicate partition key values." % FQ_TBL_NAME
 
   @SkipIfLocal.hdfs_client
   def test_post_invalidate(self, vector, unique_database):
@@ -285,9 +285,9 @@ class TestRecoverPartitions(ImpalaTestSuite):
     self.client.execute("INVALIDATE METADATA %s" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
         "select c from %s" % FQ_TBL_NAME)
-    assert (self.has_value(INSERTED_VALUE, result.data),
-        "INVALIDATE can't work on partitions recovered by ALTER TABLE %s RECOVER PARTITIONS."
-        % FQ_TBL_NAME)
+    assert self.has_value(INSERTED_VALUE, result.data),\
+        "INVALIDATE can't work on partitions recovered by "\
+        "ALTER TABLE %s RECOVER PARTITIONS." % FQ_TBL_NAME
     self.execute_query_expect_success(self.client,
         "INSERT INTO TABLE %s PARTITION(i=002, p='p2') VALUES(4)" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
@@ -329,9 +329,9 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
-    assert (len(result.data) == (old_length + 1),
-        "ALTER TABLE %s RECOVER PARTITIONS failed to handle some data types."
-        % FQ_TBL_NAME)
+    assert len(result.data) == (old_length + 1),\
+        "ALTER TABLE %s RECOVER PARTITIONS failed to handle some data types."\
+        % FQ_TBL_NAME
 
     # Test malformed partition values.
     self.check_invalid_partition_values(FQ_TBL_NAME, TBL_LOCATION,
@@ -386,9 +386,9 @@ class TestRecoverPartitions(ImpalaTestSuite):
           "ALTER TABLE %s RECOVER PARTITIONS" % fq_tbl_name)
       result = self.execute_query_expect_success(self.client,
           "SHOW PARTITIONS %s" % fq_tbl_name)
-      assert (len(result.data) == old_length,
-        "ALTER TABLE %s RECOVER PARTITIONS failed to handle invalid partition key values."
-        % fq_tbl_name)
+      assert len(result.data) == old_length,\
+        "ALTER TABLE %s RECOVER PARTITIONS failed to handle "\
+        "invalid partition key values." % fq_tbl_name
 
   def has_value(self, value, lines):
     """Check if lines contain value."""
