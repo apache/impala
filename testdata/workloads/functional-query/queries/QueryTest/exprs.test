@@ -2995,3 +2995,15 @@ select cast('2001-1-2' as timestamp)
 ---- TYPES
 timestamp
 ====
+---- QUERY
+# IMPALA-6771: Test that the in-predicate set does not have default initialized
+# values that can result in wrong results. For a string column the default initialized
+# value is an empty string.
+select count(*) from functional.alltypes
+where regexp_replace(string_col, '1', '')
+in ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
+---- RESULTS
+6570
+---- TYPES
+bigint
+====
