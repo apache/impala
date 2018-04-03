@@ -136,4 +136,29 @@ $ ps ax | grep [i]mpalad
       </note>
     </conbody>
   </concept>
+  <concept id="concept_a2p_szq_jdb">
+    <title>Impala Upgrade Considerations</title>
+    <concept id="concept_mkn_ygr_jdb">
+      <title>Default Setting Changes</title>
+      <conbody>
+        <simpletable frame="all" id="simpletable_x55_ghr_jdb">
+          <sthead>
+            <stentry>Release Changed</stentry>
+            <stentry>Setting</stentry>
+            <stentry>Default Value</stentry>
+          </sthead>
+          <strow>
+            <stentry><keyword keyref="impala212_full"/></stentry>
+            <stentry><codeph>compact_catalog_topic</codeph></stentry>
+            <stentry><codeph>true</codeph></stentry>
+          </strow>
+          <strow>
+            <stentry><keyword keyref="impala212_full"/></stentry>
+            <stentry><codeph>max_cached_file_handle</codeph></stentry>
+            <stentry><codeph>20000</codeph></stentry>
+          </strow>
+        </simpletable>
+      </conbody>
+    </concept>
+  </concept>
 </concept>

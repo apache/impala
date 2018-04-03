@@ -736,12 +736,10 @@ impala hard nproc 262144
         <p><b>Bug:</b> <xref keyref="IMPALA-5500">IMPALA-5500</xref></p>
         <p><b>Severity:</b> Medium</p>
         <p>
-          <b>Workaround:</b> Consider leaving the <codeph>compact_catalog_topic</codeph>
-          configuration setting at its default value of <codeph>false</codeph> until
-          this issue is resolved.
-        </p>
-        <p><b>Resolution:</b> A fix is in the pipeline. Check the status of
-        <xref keyref="IMPALA-5500">IMPALA-5500</xref> for the release where the fix is available.</p>
+          <b>Workaround:</b> Consider setting the
+            <codeph>compact_catalog_topic</codeph> configuration setting to
+            <codeph>false</codeph> until this issue is resolved. </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala210"/>.</p>
       </conbody>
     </concept>
 
@@ -752,7 +750,7 @@ impala hard nproc 262144
         <p><b>Bug:</b> <xref keyref="IMPALA-2294">IMPALA-2294</xref></p>
         <p><b>Severity:</b> High</p>
         <p><b>Workaround:</b></p>
-        <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_start" conrefend="vm_overcommit_memory_end"/>
+        <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_start" conrefend="../shared/impala_common.xml#common/vm_overcommit_memory_end"/>
       </conbody>
     </concept>
 
@@ -1672,13 +1670,15 @@ select
         </p>
 
         <note type="warning">
-          Only use this for external tables, or Impala will remove the data files. In case of an internal table, set it to external first:
+          <p>Only use this for external tables, or Impala will remove the data
+            files. In case of an internal table, set it to external first:
 <codeblock>
 ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 </codeblock>
-          (The part in parentheses is case sensitive.) Make sure to pick the right choice between internal and external when recreating the
-          table. See <xref href="impala_tables.xml#tables"/> for the differences between internal and external tables.
-        </note>
+          (The part in parentheses is case sensitive.) Make sure to pick the
+          right choice between internal and external when recreating the table.
+          See <xref href="impala_tables.xml#tables"/> for the differences
+          between internal and external tables. </p></note>
 
         <p>
           <b>Severity:</b> High
