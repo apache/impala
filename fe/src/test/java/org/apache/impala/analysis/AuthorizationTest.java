@@ -1642,6 +1642,8 @@ public class AuthorizationTest extends FrontendTestBase {
   @Test
   public void TestComputeStatsTable() throws ImpalaException {
     AuthzOk("compute stats functional_seq_snap.alltypes");
+    // User has ALTER privilege on functional.alltypeserror table.
+    AuthzOk("compute stats functional.alltypeserror");
 
     AuthzError("compute stats functional.alltypes",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
@@ -1656,6 +1658,8 @@ public class AuthorizationTest extends FrontendTestBase {
   @Test
   public void TestDropStats() throws ImpalaException {
     AuthzOk("drop stats functional_seq_snap.alltypes");
+    // User has ALTER privilege on functional.alltypeserror table.
+    AuthzOk("drop stats functional.alltypeserror");
 
     AuthzError("drop stats functional.alltypes",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
