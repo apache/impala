@@ -3917,7 +3917,7 @@ sudo pip-python install ssl</codeblock>
       </p>
 
       <p id="kudu_unsupported_data_type" rev="kudu">
-        Currently, the data types <codeph>DECIMAL</codeph>, <codeph>CHAR</codeph>, <codeph>VARCHAR</codeph>,
+        Currently, the data types <codeph>CHAR</codeph>, <codeph>VARCHAR</codeph>,
         <codeph>ARRAY</codeph>, <codeph>MAP</codeph>, and <codeph>STRUCT</codeph> cannot be used with Kudu tables.
       </p>
 
