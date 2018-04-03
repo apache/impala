@@ -162,23 +162,23 @@ export IMPALA_KUDU_VERSION=0eef8e0
 unset IMPALA_KUDU_URL
 
 # Kudu version used to identify Java client jar from maven
-export KUDU_JAVA_VERSION=1.7.0-cdh5.15.0-SNAPSHOT
+export KUDU_JAVA_VERSION=1.7.0-cdh5.16.0-SNAPSHOT
 
 # Versions of Hadoop ecosystem dependencies.
 # ------------------------------------------
 export CDH_MAJOR_VERSION=5
-export IMPALA_HADOOP_VERSION=2.6.0-cdh5.15.0-SNAPSHOT
+export IMPALA_HADOOP_VERSION=2.6.0-cdh5.16.0-SNAPSHOT
 unset IMPALA_HADOOP_URL
-export IMPALA_HBASE_VERSION=1.2.0-cdh5.15.0-SNAPSHOT
+export IMPALA_HBASE_VERSION=1.2.0-cdh5.16.0-SNAPSHOT
 unset IMPALA_HBASE_URL
-export IMPALA_HIVE_VERSION=1.1.0-cdh5.15.0-SNAPSHOT
+export IMPALA_HIVE_VERSION=1.1.0-cdh5.16.0-SNAPSHOT
 unset IMPALA_HIVE_URL
-export IMPALA_SENTRY_VERSION=1.5.1-cdh5.15.0-SNAPSHOT
+export IMPALA_SENTRY_VERSION=1.5.1-cdh5.16.0-SNAPSHOT
 unset IMPALA_SENTRY_URL
-export IMPALA_PARQUET_VERSION=1.5.0-cdh5.15.0-SNAPSHOT
+export IMPALA_PARQUET_VERSION=1.5.0-cdh5.16.0-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 unset IMPALA_LLAMA_MINIKDC_URL
-export IMPALA_KITE_VERSION=1.0.0-cdh5.15.0-SNAPSHOT
+export IMPALA_KITE_VERSION=1.0.0-cdh5.16.0-SNAPSHOT
 
 # Source the branch and local config override files here to override any
 # variables above or any variables below that allow overriding via environment
