@@ -700,10 +700,13 @@ Status Scheduler::Schedule(QuerySchedule* schedule) {
 
   // TODO: Move to admission control, it doesn't need to be in the Scheduler.
   string resolved_pool;
+  // Re-resolve the pool name to propagate any resolution errors now that this request
+  // is known to require a valid pool.
   RETURN_IF_ERROR(request_pool_service_->ResolveRequestPool(
-      schedule->request().query_ctx, &resolved_pool));
-  schedule->set_request_pool(resolved_pool);
-  schedule->summary_profile()->AddInfoString("Request Pool", resolved_pool);
+          schedule->request().query_ctx, &resolved_pool));
+  // Resolved pool name should have been set in the TQueryCtx and shouldn't have changed.
+  DCHECK_EQ(resolved_pool, schedule->request_pool());
+  schedule->summary_profile()->AddInfoString("Request Pool", schedule->request_pool());
   return Status::OK();
 }
 

@@ -706,9 +706,9 @@ class ImpalaServer : public ImpalaServiceIf,
     // The most recent time this query was actively being processed, in Unix milliseconds.
     int64_t last_active_time_ms;
 
-    /// Request pool to which the request was submitted for admission, or an empty string
-    /// if this request doesn't have a pool.
-    std::string request_pool;
+    /// Resource pool to which the request was submitted for admission, or an empty
+    /// string if this request doesn't go through admission control.
+    std::string resource_pool;
 
     /// Initialise from an exec_state. If copy_profile is true, print the query
     /// profile to a string and copy that into this.profile (which is expensive),
@@ -789,11 +789,11 @@ class ImpalaServer : public ImpalaServiceIf,
   void CancelFromThreadPool(uint32_t thread_id,
       const CancellationWork& cancellation_work);
 
-  /// Helper method to add any pool query options to the query_ctx. Must be called before
-  /// ExecuteInternal() at which point the TQueryCtx is const and cannot be mutated.
-  /// override_options_mask indicates which query options can be overridden by the pool
-  /// default query options.
-  void AddPoolQueryOptions(TQueryCtx* query_ctx,
+  /// Helper method to add the pool name and query options to the query_ctx. Must be
+  /// called before ExecuteInternal() at which point the TQueryCtx is const and cannot
+  /// be mutated. override_options_mask indicates which query options can be overridden
+  /// by the pool default query options.
+  void AddPoolConfiguration(TQueryCtx* query_ctx,
       const QueryOptionsMask& override_options_mask);
 
   /// Register timeout value upon opening a new session. This will wake up

@@ -143,8 +143,9 @@ class QuerySchedule {
   const TUniqueId& query_id() const { return query_id_; }
   const TQueryExecRequest& request() const { return request_; }
   const TQueryOptions& query_options() const { return query_options_; }
-  const std::string& request_pool() const { return request_pool_; }
-  void set_request_pool(const std::string& pool_name) { request_pool_ = pool_name; }
+
+  // Valid after Schedule() succeeds.
+  const std::string& request_pool() const { return request().query_ctx.request_pool; }
 
   /// Gets the estimated memory (bytes) per-node. Returns the user specified estimate
   /// (MEM_LIMIT query parameter) if provided or the estimate from planning if available,
@@ -249,9 +250,6 @@ class QuerySchedule {
 
   /// Used to generate consecutive fragment instance ids.
   TUniqueId next_instance_id_;
-
-  /// Request pool to which the request was submitted for admission.
-  std::string request_pool_;
 
   /// Indicates if the query has been admitted for execution.
   bool is_admitted_;

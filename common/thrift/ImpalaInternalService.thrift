@@ -418,8 +418,8 @@ struct TQueryCtx {
   // List of tables with scan ranges that map to blocks with missing disk IDs.
   15: optional list<CatalogObjects.TTableName> tables_missing_diskids
 
-  // The pool to which this request has been submitted. Used to update pool statistics
-  // for admission control.
+  // The resolved admission control pool to which this request will be submitted. May be
+  // unset for statements that aren't subjected to admission control (e.g. USE, SET).
   16: optional string request_pool
 
   // String containing a timestamp (in UTC) set as the query submission time. It
