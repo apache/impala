@@ -782,7 +782,7 @@ void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
 
 ImpalaServer::~ImpalaServer() {}
 
-void ImpalaServer::AddPoolQueryOptions(TQueryCtx* ctx,
+void ImpalaServer::AddPoolConfiguration(TQueryCtx* ctx,
     const QueryOptionsMask& override_options_mask) {
   // Errors are not returned and are only logged (at level 2) because some incoming
   // requests are not expected to be mapped to a pool and will not have query options,
@@ -796,6 +796,7 @@ void ImpalaServer::AddPoolQueryOptions(TQueryCtx* ctx,
              << " ResolveRequestPool status: " << status.GetDetail();
     return;
   }
+  ctx->__set_request_pool(resolved_pool);
 
   TPoolConfig config;
   status = exec_env_->request_pool_service()->GetPoolConfig(resolved_pool, &config);
@@ -1717,7 +1718,11 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
   }
   all_rows_returned = request_state.eos();
   last_active_time_ms = request_state.last_active_ms();
-  request_pool = request_state.request_pool();
+  // For statement types other than QUERY/DML, show an empty string for resource pool
+  // to indicate that they are not subjected to admission control.
+  if (stmt_type == TStmtType::QUERY || stmt_type == TStmtType::DML) {
+    resource_pool = request_state.request_pool();
+  }
   user_has_profile_access = request_state.user_has_profile_access();
 }
 

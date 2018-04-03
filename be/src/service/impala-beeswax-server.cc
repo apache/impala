@@ -458,7 +458,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
 
   // Only query options not set in the session or confOverlay can be overridden by the
   // pool options.
-  AddPoolQueryOptions(query_ctx, ~set_query_options_mask);
+  AddPoolConfiguration(query_ctx, ~set_query_options_mask);
   VLOG_QUERY << "TClientRequest.queryOptions: "
              << ThriftDebugString(query_ctx->client_request.query_options);
   return Status::OK();

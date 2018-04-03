@@ -187,9 +187,6 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// owned by the ClientRequestState that owns this coordinator
   const QuerySchedule& schedule_;
 
-  /// copied from TQueryExecRequest; constant across all fragments
-  TQueryCtx query_ctx_;
-
   /// copied from TQueryExecRequest, governs when to call ReportQuerySummary
   TStmtType::type stmt_type_;
 
