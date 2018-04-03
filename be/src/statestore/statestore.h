@@ -517,7 +517,11 @@ class Statestore : public CacheLineAligned {
 
   /// Failure detector for subscribers. If a subscriber misses a configurable number of
   /// consecutive heartbeat messages, it is considered failed and a) its transient topic
-  /// entries are removed and b) its entry in the subscriber map is erased.
+  /// entries are removed and b) its entry in the subscriber map is erased. The
+  /// subscriber ID is used to identify peers for failure detection purposes. Subscriber
+  /// state is evicted from the failure detector when the subscriber is unregistered,
+  /// so old subscribers do not occupy memory and the failure detection state does not
+  /// carry over to any new registrations of the previous subscriber.
   boost::scoped_ptr<MissedHeartbeatFailureDetector> failure_detector_;
 
   /// Metric that track the registered, non-failed subscribers.

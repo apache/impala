@@ -17,6 +17,7 @@
 
 from collections import defaultdict
 import json
+import logging
 import socket
 import threading
 import traceback
@@ -38,6 +39,8 @@ from ErrorCodes.ttypes import TErrorCode
 from Status.ttypes import TStatus
 
 from tests.common.environ import specific_build_type_timeout
+
+LOG = logging.getLogger('test_statestore')
 
 # Tests for the statestore. The StatestoreSubscriber class is a skeleton implementation of
 # a Python-based statestore subscriber with additional hooks to allow testing. Each
@@ -174,6 +177,7 @@ class StatestoreSubscriber(object):
     # Variables to notify for updates on each topic.
     self.update_event = threading.Condition()
     self.heartbeat_cb, self.update_cb = heartbeat_cb, update_cb
+    self.subscriber_id = "python-test-client-%s" % uuid.uuid1()
     self.exception = None
 
   def Heartbeat(self, args):
@@ -250,7 +254,6 @@ class StatestoreSubscriber(object):
 
   def register(self, topics=None):
     """Call the Register() RPC"""
-    self.subscriber_id = "python-test-client-%s" % uuid.uuid1()
     if topics is None: topics = []
     request = Subscriber.TRegisterSubscriberRequest(
       topic_registrations=topics,
@@ -515,3 +518,26 @@ class TestStatestore():
           .wait_for_update(persistent_topic_name, 1)
           .wait_for_update(transient_topic_name, 1)
     )
+
+  def test_heartbeat_failure_reset(self):
+    """Regression test for IMPALA-6785: the heartbeat failure count for the subscriber ID
+    should be reset when it resubscribes, not after the first successful heartbeat. Delay
+    the heartbeat to force the topic update to finish first."""
+
+    sub = StatestoreSubscriber(heartbeat_cb=lambda sub, args: time.sleep(0.5))
+    topic_name = "test_heartbeat_failure_reset"
+    reg = TTopicRegistration(topic_name=topic_name, is_transient=True)
+    sub.start()
+    sub.register(topics=[reg])
+    LOG.info("Registered with id {0}".format(sub.subscriber_id))
+    sub.wait_for_heartbeat(1)
+    sub.kill()
+    LOG.info("Killed, waiting for statestore to detect failure via heartbeats")
+    sub.wait_for_failure()
+    # IMPALA-6785 caused only one topic update to be send. Wait for multiple updates to
+    # be received to confirm that the subsequent updates are being scheduled repeatedly.
+    target_updates = sub.update_counts[topic_name] + 5
+    sub.start()
+    sub.register(topics=[reg])
+    LOG.info("Re-registered with id {0}, waiting for update".format(sub.subscriber_id))
+    sub.wait_for_update(topic_name, target_updates)
