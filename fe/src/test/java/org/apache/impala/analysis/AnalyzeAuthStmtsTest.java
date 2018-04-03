@@ -165,8 +165,8 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format("%s INSERT ON DATABASE functional %s myrole",
           formatArgs));
       AnalysisError(String.format("%s INSERT ON SERVER %s myrole", formatArgs),
-          "Only 'ALL', 'REFRESH', 'CREATE', or 'ALTER' privilege may be applied at " +
-          "SERVER scope in privilege spec.");
+          "Only 'ALL', 'REFRESH', 'CREATE', 'ALTER', or 'DROP' privilege may be " +
+          "applied at SERVER scope in privilege spec.");
       AnalysisError(String.format("%s INSERT ON URI 'hdfs:////abc//123' %s myrole",
           formatArgs), "Only 'ALL' privilege may be applied at URI scope in privilege " +
           "spec.");
@@ -181,8 +181,8 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format("%s SELECT ON DATABASE functional %s myrole",
           formatArgs));
       AnalysisError(String.format("%s SELECT ON SERVER %s myrole", formatArgs),
-          "Only 'ALL', 'REFRESH', 'CREATE', or 'ALTER' privilege may be applied at " +
-          "SERVER scope in privilege spec.");
+          "Only 'ALL', 'REFRESH', 'CREATE', 'ALTER', or 'DROP' privilege may be " +
+          "applied at SERVER scope in privilege spec.");
       AnalysisError(String.format("%s SELECT ON URI 'hdfs:////abc//123' %s myrole",
           formatArgs), "Only 'ALL' privilege may be applied at URI scope in privilege " +
           "spec.");
@@ -254,6 +254,16 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
           "%s ALTER ON TABLE functional.alltypes %s myrole", formatArgs));
       AnalysisError(String.format(
           "%s ALTER ON URI 'hdfs:////abc/123' %s myrole", formatArgs),
+          "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
+
+      // DROP privilege
+      AnalyzesOk(String.format("%s DROP ON SERVER %s myrole", formatArgs));
+      AnalyzesOk(String.format("%s DROP ON SERVER server1 %s myrole", formatArgs));
+      AnalyzesOk(String.format("%s DROP ON DATABASE functional %s myrole", formatArgs));
+      AnalyzesOk(String.format(
+          "%s DROP ON TABLE functional.alltypes %s myrole", formatArgs));
+      AnalysisError(String.format(
+          "%s DROP ON URI 'hdfs:////abc/123' %s myrole", formatArgs),
           "Only 'ALL' privilege may be applied at URI scope in privilege spec.");
     }
 
