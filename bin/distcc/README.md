@@ -26,6 +26,14 @@ The rest of the setup is done for you; here is a short description of what they 
 # Usage
 
 ### First time
+1. Symlink /opt/Impala-Toolchain to a directory writable by your user and point
+  IMPALA_TOOLCHAIN at that directory. This ensures toolchain binaries are at the
+  same path locally as on the distcc servers
+
+        mkdir -p "$IMPALA_TOOLCHAIN"/toolchain
+        sudo ln -s "$IMPALA_TOOLCHAIN"/toolchain /opt/Impala-Toolchain
+        echo 'export IMPALA_TOOLCHAIN=/opt/Impala-Toolchain' >> bin/impala-config-local.sh
+
 1. Source bin/impala-config.sh in the Impala repo. Step #2 depends on this.
 
         source "$IMPALA_HOME"/bin/impala-config.sh
@@ -70,7 +78,16 @@ source "$IMPALA_HOME"/bin/impala-config.sh   # Skip if already done
 source "$IMPALA_HOME"/bin/distcc/distcc_env.sh
 ```
 
-# Setting up a new distcc server
+# Setting up a new distcc server (automatic)
+1. Run distcc_server_setup.sh to do initial setup for a server that accepts connections
+   from the 172.\* private IP address block:
+  sudo ./bin/distcc/distcc_server_setup.sh 172.16.0.0/12
+1. Download toolchain packages. This is run initially and can be rerun to download
+  new packages that a new version of Impala depends on.
+  (. ./bin/impala-config.sh && ./infra/python/deps/download_requirements &&
+   DOWNLOAD_CDH_COMPONENTS=false ./bin/bootstrap_toolchain.py)
+
+# Setting up a new distcc server (manual)
 
 1. Install "distccd" and "ccache".
 1. Configure distccd (edit /etc/sysconfig/distccd on a RHEL server) with the options
