@@ -977,7 +977,7 @@ so other secure services might be affected temporarily.
   <title>Kerberos-Related Memory Overhead for Large Clusters</title>
   <conbody>
     <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_intro"/>
-    <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_start" conrefend="vm_overcommit_memory_end"/>
+    <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_start" conrefend="../shared/impala_common.xml#common/vm_overcommit_memory_end"/>
   </conbody>
   </concept>
 
@@ -1032,26 +1032,26 @@ so other secure services might be affected temporarily.
         (that is, increase latency) to Impala queries, and reduce overall throughput for non-Impala
         workloads that also require accessing HDFS files.
       </p>
-      <p>
-        In <keyword keyref="impala210_full"/> and higher, you can reduce NameNode overhead by enabling
-        a caching feature for HDFS file handles. Data files that are accessed by different queries,
-        or even multiple times within the same query, can be accessed without a new <q>open</q>
-        call and without fetching the file details again from the NameNode.
-      </p>
+      <p> In <keyword keyref="impala210_full"/> and higher, you can reduce
+        NameNode overhead by enabling a caching feature for HDFS file handles.
+        Data files that are accessed by different queries, or even multiple
+        times within the same query, can be accessed without a new <q>open</q>
+        call and without fetching the file details again from the NameNode. </p>
       <p>
         Because this feature only involves HDFS data files, it does not apply to non-HDFS tables,
         such as Kudu or HBase tables, or tables that store their data on cloud services such as
         S3 or ADLS. Any read operations that perform remote reads also skip the cached file handles.
       </p>
-      <p>
-        This feature is turned off by default. To enable it, set the configuration option
-        <codeph>max_cached_file_handles</codeph> to a non-zero value for each <cmdname>impalad</cmdname>
-        daemon. Consider an initial starting value of 20 thousand, and adjust upward if NameNode
-        overhead is still significant, or downward if it is more important to reduce the extra memory usage
-        on each host. Each cache entry consumes 6 KB, meaning that caching 20,000 file handles requires
-        up to 120 MB on each DataNode. The exact memory usage varies depending on how many file handles
-        have actually been cached; memory is freed as file handles are evicted from the cache.
-      </p>
+      <p> The feature is enabled by default with 20,000 file handles to be
+        cached. To change the value, set the configuration option
+          <codeph>max_cached_file_handles</codeph> to a non-zero value for each
+          <cmdname>impalad</cmdname> daemon. From the initial default value of
+        20000, adjust upward if NameNode request load is still significant, or
+        downward if it is more important to reduce the extra memory usage on
+        each host. Each cache entry consumes 6 KB, meaning that caching 20,000
+        file handles requires up to 120 MB on each Impala executor. The exact
+        memory usage varies depending on how many file handles have actually
+        been cached; memory is freed as file handles are evicted from the cache. </p>
       <p>
         If a manual HDFS operation moves a file to the HDFS Trashcan while the file handle is cached,
         Impala still accesses the contents of that file. This is a change from prior behavior. Previously,
