@@ -105,13 +105,13 @@ public class AuthorizationChecker {
     Preconditions.checkNotNull(privilegeRequest);
 
     if (!hasAccess(user, privilegeRequest)) {
+      Privilege privilege = privilegeRequest.getPrivilege();
       if (privilegeRequest.getAuthorizeable() instanceof AuthorizeableFn) {
         throw new AuthorizationException(String.format(
-            "User '%s' does not have privileges to CREATE/DROP functions in: %s",
-            user.getName(), privilegeRequest.getName()));
+            "User '%s' does not have privileges to %s functions in: %s",
+            user.getName(), privilege, privilegeRequest.getName()));
       }
 
-      Privilege privilege = privilegeRequest.getPrivilege();
       if (EnumSet.of(Privilege.ANY, Privilege.ALL, Privilege.VIEW_METADATA)
           .contains(privilege)) {
         throw new AuthorizationException(String.format(

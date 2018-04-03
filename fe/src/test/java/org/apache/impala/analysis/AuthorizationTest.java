@@ -40,6 +40,7 @@ import org.apache.impala.catalog.AuthorizationException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ScalarFunction;
+import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
@@ -87,11 +88,11 @@ public class AuthorizationTest extends FrontendTestBase {
   //   ALL permission on 'tpch' database and 'newdb' database
   //   ALL permission on 'functional_seq_snap' database
   //   SELECT permissions on all tables in 'tpcds' database
-  //   SELECT, REFRESH permissions on 'functional.alltypesagg' (no INSERT permissions)
+  //   SELECT, REFRESH, DROP permissions on 'functional.alltypesagg'
   //   ALTER permissions on 'functional.alltypeserror'
-  //   SELECT permissions on 'functional.complex_view' (no INSERT permissions)
-  //   SELECT, REFRESH permissions on 'functional.view_view' (no INSERT permissions)
-  //   ALTER permission on 'functional.alltypes_view'
+  //   SELECT permissions on 'functional.complex_view'
+  //   SELECT, REFRESH permissions on 'functional.view_view'
+  //   ALTER, DROP permissions on 'functional.alltypes_view'
   //   SELECT permissions on columns ('id', 'int_col', and 'year') on
   //   'functional.alltypessmall' (no SELECT permissions on 'functional.alltypessmall')
   //   SELECT permissions on columns ('id', 'int_struct_col', 'struct_array_col',
@@ -105,7 +106,7 @@ public class AuthorizationTest extends FrontendTestBase {
   //   No permissions on database 'functional_rc'
   //   Only column level permissions in 'functional_avro':
   //     SELECT permissions on columns ('id') on 'functional_avro.alltypessmall'
-  //   REFRESH, INSERT, CREATE, ALTER permissions on 'functional_text_lzo' database
+  //   REFRESH, INSERT, CREATE, ALTER, DROP permissions on 'functional_text_lzo' database
   public final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
   public final static User USER = new User(System.getProperty("user.name"));
 
@@ -267,6 +268,18 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege.setTable_name("alltypesagg");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
+    // drop_functional_alltypesagg
+    roleName = "drop_functional_alltypesagg";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.DROP,
+        TPrivilegeScope.TABLE, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional");
+    privilege.setTable_name("alltypesagg");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
     // refresh_functional_view_view
     roleName = "refresh_functional_view_view";
     sentryService.createRole(USER, roleName, true);
@@ -277,6 +290,18 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege.setServer_name("server1");
     privilege.setDb_name("functional");
     privilege.setTable_name("view_view");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    // drop_functional_alltypes_view
+    roleName = "drop_functional_alltypes_view";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.DROP,
+        TPrivilegeScope.TABLE, false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional");
+    privilege.setTable_name("alltypes_view");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // insert_functional_text_lzo
@@ -309,6 +334,18 @@ public class AuthorizationTest extends FrontendTestBase {
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
     privilege = new TPrivilege("", TPrivilegeLevel.ALTER, TPrivilegeScope.DATABASE,
+        false);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional_text_lzo");
+    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    // drop_functional_text_lzo
+    roleName = "drop_functional_text_lzo";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.DROP, TPrivilegeScope.DATABASE,
         false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_text_lzo");
@@ -1244,6 +1281,15 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("drop database if exists newdb");
     AuthzOk("drop database if exists newdb cascade");
     AuthzOk("drop database if exists newdb restrict");
+
+    // User has DROP privilege on functional_text_lzo database.
+    AuthzOk("drop database functional_text_lzo");
+    AuthzOk("drop database functional_text_lzo cascade");
+    AuthzOk("drop database functional_text_lzo restrict");
+    AuthzOk("drop database if exists functional_text_lzo");
+    AuthzOk("drop database if exists functional_text_lzo cascade");
+    AuthzOk("drop database if exists functional_text_lzo restrict");
+
     // User has permission, database does not exists, IF EXISTS not specified.
     try {
       AuthzOk("drop database newdb");
@@ -1294,6 +1340,9 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("drop table tpch.lineitem");
     AuthzOk("drop table if exists tpch.lineitem");
 
+    // User has DROP privilege on functional.alltypesagg table.
+    AuthzOk("drop table functional.alltypesagg");
+
     // Drop table (user does not have permission).
     AuthzError("drop table functional.alltypes",
         "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
@@ -1330,10 +1379,13 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("drop view functional_seq_snap.alltypes_view");
     AuthzOk("drop view if exists functional_seq_snap.alltypes_view");
 
-    // Drop view (user does not have permission).
-    AuthzError("drop view functional.alltypes_view",
+    // User has DROP privilege on functional.alltypes_view view.
+    AuthzOk("drop view functional.alltypes_view");
+
+    // User does not have DROP privilege on functional.alltypes_view_sub view.
+    AuthzError("drop view functional.alltypes_view_sub",
         "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
-    AuthzError("drop view if exists functional.alltypes_view",
+    AuthzError("drop view if exists functional.alltypes_view_sub",
         "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
 
     // Drop view with unqualified table name.
@@ -2412,7 +2464,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
     AuthzError(ctx, "create function f() returns int location " +
         "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
-        "User '%s' does not have privileges to CREATE/DROP functions in: default.f()");
+        "User '%s' does not have privileges to CREATE functions in: default.f()");
 
     // User has ALL privilege on tpch database and ALL privilege on
     // /test-warehouse/libTestUdfs.so URI.
@@ -2421,19 +2473,31 @@ public class AuthorizationTest extends FrontendTestBase {
 
     AuthzError(ctx, "create function notdb.f() returns int location " +
         "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
-        "User '%s' does not have privileges to CREATE/DROP functions in: notdb.f()");
+        "User '%s' does not have privileges to CREATE functions in: notdb.f()");
+
+    // User has DROP privilege on functional_text_lzo database.
+    try {
+      ctx_.catalog.addFunction(ScalarFunction.createForTesting("functional_text_lzo",
+          "f", new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
+          null, TFunctionBinaryType.NATIVE));
+      AuthzOk("drop function functional_text_lzo.f()");
+    } finally {
+      ctx_.catalog.removeFunction(ScalarFunction.createForTesting("functional_text_lzo",
+          "f", new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
+          null, TFunctionBinaryType.NATIVE));
+    }
 
     AuthzError(ctx, "drop function if exists f()",
-        "User '%s' does not have privileges to CREATE/DROP functions in: default.f()");
+        "User '%s' does not have privileges to DROP functions in: default.f()");
 
     AuthzError(ctx, "drop function notdb.f()",
-        "User '%s' does not have privileges to CREATE/DROP functions in: notdb.f()");
+        "User '%s' does not have privileges to DROP functions in: notdb.f()");
 
     // User does not have ALL privilege on SERVER and tries to create a function with
     // the same name as the built-in function.
     AuthzError(ctx, "create function sin(double) returns double location " +
         "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'",
-        "User '%s' does not have privileges to CREATE/DROP functions in: " +
+        "User '%s' does not have privileges to CREATE functions in: " +
         "default.sin(DOUBLE)");
     // User tries to create a function in the system database.
     AuthzError(ctx, "create function _impala_builtins.sin(double) returns double " +
@@ -2446,7 +2510,7 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzError(ctx, "drop function _impala_builtins.sin(double)",
         "Cannot modify system database.");
     AuthzError(ctx, "drop function sin(double)",
-        "User '%s' does not have privileges to CREATE/DROP functions in: " +
+        "User '%s' does not have privileges to DROP functions in: " +
         "default.sin(DOUBLE)");
 
     // TODO: Add test support for dynamically changing privileges for
@@ -2734,6 +2798,42 @@ public class AuthorizationTest extends FrontendTestBase {
     } finally {
       sentryService.dropRole(USER, roleName, true);
       ctx_.catalog.reset();
+    }
+  }
+
+  @Test
+  public void TestServerLevelDrop() throws ImpalaException {
+    // TODO: Add test support for dynamically changing privileges for
+    // file-based policy.
+    if (ctx_.authzConfig.isFileBasedPolicy()) return;
+
+    SentryPolicyService sentryService =
+        new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
+
+    // User has DROP privilege on server.
+    String roleName = "drop_role";
+    try {
+      sentryService.createRole(USER, roleName, true);
+      TPrivilege privilege = new TPrivilege("", TPrivilegeLevel.DROP,
+          TPrivilegeScope.SERVER, false);
+      privilege.setServer_name("server1");
+      sentryService.grantRolePrivilege(USER, roleName, privilege);
+      sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+      ctx_.catalog.reset();
+
+      AuthzOk("drop database functional");
+      AuthzOk("drop table functional.alltypes");
+      AuthzOk("drop view functional.alltypes_view_sub");
+      ctx_.catalog.addFunction(ScalarFunction.createForTesting("functional",
+          "f", new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
+          null, TFunctionBinaryType.NATIVE));
+      AuthzOk("drop function functional.f()");
+    } finally {
+      sentryService.dropRole(USER, roleName, true);
+      ctx_.catalog.reset();
+      ctx_.catalog.addFunction(ScalarFunction.createForTesting("functional",
+          "f", new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
+          null, TFunctionBinaryType.NATIVE));
     }
   }
 

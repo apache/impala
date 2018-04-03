@@ -29,7 +29,8 @@ ${USER} = all_tpch, all_newdb, all_functional_seq_snap, select_tpcds,\
           refresh_functional_view_view, insert_functional_text_lzo,\
           create_functional_text_lzo, alter_functional_text_lzo,\
           alter_functional_alltypeserror, alter_functional_alltypes_view,\
-          libtestudfs_uri
+          libtestudfs_uri, drop_functional_text_lzo, drop_functional_alltypesagg,\
+          drop_functional_alltypes_view
 auth_to_local_group = test_role
 server_admin = all_server
 
@@ -55,15 +56,20 @@ insert_parquet = server=server1->db=functional_parquet->table=*->action=insert
 refresh_functional_text_lzo = server=server1->db=functional_text_lzo->action=refresh
 refresh_functional_alltypesagg =\
     server=server1->db=functional->table=alltypesagg->action=refresh
+drop_functional_alltypesagg =\
+    server=server1->db=functional->table=alltypesagg->action=drop
 alter_functional_alltypeserror =\
     server=server1->db=functional->table=alltypeserror->action=alter
 refresh_functional_view_view =\
     server=server1->db=functional->table=view_view->action=refresh
+drop_functional_alltypes_view =\
+    server=server1->db=functional->table=alltypes_view->action=drop
 alter_functional_alltypes_view =\
     server=server1->db=functional->table=alltypes_view->action=alter
 insert_functional_text_lzo = server=server1->db=functional_text_lzo->action=insert
 create_functional_text_lzo = server=server1->db=functional_text_lzo->action=create
 alter_functionl_text_lzo = server=server1->db=functional_text_lzo->action=alter
+drop_functional_text_lzo = server=server1->db=functional_text_lzo->action=drop
 select_column_level_functional =\
     server=server1->db=functional->table=alltypessmall->column=id->action=select,\
     server=server1->db=functional->table=alltypessmall->column=int_col->action=select,\
