@@ -3586,6 +3586,12 @@ public class ParserTest extends FrontendTestBase {
       ParsesOk(String.format("%s CREATE ON SERVER foo %s myRole", formatStr));
       ParsesOk(String.format("%s CREATE ON DATABASE foo %s myRole", formatStr));
 
+      // ALTER privilege.
+      ParsesOk(String.format("%s ALTER ON SERVER %s myRole", formatStr));
+      ParsesOk(String.format("%s ALTER ON SERVER foo %s myRole", formatStr));
+      ParsesOk(String.format("%s ALTER ON DATABASE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s ALTER ON TABLE foo %s myRole", formatStr));
+
       // Server scope does not accept a name.
       ParsesOk(String.format("%s ALL ON SERVER %s myRole", formatStr));
       ParsesOk(String.format("%s INSERT ON SERVER %s myRole", formatStr));
