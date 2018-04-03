@@ -548,8 +548,7 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     shared_ptr<Subscriber> current_registration(
         new Subscriber(subscriber_id, *registration_id, location, topic_registrations));
     subscribers_.emplace(subscriber_id, current_registration);
-    failure_detector_->UpdateHeartbeat(
-        PrintId(current_registration->registration_id()), true);
+    failure_detector_->UpdateHeartbeat(subscriber_id, true);
     num_subscribers_metric_->SetValue(subscribers_.size());
     subscriber_set_metric_->Add(subscriber_id);
 
@@ -878,6 +877,9 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
                   << "or re-registered (last known registration ID: "
                   << update.registration_id << ")";
         UnregisterSubscriber(subscriber.get());
+      } else {
+        LOG(INFO) << "Failure was already detected for subscriber '" << subscriber->id()
+                  << "'. Won't send another " << update_kind_str;
       }
     } else {
       // Schedule the next message.
@@ -907,7 +909,7 @@ void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
   heartbeat_client_cache_->CloseConnections(subscriber->network_address());
 
   // Prevent the failure detector from growing without bound
-  failure_detector_->EvictPeer(PrintId(subscriber->registration_id()));
+  failure_detector_->EvictPeer(subscriber->id());
 
   // Delete all transient entries
   {
