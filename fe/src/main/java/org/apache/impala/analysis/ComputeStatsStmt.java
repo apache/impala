@@ -776,7 +776,7 @@ public class ComputeStatsStmt extends StatementBase {
       return "COMPUTE STATS " + tableName_.toSql() + columnList.toString() + tblsmpl;
     } else {
       return "COMPUTE INCREMENTAL STATS " + tableName_.toSql() +
-          partitionSet_ == null ? "" : partitionSet_.toSql();
+          (partitionSet_ == null ? "" : partitionSet_.toSql());
     }
   }
 

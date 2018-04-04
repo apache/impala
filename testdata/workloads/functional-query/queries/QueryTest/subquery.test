@@ -847,6 +847,177 @@ WHERE EXISTS
    ORDER BY id LIMIT 10 OFFSET 6)
 ---- RESULTS
 0
+====
+---- QUERY
+# Uncorrelated subquery in binary predicate that returns scalar value at runtime
+SELECT id FROM functional.alltypessmall
+WHERE int_col =
+  (SELECT int_col
+   FROM functional.alltypessmall
+   WHERE id = 1)
+ORDER BY id
+---- RESULTS
+1
+11
+21
+26
+36
+46
+51
+61
+71
+76
+86
+96
+---- TYPES
+INT
+====
+---- QUERY
+# Uncorrelated subquery in arithmetic expr that returns scalar value at runtime
+SELECT id FROM functional.alltypessmall
+WHERE int_col =
+  3 * (SELECT int_col
+       FROM functional.alltypessmall
+       WHERE id = 1)
+ORDER BY id
+---- RESULTS
+3
+13
+23
+28
+38
+48
+53
+63
+73
+78
+88
+98
+---- TYPES
+INT
+====
+---- QUERY
+# Uncorrelated subquery in binary predicate that returns no rows.
+SELECT id FROM functional.alltypessmall
+WHERE int_col =
+  (SELECT int_col
+   FROM functional.alltypessmall
+   WHERE id = -123)
+ORDER BY id
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Uncorrelated subquery in arithmetic expr that returns no rows.
+SELECT id FROM functional.alltypessmall
+WHERE int_col =
+  3 * (SELECT int_col
+       FROM functional.alltypessmall
+       WHERE id = -123)
+ORDER BY id
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Uncorrelated subquery in binary predicate that returns multiple rows
+SELECT id FROM functional.alltypessmall
+WHERE int_col =
+  (SELECT int_col
+   FROM functional.alltypessmall)
+ORDER BY id
+---- RESULTS
+---- CATCH
+Query aborted:Subquery must not return more than one row:
+====
+---- QUERY
+# Uncorrelated subquery in arithmetic expr that returns multiple rows
+SELECT id FROM functional.alltypessmall
+WHERE int_col =
+  3 * (SELECT int_col
+       FROM functional.alltypessmall)
+ORDER BY id
+---- RESULTS
+---- CATCH
+Query aborted:Subquery must not return more than one row:
+====
+---- QUERY
+# Uncorrelated subquery in binary predicate that returns scalar value at runtime
+SELECT count(id) FROM functional.alltypes
+WHERE int_col =
+  (SELECT int_col
+   FROM functional.alltypessmall
+   WHERE id = 1)
+---- RESULTS
+730
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Uncorrelated subquery in arithmetic expr that returns scalar value at runtime
+SELECT count(id) FROM functional.alltypes
+WHERE int_col =
+  3 * (SELECT int_col
+       FROM functional.alltypessmall
+       WHERE id = 1)
+---- RESULTS
+730
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Uncorrelated subquery in binary predicate that returns scalar value at runtime
+# executed on a single node.
+set num_nodes=1;
+SELECT count(id) FROM functional.alltypes
+WHERE int_col =
+  (SELECT int_col
+   FROM functional.alltypessmall
+   WHERE id = 1)
+---- RESULTS
+730
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Uncorrelated subquery in arithmetic expr that returns scalar value at runtime
+# executed on a single node.
+set num_nodes=1;
+SELECT count(id) FROM functional.alltypes
+WHERE int_col =
+  3 * (SELECT int_col
+       FROM functional.alltypessmall
+       WHERE id = 1)
+---- RESULTS
+730
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Subquery that returns more than one row
+SELECT a FROM (values(1 a),(2),(3)) v
+WHERE a = (SELECT x FROM (values(1 x),(2),(3)) v)
+---- RESULTS
+---- CATCH
+Query aborted:Subquery must not return more than one row:
+====
+---- QUERY
+# Subquery that returns more than one row
+# The error message must not reveal the definition of functional.alltypes_view
+SELECT id FROM functional.alltypes
+WHERE id = (SELECT bigint_col FROM functional.alltypes_view)
+---- RESULTS
+---- CATCH
+Query aborted:Subquery must not return more than one row: SELECT bigint_col FROM functional.alltypes_view
+====
+---- QUERY
+# Runtime scalar subquery with offset.
+select count(*) from functional.alltypes
+where 7 = (select id from functional.alltypestiny
+           order by id limit 8 offset 7)
+---- RESULTS
+7300
 ---- TYPES
 BIGINT
 ====

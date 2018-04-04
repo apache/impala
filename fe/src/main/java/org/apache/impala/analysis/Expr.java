@@ -152,6 +152,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
+  // Returns true if an Expr is a user-defined aggregate function.
+  public final static com.google.common.base.Predicate<Expr> IS_UDA_FN =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return isAggregatePredicate_.apply(arg) &&
+              !((FunctionCallExpr)arg).getFnName().isBuiltin();
+        }
+      };
+
   public final static com.google.common.base.Predicate<Expr> IS_TRUE_LITERAL =
       new com.google.common.base.Predicate<Expr>() {
         @Override
@@ -1189,7 +1199,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public boolean isScalarSubquery() {
     Preconditions.checkState(isAnalyzed_);
-    return this instanceof Subquery && getType().isScalarType();
+    if (!(this instanceof Subquery)) return false;
+    Subquery subq = (Subquery) this;
+    SelectStmt stmt = (SelectStmt) subq.getStatement();
+    return stmt.returnsSingleRow() && getType().isScalarType();
   }
 
   /**

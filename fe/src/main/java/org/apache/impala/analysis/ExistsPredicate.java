@@ -55,6 +55,12 @@ public class ExistsPredicate extends Predicate {
   }
 
   @Override
+  protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
+    super.analyzeImpl(analyzer);
+    ((Subquery)children_.get(0)).getStatement().setIsRuntimeScalar(false);
+  }
+
+  @Override
   protected void toThrift(TExprNode msg) {
     // Cannot serialize a nested predicate
     Preconditions.checkState(false);

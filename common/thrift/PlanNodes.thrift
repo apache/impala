@@ -46,7 +46,8 @@ enum TPlanNodeType {
   SINGULAR_ROW_SRC_NODE,
   UNNEST_NODE,
   SUBPLAN_NODE,
-  KUDU_SCAN_NODE
+  KUDU_SCAN_NODE,
+  CARDINALITY_CHECK_NODE
 }
 
 // phases of an execution node
@@ -519,6 +520,11 @@ struct TBackendResourceProfile {
   4: optional i64 max_row_buffer_size
 }
 
+struct TCardinalityCheckNode {
+  // Associated statement of child
+  1: required string display_statement
+}
+
 // This is essentially a union of all messages corresponding to subclasses
 // of PlanNode.
 struct TPlanNode {
@@ -567,6 +573,8 @@ struct TPlanNode {
 
   // Resource profile for this plan node.
   25: required TBackendResourceProfile resource_profile
+
+  26: optional TCardinalityCheckNode cardinality_check_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

@@ -79,7 +79,11 @@ public class ToSqlTest extends FrontendTestBase {
     String actual = null;
     try {
       ParseNode node = AnalyzesOk(query, createAnalysisCtx(defaultDb));
-      actual = node.toSql();
+      if (node instanceof QueryStmt) {
+        actual = ((QueryStmt)node).getOrigSqlString();
+      } else {
+        actual = node.toSql();
+      }
       if (ignoreWhitespace) {
         // Transform whitespace to single space.
         actual = actual.replace('\n', ' ').replaceAll(" +", " ").trim();
@@ -886,9 +890,6 @@ public class ToSqlTest extends FrontendTestBase {
   /**
    * Tests that toSql() properly handles subqueries in the where clause.
    */
-  // TODO Fix testToSql to print the stmt after the first analysis phase and not
-  // after the rewrite.
-  @Ignore("Prints the rewritten statement")
   @Test
   public void subqueryTest() {
     // Nested predicates
@@ -912,13 +913,6 @@ public class ToSqlTest extends FrontendTestBase {
             "(select * from functional.alltypestiny)",
         "SELECT * FROM functional.alltypes WHERE NOT EXISTS " +
             "(SELECT * FROM functional.alltypestiny)");
-    // Multiple nested predicates in the WHERE clause
-    testToSql("select * from functional.alltypes where not (id < 10 and " +
-            "(int_col in (select int_col from functional.alltypestiny)) and " +
-            "(string_col = (select max(string_col) from functional.alltypestiny)))",
-        "SELECT * FROM functional.alltypes WHERE NOT (id < 10 AND " +
-            "(int_col IN (SELECT int_col FROM functional.alltypestiny)) AND " +
-        "(string_col = (SELECT max(string_col) FROM functional.alltypestiny)))");
     // Multiple nesting levels
     testToSql("select * from functional.alltypes where id in " +
         "(select id from functional.alltypestiny where int_col = " +

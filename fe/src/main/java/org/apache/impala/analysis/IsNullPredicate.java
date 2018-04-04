@@ -104,7 +104,8 @@ public class IsNullPredicate extends Predicate {
         // a null value.
         setChild(0, new BoolLiteral(true));
         getChild(0).analyze(analyzer);
-      } else if (!getChild(0).contains(Expr.IS_SCALAR_SUBQUERY)) {
+      } else if (!getChild(0).contains(Expr.IS_SCALAR_SUBQUERY) &&
+          !getChild(0).getSubquery().getStatement().isRuntimeScalar()) {
         // We only support scalar subqueries in an IS NULL predicate because
         // they can be rewritten into a join.
         // TODO: Add support for InPredicates and BinaryPredicates with

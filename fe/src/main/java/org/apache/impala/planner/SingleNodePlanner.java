@@ -1098,6 +1098,14 @@ public class SingleNodePlanner {
     // Set output smap of rootNode *before* creating a SelectNode for proper resolution.
     rootNode.setOutputSmap(outputSmap);
 
+    // Add runtime cardinality check if needed
+    if (inlineViewRef.getViewStmt().isRuntimeScalar()) {
+      rootNode = new CardinalityCheckNode(ctx_.getNextNodeId(), rootNode,
+          inlineViewRef.getViewStmt().getOrigSqlString());
+      rootNode.setOutputSmap(outputSmap);
+      rootNode.init(ctx_.getRootAnalyzer());
+    }
+
     // If the inline view has a LIMIT/OFFSET or unassigned conjuncts due to analytic
     // functions, we may have conjuncts that need to be assigned to a SELECT node on
     // top of the current plan root node.

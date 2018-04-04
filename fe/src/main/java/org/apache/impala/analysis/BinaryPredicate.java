@@ -173,20 +173,8 @@ public class BinaryPredicate extends Predicate {
     fn_ = getBuiltinFunction(analyzer, opName, collectChildReturnTypes(),
         CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     if (fn_ == null) {
-      // Construct an appropriate error message and throw an AnalysisException.
-      String errMsg = "operands of type " + getChild(0).getType().toSql() + " and " +
-            getChild(1).getType().toSql()  + " are not comparable: " + toSql();
-
-      // Check if any of the children is a Subquery that does not return a
-      // scalar.
-      for (Expr expr: children_) {
-        if (expr instanceof Subquery && !expr.getType().isScalarType()) {
-          errMsg = "Subquery must return a single row: " + expr.toSql();
-          break;
-        }
-      }
-
-      throw new AnalysisException(errMsg);
+      throw new AnalysisException("operands of type " + getChild(0).getType().toSql() +
+          " and " + getChild(1).getType().toSql()  + " are not comparable: " + toSql());
     }
     Preconditions.checkState(fn_.getReturnType().isBoolean());
 

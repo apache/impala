@@ -143,6 +143,8 @@ public class DistributedPlanner {
     } else if (root instanceof EmptySetNode) {
       result = new PlanFragment(
           ctx_.getNextFragmentId(), root, DataPartition.UNPARTITIONED);
+    } else if (root instanceof CardinalityCheckNode) {
+      result = createCardinalityCheckNodeFragment((CardinalityCheckNode) root, childFragments);
     } else {
       throw new InternalException("Cannot create plan fragment for this node type: "
           + root.getExplainString(ctx_.getQueryOptions()));
@@ -724,6 +726,25 @@ public class DistributedPlanner {
     // (whereas selectNode.child[0] would point to the original child)
     selectNode.setChild(0, childFragment.getPlanRoot());
     childFragment.setPlanRoot(selectNode);
+    return childFragment;
+  }
+
+  /**
+   * Adds the CardinalityCheckNode as the new plan root to the child fragment and returns
+   * the child fragment.
+   */
+  private PlanFragment createCardinalityCheckNodeFragment(
+      CardinalityCheckNode cardinalityCheckNode,
+      ArrayList<PlanFragment> childFragments) throws ImpalaException {
+    PlanFragment childFragment = childFragments.get(0);
+    // The cardinality check must execute on a single node.
+    if (childFragment.getOutputPartition().isPartitioned()) {
+      childFragment = createMergeFragment(childFragment);
+    }
+    // Set the child explicitly, an ExchangeNode might have been inserted
+    // (whereas cardinalityCheckNode.child[0] would point to the original child)
+    cardinalityCheckNode.setChild(0, childFragment.getPlanRoot());
+    childFragment.setPlanRoot(cardinalityCheckNode);
     return childFragment;
   }
 

@@ -670,3 +670,41 @@ where c_custkey < 10 and c_custkey in
 ---- TYPES
 bigint
 ====
+---- QUERY
+# Create CardinalityCheckNode inside a subplan
+select c_custkey
+from customer c
+where c_custkey < (select o_orderkey
+                   from c.c_orders
+                   where o_orderkey = 6000000)
+---- RESULTS
+110063
+---- TYPES
+bigint
+====
+---- QUERY
+# Create CardinalityCheckNode inside a subplan
+# o_orderkey 6000000 and 5000000 belong to different customers
+select c_custkey
+from customer c
+where c_custkey < (select o_orderkey
+                   from c.c_orders
+                   where o_orderkey = 6000000 or o_orderkey = 5000000)
+order by c_custkey
+---- RESULTS
+24325
+110063
+---- TYPES
+bigint
+====
+---- QUERY
+# Create CardinalityCheckNode inside a subplan.
+# o_orderkey 6000000 and 4285920 belong to the same customer
+select c_custkey
+from customer c
+where c_custkey < (select o_orderkey
+                   from c.c_orders
+                   where o_orderkey = 6000000 or o_orderkey = 4285920)
+---- CATCH
+Subquery must not return more than one row: SELECT o_orderkey FROM c.c_orders WHERE o_orderkey = 6000000 OR o_orderkey = 4285920
+====

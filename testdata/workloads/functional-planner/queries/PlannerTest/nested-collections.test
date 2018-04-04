@@ -1987,3 +1987,69 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=4.18KB
    runtime filters: RF000 -> t1.pos
 ====
+# Add run time scalar subquery check for uncorrelated subqueries
+# Create CardinalityCheckNode inside a subplan
+select c_custkey
+from tpch_nested_parquet.customer c
+where c_custkey < (select o_orderkey
+                   from c.c_orders
+                   where o_orderkey = 6000000)
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|
+|--05:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  join predicates: c_custkey < o_orderkey
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  03:UNNEST [c.c_orders]
+|     limit: 2
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=292.35MB
+   predicates on c_orders: o_orderkey = 6000000
+====
+# CardinalityCheckNode in subplan in a subplan
+select c_custkey
+from tpch_nested_parquet.customer c
+where c_custkey < (select o_orderkey
+                   from c.c_orders co
+                   where o_orderkey = (select li.l_linenumber
+                                       from co.o_lineitems li))
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|
+|--10:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  join predicates: c_custkey < o_orderkey
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  09:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  04:SUBPLAN
+|  |  limit: 2
+|  |
+|  |--08:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  |  join predicates: li.l_linenumber = o_orderkey
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  07:CARDINALITY CHECK
+|  |  |  limit: 1
+|  |  |
+|  |  06:UNNEST [co.o_lineitems li]
+|  |     limit: 2
+|  |
+|  03:UNNEST [c.c_orders co]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=292.35MB
+====

@@ -45,6 +45,7 @@ public class Subquery extends Expr {
 
   public Analyzer getAnalyzer() { return analyzer_; }
   public QueryStmt getStatement() { return stmt_; }
+
   @Override
   public String toSqlImpl() { return "(" + stmt_.toSql() + ")"; }
 
@@ -92,8 +93,8 @@ public class Subquery extends Expr {
       type_ = createStructTypeFromExprList();
     }
 
-    // If the subquery returns many rows, set its type to ArrayType.
-    if (!((SelectStmt)stmt_).returnsSingleRow()) type_ = new ArrayType(type_);
+    // If the subquery can return many rows, do the cardinality check at runtime.
+    if (!((SelectStmt)stmt_).returnsSingleRow()) stmt_.setIsRuntimeScalar(true);
 
     Preconditions.checkNotNull(type_);
   }

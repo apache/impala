@@ -28,6 +28,7 @@ add_library(Exec
   analytic-eval-node.cc
   base-sequence-scanner.cc
   blocking-join-node.cc
+  cardinality-check-node.cc
   catalog-op-executor.cc
   data-sink.cc
   data-source-scan-node.cc
