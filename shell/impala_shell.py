@@ -70,7 +70,9 @@ class CmdStatus:
   ERROR = False
 
 class ImpalaPrettyTable(prettytable.PrettyTable):
-  """Patched version of PrettyTable that TODO"""
+  """Patched version of PrettyTable with different unicode handling - instead of throwing
+  exceptions when a character can't be converted to unicode, it is replaced with a
+  placeholder character."""
   def _unicode(self, value):
     if not isinstance(value, basestring):
       value = str(value)

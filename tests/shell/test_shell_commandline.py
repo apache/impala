@@ -33,6 +33,8 @@ from util import assert_var_substitution, run_impala_shell_cmd, ImpalaShell
 DEFAULT_QUERY = 'select 1'
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
+RUSSIAN_CHARS = (u"А, Б, В, Г, Д, Е, Ё, Ж, З, И, Й, К, Л, М, Н, О, П, Р,"
+                 u"С, Т, У, Ф, Х, Ц,Ч, Ш, Щ, Ъ, Ы, Ь, Э, Ю, Я")
 
 @pytest.fixture
 def empty_table(unique_database, request):
@@ -406,12 +408,27 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_international_characters(self):
     """Sanity test to ensure that the shell can read international characters."""
-    russian_chars = (u"А, Б, В, Г, Д, Е, Ё, Ж, З, И, Й, К, Л, М, Н, О, П, Р,"
-                     u"С, Т, У, Ф, Х, Ц,Ч, Ш, Щ, Ъ, Ы, Ь, Э, Ю, Я")
-    args = """-B -q "select '%s'" """ % russian_chars
+    args = """-B -q "select '%s'" """ % RUSSIAN_CHARS
     result = run_impala_shell_cmd(args.encode('utf-8'))
     assert 'UnicodeDecodeError' not in result.stderr
-    assert russian_chars.encode('utf-8') in result.stdout
+    assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
+
+  def test_international_characters_prettyprint(self):
+    """IMPALA-2717: ensure we can handle international characters in pretty-printed
+    output"""
+    args = """-q "select '%s'" """ % RUSSIAN_CHARS
+    result = run_impala_shell_cmd(args.encode('utf-8'))
+    assert 'UnicodeDecodeError' not in result.stderr
+    assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
+
+  def test_international_characters_prettyprint_tabs(self):
+    """IMPALA-2717: ensure we can handle international characters in pretty-printed
+    output when pretty-printing falls back to delimited output."""
+    args = """-q "select '%s\\t'" """ % RUSSIAN_CHARS
+    result = run_impala_shell_cmd(args.encode('utf-8'))
+    assert 'Reverting to tab delimited text' in result.stderr
+    assert 'UnicodeDecodeError' not in result.stderr
+    assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
 
   @pytest.mark.execute_serially  # This tests invalidates metadata, and must run serially
   def test_config_file(self):
