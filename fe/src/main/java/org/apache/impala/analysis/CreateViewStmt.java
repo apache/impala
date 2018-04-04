@@ -72,9 +72,9 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
     sb.append("CREATE VIEW ");
     if (ifNotExists_) sb.append("IF NOT EXISTS ");
     if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
-    sb.append(tableName_.getTbl() + " (");
-    sb.append(Joiner.on(", ").join(columnDefs_));
-    sb.append(") AS ");
+    sb.append(tableName_.getTbl());
+    if (columnDefs_ != null) sb.append("(" + Joiner.on(", ").join(columnDefs_) + ")");
+    sb.append(" AS ");
     sb.append(viewDefStmt_.toSql());
     return sb.toString();
   }

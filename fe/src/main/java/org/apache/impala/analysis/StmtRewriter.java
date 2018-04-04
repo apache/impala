@@ -217,7 +217,7 @@ public class StmtRewriter {
       }
       if (!(conjunct instanceof InPredicate) && !(conjunct instanceof ExistsPredicate) &&
           !(conjunct instanceof BinaryPredicate) &&
-          !conjunct.contains(Expr.IS_SCALAR_SUBQUERY)) {
+          !conjunct.getSubquery().getType().isScalarType()) {
         throw new AnalysisException("Non-scalar subquery is not supported in " +
             "expression: " + conjunct.toSql());
       }
@@ -457,8 +457,9 @@ public class StmtRewriter {
     Preconditions.checkNotNull(expr);
     Preconditions.checkNotNull(analyzer);
     boolean updateSelectList = false;
-
     SelectStmt subqueryStmt = (SelectStmt)expr.getSubquery().getStatement();
+    boolean isScalarSubquery = expr.getSubquery().isScalarSubquery();
+    boolean isRuntimeScalar = subqueryStmt.isRuntimeScalar();
     // Create a new inline view from the subquery stmt. The inline view will be added
     // to the stmt's table refs later. Explicitly set the inline view's column labels
     // to eliminate any chance that column aliases from the parent query could reference
@@ -478,10 +479,13 @@ public class StmtRewriter {
       // safely remove it.
       subqueryStmt.limitElement_ = new LimitElement(null, null);
     }
+    // If runtime scalar, we need to prevent the propagation of predicates into the
+    // inline view by setting a limit on the statement.
+    if (isRuntimeScalar) subqueryStmt.setLimit(2);
 
     // Update the subquery's select list and/or its GROUP BY clause by adding
     // exprs from the extracted correlated predicates.
-    boolean updateGroupBy = expr.getSubquery().isScalarSubquery()
+    boolean updateGroupBy = isScalarSubquery
         || (expr instanceof ExistsPredicate
             && !subqueryStmt.getSelectList().isDistinct()
             && subqueryStmt.hasAggInfo());
@@ -610,14 +614,15 @@ public class StmtRewriter {
       // TODO: Remove this when independent subquery evaluation is implemented.
       // TODO: Requires support for non-equi joins.
       boolean hasGroupBy = ((SelectStmt) inlineView.getViewStmt()).hasGroupByClause();
-      if (!expr.getSubquery().isScalarSubquery() ||
-          (!(hasGroupBy && stmt.selectList_.isDistinct()) && hasGroupBy)) {
+      Subquery subquery = expr.getSubquery();
+      if ((!isScalarSubquery && !isRuntimeScalar) ||
+          (hasGroupBy && !stmt.selectList_.isDistinct())) {
         throw new AnalysisException("Unsupported predicate with subquery: " +
             expr.toSql());
       }
 
       // TODO: Requires support for null-aware anti-join mode in nested-loop joins
-      if (expr.getSubquery().isScalarSubquery() && expr instanceof InPredicate
+      if (isScalarSubquery && expr instanceof InPredicate
           && ((InPredicate) expr).isNotIn()) {
         throw new AnalysisException("Unsupported NOT IN predicate with subquery: " +
             expr.toSql());
@@ -796,7 +801,12 @@ public class StmtRewriter {
       throw new AnalysisException("Unsupported correlated subquery with grouping " +
           "and/or aggregation: " + stmt.toSql());
     }
-
+    // TODO: instead of this check, implement IMPALA-6315
+    if (!expr.getSubquery().isScalarSubquery() &&
+        !(expr instanceof InPredicate || expr instanceof ExistsPredicate)) {
+      throw new AnalysisException(
+          "Unsupported correlated subquery with runtime scalar check: " + stmt.toSql());
+    }
     // The following correlated subqueries with a limit clause are supported:
     // 1. EXISTS subqueries
     // 2. Scalar subqueries with aggregation
@@ -1016,16 +1026,12 @@ public class StmtRewriter {
       pred.analyze(analyzer);
       return pred;
     }
-    // Only scalar subqueries are supported
     Subquery subquery = exprWithSubquery.getSubquery();
-    if (!subquery.isScalarSubquery()) {
-      throw new AnalysisException("Unsupported predicate with a non-scalar subquery: "
-          + subquery.toSql());
-    }
+    Preconditions.checkState(subquery.getType().isScalarType());
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
     SelectListItem item =
       ((SelectStmt) inlineView.getViewStmt()).getSelectList().getItems().get(0);
-    if (isCorrelated && !item.getExpr().contains(Expr.IS_BUILTIN_AGG_FN)) {
+    if (isCorrelated && item.getExpr().contains(Expr.IS_UDA_FN)) {
       throw new AnalysisException("UDAs are not supported in the select list of " +
           "correlated subqueries: " + subquery.toSql());
     }

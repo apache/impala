@@ -255,6 +255,7 @@ public class SelectStmt extends QueryStmt {
 
     // Remember the SQL string before inline-view expression substitution.
     sqlString_ = toSql();
+    if (origSqlString_ == null) origSqlString_ = sqlString_;
     resolveInlineViewRefs(analyzer);
 
     // If this block's select-project-join portion returns an empty result set and the
@@ -1088,8 +1089,9 @@ public class SelectStmt extends QueryStmt {
    * result set also depends on the data a stmt is processing.
    */
   public boolean returnsSingleRow() {
+    Preconditions.checkState(isAnalyzed());
     // limit 1 clause
-    if (limitElement_ != null && limitElement_.getLimit() == 1) return true;
+    if (limitElement_ != null && hasLimit() && limitElement_.getLimit() == 1) return true;
     // No from clause (base tables or inline views)
     if (fromClause_.isEmpty()) return true;
     // Aggregation with no group by and no DISTINCT

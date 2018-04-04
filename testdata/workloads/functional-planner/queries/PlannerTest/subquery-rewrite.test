@@ -2338,4 +2338,426 @@ PLAN-ROOT SINK
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
    predicates: id < 5
+=======
+# Subquery in binary predicate that needs cardinality check at runtime
+select bigint_col from functional.alltypes where id =
+  (select id
+   from functional.alltypes where id = 1
+  )
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: id = id
+|  runtime filters: RF000 <- id
+|
+|--02:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: id = 1
+|     limit: 2
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.id = 1
+   runtime filters: RF000 -> id
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
+|  hash predicates: id = id
+|  runtime filters: RF000 <- id
+|
+|--06:EXCHANGE [HASH(id)]
+|  |
+|  02:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |  limit: 2
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: id = 1
+|     limit: 2
+|
+05:EXCHANGE [HASH(id)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.id = 1
+   runtime filters: RF000 -> id
+====
+# Subquery in arithmetic expression that needs cardinality check at runtime
+select bigint_col from functional.alltypes where id =
+  3 * (select id
+   from functional.alltypes where id = 1
+  )
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: id = 3 * id
+|  runtime filters: RF000 <- 3 * id
+|
+|--02:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: id = 1
+|     limit: 2
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> id
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: id = 3 * id
+|  runtime filters: RF000 <- 3 * id
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  02:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |  limit: 2
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: id = 1
+|     limit: 2
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> id
+====
+# Subquery that contains union and needs cardinality check at runtime
+select * from functional.alltypes where id =
+  (select i from (select bigint_col as i from functional.alltypes
+                  union
+                  select smallint_col as i from functional.alltypes) t)
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: id = i
+|  runtime filters: RF000 <- i
+|
+|--05:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  04:AGGREGATE [FINALIZE]
+|  |  group by: i
+|  |  limit: 2
+|  |
+|  01:UNION
+|  |  pass-through-operands: 02
+|  |
+|  |--03:SCAN HDFS [functional.alltypes]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> id
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+11:EXCHANGE [UNPARTITIONED]
+|
+06:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: id = i
+|  runtime filters: RF000 <- i
+|
+|--10:EXCHANGE [BROADCAST]
+|  |
+|  05:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  09:EXCHANGE [UNPARTITIONED]
+|  |  limit: 2
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  group by: i
+|  |  limit: 2
+|  |
+|  07:EXCHANGE [HASH(i)]
+|  |
+|  04:AGGREGATE [STREAMING]
+|  |  group by: i
+|  |
+|  01:UNION
+|  |  pass-through-operands: 02
+|  |
+|  |--03:SCAN HDFS [functional.alltypes]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> id
+====
+# Subquery that contains join and GROUP BY and needs cardinality check at runtime
+select * from functional.alltypes where id =
+  (select max(allt.smallint_col) from functional.alltypes allt, functional.alltypesagg ata
+   where allt.id = ata.id and ata.month = 1 group by ata.month)
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: id = max(allt.smallint_col)
+|  runtime filters: RF000 <- max(allt.smallint_col)
+|
+|--05:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  04:AGGREGATE [FINALIZE]
+|  |  output: max(allt.smallint_col)
+|  |  group by: ata.month
+|  |  limit: 2
+|  |
+|  03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ata.id = allt.id
+|  |  runtime filters: RF002 <- allt.id
+|  |
+|  |--01:SCAN HDFS [functional.alltypes allt]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  02:SCAN HDFS [functional.alltypesagg ata]
+|     partitions=11/11 files=11 size=814.73KB
+|     runtime filters: RF002 -> ata.id
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> id
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+13:EXCHANGE [UNPARTITIONED]
+|
+06:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: id = max(allt.smallint_col)
+|  runtime filters: RF000 <- max(allt.smallint_col)
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  05:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  11:EXCHANGE [UNPARTITIONED]
+|  |  limit: 2
+|  |
+|  10:AGGREGATE [FINALIZE]
+|  |  output: max:merge(allt.smallint_col)
+|  |  group by: ata.month
+|  |  limit: 2
+|  |
+|  09:EXCHANGE [HASH(ata.month)]
+|  |
+|  04:AGGREGATE [STREAMING]
+|  |  output: max(allt.smallint_col)
+|  |  group by: ata.month
+|  |
+|  03:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: ata.id = allt.id
+|  |  runtime filters: RF002 <- allt.id
+|  |
+|  |--08:EXCHANGE [HASH(allt.id)]
+|  |  |
+|  |  01:SCAN HDFS [functional.alltypes allt]
+|  |     partitions=24/24 files=24 size=478.45KB
+|  |
+|  07:EXCHANGE [HASH(ata.id)]
+|  |
+|  02:SCAN HDFS [functional.alltypesagg ata]
+|     partitions=11/11 files=11 size=814.73KB
+|     runtime filters: RF002 -> ata.id
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> id
+====
+# IS NULL predicate must not be pushed down to the scan node of the inline view.
+select count(1) from functional.alltypes
+where (select int_col from functional.alltypes) is null
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+04:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--03:SELECT
+|  |  predicates: int_col IS NULL
+|  |
+|  02:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     limit: 2
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE
+|  output: count(*)
+|
+04:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  03:SELECT
+|  |  predicates: int_col IS NULL
+|  |
+|  02:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  06:EXCHANGE [UNPARTITIONED]
+|  |  limit: 2
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     limit: 2
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Binary predicate with constant must not be pushed down
+# to the scan node of the inline view.
+select count(1) from functional.alltypes
+where (select int_col from functional.alltypes) > 10
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+04:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--03:SELECT
+|  |  predicates: int_col > 10
+|  |
+|  02:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     limit: 2
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE
+|  output: count(*)
+|
+04:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  03:SELECT
+|  |  predicates: int_col > 10
+|  |
+|  02:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  06:EXCHANGE [UNPARTITIONED]
+|  |  limit: 2
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     limit: 2
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Runtime scalar subquery with offset.
+select count(*) from functional.alltypes
+where 7 = (select id from functional.alltypestiny
+           order by id limit 8 offset 7)
+---- PLAN
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+05:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--04:SELECT
+|  |  predicates: id = 7
+|  |
+|  03:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  02:TOP-N [LIMIT=2 OFFSET=7]
+|  |  order by: id ASC
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+10:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+06:AGGREGATE
+|  output: count(*)
+|
+05:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  04:SELECT
+|  |  predicates: id = 7
+|  |
+|  03:CARDINALITY CHECK
+|  |  limit: 1
+|  |
+|  07:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  offset: 7
+|  |  order by: id ASC
+|  |  limit: 2
+|  |
+|  02:TOP-N [LIMIT=9]
+|  |  order by: id ASC
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
 ====

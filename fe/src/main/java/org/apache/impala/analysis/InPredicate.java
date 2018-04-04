@@ -114,6 +114,7 @@ public class InPredicate extends Predicate {
             toSqlImpl());
       }
       Subquery subquery = (Subquery)getChild(1);
+      subquery.getStatement().setIsRuntimeScalar(false);
       if (!subquery.returnsScalarColumn()) {
         throw new AnalysisException("Subquery must return a single column: " +
             subquery.toSql());

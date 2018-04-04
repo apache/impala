@@ -87,6 +87,16 @@ public abstract class QueryStmt extends StatementBase {
   /////////////////////////////////////////
   // END: Members that need to be reset()
 
+  // Contains the post-analysis toSql() string before rewrites. I.e. table refs are
+  // resolved and fully qualified, but no rewrites happened yet. This string is showed
+  // to the user in some cases in order to display a statement that is very similar
+  // to what was originally issued.
+  protected String origSqlString_ = null;
+
+  // If true, we need a runtime check on this statement's result to check if it
+  // returns a single row.
+  protected boolean isRuntimeScalar_ = false;
+
   QueryStmt(ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
     orderByElements_ = orderByElements;
     sortInfo_ = null;
@@ -372,6 +382,11 @@ public abstract class QueryStmt extends StatementBase {
   public WithClause getWithClause() { return withClause_; }
   public boolean hasOrderByClause() { return orderByElements_ != null; }
   public boolean hasLimit() { return limitElement_.getLimitExpr() != null; }
+  public String getOrigSqlString() { return origSqlString_; }
+  public boolean isRuntimeScalar() { return isRuntimeScalar_; }
+  public void setIsRuntimeScalar(boolean isRuntimeScalar) {
+    isRuntimeScalar_ = isRuntimeScalar;
+  }
   public long getLimit() { return limitElement_.getLimit(); }
   public boolean hasOffset() { return limitElement_.getOffsetExpr() != null; }
   public long getOffset() { return limitElement_.getOffset(); }
@@ -446,6 +461,8 @@ public abstract class QueryStmt extends StatementBase {
     sortInfo_ = (other.sortInfo_ != null) ? other.sortInfo_.clone() : null;
     analyzer_ = other.analyzer_;
     evaluateOrderBy_ = other.evaluateOrderBy_;
+    origSqlString_ = other.origSqlString_;
+    isRuntimeScalar_ = other.isRuntimeScalar_;
   }
 
   @Override

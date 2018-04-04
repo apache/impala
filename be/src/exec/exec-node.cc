@@ -30,6 +30,7 @@
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exec/analytic-eval-node.h"
+#include "exec/cardinality-check-node.h"
 #include "exec/data-source-scan-node.h"
 #include "exec/empty-set-node.h"
 #include "exec/exchange-node.h"
@@ -397,6 +398,9 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       break;
     case TPlanNodeType::UNNEST_NODE:
       *node = pool->Add(new UnnestNode(pool, tnode, descs));
+      break;
+    case TPlanNodeType::CARDINALITY_CHECK_NODE:
+      *node = pool->Add(new CardinalityCheckNode(pool, tnode, descs));
       break;
     default:
       map<int, const char*>::const_iterator i =

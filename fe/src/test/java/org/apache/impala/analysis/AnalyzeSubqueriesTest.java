@@ -938,26 +938,11 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       }
     }
 
-    // Subquery returns multiple rows
-    AnalysisError("select * from functional.alltypestiny where " +
-        "(select max(id) from functional.alltypes) = " +
-        "(select id from functional.alltypestiny)",
-        "Subquery must return a single row: " +
-        "(SELECT id FROM functional.alltypestiny)");
-    AnalysisError("select id from functional.alltypestiny t where int_col = " +
-        "(select int_col from functional.alltypessmall limit 2)",
-        "Subquery must return a single row: " +
-        "(SELECT int_col FROM functional.alltypessmall LIMIT 2)");
-    AnalysisError("select id from functional.alltypestiny where int_col = " +
-        "(select id from functional.alltypessmall)",
-        "Subquery must return a single row: " +
-        "(SELECT id FROM functional.alltypessmall)");
-
     // Subquery returns multiple columns
     AnalysisError("select id from functional.alltypestiny where int_col = " +
         "(select id, int_col from functional.alltypessmall)",
-        "Subquery must return a single row: " +
-        "(SELECT id, int_col FROM functional.alltypessmall)");
+        "operands of type INT and STRUCT<id:INT,int_col:INT> are not " +
+        "comparable: int_col = (SELECT id, int_col FROM functional.alltypessmall)");
     AnalysisError("select * from functional.alltypestiny where id in " +
         "(select * from (values(1,2)) as t)",
         "Subquery must return a single column: (SELECT * FROM (VALUES(1, 2)) t)");
@@ -965,9 +950,9 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // Subquery returns multiple columns due to a group by clause
     AnalysisError("select id from functional.alltypestiny where int_col = " +
         "(select int_col, count(*) from functional.alltypessmall group by int_col)",
-        "Subquery must return a single row: " +
-        "(SELECT int_col, count(*) FROM functional.alltypessmall " +
-        "GROUP BY int_col)");
+        "operands of type INT and STRUCT<int_col:INT,_1:BIGINT> are not " +
+        "comparable: int_col = (SELECT int_col, count(*) FROM " +
+        "functional.alltypessmall GROUP BY int_col)");
 
     // Outer join with a table from the outer block using an explicit alias
     AnalysisError("select id from functional.alltypestiny t where int_col = " +
@@ -1083,12 +1068,10 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "g.int_col = t.int_col limit 1)");
 
     // Aggregate subquery with analytic function
-    AnalysisError("select id, int_col, bool_col from " +
+    AnalyzesOk("select id, int_col, bool_col from " +
       "functional.alltypestiny t1 where int_col = (select min(bigint_col) " +
       "over (partition by bool_col) from functional.alltypessmall t2 where " +
-      "int_col < 10)", "Subquery must return a single row: (SELECT " +
-      "min(bigint_col) OVER (PARTITION BY bool_col) FROM " +
-      "functional.alltypessmall t2 WHERE int_col < 10)");
+      "int_col < 10)");
 
     // Aggregate subquery with analytic function + limit 1 and a relative table ref
     // TODO: Modify the StmtRewriter to allow this query with only relative refs.
@@ -1114,10 +1097,8 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       "int_col < 10 limit 1)");
 
     // Subquery with distinct in binary predicate
-    AnalysisError("select * from functional.alltypes where int_col = " +
-        "(select distinct int_col from functional.alltypesagg)", "Subquery " +
-        "must return a single row: (SELECT DISTINCT int_col FROM " +
-        "functional.alltypesagg)");
+    AnalyzesOk("select * from functional.alltypes where int_col = " +
+        "(select distinct int_col from functional.alltypesagg)");
     AnalyzesOk("select * from functional.alltypes where int_col = " +
         "(select count(distinct int_col) from functional.alltypesagg)");
     // Multiple count aggregate functions in a correlated subquery's select list
@@ -1178,6 +1159,29 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     AnalysisError("select * from functional.jointbl t where exists " +
         "(select t.* from functional.alltypes)",
         "Could not resolve star expression: 't.*'");
+
+    // Scalar subquery check is done at runtime, not during analysis
+    for (String cmpOp: cmpOperators) {
+      AnalyzesOk(String.format(
+          "select id from functional.alltypestiny t where int_col %s " +
+          "(select int_col from functional.alltypessmall)", cmpOp));
+      AnalyzesOk(String.format(
+          "select id from functional.alltypestiny t where int_col %s " +
+          "(select int_col from functional.alltypessmall where id = 1)", cmpOp));
+      AnalyzesOk(String.format(
+          "select id from functional.alltypestiny t where int_col %s " +
+          "1 - (select int_col from functional.alltypessmall where id = 1)", cmpOp));
+      AnalyzesOk(String.format(
+          "select id from functional.alltypestiny t where int_col %s " +
+          "1 - (select int_col from functional.alltypessmall limit 10)", cmpOp));
+      AnalyzesOk(String.format(
+          "select id from functional.alltypestiny t where int_col %s " +
+          "(select int_col from functional.alltypessmall) * 7", cmpOp));
+    }
+    AnalysisError("select * from functional.alltypes t1 where id < " +
+        "(select id from functional.alltypes t2 where t1.int_col = t2.int_col)",
+        "Unsupported correlated subquery with runtime scalar check: " +
+        "SELECT id FROM functional.alltypes t2 WHERE t1.int_col = t2.int_col");
 
     // Test resolution of correlated table references inside subqueries. The testing
     // here is rather basic, because the analysis goes through the same codepath
@@ -1396,5 +1400,16 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     AnalyzesOk("select * from functional.alltypestiny a where " +
         "double_col between cast(1 as double) and cast(10 as double) and " +
         "exists (select 1 from functional.alltypessmall b where a.id = b.id)");
+
+    AnalyzesOk("select count(1) from functional.alltypes " +
+        "where (select int_col > 10 from functional.alltypes)");
+    AnalyzesOk("select count(1) from functional.alltypes " +
+        "where (select string_col is null from functional.alltypes)");
+    AnalyzesOk("select count(1) from functional.alltypes " +
+        "where (select int_col from functional.alltypes) is null");
+    AnalyzesOk("select count(1) from functional.alltypes " +
+        "where (select int_col from functional.alltypes) is not null");
+    AnalyzesOk("select 1 from functional.alltypes where " +
+        "coalesce(null, (select bool_col from functional.alltypes where id = 0))");
   }
 }

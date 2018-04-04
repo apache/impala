@@ -79,8 +79,13 @@ public class HdfsCachingOp implements ParseNode {
 
   @Override
   public String toSql() {
-    return !shouldCache() ? "UNCACHED" : "CACHED IN '" + getCachePoolName() + "' WITH " +
-        "REPLICATION = " + parsedReplication_.longValue();
+    if (!shouldCache()) return "UNCACHED";
+    StringBuilder sb = new StringBuilder();
+    sb.append("CACHED IN '" + getCachePoolName() + "'");
+    if (parsedReplication_ != null) {
+      sb.append(" WITH REPLICATION = " + parsedReplication_.longValue());
+    }
+    return sb.toString();
   }
 
   public THdfsCachingOp toThrift() { return cacheOp_; }

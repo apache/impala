@@ -219,6 +219,7 @@ public class UnionStmt extends QueryStmt {
 
     // Remember the SQL string before unnesting operands.
     toSqlString_ = toSql();
+    if (origSqlString_ == null) origSqlString_ = toSqlString_;
 
     // Unnest the operands before casting the result exprs. Unnesting may add
     // additional entries to operands_ and the result exprs of those unnested
