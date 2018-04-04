@@ -105,6 +105,7 @@ class ImpalaShell(object, cmd.Cmd):
 
   # If not connected to an impalad, the server version is unknown.
   UNKNOWN_SERVER_VERSION = "Not Connected"
+  PROMPT_FORMAT = "[{host}:{port}] {db}> "
   DISCONNECTED_PROMPT = "[Not connected] > "
   UNKNOWN_WEBSERVER = "0.0.0.0"
   # Message to display in shell when cancelling a query
@@ -774,7 +775,8 @@ class ImpalaShell(object, cmd.Cmd):
     if self.imp_client.connected:
       self._print_if_verbose('Connected to %s:%s' % self.impalad)
       self._print_if_verbose('Server version: %s' % self.server_version)
-      self.prompt = "[%s:%s] > " % self.impalad
+      self.prompt = ImpalaShell.PROMPT_FORMAT.format(
+        host=self.impalad[0], port=self.impalad[1], db=ImpalaShell.DEFAULT_DB)
       self._validate_database()
     try:
       self.imp_client.build_default_query_options_dict()
@@ -1141,7 +1143,16 @@ class ImpalaShell(object, cmd.Cmd):
     """Executes a USE... query"""
     query = self._create_beeswax_query(args)
     if self._execute_stmt(query) is CmdStatus.SUCCESS:
-      self.current_db = args
+      self.current_db = args.strip('`').strip()
+      self.prompt = ImpalaShell.PROMPT_FORMAT.format(host=self.impalad[0],
+                                                     port=self.impalad[1],
+                                                     db=self.current_db)
+    elif args.strip('`') == self.current_db:
+      # args == current_db means -d option was passed but the "use [db]" operation failed.
+      # We need to set the current_db to None so that it does not show a database, which
+      # may not exist.
+      self.current_db = None
+      return CmdStatus.ERROR
     else:
       return CmdStatus.ERROR
 

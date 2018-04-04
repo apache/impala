@@ -58,11 +58,11 @@ class TestImpalaShellInteractive(object):
   def teardown_class(cls):
     restore_shell_history(cls.tempfile_name)
 
-  def _expect_with_cmd(self, proc, cmd, expectations=()):
+  def _expect_with_cmd(self, proc, cmd, expectations=(), db="default"):
     """Executes a command on the expect process instance and verifies a set of
     assertions defined by the expections."""
     proc.sendline(cmd + ";")
-    proc.expect(":21000] >")
+    proc.expect(":21000] {db}>".format(db=db))
     if not expectations: return
     for e in expectations:
       assert e in proc.before
@@ -71,7 +71,7 @@ class TestImpalaShellInteractive(object):
   def test_local_shell_options(self):
     """Test that setting the local shell options works"""
     proc = pexpect.spawn(SHELL_CMD)
-    proc.expect(":21000] >")
+    proc.expect(":21000] default>")
     self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: False", "LIVE_SUMMARY: False"))
     self._expect_with_cmd(proc, "set live_progress=true")
     self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
@@ -179,11 +179,14 @@ class TestImpalaShellInteractive(object):
     assert get_num_open_sessions(initial_impala_service) == num_sessions_initial + 1, \
         "Not connected to %s:21000" % hostname
     p.send_cmd("connect %s:21001" % hostname)
+
     # Wait for a little while
     sleep(2)
     # The number of sessions on the target impalad should have been incremented.
     assert get_num_open_sessions(target_impala_service) == num_sessions_target + 1, \
         "Not connected to %s:21001" % hostname
+    assert "[%s:21001] default>" % hostname in p.get_result().stdout
+
     # The number of sessions on the initial impalad should have been decremented.
     assert get_num_open_sessions(initial_impala_service) == num_sessions_initial, \
         "Connection to %s:21000 should have been closed" % hostname
@@ -260,7 +263,7 @@ class TestImpalaShellInteractive(object):
       os.remove(SHELL_HISTORY_FILE)
     assert not os.path.exists(SHELL_HISTORY_FILE)
     child_proc = pexpect.spawn(SHELL_CMD)
-    child_proc.expect(":21000] >")
+    child_proc.expect(":21000] default>")
     self._expect_with_cmd(child_proc, "@1", ("Command index out of range"))
     self._expect_with_cmd(child_proc, "rerun -1", ("Command index out of range"))
     self._expect_with_cmd(child_proc, "select 'first_command'", ("first_command"))
@@ -268,7 +271,7 @@ class TestImpalaShellInteractive(object):
     self._expect_with_cmd(child_proc, "@ -1", ("first_command"))
     self._expect_with_cmd(child_proc, "select 'second_command'", ("second_command"))
     child_proc.sendline('history;')
-    child_proc.expect(":21000] >")
+    child_proc.expect(":21000] default>")
     assert '[1]: select \'first_command\';' in child_proc.before;
     assert '[2]: select \'second_command\';' in child_proc.before;
     assert '[3]: history;' in child_proc.before;
@@ -497,6 +500,35 @@ class TestImpalaShellInteractive(object):
              '*/')
     result = run_impala_shell_interactive(query)
     assert '| id   |' in result.stdout
+
+  @pytest.mark.execute_serially
+  def test_shell_prompt(self):
+    proc = pexpect.spawn(SHELL_CMD)
+    proc.expect(":21000] default>")
+    self._expect_with_cmd(proc, "use foo", (), 'default')
+    self._expect_with_cmd(proc, "use functional", (), 'functional')
+    self._expect_with_cmd(proc, "use foo", (), 'functional')
+    self._expect_with_cmd(proc, 'use `tpch`', (), 'tpch')
+    self._expect_with_cmd(proc, 'use ` tpch `', (), 'tpch')
+
+    proc = pexpect.spawn(SHELL_CMD, ['-d', 'functional'])
+    proc.expect(":21000] functional>")
+    self._expect_with_cmd(proc, "use foo", (), 'functional')
+    self._expect_with_cmd(proc, "use tpch", (), 'tpch')
+    self._expect_with_cmd(proc, "use foo", (), 'tpch')
+
+    proc = pexpect.spawn(SHELL_CMD, ['-d', ' functional '])
+    proc.expect(":21000] functional>")
+
+    proc = pexpect.spawn(SHELL_CMD, ['-d', '` functional `'])
+    proc.expect(":21000] functional>")
+
+    # Start an Impala shell with an invalid DB.
+    proc = pexpect.spawn(SHELL_CMD, ['-d', 'foo'])
+    proc.expect(":21000] default>")
+    self._expect_with_cmd(proc, "use foo", (), 'default')
+    self._expect_with_cmd(proc, "use functional", (), 'functional')
+    self._expect_with_cmd(proc, "use foo", (), 'functional')
 
 def run_impala_shell_interactive(input_lines, shell_args=None):
   """Runs a command in the Impala shell interactively."""
