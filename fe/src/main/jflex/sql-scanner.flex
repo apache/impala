@@ -30,7 +30,7 @@ import java.util.HashSet;
 
 import org.apache.impala.analysis.SqlParserSymbols;
 import org.apache.impala.catalog.BuiltinsDb;
-import static org.apache.impala.catalog.Catalog.BUILTINS_DB;
+import static org.apache.impala.catalog.ImpaladCatalog.BUILTINS_DB;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TReservedWordsVersion;
 
