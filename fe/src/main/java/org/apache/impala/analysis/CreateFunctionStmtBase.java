@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.AuthorizeableFn;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
-import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
@@ -152,8 +152,7 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
     analyzer.registerPrivReq(new PrivilegeRequest(
         new AuthorizeableFn(fn_.signatureString()), Privilege.ALL));
 
-    Db builtinsDb = analyzer.getCatalog().getDb(Catalog.BUILTINS_DB);
-    if (builtinsDb.containsFunction(fn_.getName())) {
+    if (ImpaladCatalog.getBuiltinsDb().containsFunction(fn_.getName())) {
       throw new AnalysisException("Function cannot have the same name as a builtin: " +
           fn_.getFunctionName().getFunction());
     }

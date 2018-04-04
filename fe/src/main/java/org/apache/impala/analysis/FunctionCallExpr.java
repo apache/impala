@@ -24,6 +24,7 @@ import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
@@ -111,7 +112,7 @@ public class FunctionCallExpr extends Expr {
     return fnName.getFnNamePath().size() == 1
            && fnName.getFnNamePath().get(0).equalsIgnoreCase(name)
         || fnName.getFnNamePath().size() == 2
-           && fnName.getFnNamePath().get(0).equals(Catalog.BUILTINS_DB)
+           && fnName.getFnNamePath().get(0).equals(ImpaladCatalog.BUILTINS_DB)
            && fnName.getFnNamePath().get(1).equalsIgnoreCase(name);
   }
 

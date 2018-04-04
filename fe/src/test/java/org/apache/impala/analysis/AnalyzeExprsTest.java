@@ -34,6 +34,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
+import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.ScalarType;
@@ -2696,7 +2697,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   @Test
   // IMPALA-2233: Regression test for loss of precision through implicit casts.
   public void TestImplicitArgumentCasts() throws AnalysisException {
-    FunctionName fnName = new FunctionName(Catalog.BUILTINS_DB, "greatest");
+    FunctionName fnName = new FunctionName(ImpaladCatalog.BUILTINS_DB, "greatest");
     Function tinyIntFn = new Function(fnName, new Type[] {ScalarType.DOUBLE},
         Type.DOUBLE, true);
     Function decimalFn = new Function(fnName,
@@ -2706,7 +2707,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     Assert.assertTrue(tinyIntFn.compare(decimalFn,
         CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
     // Check that this resolves to the decimal version of the function.
-    Db db = catalog_.getDb(Catalog.BUILTINS_DB);
+    Db db = catalog_.getDb(ImpaladCatalog.BUILTINS_DB);
     Function foundFn = db.getFunction(decimalFn, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     assertNotNull(foundFn);
     Assert.assertTrue(foundFn.getArgs()[0].isDecimal());
@@ -2739,7 +2740,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     Assert.assertNotNull(foundFn);
     Assert.assertEquals(Type.DOUBLE, foundFn.getArgs()[0]);
 
-    FunctionName lagFnName = new FunctionName(Catalog.BUILTINS_DB, "lag");
+    FunctionName lagFnName = new FunctionName(ImpaladCatalog.BUILTINS_DB, "lag");
     // Timestamp should not be converted to string if string overload available.
     Function lagStringFn = new Function(lagFnName,
         new Type[] {ScalarType.STRING, Type.TINYINT}, Type.INVALID, false);
