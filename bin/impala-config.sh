@@ -168,8 +168,6 @@ fi
 export IMPALA_KUDU_VERSION=0eef8e0
 unset IMPALA_KUDU_URL
 
-# Kudu version used to identify Java client jar from maven
-export KUDU_JAVA_VERSION=1.7.0-cdh5.16.0-SNAPSHOT
 
 # Versions of Hadoop ecosystem dependencies.
 # ------------------------------------------
@@ -206,6 +204,8 @@ if [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 2 ]]; then
   export IMPALA_PARQUET_VERSION=1.5.0-cdh5.16.0-SNAPSHOT
   export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
   export IMPALA_KITE_VERSION=1.0.0-cdh5.16.0-SNAPSHOT
+  # Kudu version used to identify Java client jar from maven
+  export KUDU_JAVA_VERSION=1.8.0-cdh5.16.0-SNAPSHOT
 
 elif [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 3 ]]; then
   export IMPALA_MINICLUSTER_PROFILE=3
@@ -218,9 +218,7 @@ elif [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 3 ]]; then
   export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
   export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
   export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
-  # We continue using an older version of KUDU_JAVA_VERSION,
-  # as it includes support for DECIMAL.
-  # TODO: Jump to newer Kudu when it's published in Maven.
+  export KUDU_JAVA_VERSION=1.8.0-cdh6.x-SNAPSHOT
 fi
 
 unset IMPALA_HADOOP_URL
