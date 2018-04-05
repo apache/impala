@@ -312,11 +312,15 @@ class ImpalaShell(object, cmd.Cmd):
     command = self.orig_cmd
     self.orig_cmd = None
     if not command:
-      print_to_stderr("Unexpected error: Failed to execute query due to command "\
+      print_to_stderr("Unexpected error: Failed to execute query due to command "
                       "is missing")
       sys.exit(1)
-    return self.imp_client.create_beeswax_query("%s %s" % (command, args),
-                                                 self.set_query_options)
+    # In order to deduce the correct cmd, parseline stripped the leading comment.
+    # To preserve the original query, the leading comment (if exists) will be
+    # prepended when constructing the query sent to the Impala front-end.
+    return self.imp_client.create_beeswax_query("%s%s %s" % (self.leading_comment or "",
+                                                command, args),
+                                                self.set_query_options)
 
   def do_shell(self, args):
     """Run a command on the shell
@@ -582,7 +586,7 @@ class ImpalaShell(object, cmd.Cmd):
       # is necessary to find a proper function and here is a right place
       # because the lowering command in front of the finding can avoid a
       # side effect.
-      command, arg, line = self.parseline(line)
+      command, arg, line, leading_comment = self.parseline(line)
       if not line:
         return self.emptyline()
       if command is None:
@@ -596,6 +600,7 @@ class ImpalaShell(object, cmd.Cmd):
         try:
           func = getattr(self, 'do_' + command.lower())
           self.orig_cmd = command
+          self.leading_comment = leading_comment
         except AttributeError:
           return self.default(line)
         return func(arg)
@@ -1281,17 +1286,78 @@ class ImpalaShell(object, cmd.Cmd):
 
   def parseline(self, line):
     """Parse the line into a command name and a string containing
-    the arguments.  Returns a tuple containing (command, args, line).
+    the arguments.  Returns a tuple containing (command, args, line, leading comment).
     'command' and 'args' may be None if the line couldn't be parsed.
     'line' in return tuple is the rewritten original line, with leading
     and trailing space removed and special characters transformed into
-    their aliases.
+    their aliases. If the line contains a leading comment, the leading
+    comment will be removed in order to deduce a 'command' correctly.
+    The 'command' is used to determine which 'do_<command>' function to invoke.
+    The 'do_<command>' implementation can decide whether to retain or ignore the
+    leading comment.
+
+    Examples:
+
+    > /*comment*/ help connect;
+    line: help connect
+    args: connect
+    command: help
+    leading comment: /*comment*/
+
+    > /*comment*/ ? connect;
+    line: help connect
+    args: connect
+    command: help
+    leading comment: /*comment*/
+
+    > /*first comment*/ select /*second comment*/ 1;
+    line: select /*second comment*/ 1
+    args: /*second comment*/ 1
+    command: select
+    leading comment: /*first comment*/
     """
-    line = line.strip()
+    leading_comment, line = ImpalaShell.strip_leading_comment(line.strip())
+    line = line.encode('utf-8')
     if line and line[0] == '@':
       line = 'rerun ' + line[1:]
-    return super(ImpalaShell, self).parseline(line)
+    return super(ImpalaShell, self).parseline(line) + (leading_comment,)
 
+  @staticmethod
+  def strip_leading_comment(sql):
+    """
+    Filter a leading comment in the SQL statement. This function returns a tuple
+    containing (leading comment, line without the leading comment).
+    """
+    class StripLeadingCommentFilter:
+      def __init__(self):
+        self.comment = None
+
+      def _process(self, tlist):
+        token = tlist.token_first()
+        if self._is_comment(token):
+          self.comment = token.value
+          tidx = tlist.token_index(token)
+          tlist.tokens.pop(tidx)
+
+      def _is_comment(self, token):
+        if isinstance(token, sqlparse.sql.Comment):
+          return True
+        for comment in sqlparse.tokens.Comment:
+          if token.ttype == comment:
+            return True
+        return False
+
+      def process(self, stack, stmt):
+        [self.process(stack, sgroup) for sgroup in stmt.get_sublists()]
+        self._process(stmt)
+
+    stack = sqlparse.engine.FilterStack()
+    stack.enable_grouping()
+    strip_leading_comment_filter = StripLeadingCommentFilter()
+    stack.stmtprocess.append(strip_leading_comment_filter)
+    stack.postprocess.append(sqlparse.filters.SerializerUnicode())
+    stripped_line = ''.join(stack.run(sql, 'utf-8'))
+    return strip_leading_comment_filter.comment, stripped_line
 
   def _replace_history_delimiters(self, src_delim, tgt_delim):
     """Replaces source_delim with target_delim for all items in history.
