@@ -8,6 +8,7 @@ create table tdata
   PARTITION BY RANGE (PARTITION VALUES < 100, PARTITION 100 <= VALUES < 1000,
   PARTITION 1000 <= VALUES <= 10000) STORED AS KUDU
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 insert into table tdata values
@@ -385,6 +386,7 @@ STRING,BIGINT,TINYINT,SMALLINT,BOOLEAN,INT,DOUBLE,FLOAT
 create table impala_3454 (key_1 tinyint, key_2 bigint, PRIMARY KEY (key_1, key_2))
   PARTITION BY HASH PARTITIONS 3 STORED AS KUDU
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 insert into impala_3454 values

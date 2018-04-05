@@ -4,6 +4,7 @@
 create table alltypes_test like functional_seq_snap.alltypes
 stored as parquet
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # Make sure no data exists for this table
@@ -35,6 +36,7 @@ BIGINT
 # CREATE TABLE LIKE on a view
 create table like_view like functional.view_view
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe like_view
@@ -67,6 +69,7 @@ BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 create table like_view_parquet like functional.view_view stored as parquet
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show table stats like_view_parquet
@@ -82,6 +85,7 @@ BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 create external table jointbl_rc_like like functional_rc_gzip.jointbl
 location '$FILESYSTEM_PREFIX/test-warehouse/jointbl_rc_gzip'
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # should get some results back
@@ -97,6 +101,7 @@ BIGINT, STRING, INT, INT
 # CREATE TABLE LIKE on unpartitioned table.
 create table jointbl_like like functional.jointbl
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # Make sure the new table can be queried and no data exists for this table.
@@ -110,11 +115,13 @@ BIGINT
 # No error is thrown when IF NOT EXISTS is specified and the table already exists.
 create table if not exists jointbl_like like functional.jointbl
 ---- RESULTS
+'Table already exists.'
 ====
 ---- QUERY
 # IF NOT EXISTS also applies when the src table is the same as the new table.
 create table if not exists jointbl_like like jointbl_like
 ---- RESULTS
+'Table already exists.'
 ====
 ---- QUERY
 insert overwrite table jointbl_like
@@ -155,6 +162,7 @@ create table no_avro_schema (
 partitioned by (year int, month int)
 stored as avro
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe no_avro_schema
@@ -182,6 +190,7 @@ STRING, STRING, STRING
 # Test creating an Avro table without an Avro schema via CREATE TABLE LIKE (IMPALA-1813)
 create table like_no_avro_schema like no_avro_schema stored as avro
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe like_no_avro_schema
@@ -208,10 +217,12 @@ STRING, STRING, STRING
 ---- QUERY
 drop table like_no_avro_schema
 ---- RESULTS
+'Table has been dropped.'
 ====
 ---- QUERY
 drop table no_avro_schema
 ---- RESULTS
+'Table has been dropped.'
 ====
 ---- QUERY
 # Test setting sort.columns when using create table like.

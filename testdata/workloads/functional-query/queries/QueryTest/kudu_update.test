@@ -8,6 +8,7 @@ create table tdata
   PARTITION BY RANGE (PARTITION VALUES < 10, PARTITION 10 <= VALUES < 30,
   PARTITION 30 <= VALUES <= 10000) STORED AS KUDU
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 insert into tdata values

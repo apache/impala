@@ -2,6 +2,7 @@
 ---- QUERY
 create table alltypessmall_hbase like functional_hbase.alltypessmall
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 compute incremental stats alltypessmall_hbase

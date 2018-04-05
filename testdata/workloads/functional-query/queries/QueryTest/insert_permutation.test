@@ -3,6 +3,7 @@
 create database insert_permutation_test location
 '$FILESYSTEM_PREFIX/test-warehouse/insert_permutation_test'
 ---- RESULTS
+'Database has been created.'
 ====
 ---- QUERY
 use insert_permutation_test
@@ -14,6 +15,7 @@ create table perm_part(int_col1 int, string_col string) partitioned by (p1 int, 
 create table parquet_part(int_col1 int, string_col string)
 partitioned by (p1 int, p2 string) stored as parquet;
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # Simple non-permutation

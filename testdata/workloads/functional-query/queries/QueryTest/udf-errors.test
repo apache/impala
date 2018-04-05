@@ -4,6 +4,7 @@ create function if not exists hive_pi() returns double
 location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFPI';
 ---- RESULTS
+'Function has been created.'
 ====
 ---- QUERY
 create function if not exists foo() returns double
@@ -33,6 +34,7 @@ create function if not exists twenty_args(int, int, int, int, int, int,
 location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so'
 symbol='TwentyArgs';
 ---- RESULTS
+'Function has been created.'
 ====
 ---- QUERY
 # Verifies that interpretation can support up to 20 arguments
@@ -49,6 +51,7 @@ create function if not exists twenty_one_args(int, int, int, int, int, int,
 location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so'
 symbol='TwentyOneArgs';
 ---- RESULTS
+'Function has been created.'
 ====
 ---- QUERY
 # Verifies that interpretation fails with more than 20 arguments.
@@ -63,6 +66,7 @@ create function if not exists nine_args_ir(int, int, int, int, int, int,
 location '$FILESYSTEM_PREFIX/test-warehouse/test-udfs.ll'
 symbol='NineArgs';
 ---- RESULTS
+'Function has been created.'
 ====
 ---- QUERY
 select nine_args_ir(1,2,3,4,5,6,7,8,9);
@@ -74,12 +78,14 @@ create function if not exists bad_expr(double) returns boolean
 location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so'
 symbol='BadExpr' prepare_fn='BadExprPrepare' close_fn='BadExprClose';
 ---- RESULTS
+'Function has been created.'
 ====
 ---- QUERY
 create function if not exists bad_expr2(double) returns boolean
 location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so'
 symbol='BadExpr' prepare_fn='BadExpr2Prepare' close_fn='BadExprClose';
 ---- RESULTS
+'Function has been created.'
 ====
 ---- QUERY
 select count(t1.int_col) from functional.alltypes t1 join functional.alltypes t2
@@ -120,4 +126,5 @@ drop function nine_args_ir(int, int, int, int, int, int, int, int, int);
 drop function bad_expr(double);
 drop function bad_expr2(double);
 ---- RESULTS
+'Function has been dropped.'
 ====

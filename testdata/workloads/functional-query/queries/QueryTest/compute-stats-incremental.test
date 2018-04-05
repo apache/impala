@@ -609,6 +609,7 @@ STRING
 # The table was not changed. Validate that the next compute incremental stats is a no-op.
 compute incremental stats complextypestbl_part;
 ---- RESULTS
+'No partitions selected for incremental stats update.'
 ---- ERRORS
 No partitions selected for incremental stats update
 ====

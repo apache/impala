@@ -90,6 +90,7 @@ create table if not exists nested_structs (
   map_array_map_struct_col
   map<string, array<map<string, struct<f1:string, f2:int>>>>)
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe nested_structs

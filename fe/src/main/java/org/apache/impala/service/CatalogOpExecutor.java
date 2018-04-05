@@ -133,6 +133,7 @@ import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TRangePartitionOperationType;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TResetMetadataResponse;
 import org.apache.impala.thrift.TResultRow;
@@ -345,6 +346,21 @@ public class CatalogOpExecutor {
   }
 
   /**
+   * Create result set from string 'summary', and attach it to 'response'.
+   */
+  private void addSummary(TDdlExecResponse response, String summary) {
+    TColumnValue resultColVal = new TColumnValue();
+    resultColVal.setString_val(summary);
+    TResultSet resultSet = new TResultSet();
+    resultSet.setSchema(new TResultSetMetadata(Lists.newArrayList(new TColumn(
+        "summary", Type.STRING.toThrift()))));
+    TResultRow resultRow = new TResultRow();
+    resultRow.setColVals(Lists.newArrayList(resultColVal));
+    resultSet.setRows(Lists.newArrayList(resultRow));
+    response.setResult_set(resultSet);
+  }
+
+  /**
    * Execute the ALTER TABLE command according to the TAlterTableParams and refresh the
    * table metadata, except for RENAME, ADD PARTITION and DROP PARTITION. This call is
    * thread-safe, i.e. concurrent operations on the same table are serialized.
@@ -356,9 +372,6 @@ public class CatalogOpExecutor {
     // When true, loads the table schema and the column stats from the Hive Metastore.
     boolean reloadTableSchema = false;
 
-    // When true, sets the result to be reported to the client.
-    boolean setResultSet = false;
-    TColumnValue resultColVal = new TColumnValue();
     Reference<Long> numUpdatedPartitions = new Reference<>(0L);
 
     TableName tableName = TableName.fromThrift(params.getTable_name());
@@ -402,6 +415,11 @@ public class CatalogOpExecutor {
           alterTableAddReplaceCols(tbl, addReplaceColParams.getColumns(),
               addReplaceColParams.isReplace_existing_cols());
           reloadTableSchema = true;
+          if (addReplaceColParams.isReplace_existing_cols()) {
+            addSummary(response, "Table columns have been replaced.");
+          } else {
+            addSummary(response, "New column(s) have been added to the table.");
+          }
           break;
         case ADD_PARTITION:
           // Create and add HdfsPartition objects to the corresponding HdfsTable and load
@@ -413,17 +431,20 @@ public class CatalogOpExecutor {
             addTableToCatalogUpdate(refreshedTable, response.result);
           }
           reloadMetadata = false;
+          addSummary(response, "New partition has been added to the table.");
           break;
         case DROP_COLUMN:
           TAlterTableDropColParams dropColParams = params.getDrop_col_params();
           alterTableDropCol(tbl, dropColParams.getCol_name());
           reloadTableSchema = true;
+          addSummary(response, "Column has been dropped.");
           break;
         case ALTER_COLUMN:
           TAlterTableAlterColParams alterColParams = params.getAlter_col_params();
           alterTableAlterCol(tbl, alterColParams.getCol_name(),
               alterColParams.getNew_col_def());
           reloadTableSchema = true;
+          addSummary(response, "Column has been altered.");
           break;
         case DROP_PARTITION:
           TAlterTableDropPartitionParams dropPartParams =
@@ -440,9 +461,8 @@ public class CatalogOpExecutor {
             refreshedTable.setCatalogVersion(newCatalogVersion);
             addTableToCatalogUpdate(refreshedTable, response.result);
           }
-          resultColVal.setString_val(
+          addSummary(response,
               "Dropped " + numUpdatedPartitions.getRef() + " partition(s).");
-          setResultSet = true;
           reloadMetadata = false;
           break;
         case RENAME_TABLE:
@@ -458,12 +478,11 @@ public class CatalogOpExecutor {
               fileFormatParams.getFile_format(), numUpdatedPartitions);
 
           if (fileFormatParams.isSetPartition_set()) {
-            resultColVal.setString_val(
+            addSummary(response,
                 "Updated " + numUpdatedPartitions.getRef() + " partition(s).");
           } else {
-            resultColVal.setString_val("Updated table.");
+            addSummary(response, "Updated table.");
           }
-          setResultSet = true;
           break;
         case SET_ROW_FORMAT:
           TAlterTableSetRowFormatParams rowFormatParams =
@@ -472,29 +491,33 @@ public class CatalogOpExecutor {
               rowFormatParams.getPartition_set(), rowFormatParams.getRow_format(),
               numUpdatedPartitions);
           if (rowFormatParams.isSetPartition_set()) {
-            resultColVal.setString_val(
+            addSummary(response,
                 "Updated " + numUpdatedPartitions.getRef() + " partition(s).");
           } else {
-            resultColVal.setString_val("Updated table.");
+            addSummary(response, "Updated table.");
           }
-          setResultSet = true;
           break;
         case SET_LOCATION:
           TAlterTableSetLocationParams setLocationParams =
               params.getSet_location_params();
-          reloadFileMetadata = alterTableSetLocation(tbl,
-              setLocationParams.getPartition_spec(), setLocationParams.getLocation());
+          List<TPartitionKeyValue> partitionSpec = setLocationParams.getPartition_spec();
+          reloadFileMetadata = alterTableSetLocation(tbl, partitionSpec,
+              setLocationParams.getLocation());
+          if (partitionSpec == null) {
+            addSummary(response, "New location has been set.");
+          } else {
+            addSummary(response, "New location has been set for the specified partition.");
+          }
           break;
         case SET_TBL_PROPERTIES:
           alterTableSetTblProperties(tbl, params.getSet_tbl_properties_params(),
               numUpdatedPartitions);
           if (params.getSet_tbl_properties_params().isSetPartition_set()) {
-            resultColVal.setString_val(
+            addSummary(response,
                 "Updated " + numUpdatedPartitions.getRef() + " partition(s).");
           } else {
-            resultColVal.setString_val("Updated table.");
+            addSummary(response, "Updated table.");
           }
-          setResultSet = true;
           break;
         case UPDATE_STATS:
           Preconditions.checkState(params.isSetUpdate_stats_params());
@@ -502,9 +525,8 @@ public class CatalogOpExecutor {
           alterTableUpdateStats(tbl, params.getUpdate_stats_params(),
               numUpdatedPartitions, numUpdatedColumns);
           reloadTableSchema = true;
-          resultColVal.setString_val("Updated " + numUpdatedPartitions.getRef() +
+          addSummary(response, "Updated " + numUpdatedPartitions.getRef() +
               " partition(s) and " + numUpdatedColumns.getRef() + " column(s).");
-          setResultSet = true;
           break;
         case SET_CACHED:
           Preconditions.checkState(params.isSetSet_cached_params());
@@ -513,17 +535,17 @@ public class CatalogOpExecutor {
           if (params.getSet_cached_params().getPartition_set() == null) {
             reloadFileMetadata =
                 alterTableSetCached(tbl, params.getSet_cached_params());
-            resultColVal.setString_val(op + "table.");
+            addSummary(response, op + "table.");
           } else {
             alterPartitionSetCached(tbl, params.getSet_cached_params(),
                 numUpdatedPartitions);
-            resultColVal.setString_val(
+            addSummary(response,
                 op + numUpdatedPartitions.getRef() + " partition(s).");
           }
-          setResultSet = true;
           break;
         case RECOVER_PARTITIONS:
           alterTableRecoverPartitions(tbl);
+          addSummary(response, "Partitions have been recovered.");
           break;
         default:
           throw new UnsupportedOperationException(
@@ -534,16 +556,6 @@ public class CatalogOpExecutor {
         loadTableMetadata(tbl, newCatalogVersion, reloadFileMetadata,
             reloadTableSchema, null);
         addTableToCatalogUpdate(tbl, response.result);
-      }
-
-      if (setResultSet) {
-        TResultSet resultSet = new TResultSet();
-        resultSet.setSchema(new TResultSetMetadata(Lists.newArrayList(
-            new TColumn("summary", Type.STRING.toThrift()))));
-        TResultRow resultRow = new TResultRow();
-        resultRow.setColVals(Lists.newArrayList(resultColVal));
-        resultSet.setRows(Lists.newArrayList(resultRow));
-        response.setResult_set(resultSet);
       }
     } finally {
       context.stop();
@@ -575,21 +587,27 @@ public class CatalogOpExecutor {
             params.getAdd_replace_cols_params();
         KuduCatalogOpExecutor.addColumn((KuduTable) tbl,
             addReplaceColParams.getColumns());
+        addSummary(response, "Column has been added/replaced.");
         break;
       case DROP_COLUMN:
         TAlterTableDropColParams dropColParams = params.getDrop_col_params();
         KuduCatalogOpExecutor.dropColumn((KuduTable) tbl,
             dropColParams.getCol_name());
+        addSummary(response, "Column has been dropped.");
         break;
       case ALTER_COLUMN:
         TAlterTableAlterColParams alterColParams = params.getAlter_col_params();
         KuduCatalogOpExecutor.alterColumn((KuduTable) tbl, alterColParams.getCol_name(),
             alterColParams.getNew_col_def());
+        addSummary(response, "Column has been altered.");
         break;
       case ADD_DROP_RANGE_PARTITION:
         TAlterTableAddDropRangePartitionParams partParams =
             params.getAdd_drop_range_partition_params();
         KuduCatalogOpExecutor.addDropRangePartition((KuduTable) tbl, partParams);
+        addSummary(response, "Range partition has been " +
+            (partParams.type == TRangePartitionOperationType.ADD ?
+            "added." : "dropped."));
         break;
       default:
         throw new UnsupportedOperationException(
@@ -692,6 +710,7 @@ public class CatalogOpExecutor {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         tbl.load(true, msClient.getHiveClient(), msTbl);
       }
+      addSummary(resp, "View has been altered.");
       tbl.setCatalogVersion(newCatalogVersion);
       addTableToCatalogUpdate(tbl, resp.result);
     } finally {
@@ -946,6 +965,7 @@ public class CatalogOpExecutor {
       Preconditions.checkNotNull(existingDb);
       resp.getResult().addToUpdated_catalog_objects(existingDb.toTCatalogObject());
       resp.getResult().setVersion(existingDb.getCatalogVersion());
+      addSummary(resp, "Database already exists.");
       return;
     }
     org.apache.hadoop.hive.metastore.api.Database db =
@@ -966,11 +986,13 @@ public class CatalogOpExecutor {
         try {
           msClient.getHiveClient().createDatabase(db);
           newDb = catalog_.addDb(dbName, db);
+          addSummary(resp, "Database has been created.");
         } catch (AlreadyExistsException e) {
           if (!params.if_not_exists) {
             throw new ImpalaRuntimeException(
                 String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e);
           }
+          addSummary(resp, "Database already exists.");
           if (LOG.isTraceEnabled()) {
             LOG.trace(String.format("Ignoring '%s' when creating database %s because " +
                 "IF NOT EXISTS was specified.", e, dbName));
@@ -1022,6 +1044,7 @@ public class CatalogOpExecutor {
             throw new CatalogException("Function " + fn.functionName() +
                 " already exists.");
           }
+          addSummary(resp, "Function already exists.");
           return;
         }
       }
@@ -1059,6 +1082,9 @@ public class CatalogOpExecutor {
       if (!addedFunctions.isEmpty()) {
         resp.result.setUpdated_catalog_objects(addedFunctions);
         resp.result.setVersion(catalog_.getCatalogVersion());
+        addSummary(resp, "Function has been created.");
+      } else {
+        addSummary(resp, "Function already exists.");
       }
     }
   }
@@ -1073,6 +1099,7 @@ public class CatalogOpExecutor {
         throw new ImpalaRuntimeException("Data source " + dataSource.getName() +
             " already exists.");
       }
+      addSummary(resp, "Data source already exists.");
       resp.result.addToUpdated_catalog_objects(existingDataSource.toTCatalogObject());
       resp.result.setVersion(existingDataSource.getCatalogVersion());
       return;
@@ -1080,6 +1107,7 @@ public class CatalogOpExecutor {
     catalog_.addDataSource(dataSource);
     resp.result.addToUpdated_catalog_objects(dataSource.toTCatalogObject());
     resp.result.setVersion(dataSource.getCatalogVersion());
+    addSummary(resp, "Data source has been created.");
   }
 
   private void dropDataSource(TDropDataSourceParams params, TDdlExecResponse resp)
@@ -1091,12 +1119,14 @@ public class CatalogOpExecutor {
         throw new ImpalaRuntimeException("Data source " + params.getData_source() +
             " does not exists.");
       }
+      addSummary(resp, "Data source does not exist.");
       // No data source was removed.
       resp.result.setVersion(catalog_.getCatalogVersion());
       return;
     }
     resp.result.addToRemoved_catalog_objects(dataSource.toTCatalogObject());
     resp.result.setVersion(dataSource.getCatalogVersion());
+    addSummary(resp, "Data source has been dropped.");
   }
 
   /**
@@ -1126,7 +1156,10 @@ public class CatalogOpExecutor {
         HdfsTable hdfsTbl = (HdfsTable) table;
         List<HdfsPartition> partitions =
             hdfsTbl.getPartitionsFromPartitionSet(params.getPartition_set());
-        if (partitions.isEmpty()) return;
+        if (partitions.isEmpty()) {
+          addSummary(resp, "No partitions found for table.");
+          return;
+        }
 
         for(HdfsPartition partition : partitions) {
           if (partition.getPartitionStats() != null) {
@@ -1141,6 +1174,7 @@ public class CatalogOpExecutor {
       }
       loadTableMetadata(table, newCatalogVersion, false, true, null);
       addTableToCatalogUpdate(table, resp.result);
+      addSummary(resp, "Stats have been dropped.");
     } finally {
       Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
       table.getLock().unlock();
@@ -1258,11 +1292,13 @@ public class CatalogOpExecutor {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         msClient.getHiveClient().dropDatabase(
             params.getDb(), true, params.if_exists, params.cascade);
+        addSummary(resp, "Database has been dropped.");
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "dropDatabase"), e);
       }
       Db removedDb = catalog_.removeDb(params.getDb());
+
       if (removedDb == null) {
         // Nothing was removed from the catalogd's cache.
         resp.result.setVersion(catalog_.getCatalogVersion());
@@ -1277,6 +1313,7 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(removedObject);
     resp.result.setVersion(removedObject.getCatalog_version());
     resp.result.addToRemoved_catalog_objects(removedObject);
+    addSummary(resp, "Database has been dropped.");
   }
 
   /**
@@ -1333,14 +1370,20 @@ public class CatalogOpExecutor {
     synchronized (metastoreDdlLock_) {
       Db db = catalog_.getDb(params.getTable_name().db_name);
       if (db == null) {
-        if (params.if_exists) return;
-        throw new CatalogException("Database does not exist: " +
-            params.getTable_name().db_name);
+        String dbNotExist = "Database does not exist: " + params.getTable_name().db_name;
+        if (params.if_exists) {
+          addSummary(resp, dbNotExist);
+          return;
+        }
+        throw new CatalogException(dbNotExist);
       }
       Table existingTbl = db.getTable(params.getTable_name().table_name);
       if (existingTbl == null) {
-        if (params.if_exists) return;
-        throw new CatalogException("Table/View does not exist: " + tableName);
+        if (params.if_exists) {
+          addSummary(resp, (params.is_table ? "Table " : "View ") + "does not exist.");
+          return;
+        }
+        throw new CatalogException("Table/View does not exist.");
       }
 
       // Retrieve the HMS table to determine if this is a Kudu table.
@@ -1366,9 +1409,13 @@ public class CatalogOpExecutor {
       // fixed.
       if (params.isSetIs_table() && ((params.is_table && existingTbl instanceof View)
           || (!params.is_table && !(existingTbl instanceof View)))) {
-        if (params.if_exists) return;
         String errorMsg = "DROP " + (params.is_table ? "TABLE " : "VIEW ") +
             "not allowed on a " + (params.is_table ? "view: " : "table: ") + tableName;
+        if (params.if_exists) {
+          addSummary(resp, "Drop " + (params.is_table ? "table " : "view ") +
+              "is not allowed on a " + (params.is_table ? "view." : "table."));
+          return;
+        }
         throw new CatalogException(errorMsg);
       }
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
@@ -1382,6 +1429,7 @@ public class CatalogOpExecutor {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "dropTable"), e);
       }
+      addSummary(resp, (params.is_table ? "Table " : "View ") + "has been dropped.");
 
       Table table = catalog_.removeTable(params.getTable_name().db_name,
           params.getTable_name().table_name);
@@ -1442,7 +1490,10 @@ public class CatalogOpExecutor {
     try {
       table = getExistingTable(tblName.getDb_name(), tblName.getTable_name());
     } catch (TableNotFoundException e) {
-      if (params.if_exists) return;
+      if (params.if_exists) {
+        addSummary(resp, "Table does not exist.");
+        return;
+      }
       throw e;
     }
     Preconditions.checkNotNull(table);
@@ -1472,6 +1523,7 @@ public class CatalogOpExecutor {
         throw new CatalogException(String.format("Failed to truncate table: %s.\n" +
             "Table may be in a partially truncated state.", fqName), e);
       }
+      addSummary(resp, "Table has been truncated.");
 
       loadTableMetadata(table, newCatalogVersion, true, true, null);
       addTableToCatalogUpdate(table, resp.result);
@@ -1491,6 +1543,7 @@ public class CatalogOpExecutor {
             throw new CatalogException("Database: " + fName.getDb()
                 + " does not exist.");
         }
+        addSummary(resp, "Database does not exist.");
         return;
       }
       List<TCatalogObject> removedFunctions = Lists.newArrayList();
@@ -1524,7 +1577,10 @@ public class CatalogOpExecutor {
       }
 
       if (!removedFunctions.isEmpty()) {
+        addSummary(resp, "Function has been dropped.");
         resp.result.setRemoved_catalog_objects(removedFunctions);
+      } else {
+        addSummary(resp, "Function does not exist.");
       }
       resp.result.setVersion(catalog_.getCatalogVersion());
     }
@@ -1546,6 +1602,7 @@ public class CatalogOpExecutor {
 
     Table existingTbl = catalog_.getTableNoThrow(tableName.getDb(), tableName.getTbl());
     if (params.if_not_exists && existingTbl != null) {
+      addSummary(response, "Table already exists.");
       LOG.trace(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tableName));
       existingTbl.getLock().lock();
@@ -1667,10 +1724,14 @@ public class CatalogOpExecutor {
             " dropped. The log contains more information.", newTable.getTableName(),
             kuduTableName), e);
       }
-      if (e instanceof AlreadyExistsException && params.if_not_exists) return false;
+      if (e instanceof AlreadyExistsException && params.if_not_exists) {
+        addSummary(response, "Table already exists.");
+        return false;
+      }
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
     }
+    addSummary(response, "Table has been created.");
     return true;
   }
 
@@ -1687,6 +1748,7 @@ public class CatalogOpExecutor {
     synchronized (metastoreDdlLock_) {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         msClient.getHiveClient().createTable(newTable);
+        addSummary(response, "Table has been created.");
         // If this table should be cached, and the table location was not specified by
         // the user, an extra step is needed to read the table to find the location.
         if (cacheOp != null && cacheOp.isSet_cached() &&
@@ -1695,7 +1757,10 @@ public class CatalogOpExecutor {
               newTable.getDbName(), newTable.getTableName());
         }
       } catch (Exception e) {
-        if (e instanceof AlreadyExistsException && if_not_exists) return false;
+        if (e instanceof AlreadyExistsException && if_not_exists) {
+          addSummary(response, "Table already exists");
+          return false;
+        }
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
       }
@@ -1739,7 +1804,11 @@ public class CatalogOpExecutor {
         new org.apache.hadoop.hive.metastore.api.Table();
     setViewAttributes(params, view);
     LOG.trace(String.format("Creating view %s", tableName));
-    createTable(view, params.if_not_exists, null, response);
+    if (!createTable(view, params.if_not_exists, null, response)) {
+      addSummary(response, "View already exists.");
+    } else {
+      addSummary(response, "View has been created.");
+    }
   }
 
   /**
@@ -1762,6 +1831,7 @@ public class CatalogOpExecutor {
 
     Table existingTbl = catalog_.getTableNoThrow(tblName.getDb(), tblName.getTbl());
     if (params.if_not_exists && existingTbl != null) {
+      addSummary(response, "Table already exists.");
       LOG.trace(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tblName));
       existingTbl.getLock().lock();
@@ -2226,6 +2296,7 @@ public class CatalogOpExecutor {
     response.result.addToRemoved_catalog_objects(result.first.toMinimalTCatalogObject());
     response.result.addToUpdated_catalog_objects(result.second.toTCatalogObject());
     response.result.setVersion(result.second.getCatalogVersion());
+    addSummary(response, "Renaming was successful.");
   }
 
   /**
@@ -2838,6 +2909,7 @@ public class CatalogOpExecutor {
       if (role == null) {
         // Nothing was removed from the catalogd's cache.
         resp.result.setVersion(catalog_.getCatalogVersion());
+        addSummary(resp, "No such role.");
         return;
       }
     } else {
@@ -2852,8 +2924,10 @@ public class CatalogOpExecutor {
     catalogObject.setCatalog_version(role.getCatalogVersion());
     if (createDropRoleParams.isIs_drop()) {
       resp.result.addToRemoved_catalog_objects(catalogObject);
+      addSummary(resp, "Role has been dropped.");
     } else {
       resp.result.addToUpdated_catalog_objects(catalogObject);
+      addSummary(resp, "Role has been created.");
     }
     resp.result.setVersion(role.getCatalogVersion());
   }
@@ -2884,6 +2958,11 @@ public class CatalogOpExecutor {
     catalogObject.setRole(role.toThrift());
     catalogObject.setCatalog_version(role.getCatalogVersion());
     resp.result.addToUpdated_catalog_objects(catalogObject);
+    if (grantRevokeRoleParams.isIs_grant()) {
+      addSummary(resp, "Role has been granted.");
+    } else {
+      addSummary(resp, "Role has been revoked.");
+    }
     resp.result.setVersion(role.getCatalogVersion());
   }
 
@@ -2902,9 +2981,11 @@ public class CatalogOpExecutor {
     if (grantRevokePrivParams.isIs_grant()) {
       rolePrivileges = catalog_.getSentryProxy().grantRolePrivileges(requestingUser,
           roleName, privileges);
+      addSummary(resp, "Privilege(s) have been granted.");
     } else {
       rolePrivileges = catalog_.getSentryProxy().revokeRolePrivileges(requestingUser,
           roleName, privileges, grantRevokePrivParams.isHas_grant_opt());
+      addSummary(resp, "Privilege(s) have been revoked.");
     }
     Preconditions.checkNotNull(rolePrivileges);
     List<TCatalogObject> updatedPrivs = Lists.newArrayList();

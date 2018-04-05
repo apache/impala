@@ -29,6 +29,7 @@ BIGINT, STRING, INT, INT
 ---- QUERY
 alter table jointbl_test add columns(new_col string)
 ---- RESULTS
+'New column(s) have been added to the table.'
 ====
 ---- QUERY
 select * from jointbl_test
@@ -58,6 +59,7 @@ BIGINT, STRING, INT, INT, STRING
 ---- QUERY
 alter table jointbl_test add columns(new_int_col int)
 ---- RESULTS
+'New column(s) have been added to the table.'
 ====
 ---- QUERY
 select * from jointbl_test
@@ -87,6 +89,7 @@ BIGINT, STRING, INT, INT, STRING, INT
 ---- QUERY
 alter table jointbl_test drop column new_int_col
 ---- RESULTS
+'Column has been dropped.'
 ====
 ---- QUERY
 select * from jointbl_test
@@ -116,10 +119,12 @@ BIGINT, STRING, INT, INT, STRING
 ---- QUERY
 alter table jointbl_test drop column new_col
 ---- RESULTS
+'Column has been dropped.'
 ====
 ---- QUERY
 alter table jointbl_test drop column alltypes_id
 ---- RESULTS
+'Column has been dropped.'
 ====
 ---- QUERY
 select * from jointbl_test

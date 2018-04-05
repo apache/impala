@@ -2,6 +2,7 @@
 ---- QUERY
 create table test_char_tmp (c char(5))
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 insert into test_char_tmp select cast("hello" as char(5))
@@ -64,6 +65,7 @@ string
 ---- QUERY
 create table test_varchar_tmp (vc varchar(5))
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 insert into test_varchar_tmp values (cast("hello" as varchar(5)))
@@ -101,6 +103,7 @@ string
 create table allchars
 (cshort char(5), clong char(140), vc varchar(5))
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 insert into allchars values (cast("123456" as char(5)), cast("123456" as char(140)),
@@ -117,6 +120,7 @@ char,char,string
 create table allchars_par
 (cshort char(5), clong char(140), vc varchar(5)) stored as parquet
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 insert into allchars_par values (cast("123456" as char(5)), cast("123456" as char(140)),
@@ -193,6 +197,7 @@ test_char_nulls ( c20 char(20),
                   c120 char(120),
                   c140 char(140))
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 insert into test_char_nulls

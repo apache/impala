@@ -2,6 +2,7 @@
 ---- QUERY
 create table $DATABASE.testtbl(i int, s string COMMENT 'String col') STORED AS TEXTFILE
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # Make sure creating a table with the same name doesn't throw an error when
@@ -13,6 +14,7 @@ ESCAPED BY '\\'
 LINES TERMINATED BY '\n'
 STORED AS TEXTFILE
 ---- RESULTS
+'Table already exists.'
 ====
 ---- QUERY
 show tables in $DATABASE
@@ -54,6 +56,7 @@ INT, STRING
 ---- QUERY
 create table $DATABASE.testtbl_part(i int, s string) PARTITIONED BY (id int comment 'C')
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # Partition columns are displayed as part of DESCRIBE <table>
@@ -105,6 +108,7 @@ STRING
 # Make sure we create the table in the proper database after a "use"
 create table testtbl2(f float, d double) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show tables
@@ -118,6 +122,7 @@ STRING
 ---- QUERY
 drop table testtbl2
 ---- RESULTS
+'Table has been dropped.'
 ====
 ---- QUERY
 show tables
@@ -134,6 +139,7 @@ with serdeproperties
 ('avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypes.json')
 stored as avro
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe avro_alltypes_nopart
@@ -160,6 +166,7 @@ with serdeproperties
 ('avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypes.json')
 stored as avro
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe avro_alltypes_part
@@ -183,18 +190,22 @@ STRING, STRING, STRING
 ---- QUERY
 drop table avro_alltypes_part
 ---- RESULTS
+'Table has been dropped.'
 ====
 ---- QUERY
 drop table avro_alltypes_nopart
 ---- RESULTS
+'Table has been dropped.'
 ====
 ---- QUERY
 drop table testtbl
 ---- RESULTS
+'Table has been dropped.'
 ====
 ---- QUERY
 drop table testtbl_part
 ---- RESULTS
+'Table has been dropped.'
 ====
 ---- QUERY
 show tables
@@ -205,6 +216,7 @@ STRING
 ---- QUERY
 drop table if exists non_existent_db.tbl
 ---- RESULTS
+'Database does not exist: non_existent_db'
 ====
 ---- QUERY
 # Test table creation with tblproperty and serdeproperty lengths just within limits
@@ -219,17 +231,20 @@ with serdeproperties(
 'valuevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevaluevalue'
 )
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # IMPALA-1740: Test setting the skip.header.line.count tblproperty
 create table skip_header_test_a (i1 integer) tblproperties('skip.header.line.count'='2')
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # IMPALA-1740: Test setting the skip.header.line.count tblproperty on a Parquet table
 create table skip_header_test_d (i1 integer) stored as parquet
 tblproperties('skip.header.line.count'='2')
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # IMPALA-1740: Test setting an invalid skip.header.line.count tblproperty
