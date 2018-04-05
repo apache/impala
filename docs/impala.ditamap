@@ -306,7 +306,7 @@ under the License.
 <!-- End of former contents of Installing-and-Using-Impala_xi42979.ditamap. -->
   <topicref audience="standalone" href="topics/impala_faq.xml"/>
   <topicref audience="standalone" href="topics/impala_release_notes.xml">
-    <mapref href="Cloudera-Impala-Release-Notes.ditamap" format="ditamap"
+    <mapref href="impala_release_notes.ditamap" format="ditamap"
       audience="standalone"/>
   </topicref>
 
