@@ -8,6 +8,7 @@ create table tdata
   PARTITION BY RANGE (PARTITION VALUES < 10, PARTITION 10 <= VALUES < 30,
   PARTITION 30 <= VALUES) STORED AS KUDU
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # VALUES, single row, all target cols, no errors
@@ -295,6 +296,7 @@ create table allkeytypes (i1 tinyint, i2 smallint, i3 int, i4 bigint, name strin
   partition value = (2,2,2,2,'2','2009-01-01 00:02:00.100000000'),
   partition value = (3,3,3,3,'3','2009-01-01 00:03:00.300000000')) stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 insert into allkeytypes select cast(id as tinyint), smallint_col, int_col,
@@ -325,6 +327,7 @@ create table tbl_with_defaults (a int primary key, b int null default 10,
   i decimal(9, 2) default 1111.11) partition by hash (a)
   partitions 3 stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 insert into tbl_with_defaults (a, f) values (1, 1), (2, 2), (3, 3), (4, 4)
@@ -360,6 +363,7 @@ INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL
 ---- QUERY
 alter table tbl_with_defaults add columns (j int null, k int not null default 10000)
 ---- RESULTS
+'Column has been added/replaced.'
 ====
 ---- QUERY
 select * from tbl_with_defaults
@@ -421,6 +425,7 @@ INT,INT,INT,INT,INT,INT,STRING,BOOLEAN,DECIMAL,INT,INT
 create table multiple_partition_cols (x bigint, y bigint, z string, primary key(x, y))
 partition by hash(x, y) partitions 8 stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # SELECT with constant

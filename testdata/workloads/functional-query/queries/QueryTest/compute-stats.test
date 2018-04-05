@@ -70,6 +70,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 # Adding a column shouldn't cause the stats to be dropped.
 alter table alltypes add columns (new_col int)
 ---- RESULTS
+'New column(s) have been added to the table.'
 ====
 ---- QUERY
 show column stats alltypes
@@ -99,6 +100,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 # HIVE-15075 is resolved.
 alter table alltypes change new_col new_col2 int
 ---- RESULTS
+'Column has been altered.'
 ====
 ---- QUERY
 show column stats alltypes
@@ -126,6 +128,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 # Removing a column shouldn't cause the stats to be dropped.
 alter table alltypes drop column new_col2
 ---- RESULTS
+'Column has been dropped.'
 ====
 ---- QUERY
 show column stats alltypes
@@ -345,6 +348,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 # Add partitions with NULL values and check for stats.
 alter table alltypes add partition (year=NULL, month=NULL)
 ---- RESULTS
+'New partition has been added to the table.'
 ====
 ---- QUERY
 show column stats alltypes
@@ -370,6 +374,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ---- QUERY
 alter table alltypes add partition (year=2011, month=NULL)
 ---- RESULTS
+'New partition has been added to the table.'
 ====
 ---- QUERY
 show column stats alltypes
@@ -1025,9 +1030,13 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 insert into table empty_partitioned partition (j=2) select 1;
 ====
 ---- QUERY
+drop stats empty_partitioned
+---- RESULTS
+'Stats have been dropped.'
+====
+---- QUERY
 # Verify partition stats work with empty and non-empty partition.
-drop stats empty_partitioned;
-compute stats empty_partitioned;
+compute stats empty_partitioned
 ---- RESULTS
 'Updated 2 partition(s) and 1 column(s).'
 ---- TYPES

@@ -334,21 +334,18 @@ public class Frontend {
       req.setDdl_type(TDdlType.ALTER_TABLE);
       req.setAlter_table_params(analysis.getAlterTableStmt().toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isAlterViewStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
       req.setDdl_type(TDdlType.ALTER_VIEW);
       req.setAlter_view_params(analysis.getAlterViewStmt().toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isCreateTableStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
       req.setDdl_type(TDdlType.CREATE_TABLE);
       req.setCreate_table_params(analysis.getCreateTableStmt().toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isCreateTableAsSelectStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -356,29 +353,24 @@ public class Frontend {
       req.setCreate_table_params(
           analysis.getCreateTableAsSelectStmt().getCreateStmt().toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Arrays.asList(
-          new TColumn("summary", Type.STRING.toThrift())));
     } else if (analysis.isCreateTableLikeStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
       req.setDdl_type(TDdlType.CREATE_TABLE_LIKE);
       req.setCreate_table_like_params(analysis.getCreateTableLikeStmt().toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isCreateViewStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
       req.setDdl_type(TDdlType.CREATE_VIEW);
       req.setCreate_view_params(analysis.getCreateViewStmt().toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isCreateDbStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
       req.setDdl_type(TDdlType.CREATE_DATABASE);
       req.setCreate_db_params(analysis.getCreateDbStmt().toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isCreateUdfStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       CreateUdfStmt stmt = (CreateUdfStmt) analysis.getStmt();
@@ -386,7 +378,6 @@ public class Frontend {
       req.setDdl_type(TDdlType.CREATE_FUNCTION);
       req.setCreate_fn_params(stmt.toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isCreateUdaStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -394,7 +385,6 @@ public class Frontend {
       CreateUdaStmt stmt = (CreateUdaStmt)analysis.getStmt();
       req.setCreate_fn_params(stmt.toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isCreateDataSrcStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -402,21 +392,18 @@ public class Frontend {
       CreateDataSrcStmt stmt = (CreateDataSrcStmt)analysis.getStmt();
       req.setCreate_data_source_params(stmt.toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isComputeStatsStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
       req.setDdl_type(TDdlType.COMPUTE_STATS);
       req.setCompute_stats_params(analysis.getComputeStatsStmt().toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isDropDbStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
       req.setDdl_type(TDdlType.DROP_DATABASE);
       req.setDrop_db_params(analysis.getDropDbStmt().toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isDropTableOrViewStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -424,7 +411,6 @@ public class Frontend {
       req.setDdl_type(stmt.isDropTable() ? TDdlType.DROP_TABLE : TDdlType.DROP_VIEW);
       req.setDrop_table_or_view_params(stmt.toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isTruncateStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -432,7 +418,6 @@ public class Frontend {
       req.setDdl_type(TDdlType.TRUNCATE_TABLE);
       req.setTruncate_params(stmt.toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isDropFunctionStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -440,7 +425,6 @@ public class Frontend {
       DropFunctionStmt stmt = (DropFunctionStmt)analysis.getStmt();
       req.setDrop_fn_params(stmt.toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isDropDataSrcStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -448,7 +432,6 @@ public class Frontend {
       DropDataSrcStmt stmt = (DropDataSrcStmt)analysis.getStmt();
       req.setDrop_data_source_params(stmt.toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isDropStatsStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
       TDdlExecRequest req = new TDdlExecRequest();
@@ -456,7 +439,6 @@ public class Frontend {
       DropStatsStmt stmt = (DropStatsStmt) analysis.getStmt();
       req.setDrop_stats_params(stmt.toThrift());
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isResetMetadataStmt()) {
       ddl.op_type = TCatalogOpType.RESET_METADATA;
       ResetMetadataStmt resetMetadataStmt = (ResetMetadataStmt) analysis.getStmt();
@@ -499,7 +481,6 @@ public class Frontend {
       req.setCreate_drop_role_params(params);
       ddl.op_type = TCatalogOpType.DDL;
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isGrantRevokeRoleStmt()) {
       GrantRevokeRoleStmt grantRoleStmt = (GrantRevokeRoleStmt) analysis.getStmt();
       TGrantRevokeRoleParams params = grantRoleStmt.toThrift();
@@ -508,7 +489,6 @@ public class Frontend {
       req.setGrant_revoke_role_params(params);
       ddl.op_type = TCatalogOpType.DDL;
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isGrantRevokePrivStmt()) {
       GrantRevokePrivStmt grantRevokePrivStmt = (GrantRevokePrivStmt) analysis.getStmt();
       TGrantRevokePrivParams params = grantRevokePrivStmt.toThrift();
@@ -518,9 +498,12 @@ public class Frontend {
       req.setGrant_revoke_priv_params(params);
       ddl.op_type = TCatalogOpType.DDL;
       ddl.setDdl_params(req);
-      metadata.setColumns(Collections.<TColumn>emptyList());
     } else {
       throw new IllegalStateException("Unexpected CatalogOp statement type.");
+    }
+    // All DDL commands return a string summarizing the outcome of the DDL.
+    if (ddl.op_type == TCatalogOpType.DDL) {
+      metadata.setColumns(Arrays.asList(new TColumn("summary", Type.STRING.toThrift())));
     }
     result.setResult_set_metadata(metadata);
     ddl.setSync_ddl(result.getQuery_options().isSync_ddl());

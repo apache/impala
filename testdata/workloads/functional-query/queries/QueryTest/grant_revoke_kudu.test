@@ -2,10 +2,12 @@
 ---- QUERY
 create role grant_revoke_test_ALL_SERVER
 ---- RESULTS
+'Role has been created.'
 ====
 ---- QUERY
 create role grant_revoke_test_ALL_TEST_DB
 ---- RESULTS
+'Role has been created.'
 ====
 ---- QUERY
 show roles
@@ -156,6 +158,7 @@ does not have privileges to access: grant_rev_db.kudu_tbl
 ---- QUERY
 grant select(a) on table grant_rev_db.kudu_tbl to grant_revoke_test_KUDU
 ---- RESULTS
+'Privilege(s) have been granted.'
 ====
 ---- QUERY
 grant ALL on table grant_rev_db.kudu_tbl to grant_revoke_test_KUDU
@@ -184,4 +187,5 @@ drop role grant_revoke_test_ALL_SERVER;
 drop role grant_revoke_test_ALL_TEST_DB;
 drop role grant_revoke_test_KUDU;
 ---- RESULTS
+'Role has been dropped.'
 ====

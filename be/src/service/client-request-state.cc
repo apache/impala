@@ -516,6 +516,8 @@ Status ClientRequestState::ExecDdlRequest() {
 
     if (child_queries.size() > 0) {
       RETURN_IF_ERROR(child_query_executor_->ExecAsync(move(child_queries)));
+    } else {
+      SetResultSet({"No partitions selected for incremental stats update."});
     }
     return Status::OK();
   }
@@ -646,6 +648,9 @@ void ClientRequestState::Wait() {
     discard_result(UpdateQueryStatus(status));
   }
   if (status.ok()) {
+    if (stmt_type() == TStmtType::DDL) {
+      DCHECK(catalog_op_type() != TCatalogOpType::DDL || request_result_set_ != nullptr);
+    }
     UpdateNonErrorOperationState(TOperationState::FINISHED_STATE);
   }
   // UpdateQueryStatus() or UpdateNonErrorOperationState() have updated operation_state_.
@@ -681,7 +686,7 @@ Status ClientRequestState::WaitInternal() {
 
   if (!returns_result_set()) {
     // Queries that do not return a result are finished at this point. This includes
-    // DML operations and a subset of the DDL operations.
+    // DML operations.
     eos_ = true;
   } else if (catalog_op_type() == TCatalogOpType::DDL &&
       ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {

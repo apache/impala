@@ -5,6 +5,7 @@ create external table tbl
 row format delimited fields terminated by ','
 location 'file://$IMPALA_HOME/testdata/data/local_tbl'
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe tbl

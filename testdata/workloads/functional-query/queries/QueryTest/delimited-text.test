@@ -34,6 +34,7 @@ STRING,STRING,INT,INT
 create table cbn like functional.text_comma_backslash_newline;
 create table dhp like functional.text_dollar_hash_pipe;
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # insert data into cbn table and check results

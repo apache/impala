@@ -6,6 +6,7 @@ create function if not exists twenty_one_args(int, int, int, int, int, int,
 location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so'
 symbol='TwentyOneArgs';
 ---- RESULTS
+'Function has been created.'
 ====
 ---- QUERY
 # Regression test for IMPALA-6262: failure to initialize the output expressions
@@ -21,5 +22,6 @@ Cannot interpret native UDF 'twenty_one_args': number of arguments is more than 
 drop function twenty_one_args(int, int, int, int, int, int, int, int,
     int, int, int, int, int, int, int, int, int, int, int, int, int);
 ---- RESULTS
+'Function has been dropped.'
 ====
 

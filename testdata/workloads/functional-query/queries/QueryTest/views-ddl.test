@@ -4,12 +4,14 @@
 create view $DATABASE.simple_view as
 select * from functional.alltypes
 ---- RESULTS
+'View has been created.'
 ====
 ---- QUERY
 # Test that 'if not exists' swallows the error (view already exists)
 create view if not exists $DATABASE.simple_view as
 select * from functional.alltypesagg
 ---- RESULTS
+'View already exists.'
 ====
 ---- QUERY
 # Create another simple view with 'if not exists' on a subset of
@@ -18,12 +20,14 @@ create view if not exists
 $DATABASE.simple_view_sub (x, y comment 'hello', z) as
 select int_col, string_col, timestamp_col from functional.alltypes
 ---- RESULTS
+'View has been created.'
 ====
 ---- QUERY
 # Create a view on a parquet table (Hive cannot create/read/write parquet)
 create view $DATABASE.parquet_view as
 select * from functional_parquet.alltypes where id < 20
 ---- RESULTS
+'View has been created.'
 ====
 ---- QUERY
 # Create a complex view with predicates, joins, aggregates and order by
@@ -34,12 +38,14 @@ on a.id = b.id where a.bigint_col < 50
 group by b.string_col having count(a.bigint_col) > 1
 order by b.string_col limit 100
 ---- RESULTS
+'View has been created.'
 ====
 ---- QUERY
 # Create a view on a view
 create view $DATABASE.view_view (aaa, bbb) as
 select * from $DATABASE.complex_view
 ---- RESULTS
+'View has been created.'
 ====
 ---- QUERY
 # Test that the views are displayed by 'show tables'
@@ -155,6 +161,7 @@ bigint
 # Test dropping a view
 drop view $DATABASE.simple_view_sub
 ---- RESULTS
+'View has been dropped.'
 ====
 ---- QUERY
 # Test that the view is gone
@@ -169,15 +176,18 @@ show tables in $DATABASE
 # Test 'if exists' for dropping a view (view does not exist)
 drop view if exists $DATABASE.bad_view
 ---- RESULTS
+'View does not exist.'
 ====
 ---- QUERY
 # Test 'if exists' does not drop a table with same name
 create table $DATABASE.drop_tbl_test(a int)
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 drop view if exists $DATABASE.drop_tbl_test
 ---- RESULTS
+'Drop view is not allowed on a table.'
 ====
 ---- QUERY
 # Test drop table 'if exists' does not drop a view with same name.
@@ -185,6 +195,7 @@ drop view if exists $DATABASE.drop_tbl_test
 # still be listed in the subsequent show tables output (as a view).
 drop table if exists $DATABASE.complex_view
 ---- RESULTS
+'Drop table is not allowed on a view.'
 ====
 ---- QUERY
 # Test that the table is present
@@ -200,11 +211,13 @@ show tables in $DATABASE
 # Test renaming a view
 alter view $DATABASE.view_view rename to $DATABASE.view_on_view
 ---- RESULTS
+'Renaming was successful.'
 ====
 ---- QUERY
 # Test renaming a parquet view
 alter view $DATABASE.parquet_view rename to $DATABASE.new_parquet_view
 ---- RESULTS
+'Renaming was successful.'
 ====
 ---- QUERY
 # Test that the view was renamed
@@ -222,6 +235,7 @@ alter view $DATABASE.new_parquet_view as
 select bigint_col, string_col from functional_parquet.alltypesagg
 where bigint_col is null limit 10
 ---- RESULTS
+'View has been altered.'
 ====
 ---- QUERY
 # Test querying the altered view
@@ -236,6 +250,7 @@ bigint,bigint
 create view $DATABASE.const_view
 as select 1, 'a', cast(10.0 as float)
 ---- RESULTS
+'View has been created.'
 ====
 ---- QUERY
 select * from $DATABASE.const_view
@@ -251,6 +266,7 @@ create view $DATABASE.paren_view as
 select count(*) from functional.alltypessmall
 where true and (true or false) and false
 ---- RESULTS
+'View has been created.'
 ====
 ---- QUERY
 # Test that parentheses are preserved in view creation.
@@ -265,6 +281,7 @@ bigint
 create view $DATABASE.decimal_view as
 select * from functional.decimal_tbl
 ---- RESULTS
+'View has been created.'
 ====
 ---- QUERY
 # Query a view with decimal columns. Regression test for IMPALA-1021.

@@ -5,6 +5,7 @@ create table simple_hash (id int, name string, valf float, vali bigint,
   primary key (id, name)) partition by hash(id) partitions 4,
   hash(name) partitions 2 stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show table stats simple_hash
@@ -29,6 +30,7 @@ create table range_part_bounds (id int, name string, valf float, vali bigint,
   (partition values <= 10, partition 10 < values <= 20, partition 20 < values)
   stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show table stats range_part_bounds
@@ -48,6 +50,7 @@ create table range_part_single (id int, name string, valf float, vali bigint,
   (partition value = 1, partition value = 10, partition value = 100)
   stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show table stats range_part_single
@@ -68,6 +71,7 @@ create table range_part_multiple_bounds (id int, name string, valf float,
   (partition values <= 10, partition 10 < values <= 20, partition 20 < values <= 30,
    partition value = 40, partition value = 50) stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show table stats range_part_multiple_bounds
@@ -89,6 +93,7 @@ create table range_part_multiple_cols (id int, name string, valf float, vali big
   (partition value = (10, 'martin'), partition value = (20, 'dimitris'),
    partition value = (30, 'matthew')) stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 -- Test printing of multiple column range partitioning
@@ -116,6 +121,7 @@ create table range_part_single_string_col (id int, name string, valf float,
   (partition values <= 'aaa', partition 'aaa' < values <= 'bbb',
    partition 'bbb' < values <= 'ccc', partition value = 'ddd') stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show table stats range_part_single_string_col
@@ -135,6 +141,7 @@ create table simple_hash_range (id int, name string, valf float, vali bigint,
   primary key (id, name)) partition by hash(id) partitions 4, range(id, name)
   (partition value = (10, 'martin'), partition value = (20, 'alex')) stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show table stats simple_hash_range
@@ -182,6 +189,7 @@ INT,STRING,STRING,STRING,INT
 create table simple_hash_all_columns (id int, name string, valf float, vali bigint,
   primary key (id, name)) partition by hash partitions 4 stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show table stats simple_hash_all_columns
@@ -202,6 +210,7 @@ create table simple_range_all_columns (id int, name string, valf float, vali big
   (partition value = (1, 'a'), partition value = (2, 'b'))
   stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show table stats simple_range_all_columns
@@ -220,6 +229,7 @@ create table range_complex_const_boundary_vals (x int, y int, primary key (x))
   partition factorial(4) < values < factorial(5), partition value = factorial(6))
   stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show table stats range_complex_const_boundary_vals

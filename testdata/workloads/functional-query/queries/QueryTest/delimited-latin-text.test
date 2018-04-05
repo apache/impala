@@ -18,6 +18,7 @@ STRING,STRING,INT,INT
 # create new tables like the ones above to test inserting
 create table tecn like functional.text_thorn_ecirc_newline;
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # insert data into tecn table and check results

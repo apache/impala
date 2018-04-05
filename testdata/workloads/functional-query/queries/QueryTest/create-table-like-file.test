@@ -3,6 +3,7 @@
 create table $DATABASE.temp_decimal_table like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/decimal.parquet'
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe $DATABASE.temp_decimal_table
@@ -17,6 +18,7 @@ STRING, STRING, STRING
 create table $DATABASE.like_zipcodes_file like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/zipcode_incomes.parquet'
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe $DATABASE.like_zipcodes_file
@@ -33,6 +35,7 @@ STRING, STRING, STRING
 create table $DATABASE.like_alltypestiny_file like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/alltypestiny.parquet'
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe $DATABASE.like_alltypestiny_file
@@ -59,6 +62,7 @@ create external table $DATABASE.like_enumtype_file like parquet
 STORED AS PARQUET
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/schemas/enum'
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe $DATABASE.like_enumtype_file
@@ -81,6 +85,7 @@ STRING, STRING
 create table if not exists $DATABASE.like_alltypestiny_file like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/zipcode_incomes.parquet'
 ---- RESULTS
+'Table already exists.'
 ====
 ---- QUERY
 # Should not have changed since last statement was IF NOT EXISTS.
@@ -103,11 +108,13 @@ STRING, STRING, STRING
 ---- QUERY
 drop table if exists allcomplextypes_clone
 ---- RESULTS
+'Table does not exist.'
 ====
 ---- QUERY
 create table allcomplextypes_clone like functional.allcomplextypes
 stored as parquet
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe allcomplextypes_clone
@@ -133,15 +140,18 @@ STRING, STRING, STRING
 ---- QUERY
 drop table allcomplextypes_clone
 ---- RESULTS
+'Table has been dropped.'
 ====
 ---- QUERY
 drop table if exists $DATABASE.temp_legacy_table
 ---- RESULTS
+'Table does not exist.'
 ====
 ---- QUERY
 create table $DATABASE.temp_legacy_table like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/legacy_nested.parquet'
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe $DATABASE.temp_legacy_table
@@ -162,15 +172,18 @@ STRING, STRING, STRING
 ---- QUERY
 drop table if exists $DATABASE.temp_legacy_table
 ---- RESULTS
+'Table has been dropped.'
 ====
 ---- QUERY
 drop table if exists $DATABASE.temp_modern_table
 ---- RESULTS
+'Table does not exist.'
 ====
 ---- QUERY
 create table $DATABASE.temp_modern_table like parquet
 '$FILESYSTEM_PREFIX/test-warehouse/schemas/modern_nested.parquet'
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 describe $DATABASE.temp_modern_table
@@ -191,6 +204,7 @@ STRING, STRING, STRING
 ---- QUERY
 drop table if exists $DATABASE.temp_modern_table
 ---- RESULTS
+'Table has been dropped.'
 ====
 ---- QUERY
 # Test adding sort.columns when creating a table like a parquet file.

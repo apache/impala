@@ -3,10 +3,19 @@
 # Add functions and test function overloading and scoping.
 create function $DATABASE.fn() RETURNS int
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+---- RESULTS
+'Function has been created.'
 ====
 ---- QUERY
 create function $DATABASE.fn(int) RETURNS double
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+====
+---- QUERY
+# Test IF NOT EXISTS
+create function if not exists $DATABASE.fn(int) RETURNS double
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+---- RESULTS
+'Function already exists.'
 ====
 ---- QUERY
 create function $DATABASE.fn(int, string) RETURNS int
@@ -149,6 +158,8 @@ STRING
 ====
 ---- QUERY
 drop function $DATABASE.fn2(int, string)
+---- RESULTS
+'Function has been dropped.'
 ====
 ---- QUERY
 show functions
@@ -197,6 +208,11 @@ STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop function fn()
+====
+---- QUERY
+drop function if exists fn()
+---- RESULTS
+'Function does not exist.'
 ====
 ---- QUERY
 show functions;

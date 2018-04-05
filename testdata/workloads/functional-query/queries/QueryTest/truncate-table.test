@@ -166,6 +166,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 # TRUNCATE IF EXISTS does not fail on non existent table
 truncate table if exists non_existent;
 ---- RESULTS
+'Table does not exist.'
 ====
 ---- QUERY
 # Create an unpartitioned table.
@@ -182,6 +183,7 @@ BIGINT
 # TRUNCATE IF EXISTS base scenario
 truncate table if exists t3;
 ---- RESULTS
+'Table has been truncated.'
 ====
 ---- QUERY
 # Verify that truncate was successful

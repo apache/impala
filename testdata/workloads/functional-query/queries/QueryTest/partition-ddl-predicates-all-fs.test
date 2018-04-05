@@ -157,7 +157,7 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 # Tests no matching partition.
 alter table p1 partition (j=100) set location '$FILESYSTEM_PREFIX/test-warehouse/newtable';
 ---- RESULTS
-# TODO: IMPALA-6775
+'New location has been set.'
 ==== QUERY
 # Check nothing was updated.
 show partitions p1

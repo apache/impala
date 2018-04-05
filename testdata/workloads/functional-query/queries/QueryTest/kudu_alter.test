@@ -3,6 +3,7 @@
 create table simple (id int primary key, name string, valf float, vali bigint)
   partition by hash (id) partitions 3 stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # Hash partitions cannot be enumerated as range partitions
@@ -44,6 +45,7 @@ ImpalaRuntimeException: Kudu table 'impala::$DATABASE.simple' does not exist on 
 ---- QUERY
 alter table simple rename to simple_new;
 ---- RESULTS
+'Renaming was successful.'
 ====
 ---- QUERY
 select count(*) from simple_new;
@@ -57,6 +59,7 @@ BIGINT
 create table tbl_to_alter (id int primary key, name string null, vali bigint not null)
   partition by range (id) (partition 1 < values <= 10) stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 # Verify partition layout
@@ -68,6 +71,7 @@ show range partitions tbl_to_alter;
 # Add a range partition
 alter table tbl_to_alter add range partition 10 < values <= 20
 ---- RESULTS
+'Range partition has been added.'
 ====
 ---- QUERY
 # Verify partition layout
@@ -93,6 +97,7 @@ INT,STRING,BIGINT
 # Add a singleton range partition
 alter table tbl_to_alter add range partition value = 100
 ---- RESULTS
+'Range partition has been added.'
 ====
 ---- QUERY
 # Verify partition layout
@@ -120,6 +125,7 @@ INT,STRING,BIGINT
 # Add an unbounded range partition
 alter table tbl_to_alter add range partition 1000 < values
 ---- RESULTS
+'Range partition has been added.'
 ====
 ---- QUERY
 # Verify partition layout
@@ -141,11 +147,13 @@ NonRecoverableException: New range partition conflicts with existing range parti
 # to hide the error
 alter table tbl_to_alter add if not exists range partition 10 < values <= 30
 ---- RESULTS
+'Range partition has been added.'
 ====
 ---- QUERY
 # Drop one of the recently inserted partitions
 alter table tbl_to_alter drop range partition value = 100
 ---- RESULTS
+'Range partition has been dropped.'
 ====
 ---- QUERY
 # Verify partition layout
@@ -167,6 +175,7 @@ INT,STRING,BIGINT
 # Drop an existing range partition
 alter table tbl_to_alter drop range partition 11 <= values < 21
 ---- RESULTS
+'Range partition has been dropped.'
 ====
 ---- QUERY
 # Verify partition layout
@@ -180,6 +189,7 @@ show range partitions tbl_to_alter;
 alter table tbl_to_alter drop range partition 1 < values <= 10;
 alter table tbl_to_alter drop range partition 1000 < values
 ---- RESULTS
+'Range partition has been dropped.'
 ====
 ---- QUERY
 # Verify partition layout
@@ -209,6 +219,7 @@ alter table tbl_to_alter add range partition 1 < values <= 20;
 alter table tbl_to_alter add columns (new_col1 int not null default 10,
   new_col2 bigint not null default 1000)
 ---- RESULTS
+'Column has been added/replaced.'
 ====
 ---- QUERY
 # Verify partition layout
@@ -261,6 +272,7 @@ INT,STRING,BIGINT,INT,BIGINT
 # Add nullable columns: with and without a default
 alter table tbl_to_alter add columns (new_col3 string null, new_col4 int null default -1)
 ---- RESULTS
+'Column has been added/replaced.'
 ====
 ---- QUERY
 # Add a row
@@ -307,6 +319,7 @@ A new non-null column must have a default value
 # Drop a column
 alter table tbl_to_alter drop column vali
 ---- RESULTS
+'Column has been dropped.'
 ====
 ---- QUERY
 # Retrieve table rows after column got dropped
@@ -330,6 +343,7 @@ NonRecoverableException: cannot remove a key column
 # Rename a column
 alter table tbl_to_alter change column new_col3 last_name string
 ---- RESULTS
+'Column has been altered.'
 ====
 ---- QUERY
 # Ensure the renamed column is accessible
@@ -355,6 +369,7 @@ BIGINT
 # Rename the Impala table
 alter table tbl_to_alter rename to kudu_tbl_to_alter
 ---- RESULTS
+'Renaming was successful.'
 ====
 ---- QUERY
 # Ensure the Impala table is accessible after it got renamed
@@ -421,6 +436,7 @@ partition by range (
             cast('2009-01-02 00:00:00' as timestamp)
 ) stored as kudu
 ---- RESULTS
+'Table has been created.'
 ====
 ---- QUERY
 show range partitions ts_ranges
@@ -434,6 +450,7 @@ alter table ts_ranges add range partition
 cast('2009-01-02 00:00:00' as timestamp) <= VALUES <
 cast('2009-01-03 00:00:00' as timestamp)
 ---- RESULTS
+'Range partition has been added.'
 ====
 ---- QUERY
 show range partitions ts_ranges
@@ -448,6 +465,7 @@ alter table ts_ranges drop range partition
 cast('2009-01-02 00:00:00' as timestamp) <= VALUES <
 cast('2009-01-03 00:00:00' as timestamp)
 ---- RESULTS
+'Range partition has been dropped.'
 ====
 ---- QUERY
 show range partitions ts_ranges
