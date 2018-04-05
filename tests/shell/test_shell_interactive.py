@@ -367,12 +367,9 @@ class TestImpalaShellInteractive(object):
   @pytest.mark.execute_serially
   def test_zero_row_fetch(self):
     # IMPALA-4418: DROP and USE are generally exceptional statements where
-    # the client does not fetch. However, when preceded by a comment, the
-    # Impala shell treats them like any other statement and will try to
-    # fetch - receiving 0 rows. For statements returning 0 rows we do not
+    # the client does not fetch. For statements returning 0 rows we do not
     # want an empty line in stdout.
     result = run_impala_shell_interactive("-- foo \n use default;")
-    assert "Fetched 0 row(s)" in result.stderr
     assert re.search('> \[', result.stdout)
     result = run_impala_shell_interactive("select * from functional.alltypes limit 0;")
     assert "Fetched 0 row(s)" in result.stderr
@@ -461,6 +458,55 @@ class TestImpalaShellInteractive(object):
       assert "SeLeCt 'second command'" in result.stderr
     finally:
       os.chdir(cwd)
+
+  @pytest.mark.execute_serially
+  def test_line_with_leading_comment(self):
+    # IMPALA-2195: A line with a comment produces incorrect command.
+    try:
+      run_impala_shell_interactive('drop table if exists leading_comment;')
+      run_impala_shell_interactive('create table leading_comment (i int);')
+      result = run_impala_shell_interactive('-- comment\n'
+                                            'insert into leading_comment values(1);')
+      assert 'Modified 1 row(s)' in result.stderr
+      result = run_impala_shell_interactive('-- comment\n'
+                                            'select * from leading_comment;')
+      assert 'Fetched 1 row(s)' in result.stderr
+
+      result = run_impala_shell_interactive('/* comment */\n'
+                                            'select * from leading_comment;')
+      assert 'Fetched 1 row(s)' in result.stderr
+
+      result = run_impala_shell_interactive('/* comment1 */\n'
+                                            '-- comment2\n'
+                                            'select * from leading_comment;')
+      assert 'Fetched 1 row(s)' in result.stderr
+
+      result = run_impala_shell_interactive('/* comment1\n'
+                                            'comment2 */ select * from leading_comment;')
+      assert 'Fetched 1 row(s)' in result.stderr
+
+      result = run_impala_shell_interactive('/* select * from leading_comment */ '
+                                            'select * from leading_comment;')
+      assert 'Fetched 1 row(s)' in result.stderr
+
+      result = run_impala_shell_interactive('/* comment */ help use')
+      assert 'Executes a USE... query' in result.stdout
+
+      result = run_impala_shell_interactive('-- comment\n'
+                                            ' help use;')
+      assert 'Executes a USE... query' in result.stdout
+
+      result = run_impala_shell_interactive('/* comment1 */\n'
+                                            '-- comment2\n'
+                                            'desc leading_comment;')
+      assert 'Fetched 1 row(s)' in result.stderr
+
+      result = run_impala_shell_interactive('/* comment1 */\n'
+                                            '-- comment2\n'
+                                            'help use;')
+      assert 'Executes a USE... query' in result.stdout
+    finally:
+      run_impala_shell_interactive('drop table if exists leading_comment;')
 
   @pytest.mark.execute_serially
   def test_line_ends_with_comment(self):
@@ -561,6 +607,55 @@ class TestImpalaShellInteractive(object):
     self._expect_with_cmd(proc, "use foo", (), 'default')
     self._expect_with_cmd(proc, "use functional", (), 'functional')
     self._expect_with_cmd(proc, "use foo", (), 'functional')
+
+  def test_strip_leading_comment(self):
+    """Test stripping leading comments from SQL statements"""
+    assert ('--delete\n', 'select 1') == \
+        ImpalaShellClass.strip_leading_comment('--delete\nselect 1')
+    assert ('--delete\n', 'select --do not delete\n1') == \
+        ImpalaShellClass.strip_leading_comment('--delete\nselect --do not delete\n1')
+    assert (None, 'select --do not delete\n1') == \
+        ImpalaShellClass.strip_leading_comment('select --do not delete\n1')
+
+    assert ('/*delete*/\n', 'select 1') == \
+        ImpalaShellClass.strip_leading_comment('/*delete*/\nselect 1')
+    assert ('/*delete\nme*/\n', 'select 1') == \
+        ImpalaShellClass.strip_leading_comment('/*delete\nme*/\nselect 1')
+    assert ('/*delete\nme*/\n', 'select 1') == \
+        ImpalaShellClass.strip_leading_comment('/*delete\nme*/\nselect 1')
+    assert ('/*delete*/', 'select 1') == \
+        ImpalaShellClass.strip_leading_comment('/*delete*/select 1')
+    assert ('/*delete*/ ', 'select /*do not delete*/ 1') == \
+        ImpalaShellClass.strip_leading_comment('/*delete*/ select /*do not delete*/ 1')
+    assert ('/*delete1*/ \n/*delete2*/ \n--delete3 \n', 'select /*do not delete*/ 1') == \
+        ImpalaShellClass.strip_leading_comment('/*delete1*/ \n'
+                                               '/*delete2*/ \n'
+                                               '--delete3 \n'
+                                               'select /*do not delete*/ 1')
+    assert (None, 'select /*do not delete*/ 1') == \
+        ImpalaShellClass.strip_leading_comment('select /*do not delete*/ 1')
+    assert ('/*delete*/\n', 'select c1 from\n'
+                            'a\n'
+                            'join -- +SHUFFLE\n'
+                            'b') == \
+        ImpalaShellClass.strip_leading_comment('/*delete*/\n'
+                                               'select c1 from\n'
+                                               'a\n'
+                                               'join -- +SHUFFLE\n'
+                                               'b')
+    assert ('/*delete*/\n', 'select c1 from\n'
+                            'a\n'
+                            'join /* +SHUFFLE */\n'
+                            'b') == \
+        ImpalaShellClass.strip_leading_comment('/*delete*/\n'
+                                               'select c1 from\n'
+                                               'a\n'
+                                               'join /* +SHUFFLE */\n'
+                                               'b')
+
+    assert (None, 'select 1') == \
+        ImpalaShellClass.strip_leading_comment('select 1')
+
 
 def run_impala_shell_interactive(input_lines, shell_args=None):
   """Runs a command in the Impala shell interactively."""
