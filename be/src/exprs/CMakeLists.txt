@@ -72,5 +72,6 @@ ADD_BE_TEST(expr-codegen-test)
 # expr-codegen-test includes test IR functions
 COMPILE_TO_IR(expr-codegen-test.cc)
 add_dependencies(expr-codegen-test-ir gen-deps)
+add_dependencies(expr-codegen-test expr-codegen-test-ir)
 
 ADD_UDF_TEST(aggregate-functions-test)

@@ -90,12 +90,6 @@ function impala_environment() {
 function boot_container() {
   pushd /home/impdev/Impala
 
-  # Required for metastore
-  sudo service postgresql start
-
-  # Required for starting HBase
-  sudo service ssh start
-
   # Make log directories. This is typically done in buildall.sh.
   mkdir -p logs/be_tests logs/fe_tests/coverage logs/ee_tests logs/custom_cluster_tests
 
@@ -112,17 +106,37 @@ function boot_container() {
   echo Hosts file:
   cat /etc/hosts
 
-  # Make a copy of Kudu's WALs to avoid isue with Docker filesystems (aufs and
+  popd
+}
+
+function start_minicluster {
+  # The subshell here avoids the verbose output from set -x.
+  (echo ">>> Starting PostgreSQL and SSH") 2> /dev/null
+  pushd /home/impdev/Impala
+
+  # Required for metastore
+  sudo service postgresql start
+
+  # Required for starting HBase
+  sudo service ssh start
+
+  (echo ">>> Copying Kudu Data") 2> /dev/null
+  # Move around Kudu's WALs to avoid issue with Docker filesystems (aufs and
   # overlayfs) that don't support os.rename(2) on directories, which Kudu
   # requires. We make a fresh copy of the data, in which case rename(2) works
   # presumably because there's only one layer involved. See
   # https://issues.apache.org/jira/browse/KUDU-1419.
-  cd /home/impdev/Impala/testdata
+  set -x
+  pushd /home/impdev/Impala/testdata
   for x in cluster/cdh*/node-*/var/lib/kudu/*/wal; do
+    echo $x
+    # This mv takes time, as it's actually copying into the latest layer.
     mv $x $x-orig
-    cp -r $x-orig $x
-    rm -r $x-orig
+    mkdir $x
+    mv $x-orig/* $x
+    rmdir $x-orig
   done
+  popd
 
   # Wait for postgresql to really start; if it doesn't, Hive Metastore will fail to start.
   for i in {1..120}; do
@@ -134,6 +148,9 @@ function boot_container() {
     fi
   done
   sudo -u postgres psql -c "select 1"
+
+  (echo ">>> Starting mini cluster") 2> /dev/null
+  testdata/bin/run-all.sh
 
   popd
 }
@@ -164,8 +181,13 @@ function build_impdev() {
 
   # Builds Impala and loads test data.
   # Note that IMPALA-6494 prevents us from using shared library builds,
-  # which are smaller and thereby speed things up.
-  ./buildall.sh -noclean -format -testdata -skiptests
+  # which are smaller and thereby speed things up. We use "-notests"
+  # to avoid building backend tests, which are sizable, and
+  # can be built when executing those tests.
+  ./buildall.sh -noclean -format -testdata -notests
+
+  # Dump current memory usage to logs, before shutting things down.
+  memory_usage
 
   # Shut down things cleanly.
   testdata/bin/kill-all.sh
@@ -176,7 +198,32 @@ function build_impdev() {
   # Clean up things we don't need to reduce image size
   find be -name '*.o' -execdir rm '{}' + # ~1.6GB
 
+  # Clean up dangling symlinks. These (typically "cluster/cdh*-node-*")
+  # may point to something inside a container that no longer exists
+  # and can confuse Jenkins.
+  find /logs -xtype l -execdir rm '{}' ';'
+
   popd
+}
+
+# Prints top 20 RSS consumers (and other, total), in megabytes Common culprits
+# are Java processes without Xmx set. Since most things don't reclaim memory,
+# this is a decent proxy for peak memory usage by long-lived processes.
+function memory_usage() {
+  (
+  echo "Top 20 memory consumers (RSS in MBs)"
+  sudo ps -axho rss,args | \
+    sed -e 's/^ *//' | \
+    sed -e 's, ,\t,' | \
+    sort -nr | \
+    awk -F'\t' '
+    FNR < 20 { print $1/1024.0, $2; total += $1/1024.0 }
+    FNR >= 20 { other+= $1/1024.0; total += $1/1024.0 }
+    END {
+      if (other) { print other, "-- other --" };
+      print total, "-- total --"
+    }'
+  ) >& /logs/memory_usage.txt
 }
 
 # Runs a suite passed in as the first argument. Tightly
@@ -189,6 +236,8 @@ function test_suite() {
 
   # These test suites are for testing.
   if [[ $1 == NOOP ]]; then
+    # Sleep busily for 10 seconds.
+    bash -c 'while [[ $SECONDS -lt 10 ]]; do :; done'
     return 0
   fi
   if [[ $1 == NOOP_FAIL ]]; then
@@ -208,31 +257,9 @@ function test_suite() {
   boot_container
   impala_environment
 
-  # By default, the JVM will use 1/4 of your OS memory for its heap size. For a
-  # long-running test, this will delay GC inside of impalad's leading to
-  # unnecessarily large process RSS footprints. We cap the heap size at
-  # a more reasonable size.  Note that "test_insert_large_string" fails
-  # at 2g and 3g, so the suite that includes it (EE_TEST_PARALLEL) gets
-  # additional memory.
-  #
-  # Similarly, bin/start-impala-cluster typically configures the memlimit
-  # to be 80% of the machine memory, divided by the number of daemons.
-  # If multiple containers are to be run simultaneously, this is scaled
-  # down in test-with-docker.py (and further configurable with --impalad-mem-limit-bytes)
-  # and passed in via $IMPALAD_MEM_LIMIT_BYTES to the container. There is a
-  # relationship between the number of parallel tests that can be run by py.test and this
-  # limit.
-  JVM_HEAP_GB=2
-  if [[ $1 = EE_TEST_PARALLEL ]]; then
-    JVM_HEAP_GB=4
-  fi
-  export TEST_START_CLUSTER_ARGS="--jvm_args=-Xmx${JVM_HEAP_GB}g \
-    --impalad_args=--mem_limit=$IMPALAD_MEM_LIMIT_BYTES"
-
   # BE tests don't require the minicluster, so we can run them directly.
   if [[ $1 = BE_TEST ]]; then
-    # IMPALA-6494: thrift-server-test fails in Ubuntu16.04 for the moment; skip it.
-    export SKIP_BE_TEST_PATTERN='thrift-server-test*'
+    make -j$(nproc) --load-average=$(nproc) be-test be-benchmarks
     if ! bin/run-backend-tests.sh; then
       echo "Tests $1 failed!"
       return 1
@@ -242,37 +269,73 @@ function test_suite() {
     fi
   fi
 
+  if [[ $1 == RAT_CHECK ]]; then
+    # Runs Apache RAT (a license checker)
+    git archive --prefix=rat/ -o rat-impala.zip HEAD
+    wget --quiet https://archive.apache.org/dist/creadur/apache-rat-0.12/apache-rat-0.12-bin.tar.gz
+    tar xzf apache-rat-0.12-bin.tar.gz
+    java -jar apache-rat-0.12/apache-rat-0.12.jar -x rat-impala.zip > logs/rat.xml
+    bin/check-rat-report.py bin/rat_exclude_files.txt logs/rat.xml
+    return $?
+  fi
+
   # Start the minicluster
-  testdata/bin/run-all.sh
+  start_minicluster
+
+  # By default, the JVM will use 1/4 of your OS memory for its heap size. For a
+  # long-running test, this will delay GC inside of impalad's leading to
+  # unnecessarily large process RSS footprints. To combat this, we
+  # set a small initial heap size, and then cap it at a more reasonable
+  # size. The small initial heap sizes help for daemons that do little
+  # in the way of JVM work (e.g., the 2nd and 3rd impalad's).
+  # Note that "test_insert_large_string" fails at 2g and 3g, so the suite that
+  # includes it (EE_TEST_PARALLEL) gets additional memory.
+
+  # Note that we avoid using TEST_START_CLUSTER_ARGS="--jvm-args=..."
+  # because it gets flattened along the way if we need to provide
+  # more than one Java argument. We use JAVA_TOOL_OPTIONS instead.
+  JVM_HEAP_MAX_GB=2
+  if [[ $1 = EE_TEST_PARALLEL ]]; then
+    JVM_HEAP_MAX_GB=4
+  elif [[ $1 = EE_TEST_PARALLEL_EXHAUSTIVE ]]; then
+    JVM_HEAP_MAX_GB=8
+  fi
+  JAVA_TOOL_OPTIONS="-Xms512M -Xmx${JVM_HEAP_MAX_GB}G"
+
+  # Similarly, bin/start-impala-cluster typically configures the memlimit
+  # to be 80% of the machine memory, divided by the number of daemons.
+  # If multiple containers are to be run simultaneously, this is scaled
+  # down in test-with-docker.py (and further configurable with --impalad-mem-limit-bytes)
+  # and passed in via $IMPALAD_MEM_LIMIT_BYTES to the container. There is a
+  # relationship between the number of parallel tests that can be run by py.test and this
+  # limit.
+  export TEST_START_CLUSTER_ARGS="--impalad_args=--mem_limit=$IMPALAD_MEM_LIMIT_BYTES"
 
   export MAX_PYTEST_FAILURES=0
-  # Choose which suite to run; this is how run-all.sh chooses between them.
-  export FE_TEST=false
-  export BE_TEST=false
-  export EE_TEST=false
-  export JDBC_TEST=false
-  export CLUSTER_TEST=false
 
-  eval "export ${1}=true"
-
-  if [[ ${1} = "EE_TEST_SERIAL" ]]; then
-    # We bucket the stress tests with the parallel tests.
-    export RUN_TESTS_ARGS="--skip-parallel --skip-stress"
-    export EE_TEST=true
-  elif [[ ${1} = "EE_TEST_PARALLEL" ]]; then
-    export RUN_TESTS_ARGS="--skip-serial"
-    export EE_TEST=true
-  fi
+  # Asserting that these should are all set (to either true or false as strings).
+  # This is how run-all.sh chooses between them.
+  [[ $FE_TEST && $BE_TEST && $EE_TEST && $JDBC_TEST && $CLUSTER_TEST ]]
 
   ret=0
 
+  if [[ ${EE_TEST} = true ]]; then
+    # test_insert_parquet.py depends on this binary
+    make -j$(nproc) --load-average=$(nproc) parquet-reader
+  fi
+
   # Run tests.
-  if ! time -p bin/run-all-tests.sh; then
+  (echo ">>> $1: Starting run-all-test") 2> /dev/null
+  if ! time -p bash -x bin/run-all-tests.sh; then
     ret=1
     echo "Tests $1 failed!"
   else
     echo "Tests $1 succeeded!"
   fi
+
+  # Save memory usage after tests have run but before shutting down the cluster.
+  memory_usage || true
+
   # Oddly, I've observed bash fail to exit (and wind down the container),
   # leading to test-with-docker.py hitting a timeout. Killing the minicluster
   # daemons fixes this.
@@ -312,6 +375,8 @@ function main() {
   shift
 
   echo ">>> ${CMD} $@ (begin)"
+  # Dump environment, for debugging
+  env | grep -vE "AWS_(SECRET_)?ACCESS_KEY"
   set -x
   if "${CMD}" "$@"; then
     ret=0

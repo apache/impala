@@ -180,6 +180,10 @@ def build_test_args(base_name, valid_dirs=VALID_TEST_DIRS):
     #
     explicit_tests = pytest.config.getoption(FILE_OR_DIR)
     config_options = [arg for arg in commandline_args if arg not in explicit_tests]
+    # We also want to strip out any --shard_tests option and its corresponding value.
+    while "--shard_tests" in config_options:
+      i = config_options.index("--shard_tests")
+      del config_options[i:i+2]
     test_args = ignored_dirs + logging_args + config_options
 
   return test_args
@@ -237,6 +241,11 @@ if __name__ == "__main__":
     test_executor.run_tests(sys.argv[1:])
     sys.exit(0)
 
+  def run(args):
+    """Helper to print out arguments of test_executor before invoking."""
+    print "Running TestExecutor with args: %s" % (args,)
+    test_executor.run_tests(args)
+
   os.chdir(TEST_DIR)
 
   # Create the test result directory if it doesn't already exist.
@@ -248,25 +257,25 @@ if __name__ == "__main__":
   # pytest warnings/messages and displays collected tests
 
   if '--collect-only' in sys.argv:
-    test_executor.run_tests(sys.argv[1:])
+    run(sys.argv[1:])
   else:
     print_metrics('connections')
     # First run query tests that need to be executed serially
     if not skip_serial:
       base_args = ['-m', 'execute_serially']
-      test_executor.run_tests(base_args + build_test_args('serial'))
+      run(base_args + build_test_args('serial'))
       print_metrics('connections')
 
     # Run the stress tests tests
     if not skip_stress:
       base_args = ['-m', 'stress', '-n', NUM_STRESS_CLIENTS]
-      test_executor.run_tests(base_args + build_test_args('stress'))
+      run(base_args + build_test_args('stress'))
       print_metrics('connections')
 
     # Run the remaining query tests in parallel
     if not skip_parallel:
       base_args = ['-m', 'not execute_serially and not stress', '-n', NUM_CONCURRENT_TESTS]
-      test_executor.run_tests(base_args + build_test_args('parallel'))
+      run(base_args + build_test_args('parallel'))
 
     # The total number of tests executed at this point is expected to be >0
     # If it is < 0 then the script needs to exit with a non-zero
@@ -277,7 +286,7 @@ if __name__ == "__main__":
     # Finally, validate impalad/statestored metrics.
     args = build_test_args(base_name='verify-metrics', valid_dirs=['verifiers'])
     args.append('verifiers/test_verify_metrics.py')
-    test_executor.run_tests(args)
+    run(args)
 
   if test_executor.tests_failed:
     sys.exit(1)

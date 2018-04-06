@@ -18,3 +18,10 @@
 export HADOOP_LOG_DIR="$LOG_DIR/hadoop-hdfs"
 export HADOOP_ROOT_LOGGER="${HADOOP_ROOT_LOGGER:-INFO,RFA}"
 export HADOOP_LOGFILE=$(basename $0).log
+
+# Force minicluster processes to have a maximum heap.
+# If unset, on large machines, the JVM default
+# is 1/4th of the RAM (or so), and processes like DataNode
+# end up never garbage collecting.
+export HADOOP_HEAPSIZE_MIN=512m
+export HADOOP_HEAPSIZE_MAX=2g

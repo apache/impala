@@ -57,6 +57,8 @@ fi
 : ${TEST_START_CLUSTER_ARGS:=}
 # Extra args to pass to run-tests.py
 : ${RUN_TESTS_ARGS:=}
+# Extra args to pass to run-custom-cluster-tests.sh
+: ${RUN_CUSTOM_CLUSTER_TESTS_ARGS:=}
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # TODO: Remove abort_on_config_error flag from here and create-load-data.sh once
   # checkConfiguration() accepts the local filesystem (see IMPALA-1850).
@@ -223,7 +225,8 @@ do
     # Run the custom-cluster tests after all other tests, since they will restart the
     # cluster repeatedly and lose state.
     # TODO: Consider moving in to run-tests.py.
-    if ! "${IMPALA_HOME}/tests/run-custom-cluster-tests.sh" ${COMMON_PYTEST_ARGS}; then
+    if ! "${IMPALA_HOME}/tests/run-custom-cluster-tests.sh" ${COMMON_PYTEST_ARGS} \
+        ${RUN_CUSTOM_CLUSTER_TESTS_ARGS}; then
       TEST_RET_CODE=1
     fi
     export IMPALA_MAX_LOG_FILES="${IMPALA_MAX_LOG_FILES_SAVE}"
