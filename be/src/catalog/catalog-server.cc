@@ -157,7 +157,7 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
   : thrift_iface_(new CatalogServiceThriftIf(this)),
     thrift_serializer_(FLAGS_compact_catalog_topic), metrics_(metrics),
     topic_updates_ready_(false), last_sent_catalog_version_(0L),
-    catalog_objects_min_version_(0L), catalog_objects_max_version_(0L) {
+    catalog_objects_max_version_(0L) {
   topic_processing_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
       CATALOG_SERVER_TOPIC_PROCESSING_TIMES);
 }
@@ -228,10 +228,12 @@ void CatalogServer::UpdateCatalogTopicCallback(
 
   const TTopicDelta& delta = topic->second;
 
-  // If not generating a delta update and 'pending_topic_updates_' doesn't already contain
-  // the full catalog (beginning with version 0), then force GatherCatalogUpdatesThread()
-  // to reload the full catalog.
-  if (delta.from_version == 0 && catalog_objects_min_version_ != 0) {
+  // If the statestore restarts, both from_version and to_version would be 0. If catalog
+  // has sent non-empty topic udpate, pending_topic_updates_ won't be from version 0 and
+  // it should be re-collected.
+  if (delta.from_version == 0 && delta.to_version == 0 &&
+      last_sent_catalog_version_ != 0) {
+    LOG(INFO) << "Statestore restart detected. Collecting a non-delta catalog update.";
     last_sent_catalog_version_ = 0L;
   } else if (!pending_topic_updates_.empty()) {
     // Process the pending topic update.
@@ -284,7 +286,6 @@ void CatalogServer::UpdateCatalogTopicCallback(
       if (!status.ok()) {
         LOG(ERROR) << status.GetDetail();
       } else {
-        catalog_objects_min_version_ = last_sent_catalog_version_;
         catalog_objects_max_version_ = resp.max_catalog_version;
       }
     }
