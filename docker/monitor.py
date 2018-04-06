@@ -232,26 +232,35 @@ class Timeline(object):
         if self.interesting_re.search(line)]
     return [(container.name,) + split_timestamp(line) for line in interesting_lines]
 
-  @staticmethod
-  def parse_metrics(f):
+  def parse_metrics(self, f):
     """Parses timestamped metric lines.
 
     Given metrics lines like:
 
     2017-10-25 10:08:30.961510 87d5562a5fe0ea075ebb2efb0300d10d23bfa474645bb464d222976ed872df2a cpu user 33 system 15
 
-    Returns an iterable of (ts, container, user_cpu, system_cpu)
+    Returns an iterable of (ts, container, user_cpu, system_cpu). It also updates
+    container.peak_total_rss and container.total_user_cpu and container.total_system_cpu.
     """
     prev_by_container = {}
+    peak_rss_by_container = {}
     for line in f:
       ts, rest = split_timestamp(line.rstrip())
+      total_rss = None
       try:
         container, metric_type, rest2 = rest.split(" ", 2)
-        if metric_type != "cpu":
-          continue
-        _, user_cpu_s, _, system_cpu_s = rest2.split(" ", 3)
+        if metric_type == "cpu":
+          _, user_cpu_s, _, system_cpu_s = rest2.split(" ", 3)
+        elif metric_type == "memory":
+          memory_metrics = rest2.split(" ")
+          total_rss = int(memory_metrics[memory_metrics.index("total_rss") + 1 ])
       except:
         logging.warning("Skipping metric line: %s", line)
+        continue
+
+      if total_rss is not None:
+        peak_rss_by_container[container] = max(peak_rss_by_container.get(container, 0),
+            total_rss)
         continue
 
       prev_ts, prev_user, prev_system = prev_by_container.get(
@@ -266,6 +275,14 @@ class Timeline(object):
           yield ts, container, (user_cpu - prev_user)/dt/USER_HZ,\
               (system_cpu - prev_system)/dt/USER_HZ
       prev_by_container[container] = ts, user_cpu, system_cpu
+
+    # Now update container totals
+    for c in self.containers:
+      if c.id in prev_by_container:
+        _, u, s = prev_by_container[c.id]
+        c.total_user_cpu, c.total_system_cpu = u / USER_HZ, s / USER_HZ
+      if c.id in peak_rss_by_container:
+        c.peak_total_rss = peak_rss_by_container[c.id]
 
   def create(self, output):
     # Read logfiles

@@ -120,6 +120,10 @@ def pytest_addoption(parser):
                    default=False, help="Run all tests with KRPC disabled. This assumes "
                    "that the test cluster has been started with --disable_krpc.")
 
+  parser.addoption("--shard_tests", default=None,
+                   help="If set to N/M (e.g., 3/5), will split the tests into "
+                   "M partitions and run the Nth partition. 1-indexed.")
+
 
 def pytest_assertrepr_compare(op, left, right):
   """
@@ -501,3 +505,34 @@ def validate_pytest_config():
     if any(pytest.config.option.impalad.startswith(loc) for loc in local_prefixes):
       logging.error("--testing_remote_cluster can not be used with a local impalad")
       pytest.exit("Invalid pytest config option: --testing_remote_cluster")
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(items, config, session):
+  """Hook to handle --shard_tests command line option.
+
+  If set, this "deselects" a subset of tests, by hashing
+  their id into buckets.
+  """
+  if not config.option.shard_tests:
+    return
+
+  num_items = len(items)
+  this_shard, num_shards = map(int, config.option.shard_tests.split("/"))
+  assert 0 <= this_shard <= num_shards
+  if this_shard == num_shards:
+    this_shard = 0
+
+  items_selected, items_deselected = [], []
+  for i in items:
+    if hash(i.nodeid) % num_shards == this_shard:
+      items_selected.append(i)
+    else:
+      items_deselected.append(i)
+  config.hook.pytest_deselected(items=items_deselected)
+
+  # We must modify the items list in place for it to take effect.
+  items[:] = items_selected
+
+  logging.info("pytest shard selection enabled %s. Of %d items, selected %d items by hash.",
+      config.option.shard_tests, num_items, len(items))

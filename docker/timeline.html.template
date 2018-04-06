@@ -96,9 +96,7 @@ function ts_to_date(secs) {
 }
 
 function drawChart() {
-  var container = document.getElementById('container');
-  var timelineContainer = document.createElement("div");
-  container.appendChild(timelineContainer);
+  var timelineContainer = document.getElementById('timelineContainer');
   var chart = new google.visualization.Timeline(timelineContainer);
   var dataTable = new google.visualization.DataTable();
   dataTable.addColumn({ type: 'string', id: 'Position' });
@@ -115,7 +113,7 @@ function drawChart() {
 
   for (const k of Object.keys(data.metrics)) {
     var lineChart = document.createElement("div");
-    container.appendChild(lineChart);
+    lineChartContainer.appendChild(lineChart);
 
     var dataTable = new google.visualization.DataTable();
     dataTable.addColumn({ type: 'timeofday', id: 'Time' });
@@ -139,4 +137,5 @@ function drawChart() {
   }
 }
 </script>
-<div id="container" style="height: 200px;"></div>
+<div id="timelineContainer" style="height: 400px;"></div>
+<div id="lineChartContainer" style="height: 200px;"></div>

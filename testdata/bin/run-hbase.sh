@@ -36,6 +36,7 @@ cat > ${HBASE_CONF_DIR}/hbase-env.sh <<EOF
 export JAVA_HOME=${JAVA_HOME}
 export HBASE_LOG_DIR=${HBASE_LOGDIR}
 export HBASE_PID_DIR=${HBASE_LOGDIR}
+export HBASE_HEAPSIZE=1g
 EOF
 
 # Put zookeeper things in the logs/cluster/zoo directory.

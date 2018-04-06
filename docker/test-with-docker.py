@@ -95,14 +95,10 @@ as part of the build, in logs/docker/*/timeline.html.
 # Suggested speed improvement TODOs:
 #   - Speed up testdata generation
 #   - Skip generating test data for variants not being run
-#   - Make container image smaller; perhaps make BE test binaries
-#     smaller
-#   - Split up cluster tests into two groups
+#   - Make container image smaller
 #   - Analyze .xml junit files to find slow tests; eradicate
 #     or move to different suite.
-#   - Avoid building BE tests, and build them during execution,
-#     saving on container space as well as baseline build
-#     time.
+#   - Run BE tests earlier (during data load)
 
 # We do not use Impala's python environment here, nor do we depend on
 # non-standard python libraries to avoid needing extra build steps before
@@ -125,11 +121,11 @@ if __name__ == '__main__' and __package__ is None:
 
 base = os.path.dirname(os.path.abspath(__file__))
 
+LOG_FORMAT="%(asctime)s %(threadName)s: %(message)s"
+
 
 def main():
-
-  logging.basicConfig(level=logging.INFO,
-                      format='%(asctime)s %(threadName)s: %(message)s')
+  logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
   default_parallel_test_concurrency, default_suite_concurrency, default_memlimit_gb = \
       _compute_defaults()
@@ -160,20 +156,25 @@ def main():
   parser.add_argument(
       '--build-image', metavar='IMAGE',
       help='Skip building, and run tests on pre-existing image.')
-  parser.add_argument(
+
+  suite_group = parser.add_mutually_exclusive_group()
+  suite_group.add_argument(
       '--suite', metavar='VARIANT', action='append',
-      help="Run specific test suites; can be specified multiple times. \
-          If not specified, all tests are run. Choices: " + ",".join(ALL_SUITES))
+      help="""
+        Run specific test suites; can be specified multiple times.
+        Test-with-docker may shard some suites to improve parallelism.
+        If not specified, default tests are run.
+        Default: %s, All Choices: %s
+        """ % (",".join([ s.name for s in DEFAULT_SUITES]),
+          ",".join([ s.name for s in ALL_SUITES ])))
+  suite_group.add_argument('--all-suites', action='store_true', default=False,
+      help="If set, run all available suites.")
   parser.add_argument(
       '--name', metavar='NAME',
       help="Use a specific name for the test run. The name is used " +
       "as a prefix for the container and image names, and " +
       "as part of the log directory naming. Defaults to include a timestamp.",
       default=datetime.datetime.now().strftime("i-%Y%m%d-%H%M%S"))
-  parser.add_argument('--timeout', metavar='MINUTES',
-                      help="Timeout for test suites, in minutes.",
-                      type=int,
-                      default=60*2)
   parser.add_argument('--ccache-dir', metavar='DIR',
                       help="CCache directory to use",
                       default=os.path.expanduser("~/.ccache"))
@@ -181,22 +182,28 @@ def main():
   args = parser.parse_args()
 
   if not args.suite:
-    args.suite = ALL_SUITES
+    if args.all_suites:
+      # Ignore "NOOP" tasks, as they are just for testing.
+      args.suite = [ s.name for s in ALL_SUITES if not s.name.startswith("NOOP") ]
+    else:
+      args.suite = [ s.name for s in DEFAULT_SUITES ]
   t = TestWithDocker(
-      build_image=args.build_image, suites=args.suite,
-      name=args.name, timeout=args.timeout, cleanup_containers=args.cleanup_containers,
+      build_image=args.build_image, suite_names=args.suite,
+      name=args.name, cleanup_containers=args.cleanup_containers,
       cleanup_image=args.cleanup_image, ccache_dir=args.ccache_dir, test_mode=args.test,
       parallel_test_concurrency=args.parallel_test_concurrency,
       suite_concurrency=args.suite_concurrency,
       impalad_mem_limit_bytes=args.impalad_mem_limit_bytes)
 
-  logging.getLogger('').addHandler(
-      logging.FileHandler(os.path.join(_make_dir_if_not_exist(t.log_dir), "log.txt")))
+  fh = logging.FileHandler(os.path.join(_make_dir_if_not_exist(t.log_dir), "log.txt"))
+  fh.setFormatter(logging.Formatter(LOG_FORMAT))
+  logging.getLogger('').addHandler(fh)
 
   logging.info("Arguments: %s", args)
 
   ret = t.run()
   t.create_timeline()
+  t.log_summary()
 
   if not ret:
     sys.exit(1)
@@ -229,10 +236,11 @@ def _compute_defaults():
   logging.info("CPUs: %s Memory (GB): %s", cpus, total_memory_gb)
 
   parallel_test_concurrency = min(cpus, 8)
-  memlimit_gb = 7
+  memlimit_gb = 8
 
   if total_memory_gb >= 95:
     suite_concurrency = 4
+    memlimit_gb = 11
     parallel_test_concurrency = min(cpus, 12)
   elif total_memory_gb >= 65:
     suite_concurrency = 3
@@ -244,19 +252,100 @@ def _compute_defaults():
 
   return parallel_test_concurrency, suite_concurrency, memlimit_gb * 1024 * 1024 * 1024
 
+class Suite(object):
+  """Encapsulates a test suite.
 
-# The names of all the test tracks supported.  NOOP isn't included here, but is
-# handy for testing.  These are organized slowest-to-fastest, so that, when
-# parallelism of suites is limited, the total time is not impacted.
-ALL_SUITES = [
-    "EE_TEST_SERIAL",
-    "EE_TEST_PARALLEL",
-    "CLUSTER_TEST",
-    "BE_TEST",
-    "FE_TEST",
-    "JDBC_TEST",
+  A test suite is a named thing that the user can select to run,
+  and it runs in its own container, in parallel with other suites.
+  The actual running happens from entrypoint.sh and is controlled
+  mostly by environment variables. When complexity is easier
+  to handle in Python (with its richer data types), we prefer
+  it here.
+  """
+  def __init__(self, name, **envs):
+    """Create suite with given name and environment."""
+    self.name = name
+    self.envs = dict(
+        FE_TEST="false",
+        BE_TEST="false",
+        EE_TEST="false",
+        JDBC_TEST="false",
+        CLUSTER_TEST="false")
+    # If set, this suite is sharded past a certain suite concurrency threshold.
+    self.shard_at_concurrency = None
+    # Variable to which to append --shard_tests
+    self.sharding_variable = None
+    self.envs[name] = "true"
+    self.envs.update(envs)
+    self.timeout_minutes = 120
+
+  def copy(self, name, **envs):
+    """Duplicates current suite allowing for environment updates."""
+    v = dict()
+    v.update(self.envs)
+    v.update(envs)
+    ret = Suite(name, **v)
+    ret.shard_at_concurrency = self.shard_at_concurrency
+    ret.sharding_variable = self.sharding_variable
+    ret.timeout_minutes = self.timeout_minutes
+    return ret
+
+  def exhaustive(self):
+    """Returns an "exhaustive" copy of the suite."""
+    r = self.copy(self.name + "_EXHAUSTIVE", EXPLORATION_STRATEGY="exhaustive")
+    r.timeout_minutes = 240
+    return r
+
+  def sharded(self, shards):
+    """Returns a list of sharded copies of the list.
+
+    key is the name of the variable which needs to be appended with "--shard-tests=..."
+    """
+    # RUN_TESTS_ARGS
+    ret = []
+    for i in range(1, shards + 1):
+      s = self.copy("%s_%d_of_%d" % (self.name, i, shards))
+      s.envs[self.sharding_variable] = self.envs.get(self.sharding_variable, "") \
+          + " --shard_tests=%s/%s" % (i, shards)
+      ret.append(s)
+    return ret
+
+# Definitions of all known suites:
+ee_test_serial = Suite("EE_TEST_SERIAL", EE_TEST="true",
+    RUN_TESTS_ARGS="--skip-parallel --skip-stress")
+ee_test_serial.shard_at_concurrency = 4
+ee_test_serial.sharding_variable = "RUN_TESTS_ARGS"
+ee_test_serial_exhaustive = ee_test_serial.exhaustive()
+ee_test_parallel = Suite("EE_TEST_PARALLEL", EE_TEST="true",
+    RUN_TESTS_ARGS="--skip-serial")
+ee_test_parallel_exhaustive = ee_test_parallel.exhaustive()
+cluster_test = Suite("CLUSTER_TEST")
+cluster_test.shard_at_concurrency = 4
+cluster_test.sharding_variable = "RUN_CUSTOM_CLUSTER_TESTS_ARGS"
+cluster_test_exhaustive = cluster_test.exhaustive()
+
+# Default supported suites. These are organized slowest-to-fastest, so that,
+# when parallelism is limited, the total time is least impacted.
+DEFAULT_SUITES = [
+    ee_test_serial,
+    ee_test_parallel,
+    cluster_test,
+    Suite("BE_TEST"),
+    Suite("FE_TEST"),
+    Suite("JDBC_TEST")
 ]
 
+OTHER_SUITES = [
+    ee_test_parallel_exhaustive,
+    ee_test_serial_exhaustive,
+    cluster_test_exhaustive,
+    Suite("RAT_CHECK"),
+    # These are used for testing this script
+    Suite("NOOP"),
+    Suite("NOOP_FAIL"),
+    Suite("NOOP_SLEEP_FOREVER")
+]
+ALL_SUITES = DEFAULT_SUITES + OTHER_SUITES
 
 def _call(args, check=True):
   """Wrapper for calling a subprocess.
@@ -297,6 +386,12 @@ class Container(object):
     self.running = running
     self.start = None
     self.end = None
+    self.removed = False
+
+    # Updated by Timeline class
+    self.total_user_cpu = -1
+    self.total_system_cpu = -1
+    self.peak_total_rss = -1
 
   def runtime_seconds(self):
     if self.start and self.end:
@@ -311,15 +406,13 @@ class Container(object):
 class TestWithDocker(object):
   """Tests Impala using Docker containers for parallelism."""
 
-  def __init__(self, build_image, suites, name, timeout, cleanup_containers,
+  def __init__(self, build_image, suite_names, name, cleanup_containers,
                cleanup_image, ccache_dir, test_mode,
                suite_concurrency, parallel_test_concurrency,
                impalad_mem_limit_bytes):
     self.build_image = build_image
-    self.suites = [TestSuiteRunner(self, suite) for suite in suites]
     self.name = name
     self.containers = []
-    self.timeout_minutes = timeout
     self.git_root = _check_output(["git", "rev-parse", "--show-toplevel"]).strip()
     self.cleanup_containers = cleanup_containers
     self.cleanup_image = cleanup_image
@@ -335,6 +428,26 @@ class TestWithDocker(object):
     self.suite_concurrency = suite_concurrency
     self.parallel_test_concurrency = parallel_test_concurrency
     self.impalad_mem_limit_bytes = impalad_mem_limit_bytes
+
+    # Map suites back into objects; we ignore case for this mapping.
+    suites = []
+    suites_by_name = {}
+    for suite in ALL_SUITES:
+      suites_by_name[suite.name.lower()] = suite
+    for suite_name in suite_names:
+      suites.append(suites_by_name[suite_name.lower()])
+
+    # If we have enough concurrency, shard some suites into two halves.
+    suites2 = []
+    for suite in suites:
+      if suite.shard_at_concurrency is not None and \
+          suite_concurrency >= suite.shard_at_concurrency:
+        suites2.extend(suite.sharded(2))
+      else:
+        suites2.append(suite)
+    suites = suites2
+
+    self.suite_runners = [TestSuiteRunner(self, suite) for suite in suites]
 
   def _create_container(self, image, name, logdir, logname, entrypoint, extras=None):
     """Returns a new container.
@@ -374,8 +487,10 @@ class TestWithDocker(object):
         + extras
         + [image]
         + entrypoint).strip()
-    return Container(name=name, id_=container_id,
+    ctr = Container(name=name, id_=container_id,
                      logfile=os.path.join(self.log_dir, logdir, logname))
+    logging.info("Created container %s", ctr)
+    return ctr
 
   def _run_container(self, container):
     """Runs container, and returns True if the container had a successful exit value.
@@ -413,15 +528,17 @@ class TestWithDocker(object):
   @staticmethod
   def _stop_container(container):
     """Stops container. Ignores errors (e.g., if it's already exited)."""
-    _call(["docker", "stop", container.id], check=False)
     if container.running:
+      _call(["docker", "stop", container.id], check=False)
       container.end = time.time()
       container.running = False
 
   @staticmethod
   def _rm_container(container):
     """Removes container."""
-    _call(["docker", "rm", container.id], check=False)
+    if not container.removed:
+      _call(["docker", "rm", container.id], check=False)
+      container.removed = True
 
   def _create_build_image(self):
     """Creates the "build image", with Impala compiled and data loaded."""
@@ -451,36 +568,36 @@ class TestWithDocker(object):
         self._rm_container(container)
 
   def _run_tests(self):
-    start_time = time.time()
-    timeout_seconds = self.timeout_minutes * 60
-    deadline = start_time + timeout_seconds
     pool = multiprocessing.pool.ThreadPool(processes=self.suite_concurrency)
     outstanding_suites = []
-    for suite in self.suites:
+    for suite in self.suite_runners:
       suite.task = pool.apply_async(suite.run)
       outstanding_suites.append(suite)
 
     ret = True
-    while time.time() < deadline and len(outstanding_suites) > 0:
-      for suite in list(outstanding_suites):
-        task = suite.task
-        if task.ready():
-          this_task_ret = task.get()
-          outstanding_suites.remove(suite)
-          if this_task_ret:
-            logging.info("Suite %s succeeded.", suite.name)
-          else:
-            logging.info("Suite %s failed.", suite.name)
-            ret = False
-      time.sleep(10)
-    if len(outstanding_suites) > 0:
-      for container in self.containers:
-        self._stop_container(container)
-      for suite in outstanding_suites:
-        suite.task.get()
-      raise Exception("Tasks not finished within timeout (%s minutes): %s" %
-                      (self.timeout_minutes, ",".join([
-                          suite.name for suite in outstanding_suites])))
+    try:
+      while len(outstanding_suites) > 0:
+        for suite in list(outstanding_suites):
+          if suite.timed_out():
+            msg = "Task %s not finished within timeout %s" % (suite.name,
+                suite.suite.timeout_minutes,)
+            logging.error(msg)
+            raise Exception(msg)
+          task = suite.task
+          if task.ready():
+            this_task_ret = task.get()
+            outstanding_suites.remove(suite)
+            if this_task_ret:
+              logging.info("Suite %s succeeded.", suite.name)
+            else:
+              logging.info("Suite %s failed.", suite.name)
+              ret = False
+        time.sleep(5)
+    except KeyboardInterrupt:
+      logging.info("\n\nDetected KeyboardInterrupt; shutting down!\n\n")
+      raise
+    finally:
+      pool.terminate()
     return ret
 
   def run(self):
@@ -495,17 +612,13 @@ class TestWithDocker(object):
       else:
         self.image = self.build_image
       ret = self._run_tests()
-      logging.info("Containers:")
-      for c in self.containers:
-        def to_success_string(exitcode):
-          if exitcode == 0:
-            return "SUCCESS"
-          return "FAILURE"
-        logging.info("%s %s %s %s", to_success_string(c.exitcode), c.name, c.logfile,
-                     c.runtime_seconds())
       return ret
     finally:
       self.monitor.stop()
+      if self.cleanup_containers:
+        for c in self.containers:
+          self._stop_container(c)
+          self._rm_container(c)
       if self.cleanup_image and self.image:
         _call(["docker", "rmi", self.image], check=False)
       logging.info("Memory usage: %s GB min, %s GB max",
@@ -526,6 +639,23 @@ class TestWithDocker(object):
         interesting_re=self._INTERESTING_RE)
     timeline.create(os.path.join(self.log_dir, "timeline.html"))
 
+  def log_summary(self):
+    logging.info("Containers:")
+    def to_success_string(exitcode):
+      if exitcode == 0:
+        return "SUCCESS"
+      return "FAILURE"
+
+    for c in self.containers:
+      logging.info("%s %s %s %0.1fm wall, %0.1fm user, %0.1fm system, " +
+            "%0.1fx parallelism, %0.1f GB peak RSS",
+          to_success_string(c.exitcode), c.name, c.logfile,
+          c.runtime_seconds() / 60.0,
+          c.total_user_cpu / 60.0,
+          c.total_system_cpu / 60.0,
+          (c.total_user_cpu + c.total_system_cpu) / max(c.runtime_seconds(), 0.0001),
+          c.peak_total_rss / 1024.0 / 1024.0 / 1024.0)
+
 
 class TestSuiteRunner(object):
   """Runs a single test suite."""
@@ -534,12 +664,24 @@ class TestSuiteRunner(object):
     self.test_with_docker = test_with_docker
     self.suite = suite
     self.task = None
-    self.name = self.suite.lower()
+    self.name = suite.name.lower()
+    # Set at the beginning of run and facilitates enforcing timeouts
+    # for individual suites.
+    self.deadline = None
+
+  def timed_out(self):
+    return self.deadline is not None and time.time() > self.deadline
 
   def run(self):
     """Runs given test. Returns true on success, based on exit code."""
+    self.deadline = time.time() + self.suite.timeout_minutes * 60
     test_with_docker = self.test_with_docker
     suite = self.suite
+    envs = ["-e", "NUM_CONCURRENT_TESTS=" + str(test_with_docker.parallel_test_concurrency)]
+    for k, v in sorted(suite.envs.iteritems()):
+      envs.append("-e")
+      envs.append("%s=%s" % (k, v))
+
     self.start = time.time()
 
     # io-file-mgr-test expects a real-ish file system at /tmp;
@@ -554,13 +696,11 @@ class TestSuiteRunner(object):
         name=container_name,
         extras=[
             "-v", tmpdir + ":/tmp",
-            "-u", str(os.getuid()),
-            "-e", "NUM_CONCURRENT_TESTS=" +
-            str(test_with_docker.parallel_test_concurrency),
-        ],
+            "-u", str(os.getuid())
+        ] + envs,
         logdir=self.name,
-        logname="log-test-" + self.suite + ".txt",
-        entrypoint=["/mnt/base/entrypoint.sh", "test_suite", suite])
+        logname="log-test-" + self.suite.name + ".txt",
+        entrypoint=["/mnt/base/entrypoint.sh", "test_suite", suite.name])
 
     test_with_docker.containers.append(container)
     test_with_docker.monitor.add(container)
@@ -569,7 +709,7 @@ class TestSuiteRunner(object):
     except:
       return False
     finally:
-      logging.info("Cleaning up containers for %s" % (suite,))
+      logging.info("Cleaning up containers for %s" % (suite.name,))
       test_with_docker._stop_container(container)
       if test_with_docker.cleanup_containers:
         test_with_docker._rm_container(container)
