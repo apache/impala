@@ -42,23 +42,23 @@ class TestQueryFullSort(ImpalaTestSuite):
       cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format == 'parquet')
 
-  def test_multiple_mem_limits(self, vector):
-    """Exercise the dynamic memory scaling functionality."""
-
-    """Using lineitem table forces the multi-phase sort with low mem_limit. This test
-       takes about a minute"""
+  def test_multiple_buffer_pool_limits(self, vector):
+    """Using lineitem table forces the multi-phase sort with low buffer_pool_limit.
+       This test takes about a minute."""
     query = """select l_comment, l_partkey, l_orderkey, l_suppkey, l_commitdate
             from lineitem order by l_comment limit 100000"""
     exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
+    exec_option['num_nodes'] = 1
     table_format = vector.get_value('table_format')
 
-    """The first run should fit in memory, the 300m run is a 2-phase disk sort,
-       the 150m run is a multi-phase sort (i.e. with an intermediate merge)."""
-    for mem_limit in ['-1', '300m', '150m']:
-      exec_option['mem_limit'] = mem_limit
-      result = transpose_results(self.execute_query(
-        query, exec_option, table_format=table_format).data)
+    """The first run should fit in memory, the second run is a 2-phase disk sort,
+       and the third run is a multi-phase sort (i.e. with an intermediate merge)."""
+    for buffer_pool_limit in ['-1', '300m', '130m']:
+      exec_option['buffer_pool_limit'] = buffer_pool_limit
+      query_result = self.execute_query(
+        query, exec_option, table_format=table_format)
+      result = transpose_results(query_result.data)
       assert(result[0] == sorted(result[0]))
 
   def test_multiple_mem_limits_full_output(self, vector):
@@ -92,17 +92,19 @@ class TestQueryFullSort(ImpalaTestSuite):
       assert(result[0] == sorted(result[0]))
 
   def test_sort_join(self, vector):
-    """With 200m memory limit this should be a 2-phase sort"""
+    """With minimum memory limit this should be a 1-phase sort"""
     query = """select o1.o_orderdate, o2.o_custkey, o1.o_comment from orders o1 join
     orders o2 on (o1.o_orderkey = o2.o_orderkey) order by o1.o_orderdate limit 100000"""
 
     exec_option = copy(vector.get_value('exec_option'))
     exec_option['disable_outermost_topn'] = 1
-    exec_option['mem_limit'] = "1200m"
+    exec_option['mem_limit'] = "134m"
+    exec_option['num_nodes'] = 1
     table_format = vector.get_value('table_format')
 
-    result = transpose_results(self.execute_query(
-      query, exec_option, table_format=table_format).data)
+    query_result = self.execute_query(query, exec_option, table_format=table_format)
+    assert "TotalMergesPerformed: 1" in query_result.runtime_profile
+    result = transpose_results(query_result.data)
     assert(result[0] == sorted(result[0]))
 
   def test_sort_union(self, vector):
