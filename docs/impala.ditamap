@@ -166,7 +166,6 @@ under the License.
         <topicref rev="IMPALA-5309" href="topics/impala_tablesample.xml"/>
         <topicref href="topics/impala_with.xml"/>
         <topicref href="topics/impala_distinct.xml"/>
-        <topicref href="topics/impala_hints.xml"/>
       </topicref>
       <topicref href="topics/impala_set.xml">
         <topicref href="topics/impala_query_options.xml">
@@ -230,6 +229,7 @@ under the License.
       <topicref href="topics/impala_update.xml"/>
       <topicref href="topics/impala_upsert.xml"/>
       <topicref href="topics/impala_use.xml"/>
+      <topicref href="topics/impala_hints.xml"/>
     </topicref>
     <topicref href="topics/impala_functions.xml">
       <topicref href="topics/impala_math_functions.xml"/>

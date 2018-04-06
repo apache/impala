@@ -3063,6 +3063,7 @@ select max(height), avg(height) from census_data where age &gt; 20;
         Another way to define different names for the same tables or columns is to create views. See
         <xref href="../topics/impala_views.xml#views"/> for details.
       </p>
+      <!--Alex R: Insert hints below is being refactored in impala_hints.xml fore more general purpose. Keep this for now for impala_paquet.xml.-->
 
       <p id="insert_hints">
         When inserting into partitioned tables, especially using the Parquet file format, you can include a hint in
