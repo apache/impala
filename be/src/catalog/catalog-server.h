@@ -119,11 +119,6 @@ class CatalogServer {
   /// Set in UpdateCatalogTopicCallback() and protected by the catalog_lock_.
   int64_t last_sent_catalog_version_;
 
-  /// The minimum catalog object version in pending_topic_updates_. All items in
-  /// pending_topic_updates_ will be greater than this version. Set by the
-  /// catalog_update_gathering_thread_ and protected by catalog_lock_.
-  int64_t catalog_objects_min_version_;
-
   /// The max catalog version in pending_topic_updates_. Set by the
   /// catalog_update_gathering_thread_ and protected by catalog_lock_.
   int64_t catalog_objects_max_version_;
