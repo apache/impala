@@ -18,7 +18,6 @@
 #include "rpc/rpc-mgr-test-base.h"
 #include "service/fe-support.h"
 
-DECLARE_bool(use_kudu_kinit);
 DECLARE_bool(use_krpc);
 
 DECLARE_string(be_principal);
@@ -39,9 +38,7 @@ class RpcMgrKerberizedTest :
     public RpcMgrTestBase<testing::TestWithParam<KerberosSwitch> > {
 
   virtual void SetUp() override {
-    KerberosSwitch k = GetParam();
     FLAGS_use_krpc = true;
-    FLAGS_use_kudu_kinit = k == USE_KRPC_KUDU_KERBEROS;
     FLAGS_principal = "dummy-service/host@realm";
     FLAGS_be_principal = strings::Substitute("$0@$1", kdc_principal, kdc_realm);
     ASSERT_OK(InitAuth(CURRENT_EXECUTABLE_PATH));
@@ -56,8 +53,7 @@ class RpcMgrKerberizedTest :
 
 INSTANTIATE_TEST_CASE_P(KerberosOnAndOff,
                         RpcMgrKerberizedTest,
-                        ::testing::Values(USE_KRPC_IMPALA_KERBEROS,
-                                          USE_KRPC_KUDU_KERBEROS));
+                        ::testing::Values(KERBEROS_ON));
 
 TEST_P(RpcMgrKerberizedTest, MultipleServicesTls) {
   // TODO: We're starting a seperate RpcMgr here instead of configuring

@@ -24,13 +24,10 @@
 
 #include "common/status.h"
 #include "util/promise.h"
-#include "util/thread.h"
 
 namespace sasl { class TSasl; }
 
 namespace impala {
-
-class Thread;
 
 /// An AuthProvider creates Thrift transports that are set up to authenticate themselves
 /// using a protocol such as Kerberos or PLAIN/SASL. Both server and client transports are
@@ -70,9 +67,8 @@ class SaslAuthProvider : public AuthProvider {
   SaslAuthProvider(bool is_internal) : has_ldap_(false), is_internal_(is_internal),
       needs_kinit_(false) {}
 
-  /// Performs initialization of external state.  If we're using kerberos and
-  /// need to kinit, start that thread.  If we're using ldap, set up appropriate
-  /// certificate usage.
+  /// Performs initialization of external state. Kinit if configured to use kerberos.
+  /// If we're using ldap, set up appropriate certificate usage.
   virtual Status Start();
 
   /// Wrap the client transport with a new TSaslClientTransport.  This is only for
@@ -142,19 +138,6 @@ class SaslAuthProvider : public AuthProvider {
   /// we're an auth provider for an "internal" connection, because we may
   /// function as a client.
   bool needs_kinit_;
-
-  /// Runs "RunKinit" below if needs_kinit_ is true and FLAGS_use_kudu_kinit is false
-  /// and FLAGS_use_krpc is false. Once started, this thread lives as long as the process
-  /// does and periodically forks impalad and execs the 'kinit' process.
-  std::unique_ptr<Thread> kinit_thread_;
-
-  /// Periodically (roughly once every FLAGS_kerberos_reinit_interval minutes) calls kinit
-  /// to get a ticket granting ticket from the kerberos server for principal_, which is
-  /// kept in the kerberos cache associated with this process. This ensures that we have
-  /// valid kerberos credentials when operating as a client. Once the first attempt to
-  /// obtain a ticket has completed, first_kinit is Set() with the status of the operation.
-  /// Additionally, if the first attempt fails, this method will return.
-  void RunKinit(Promise<Status>* first_kinit);
 
   /// One-time kerberos-specific environment variable setup.  Called by InitKerberos().
   Status InitKerberosEnv() WARN_UNUSED_RESULT;

@@ -29,10 +29,7 @@ namespace impala {
 
 enum KerberosSwitch {
   KERBEROS_OFF,
-  USE_KRPC_KUDU_KERBEROS,    // FLAGS_use_kudu_kinit = true,  FLAGS_use_krpc = true
-  USE_KRPC_IMPALA_KERBEROS,  // FLAGS_use_kudu_kinit = false, FLAGS_use_krpc = true
-  USE_THRIFT_KUDU_KERBEROS,  // FLAGS_use_kudu_kinit = true,  FLAGS_use_krpc = false
-  USE_THRIFT_IMPALA_KERBEROS // FLAGS_use_kudu_kinit = false, FLAGS_use_krpc = false
+  KERBEROS_ON
 };
 
 /// This class allows tests to easily start and stop a KDC and configure Impala's auth

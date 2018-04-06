@@ -35,7 +35,6 @@ using namespace strings;
 using namespace apache::thrift;
 using apache::thrift::transport::SSLProtocol;
 
-DECLARE_bool(use_kudu_kinit);
 DECLARE_bool(use_krpc);
 
 DECLARE_string(principal);
@@ -110,7 +109,6 @@ class ThriftKerberizedParamsTest :
       FLAGS_principal.clear();
       FLAGS_be_principal.clear();
     } else {
-      FLAGS_use_kudu_kinit = k == USE_THRIFT_KUDU_KERBEROS;
       FLAGS_principal = "dummy-service/host@realm";
       FLAGS_be_principal = strings::Substitute("$0@$1", kdc_principal, kdc_realm);
     }
@@ -127,8 +125,7 @@ class ThriftKerberizedParamsTest :
 INSTANTIATE_TEST_CASE_P(KerberosOnAndOff,
                         ThriftKerberizedParamsTest,
                         ::testing::Values(KERBEROS_OFF,
-                                          USE_THRIFT_KUDU_KERBEROS,
-                                          USE_THRIFT_IMPALA_KERBEROS));
+                                          KERBEROS_ON));
 
 TEST(ThriftTestBase, Connectivity) {
   int port = GetServerPort();

@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <signal.h>
 #include <boost/algorithm/string.hpp>
-#include <boost/thread/thread.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int.hpp>
@@ -48,7 +47,6 @@
 #include "util/network-util.h"
 #include "util/os-util.h"
 #include "util/promise.h"
-#include "util/thread.h"
 #include "util/time.h"
 
 #include <sys/types.h>    // for stat system call
@@ -73,11 +71,6 @@ DECLARE_string(principal);
 DECLARE_string(be_principal);
 DECLARE_string(krb5_conf);
 DECLARE_string(krb5_debug_file);
-
-// TODO: Remove this flag in a compatibility-breaking release. (IMPALA-5893)
-DEFINE_int32(kerberos_reinit_interval, 60,
-    "Interval, in minutes, between kerberos ticket renewals. "
-    "Only used when FLAGS_use_krpc is false");
 
 DEFINE_string(sasl_path, "", "Colon separated list of paths to look for SASL "
     "security library plugins.");
@@ -107,13 +100,6 @@ DEFINE_string(internal_principals_whitelist, "hdfs", "(Advanced) Comma-separated
     " additional usernames authorized to access Impala's internal APIs. Defaults to "
     "'hdfs' which is the system user that in certain deployments must access "
     "catalog server APIs.");
-
-// TODO: Remove this flag and the old kerberos code once we remove 'use_krpc' flag.
-// (IMPALA-5893)
-DEFINE_bool(use_kudu_kinit, true, "If true, Impala will programatically perform kinit "
-    "by calling into the libkrb5 library using the provided APIs. If false, it will fork "
-    "off a kinit process. If use_krpc=true, this flag is treated as true regardless of "
-    "what it's set to.");
 
 namespace impala {
 
@@ -496,51 +482,6 @@ static int SaslGetPath(void* context, const char** path) {
   return SASL_OK;
 }
 
-// When operating as a Kerberos client (internal connections only), we need to
-// 'kinit' as the principal.  A thread is created and calls this function for
-// that purpose, and to periodically renew the ticket as well.
-//
-// first_kinit: Used to communicate success/failure of the initial kinit call to
-//              the parent thread
-// Return: Only if the first call to 'kinit' fails
-void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
-
-  // Pass the path to the key file and the principal.
-  const string kinit_cmd = Substitute("kinit -k -t $0 $1 2>&1",
-      keytab_file_, principal_);
-
-  bool first_time = true;
-  std::random_device rd;
-  mt19937 generator(rd());
-  uniform_int<> dist(0, 300);
-
-  while (true) {
-    LOG(INFO) << "Registering " << principal_ << ", keytab file " << keytab_file_;
-    string kinit_output;
-    bool success = RunShellProcess(kinit_cmd, &kinit_output);
-
-    if (!success) {
-      const string& err_msg = Substitute(
-          "Failed to obtain Kerberos ticket for principal: $0. $1", principal_,
-          kinit_output);
-      if (first_time) {
-        first_kinit->Set(Status(err_msg));
-        return;
-      } else {
-        LOG(ERROR) << err_msg;
-      }
-    } else if (first_time) {
-      first_time = false;
-      first_kinit->Set(Status::OK());
-    }
-
-    // Sleep for the renewal interval, minus a random time between 0-5 minutes to help
-    // avoid a storm at the KDC. Additionally, never sleep less than a minute to
-    // reduce KDC stress due to frequent renewals.
-    SleepForMs(1000 * max((60 * FLAGS_kerberos_reinit_interval) - dist(generator), 60));
-  }
-}
-
 namespace {
 
 // SASL requires mutexes for thread safety, but doesn't implement
@@ -842,25 +783,10 @@ Status SaslAuthProvider::Start() {
   if (needs_kinit_) {
     DCHECK(is_internal_);
     DCHECK(!principal_.empty());
-    if (FLAGS_use_kudu_kinit || FLAGS_use_krpc) {
-      // With KRPC enabled, we always rely on the Kudu library to carry out the Kerberos
-      // authentication during connection negotiation.
-      if (!FLAGS_use_kudu_kinit) {
-        LOG(INFO) << "Ignoring --use_kudu_kinit=false as KRPC and Kerberos are enabled";
-      }
-      // Starts a thread that periodically does a 'kinit'. The thread lives as long as the
-      // process does.
-      KUDU_RETURN_IF_ERROR(kudu::security::InitKerberosForServer(principal_, keytab_file_,
-          KRB5CCNAME_PATH, false), "Could not init kerberos");
-    } else {
-      Promise<Status> first_kinit;
-      stringstream thread_name;
-      thread_name << "kinit-" << principal_;
-      RETURN_IF_ERROR(Thread::Create("authentication", thread_name.str(),
-          &SaslAuthProvider::RunKinit, this, &first_kinit, &kinit_thread_));
-      LOG(INFO) << "Waiting for Kerberos ticket for principal: " << principal_;
-      RETURN_IF_ERROR(first_kinit.Get());
-    }
+    // Starts a thread that periodically does a 'kinit'. The thread lives as long as the
+    // process does.
+    KUDU_RETURN_IF_ERROR(kudu::security::InitKerberosForServer(principal_, keytab_file_,
+        KRB5CCNAME_PATH, false), "Could not init kerberos");
     LOG(INFO) << "Kerberos ticket granted to " << principal_;
   }
 
