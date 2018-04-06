@@ -20,27 +20,28 @@ package org.apache.impala.authorization;
 import java.util.EnumSet;
 
 import org.apache.sentry.core.common.Action;
+import org.apache.sentry.core.common.BitFieldAction;
 
 /**
- * Maps an Impala Privilege to one or more Sentry "Actions".
+ * Maps an Impala Privilege to one or more Impala "Actions".
  */
 public enum Privilege {
-  ALL(SentryAction.ALL, false),
-  ALTER(SentryAction.ALTER, false),
-  DROP(SentryAction.DROP, false),
-  CREATE(SentryAction.CREATE, false),
-  INSERT(SentryAction.INSERT, false),
-  SELECT(SentryAction.SELECT, false),
-  REFRESH(SentryAction.REFRESH, false),
+  ALL(ImpalaAction.ALL, false),
+  ALTER(ImpalaAction.ALTER, false),
+  DROP(ImpalaAction.DROP, false),
+  CREATE(ImpalaAction.CREATE, false),
+  INSERT(ImpalaAction.INSERT, false),
+  SELECT(ImpalaAction.SELECT, false),
+  REFRESH(ImpalaAction.REFRESH, false),
   // Privileges required to view metadata on a server object.
-  VIEW_METADATA(EnumSet.of(SentryAction.INSERT, SentryAction.SELECT,
-      SentryAction.REFRESH), true),
+  VIEW_METADATA(EnumSet.of(ImpalaAction.INSERT, ImpalaAction.SELECT,
+      ImpalaAction.REFRESH), true),
   // Special privilege that is used to determine if the user has any valid privileges
   // on a target object.
-  ANY(EnumSet.allOf(SentryAction.class), true),
+  ANY(EnumSet.allOf(ImpalaAction.class), true),
   ;
 
-  private final EnumSet<SentryAction> actions;
+  private final EnumSet<ImpalaAction> actions;
 
   // Determines whether to check if the user has ANY the privileges defined in the
   // actions list or whether to check if the user has ALL of the privileges in the
@@ -50,39 +51,48 @@ public enum Privilege {
   /**
    * This enum provides a list of Sentry actions used in Impala.
    */
-  public enum SentryAction implements Action {
-    SELECT("select"),
-    INSERT("insert"),
-    REFRESH("refresh"),
-    CREATE("create"),
-    ALTER("alter"),
-    DROP("drop"),
-    ALL("*");
+  public enum ImpalaAction implements Action {
+    SELECT("select", 1),
+    INSERT("insert", 1 << 2),
+    ALTER("alter", 1 << 3),
+    CREATE("create", 1 << 4),
+    DROP("drop", 1 << 5),
+    REFRESH("refresh", 1 << 6),
+    ALL("*",
+        SELECT.getCode() |
+        INSERT.getCode() |
+        ALTER.getCode() |
+        CREATE.getCode() |
+        DROP.getCode() |
+        REFRESH.getCode());
 
-    private final String value;
+    private final BitFieldAction bitFieldAction_;
 
-    SentryAction(String value) {
-      this.value = value;
+    ImpalaAction(String value, int code) {
+      bitFieldAction_ = new BitFieldAction(value, code);
     }
 
-    public String getValue() {
-      return value;
-    }
+    @Override
+    public String getValue() { return bitFieldAction_.getValue(); }
+
+    public int getCode() { return bitFieldAction_.getActionCode(); }
+
+    public BitFieldAction getBitFieldAction() { return bitFieldAction_; }
   }
 
-  private Privilege(EnumSet<SentryAction> actions, boolean anyOf) {
+  private Privilege(EnumSet<ImpalaAction> actions, boolean anyOf) {
     this.actions = actions;
     this.anyOf_ = anyOf;
   }
 
-  private Privilege(SentryAction action, boolean anyOf) {
+  private Privilege(ImpalaAction action, boolean anyOf) {
     this(EnumSet.of(action), anyOf);
   }
 
   /*
    * Returns the set of Sentry Access Actions mapping to this Privilege.
    */
-  public EnumSet<SentryAction> getSentryActions() {
+  public EnumSet<ImpalaAction> getSentryActions() {
     return actions;
   }
 
