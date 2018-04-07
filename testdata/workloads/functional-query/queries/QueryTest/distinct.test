@@ -370,3 +370,33 @@ SELECT COUNT(*) FROM
 ---- TYPES
 bigint
 ====
+---- QUERY
+# Distinct agg without a grouping expr and with a compatible child partition
+select count(distinct a.int_col) from functional.alltypes a inner join [shuffle]
+    functional.alltypes b on a.int_col = b.int_col;
+---- RESULTS
+10
+---- TYPES
+bigint
+====
+---- QUERY
+# Distinct agg with a grouping expr. The input is partitioned by grouping exprs.
+select count(distinct a.int_col) from functional.alltypes a inner join [shuffle]
+    functional.alltypes b on a.year = b.year group by a.year;
+---- RESULTS
+10
+10
+---- TYPES
+bigint
+====
+---- QUERY
+# Distinct agg with a grouping expr. The input is partitioned by grouping exprs and
+# distinct exprs.
+select count(distinct a.int_col) from functional.alltypes a inner join [shuffle]
+   functional.alltypes b on a.year = b.year and a.int_col = b.int_col group by a.year;
+---- RESULTS
+10
+10
+---- TYPES
+bigint
+====

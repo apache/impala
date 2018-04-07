@@ -23,6 +23,7 @@ from testdata.common import widetable
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
+    create_exec_option_dimension_from_dict,
     create_uncompressed_text_dimension)
 from tests.common.test_result_verifier import (
     assert_codegen_enabled,
@@ -198,14 +199,6 @@ class TestAggregationQueries(ImpalaTestSuite):
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
     self.run_test_case('QueryTest/aggregation', vector)
 
-  def test_distinct(self, vector):
-    if vector.get_value('table_format').file_format == 'hbase':
-      pytest.xfail("HBase returns columns in alphabetical order for select distinct *, "
-                   "making the result verication to fail.")
-    if vector.get_value('table_format').file_format == 'kudu':
-      pytest.xfail("IMPALA-4042: count(distinct NULL) fails on a view, needed for kudu")
-    self.run_test_case('QueryTest/distinct', vector)
-
   def test_group_concat(self, vector):
     """group_concat distinct tests
        Required to run directly in python because the order in which results will be
@@ -338,6 +331,38 @@ class TestAggregationQueries(ImpalaTestSuite):
       # with a sampling percent of 0.1 to be approximately 10x of the NDV().
       for i in xrange(14, 16):
         self.appx_equals(int(sampled_ndv_vals[i]) * sample_perc, int(ndv_vals[i]), 2.0)
+
+
+class TestDistinctAggregation(ImpalaTestSuite):
+  """Run the distinct aggregation test suite, with codegen and shuffle_distinct_exprs
+  enabled and disabled."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestDistinctAggregation, cls).add_test_dimensions()
+
+    cls.ImpalaTestMatrix.add_dimension(
+      create_exec_option_dimension_from_dict({
+        'disable_codegen': [False, True],
+        'shuffle_distinct_exprs': [False, True]
+      }))
+
+    if cls.exploration_strategy() == 'core':
+      cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'text' and
+        v.get_value('table_format').compression_codec == 'none')
+
+  def test_distinct(self, vector):
+    if vector.get_value('table_format').file_format == 'hbase':
+      pytest.xfail("HBase returns columns in alphabetical order for select distinct *, "
+                   "making the result verication to fail.")
+    if vector.get_value('table_format').file_format == 'kudu':
+      pytest.xfail("IMPALA-4042: count(distinct NULL) fails on a view, needed for kudu")
+    self.run_test_case('QueryTest/distinct', vector)
+
 
 class TestWideAggregationQueries(ImpalaTestSuite):
   """Test that aggregations with many grouping columns work"""

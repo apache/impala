@@ -75,6 +75,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testShuffleByDistinctExprs() {
+    runPlannerTestFile("shuffle-by-distinct-exprs");
+  }
+
+  @Test
   public void testAggregation() {
     runPlannerTestFile("aggregation");
   }
