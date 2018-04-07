@@ -883,27 +883,46 @@ public class DistributedPlanner {
   private PlanFragment createPhase2DistinctAggregationFragment(
       AggregationNode phase2AggNode, PlanFragment childFragment,
       ArrayList<PlanFragment> fragments) throws ImpalaException {
+    // When a query has both grouping and distinct exprs, impala can optionally include
+    // the distinct exprs in the hash exchange of the first aggregation phase to spread
+    // the data among more nodes. However, this plan requires another hash exchange on the
+    // grouping exprs in the second phase which is not required when omitting the distinct
+    // exprs in the first phase. Shuffling by both is better if the grouping exprs have
+    // low NDVs.
+    boolean shuffleDistinctExprs = ctx_.getQueryOptions().shuffle_distinct_exprs ||
+        phase2AggNode.getAggInfo().getGroupingExprs().isEmpty();
     // The phase-1 aggregation node is already in the child fragment.
     Preconditions.checkState(phase2AggNode.getChild(0) == childFragment.getPlanRoot());
 
     AggregateInfo phase1AggInfo = ((AggregationNode) phase2AggNode.getChild(0))
         .getAggInfo();
-    // We need to do
-    // - child fragment:
-    //   * phase-1 aggregation
-    // - first merge fragment, hash-partitioned on grouping and distinct exprs:
-    //   * merge agg of phase-1
-    //   * phase-2 agg
-    // - second merge fragment, partitioned on grouping exprs or unpartitioned
-    //   without grouping exprs
-    //   * merge agg of phase-2
+    ArrayList<Expr> partitionExprs;
     // With grouping, the output partition exprs of the child are the (input) grouping
     // exprs of the parent. The grouping exprs reference the output tuple of phase-1
     // but the partitioning happens on the intermediate tuple of the phase-1.
-    ArrayList<Expr> partitionExprs = Expr.substituteList(
-        phase1AggInfo.getGroupingExprs(), phase1AggInfo.getIntermediateSmap(),
-        ctx_.getRootAnalyzer(), false);
-
+    if (shuffleDistinctExprs) {
+      // We need to do
+      // - child fragment:
+      //   * phase-1 aggregation
+      // - first merge fragment, hash-partitioned on grouping and distinct exprs:
+      //   * merge agg of phase-1
+      //   * phase-2 agg
+      // - second merge fragment, partitioned on grouping exprs or unpartitioned
+      //   without grouping exprs
+      //   * merge agg of phase-2
+      partitionExprs = Expr.substituteList(
+          phase1AggInfo.getGroupingExprs(), phase1AggInfo.getIntermediateSmap(),
+          ctx_.getRootAnalyzer(), false);
+    } else {
+      // We need to do
+      // - child fragment:
+      //   * phase-1 aggregation
+      // - merge fragment, hash-partitioned on grouping exprs:
+      //   * merge agg of phase-1
+      //   * phase-2 agg
+      partitionExprs = Expr.substituteList(phase2AggNode.getAggInfo().getGroupingExprs(),
+          phase1AggInfo.getOutputToIntermediateSmap(), ctx_.getRootAnalyzer(), false);
+    }
     PlanFragment firstMergeFragment;
     boolean childHasCompatPartition = ctx_.getRootAnalyzer().setsHaveValueTransfer(
         partitionExprs, childFragment.getDataPartition().getPartitionExprs(), true);
@@ -932,8 +951,9 @@ public class DistributedPlanner {
       // if there is a limit, it had already been placed with the phase-2 aggregation
       // step (which is where it should be)
       firstMergeFragment.addPlanRoot(phase2AggNode);
-      fragments.add(firstMergeFragment);
+      if (shuffleDistinctExprs) fragments.add(firstMergeFragment);
     }
+    if (!shuffleDistinctExprs) return firstMergeFragment;
     phase2AggNode.unsetNeedsFinalize();
     phase2AggNode.setIntermediateTuple();
     // Limit should be applied at the final merge aggregation node

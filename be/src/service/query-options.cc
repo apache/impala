@@ -632,6 +632,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_exec_time_limit_s(time_limit);
         break;
       }
+      case TImpalaQueryOptions::SHUFFLE_DISTINCT_EXPRS: {
+        query_options->__set_shuffle_distinct_exprs(
+                iequals(value, "true") || iequals(value, "1"));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
