@@ -216,15 +216,21 @@ def start_impalad_instances(cluster_size, num_coordinators, use_exclusive_coordi
     # No impalad instances should be started.
     return
 
+  # Set mem_limit of each impalad to the smaller of 12GB or
+  # 1/cluster_size (typically 1/3) of 70% of system memory.
+  #
   # The default memory limit for an impalad is 80% of the total system memory. On a
   # mini-cluster with 3 impalads that means 240%. Since having an impalad be OOM killed
   # is very annoying, the mem limit will be reduced. This can be overridden using the
   # --impalad_args flag. virtual_memory().total returns the total physical memory.
   # The exact ratio to use is somewhat arbitrary. Peak memory usage during
   # tests depends on the concurrency of parallel tests as well as their ordering.
-  # At a ratio of 0.8, on 8-core, 68GB machines, ASAN builds can trigger the OOM
-  # killer, so this ratio is currently set to 0.7.
+  # On the other hand, to avoid using too much memory, we limit the
+  # memory choice here to max out at 12GB. This should be sufficient for tests.
+  #
+  # Beware that ASAN builds use more memory than regular builds.
   mem_limit = int(0.7 * psutil.virtual_memory().total / cluster_size)
+  mem_limit = min(12 * 1024 * 1024 * 1024, mem_limit)
 
   delay_list = []
   if options.catalog_init_delays != "":
