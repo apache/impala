@@ -323,7 +323,6 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanNodeBase* node,
     LlvmCodeGen* codegen, const vector<ScalarExpr*>& conjuncts,
     llvm::Function** write_complete_tuple_fn) {
   *write_complete_tuple_fn = NULL;
-  SCOPED_TIMER(codegen->codegen_timer());
   RuntimeState* state = node->runtime_state();
 
   // Cast away const-ness.  The codegen only sets the cached typed llvm struct.
@@ -531,7 +530,6 @@ Status HdfsScanner::CodegenWriteAlignedTuples(const HdfsScanNodeBase* node,
     LlvmCodeGen* codegen, llvm::Function* write_complete_tuple_fn,
     llvm::Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = NULL;
-  SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(write_complete_tuple_fn != NULL);
 
   llvm::Function* write_tuples_fn =

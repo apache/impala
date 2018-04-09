@@ -244,11 +244,17 @@ Status FragmentInstanceState::Open() {
   if (runtime_state_->ShouldCodegen()) {
     UpdateState(StateEvent::CODEGEN_START);
     RETURN_IF_ERROR(runtime_state_->CreateCodegen());
-    exec_tree_->Codegen(runtime_state_);
-    // It shouldn't be fatal to fail codegen. However, until IMPALA-4233 is fixed,
-    // ScalarFnCall has no fall back to interpretation when codegen fails so propagates
-    // the error status for now.
-    RETURN_IF_ERROR(runtime_state_->CodegenScalarFns());
+    {
+      SCOPED_TIMER(runtime_state_->codegen()->ir_generation_timer());
+      SCOPED_TIMER(runtime_state_->codegen()->runtime_profile()->total_time_counter());
+      SCOPED_THREAD_COUNTER_MEASUREMENT(
+          runtime_state_->codegen()->llvm_thread_counters());
+      exec_tree_->Codegen(runtime_state_);
+      // It shouldn't be fatal to fail codegen. However, until IMPALA-4233 is fixed,
+      // ScalarFnCall has no fall back to interpretation when codegen fails so propagates
+      // the error status for now.
+      RETURN_IF_ERROR(runtime_state_->CodegenScalarFns());
+    }
 
     LlvmCodeGen* codegen = runtime_state_->codegen();
     DCHECK(codegen != nullptr);

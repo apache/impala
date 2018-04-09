@@ -1721,8 +1721,6 @@ Status PartitionedAggregationNode::CodegenCallUda(LlvmCodeGen* codegen,
 //
 Status PartitionedAggregationNode::CodegenUpdateTuple(
     LlvmCodeGen* codegen, llvm::Function** fn) {
-  SCOPED_TIMER(codegen->codegen_timer());
-
   for (const SlotDescriptor* slot_desc : intermediate_tuple_desc_->slots()) {
     if (slot_desc->type().type == TYPE_CHAR) {
       return Status::Expected("PartitionedAggregationNode::CodegenUpdateTuple(): cannot "
@@ -1811,8 +1809,6 @@ Status PartitionedAggregationNode::CodegenUpdateTuple(
 
 Status PartitionedAggregationNode::CodegenProcessBatch(LlvmCodeGen* codegen,
     TPrefetchMode::type prefetch_mode) {
-  SCOPED_TIMER(codegen->codegen_timer());
-
   llvm::Function* update_tuple_fn;
   RETURN_IF_ERROR(CodegenUpdateTuple(codegen, &update_tuple_fn));
 
@@ -1884,7 +1880,6 @@ Status PartitionedAggregationNode::CodegenProcessBatch(LlvmCodeGen* codegen,
 Status PartitionedAggregationNode::CodegenProcessBatchStreaming(
     LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) {
   DCHECK(is_streaming_preagg_);
-  SCOPED_TIMER(codegen->codegen_timer());
 
   IRFunction::Type ir_fn = IRFunction::PART_AGG_NODE_PROCESS_BATCH_STREAMING;
   llvm::Function* process_batch_streaming_fn = codegen->GetFunction(ir_fn, true);
