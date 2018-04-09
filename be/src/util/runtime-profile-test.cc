@@ -613,6 +613,38 @@ TEST(CountersTest, EventSequences) {
   }
 }
 
+TEST(CountersTest, UpdateEmptyEventSequence) {
+  // IMPALA-6824: This test makes sure that adding events to an empty event sequence does
+  // not crash.
+  ObjectPool pool;
+
+  // Create the profile to send in the update and add some events.
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+  RuntimeProfile::EventSequence* seq = profile->AddEventSequence("event sequence");
+  seq->Start();
+  // Sleep for 10ms to make sure the events are logged at a time > 0.
+  SleepForMs(10);
+  seq->MarkEvent("aaaa");
+  seq->MarkEvent("bbbb");
+
+  vector<RuntimeProfile::EventSequence::Event> events;
+  seq->GetEvents(&events);
+  EXPECT_EQ(2, events.size());
+
+  TRuntimeProfileTree thrift_profile;
+  profile->ToThrift(&thrift_profile);
+
+  // Create the profile that will be updated and add the empty event sequence to it.
+  RuntimeProfile* updated_profile = RuntimeProfile::Create(&pool, "Updated Profile");
+  seq = updated_profile->AddEventSequence("event sequence");
+  updated_profile->Update(thrift_profile);
+
+  // Verify that the events have been updated successfully.
+  events.clear();
+  seq->GetEvents(&events);
+  EXPECT_EQ(2, events.size());
+}
+
 void ValidateSampler(const StreamingSampler<int, 10>& sampler, int expected_num,
     int expected_period, int expected_delta) {
   const int* samples = NULL;
