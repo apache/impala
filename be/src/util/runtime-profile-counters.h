@@ -344,10 +344,10 @@ class RuntimeProfile::EventSequence {
     DCHECK_EQ(timestamps.size(), labels.size());
     DCHECK(std::is_sorted(timestamps.begin(), timestamps.end()));
     boost::lock_guard<SpinLock> event_lock(lock_);
-    int64_t last_timestamp = events_.back().second;
+    int64_t last_timestamp = events_.empty() ? 0 : events_.back().second;
     for (int64_t i = 0; i < timestamps.size(); ++i) {
       if (timestamps[i] <= last_timestamp) continue;
-      events_.push_back(make_pair(labels[i], timestamps[i]));
+      events_.emplace_back(labels[i], timestamps[i]);
     }
   }
 
