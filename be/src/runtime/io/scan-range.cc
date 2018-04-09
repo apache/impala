@@ -498,11 +498,13 @@ void ScanRange::Close() {
       closed_file = true;
     }
 
-    if (FLAGS_use_hdfs_pread) {
+    if (FLAGS_use_hdfs_pread && IsHdfsPath(file())) {
       // Update Hedged Read Metrics.
       // We call it only if the --use_hdfs_pread flag is set, to avoid having the
       // libhdfs client malloc and free a hdfsHedgedReadMetrics object unnecessarily
       // otherwise. 'hedged_metrics' is only set upon success.
+      // We also avoid calling hdfsGetHedgedReadMetrics() when the file is not on HDFS
+      // (see HDFS-13417).
       struct hdfsHedgedReadMetrics* hedged_metrics;
       int success = hdfsGetHedgedReadMetrics(fs_, &hedged_metrics);
       if (success == 0) {
