@@ -28,6 +28,8 @@ namespace impala {
 inline void ColumnStatsBase::Reset() {
   has_min_max_values_ = false;
   null_count_ = 0;
+  ascending_boundary_order_ = true;
+  descending_boundary_order_ = true;
 }
 
 template <typename T>
@@ -46,7 +48,25 @@ template <typename T>
 inline void ColumnStats<T>::Merge(const ColumnStatsBase& other) {
   DCHECK(dynamic_cast<const ColumnStats<T>*>(&other));
   const ColumnStats<T>* cs = static_cast<const ColumnStats<T>*>(&other);
-  if (cs->has_min_max_values_) Update(cs->min_value_, cs->max_value_);
+  if (cs->has_min_max_values_) {
+    if (has_min_max_values_) {
+      if (ascending_boundary_order_) {
+        if (MinMaxTrait<T>::Compare(prev_page_max_value_, cs->max_value_) > 0 ||
+            MinMaxTrait<T>::Compare(prev_page_min_value_, cs->min_value_) > 0) {
+          ascending_boundary_order_ = false;
+        }
+      }
+      if (descending_boundary_order_) {
+        if (MinMaxTrait<T>::Compare(prev_page_max_value_, cs->max_value_) < 0 ||
+            MinMaxTrait<T>::Compare(prev_page_min_value_, cs->min_value_) < 0) {
+          descending_boundary_order_ = false;
+        }
+      }
+    }
+    Update(cs->min_value_, cs->max_value_);
+    prev_page_min_value_ = cs->min_value_;
+    prev_page_max_value_ = cs->max_value_;
+  }
   IncrementNullCount(cs->null_count_);
 }
 
@@ -176,12 +196,52 @@ inline void ColumnStats<StringValue>::Update(
   }
 }
 
+template <>
+inline void ColumnStats<StringValue>::Merge(const ColumnStatsBase& other) {
+  DCHECK(dynamic_cast<const ColumnStats<StringValue>*>(&other));
+  const ColumnStats<StringValue>* cs = static_cast<
+      const ColumnStats<StringValue>*>(&other);
+  if (cs->has_min_max_values_) {
+    if (has_min_max_values_) {
+      // Make sure that we copied the previous page's min/max values to their own buffer.
+      DCHECK_NE(static_cast<void*>(prev_page_min_value_.ptr),
+                static_cast<void*>(cs->min_value_.ptr));
+      DCHECK_NE(static_cast<void*>(prev_page_max_value_.ptr),
+                static_cast<void*>(cs->max_value_.ptr));
+      if (ascending_boundary_order_) {
+        if (prev_page_max_value_ > cs->max_value_ ||
+            prev_page_min_value_ > cs->min_value_) {
+          ascending_boundary_order_ = false;
+        }
+      }
+      if (descending_boundary_order_) {
+        if (prev_page_max_value_ < cs->max_value_ ||
+            prev_page_min_value_ < cs->min_value_) {
+          descending_boundary_order_ = false;
+        }
+      }
+    }
+    Update(cs->min_value_, cs->max_value_);
+    prev_page_min_value_ = cs->min_value_;
+    prev_page_max_value_ = cs->max_value_;
+    prev_page_min_buffer_.Clear();
+    prev_page_max_buffer_.Clear();
+  }
+  IncrementNullCount(cs->null_count_);
+}
+
 // StringValues need to be copied at the end of processing a row batch, since the batch
 // memory will be released.
 template <>
 inline Status ColumnStats<StringValue>::MaterializeStringValuesToInternalBuffers() {
   if (min_buffer_.IsEmpty()) RETURN_IF_ERROR(CopyToBuffer(&min_buffer_, &min_value_));
   if (max_buffer_.IsEmpty()) RETURN_IF_ERROR(CopyToBuffer(&max_buffer_, &max_value_));
+  if (prev_page_min_buffer_.IsEmpty()) {
+    RETURN_IF_ERROR(CopyToBuffer(&prev_page_min_buffer_, &prev_page_min_value_));
+  }
+  if (prev_page_max_buffer_.IsEmpty()) {
+    RETURN_IF_ERROR(CopyToBuffer(&prev_page_max_buffer_, &prev_page_max_value_));
+  }
   return Status::OK();
 }
 

@@ -103,6 +103,12 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   /// as 'parquet-mr'.
   static const int MAX_COLUMN_STATS_SIZE = 4 * 1024;
 
+  /// In parquet::ColumnIndex we store the min and max values for each page.
+  /// However, we don't want to store very long strings, so we truncate them.
+  /// The value of it must not be too small, since we don't want to truncate
+  /// non-string values.
+  static const int PAGE_INDEX_MAX_STRING_LENGTH = 64;
+
   /// Per-column information state.  This contains some metadata as well as the
   /// data buffers.
   class BaseColumnWriter;
@@ -120,10 +126,14 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   /// table_desc_ into the format in the file metadata
   Status CreateSchema();
 
-  /// Write the file header information to the output file.
+  /// Writes the file header information to the output file.
   Status WriteFileHeader();
 
-  /// Write the file metadata and footer.
+  /// Writes the column index and offset index of each page in the file.
+  /// It also resets the column writers.
+  Status WritePageIndex();
+
+  /// Writes the file metadata and footer.
   Status WriteFileFooter();
 
   /// Flushes the current row group to file.  This will compute the final

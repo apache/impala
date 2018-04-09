@@ -26,6 +26,8 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/types.h"
 
+#include "gen-cpp/parquet_types.h"
+
 namespace impala {
 
 /// This class, together with its derivatives, is used to update column statistics when
@@ -67,6 +69,11 @@ class ColumnStatsBase {
   struct MinMaxTrait {
     static decltype(auto) MinValue(const T& a, const T& b) { return std::min(a, b); }
     static decltype(auto) MaxValue(const T& a, const T& b) { return std::max(a, b); }
+    static int Compare(const T& a, const T& b) {
+      if (a < b) return -1;
+      if (a > b) return 1;
+      return 0;
+    }
   };
 
   /// min and max functions for floating point types
@@ -74,6 +81,13 @@ class ColumnStatsBase {
   struct MinMaxTrait<T, std::enable_if_t<std::is_floating_point<T>::value>> {
     static decltype(auto) MinValue(const T& a, const T& b) { return std::fmin(a, b); }
     static decltype(auto) MaxValue(const T& a, const T& b) { return std::fmax(a, b); }
+    static int Compare(const T& a, const T& b) {
+      //TODO: Should be aligned with PARQUET-1222, once resolved
+      if (a == b) return 0;
+      if (std::isnan(a) && std::isnan(b)) return 0;
+      if (MaxValue(a, b) == a) return 1;
+      return -1;
+    }
   };
 
   ColumnStatsBase() : has_min_max_values_(false), null_count_(0) {}
@@ -94,7 +108,8 @@ class ColumnStatsBase {
       int64_t* null_count);
 
   /// Merges this statistics object with values from 'other'. If other has not been
-  /// initialized, then this object will not be changed.
+  /// initialized, then this object will not be changed. It maintains internal state that
+  /// tracks whether the min/max values are ordered.
   virtual void Merge(const ColumnStatsBase& other) = 0;
 
   /// Copies the contents of this object's statistics values to internal buffers. Some
@@ -119,6 +134,18 @@ class ColumnStatsBase {
   /// value is appended to the column or the statistics are merged.
   void IncrementNullCount(int64_t count) { null_count_ += count; }
 
+  /// Returns the boundary order of the pages. That is, whether the lists of min/max
+  /// elements inside the ColumnIndex are ordered and if so, in which direction.
+  /// If both 'ascending_boundary_order_' and 'descending_boundary_order_' is true,
+  /// it means all elements are equal, we choose ascending order in this case.
+  /// If only one flag is true, or both of them is false, then we return the identified
+  /// ordering, or unordered.
+  parquet::BoundaryOrder::type GetBoundaryOrder() const {
+    if (ascending_boundary_order_) return parquet::BoundaryOrder::ASCENDING;
+    if (descending_boundary_order_) return parquet::BoundaryOrder::DESCENDING;
+    return parquet::BoundaryOrder::UNORDERED;
+  }
+
  protected:
   // Copies the memory of 'value' into 'buffer' and make 'value' point to 'buffer'.
   // 'buffer' is reset before making the copy.
@@ -129,6 +156,16 @@ class ColumnStatsBase {
 
   // Number of null values since the last call to Reset().
   int64_t null_count_;
+
+  // If true, min/max values are ascending.
+  // We assume the values are ascending, so start with true and only make it false when
+  // we find a descending value. If not all values are equal, then at least one of
+  // 'ascending_boundary_order_' and 'descending_boundary_order_' will be false.
+  bool ascending_boundary_order_ = true;
+
+  // If true, min/max values are descending.
+  // See description of 'ascending_boundary_order_'.
+  bool descending_boundary_order_ = true;
 
  private:
   /// Returns true if we support reading statistics stored in the fields 'min_value' and
@@ -174,7 +211,9 @@ class ColumnStats : public ColumnStatsBase {
       plain_encoded_value_size_(plain_encoded_value_size),
       mem_pool_(mem_pool),
       min_buffer_(mem_pool),
-      max_buffer_(mem_pool) {}
+      max_buffer_(mem_pool),
+      prev_page_min_buffer_(mem_pool),
+      prev_page_max_buffer_(mem_pool) {}
 
   /// Updates the statistics based on the values min_value and max_value. If necessary,
   /// initializes the statistics. It may keep a reference to either value until
@@ -216,12 +255,20 @@ class ColumnStats : public ColumnStatsBase {
   // Maximum value since the last call to Reset().
   T max_value_;
 
+  // Minimum value of the previous page. Need to store that to calculate boundary order.
+  T prev_page_min_value_;
+
+  // Maximum value of the previous page. Need to store that to calculate boundary order.
+  T prev_page_max_value_;
+
   // Memory pool to allocate from when making copies of the statistics data.
   MemPool* mem_pool_;
 
   // Local buffers to copy statistics data into.
   StringBuffer min_buffer_;
   StringBuffer max_buffer_;
+  StringBuffer prev_page_min_buffer_;
+  StringBuffer prev_page_max_buffer_;
 };
 
 } // end ns impala
