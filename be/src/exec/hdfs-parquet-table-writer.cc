@@ -36,6 +36,7 @@
 #include "util/debug-util.h"
 #include "util/dict-encoding.h"
 #include "util/hdfs-util.h"
+#include "util/string-util.h"
 #include "util/rle-encoding.h"
 
 #include <sstream>
@@ -44,7 +45,6 @@
 
 #include "common/names.h"
 using namespace impala;
-using namespace parquet;
 using namespace apache::thrift;
 
 // Managing file sizes: We need to estimate how big the files being buffered
@@ -102,7 +102,10 @@ class HdfsParquetTableWriter::BaseColumnWriter {
       def_levels_(nullptr),
       values_buffer_len_(DEFAULT_DATA_PAGE_SIZE),
       page_stats_base_(nullptr),
-      row_group_stats_base_(nullptr) {
+      row_group_stats_base_(nullptr),
+      table_sink_mem_tracker_(parent_->parent_->mem_tracker()) {
+    static_assert(std::is_same<decltype(parent_->parent_), HdfsTableSink*>::value,
+        "'table_sink_mem_tracker_' must point to the mem tracker of an HdfsTableSink");
     def_levels_ = parent_->state_->obj_pool()->Add(
         new RleEncoder(parent_->reusable_col_mem_pool_->Allocate(DEFAULT_DATA_PAGE_SIZE),
                        DEFAULT_DATA_PAGE_SIZE, 1));
@@ -145,7 +148,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
 
   // Encodes the row group statistics into a parquet::Statistics object and attaches it to
   // 'meta_data'.
-  void EncodeRowGroupStats(ColumnMetaData* meta_data) {
+  void EncodeRowGroupStats(parquet::ColumnMetaData* meta_data) {
     DCHECK(row_group_stats_base_ != nullptr);
     if (row_group_stats_base_->BytesNeeded() <= MAX_COLUMN_STATS_SIZE) {
       row_group_stats_base_->EncodeToThrift(&meta_data->statistics);
@@ -162,13 +165,21 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     current_page_ = nullptr;
     num_values_ = 0;
     total_compressed_byte_size_ = 0;
-    current_encoding_ = Encoding::PLAIN;
-    next_page_encoding_ = Encoding::PLAIN;
+    current_encoding_ = parquet::Encoding::PLAIN;
+    next_page_encoding_ = parquet::Encoding::PLAIN;
     column_encodings_.clear();
     dict_encoding_stats_.clear();
     data_encoding_stats_.clear();
     // Repetition/definition level encodings are constant. Incorporate them here.
-    column_encodings_.insert(Encoding::RLE);
+    column_encodings_.insert(parquet::Encoding::RLE);
+    offset_index_.page_locations.clear();
+    column_index_.null_pages.clear();
+    column_index_.min_values.clear();
+    column_index_.max_values.clear();
+    table_sink_mem_tracker_->Release(page_index_memory_consumption_);
+    page_index_memory_consumption_ = 0;
+    column_index_.null_counts.clear();
+    valid_column_index_ = true;
   }
 
   // Close this writer. This is only called after Flush() and no more rows will
@@ -176,6 +187,9 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   void Close() {
     if (compressor_.get() != nullptr) compressor_->Close();
     if (dict_encoder_base_ != nullptr) dict_encoder_base_->Close();
+    // We must release the memory consumption of this column writer.
+    table_sink_mem_tracker_->Release(page_index_memory_consumption_);
+    page_index_memory_consumption_ = 0;
   }
 
   const ColumnType& type() const { return expr_eval_->root().type(); }
@@ -211,7 +225,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
 
   struct DataPage {
     // Page header.  This is a union of all page types.
-    PageHeader header;
+    parquet::PageHeader header;
 
     // Number of bytes needed to store definition levels.
     int num_def_bytes;
@@ -259,21 +273,21 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   int64_t total_compressed_byte_size_;
   int64_t total_uncompressed_byte_size_;
   // Encoding of the current page.
-  Encoding::type current_encoding_;
+  parquet::Encoding::type current_encoding_;
   // Encoding to use for the next page. By default, the same as 'current_encoding_'.
   // Used by the column writer to switch encoding while writing a column, e.g. if the
   // dictionary overflows.
-  Encoding::type next_page_encoding_;
+  parquet::Encoding::type next_page_encoding_;
 
   // Set of all encodings used in the column chunk
-  unordered_set<Encoding::type> column_encodings_;
+  unordered_set<parquet::Encoding::type> column_encodings_;
 
   // Map from the encoding to the number of pages in the column chunk with this encoding
   // These are used to construct the PageEncodingStats, which provide information
   // about encoding usage for each different page type. Currently, only dictionary
   // and data pages are used.
-  unordered_map<Encoding::type, int> dict_encoding_stats_;
-  unordered_map<Encoding::type, int> data_encoding_stats_;
+  unordered_map<parquet::Encoding::type, int> dict_encoding_stats_;
+  unordered_map<parquet::Encoding::type, int> data_encoding_stats_;
 
   // Created, owned, and set by the derived class.
   DictEncoderBase* dict_encoder_base_;
@@ -292,6 +306,22 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // Pointers to statistics, created, owned, and set by the derived class.
   ColumnStatsBase* page_stats_base_;
   ColumnStatsBase* row_group_stats_base_;
+
+  // OffsetIndex stores the locations of the pages.
+  parquet::OffsetIndex offset_index_;
+
+  // ColumnIndex stores the statistics of the pages.
+  parquet::ColumnIndex column_index_;
+
+  // Pointer to the HdfsTableSink's MemTracker.
+  MemTracker* table_sink_mem_tracker_;
+
+  // Memory consumption of the min/max values in the page index.
+  int64_t page_index_memory_consumption_ = 0;
+
+  // Only write ColumnIndex when 'valid_column_index_' is true. We always need to write
+  // the OffsetIndex though.
+  bool valid_column_index_ = true;
 };
 
 // Per type column writer.
@@ -312,8 +342,8 @@ class HdfsParquetTableWriter::ColumnWriter :
     BaseColumnWriter::Reset();
     // Default to dictionary encoding.  If the cardinality ends up being too high,
     // it will fall back to plain.
-    current_encoding_ = Encoding::PLAIN_DICTIONARY;
-    next_page_encoding_ = Encoding::PLAIN_DICTIONARY;
+    current_encoding_ = parquet::Encoding::PLAIN_DICTIONARY;
+    next_page_encoding_ = parquet::Encoding::PLAIN_DICTIONARY;
     dict_encoder_.reset(
         new DictEncoder<T>(parent_->per_file_mem_pool_.get(), plain_encoded_value_size_,
             parent_->parent_->mem_tracker()));
@@ -328,7 +358,7 @@ class HdfsParquetTableWriter::ColumnWriter :
 
  protected:
   virtual bool ProcessValue(void* value, int64_t* bytes_needed) {
-    if (current_encoding_ == Encoding::PLAIN_DICTIONARY) {
+    if (current_encoding_ == parquet::Encoding::PLAIN_DICTIONARY) {
       if (UNLIKELY(num_values_since_dict_size_check_ >=
                    DICTIONARY_DATA_PAGE_SIZE_CHECK_PERIOD)) {
         num_values_since_dict_size_check_ = 0;
@@ -339,11 +369,11 @@ class HdfsParquetTableWriter::ColumnWriter :
       // If the dictionary contains the maximum number of values, switch to plain
       // encoding for the next page. The current page is full and must be written out.
       if (UNLIKELY(*bytes_needed < 0)) {
-        next_page_encoding_ = Encoding::PLAIN;
+        next_page_encoding_ = parquet::Encoding::PLAIN;
         return false;
       }
       parent_->file_size_estimate_ += *bytes_needed;
-    } else if (current_encoding_ == Encoding::PLAIN) {
+    } else if (current_encoding_ == parquet::Encoding::PLAIN) {
       T* v = CastValue(value);
       *bytes_needed = plain_encoded_value_size_ < 0 ?
           ParquetPlainEncoder::ByteSize<T>(*v) :
@@ -386,8 +416,7 @@ class HdfsParquetTableWriter::ColumnWriter :
   // Temporary string value to hold CHAR(N)
   StringValue temp_;
 
-  // Tracks statistics per page. These are not written out currently but are merged into
-  // the row group stats. TODO(IMPALA-5841): Write these to the page index.
+  // Tracks statistics per page. These are written out to the page index.
   scoped_ptr<ColumnStats<T>> page_stats_;
 
   // Tracks statistics per row group. This gets reset when starting a new row group.
@@ -424,7 +453,7 @@ class HdfsParquetTableWriter::BoolColumnWriter :
         new BitWriter(values_buffer_, values_buffer_len_));
     // Dictionary encoding doesn't make sense for bools and is not allowed by
     // the format.
-    current_encoding_ = Encoding::PLAIN;
+    current_encoding_ = parquet::Encoding::PLAIN;
     dict_encoder_base_ = nullptr;
 
     page_stats_base_ = &page_stats_;
@@ -455,8 +484,7 @@ class HdfsParquetTableWriter::BoolColumnWriter :
   // Used to encode bools as single bit values. This is reused across pages.
   BitWriter* bool_values_;
 
-  // Tracks statistics per page. These are not written out currently but are merged into
-  // the row group stats. TODO(IMPALA-5841): Write these to the page index.
+  // Tracks statistics per page. These are written out to the page index.
   ColumnStats<bool> page_stats_;
 
   // Tracks statistics per row group. This gets reset when starting a new file.
@@ -559,13 +587,13 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
   if (dict_encoder_base_ != nullptr) {
     *first_dictionary_page = *file_pos;
     // Write dictionary page header
-    DictionaryPageHeader dict_header;
+    parquet::DictionaryPageHeader dict_header;
     dict_header.num_values = dict_encoder_base_->num_entries();
-    dict_header.encoding = Encoding::PLAIN_DICTIONARY;
+    dict_header.encoding = parquet::Encoding::PLAIN_DICTIONARY;
     ++dict_encoding_stats_[dict_header.encoding];
 
-    PageHeader header;
-    header.type = PageType::DICTIONARY_PAGE;
+    parquet::PageHeader header;
+    header.type = parquet::PageType::DICTIONARY_PAGE;
     header.uncompressed_page_size = dict_encoder_base_->dict_encoded_size();
     header.__set_dictionary_page_header(dict_header);
 
@@ -608,14 +636,25 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
   }
 
   *first_data_page = *file_pos;
+  int64_t current_row_group_index = 0;
+  offset_index_.page_locations.resize(num_data_pages_);
+
   // Write data pages
   for (int i = 0; i < num_data_pages_; ++i) {
     DataPage& page = pages_[i];
+    parquet::PageLocation location;
 
     if (page.header.data_page_header.num_values == 0) {
       // Skip empty pages
+      location.offset = -1;
+      location.compressed_page_size = 0;
+      location.first_row_index = -1;
+      offset_index_.page_locations[i] = location;
       continue;
     }
+
+    location.offset = *file_pos;
+    location.first_row_index = current_row_group_index;
 
     // Write data page header
     uint8_t* buffer = nullptr;
@@ -625,9 +664,17 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
     RETURN_IF_ERROR(parent_->Write(buffer, len));
     *file_pos += len;
 
+    // Note that the namings are confusing here:
+    // parquet::PageHeader::compressed_page_size is the compressed page size in bytes, as
+    // its name suggests. On the other hand, parquet::PageLocation::compressed_page_size
+    // also includes the size of the page header.
+    location.compressed_page_size = page.header.compressed_page_size + len;
+    offset_index_.page_locations[i] = location;
+
     // Write the page data
     RETURN_IF_ERROR(parent_->Write(page.data, page.header.compressed_page_size));
     *file_pos += page.header.compressed_page_size;
+    current_row_group_index += page.header.data_page_header.num_values;
   }
   return Status::OK();
 }
@@ -639,11 +686,11 @@ Status HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
   // If the entire page was NULL, encode it as PLAIN since there is no
   // data anyway. We don't output a useless dictionary page and it works
   // around a parquet MR bug (see IMPALA-759 for more details).
-  if (current_page_->num_non_null == 0) current_encoding_ = Encoding::PLAIN;
+  if (current_page_->num_non_null == 0) current_encoding_ = parquet::Encoding::PLAIN;
 
-  if (current_encoding_ == Encoding::PLAIN_DICTIONARY) WriteDictDataPage();
+  if (current_encoding_ == parquet::Encoding::PLAIN_DICTIONARY) WriteDictDataPage();
 
-  PageHeader& header = current_page_->header;
+  parquet::PageHeader& header = current_page_->header;
   header.data_page_header.encoding = current_encoding_;
 
   // Accumulate encoding statistics
@@ -698,9 +745,41 @@ Status HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
         max_compressed_size - header.compressed_page_size);
   }
 
+  DCHECK(page_stats_base_ != nullptr);
+  parquet::Statistics page_stats;
+  page_stats_base_->EncodeToThrift(&page_stats);
+  {
+    // If pages_stats contains min_value and max_value, then append them to min_values_
+    // and max_values_ and also mark the page as not null. In case min and max values are
+    // not set, push empty strings to maintain the consistency of the index and mark the
+    // page as null. Always push the null_count.
+    string min_val;
+    string max_val;
+    if ((page_stats.__isset.min_value) && (page_stats.__isset.max_value)) {
+      Status s_min = TruncateDown(page_stats.min_value, PAGE_INDEX_MAX_STRING_LENGTH,
+          &min_val);
+      Status s_max = TruncateUp(page_stats.max_value, PAGE_INDEX_MAX_STRING_LENGTH,
+          &max_val);
+      if (!s_min.ok() || !s_max.ok()) valid_column_index_ = false;
+      column_index_.null_pages.push_back(false);
+    } else {
+      DCHECK(!page_stats.__isset.min_value && !page_stats.__isset.max_value);
+      column_index_.null_pages.push_back(true);
+      DCHECK_EQ(page_stats.null_count, num_values_);
+    }
+    int64_t new_memory_allocation = min_val.capacity() + max_val.capacity();
+    if (UNLIKELY(!table_sink_mem_tracker_->TryConsume(new_memory_allocation))) {
+      return table_sink_mem_tracker_->MemLimitExceeded(parent_->state_,
+          "Failed to allocate memory for Parquet page index.", new_memory_allocation);
+    }
+    page_index_memory_consumption_ += new_memory_allocation;
+    column_index_.min_values.emplace_back(std::move(min_val));
+    column_index_.max_values.emplace_back(std::move(max_val));
+    column_index_.null_counts.push_back(page_stats.null_count);
+  }
+
   // Update row group statistics from page statistics.
   DCHECK(row_group_stats_base_ != nullptr);
-  DCHECK(page_stats_base_ != nullptr);
   row_group_stats_base_->Merge(*page_stats_base_);
 
   // Add the size of the data page header
@@ -728,13 +807,13 @@ void HdfsParquetTableWriter::BaseColumnWriter::NewPage() {
     pages_.push_back(DataPage());
     current_page_ = &pages_[num_data_pages_++];
 
-    DataPageHeader header;
+    parquet::DataPageHeader header;
     header.num_values = 0;
     // The code that populates the column chunk metadata's encodings field
     // relies on these specific values for the definition/repetition level
     // encodings.
-    header.definition_level_encoding = Encoding::RLE;
-    header.repetition_level_encoding = Encoding::RLE;
+    header.definition_level_encoding = parquet::Encoding::RLE;
+    header.repetition_level_encoding = parquet::Encoding::RLE;
     current_page_->header.__set_data_page_header(header);
   }
   current_encoding_ = next_page_encoding_;
@@ -861,14 +940,14 @@ Status HdfsParquetTableWriter::CreateSchema() {
     const ColumnType& type = output_expr_evals_[i]->root().type();
     node.name = table_desc_->col_descs()[i + num_clustering_cols].name();
     node.__set_type(ConvertInternalToParquetType(type.type));
-    node.__set_repetition_type(FieldRepetitionType::OPTIONAL);
+    node.__set_repetition_type(parquet::FieldRepetitionType::OPTIONAL);
     if (type.type == TYPE_DECIMAL) {
       // This column is type decimal. Update the file metadata to include the
       // additional fields:
       //  1) converted_type: indicate this is really a decimal column.
       //  2) type_length: the number of bytes used per decimal value in the data
       //  3) precision/scale
-      node.__set_converted_type(ConvertedType::DECIMAL);
+      node.__set_converted_type(parquet::ConvertedType::DECIMAL);
       node.__set_type_length(
           ParquetPlainEncoder::DecimalSize(output_expr_evals_[i]->root().type()));
       node.__set_scale(output_expr_evals_[i]->root().type().scale);
@@ -876,15 +955,15 @@ Status HdfsParquetTableWriter::CreateSchema() {
     } else if (type.type == TYPE_VARCHAR || type.type == TYPE_CHAR ||
         (type.type == TYPE_STRING &&
          state_->query_options().parquet_annotate_strings_utf8)) {
-      node.__set_converted_type(ConvertedType::UTF8);
+      node.__set_converted_type(parquet::ConvertedType::UTF8);
     } else if (type.type == TYPE_TINYINT) {
-      node.__set_converted_type(ConvertedType::INT_8);
+      node.__set_converted_type(parquet::ConvertedType::INT_8);
     } else if (type.type == TYPE_SMALLINT) {
-      node.__set_converted_type(ConvertedType::INT_16);
+      node.__set_converted_type(parquet::ConvertedType::INT_16);
     } else if (type.type == TYPE_INT) {
-      node.__set_converted_type(ConvertedType::INT_32);
+      node.__set_converted_type(parquet::ConvertedType::INT_32);
     } else if (type.type == TYPE_BIGINT) {
-      node.__set_converted_type(ConvertedType::INT_64);
+      node.__set_converted_type(parquet::ConvertedType::INT_64);
     }
   }
 
@@ -893,14 +972,14 @@ Status HdfsParquetTableWriter::CreateSchema() {
 
 Status HdfsParquetTableWriter::AddRowGroup() {
   if (current_row_group_ != nullptr) RETURN_IF_ERROR(FlushCurrentRowGroup());
-  file_metadata_.row_groups.push_back(RowGroup());
+  file_metadata_.row_groups.push_back(parquet::RowGroup());
   current_row_group_ = &file_metadata_.row_groups[file_metadata_.row_groups.size() - 1];
 
   // Initialize new row group metadata.
   int num_clustering_cols = table_desc_->num_clustering_cols();
   current_row_group_->columns.resize(columns_.size());
   for (int i = 0; i < columns_.size(); ++i) {
-    ColumnMetaData metadata;
+    parquet::ColumnMetaData metadata;
     metadata.type = ConvertInternalToParquetType(columns_[i]->type().type);
     metadata.path_in_schema.push_back(
         table_desc_->col_descs()[i + num_clustering_cols].name());
@@ -1029,12 +1108,13 @@ Status HdfsParquetTableWriter::Finalize() {
   file_metadata_.num_rows = row_count_;
 
   // Set the ordering used to write parquet statistics for columns in the file.
-  ColumnOrder col_order = ColumnOrder();
-  col_order.__set_TYPE_ORDER(TypeDefinedOrder());
+  parquet::ColumnOrder col_order = parquet::ColumnOrder();
+  col_order.__set_TYPE_ORDER(parquet::TypeDefinedOrder());
   file_metadata_.column_orders.assign(columns_.size(), col_order);
   file_metadata_.__isset.column_orders = true;
 
   RETURN_IF_ERROR(FlushCurrentRowGroup());
+  RETURN_IF_ERROR(WritePageIndex());
   RETURN_IF_ERROR(WriteFileFooter());
   stats_.__set_parquet_stats(parquet_insert_stats_);
   COUNTER_ADD(parent_->rows_inserted_counter(), row_count_);
@@ -1069,8 +1149,8 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
     RETURN_IF_ERROR(columns_[i]->Flush(&file_pos_, &data_page_offset, &dict_page_offset));
     DCHECK_GT(data_page_offset, 0);
 
-    ColumnChunk& col_chunk = current_row_group_->columns[i];
-    ColumnMetaData& col_metadata = col_chunk.meta_data;
+    parquet::ColumnChunk& col_chunk = current_row_group_->columns[i];
+    parquet::ColumnMetaData& col_metadata = col_chunk.meta_data;
     col_metadata.data_page_offset = data_page_offset;
     if (dict_page_offset >= 0) {
       col_metadata.__set_dictionary_page_offset(dict_page_offset);
@@ -1089,23 +1169,23 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
 
     // Write encodings and encoding stats for this column
     col_metadata.encodings.clear();
-    for (Encoding::type encoding : col_writer->column_encodings_) {
+    for (parquet::Encoding::type encoding : col_writer->column_encodings_) {
       col_metadata.encodings.push_back(encoding);
     }
 
-    vector<PageEncodingStats> encoding_stats;
+    vector<parquet::PageEncodingStats> encoding_stats;
     // Add dictionary page encoding stats
     for (const auto& entry: col_writer->dict_encoding_stats_) {
-      PageEncodingStats dict_enc_stat;
-      dict_enc_stat.page_type = PageType::DICTIONARY_PAGE;
+      parquet::PageEncodingStats dict_enc_stat;
+      dict_enc_stat.page_type = parquet::PageType::DICTIONARY_PAGE;
       dict_enc_stat.encoding = entry.first;
       dict_enc_stat.count = entry.second;
       encoding_stats.push_back(dict_enc_stat);
     }
     // Add data page encoding stats
     for (const auto& entry: col_writer->data_encoding_stats_) {
-      PageEncodingStats data_enc_stat;
-      data_enc_stat.page_type = PageType::DATA_PAGE;
+      parquet::PageEncodingStats data_enc_stat;
+      data_enc_stat.page_type = parquet::PageType::DATA_PAGE;
       data_enc_stat.encoding = entry.first;
       data_enc_stat.count = entry.second;
       encoding_stats.push_back(data_enc_stat);
@@ -1129,8 +1209,6 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
         thrift_serializer_->Serialize(&current_row_group_->columns[i], &len, &buffer));
     RETURN_IF_ERROR(Write(buffer, len));
     file_pos_ += len;
-
-    col_writer->Reset();
   }
 
   // Populate RowGroup::sorting_columns with all columns specified by the Frontend.
@@ -1145,6 +1223,47 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
       !current_row_group_->sorting_columns.empty();
 
   current_row_group_ = nullptr;
+  return Status::OK();
+}
+
+Status HdfsParquetTableWriter::WritePageIndex() {
+  // Currently Impala only write Parquet files with a single row group. The current
+  // page index logic depends on this behavior as it only keeps one row group's
+  // statistics in memory.
+  DCHECK_EQ(file_metadata_.row_groups.size(), 1);
+
+  parquet::RowGroup* row_group = &(file_metadata_.row_groups[0]);
+  // Write out the column indexes.
+  for (int i = 0; i < columns_.size(); ++i) {
+    auto& column = *columns_[i];
+    if (!column.valid_column_index_) continue;
+    column.column_index_.__set_boundary_order(
+        column.row_group_stats_base_->GetBoundaryOrder());
+    // We always set null_counts.
+    column.column_index_.__isset.null_counts = true;
+    uint8_t* buffer = nullptr;
+    uint32_t len = 0;
+    RETURN_IF_ERROR(thrift_serializer_->Serialize(&column.column_index_, &len, &buffer));
+    RETURN_IF_ERROR(Write(buffer, len));
+    // Update the column_index_offset and column_index_length of the ColumnChunk
+    row_group->columns[i].__set_column_index_offset(file_pos_);
+    row_group->columns[i].__set_column_index_length(len);
+    file_pos_ += len;
+  }
+  // Write out the offset indexes.
+  for (int i = 0; i < columns_.size(); ++i) {
+    auto& column = *columns_[i];
+    uint8_t* buffer = nullptr;
+    uint32_t len = 0;
+    RETURN_IF_ERROR(thrift_serializer_->Serialize(&column.offset_index_, &len, &buffer));
+    RETURN_IF_ERROR(Write(buffer, len));
+    // Update the offset_index_offset and offset_index_length of the ColumnChunk
+    row_group->columns[i].__set_offset_index_offset(file_pos_);
+    row_group->columns[i].__set_offset_index_length(len);
+    file_pos_ += len;
+  }
+  // Reset column writers.
+  for (auto& column : columns_) column->Reset();
   return Status::OK();
 }
 

@@ -74,6 +74,7 @@ add_library(Util
   runtime-profile.cc
   simple-logger.cc
   string-parser.cc
+  string-util.cc
   symbols-util.cc
   static-asserts.cc
   summary-util.cc
@@ -135,6 +136,7 @@ ADD_BE_TEST(redactor-unconfigured-test)
 ADD_BE_TEST(rle-test)
 ADD_BE_TEST(runtime-profile-test)
 ADD_BE_TEST(string-parser-test)
+ADD_BE_TEST(string-util-test)
 ADD_BE_TEST(symbols-util-test)
 ADD_BE_TEST(sys-info-test)
 ADD_BE_TEST(thread-pool-test)

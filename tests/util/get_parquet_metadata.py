@@ -20,11 +20,19 @@ import struct
 
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from parquet.ttypes import FileMetaData, Type
+from parquet.ttypes import ColumnIndex, FileMetaData, OffsetIndex, PageHeader, Type
 from thrift.protocol import TCompactProtocol
 from thrift.transport import TTransport
 
 PARQUET_VERSION_NUMBER = 'PAR1'
+
+
+def create_protocol(serialized_object_buffer):
+  """Creates a thrift protocol object from a memory buffer. The buffer should
+  contain a serialized thrift object.
+  """
+  transport = TTransport.TMemoryBuffer(serialized_object_buffer)
+  return TCompactProtocol.TCompactProtocol(transport)
 
 
 def julian_day_to_date(julian_day):
@@ -71,7 +79,8 @@ def parse_double(s):
 
 def decode_timestamp(s):
   """Reinterprets the string 's' as a 12-byte timestamp as written by Impala and decode it
-  into a datetime object."""
+  into a datetime object.
+  """
   # Impala writes timestamps as 12-byte values. The first 8 byte store a
   # boost::posix_time::time_duration, which is the time within the current day in
   # nanoseconds stored as int64. The last 4 bytes store a boost::gregorian::date,
@@ -99,7 +108,8 @@ def decode_decimal(schema, value):
 def decode_stats_value(schema, value):
   """Decodes 'value' according to 'schema. It expects 'value' to be plain encoded. For
   BOOLEAN values, only the least significant bit is parsed and returned. Binary arrays are
-  expected to be stored as such, without a preceding length."""
+  expected to be stored as such, without a preceding length.
+  """
   column_type = schema.type
   if column_type == Type.BOOLEAN:
     return parse_boolean(value)
@@ -123,9 +133,22 @@ def decode_stats_value(schema, value):
   return None
 
 
+def read_serialized_object(thrift_class, file, file_pos, length):
+  """Reads an instance of class 'thrift_class' from an already opened file at the
+  given position.
+  """
+  file.seek(file_pos)
+  serialized_thrift_object = file.read(length)
+  protocol = create_protocol(serialized_thrift_object)
+  thrift_object = thrift_class()
+  thrift_object.read(protocol)
+  return thrift_object
+
+
 def get_parquet_metadata(filename):
   """Returns a FileMetaData as defined in parquet.thrift. 'filename' must be a local
-  file path."""
+  file path.
+  """
   file_size = os.path.getsize(filename)
   with open(filename) as f:
     # Check file starts and ends with magic bytes
@@ -140,13 +163,8 @@ def get_parquet_metadata(filename):
     f.seek(file_size - len(PARQUET_VERSION_NUMBER) - 4)
     metadata_len = parse_int32(f.read(4))
 
-    # Read metadata
-    f.seek(file_size - len(PARQUET_VERSION_NUMBER) - 4 - metadata_len)
-    serialized_metadata = f.read(metadata_len)
+    # Calculate metadata position in file
+    metadata_pos = file_size - len(PARQUET_VERSION_NUMBER) - 4 - metadata_len
 
-    # Deserialize metadata
-    transport = TTransport.TMemoryBuffer(serialized_metadata)
-    protocol = TCompactProtocol.TCompactProtocol(transport)
-    metadata = FileMetaData()
-    metadata.read(protocol)
-    return metadata
+    # Return deserialized FileMetaData object
+    return read_serialized_object(FileMetaData, f, metadata_pos, metadata_len)
