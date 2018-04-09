@@ -512,6 +512,9 @@ if [[ $IMPALA_MINICLUSTER_PROFILE == 3 ]]; then
   # Beware of adding entries from $HADOOP_HOME here, because they can change
   # the order of the classpath, leading to configuration not showing up first.
   HADOOP_CLASSPATH="$LZO_JAR_PATH"
+  # Add the path containing the hadoop-aws jar, which is required to access AWS from the
+  # minicluster.
+  HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${HADOOP_HOME}/share/hadoop/tools/lib/*"
 fi
 
 export MINI_DFS_BASE_DATA_DIR="$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data"
