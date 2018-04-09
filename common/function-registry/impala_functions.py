@@ -88,11 +88,11 @@ visible_functions = [
   # TIMESTAMPs meaning EXTRACT(STRING, STRING) is valid. If EXTRACT(STRING, TIMESTAMP)
   # is added, it takes precedence over the existing EXTRACT(TIMESTAMP, STRING)
   # which could break users.
-  [['extract'], 'INT', ['TIMESTAMP', 'STRING'],
+  [['extract'], 'BIGINT', ['TIMESTAMP', 'STRING'],
    '_ZN6impala11UdfBuiltins7ExtractEPN10impala_udf15FunctionContextERKNS1_12TimestampValERKNS1_9StringValE',
    '_ZN6impala11UdfBuiltins21SwappedExtractPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
    '_ZN6impala11UdfBuiltins12ExtractCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
-  [['date_part'], 'INT', ['STRING', 'TIMESTAMP'],
+  [['date_part'], 'BIGINT', ['STRING', 'TIMESTAMP'],
    '_ZN6impala11UdfBuiltins7ExtractEPN10impala_udf15FunctionContextERKNS1_9StringValERKNS1_12TimestampValE',
    '_ZN6impala11UdfBuiltins14ExtractPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
    '_ZN6impala11UdfBuiltins12ExtractCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],

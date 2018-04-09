@@ -33,7 +33,7 @@ cross join
 'millisecond',10
 'epoch',1361205960
 ---- TYPES
-string, int
+string, bigint
 ====
 ---- QUERY
 # EXTRACT fields from timestamp
@@ -46,7 +46,7 @@ from alltypesagg order by id limit 5
 2010,100
 2010,300
 ---- TYPES
-int, int
+bigint, bigint
 ====
 ---- QUERY
 # IS NULL predicate

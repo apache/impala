@@ -6731,73 +6731,73 @@ TEST_F(ExprTest, TimestampFunctions) {
       "cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'XXYYZZ') as string)");
 
   // Extract as a regular function
-  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'YEAR')",
-            TYPE_INT, 2006);
-  TestValue("extract('2006-05-12 18:27:28.12345', 'YEAR')", TYPE_INT, 2006);
-  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'MoNTH')",
-            TYPE_INT, 5);
-  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'DaY')",
-            TYPE_INT, 12);
-  TestValue("extract(cast('2006-05-12 06:27:28.12345' as timestamp), 'hour')",
-            TYPE_INT, 6);
-  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'MINUTE')",
-            TYPE_INT, 27);
-  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'SECOND')",
-            TYPE_INT, 28);
-  TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'MILLISECOND')",
-            TYPE_INT, 123);
-  TestValue("extract(cast('2006-05-13 01:27:28.12345' as timestamp), 'EPOCH')",
-            TYPE_INT, 1147483648);
-  TestNonOkStatus("extract(cast('2006-05-13 01:27:28.12345' as timestamp), 'foo')");
-  TestNonOkStatus("extract(cast('2006-05-13 01:27:28.12345' as timestamp), NULL)");
-  TestIsNull("extract(NULL, 'EPOCH')", TYPE_INT);
+  TestValue("extract(cast('2006-05-12 18:27:28.123456789' as timestamp), 'YEAR')",
+            TYPE_BIGINT, 2006);
+  TestValue("extract('2006-05-12 18:27:28.123456789', 'YEAR')", TYPE_BIGINT, 2006);
+  TestValue("extract(cast('2006-05-12 18:27:28.123456789' as timestamp), 'MoNTH')",
+            TYPE_BIGINT, 5);
+  TestValue("extract(cast('2006-05-12 18:27:28.123456789' as timestamp), 'DaY')",
+            TYPE_BIGINT, 12);
+  TestValue("extract(cast('2006-05-12 06:27:28.123456789' as timestamp), 'hour')",
+            TYPE_BIGINT, 6);
+  TestValue("extract(cast('2006-05-12 18:27:28.123456789' as timestamp), 'MINUTE')",
+            TYPE_BIGINT, 27);
+  TestValue("extract(cast('2006-05-12 18:27:28.123456789' as timestamp), 'SECOND')",
+            TYPE_BIGINT, 28);
+  TestValue("extract(cast('2006-05-12 18:27:28.123456789' as timestamp), 'MILLISECOND')",
+            TYPE_BIGINT, 28123);
+  TestValue("extract(cast('2006-05-13 01:27:28.123456789' as timestamp), 'EPOCH')",
+            TYPE_BIGINT, 1147483648);
+  TestNonOkStatus("extract(cast('2006-05-13 01:27:28.123456789' as timestamp), 'foo')");
+  TestNonOkStatus("extract(cast('2006-05-13 01:27:28.123456789' as timestamp), NULL)");
+  TestIsNull("extract(NULL, 'EPOCH')", TYPE_BIGINT);
   TestNonOkStatus("extract(NULL, NULL)");
 
   // Extract using FROM keyword
-  TestValue("extract(YEAR from cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 2006);
-  TestValue("extract(QUARTER from cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 2);
-  TestValue("extract(MoNTH from cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 5);
-  TestValue("extract(DaY from cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 12);
-  TestValue("extract(hour from cast('2006-05-12 06:27:28.12345' as timestamp))",
-            TYPE_INT, 6);
-  TestValue("extract(MINUTE from cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 27);
-  TestValue("extract(SECOND from cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 28);
-  TestValue("extract(MILLISECOND from cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 123);
-  TestValue("extract(EPOCH from cast('2006-05-13 01:27:28.12345' as timestamp))",
-            TYPE_INT, 1147483648);
-  TestNonOkStatus("extract(foo from cast('2006-05-13 01:27:28.12345' as timestamp))");
-  TestNonOkStatus("extract(NULL from cast('2006-05-13 01:27:28.12345' as timestamp))");
-  TestIsNull("extract(EPOCH from NULL)", TYPE_INT);
+  TestValue("extract(YEAR from cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 2006);
+  TestValue("extract(QUARTER from cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 2);
+  TestValue("extract(MoNTH from cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 5);
+  TestValue("extract(DaY from cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 12);
+  TestValue("extract(hour from cast('2006-05-12 06:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 6);
+  TestValue("extract(MINUTE from cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 27);
+  TestValue("extract(SECOND from cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 28);
+  TestValue("extract(MILLISECOND from cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 28123);
+  TestValue("extract(EPOCH from cast('2006-05-13 01:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 1147483648);
+  TestNonOkStatus("extract(foo from cast('2006-05-13 01:27:28.123456789' as timestamp))");
+  TestNonOkStatus("extract(NULL from cast('2006-05-13 01:27:28.123456789' as timestamp))");
+  TestIsNull("extract(EPOCH from NULL)", TYPE_BIGINT);
 
   // Date_part, same as extract function but with arguments swapped
-  TestValue("date_part('YEAR', cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 2006);
-  TestValue("date_part('QUARTER', cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 2);
-  TestValue("date_part('MoNTH', cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 5);
-  TestValue("date_part('DaY', cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 12);
-  TestValue("date_part('hour', cast('2006-05-12 06:27:28.12345' as timestamp))",
-            TYPE_INT, 6);
-  TestValue("date_part('MINUTE', cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 27);
-  TestValue("date_part('SECOND', cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 28);
-  TestValue("date_part('MILLISECOND', cast('2006-05-12 18:27:28.12345' as timestamp))",
-            TYPE_INT, 123);
-  TestValue("date_part('EPOCH', cast('2006-05-13 01:27:28.12345' as timestamp))",
-            TYPE_INT, 1147483648);
-  TestNonOkStatus("date_part('foo', cast('2006-05-13 01:27:28.12345' as timestamp))");
-  TestNonOkStatus("date_part(NULL, cast('2006-05-13 01:27:28.12345' as timestamp))");
-  TestIsNull("date_part('EPOCH', NULL)", TYPE_INT);
+  TestValue("date_part('YEAR', cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 2006);
+  TestValue("date_part('QUARTER', cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 2);
+  TestValue("date_part('MoNTH', cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 5);
+  TestValue("date_part('DaY', cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 12);
+  TestValue("date_part('hour', cast('2006-05-12 06:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 6);
+  TestValue("date_part('MINUTE', cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 27);
+  TestValue("date_part('SECOND', cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 28);
+  TestValue("date_part('MILLISECOND', cast('2006-05-12 18:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 28123);
+  TestValue("date_part('EPOCH', cast('2006-05-13 01:27:28.123456789' as timestamp))",
+            TYPE_BIGINT, 1147483648);
+  TestNonOkStatus("date_part('foo', cast('2006-05-13 01:27:28.123456789' as timestamp))");
+  TestNonOkStatus("date_part(NULL, cast('2006-05-13 01:27:28.123456789' as timestamp))");
+  TestIsNull("date_part('EPOCH', NULL)", TYPE_BIGINT);
   TestNonOkStatus("date_part(NULL, NULL)");
 
   // Test with timezone offset

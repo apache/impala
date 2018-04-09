@@ -117,12 +117,12 @@ class UdfBuiltins {
   ///    http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions050.htm
   ///
   /// This is used by the DATE_PART function.
-  static IntVal Extract(FunctionContext* context, const StringVal& field_str,
+  static BigIntVal Extract(FunctionContext* context, const StringVal& field_str,
       const TimestampVal& date);
 
   /// This is for the EXTRACT(Timestamp, String) and EXTRACT(Timeunit FROM
   /// Timestamp) functions.
-  static IntVal Extract(FunctionContext* context, const TimestampVal& date,
+  static BigIntVal Extract(FunctionContext* context, const TimestampVal& date,
       const StringVal& field_str);
   /// This is used by the DATE_PART function.
   static void ExtractPrepare(FunctionContext* context,

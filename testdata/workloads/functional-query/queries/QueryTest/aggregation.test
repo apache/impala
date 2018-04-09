@@ -1231,7 +1231,7 @@ order by 1, 2;
 2010,11,1350
 2010,12,1395
 ---- TYPES
-INT,INT,BIGINT
+BIGINT,BIGINT,BIGINT
 ====
 ---- QUERY
 # IMPALA-2089: Tests correct elimination of redundant predicates.

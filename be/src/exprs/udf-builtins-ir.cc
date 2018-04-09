@@ -25,6 +25,7 @@
 #include <string>
 
 #include "gen-cpp/Exprs_types.h"
+#include "gutil/walltime.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf-internal.h"
@@ -113,6 +114,13 @@ TimestampVal UdfBuiltins::DateTrunc(
   return DateTruncImpl(context, tv, unit_str);
 }
 
+static int64_t ExtractMillisecond(const time_duration& time) {
+  // Fractional seconds are nanoseconds because Boost is configured
+  // to use nanoseconds precision
+  return time.fractional_seconds() / (NANOS_PER_MICRO * MICROS_PER_MILLI)
+       + time.seconds() * MILLIS_PER_SEC;
+}
+
 // Maps the user facing name of a unit to a TExtractField
 // Returns the TExtractField for the given unit
 TExtractField::type StrToExtractField(FunctionContext* ctx, const StringVal& unit_str) {
@@ -130,11 +138,11 @@ TExtractField::type StrToExtractField(FunctionContext* ctx, const StringVal& uni
   return TExtractField::INVALID_FIELD;
 }
 
-IntVal UdfBuiltins::Extract(FunctionContext* context, const StringVal& unit_str,
+BigIntVal UdfBuiltins::Extract(FunctionContext* context, const StringVal& unit_str,
     const TimestampVal& tv) {
   // resolve extract_field using the prepared state if possible, o.w. parse now
   // ExtractPrepare() can only parse extract_field if user passes it as a string literal
-  if (tv.is_null) return IntVal::null();
+  if (tv.is_null) return BigIntVal::null();
 
   TExtractField::type field;
   void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
@@ -145,7 +153,7 @@ IntVal UdfBuiltins::Extract(FunctionContext* context, const StringVal& unit_str,
     if (field == TExtractField::INVALID_FIELD) {
       string string_unit(reinterpret_cast<char*>(unit_str.ptr), unit_str.len);
       context->SetError(Substitute("invalid extract field: $0", string_unit).c_str());
-      return IntVal::null();
+      return BigIntVal::null();
     }
   }
 
@@ -157,16 +165,16 @@ IntVal UdfBuiltins::Extract(FunctionContext* context, const StringVal& unit_str,
     case TExtractField::QUARTER:
     case TExtractField::MONTH:
     case TExtractField::DAY:
-      if (orig_date.is_special()) return IntVal::null();
+      if (orig_date.is_special()) return BigIntVal::null();
       break;
     case TExtractField::HOUR:
     case TExtractField::MINUTE:
     case TExtractField::SECOND:
     case TExtractField::MILLISECOND:
-      if (time.is_special()) return IntVal::null();
+      if (time.is_special()) return BigIntVal::null();
       break;
     case TExtractField::EPOCH:
-      if (time.is_special() || orig_date.is_special()) return IntVal::null();
+      if (time.is_special() || orig_date.is_special()) return BigIntVal::null();
       break;
     case TExtractField::INVALID_FIELD:
       DCHECK(false);
@@ -174,44 +182,44 @@ IntVal UdfBuiltins::Extract(FunctionContext* context, const StringVal& unit_str,
 
   switch (field) {
     case TExtractField::YEAR: {
-      return IntVal(orig_date.year());
+      return BigIntVal(orig_date.year());
     }
     case TExtractField::QUARTER: {
       int m = orig_date.month();
-      return IntVal((m - 1) / 3 + 1);
+      return BigIntVal((m - 1) / 3 + 1);
     }
     case TExtractField::MONTH: {
-      return IntVal(orig_date.month());
+      return BigIntVal(orig_date.month());
     }
     case TExtractField::DAY: {
-      return IntVal(orig_date.day());
+      return BigIntVal(orig_date.day());
     }
     case TExtractField::HOUR: {
-      return IntVal(time.hours());
+      return BigIntVal(time.hours());
     }
     case TExtractField::MINUTE: {
-      return IntVal(time.minutes());
+      return BigIntVal(time.minutes());
     }
     case TExtractField::SECOND: {
-      return IntVal(time.seconds());
+      return BigIntVal(time.seconds());
     }
     case TExtractField::MILLISECOND: {
-      return IntVal(time.total_milliseconds() - time.total_seconds() * 1000);
+      return BigIntVal(ExtractMillisecond(time));
     }
     case TExtractField::EPOCH: {
       ptime epoch_date(date(1970, 1, 1), time_duration(0, 0, 0));
       ptime cur_date(orig_date, time);
       time_duration diff = cur_date - epoch_date;
-      return IntVal(diff.total_seconds());
+      return BigIntVal(diff.total_seconds());
     }
     default: {
       DCHECK(false) << field;
-      return IntVal::null();
+      return BigIntVal::null();
     }
   }
 }
 
-IntVal UdfBuiltins::Extract(FunctionContext* context, const TimestampVal& tv,
+BigIntVal UdfBuiltins::Extract(FunctionContext* context, const TimestampVal& tv,
     const StringVal& unit_str) {
   return Extract(context, unit_str, tv);
 }
