@@ -311,7 +311,6 @@ Status Tuple::CodegenMaterializeExprs(LlvmCodeGen* codegen, bool collect_string_
   if (collect_string_vals) {
     return Status("CodegenMaterializeExprs() collect_string_vals == true NYI");
   }
-  SCOPED_TIMER(codegen->codegen_timer());
   llvm::LLVMContext& context = codegen->context();
 
   // Codegen each compute function from slot_materialize_exprs

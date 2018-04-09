@@ -201,11 +201,12 @@ LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
   load_module_timer_ = ADD_TIMER(profile_, "LoadTime");
   prepare_module_timer_ = ADD_TIMER(profile_, "PrepareTime");
   module_bitcode_size_ = ADD_COUNTER(profile_, "ModuleBitcodeSize", TUnit::BYTES);
-  codegen_timer_ = ADD_TIMER(profile_, "CodegenTime");
+  ir_generation_timer_ = ADD_TIMER(profile_, "IrGenerationTime");
   optimization_timer_ = ADD_TIMER(profile_, "OptimizationTime");
   compile_timer_ = ADD_TIMER(profile_, "CompileTime");
   num_functions_ = ADD_COUNTER(profile_, "NumFunctions", TUnit::UNIT);
   num_instructions_ = ADD_COUNTER(profile_, "NumInstructions", TUnit::UNIT);
+  llvm_thread_counters_ = ADD_THREAD_COUNTERS(profile_, "Codegen");
 }
 
 Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
@@ -213,6 +214,7 @@ Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
     scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
   SCOPED_TIMER((*codegen)->profile_->total_time_counter());
+  SCOPED_THREAD_COUNTER_MEASUREMENT((*codegen)->llvm_thread_counters());
 
   unique_ptr<llvm::Module> loaded_module;
   Status status = (*codegen)->LoadModuleFromFile(file, &loaded_module);
@@ -229,6 +231,8 @@ Status LlvmCodeGen::CreateFromMemory(RuntimeState* state, ObjectPool* pool,
     MemTracker* parent_mem_tracker, const string& id, scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
   SCOPED_TIMER((*codegen)->profile_->total_time_counter());
+  SCOPED_TIMER((*codegen)->prepare_module_timer_);
+  SCOPED_THREAD_COUNTER_MEASUREMENT((*codegen)->llvm_thread_counters());
 
   // Select the appropriate IR version. We cannot use LLVM IR with SSE4.2 instructions on
   // a machine without SSE4.2 support.
@@ -282,7 +286,6 @@ Status LlvmCodeGen::LoadModuleFromFile(
 Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<llvm::MemoryBuffer> module_ir_buf,
     string module_name, unique_ptr<llvm::Module>* module) {
   DCHECK(!module_name.empty());
-  SCOPED_TIMER(prepare_module_timer_);
   COUNTER_ADD(module_bitcode_size_, module_ir_buf->getMemBufferRef().getBufferSize());
   llvm::Expected<unique_ptr<llvm::Module>> tmp_module =
       getOwningLazyBitcodeModule(move(module_ir_buf), context());
@@ -305,7 +308,6 @@ Status LlvmCodeGen::LoadModuleFromMemory(unique_ptr<llvm::MemoryBuffer> module_i
 
 // TODO: Create separate counters/timers (file size, load time) for each module linked
 Status LlvmCodeGen::LinkModuleFromLocalFs(const string& file) {
-  SCOPED_TIMER(profile_->total_time_counter());
   unique_ptr<llvm::Module> new_module;
   RETURN_IF_ERROR(LoadModuleFromFile(file, &new_module));
 
@@ -366,6 +368,7 @@ Status LlvmCodeGen::CreateImpalaCodegen(RuntimeState* state,
   // Parse module for cross compiled functions and types
   SCOPED_TIMER(codegen->profile_->total_time_counter());
   SCOPED_TIMER(codegen->prepare_module_timer_);
+  SCOPED_THREAD_COUNTER_MEASUREMENT(codegen->llvm_thread_counters_);
 
   // Get type for StringValue
   codegen->string_value_type_ = codegen->GetStructType<StringValue>();
@@ -621,7 +624,7 @@ void LlvmCodeGen::CreateIfElseBlocks(llvm::Function* fn, const string& if_name,
   *else_block = llvm::BasicBlock::Create(context(), else_name, fn, insert_before);
 }
 
-Status LlvmCodeGen::MaterializeFunctionHelper(llvm::Function* fn) {
+Status LlvmCodeGen::MaterializeFunction(llvm::Function* fn) {
   DCHECK(!is_compiled_);
   if (fn->isIntrinsic() || !fn->isMaterializable()) return Status::OK();
 
@@ -642,16 +645,10 @@ Status LlvmCodeGen::MaterializeFunctionHelper(llvm::Function* fn) {
     for (const string& callee : *callees) {
       llvm::Function* callee_fn = module_->getFunction(callee);
       DCHECK(callee_fn != nullptr);
-      RETURN_IF_ERROR(MaterializeFunctionHelper(callee_fn));
+      RETURN_IF_ERROR(MaterializeFunction(callee_fn));
     }
   }
   return Status::OK();
-}
-
-Status LlvmCodeGen::MaterializeFunction(llvm::Function* fn) {
-  SCOPED_TIMER(profile_->total_time_counter());
-  SCOPED_TIMER(prepare_module_timer_);
-  return MaterializeFunctionHelper(fn);
 }
 
 llvm::Function* LlvmCodeGen::GetFunction(const string& symbol, bool clone) {
@@ -1038,7 +1035,6 @@ Status LlvmCodeGen::MaterializeModule() {
 
 // It's okay to call this function even if the module has been materialized.
 Status LlvmCodeGen::FinalizeLazyMaterialization() {
-  SCOPED_TIMER(prepare_module_timer_);
   for (llvm::Function& fn : module_->functions()) {
     if (fn.isMaterializable()) {
       DCHECK(!module_->isMaterialized());
@@ -1078,6 +1074,7 @@ Status LlvmCodeGen::FinalizeModule() {
 
   if (is_corrupt_) return Status("Module is corrupt.");
   SCOPED_TIMER(profile_->total_time_counter());
+  SCOPED_THREAD_COUNTER_MEASUREMENT(llvm_thread_counters_);
 
   // Clean up handcrafted functions that have not been finalized. Clean up is done by
   // deleting the function from the module. Any reference to deleted functions in the

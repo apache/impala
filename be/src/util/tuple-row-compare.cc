@@ -203,7 +203,6 @@ Status TupleRowComparator::Codegen(RuntimeState* state) {
 //   ret i32 0
 // }
 Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn) {
-  SCOPED_TIMER(codegen->codegen_timer());
   llvm::LLVMContext& context = codegen->context();
   const vector<ScalarExpr*>& ordering_exprs = ordering_exprs_;
   llvm::Function* key_fns[ordering_exprs.size()];

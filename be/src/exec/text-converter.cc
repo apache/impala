@@ -112,7 +112,6 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     return Status("TextConverter::CodegenWriteSlot(): Char isn't supported for"
         " CodegenWriteSlot");
   }
-  SCOPED_TIMER(codegen->codegen_timer());
 
   // Codegen is_null_string
   bool is_default_null = (len == 2 && null_col_val[0] == '\\' && null_col_val[1] == 'N');

@@ -48,7 +48,6 @@ void SelectNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
   ExecNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  SCOPED_TIMER(state->codegen()->codegen_timer());
   Status codegen_status = CodegenCopyRows(state);
   runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }

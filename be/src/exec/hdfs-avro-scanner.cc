@@ -1062,8 +1062,6 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
 Status HdfsAvroScanner::CodegenDecodeAvroData(const HdfsScanNodeBase* node,
     LlvmCodeGen* codegen, const vector<ScalarExpr*>& conjuncts,
     llvm::Function** decode_avro_data_fn) {
-  SCOPED_TIMER(codegen->codegen_timer());
-
   llvm::Function* materialize_tuple_fn;
   RETURN_IF_ERROR(CodegenMaterializeTuple(node, codegen, &materialize_tuple_fn));
   DCHECK(materialize_tuple_fn != nullptr);

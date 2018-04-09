@@ -1019,7 +1019,6 @@ Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
   *process_scratch_batch_fn = nullptr;
   LlvmCodeGen* codegen = node->runtime_state()->codegen();
   DCHECK(codegen != nullptr);
-  SCOPED_TIMER(codegen->codegen_timer());
 
   llvm::Function* fn = codegen->GetFunction(IRFunction::PROCESS_SCRATCH_BATCH, true);
   DCHECK(fn != nullptr);
