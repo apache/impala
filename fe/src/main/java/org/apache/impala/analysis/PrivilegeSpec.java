@@ -188,14 +188,6 @@ public class PrivilegeSpec implements ParseNode {
 
     switch (scope_) {
       case SERVER:
-        if (privilegeLevel_ != TPrivilegeLevel.ALL &&
-            privilegeLevel_ != TPrivilegeLevel.REFRESH &&
-            privilegeLevel_ != TPrivilegeLevel.CREATE &&
-            privilegeLevel_ != TPrivilegeLevel.ALTER &&
-            privilegeLevel_ != TPrivilegeLevel.DROP) {
-          throw new AnalysisException("Only 'ALL', 'REFRESH', 'CREATE', 'ALTER', or " +
-              "'DROP' privilege may be applied at SERVER scope in privilege spec.");
-        }
         break;
       case DATABASE:
         Preconditions.checkState(!Strings.isNullOrEmpty(dbName_));

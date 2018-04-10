@@ -605,9 +605,9 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("select * from functional.view_view");
 
     // User does not have SELECT privileges on this view.
-    AuthzError("select * from functional.complex_view_sub",
+    AuthzError("select * from functional.alltypes_view",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
-        "functional.complex_view_sub");
+        "functional.alltypes_view");
 
     // User has SELECT privileges on the view and the join table.
     AuthzOk("select a.id from functional.view_view a "
@@ -640,11 +640,6 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzError("select * from functional.alltypes",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypes");
-
-    // Select with no privileges on view.
-    AuthzError("select * from functional.complex_view_sub",
-        "User '%s' does not have privileges to execute 'SELECT' on: " +
-        "functional.complex_view_sub");
 
     // Select without referencing a column.
     AuthzError("select 1 from functional.alltypes",
@@ -704,7 +699,7 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("select id, b.key from functional.allcomplextypes a, a.int_map_col b");
 
     // No SELECT privileges on 'alltypessmall'
-    AuthzError("select a.* from functional.alltypesagg cross join " +
+    AuthzError("select a.* from functional.alltypesagg a cross join " +
         "functional.alltypessmall b", "User '%s' does not have privileges to execute " +
         "'SELECT' on: functional.alltypessmall");
 
@@ -758,11 +753,15 @@ public class AuthorizationTest extends FrontendTestBase {
         "functional.alltypes");
 
     // User doesn't have permissions on source table within inline view.
-    AuthzError("insert into functional.alltypes " +
-        "select * from functional.alltypesagg a join (select * from " +
-        "functional_seq.alltypes) b on (a.int_col = b.int_col)",
-        "User '%s' does not have privileges to execute 'SELECT' on: " +
-        "functional_seq.alltypes");
+    AuthzError("insert into functional.alltypes partition (month, year) " +
+        "select id, bool_col, tinyint_col, smallint_col, a.int_col, bigint_col, " +
+        "float_col, a.double_col, a.date_string_col, a.string_col, a.timestamp_col, " +
+        "a.year, a.month " +
+        "from functional_rc.alltypesagg a " +
+        "join (select int_col, double_col, date_string_col, string_col, timestamp_col, " +
+        "year, month from functional_seq.alltypes) b " +
+        "on (a.int_col = b.int_col)", "User '%s' does " +
+        "not have privileges to execute 'SELECT' on: functional_rc.alltypesagg");
 
     // User doesn't have INSERT permissions on the target table but has sufficient SELECT
     // permissions on all the referenced columns of the source table
@@ -1764,8 +1763,8 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzError("describe formatted functional.alltypestiny",
         "User '%s' does not have privileges to access: functional.alltypestiny");
     // Insufficient privileges on table for nested column.
-    AuthzError("describe functional.complextypestbl.nested_struct",
-        "User '%s' does not have privileges to access: functional.complextypestbl");
+    AuthzError("describe functional.complextypes_fileformat.s",
+        "User '%s' does not have privileges to access: functional.complextypes_fileformat");
     // Insufficient privileges on view.
     AuthzError("describe functional.alltypes_view_sub",
         "User '%s' does not have privileges to access: functional.alltypes_view_sub");
@@ -2500,6 +2499,169 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk(fe, ctx, "invalidate metadata");
     AuthzOk(fe, ctx, "create external table tpch.kudu_tbl stored as kudu " +
         "TBLPROPERTIES ('kudu.master_addresses'='127.0.0.1', 'kudu.table_name'='tbl')");
+  }
+
+  @Test
+  public void TestServerLevelInsert() throws ImpalaException {
+    // TODO: Add test support for dynamically changing privileges for
+    // file-based policy.
+    if (ctx_.authzConfig.isFileBasedPolicy()) return;
+
+    SentryPolicyService sentryService =
+        new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
+
+    // User has INSERT privilege on server.
+    String roleName = "insert_role";
+    try {
+      sentryService.createRole(USER, roleName, true);
+      TPrivilege privilege = new TPrivilege("", TPrivilegeLevel.INSERT,
+          TPrivilegeScope.SERVER, false);
+      privilege.setServer_name("server1");
+      sentryService.grantRolePrivilege(USER, roleName, privilege);
+      sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+      privilege = new TPrivilege ("", TPrivilegeLevel.SELECT, TPrivilegeScope.DATABASE,
+          false);
+      privilege.setServer_name("server1");
+      privilege.setDb_name("functional_rc");
+      sentryService.grantRolePrivilege(USER, roleName, privilege);
+      sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+      privilege = new TPrivilege ("", TPrivilegeLevel.SELECT, TPrivilegeScope.DATABASE,
+          false);
+      privilege.setServer_name("server1");
+      privilege.setDb_name("functional_seq");
+      sentryService.grantRolePrivilege(USER, roleName, privilege);
+      sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+      ctx_.catalog.reset();
+
+      // Copied majority of INSERT tests that should fail from authorization and
+      // ensure they succeed here. Some tests that fail will fail here with
+      // AnalysisException and are covered elsewhere.
+
+      // User has SELECT permissions on source table.
+      AuthzOk("insert into functional.alltypes partition (month, year) " +
+              "select * from functional_rc.alltypes");
+
+      // Ensure INSERT at server does not allow other privileges
+      AuthzError("select * from functional.alltypes",
+          "User '%s' does not have privileges to execute 'SELECT' on: functional");
+      AuthzError("create table functional.new_table (i int)",
+          "User '%s' does not have privileges to execute 'CREATE' on: functional");
+      AuthzError("alter table functional.alltypes add columns (c1 int)",
+          "User '%s' does not have privileges to execute 'ALTER' on: " +
+          "functional.alltypes");
+      AuthzError("drop table functional.alltypes",
+          "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
+
+      // User has permissions on source table within inline view.
+      AuthzOk("insert into functional.alltypes partition (month, year) " +
+          "select id, bool_col, tinyint_col, smallint_col, a.int_col, bigint_col, " +
+          "float_col, a.double_col, a.date_string_col, a.string_col, a.timestamp_col, " +
+          "a.year, a.month from functional_rc.alltypesagg a " +
+          "join (select int_col, double_col, date_string_col, string_col, " +
+          "timestamp_col, year, month from functional_seq.alltypes) b " +
+          "on (a.int_col = b.int_col)");
+
+      // User has INSERT permissions on the target table and has sufficient SELECT
+      // permissions on all the referenced columns of the source table
+      AuthzOk("insert into functional.alltypestiny partition (month, year) " +
+          "select * from functional_rc.alltypestiny");
+
+      // User has INSERT permissions on target table and column-level
+      // permissions on the source table
+      AuthzOk("insert into functional.alltypes partition (month, year) " +
+          "select * from functional_rc.alltypessmall");
+
+      // Insert and Select allow view_metadata
+      AuthzOk("describe database functional_rc");
+      AuthzOk("describe functional.complextypes_fileformat.s");
+      AuthzOk("describe functional.alltypes_view_sub");
+      AuthzOk("describe functional_rc.alltypes");
+    } finally {
+      sentryService.dropRole(USER, roleName, true);
+      ctx_.catalog.reset();
+    }
+  }
+
+  @Test
+  public void TestServerLevelSelect() throws ImpalaException {
+    // TODO: Add test support for dynamically changing privileges for
+    // file-based policy.
+    if (ctx_.authzConfig.isFileBasedPolicy()) return;
+
+    SentryPolicyService sentryService =
+        new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
+
+    // User has SELECT privilege on server.
+    String roleName = "select_role";
+    try {
+      sentryService.createRole(USER, roleName, true);
+      TPrivilege privilege = new TPrivilege("", TPrivilegeLevel.SELECT,
+          TPrivilegeScope.SERVER, false);
+      privilege.setServer_name("server1");
+      sentryService.grantRolePrivilege(USER, roleName, privilege);
+      sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+      ctx_.catalog.reset();
+
+      // Copied majority of SELECT tests that should fail from authorization and
+      // ensure they succeed here.
+      AuthzOk("select * from functional.alltypes_view_sub");
+      AuthzOk("select * from functional.alltypes");
+
+      // Ensure SELECT at server does not allow other privileges
+      AuthzError("insert into functional.alltypesagg select 1",
+          "User '%s' does not have privileges to execute 'INSERT' on: " +
+          "functional.alltypesagg");
+      AuthzError("create table functional.new_table (i int)",
+          "User '%s' does not have privileges to execute 'CREATE' on: functional");
+      AuthzError("alter table functional.alltypes add columns (c1 int)",
+          "User '%s' does not have privileges to execute 'ALTER' on: " +
+          "functional.alltypes");
+      AuthzError("drop table functional.alltypes",
+          "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
+
+      // User has SELECT privileges on the view, and has privileges
+      // to select join table.
+      AuthzOk("select a.id from functional.view_view a " +
+          "join functional.alltypes b ON (a.id = b.id)");
+
+      // User has SELECT privileges on the view which contains a subquery.
+      AuthzOk("select * from functional_rc.subquery_view");
+
+      // Constant select.
+      AuthzOk("select 1");
+
+      // Table within inline view is authorized properly.
+      AuthzOk("select a.* from (select * from functional.alltypes) a");
+
+      // SELECT privileges on all the columns of 'alltypessmall'
+      AuthzOk("select * from functional.alltypessmall");
+
+      // SELECT privileges on table 'alltypessmall'
+      AuthzOk("select count(*) from functional.alltypessmall");
+      AuthzOk("select 1 from functional.alltypessmall");
+
+      // SELECT privileges on column 'month'
+      AuthzOk("select id, int_col, year, month from functional.alltypessmall");
+
+      // SELECT privileges on 'int_array_col'
+      AuthzOk("select a.id, b.item from functional.allcomplextypes a, " +
+          "a.int_array_col b");
+
+      // SELECT privileges on 'alltypessmall'
+      AuthzOk("select a.* from functional.alltypesagg a cross join " +
+          "functional.alltypessmall b");
+
+      // Insert allows view_metadata
+      AuthzOk("describe database functional_rc");
+      AuthzOk("describe functional.complextypes_fileformat.s");
+      AuthzOk("describe functional.alltypes_view_sub");
+      AuthzOk("describe functional_rc.alltypes");
+    } finally {
+      sentryService.dropRole(USER, roleName, true);
+      ctx_.catalog.reset();
+    }
   }
 
   @Test
