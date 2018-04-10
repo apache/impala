@@ -1,0 +1,8 @@
+====
+---- QUERY: primitive_intrinsic_appx_median
+-- Description : Query dominated by APPX_MEDIAN
+-- Target test case : Validate and track memory consumption and perf for APPX_MEDIAN .
+select APPX_MEDIAN(o_totalprice),APPX_MEDIAN(o_orderpriority), count(*)  from orders  group by o_orderdate,o_orderpriority having count(*) > 100000;
+---- RESULTS
+---- TYPES
+====
