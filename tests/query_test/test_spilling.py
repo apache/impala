@@ -22,11 +22,17 @@ from tests.common.test_dimensions import (create_exec_option_dimension_from_dict
     create_parquet_dimension)
 
 # Test with denial of reservations at varying frequency.
-DEBUG_ACTION_DIMS = [None,
+# Always test with the minimal amount of spilling and running with the absolute minimum
+# memory requirement.
+CORE_DEBUG_ACTION_DIMS = [None,
+  '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
+
+# Test with different frequency of denial on exhaustive to try and exercise more
+# interesting code paths.
+EXHAUSTIVE_DEBUG_ACTION_DIMS = [
   '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.1',
   '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.5',
-  '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.9',
-  '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
+  '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.9']
 
 @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
                    reason='Queries may not spill on larger clusters')
@@ -40,10 +46,13 @@ class TestSpillingDebugActionDimensions(ImpalaTestSuite):
     super(TestSpillingDebugActionDimensions, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.clear_constraints()
     cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension('tpch'))
+    debug_action_dims = CORE_DEBUG_ACTION_DIMS
+    if cls.exploration_strategy() == 'exhaustive':
+      debug_action_dims = CORE_DEBUG_ACTION_DIMS + EXHAUSTIVE_DEBUG_ACTION_DIMS
     # Tests are calibrated so that they can execute and spill with this page size.
     cls.ImpalaTestMatrix.add_dimension(
         create_exec_option_dimension_from_dict({'default_spillable_buffer_size' : ['256k'],
-          'debug_action' : DEBUG_ACTION_DIMS}))
+          'debug_action' : debug_action_dims}))
 
   def test_spilling(self, vector):
     self.run_test_case('QueryTest/spilling', vector)
