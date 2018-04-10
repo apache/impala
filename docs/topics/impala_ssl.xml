@@ -171,16 +171,6 @@ under the License.
           </p>
         </li>
       </ul>
-      <note>
-        <p>
-          As of <keyword keyref="impala210_full"/>, TLSv1.2 may not work for Impala on RHEL 6
-          or CentOS 6, even if OpenSSL 1.0.1 is available. The daemons fail to start, with a
-          socket error stating the TLS version is not supported. The underlying cause is related to
-          <xref href="https://bugzilla.redhat.com/show_bug.cgi?id=1497859" scope="external" format="html">Red Hat issue 1497859</xref>.
-          The issue applies if you build on a RHEL 6 or CentOS 6 system with OpenSSL 1.0.0, and
-          run on a RHEL 6 or CentOS 6 system with OpenSSL 1.0.1.
-        </p>
-      </note>
 
       <p>
         Along with specifying the version, you can also specify the allowed set of TLS ciphers
