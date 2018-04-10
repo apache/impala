@@ -18,7 +18,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# This will create/control/destroy a local hdfs+yarn cluster.
+# This will create/control/destroy a local hdfs/yarn/kms/kudu cluster.
 #
 # All roles run on 127.0.0.1, just like the standard mini cluster included with hadoop.
 # The difference is with this cluster, each role runs in its own process and has its own
@@ -31,12 +31,14 @@ set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
 
 : ${IMPALA_KERBERIZE=}
+: ${INCLUDE_YARN=}
 
-while getopts vk OPT; do
+while getopts vky OPT; do
   case $OPT in
     v) set -x;;
     k) export IMPALA_KERBERIZE=1;;
-    ?) echo "Usage: $0 [-v (verbose) -k (kerberize)] ACTION (see source...)"; exit 1;;
+    y) export INCLUDE_YARN=1;;
+    ?) echo "Usage: $0 [-v (verbose) -k (kerberize) -y (yarn)] ACTION (see source...)"; exit 1;;
   esac
 done
 shift $(($OPTIND-1))
@@ -54,7 +56,10 @@ export KILL_CLUSTER_MARKER=IBelongToTheMiniCluster
 
 if [[ "$TARGET_FILESYSTEM" == "hdfs" ]]; then
   # The check above indicates that the regular mini-cluster is in use.
-  SUPPORTED_SERVICES=(hdfs yarn kms)
+  SUPPORTED_SERVICES=(hdfs kms)
+  if [ -n "${INCLUDE_YARN}" ]; then
+    SUPPORTED_SERVICES+=(yarn)
+  fi
 else
   # Either a remote distributed file system or a local non-distributed file system is
   # in use. Currently the only service that is expected to work is Kudu, though in theory
