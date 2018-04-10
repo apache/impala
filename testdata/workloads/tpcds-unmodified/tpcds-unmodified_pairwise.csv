@@ -1,0 +1,15 @@
+# Generated File.
+file_format: text, dataset: tpcds, compression_codec: none, compression_type: none
+file_format: seq, dataset: tpcds, compression_codec: def, compression_type: block
+file_format: rc, dataset: tpcds, compression_codec: gzip, compression_type: block
+file_format: avro, dataset: tpcds, compression_codec: snap, compression_type: block
+file_format: parquet, dataset: tpcds, compression_codec: snap, compression_type: block
+file_format: parquet, dataset: tpcds, compression_codec: def, compression_type: block
+file_format: avro, dataset: tpcds, compression_codec: def, compression_type: block
+file_format: rc, dataset: tpcds, compression_codec: bzip, compression_type: block
+file_format: seq, dataset: tpcds, compression_codec: snap, compression_type: record
+file_format: text, dataset: tpcds, compression_codec: lzo, compression_type: block
+file_format: rc, dataset: tpcds, compression_codec: def, compression_type: block
+file_format: avro, dataset: tpcds, compression_codec: none, compression_type: none
+file_format: parquet, dataset: tpcds, compression_codec: none, compression_type: none
+file_format: rc, dataset: tpcds, compression_codec: none, compression_type: none
