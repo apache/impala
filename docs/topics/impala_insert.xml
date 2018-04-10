@@ -180,29 +180,6 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
         </p>
       </li>
 
-      <li>
-        <p>
-          For a partitioned table, the optional <codeph>PARTITION</codeph> clause identifies which partition or
-          partitions the new values go into. If a partition key column is given a constant value such as
-          <codeph>PARTITION (year=2012)</codeph> or <codeph>PARTITION (year=2012, month=2)</codeph>, all the
-          inserted rows use those same values for those partition key columns and you omit any corresponding
-          columns in the source table from the <codeph>SELECT</codeph> list. This form is known as <q>static
-          partitioning</q>.
-        </p>
-        <p>
-          If a partition key column is mentioned but not assigned a value, such as in <codeph>PARTITION (year,
-          region)</codeph> (both columns unassigned) or <codeph>PARTITION(year, region='CA')</codeph>
-          (<codeph>year</codeph> column unassigned), the unassigned columns are filled in with the final columns of
-          the <codeph>SELECT</codeph> list. In this case, the number of columns in the <codeph>SELECT</codeph> list
-          must equal the number of columns in the column permutation plus the number of partition key columns not
-          assigned a constant value. This form is known as <q>dynamic partitioning</q>.
-        </p>
-        <p>
-          See <xref href="impala_partitioning.xml#partition_static_dynamic"/> for examples and performance
-          characteristics of static and dynamic partitioned inserts.
-        </p>
-      </li>
-
       <li rev="1.2.2">
         An optional hint clause immediately either before the <codeph>SELECT</codeph> keyword or after the
         <codeph>INSERT</codeph> keyword, to fine-tune the behavior when doing an <codeph>INSERT ... SELECT</codeph>
@@ -385,28 +362,6 @@ Backend 0:RC_FILE not implemented.
 Remote error
 Backend 0:SEQUENCE_FILE not implemented. </codeblock>
 
-    <p>
-      Inserting data into partitioned tables requires slightly different syntax that divides the partitioning
-      columns from the others:
-    </p>
-
-<codeblock>create table t1 (i int) <b>partitioned by (x int, y string)</b>;
--- Select an INT column from another table.
--- All inserted rows will have the same x and y values, as specified in the INSERT statement.
--- This technique of specifying all the partition key values is known as static partitioning.
-insert into t1 <b>partition(x=10, y='a')</b> select c1 from some_other_table;
--- Select two INT columns from another table.
--- All inserted rows will have the same y value, as specified in the INSERT statement.
--- Values from c2 go into t1.x.
--- Any partitioning columns whose value is not specified are filled in
--- from the columns specified last in the SELECT list.
--- This technique of omitting some partition key values is known as dynamic partitioning.
-insert into t1 <b>partition(x, y='b')</b> select c1, c2 from some_other_table;
--- Select an INT and a STRING column from another table.
--- All inserted rows will have the same x value, as specified in the INSERT statement.
--- Values from c3 go into t1.y.
-insert into t1 <b>partition(x=20, y)</b> select c1, c3  from some_other_table;</codeblock>
-
     <p rev="1.1">
       The following examples show how you can copy the data in all the columns from one table to another, copy the
       data from only some columns, or specify the columns in the select list in a different order than they
@@ -434,42 +389,6 @@ insert into t2 (c2, c1) select c1, c2 from t1;
 -- But the number and type of selected columns must match the columns mentioned in the () part.
 alter table t2 replace columns (x int, y int);
 insert into t2 (y) select c1 from t1;
-
--- For partitioned tables, all the partitioning columns must be mentioned in the () column list
--- or a PARTITION clause; these columns cannot be defaulted to NULL.
-create table pt1 (x int, y int) partitioned by (z int);
--- The values from c1 are copied into the column x in the new table,
--- all in the same partition based on a constant value for z.
--- The values of y in the new table are all NULL.
-insert into pt1 (x) partition (z=5) select c1 from t1;
--- Again we omit the values for column y so they are all NULL.
--- The inserted x values can go into different partitions, based on
--- the different values inserted into the partitioning column z.
-insert into pt1 (x,z) select x, z from t2;
-</codeblock>
-
-    <p>
-      <codeph>SELECT *</codeph> for a partitioned table requires that all partition key columns in the source table
-      be declared as the last columns in the <codeph>CREATE TABLE</codeph> statement. You still include a
-      <codeph>PARTITION BY</codeph> clause listing all the partition key columns. These partition columns are
-      automatically mapped to the last columns from the <codeph>SELECT *</codeph> list.
-    </p>
-
-<codeblock>create table source (x int, y int, year int, month int, day int);
-create table destination (x int, y int) partitioned by (year int, month int, day int);
-...load some data into the unpartitioned source table...
--- Insert a single partition of data.
--- The SELECT * means you cannot specify partition (year=2014, month, day).
-insert overwrite destination partition (year, month, day) select * from source where year=2014;
--- Insert the data for all year/month/day combinations.
-insert overwrite destination partition (year, month, day) select * from source;
-
--- If one of the partition columns is omitted from the source table,
--- then you can specify a specific value for that column in the PARTITION clause.
--- Here the source table holds only data from 2014, and so does not include a year column.
-create table source_2014 (x int, y int, month, day);
-...load some data into the unpartitioned source_2014 table...
-insert overwrite destination partition (year=2014, month, day) select * from source_2014;
 </codeblock>
 
     <p conref="../shared/impala_common.xml#common/insert_sort_blurb"/>
@@ -741,7 +660,177 @@ Inserted 2 rows in 0.16s
       <p rev="1.3.1" conref="../shared/impala_common.xml#common/insert_inherit_permissions"/>
     </conbody>
   </concept>
+  <concept id="partition_insert">
+    <title>Inserting Into Partitioned Tables with PARTITION Clause</title>
+    <conbody>
+      <p>
+        For a partitioned table, the optional <codeph>PARTITION</codeph> clause
+        identifies which partition or partitions the values are inserted
+        into.
+      </p>
+      <p>
+        All examples in this section will use the table declared as below:
+      </p>
+<codeblock>CREATE TABLE t1 (w INT) PARTITIONED BY (x INT, y STRING);</codeblock>
+    </conbody>
 
-<!-- Values clause -->
-</concept>
-<!-- INSERT statement -->
+    <concept id="static_partition_insert">
+      <title>Static Partition Inserts</title>
+      <conbody>
+        <p>
+          In a static partition insert where a partition key column is given a
+          constant value, such as <codeph>PARTITION</codeph>
+          <codeph>(year=2012, month=2)</codeph>, the rows are inserted with the
+          same values specified for those partition key columns.
+        </p>
+        <p>
+          The number of columns in the <codeph>SELECT</codeph> list must equal
+          the number of columns in the column permutation.
+        </p>
+        <p>
+          The <codeph>PARTITION</codeph> clause must be used for static
+          partitioning inserts.
+        </p>
+        <p>
+          Example:
+        </p>
+        <p>
+          The following statement will insert the
+            <codeph>some_other_table.c1</codeph> values for the
+            <codeph>w</codeph> column, and all the rows inserted will have the
+          same <codeph>x</codeph> value of <codeph>10</codeph>, and the same
+            <codeph>y</codeph> value of
+          <codeph>‘a’</codeph>.<codeblock>INSERT INTO t1 PARTITION (x=10, y='a')
+            SELECT c1 FROM some_other_table;</codeblock>
+        </p>
+      </conbody>
+    </concept>
+    <concept id="dynamic_partition_insert">
+        <title>Dynamic Partition Inserts</title>
+        <conbody>
+          <p>
+            In a dynamic partition insert where a partition key
+          column is in the <codeph>INSERT</codeph> statement but not assigned a
+          value, such as in <codeph>PARTITION (year, region)</codeph>(both
+          columns unassigned) or <codeph>PARTITION(year, region='CA')</codeph>
+            (<codeph>year</codeph> column unassigned), the unassigned columns
+          are filled in with the final columns of the <codeph>SELECT</codeph> or
+            <codeph>VALUES</codeph> clause. In this case, the number of columns
+          in the <codeph>SELECT</codeph> list must equal the number of columns
+          in the column permutation plus the number of partition key columns not
+          assigned a constant value.
+          </p>
+          <p>
+            See <xref
+              href="https://www.cloudera.com/documentation/enterprise/latest/topics/impala_partitioning.html#partition_static_dynamic"
+              format="html" scope="external"><u>Static and Dynamic Partitioning
+                Clauses</u></xref> for examples and performance characteristics
+            of static and dynamic partitioned inserts.
+          </p>
+          <p>
+            The following rules apply to dynamic partition
+            inserts.
+          </p>
+          <ul>
+            <li>
+              <p>
+                The columns are bound in the order they appear in the
+                  <codeph>INSERT</codeph> statement.
+              </p>
+              <p>
+                The table below shows the values inserted with the
+                <codeph>INSERT</codeph> statements of different column
+              orders.
+              </p>
+            </li>
+          </ul>
+          <table id="table_vyx_dp3_ldb" colsep="1" rowsep="1" frame="all">
+            <tgroup cols="4" align="left">
+              <colspec colnum="1" colname="col1"/>
+              <colspec colnum="2" colname="col2"/>
+              <colspec colnum="3" colname="col3"/>
+              <colspec colnum="4" colname="col4"/>
+              <tbody>
+                <row>
+                  <entry/>
+                  <entry>Column <codeph>w</codeph> Value</entry>
+                  <entry>Column <codeph>x</codeph> Value</entry>
+                  <entry>Column <codeph>y</codeph> Value</entry>
+                </row>
+                <row>
+                  <entry><codeph>INSERT INTO t1 (w, x, y) VALUES (1, 2,
+                      'c');</codeph></entry>
+                  <entry><codeph>1</codeph></entry>
+                  <entry><codeph>2</codeph></entry>
+                  <entry><codeph>‘c’</codeph></entry>
+                </row>
+                <row>
+                  <entry><codeph>INSERT INTO t1 (x,w) PARTITION (y) VALUES (1,
+                      2, 'c');</codeph></entry>
+                  <entry><codeph>2</codeph></entry>
+                  <entry><codeph>1</codeph></entry>
+                  <entry><codeph>‘c’</codeph></entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </table>
+          <ul>
+            <li>
+              When a partition clause is specified but the non-partition
+            columns are not specified in the <codeph>INSERT</codeph> statement,
+            as in the first example below, the non-partition columns are treated
+            as though they had been specified before the
+              <codeph>PARTITION</codeph> clause in the SQL.
+              <p>
+                Example: These
+              three statements are equivalent, inserting <codeph>1</codeph> to
+                <codeph>w</codeph>, <codeph>2</codeph> to <codeph>x</codeph>,
+              and <codeph>‘c’</codeph> to <codeph>y</codeph>
+            columns.
+              </p>
+<codeblock>INSERT INTO t1 PARTITION (x,y) VALUES (1, 2, ‘c’);
+INSERT INTO t1 (w) PARTITION (x, y) VALUES (1, 2, ‘c’);
+INSERT INTO t1 PARTITION (x, y='c') VALUES (1, 2);</codeblock>
+            </li>
+            <li>
+              The <codeph>PARTITION</codeph> clause is not required for
+            dynamic partition, but all the partition columns must be explicitly
+            present in the <codeph>INSERT</codeph> statement in the column list
+            or in the <codeph>PARTITION</codeph> clause. The partition columns
+            cannot be defaulted to <codeph>NULL</codeph>.
+              <p>
+                Example:
+              </p>
+              <p>The following statements are valid because the partition
+              columns, <codeph>x</codeph> and <codeph>y</codeph>, are present in
+              the <codeph>INSERT</codeph> statements, either in the
+                <codeph>PARTITION</codeph> clause or in the column
+              list.
+              </p>
+<codeblock>INSERT INTO t1 PARTITION (x,y) VALUES (1, 2, ‘c’);
+INSERT INTO t1 (w, x) PARTITION (y) VALUES (1, 2, ‘c’);</codeblock>
+              <p>
+                The following statement is not valid for the partitioned table as
+              defined above because the partition columns, <codeph>x</codeph>
+              and <codeph>y</codeph>, are not present in the
+                <codeph>INSERT</codeph> statement.
+              </p>
+<codeblock>INSERT INTO t1 VALUES (1, 2, 'c');</codeblock>
+          </li>
+            <li>
+              If partition columns do not exist in the source table, you can
+              specify a specific value for that column in the
+              <codeph>PARTITION</codeph> clause.
+              <p>
+                Example: The <codeph>source</codeph> table only contains the column
+                <codeph>w</codeph> and <codeph>y</codeph>. The value,
+                <codeph>20</codeph>, specified in the <codeph>PARTITION</codeph>
+              clause, is inserted into the <codeph>x</codeph> column.
+              </p>
+<codeblock>INSERT INTO t1 PARTITION (x=20, y) SELECT * FROM source;</codeblock>
+          </li>
+          </ul>
+        </conbody>
+      </concept>
+    </concept>
+  </concept>
