@@ -1,0 +1,9 @@
+====
+---- QUERY: primitive_conjunct_ordering_1
+-- Description : A simple select with one expensive conjunct and one cheap conjunct.
+SELECT *
+FROM lineitem
+WHERE (l_shipdate < current_timestamp() - interval 1 day) AND l_orderkey = -1;
+---- RESULTS
+---- TYPES
+====
