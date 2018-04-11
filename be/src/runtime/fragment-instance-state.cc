@@ -320,9 +320,10 @@ void FragmentInstanceState::Close() {
       RuntimeProfile::Counter* counter = timings_profile_->GetCounter(name);
       if (counter != nullptr) other_time += counter->value();
     }
-    // TODO: IMPALA-4631: Occasionally we see other_time = total_time + 1 for some reason
-    // we don't yet understand, so add 1 to total_time to avoid DCHECKing in that case.
-    DCHECK_LE(other_time, total_time + 1);
+    // TODO: IMPALA-4631: Occasionally we see other_time = total_time + ε where ε is 1,
+    // 2, or 3. It appears to be a bug with clocks on some virtualized systems. Add 3
+    // to total_time to avoid DCHECKing in that case.
+    DCHECK_LE(other_time, total_time + 3);
   }
 #endif
 }
