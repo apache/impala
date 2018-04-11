@@ -132,6 +132,21 @@ describe database extended default;
   If the <codeph>DATABASE</codeph> keyword is omitted, the default
   for the <codeph>DESCRIBE</codeph> statement is to refer to a table.
 </p>
+    <p>
+      If you have the <codeph>SELECT</codeph> privilege on a subset of the table
+      columns and no other relevant table/database/server-level privileges,
+      <codeph>DESCRIBE</codeph> returns the data from the columns you have
+      access to.
+    </p>
+
+    <p>
+      If you have the <codeph>SELECT</codeph> privilege on a subset of the table
+      columns and no other relevant table/database/server-level privileges,
+      <codeph>DESCRIBE FORMATTED/EXTENDED</codeph> does not return
+      the <codeph>LOCATION</codeph> field. The <codeph>LOCATION</codeph> data
+      is shown if you have any privilege on the table, the containing database
+      or the server.
+    </p>
 
 <codeblock>
 -- By default, the table is assumed to be in the current database.
