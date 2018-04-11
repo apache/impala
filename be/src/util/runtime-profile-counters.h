@@ -303,9 +303,9 @@ class RuntimeProfile::EventSequence {
   void Start(int64_t start_time_ns) {
     offset_ = MonotonicStopWatch::Now() - start_time_ns;
     // TODO: IMPALA-4631: Occasionally we see MonotonicStopWatch::Now() return
-    // (start_time_ns - 1), even though 'start_time_ns' was obtained using
-    // MonotonicStopWatch::Now().
-    DCHECK_GE(offset_, -1);
+    // (start_time_ns - e), where e is 1, 2 or 3 even though 'start_time_ns' was
+    // obtained using MonotonicStopWatch::Now().
+    DCHECK_GE(offset_, -3);
     sw_.Start();
   }
 
