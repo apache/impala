@@ -22,6 +22,8 @@
 # configurations, so it is best to run this in a fresh install. It also sets up the
 # ~/.bashrc for the calling user and impala-config-local.sh with some environment
 # variables to make Impala compile and run after this script is complete.
+# When IMPALA_HOME is set, the script will bootstrap Impala development in the
+# location specified.
 #
 # The intended user is a person who wants to start contributing code to Impala. This
 # script serves as an executable reference point for how to get started.
@@ -98,11 +100,13 @@ apt-get --yes install git
 echo ">>> Checking out Impala"
 
 # If there is no Impala git repo, get one now
-if ! [[ -d ~/Impala ]]
+
+: ${IMPALA_HOME:=~/Impala}
+if ! [[ -d "$IMPALA_HOME" ]]
 then
-  time -p git clone https://git-wip-us.apache.org/repos/asf/impala.git ~/Impala
+  time -p git clone https://git-wip-us.apache.org/repos/asf/impala.git "$IMPALA_HOME"
 fi
-cd ~/Impala
+cd "$IMPALA_HOME"
 SET_IMPALA_HOME="export IMPALA_HOME=$(pwd)"
 echo "$SET_IMPALA_HOME" >> ~/.bashrc
 eval "$SET_IMPALA_HOME"
@@ -199,17 +203,19 @@ echo "* - nofile 1048576" | sudo tee -a /etc/security/limits.conf
 
 # LZO is not needed to compile or run Impala, but it is needed for the data load
 echo ">>> Checking out Impala-lzo"
-if ! [[ -d ~/Impala-lzo ]]
+: ${IMPALA_LZO_HOME:="${IMPALA_HOME}/../Impala-lzo"}
+if ! [[ -d "$IMPALA_LZO_HOME" ]]
 then
-  git clone https://github.com/cloudera/impala-lzo.git ~/Impala-lzo
+  git clone https://github.com/cloudera/impala-lzo.git "$IMPALA_LZO_HOME"
 fi
 
 echo ">>> Checking out and building hadoop-lzo"
 
-if ! [[ -d ~/hadoop-lzo ]]
+: ${HADOOP_LZO_HOME:="${IMPALA_HOME}/../hadoop-lzo"}
+if ! [[ -d "$HADOOP_LZO_HOME" ]]
 then
-  git clone https://github.com/cloudera/hadoop-lzo.git ~/hadoop-lzo
+  git clone https://github.com/cloudera/hadoop-lzo.git "$HADOOP_LZO_HOME"
 fi
-cd ~/hadoop-lzo/
+cd "$HADOOP_LZO_HOME"
 time -p ant package
 cd "$IMPALA_HOME"
