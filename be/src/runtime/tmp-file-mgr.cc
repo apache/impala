@@ -38,7 +38,7 @@
 
 #include "common/names.h"
 
-DEFINE_bool(disk_spill_encryption, false,
+DEFINE_bool(disk_spill_encryption, true,
     "Set this to encrypt and perform an integrity "
     "check on all data spilled to disk during a query");
 DEFINE_string(scratch_dirs, "/tmp", "Writable scratch directories");
