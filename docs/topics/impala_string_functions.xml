@@ -650,12 +650,14 @@ select instr('foo bar bletch', 'b', 1, null);
       <dlentry id="ltrim">
 
         <dt>
-          <codeph>ltrim(string a)</codeph>
+          <codeph>ltrim(string a [, string chars_to_trim])</codeph>
         </dt>
 
         <dd>
           <indexterm audience="hidden">ltrim() function</indexterm>
-          <b>Purpose:</b> Returns the argument string with any leading spaces removed from the left side.
+          <b>Purpose:</b> Returns the argument string with all occurrences
+          of characters specified by the second argument removed from
+          the left side. Removes spaces if the second argument is not specified.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
           </p>
@@ -1039,12 +1041,14 @@ select replace('hello world','xyz','abc');
       <dlentry id="rtrim">
 
         <dt>
-          <codeph>rtrim(string a)</codeph>
+          <codeph>rtrim(string a [, string chars_to_trim])</codeph>
         </dt>
 
         <dd>
           <indexterm audience="hidden">rtrim() function</indexterm>
-          <b>Purpose:</b> Returns the argument string with any trailing spaces removed from the right side.
+          <b>Purpose:</b> Returns the argument string with all occurrences
+          of characters specified by the second argument removed from
+          the right side. Removes spaces if the second argument is not specified.
           <p>
             <b>Return type:</b> <codeph>string</codeph>
           </p>
