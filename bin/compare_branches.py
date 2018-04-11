@@ -90,6 +90,8 @@ def create_parser():
   parser.add_argument('--cherry_pick', action='store_true', default=False,
       help='Cherry-pick mismatched commits to current branch. This ' +
         'must match (in the hash sense) the target branch.')
+  parser.add_argument('--partial_ok', action='store_true', default=False,
+      help='Exit with success if at least one cherrypick succeeded.')
   parser.add_argument('--source_branch', default='master')
   parser.add_argument('--target_branch', default='2.x')
   parser.add_argument('--source_remote_name', default='asf-gerrit',
@@ -159,13 +161,16 @@ def build_commit_map(branch, merge_base):
   logging.debug("Commit map for branch %s has size %d.", branch, len(result))
   return result
 
-def cherrypick(cherry_pick_hashes, full_target_branch_name):
+def cherrypick(cherry_pick_hashes, full_target_branch_name, partial_ok):
   """Cherrypicks the given commits.
 
   Also, asserts that full_target_branch_name matches the current HEAD.
 
   cherry_pick_hashes is a list of git hashes, in the order to
   be cherry-picked.
+
+  If partial_ok is true, return gracefully if at least one cherrypick
+  has succeeded.
 
   Note that this function does not push to the remote.
   """
@@ -184,10 +189,16 @@ def cherrypick(cherry_pick_hashes, full_target_branch_name):
     sys.exit(1)
 
   cherry_pick_hashes.reverse()
-  for cherry_pick_hash in cherry_pick_hashes:
-    subprocess.check_call(
+  for i, cherry_pick_hash in enumerate(cherry_pick_hashes):
+    ret = subprocess.call(
         ['git', 'cherry-pick', '--keep-redundant-commits', cherry_pick_hash])
-
+    if ret != 0:
+      if partial_ok and i > 0:
+        subprocess.check_call(['git', 'cherry-pick', '--abort'])
+        print "Failed to cherry-pick %s; stopping picks." % (cherry_pick_hash,)
+        return
+      else:
+        raise Exception("Failed to cherry-pick: %s" % (cherry_pick_hash,))
 
 def main():
   parser = create_parser()
@@ -270,7 +281,7 @@ def main():
                .format(pformat(commits_ignored)))
 
   if options.cherry_pick:
-    cherrypick(cherry_pick_hashes, full_target_branch_name)
+    cherrypick(cherry_pick_hashes, full_target_branch_name, options.partial_ok)
 
 if __name__ == '__main__':
   main()
