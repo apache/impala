@@ -19,14 +19,16 @@ import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
-class TestDiskSpillEncryption(CustomClusterTestSuite):
-  """ Tests to exercise disk spill encryption end-to-end. """
+class TestDiskSpillConfigurations(CustomClusterTestSuite):
+  """Tests to exercise non-default disk spill configurations end-to-end."""
 
   @classmethod
   def get_workload(self):
     return 'functional-query'
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--disk_spill_encryption=true")
-  def test_spilling_query(self, vector):
-    self.run_test_case('QueryTest/disk-spill-encryption', vector)
+  @CustomClusterTestSuite.with_args("--disk_spill_encryption=false")
+  def test_disk_spill_encryption_disabled(self, vector):
+    """Disk spill encryption is enabled by default. We only need a custom cluster to test
+    the non-default configuration."""
+    self.run_test_case('QueryTest/basic-spilling', vector)

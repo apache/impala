@@ -1,5 +1,6 @@
 ====
 ---- QUERY
+# A basic spilling query to exercise spill-to-disk end-to-end.
 set buffer_pool_limit=90m;
 set default_spillable_buffer_size=64k;
 select count(*)
