@@ -106,6 +106,35 @@ under the License.
             <row>
               <entry>
                 <p>
+                  -b or
+                </p>
+                <p>
+                  --kerberos_host_fqdn
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  kerberos_host_fqdn=
+                </p>
+                <p>
+                  <varname>load-balancer-hostname</varname>
+                </p>
+              </entry>
+              <entry>
+                <p>
+                  If set, the setting overrides the expected hostname of the
+                  Impala daemon's Kerberos service principal.
+                    <cmdname>impala-shell</cmdname> will check that the server's
+                  principal matches this hostname. This may be used when
+                    <codeph>impalad</codeph> is configured to be accessed via a
+                  load-balancer, but it is desired for impala-shell to talk to a
+                  specific <codeph>impalad</codeph> directly.
+                </p>
+              </entry>
+            </row>
+            <row>
+              <entry>
+                <p>
                   --print_header
                 </p>
               </entry>
