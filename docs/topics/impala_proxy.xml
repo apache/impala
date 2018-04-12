@@ -238,11 +238,41 @@ under the License.
         verify that the host they are connecting to is the same one that is
         actually processing the request, to prevent man-in-the-middle attacks.
       </p>
-      <note>
-          Once you enable a proxy server in a Kerberized cluster, users will not
-          be able to connect to individual impala daemons directly from impala
-          shell.
-      </note>
+      <p>
+        In <keyword keyref="impala211_full">Impala 2.11</keyword> and lower
+        versions, once you enable a proxy server in a Kerberized cluster, users
+        will not be able to connect to individual impala daemons directly from
+        impala-shell.
+      </p>
+
+      <p>
+        In <keyword keyref="impala212_full">Impala 2.12</keyword> and higher,
+        if you enable a proxy server in a Kerberized cluster, users have an
+        option to connect to Impala daemons directly from
+          <cmdname>impala-shell</cmdname> using the <codeph>-b</codeph> /
+          <codeph>--kerberos_host_fqdn</codeph> option when you start
+          <cmdname>impala-shell</cmdname>. This option can be used for testing or
+        troubleshooting purposes, but not recommended for live production
+        environments as it defeats the purpose of a load balancer/proxy.
+      </p>
+
+      <p>
+        Example:
+<codeblock>
+impala-shell -i impalad-1.mydomain.com -k -b loadbalancer-1.mydomain.com
+</codeblock>
+      </p>
+
+      <p>
+        Alternatively, with the fully qualified
+        configurations:
+<codeblock>impala-shell --impalad=impalad-1.mydomain.com:21000 --kerberos --kerberos_host_fqdn=loadbalancer-1.mydomain.com</codeblock>
+      </p>
+      <p>
+        See <xref href="impala_shell_options.xml#shell_options"/> for
+        information about the option.
+      </p>
+
       <p>
         To clarify that the load-balancing proxy server is legitimate, perform
         these extra Kerberos setup steps:
