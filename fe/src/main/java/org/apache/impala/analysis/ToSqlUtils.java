@@ -67,8 +67,10 @@ public class ToSqlUtils {
   /**
    * Removes all hidden properties from the given 'tblProperties' map.
    */
-  private static void removeHiddenTableProperties(Map<String, String> tblProperties) {
+  private static void removeHiddenTableProperties(Map<String, String> tblProperties,
+      Map<String, String> generatedTblProperties) {
     for (String key: HIDDEN_TABLE_PROPERTIES) tblProperties.remove(key);
+    generatedTblProperties.remove(KuduTable.KEY_TABLE_NAME);
   }
 
   /**
@@ -165,11 +167,17 @@ public class ToSqlUtils {
     for (ColumnDef col: stmt.getPartitionColumnDefs()) {
       partitionColsSql.add(col.toString());
     }
+    LinkedHashMap<String, String> properties = Maps.newLinkedHashMap(
+        stmt.getTblProperties());
+    LinkedHashMap<String, String> generatedProperties = Maps.newLinkedHashMap(
+        stmt.getGeneratedKuduProperties());
+    removeHiddenTableProperties(properties, generatedProperties);
+    properties.putAll(generatedProperties);
     String kuduParamsSql = getKuduPartitionByParams(stmt);
     // TODO: Pass the correct compression, if applicable.
     return getCreateTableSql(stmt.getDb(), stmt.getTbl(), stmt.getComment(), colsSql,
         partitionColsSql, stmt.getTblPrimaryKeyColumnNames(), kuduParamsSql,
-        stmt.getSortColumns(), stmt.getTblProperties(), stmt.getSerdeProperties(),
+        stmt.getSortColumns(), properties, stmt.getSerdeProperties(),
         stmt.isExternal(), stmt.getIfNotExists(), stmt.getRowFormat(),
         HdfsFileFormat.fromThrift(stmt.getFileFormat()), HdfsCompression.NONE, null,
         stmt.getLocation());
@@ -190,7 +198,10 @@ public class ToSqlUtils {
     // Use a LinkedHashMap to preserve the ordering of the table properties.
     LinkedHashMap<String, String> properties =
         Maps.newLinkedHashMap(innerStmt.getTblProperties());
-    removeHiddenTableProperties(properties);
+    LinkedHashMap<String, String> generatedProperties = Maps.newLinkedHashMap(
+        stmt.getCreateStmt().getGeneratedKuduProperties());
+    removeHiddenTableProperties(properties, generatedProperties);
+    properties.putAll(generatedProperties);
     String kuduParamsSql = getKuduPartitionByParams(innerStmt);
     // TODO: Pass the correct compression, if applicable.
     String createTableSql = getCreateTableSql(innerStmt.getDb(), innerStmt.getTbl(),
@@ -220,7 +231,7 @@ public class ToSqlUtils {
         msTable.getTableType().equals(TableType.EXTERNAL_TABLE.toString());
     List<String> sortColsSql = getSortColumns(properties);
     String comment = properties.get("comment");
-    removeHiddenTableProperties(properties);
+    removeHiddenTableProperties(properties, Maps.<String, String>newHashMap());
     ArrayList<String> colsSql = Lists.newArrayList();
     ArrayList<String> partitionColsSql = Lists.newArrayList();
     boolean isHbaseTable = table instanceof HBaseTable;

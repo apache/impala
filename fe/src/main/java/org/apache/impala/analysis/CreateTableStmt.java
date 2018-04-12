@@ -112,11 +112,11 @@ public class CreateTableStmt extends StatementBase {
   Map<String, String> getSerdeProperties() { return tableDef_.getSerdeProperties(); }
   public THdfsFileFormat getFileFormat() { return tableDef_.getFileFormat(); }
   RowFormat getRowFormat() { return tableDef_.getRowFormat(); }
-  private String getGeneratedKuduTableName() {
-    return tableDef_.getGeneratedKuduTableName();
+  private void putGeneratedKuduProperty(String key, String value) {
+    tableDef_.putGeneratedKuduProperty(key, value);
   }
-  private void setGeneratedKuduTableName(String tableName) {
-    tableDef_.setGeneratedKuduTableName(tableName);
+  public Map<String, String> getGeneratedKuduProperties() {
+    return tableDef_.getGeneratedKuduProperties();
   }
 
   // Only exposed for ToSqlUtils. Returns the list of primary keys declared by the user
@@ -166,10 +166,7 @@ public class CreateTableStmt extends StatementBase {
     params.setIf_not_exists(getIfNotExists());
     params.setSort_columns(getSortColumns());
     params.setTable_properties(Maps.newHashMap(getTblProperties()));
-    if (!getGeneratedKuduTableName().isEmpty()) {
-      params.getTable_properties().put(KuduTable.KEY_TABLE_NAME,
-          getGeneratedKuduTableName());
-    }
+    params.getTable_properties().putAll(Maps.newHashMap(getGeneratedKuduProperties()));
     params.setSerde_properties(getSerdeProperties());
     for (KuduPartitionParam d: getKuduPartitionParams()) {
       params.addToPartition_by(d.toThrift());
@@ -261,7 +258,8 @@ public class CreateTableStmt extends StatementBase {
       throw new AnalysisException("Invalid storage handler specified for Kudu table: " +
           handler);
     }
-    getTblProperties().put(KuduTable.KEY_STORAGE_HANDLER, KuduTable.KUDU_STORAGE_HANDLER);
+    putGeneratedKuduProperty(KuduTable.KEY_STORAGE_HANDLER,
+        KuduTable.KUDU_STORAGE_HANDLER);
 
     String masterHosts = getTblProperties().get(KuduTable.KEY_MASTER_HOSTS);
     if (Strings.isNullOrEmpty(masterHosts)) {
@@ -271,7 +269,7 @@ public class CreateTableStmt extends StatementBase {
             "Table property '%s' is required when the impalad startup flag " +
             "-kudu_master_hosts is not used.", KuduTable.KEY_MASTER_HOSTS));
       }
-      getTblProperties().put(KuduTable.KEY_MASTER_HOSTS, masterHosts);
+      putGeneratedKuduProperty(KuduTable.KEY_MASTER_HOSTS, masterHosts);
     }
 
     // TODO: Find out what is creating a directory in HDFS and stop doing that. Kudu
@@ -357,7 +355,8 @@ public class CreateTableStmt extends StatementBase {
     AnalysisUtils.throwIfNotNull(getTblProperties().get(KuduTable.KEY_TABLE_NAME),
         String.format("Not allowed to set '%s' manually for managed Kudu tables .",
             KuduTable.KEY_TABLE_NAME));
-    setGeneratedKuduTableName(KuduUtil.getDefaultCreateKuduTableName(getDb(), getTbl()));
+    putGeneratedKuduProperty(KuduTable.KEY_TABLE_NAME,
+        KuduUtil.getDefaultCreateKuduTableName(getDb(), getTbl()));
   }
 
   /**
