@@ -16,13 +16,9 @@
 # under the License.
 
 import pytest
-import requests
 import time
-from time import localtime, strftime
 from threading import Thread
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfBuildType
 
 @SkipIfBuildType.not_dev_build
@@ -55,7 +51,7 @@ class TestQueryConcurrency(CustomClusterTestSuite):
     while time.time() - start < self.POLLING_TIMEOUT_S:
       try:
         impalad.service.read_debug_webpage("query_plan?query_id=" + query_id)
-      except e:
+      except Exception:
         pass
       time.sleep(1)
 
