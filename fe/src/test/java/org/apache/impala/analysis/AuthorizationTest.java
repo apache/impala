@@ -1126,6 +1126,17 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("create table tpch.kudu_tbl (i int, j int, primary key (i))" +
         " PARTITION BY HASH (i) PARTITIONS 9 stored as kudu");
 
+    // IMPALA-6451: CTAS for Kudu tables on non-external tables and without
+    // TBLPROPERTIES ('kudu.master_addresses') should not require ALL privileges
+    // on SERVER.
+    // User has ALL privilege on tpch database and SELECT privilege on
+    // functional.alltypesagg table.
+    // The statement below causes the SQL statement to be rewritten.
+    AuthzOk("create table tpch.kudu_tbl primary key (bigint_col) stored as kudu as " +
+        "select bigint_col, string_col, current_timestamp() as ins_date " +
+        "from functional.alltypesagg " +
+        "where exists (select 1 from functional.alltypesagg)");
+
     // User does not have permission to create table at the specified location..
     AuthzError("create table tpch.new_table (i int) location " +
         "'hdfs://localhost:20500/test-warehouse/alltypes'",
