@@ -17,10 +17,11 @@
 
 # Common test dimensions and associated utility functions.
 
+import copy
 import os
 from itertools import product
 
-from tests.common.test_vector import ImpalaTestDimension
+from tests.common.test_vector import ImpalaTestDimension, ImpalaTestVector
 
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 
@@ -178,6 +179,20 @@ def create_exec_option_dimension_from_dict(exec_option_dimensions):
 
   # Build a test vector out of it
   return ImpalaTestDimension('exec_option', *exec_option_dimension_values)
+
+def extend_exec_option_dimension(test_suite, key, value):
+  """
+  Takes an ImpalaTestSuite object 'test_suite' and extends the exec option test dimension
+  by creating a copy of each existing exec option value that has 'key' set to 'value',
+  doubling the number of tests that will be run.
+  """
+  dim = test_suite.ImpalaTestMatrix.dimensions["exec_option"]
+  new_value = []
+  for v in dim:
+    new_value.append(ImpalaTestVector.Value(v.name, copy.copy(v.value)))
+    new_value[-1].value[key] = value
+  dim.extend(new_value)
+  test_suite.ImpalaTestMatrix.add_dimension(dim)
 
 def get_dataset_from_workload(workload):
   # TODO: We need a better way to define the workload -> dataset mapping so we can
