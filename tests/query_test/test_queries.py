@@ -22,7 +22,7 @@ import pytest
 import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.test_dimensions import create_uncompressed_text_dimension, extend_exec_option_dimension
 from tests.common.test_vector import ImpalaTestVector
 
 class TestQueries(ImpalaTestSuite):
@@ -33,18 +33,9 @@ class TestQueries(ImpalaTestSuite):
       cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format == 'parquet')
 
-    # Manually adding a test dimension here to test the small query opt
-    # in exhaustive.
-    # TODO Cleanup required, allow adding values to dimensions without having to
-    # manually explode them
+    # Adding a test dimension here to test the small query opt in exhaustive.
     if cls.exploration_strategy() == 'exhaustive':
-      dim = cls.ImpalaTestMatrix.dimensions["exec_option"]
-      new_value = []
-      for v in dim:
-        new_value.append(ImpalaTestVector.Value(v.name, copy.copy(v.value)))
-        new_value[-1].value["exec_single_node_rows_threshold"] = 100
-      dim.extend(new_value)
-      cls.ImpalaTestMatrix.add_dimension(dim)
+      extend_exec_option_dimension(cls, "exec_single_node_rows_threshold", "100")
 
   @classmethod
   def get_workload(cls):
@@ -215,15 +206,21 @@ class TestQueriesParquetTables(ImpalaTestSuite):
     self.run_test_case('QueryTest/single-node-large-sorts', vector)
 
 # Tests for queries in HDFS-specific tables, e.g. AllTypesAggMultiFilesNoPart.
-# This is a subclass of TestQueries to get the extra test dimension for
-# exec_single_node_rows_threshold in exhaustive.
-class TestHdfsQueries(TestQueries):
+class TestHdfsQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHdfsQueries, cls).add_test_dimensions()
     # Kudu doesn't support AllTypesAggMultiFilesNoPart (KUDU-1271, KUDU-1570).
     cls.ImpalaTestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format != 'kudu')
+
+    # Adding a test dimension here to test the small query opt in exhaustive.
+    if cls.exploration_strategy() == 'exhaustive':
+      extend_exec_option_dimension(cls, "exec_single_node_rows_threshold", "100")
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
 
   def test_hdfs_scan_node(self, vector):
     self.run_test_case('QueryTest/hdfs-scan-node', vector)
