@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.12.0" id="exec_time_limit_s">
+
+  <title>EXEC_TIME_LIMIT_S Query Option (<keyword keyref="impala212_full"/> or higher only)</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>EXEC_TIME_LIMIT_S</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.12.0">
+      The <codeph>EXEC_TIME_LIMIT_S</codeph> query option sets a time limit on query execution.
+      If a query is still executing when time limit expires, it is automatically canceled. The
+      option is intended to prevent runaway queries that execute for much longer than intended.
+    </p>
+
+    <p>
+      For example, an Impala administrator could set a default value of
+      <codeph>EXEC_TIME_LIMIT_S=3600</codeph> for a resource pool to automatically kill queries
+      that execute for longer than one hour (see
+      <xref href="impala_admission.xml#admission_control"/> for information about default query
+      options). Then, if a user accidentally runs a large query that executes for more than one
+      hour, it will be automatically killed after the time limit expires to free up resources.
+      Users can override the default value per query or per session if they do not want the
+      default <codeph>EXEC_TIME_LIMIT_S</codeph> value to apply to a specific query or a
+      session.
+    </p>
+
+    <note>
+      <p>
+        The time limit only starts once the query is executing. Time spent planning the query,
+        scheduling the query, or in admission control is not counted towards the execution time
+        limit. <codeph>SELECT</codeph> statements are eligible for automatic cancellation until
+        the client has fetched all result rows. DML queries are eligible for automatic
+        cancellation until the DML statement has finished.
+      </p>
+    </note>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>SET EXEC_TIME_LIMIT_S=<varname>seconds</varname>;</codeblock>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p>
+      <b>Default:</b> 0 (no time limit )
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_212"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+    <p>
+      <xref href="impala_timeouts.xml#timeouts"/>
+    </p>
+
+  </conbody>
+
+</concept>

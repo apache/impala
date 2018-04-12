@@ -2901,6 +2901,14 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
         <b>Internal details:</b> Represented in memory as a byte array with the minimum size needed to represent
         each value.
       </p>
+      <p rev="3.0" id="added_in_30">
+        <b>Added in:</b>
+        <keyword keyref="impala30_full"/>
+      </p>
+      <p rev="2.12.0" id="added_in_212">
+        <b>Added in:</b>
+        <keyword keyref="impala212_full"/>
+      </p>
 
       <p rev="2.11.0" id="added_in_2110">
         <b>Added in:</b> <keyword keyref="impala2_11_0"/>
