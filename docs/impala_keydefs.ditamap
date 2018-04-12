@@ -10768,7 +10768,6 @@ under the License.
   <keydef href="topics/impala_hints.xml" keys="hints"/>
   <keydef href="topics/impala_set.xml" keys="set"/>
   <keydef href="topics/impala_query_options.xml" keys="query_options"/>
-  <keydef href="topics/impala_abort_on_default_limit_exceeded.xml" keys="abort_on_default_limit_exceeded"/>
   <keydef href="topics/impala_abort_on_error.xml" keys="abort_on_error"/>
   <keydef href="topics/impala_allow_unsupported_formats.xml" keys="allow_unsupported_formats"/>
   <keydef href="topics/impala_appx_count_distinct.xml" keys="appx_count_distinct"/>
@@ -10777,9 +10776,7 @@ under the License.
   <keydef href="topics/impala_compression_codec.xml" keys="compression_codec"/>
   <keydef href="topics/impala_debug_action.xml" keys="debug_action"/>
   <keydef href="topics/impala_default_join_distribution_mode.xml" keys="default_join_distribution_mode"/>
-  <keydef href="topics/impala_default_order_by_limit.xml" keys="default_order_by_limit"/>
   <keydef rev="2.10.0 IMPALA-3200" href="topics/impala_default_spillable_buffer_size.xml" keys="default_spillable_buffer_size"/>
-  <keydef href="topics/impala_disable_cached_reads.xml" keys="disable_cached_reads"/>
   <keydef href="topics/impala_disable_codegen.xml" keys="disable_codegen"/>
   <keydef href="topics/impala_disable_outermost_topn.xml" keys="disable_outermost_topn"/>
   <keydef href="topics/impala_disable_row_runtime_filtering.xml" keys="disable_row_runtime_filtering"/>
@@ -10792,7 +10789,6 @@ under the License.
   <keydef href="topics/impala_live_progress.xml" keys="live_progress"/>
   <keydef href="topics/impala_live_summary.xml" keys="live_summary"/>
   <keydef href="topics/impala_max_errors.xml" keys="max_errors"/>
-  <keydef href="topics/impala_max_io_buffers.xml" keys="max_io_buffers"/>
   <keydef rev="2.10.0 IMPALA-3200" href="topics/impala_max_row_size.xml" keys="max_row_size"/>
   <keydef href="topics/impala_max_scan_range_length.xml" keys="max_scan_range_length"/>
   <keydef href="topics/impala_max_num_runtime_filters.xml" keys="max_num_runtime_filters"/>
@@ -10812,14 +10808,12 @@ under the License.
   <keydef href="topics/impala_request_pool.xml" keys="request_pool"/>
   <keydef href="topics/impala_schedule_random_replica.xml" keys="schedule_random_replica"/>
   <keydef href="topics/impala_replica_preference.xml" keys="replica_preference"/>
-  <keydef href="topics/impala_rm_initial_mem.xml" keys="rm_initial_mem"/>
   <keydef href="topics/impala_runtime_bloom_filter_size.xml" keys="runtime_bloom_filter_size"/>
   <keydef href="topics/impala_runtime_filter_max_size.xml" keys="runtime_filter_max_size"/>
   <keydef href="topics/impala_runtime_filter_min_size.xml" keys="runtime_filter_min_size"/>
   <keydef href="topics/impala_runtime_filter_mode.xml" keys="runtime_filter_mode"/>
   <keydef href="topics/impala_runtime_filter_wait_time_ms.xml" keys="runtime_filter_wait_time_ms"/>
   <keydef href="topics/impala_s3_skip_insert_staging.xml" keys="s3_skip_insert_staging"/>
-  <keydef href="topics/impala_scan_node_codegen_threshold.xml" keys="scan_node_codegen_threshold"/>
   <keydef href="topics/impala_scratch_limit.xml" keys="scratch_limit"/>
   <keydef href="topics/impala_support_start_over.xml" keys="support_start_over"/>
   <keydef href="topics/impala_sync_ddl.xml" keys="sync_ddl"/>

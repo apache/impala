@@ -265,15 +265,6 @@ SELECT page_title AS "Page 3 of search results", page_url FROM search_content
         </p>
       </li>
 
-      <li>
-        <p>
-          The query options
-          <xref href="impala_default_order_by_limit.xml#default_order_by_limit">DEFAULT_ORDER_BY_LIMIT</xref> and
-          <xref href="impala_abort_on_default_limit_exceeded.xml#abort_on_default_limit_exceeded">ABORT_ON_DEFAULT_LIMIT_EXCEEDED</xref>,
-          which formerly controlled the behavior of <codeph>ORDER BY</codeph> queries with no limit specified, are
-          now ignored.
-        </p>
-      </li>
     </ul>
 
     <p rev="obwl" conref="../shared/impala_common.xml#common/null_sorting_change"/>
