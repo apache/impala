@@ -203,3 +203,19 @@ class TestRandomSort(ImpalaTestSuite):
       functional.alltypestiny"""
     results = transpose_results(self.execute_query(query).data, lambda x: float(x))
     assert (results == sorted(results))
+
+
+class TestPartialSort(ImpalaTestSuite):
+  """Test class to do functional validation of partial sorts."""
+
+  def test_partial_sort_min_reservation(self, unique_database):
+    """Test that the partial sort node can operate if it only gets its minimum
+    memory reservation."""
+    table_name = "%s.kudu_test" % unique_database
+    self.client.set_configuration_option(
+        "debug_action", "-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0")
+    self.execute_query("""create table %s (col0 string primary key)
+        partition by hash(col0) partitions 8 stored as kudu""" % table_name)
+    result = self.execute_query(
+        "insert into %s select string_col from functional.alltypessmall" % table_name)
+    assert "PARTIAL SORT" in result.runtime_profile, result.runtime_profile

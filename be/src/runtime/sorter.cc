@@ -630,7 +630,8 @@ Sorter::Run::Run(Sorter* parent, TupleDescriptor* sort_tuple_desc, bool initial_
     num_tuples_(0) {}
 
 Status Sorter::Run::Init() {
-  int num_to_create = 1 + has_var_len_slots_ + (has_var_len_slots_ && initial_run_);
+  int num_to_create = 1 + has_var_len_slots_
+      + (has_var_len_slots_ && initial_run_ && sorter_->enable_spilling_);
   int64_t required_mem = num_to_create * sorter_->page_len_;
   if (!sorter_->buffer_pool_client_->IncreaseReservationToFit(required_mem)) {
     return Status(Substitute(
@@ -641,7 +642,7 @@ Status Sorter::Run::Init() {
   RETURN_IF_ERROR(AddPage(&fixed_len_pages_));
   if (has_var_len_slots_) {
     RETURN_IF_ERROR(AddPage(&var_len_pages_));
-    if (initial_run_) {
+    if (initial_run_ && sorter_->enable_spilling_) {
       // Need additional var len page to reorder var len data in UnpinAllPages().
       RETURN_IF_ERROR(var_len_copy_page_.Init(sorter_));
     }
