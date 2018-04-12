@@ -484,22 +484,6 @@ under the License.
                 <codeph>""</codeph> (empty string, meaning unlimited) </p>
             </dd>
           </dlentry>
-          <dlentry id="disable_admission_control">
-            <dt>
-              <codeph>disable_admission_control</codeph>
-            </dt>
-            <dd>
-              <indexterm audience="hidden">--disable_admission_control</indexterm>
-              <b>Purpose:</b> Turns off the admission control feature entirely,
-              regardless of other configuration option settings.
-              <p>
-                <b>Type:</b> Boolean </p>
-              <p>
-                <b>Default:</b>
-                <codeph>false</codeph>
-              </p>
-            </dd>
-          </dlentry>
           <dlentry id="disable_pool_max_requests">
             <dt>
               <codeph>disable_pool_max_requests</codeph>
