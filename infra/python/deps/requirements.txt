@@ -55,7 +55,10 @@ requests == 2.7.0
 setuptools == 36.8.0
 setuptools-scm == 1.15.4
 sh == 1.11
-sqlparse == 0.1.15
+# Note: This version for sqlparse is not what is used for the shell. The shell uses
+# a checked-in version of sqlparse (see shell/ext-py). This version is used primarily
+# for dataload.
+sqlparse == 0.1.19
 texttable == 0.8.3
 
 # For dev purposes, not used in scripting. Version 1.2.1 is the latest that supports 2.6.
