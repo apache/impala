@@ -226,6 +226,11 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
     }
   }
 
+  if (scan_node_->limit() != -1 && conjunct_evals_.empty()) {
+    KUDU_RETURN_IF_ERROR(scanner_->SetLimit(scan_node_->limit()),
+        "Failed to set limit on scan.");
+  }
+
   {
     SCOPED_TIMER(state_->total_storage_wait_timer());
     KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");

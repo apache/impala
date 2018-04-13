@@ -107,6 +107,9 @@ class TestKuduOperations(KuduTestSuite):
   def test_kudu_describe(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_describe', vector, use_db=unique_database)
 
+  def test_kudu_limit(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_limit', vector, use_db=unique_database)
+
   def test_kudu_column_options(self, cursor, kudu_client, unique_database):
     """Test Kudu column options"""
     encodings = ["ENCODING PLAIN_ENCODING", ""]
