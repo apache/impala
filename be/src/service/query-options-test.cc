@@ -142,6 +142,7 @@ TEST(QueryOptions, SetByteOptions) {
       {MAKE_OPTIONDEF(max_row_size),          {1, ROW_SIZE_LIMIT}},
       {MAKE_OPTIONDEF(parquet_file_size),     {-1, I32_MAX}},
       {MAKE_OPTIONDEF(compute_stats_min_sample_size), {-1, I64_MAX}},
+      {MAKE_OPTIONDEF(max_mem_estimate_for_admission), {-1, I64_MAX}},
   };
   vector<pair<OptionDef<int32_t>, Range<int32_t>>> case_set_i32 {
       {MAKE_OPTIONDEF(runtime_filter_min_size),

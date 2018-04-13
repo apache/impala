@@ -290,6 +290,14 @@ enum TImpalaQueryOptions {
   // exprs in the second phase which is not required when omitting the distinct exprs in
   // the first phase. Shuffling by both is better if the grouping exprs have low NDVs.
   SHUFFLE_DISTINCT_EXPRS,
+
+  // This only has an effect if memory-estimate-based admission control is enabled, i.e.
+  // max_mem_resources is set for the pool and, *contrary to best practices*, MEM_LIMIT
+  // is not set. In that case, then min(MAX_MEM_ESTIMATE_FOR_ADMISSION,
+  // planner memory estimate) is used for admission control purposes. This provides a
+  // workaround if the planner's memory estimate is too high and prevents a runnable
+  // query from being admitted. 0 or -1 means this has no effect. Defaults to 0.
+  MAX_MEM_ESTIMATE_FOR_ADMISSION,
 }
 
 // The summary of a DML statement.

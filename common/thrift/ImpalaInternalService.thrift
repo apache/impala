@@ -279,6 +279,9 @@ struct TQueryOptions {
   // exprs in the second phase which is not required when omitting the distinct exprs in
   // the first phase. Shuffling by both is better if the grouping exprs have low NDVs.
   64: optional bool shuffle_distinct_exprs = true;
+
+  // See comment in ImpalaService.thrift.
+  65: optional i64 max_mem_estimate_for_admission = 0;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
