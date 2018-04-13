@@ -1354,11 +1354,11 @@ drop database temp;
 
       <p id="cs_or_cis">
         For a particular table, use either <codeph>COMPUTE STATS</codeph> or
-        <codeph>COMPUTE INCREMENTAL STATS</codeph>, but never combine the two or alternate
-        between them. If you switch from <codeph>COMPUTE STATS</codeph> to
-        <codeph>COMPUTE INCREMENTAL STATS</codeph> during the lifetime of a table, or vice
-        versa, drop all statistics (by running both <codeph>DROP STATS</codeph> and
-        <codeph>DROP INCREMENTAL STATS</codeph>) before making the switch.
+        <codeph>COMPUTE INCREMENTAL STATS</codeph>, but never combine the two or
+        alternate between them. If you switch from <codeph>COMPUTE STATS</codeph> to
+        <codeph>COMPUTE INCREMENTAL STATS</codeph> during the lifetime of a table, or
+        vice versa, drop all statistics by running <codeph>DROP STATS</codeph> before
+        making the switch.
       </p>
 
       <p id="incremental_stats_after_full">

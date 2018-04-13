@@ -21,6 +21,7 @@ under the License.
 <concept id="perf_stats">
 
   <title>Table and Column Statistics</title>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -35,57 +36,48 @@ under the License.
   <conbody>
 
     <p>
-      Impala can do better optimization for complex or multi-table queries when it has access to statistics about
-      the volume of data and how the values are distributed. Impala uses this information to help parallelize and
-      distribute the work for a query. For example, optimizing join queries requires a way of determining if one
-      table is <q>bigger</q> than another, which is a function of the number of rows and the average row size
-      for each table. The following sections describe the categories of statistics Impala can work
-      with, and how to produce them and keep them up to date.
+      Impala can do better optimization for complex or multi-table queries when it has access to
+      statistics about the volume of data and how the values are distributed. Impala uses this
+      information to help parallelize and distribute the work for a query. For example,
+      optimizing join queries requires a way of determining if one table is <q>bigger</q> than
+      another, which is a function of the number of rows and the average row size for each
+      table. The following sections describe the categories of statistics Impala can work with,
+      and how to produce them and keep them up to date.
     </p>
 
-    <note>
-      <p rev="1.2.2">
-        Originally, Impala relied on the Hive mechanism for collecting statistics, through the Hive <codeph>ANALYZE
-        TABLE</codeph> statement which initiates a MapReduce job. For better user-friendliness and reliability,
-        Impala implements its own <codeph>COMPUTE STATS</codeph> statement in Impala 1.2.2 and higher, along with the
-        <codeph>DROP STATS</codeph>, <codeph>SHOW TABLE STATS</codeph>, and <codeph>SHOW COLUMN STATS</codeph>
-        statements.
-      </p>
-    </note>
+    <p outputclass="toc inpage all"/>
 
-    <p outputclass="toc inpage"/>
   </conbody>
 
   <concept id="perf_table_stats">
 
     <title id="table_stats">Overview of Table Statistics</title>
-  <prolog>
-    <metadata>
-      <data name="Category" value="Concepts"/>
-    </metadata>
-  </prolog>
+
+    <prolog>
+      <metadata>
+        <data name="Category" value="Concepts"/>
+      </metadata>
+    </prolog>
 
     <conbody>
 
-<!-- Hive background info: https://cwiki.apache.org/Hive/statsdev.html -->
-
       <p>
         The Impala query planner can make use of statistics about entire tables and partitions.
-        This information includes physical characteristics such as the number of rows, number of data files,
-        the total size of the data files, and the file format. For partitioned tables, the numbers
-        are calculated per partition, and as totals for the whole table.
-        This metadata is stored in the metastore database, and can be updated by either Impala or Hive.
-        If a number is not available, the value -1 is used as a placeholder.
-        Some numbers, such as number and total sizes of data files, are always kept up to date because
-        they can be calculated cheaply, as part of gathering HDFS block metadata.
+        This information includes physical characteristics such as the number of rows, number of
+        data files, the total size of the data files, and the file format. For partitioned
+        tables, the numbers are calculated per partition, and as totals for the whole table.
+        This metadata is stored in the metastore database, and can be updated by either Impala
+        or Hive. If a number is not available, the value -1 is used as a placeholder. Some
+        numbers, such as number and total sizes of data files, are always kept up to date
+        because they can be calculated cheaply, as part of gathering HDFS block metadata.
       </p>
 
       <p>
-        The following example shows table stats for an unpartitioned Parquet table.
-        The values for the number and sizes of files are always available.
-        Initially, the number of rows is not known, because it requires a potentially expensive
-        scan through the entire table, and so that value is displayed as -1.
-        The <codeph>COMPUTE STATS</codeph> statement fills in any unknown table stats values.
+        The following example shows table stats for an unpartitioned Parquet table. The values
+        for the number and sizes of files are always available. Initially, the number of rows is
+        not known, because it requires a potentially expensive scan through the entire table,
+        and so that value is displayed as -1. The <codeph>COMPUTE STATS</codeph> statement fills
+        in any unknown table stats values.
       </p>
 
 <codeblock>
@@ -113,26 +105,29 @@ show table stats parquet_snappy;
 </codeblock>
 
       <p>
-        Impala performs some optimizations using this metadata on its own, and other optimizations by
-        using a combination of table and column statistics.
+        Impala performs some optimizations using this metadata on its own, and other
+        optimizations by using a combination of table and column statistics.
       </p>
 
       <p rev="1.2.1">
-        To check that table statistics are available for a table, and see the details of those statistics, use the
-        statement <codeph>SHOW TABLE STATS <varname>table_name</varname></codeph>. See
-        <xref href="impala_show.xml#show"/> for details.
+        To check that table statistics are available for a table, and see the details of those
+        statistics, use the statement <codeph>SHOW TABLE STATS
+        <varname>table_name</varname></codeph>. See <xref href="impala_show.xml#show"/> for
+        details.
       </p>
 
       <p>
         If you use the Hive-based methods of gathering statistics, see
         <xref href="https://cwiki.apache.org/confluence/display/Hive/StatsDev" scope="external" format="html">the
-        Hive wiki</xref> for information about the required configuration on the Hive side. Where practical,
-        use the Impala <codeph>COMPUTE STATS</codeph> statement to avoid potential configuration and scalability
-        issues with the statistics-gathering process.
+        Hive wiki</xref> for information about the required configuration on the Hive side.
+        Where practical, use the Impala <codeph>COMPUTE STATS</codeph> statement to avoid
+        potential configuration and scalability issues with the statistics-gathering process.
       </p>
 
       <p conref="../shared/impala_common.xml#common/hive_column_stats_caveat"/>
+
     </conbody>
+
   </concept>
 
   <concept id="perf_column_stats">
@@ -142,23 +137,24 @@ show table stats parquet_snappy;
     <conbody>
 
       <p>
-        The Impala query planner can make use of statistics about individual columns when that metadata is
-        available in the metastore database. This technique is most valuable for columns compared across tables in
-        <xref href="impala_perf_joins.xml#perf_joins">join queries</xref>, to help estimate how many rows the query
-        will retrieve from each table. <ph rev="2.0.0"> These statistics are also important for correlated
-        subqueries using the <codeph>EXISTS()</codeph> or <codeph>IN()</codeph> operators, which are processed
+        The Impala query planner can make use of statistics about individual columns when that
+        metadata is available in the metastore database. This technique is most valuable for
+        columns compared across tables in <xref href="impala_perf_joins.xml#perf_joins">join
+        queries</xref>, to help estimate how many rows the query will retrieve from each table.
+        <ph rev="2.0.0"> These statistics are also important for correlated subqueries using the
+        <codeph>EXISTS()</codeph> or <codeph>IN()</codeph> operators, which are processed
         internally the same way as join queries.</ph>
       </p>
 
       <p>
-        The following example shows column stats for an unpartitioned Parquet table.
-        The values for the maximum and average sizes of some types are always available,
-        because those figures are constant for numeric and other fixed-size types.
-        Initially, the number of distinct values is not known, because it requires a potentially expensive
-        scan through the entire table, and so that value is displayed as -1.
-        The same applies to maximum and average sizes of variable-sized types, such as <codeph>STRING</codeph>.
-        The <codeph>COMPUTE STATS</codeph> statement fills in most unknown column stats values.
-        (It does not record the number of <codeph>NULL</codeph> values, because currently Impala
+        The following example shows column stats for an unpartitioned Parquet table. The values
+        for the maximum and average sizes of some types are always available, because those
+        figures are constant for numeric and other fixed-size types. Initially, the number of
+        distinct values is not known, because it requires a potentially expensive scan through
+        the entire table, and so that value is displayed as -1. The same applies to maximum and
+        average sizes of variable-sized types, such as <codeph>STRING</codeph>. The
+        <codeph>COMPUTE STATS</codeph> statement fills in most unknown column stats values. (It
+        does not record the number of <codeph>NULL</codeph> values, because currently Impala
         does not use that figure for query optimization.)
       </p>
 
@@ -197,88 +193,56 @@ show column stats parquet_snappy;
 
       <note>
         <p>
-          For column statistics to be effective in Impala, you also need to have table statistics for the
-          applicable tables, as described in <xref href="impala_perf_stats.xml#perf_table_stats"/>. When you use
-          the Impala <codeph>COMPUTE STATS</codeph> statement, both table and column statistics are automatically
-          gathered at the same time, for all columns in the table.
+          For column statistics to be effective in Impala, you also need to have table
+          statistics for the applicable tables, as described in
+          <xref href="impala_perf_stats.xml#perf_table_stats"/>. When you use the Impala
+          <codeph>COMPUTE STATS</codeph> statement, both table and column statistics are
+          automatically gathered at the same time, for all columns in the table.
         </p>
       </note>
 
       <note conref="../shared/impala_common.xml#common/compute_stats_nulls"/>
 
-<!-- Hive-based instructions are considered obsolete since the introduction of the Impala COMPUTE STATS statement.
-      <p>
-        Add settings like the following to the <filepath>hive-site.xml</filepath>
-        configuration file, in the Hive configuration directory, on every node where you run
-        <codeph>ANALYZE TABLE</codeph> statements through the
-        <codeph>hive</codeph> shell. The
-        <codeph>hive.stats.ndv.error</codeph> setting represents the standard error when
-        estimating the number of distinct values for a column. The value of 5.0 is recommended as a tradeoff between the
-        accuracy of the gathered statistics and the resource usage of the stats-gathering process.
-      </p>
-
-<codeblock><![CDATA[<property>
- <name>hive.stats.ndv.error</name>
- <value>5.0</value>
-</property>]]></codeblock>
-
-      <p>
-        5.0 is a relatively low value that devotes substantial computational resources to the statistics-gathering
-        process. To reduce the resource usage, you could increase this value; to make the statistics even more precise,
-        you could lower it.
-      </p>
-
-      <p>
-        The syntax for gathering column statistics uses the <codeph>ANALYZE TABLE ...
-        COMPUTE STATISTICS</codeph> clause, with an additional <codeph>FOR
-        COLUMNS</codeph> clause. For partitioned tables, you can gather statistics for specific partitions by including
-        a clause <codeph>PARTITION
-        (<varname>col1=val1</varname>,<varname>col2=val2</varname>,
-        ...)</codeph>; but you cannot include the partitioning columns in the
-        <codeph>FOR COLUMNS</codeph> clause. Also, you cannot use fully qualified table
-        names, so issue a <codeph>USE</codeph> command first to switch to the
-        appropriate database. For example:
-      </p>
-
-<codeblock>USE <varname>database_name</varname>;
-ANALYZE TABLE <varname>table_name</varname> COMPUTE STATISTICS FOR COLUMNS <varname>column_list</varname>;
-ANALYZE TABLE <varname>table_name</varname> PARTITION (<varname>partition_specs</varname>) COMPUTE STATISTICS FOR COLUMNS <varname>column_list</varname>;</codeblock>
--->
-
       <p rev="1.2.1">
-        To check whether column statistics are available for a particular set of columns, use the <codeph>SHOW
-        COLUMN STATS <varname>table_name</varname></codeph> statement, or check the extended
-        <codeph>EXPLAIN</codeph> output for a query against that table that refers to those columns. See
-        <xref href="impala_show.xml#show"/> and <xref href="impala_explain.xml#explain"/> for details.
+        To check whether column statistics are available for a particular set of columns, use
+        the <codeph>SHOW COLUMN STATS <varname>table_name</varname></codeph> statement, or check
+        the extended <codeph>EXPLAIN</codeph> output for a query against that table that refers
+        to those columns. See <xref href="impala_show.xml#show"/> and
+        <xref href="impala_explain.xml#explain"/> for details.
       </p>
 
       <p conref="../shared/impala_common.xml#common/hive_column_stats_caveat"/>
+
     </conbody>
+
   </concept>
 
   <concept id="perf_stats_partitions">
+
     <title id="stats_partitions">How Table and Column Statistics Work for Partitioned Tables</title>
+
     <conbody>
 
       <p>
-        When you use Impala for <q>big data</q>, you are highly likely to use partitioning
-        for your biggest tables, the ones representing data that can be logically divided
-        based on dates, geographic regions, or similar criteria. The table and column statistics
-        are especially useful for optimizing queries on such tables. For example, a query involving
-        one year might involve substantially more or less data than a query involving a different year,
-        or a range of several years. Each query might be optimized differently as a result.
+        When you use Impala for <q>big data</q>, you are highly likely to use partitioning for
+        your biggest tables, the ones representing data that can be logically divided based on
+        dates, geographic regions, or similar criteria. The table and column statistics are
+        especially useful for optimizing queries on such tables. For example, a query involving
+        one year might involve substantially more or less data than a query involving a
+        different year, or a range of several years. Each query might be optimized differently
+        as a result.
       </p>
 
       <p>
         The following examples show how table and column stats work with a partitioned table.
-        The table for this example is partitioned by year, month, and day.
-        For simplicity, the sample data consists of 5 partitions, all from the same year and month.
-        Table stats are collected independently for each partition. (In fact, the
-        <codeph>SHOW PARTITIONS</codeph> statement displays exactly the same information as
-        <codeph>SHOW TABLE STATS</codeph> for a partitioned table.) Column stats apply to
-        the entire table, not to individual partitions. Because the partition key column values
-        are represented as HDFS directories, their characteristics are typically known in advance,
-        even when the values for non-key columns are shown as -1.
+        The table for this example is partitioned by year, month, and day. For simplicity, the
+        sample data consists of 5 partitions, all from the same year and month. Table stats are
+        collected independently for each partition. (In fact, the <codeph>SHOW
+        PARTITIONS</codeph> statement displays exactly the same information as <codeph>SHOW
+        TABLE STATS</codeph> for a partitioned table.) Column stats apply to the entire table,
+        not to individual partitions. Because the partition key column values are represented as
+        HDFS directories, their characteristics are typically known in advance, even when the
+        values for non-key columns are shown as -1.
       </p>
 
 <codeblock>
@@ -355,207 +319,257 @@ show column stats year_month_day;
 </codeblock>
 
       <p conref="../shared/impala_common.xml#common/hive_column_stats_caveat"/>
+
     </conbody>
+
   </concept>
 
-  <concept rev="2.1.0" id="perf_stats_incremental">
+  <concept id="perf_generating_stats">
 
-    <title id="incremental_stats">Overview of Incremental Statistics</title>
+    <title>Generating Table and Column Statistics</title>
 
     <conbody>
 
       <p>
-        In Impala 2.1.0 and higher, you can use the syntax <codeph>COMPUTE INCREMENTAL STATS</codeph> and
-        <codeph>DROP INCREMENTAL STATS</codeph>. The <codeph>INCREMENTAL</codeph> clauses work with incremental
-        statistics, a specialized feature for partitioned tables that are large or frequently updated with new
-        partitions.
-      </p>
-
-      <p>
-        When you compute incremental statistics for a partitioned table, by default Impala only processes those
-        partitions that do not yet have incremental statistics. By processing only newly added partitions, you can
-        keep statistics up to date for large partitioned tables, without incurring the overhead of reprocessing the
-        entire table each time.
+        Use the <codeph>COMPUTE STATS</codeph> family of commands to collect table and
+        column statistics. The <codeph>COMPUTE STATS</codeph> variants offer
+        different tradeoffs between computation cost, staleness, and maintenance
+        workflows which are explained below.
       </p>
 
       <note type="important">
         <p conref="../shared/impala_common.xml#common/cs_or_cis"/>
-        <p conref="../shared/impala_common.xml#common/incremental_stats_after_full"/>
-        <p conref="../shared/impala_common.xml#common/incremental_stats_caveats"/>
       </note>
 
+      <!-- TODO: Commented out because it is inaccurate and confusing. Leaving this
+      material for future refactoring into a Hive-compatibility section.
       <p>
-        You can also compute or drop statistics for a single partition by including a <codeph>PARTITION</codeph>
-        clause in the <codeph>COMPUTE INCREMENTAL STATS</codeph> or <codeph>DROP INCREMENTAL STATS</codeph>
-        statement.
+        If you use Hive as part of your ETL workflow, you can also use Hive to generate table
+        and column statistics. You might need to do extra configuration within Hive itself, the
+        metastore, or even set up a separate database to hold Hive-generated statistics. You
+        might need to run multiple statements to generate all the necessary statistics.
+        Therefore, prefer the Impala <codeph>COMPUTE STATS</codeph> statement where that
+        technique is practical. For details about collecting statistics through Hive, see
+        <xref href="https://cwiki.apache.org/confluence/display/Hive/StatsDev" scope="external" format="html">the
+        Hive wiki</xref>.
       </p>
-
-      <p>
-        The metadata for incremental statistics is handled differently from the original style of statistics:
-      </p>
-
-      <ul>
-        <li>
-          <p>
-            If you have a partitioned table for which you have already run a regular <codeph>COMPUTE STATS</codeph>
-            statement, issuing <codeph>COMPUTE INCREMENTAL STATS</codeph> without a partition clause causes Impala
-            to rescan the entire table. Once the incremental statistics are computed, any future <codeph>COMPUTE INCREMENTAL
-            STATS</codeph> statements only scan any new partitions and any partitions where you performed
-            <codeph>DROP INCREMENTAL STATS</codeph>.
-          </p>
-        </li>
-
-        <li>
-          <p>
-            The <codeph>SHOW TABLE STATS</codeph> and <codeph>SHOW PARTITIONS</codeph> statements now include an
-            additional column showing whether incremental statistics are available for each column. A partition
-            could already be covered by the original type of statistics based on a prior <codeph>COMPUTE
-            STATS</codeph> statement, as indicated by a value other than <codeph>-1</codeph> under the
-            <codeph>#Rows</codeph> column. Impala query planning uses either kind of statistics when available.
-          </p>
-        </li>
-
-        <li>
-          <p>
-            <codeph>COMPUTE INCREMENTAL STATS</codeph> takes more time than <codeph>COMPUTE STATS</codeph> for the
-            same volume of data. Therefore it is most suitable for tables with large data volume where new
-            partitions are added frequently, making it impractical to run a full <codeph>COMPUTE STATS</codeph>
-            operation for each new partition. For unpartitioned tables, or partitioned tables that are loaded once
-            and not updated with new partitions, use the original <codeph>COMPUTE STATS</codeph> syntax.
-          </p>
-        </li>
-
-        <li>
-          <p>
-            <codeph>COMPUTE INCREMENTAL STATS</codeph> uses some memory in the <cmdname>catalogd</cmdname> process,
-            proportional to the number of partitions and number of columns in the applicable table. The memory
-            overhead is approximately 400 bytes for each column in each partition. This memory is reserved in the
-            <cmdname>catalogd</cmdname> daemon, the <cmdname>statestored</cmdname> daemon, and in each instance of
-            the <cmdname>impalad</cmdname> daemon.
-          </p>
-        </li>
-
-        <li>
-          <p>
-            In cases where new files are added to an existing partition, issue a <codeph>REFRESH</codeph> statement
-            for the table, followed by a <codeph>DROP INCREMENTAL STATS</codeph> and <codeph>COMPUTE INCREMENTAL
-            STATS</codeph> sequence for the changed partition.
-          </p>
-        </li>
-
-        <li>
-          <p>
-            The <codeph>DROP INCREMENTAL STATS</codeph> statement operates only on a single partition at a time. To
-            remove statistics (whether incremental or not) from all partitions of a table, issue a <codeph>DROP
-            STATS</codeph> statement with no <codeph>INCREMENTAL</codeph> or <codeph>PARTITION</codeph> clauses.
-          </p>
-        </li>
-      </ul>
-
-      <p>
-        The following considerations apply to incremental statistics when the structure of an existing table is
-        changed (known as <term>schema evolution</term>):
-      </p>
-
-      <ul>
-        <li>
-          <p>
-            If you use an <codeph>ALTER TABLE</codeph> statement to drop a column, the existing statistics remain
-            valid and <codeph>COMPUTE INCREMENTAL STATS</codeph> does not rescan any partitions.
-          </p>
-        </li>
-
-        <li>
-          <p>
-            If you use an <codeph>ALTER TABLE</codeph> statement to add a column, Impala rescans all partitions and
-            fills in the appropriate column-level values the next time you run <codeph>COMPUTE INCREMENTAL
-            STATS</codeph>.
-          </p>
-        </li>
-
-        <li>
-          <p>
-            If you use an <codeph>ALTER TABLE</codeph> statement to change the data type of a column, Impala
-            rescans all partitions and fills in the appropriate column-level values the next time you run
-            <codeph>COMPUTE INCREMENTAL STATS</codeph>.
-          </p>
-        </li>
-
-        <li>
-          <p>
-            If you use an <codeph>ALTER TABLE</codeph> statement to change the file format of a table, the existing
-            statistics remain valid and a subsequent <codeph>COMPUTE INCREMENTAL STATS</codeph> does not rescan any
-            partitions.
-          </p>
-        </li>
-      </ul>
-
-      <p>
-        See <xref href="impala_compute_stats.xml#compute_stats"/> and
-        <xref href="impala_drop_stats.xml#drop_stats"/> for syntax details.
-      </p>
-    </conbody>
-  </concept>
-
-  <concept id="perf_stats_computing">
-    <title>Generating Table and Column Statistics (COMPUTE STATS Statement)</title>
-    <conbody>
-
-      <p>
-        To gather table statistics after loading data into a table or partition, you typically use the
-        <codeph>COMPUTE STATS</codeph> statement. This statement is available in Impala 1.2.2 and higher.
-        It gathers both table statistics and column statistics for all columns in a single operation.
-        For large partitioned tables, where you frequently need to update statistics and it is impractical
-        to scan the entire table each time, use the syntax <codeph>COMPUTE INCREMENTAL STATS</codeph>,
-        which is available in <keyword keyref="impala21_full"/> and higher.
-      </p>
-
-      <p>
-        If you use Hive as part of your ETL workflow, you can also use Hive to generate table and
-        column statistics. You might need to do extra configuration within Hive itself, the metastore,
-        or even set up a separate database to hold Hive-generated statistics. You might need to run
-        multiple statements to generate all the necessary statistics. Therefore, prefer the
-        Impala <codeph>COMPUTE STATS</codeph> statement where that technique is practical.
-        For details about collecting statistics through Hive, see
-        <xref href="https://cwiki.apache.org/confluence/display/Hive/StatsDev" scope="external" format="html">the Hive wiki</xref>.
-      </p>
-
-      <p conref="../shared/impala_common.xml#common/hive_column_stats_caveat"/>
-
-<!-- Commenting out over-detailed Hive instructions as part of stats reorg.
-        <li>
-          Issue an <codeph>ANALYZE TABLE</codeph> statement in Hive, for the entire table or a specific partition.
-<codeblock>ANALYZE TABLE <varname>tablename</varname> [PARTITION(<varname>partcol1</varname>[=<varname>val1</varname>], <varname>partcol2</varname>[=<varname>val2</varname>], ...)] COMPUTE STATISTICS [NOSCAN];</codeblock>
-          For example, to gather statistics for a non-partitioned table:
-<codeblock>ANALYZE TABLE customer COMPUTE STATISTICS;</codeblock>
-          To gather statistics for a <codeph>store</codeph> table partitioned by state and city, and both of its
-          partitions:
-<codeblock>ANALYZE TABLE store PARTITION(s_state, s_county) COMPUTE STATISTICS;</codeblock>
-          To gather statistics for the <codeph>store</codeph> table and only the partitions for California:
-<codeblock>ANALYZE TABLE store PARTITION(s_state='CA', s_county) COMPUTE STATISTICS;</codeblock>
-        </li>
-
-        <li>
-          Load the data through the <codeph>INSERT OVERWRITE</codeph> statement in Hive, while the Hive setting
-          <b>hive.stats.autogather</b> is enabled.
-        </li>
-
-      </ul>
--->
-
-      <p rev="2.0.1">
-<!-- Additional info as a result of IMPALA-1420 -->
-<!-- Keep checking if https://issues.apache.org/jira/browse/HIVE-8648 ever gets fixed and when that fix makes it into an Impala release. -->
-        For your very largest tables, you might find that <codeph>COMPUTE STATS</codeph> or even <codeph>COMPUTE INCREMENTAL STATS</codeph>
-        take so long to scan the data that it is impractical to use them regularly. In such a case, after adding a partition or inserting new data,
-        you can update just the number of rows property through an <codeph>ALTER TABLE</codeph> statement.
-        See <xref href="impala_perf_stats.xml#perf_table_stats_manual"/> for details.
-        Because the column statistics might be left in a stale state, do not use this technique as a replacement
-        for <codeph>COMPUTE STATS</codeph>. Only use this technique if all other means of collecting statistics are impractical, or as a
-        low-overhead operation that you run in between periodic <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL STATS</codeph> operations.
-      </p>
+      -->
 
     </conbody>
+
+    <concept id="concept_y2f_nfl_mdb">
+
+      <title>COMPUTE STATS</title>
+
+      <conbody>
+
+        <p>
+          The <codeph>COMPUTE STATS</codeph> command collects and sets the table-level
+          and partition-level row counts as well as all column statistics for a given
+          table. The collection process is CPU-intensive and can take a long time to
+          complete for very large tables.
+        </p>
+        <p>
+          To speed up <codeph>COMPUTE STATS</codeph> consider the following options
+          which can be combined.
+          <ul>
+          <li>
+            <p>
+              Limit the number of columns for which statistics are collected to increase
+              the efficiency of COMPUTE STATS. Queries benefit from statistics for those
+              columns involved in filters, join conditions, group by or partition by
+              clauses. Other columns are good candidates to exclude from COMPUTE STATS.
+              This feature is available since Impala 2.12.
+            </p>
+          </li>
+          <li>
+            <p>
+              Set the MT_DOP query option to use more threads within each participating
+              impalad to compute the statistics faster - but not more efficiently. Note
+              that computing stats on a large table with a high MT_DOP value can
+              negatively affect other queries running at the same time if the
+              COMPUTE STATS claims most CPU cycles.
+              This feature is available since Impala 2.8.
+            </p>
+          </li>
+          </ul>
+        </p>
+
+        <p>
+          <codeph>COMPUTE STATS</codeph> is intended to be run periodically,
+          e.g. weekly, or on-demand when the contents of a table have changed
+          significantly. Due to the high resource utilization and long repsonse
+          time of t<codeph>COMPUTE STATS</codeph>, it is most practical to run it
+          in a scheduled maintnance window where the Impala cluster is idle
+          enough to accommodate the expensive operation. The degree of change that
+          qualifies as <q>significant</q> depends on the query workload, but typically,
+          if 30% of the rows have changed then it is recommended to recompute
+          statistics.
+        </p>
+
+        <p>
+          If you reload a complete new set of data for a table, but the number of rows and
+          number of distinct values for each column is relatively unchanged from before, you
+          do not need to recompute stats for the table.
+        </p>
+
+      </conbody>
+
+    </concept>
+
+    <concept id="concept_bmk_pfl_mdb">
+
+      <title>COMPUTE INCREMENTAL STATS</title>
+
+      <conbody>
+
+        <p>
+          In Impala 2.1.0 and higher, you can use the
+          <codeph>COMPUTE INCREMENTAL STATS</codeph> and
+          <codeph>DROP INCREMENTAL STATS</codeph> commands.
+          The <codeph>INCREMENTAL</codeph> clauses work with incremental statistics,
+          a specialized feature for partitioned tables.
+        </p>
+
+        <p>
+          When you compute incremental statistics for a partitioned table, by default Impala only
+          processes those partitions that do not yet have incremental statistics. By processing
+          only newly added partitions, you can keep statistics up to date without incurring the
+          overhead of reprocessing the entire table each time.
+        </p>
+
+        <p>
+          You can also compute or drop statistics for a specified subset of partitions by
+          including a <codeph>PARTITION</codeph> clause in the
+          <codeph>COMPUTE INCREMENTAL STATS</codeph> or <codeph>DROP INCREMENTAL STATS</codeph>
+          statement.
+        </p>
+
+        <note type="important">
+          <p conref="../shared/impala_common.xml#common/incremental_stats_caveats"/>
+          <p conref="../shared/impala_common.xml#common/incremental_stats_after_full"/>
+        </note>
+
+        <p>
+          The metadata for incremental statistics is handled differently from the original style
+          of statistics:
+        </p>
+
+        <ul>
+          <li>
+            <p>
+              Issuing a <codeph>COMPUTE INCREMENTAL STATS</codeph> without a partition
+              clause causes Impala to compute incremental stats for all partitions that
+              do not already have incremental stats. This might be the entire table when
+              running the command for the first time, but subsequent runs should only
+              update new partitions. You can force updating a partition that already has
+              incremental stats by issuing a <codeph>DROP INCREMENTAL STATS</codeph>
+              before running <codeph>COMPUTE INCREMENTAL STATS</codeph>.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              The <codeph>SHOW TABLE STATS</codeph> and <codeph>SHOW PARTITIONS</codeph>
+              statements now include an additional column showing whether incremental statistics
+              are available for each column. A partition could already be covered by the original
+              type of statistics based on a prior <codeph>COMPUTE STATS</codeph> statement, as
+              indicated by a value other than <codeph>-1</codeph> under the <codeph>#Rows</codeph>
+              column. Impala query planning uses either kind of statistics when available.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>COMPUTE INCREMENTAL STATS</codeph> takes more time than <codeph>COMPUTE
+              STATS</codeph> for the same volume of data. Therefore it is most suitable for tables
+              with large data volume where new partitions are added frequently, making it
+              impractical to run a full <codeph>COMPUTE STATS</codeph> operation for each new
+              partition. For unpartitioned tables, or partitioned tables that are loaded once and
+              not updated with new partitions, use the original <codeph>COMPUTE STATS</codeph>
+              syntax.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              <codeph>COMPUTE INCREMENTAL STATS</codeph> uses some memory in the
+              <cmdname>catalogd</cmdname> process, proportional to the number of partitions and
+              number of columns in the applicable table. The memory overhead is approximately 400
+              bytes for each column in each partition. This memory is reserved in the
+              <cmdname>catalogd</cmdname> daemon, the <cmdname>statestored</cmdname> daemon, and
+              in each instance of the <cmdname>impalad</cmdname> daemon.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              In cases where new files are added to an existing partition, issue a
+              <codeph>REFRESH</codeph> statement for the table, followed by a <codeph>DROP
+              INCREMENTAL STATS</codeph> and <codeph>COMPUTE INCREMENTAL STATS</codeph> sequence
+              for the changed partition.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              The <codeph>DROP INCREMENTAL STATS</codeph> statement operates only on a single
+              partition at a time. To remove statistics (whether incremental or not) from all
+              partitions of a table, issue a <codeph>DROP STATS</codeph> statement with no
+              <codeph>INCREMENTAL</codeph> or <codeph>PARTITION</codeph> clauses.
+            </p>
+          </li>
+        </ul>
+
+        <p>
+          The following considerations apply to incremental statistics when the structure of an
+          existing table is changed (known as <term>schema evolution</term>):
+        </p>
+
+        <ul>
+          <li>
+            <p>
+              If you use an <codeph>ALTER TABLE</codeph> statement to drop a column, the existing
+              statistics remain valid and <codeph>COMPUTE INCREMENTAL STATS</codeph> does not
+              rescan any partitions.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              If you use an <codeph>ALTER TABLE</codeph> statement to add a column, Impala rescans
+              all partitions and fills in the appropriate column-level values the next time you
+              run <codeph>COMPUTE INCREMENTAL STATS</codeph>.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              If you use an <codeph>ALTER TABLE</codeph> statement to change the data type of a
+              column, Impala rescans all partitions and fills in the appropriate column-level
+              values the next time you run <codeph>COMPUTE INCREMENTAL STATS</codeph>.
+            </p>
+          </li>
+
+          <li>
+            <p>
+              If you use an <codeph>ALTER TABLE</codeph> statement to change the file format of a
+              table, the existing statistics remain valid and a subsequent <codeph>COMPUTE
+              INCREMENTAL STATS</codeph> does not rescan any partitions.
+            </p>
+          </li>
+        </ul>
+
+        <p>
+          See <xref href="impala_compute_stats.xml#compute_stats"/> and
+          <xref
+            href="impala_drop_stats.xml#drop_stats"/> for syntax details.
+        </p>
+
+      </conbody>
+
+    </concept>
+
   </concept>
 
   <concept rev="2.1.0" id="perf_stats_checking">
@@ -565,17 +579,18 @@ show column stats year_month_day;
     <conbody>
 
       <p>
-        You can check whether a specific table has statistics using the <codeph>SHOW TABLE STATS</codeph> statement
-        (for any table) or the <codeph>SHOW PARTITIONS</codeph> statement (for a partitioned table). Both
-        statements display the same information. If a table or a partition does not have any statistics, the
-        <codeph>#Rows</codeph> field contains <codeph>-1</codeph>. Once you compute statistics for the table or
-        partition, the <codeph>#Rows</codeph> field changes to an accurate value.
+        You can check whether a specific table has statistics using the <codeph>SHOW TABLE
+        STATS</codeph> statement (for any table) or the <codeph>SHOW PARTITIONS</codeph>
+        statement (for a partitioned table). Both statements display the same information. If a
+        table or a partition does not have any statistics, the <codeph>#Rows</codeph> field
+        contains <codeph>-1</codeph>. Once you compute statistics for the table or partition,
+        the <codeph>#Rows</codeph> field changes to an accurate value.
       </p>
 
       <p>
-        The following example shows a table that initially does not have any statistics. The <codeph>SHOW TABLE
-        STATS</codeph> statement displays different values for <codeph>#Rows</codeph> before and after the
-        <codeph>COMPUTE STATS</codeph> operation.
+        The following example shows a table that initially does not have any statistics. The
+        <codeph>SHOW TABLE STATS</codeph> statement displays different values for
+        <codeph>#Rows</codeph> before and after the <codeph>COMPUTE STATS</codeph> operation.
       </p>
 
 <codeblock>[localhost:21000] &gt; create table no_stats (x int);
@@ -601,9 +616,10 @@ show column stats year_month_day;
 
       <p>
         The following example shows a similar progression with a partitioned table. Initially,
-        <codeph>#Rows</codeph> is <codeph>-1</codeph>. After a <codeph>COMPUTE STATS</codeph> operation,
-        <codeph>#Rows</codeph> changes to an accurate value. Any newly added partition starts with no statistics,
-        meaning that you must collect statistics after adding a new partition.
+        <codeph>#Rows</codeph> is <codeph>-1</codeph>. After a <codeph>COMPUTE STATS</codeph>
+        operation, <codeph>#Rows</codeph> changes to an accurate value. Any newly added
+        partition starts with no statistics, meaning that you must collect statistics after
+        adding a new partition.
       </p>
 
 <codeblock>[localhost:21000] &gt; create table no_stats_partitioned (x int) partitioned by (year smallint);
@@ -638,20 +654,22 @@ show column stats year_month_day;
 </codeblock>
 
       <note>
-        Because the default <codeph>COMPUTE STATS</codeph> statement creates and updates statistics for all
-        partitions in a table, if you expect to frequently add new partitions, use the <codeph>COMPUTE INCREMENTAL
-        STATS</codeph> syntax instead, which lets you compute stats for a single specified partition, or only for
-        those partitions that do not already have incremental stats.
+        Because the default <codeph>COMPUTE STATS</codeph> statement creates and updates
+        statistics for all partitions in a table, if you expect to frequently add new
+        partitions, use the <codeph>COMPUTE INCREMENTAL STATS</codeph> syntax instead, which
+        lets you compute stats for a single specified partition, or only for those partitions
+        that do not already have incremental stats.
       </note>
 
       <p>
-        If checking each individual table is impractical, due to a large number of tables or views that hide the
-        underlying base tables, you can also check for missing statistics for a particular query. Use the
-        <codeph>EXPLAIN</codeph> statement to preview query efficiency before actually running the query. Use the
-        query profile output available through the <codeph>PROFILE</codeph> command in
-        <cmdname>impala-shell</cmdname> or the web UI to verify query execution and timing after running the query.
-        Both the <codeph>EXPLAIN</codeph> plan and the <codeph>PROFILE</codeph> output display a warning if any
-        tables or partitions involved in the query do not have statistics.
+        If checking each individual table is impractical, due to a large number of tables or
+        views that hide the underlying base tables, you can also check for missing statistics
+        for a particular query. Use the <codeph>EXPLAIN</codeph> statement to preview query
+        efficiency before actually running the query. Use the query profile output available
+        through the <codeph>PROFILE</codeph> command in <cmdname>impala-shell</cmdname> or the
+        web UI to verify query execution and timing after running the query. Both the
+        <codeph>EXPLAIN</codeph> plan and the <codeph>PROFILE</codeph> output display a warning
+        if any tables or partitions involved in the query do not have statistics.
       </p>
 
 <codeblock>[localhost:21000] &gt; create table no_stats (x int);
@@ -677,10 +695,11 @@ show column stats year_month_day;
 </codeblock>
 
       <p>
-        Because Impala uses the <term>partition pruning</term> technique when possible to only evaluate certain
-        partitions, if you have a partitioned table with statistics for some partitions and not others, whether or
-        not the <codeph>EXPLAIN</codeph> statement shows the warning depends on the actual partitions used by the
-        query. For example, you might see warnings or not for different queries against the same table:
+        Because Impala uses the <term>partition pruning</term> technique when possible to only
+        evaluate certain partitions, if you have a partitioned table with statistics for some
+        partitions and not others, whether or not the <codeph>EXPLAIN</codeph> statement shows
+        the warning depends on the actual partitions used by the query. For example, you might
+        see warnings or not for different queries against the same table:
       </p>
 
 <codeblock>-- No warning because all the partitions for the year 2012 have stats.
@@ -692,89 +711,36 @@ EXPLAIN SELECT ... FROM t1 WHERE year BETWEEN 2006 AND 2009;
 </codeblock>
 
       <p>
-        To confirm if any partitions at all in the table are missing statistics, you might explain a query that
-        scans the entire table, such as <codeph>SELECT COUNT(*) FROM <varname>table_name</varname></codeph>.
+        To confirm if any partitions at all in the table are missing statistics, you might
+        explain a query that scans the entire table, such as <codeph>SELECT COUNT(*) FROM
+        <varname>table_name</varname></codeph>.
       </p>
+
     </conbody>
+
   </concept>
 
-  <concept rev="2.1.0" id="perf_stats_collecting">
+  <concept id="concept_s3c_4gl_mdb">
 
-    <title>Keeping Statistics Up to Date</title>
+    <title>Manually Setting Table and Column Statistics with ALTER TABLE</title>
 
-    <conbody>
+    <concept id="concept_wpt_pgl_mdb">
 
-      <p>
-        When the contents of a table or partition change significantly, recompute the stats for the relevant table
-        or partition. The degree of change that qualifies as <q>significant</q> varies, depending on the absolute
-        and relative sizes of the tables. Typically, if you add more than 30% more data to a table, it is
-        worthwhile to recompute stats, because the differences in number of rows and number of distinct values
-        might cause Impala to choose a different join order when that table is used in join queries. This guideline
-        is most important for the largest tables. For example, adding 30% new data to a table containing 1 TB has a
-        greater effect on join order than adding 30% to a table containing only a few megabytes, and the larger
-        table has a greater effect on query performance if Impala chooses a suboptimal join order as a result of
-        outdated statistics.
-      </p>
+      <title>Setting Table Statistics</title>
 
-      <p>
-        If you reload a complete new set of data for a table, but the number of rows and number of distinct values
-        for each column is relatively unchanged from before, you do not need to recompute stats for the table.
-      </p>
+      <conbody>
 
-      <p>
-        If the statistics for a table are out of date, and the table's large size makes it impractical to recompute
-        new stats immediately, you can use the <codeph>DROP STATS</codeph> statement to remove the obsolete
-        statistics, making it easier to identify tables that need a new <codeph>COMPUTE STATS</codeph> operation.
-      </p>
-
-      <p>
-        For a large partitioned table, consider using the incremental stats feature available in Impala 2.1.0 and
-        higher, as explained in <xref href="impala_perf_stats.xml#perf_stats_incremental"/>. If you add a new
-        partition to a table, it is worthwhile to recompute incremental stats, because the operation only scans the
-        data for that one new partition.
-      </p>
-    </conbody>
-  </concept>
-
-<!-- Might deserve its own conceptual topic at some point. -->
-
-  <concept audience="hidden" rev="1.2.2" id="perf_stats_joins">
-
-    <title>How Statistics Are Used in Join Queries</title>
-
-    <conbody>
-
-      <p></p>
-    </conbody>
-  </concept>
-
-<!-- Might deserve its own conceptual topic at some point. -->
-
-  <concept audience="hidden" rev="1.2.2" id="perf_stats_inserts">
-
-    <title>How Statistics Are Used in INSERT Operations</title>
-
-    <conbody>
-
-      <p conref="../shared/impala_common.xml#common/insert_hints"/>
-    </conbody>
-  </concept>
-
-  <concept rev="1.2.2" id="perf_table_stats_manual">
-
-    <title>Setting the NUMROWS Value Manually through ALTER TABLE</title>
-
-    <conbody>
-
-      <p>
-        The most crucial piece of data in all the statistics is the number of rows in the table (for an
-        unpartitioned or partitioned table) and for each partition (for a partitioned table). The <codeph>COMPUTE STATS</codeph>
-        statement always gathers statistics about all columns, as well as overall table statistics. If it is not
-        practical to do a full <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL STATS</codeph>
-        operation after adding a partition or inserting data, or if you can see that Impala would produce a more
-        efficient plan if the number of rows was different, you can manually set the number of rows through an
-        <codeph>ALTER TABLE</codeph> statement:
-      </p>
+        <p>
+          The most crucial piece of data in all the statistics is the number of rows in the
+          table (for an unpartitioned or partitioned table) and for each partition (for a
+          partitioned table). The <codeph>COMPUTE STATS</codeph> statement always gathers
+          statistics about all columns, as well as overall table statistics. If it is not
+          practical to do a full <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL
+          STATS</codeph> operation after adding a partition or inserting data, or if you can see
+          that Impala would produce a more efficient plan if the number of rows was different,
+          you can manually set the number of rows through an <codeph>ALTER TABLE</codeph>
+          statement:
+        </p>
 
 <codeblock>
 -- Set total number of rows. Applies to both unpartitioned and partitioned tables.
@@ -785,49 +751,66 @@ alter table <varname>table_name</varname> set tblproperties('numRows'='<varname>
 alter table <varname>table_name</varname> partition (<varname>keycol1</varname>=<varname>val1</varname>,<varname>keycol2</varname>=<varname>val2</varname>...) set tblproperties('numRows'='<varname>new_value</varname>', 'STATS_GENERATED_VIA_STATS_TASK'='true');
 </codeblock>
 
-      <p>
-        This statement avoids re-scanning any data files. (The requirement to include the <codeph>STATS_GENERATED_VIA_STATS_TASK</codeph> property is relatively new, as a
-        result of the issue <xref href="https://issues.apache.org/jira/browse/HIVE-8648" scope="external" format="html">HIVE-8648</xref>
-        for the Hive metastore.)
-      </p>
+        <p>
+          This statement avoids re-scanning any data files. (The requirement to include the
+          <codeph>STATS_GENERATED_VIA_STATS_TASK</codeph> property is relatively new, as a
+          result of the issue
+          <xref
+            href="https://issues.apache.org/jira/browse/HIVE-8648"
+            scope="external" format="html">HIVE-8648</xref>
+          for the Hive metastore.)
+        </p>
 
 <codeblock conref="../shared/impala_common.xml#common/set_numrows_example"/>
 
-      <p>
-        For a partitioned table, update both the per-partition number of rows and the number of rows for the whole
-        table:
-      </p>
+        <p>
+          For a partitioned table, update both the per-partition number of rows and the number
+          of rows for the whole table:
+        </p>
 
 <codeblock conref="../shared/impala_common.xml#common/set_numrows_partitioned_example"/>
 
-      <p>
-        In practice, the <codeph>COMPUTE STATS</codeph> statement, or <codeph>COMPUTE INCREMENTAL STATS</codeph>
-        for a partitioned table, should be fast and convenient enough that this technique is only useful for the very
-        largest partitioned tables.
-        <!--
+        <p>
+          In practice, the <codeph>COMPUTE STATS</codeph> statement, or <codeph>COMPUTE
+          INCREMENTAL STATS</codeph> for a partitioned table, should be fast and convenient
+          enough that this technique is only useful for the very largest partitioned tables.
+<!--
         It is most useful as a workaround for in case of performance issues where you might adjust the <codeph>numRows</codeph> value higher
         or lower to produce the ideal join order.
         -->
-        <!-- Following wording is duplicated from earlier. Consider conref'ing. -->
-        Because the column statistics might be left in a stale state, do not use this technique as a replacement
-        for <codeph>COMPUTE STATS</codeph>. Only use this technique if all other means of collecting statistics are impractical, or as a
-        low-overhead operation that you run in between periodic <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL STATS</codeph> operations.
-      </p>
-    </conbody>
-  </concept>
+<!-- Following wording is duplicated from earlier. Consider conref'ing. -->
+          Because the column statistics might be left in a stale state, do not use this
+          technique as a replacement for <codeph>COMPUTE STATS</codeph>. Only use this technique
+          if all other means of collecting statistics are impractical, or as a low-overhead
+          operation that you run in between periodic <codeph>COMPUTE STATS</codeph> or
+          <codeph>COMPUTE INCREMENTAL STATS</codeph> operations.
+        </p>
 
-  <concept id="perf_column_stats_manual" rev="2.6.0 IMPALA-3369">
-    <title>Setting Column Stats Manually through ALTER TABLE</title>
-    <conbody>
-      <p>
-        In <keyword keyref="impala26_full"/> and higher, you can also use the <codeph>SET COLUMN STATS</codeph>
-        clause of <codeph>ALTER TABLE</codeph> to manually set or change column statistics.
-        Only use this technique in cases where it is impractical to run
-        <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL STATS</codeph>
-        frequently enough to keep up with data changes for a huge table.
-      </p>
-      <p conref="../shared/impala_common.xml#common/set_column_stats_example"/>
-    </conbody>
+      </conbody>
+
+    </concept>
+
+    <concept id="concept_asb_vgl_mdb">
+
+      <title>Setting Column Statistics</title>
+
+      <conbody>
+
+        <p>
+          In <keyword keyref="impala26_full"/> and higher, you can also use the <codeph>SET
+          COLUMN STATS</codeph> clause of <codeph>ALTER TABLE</codeph> to manually set or change
+          column statistics. Only use this technique in cases where it is impractical to run
+          <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL STATS</codeph>
+          frequently enough to keep up with data changes for a huge table.
+        </p>
+
+        <p conref="../shared/impala_common.xml#common/set_column_stats_example"
+        />
+
+      </conbody>
+
+    </concept>
+
   </concept>
 
   <concept rev="1.2.2" id="perf_stats_examples">
@@ -837,20 +820,23 @@ alter table <varname>table_name</varname> partition (<varname>keycol1</varname>=
     <conbody>
 
       <p>
-        The following examples walk through a sequence of <codeph>SHOW TABLE STATS</codeph>, <codeph>SHOW COLUMN
-        STATS</codeph>, <codeph>ALTER TABLE</codeph>, and <codeph>SELECT</codeph> and <codeph>INSERT</codeph>
-        statements to illustrate various aspects of how Impala uses statistics to help optimize queries.
+        The following examples walk through a sequence of <codeph>SHOW TABLE STATS</codeph>,
+        <codeph>SHOW COLUMN STATS</codeph>, <codeph>ALTER TABLE</codeph>, and
+        <codeph>SELECT</codeph> and <codeph>INSERT</codeph> statements to illustrate various
+        aspects of how Impala uses statistics to help optimize queries.
       </p>
 
       <p>
-        This example shows table and column statistics for the <codeph>STORE</codeph> column used in the
-        <xref href="http://www.tpc.org/tpcds/" scope="external" format="html">TPC-DS benchmarks for decision
-        support</xref> systems. It is a tiny table holding data for 12 stores. Initially, before any statistics are
-        gathered by a <codeph>COMPUTE STATS</codeph> statement, most of the numeric fields show placeholder values
-        of -1, indicating that the figures are unknown. The figures that are filled in are values that are easily
-        countable or deducible at the physical level, such as the number of files, total data size of the files,
-        and the maximum and average sizes for data types that have a constant size such as <codeph>INT</codeph>,
-        <codeph>FLOAT</codeph>, and <codeph>TIMESTAMP</codeph>.
+        This example shows table and column statistics for the <codeph>STORE</codeph> column
+        used in the <xref href="http://www.tpc.org/tpcds/" scope="external" format="html">TPC-DS
+        benchmarks for decision support</xref> systems. It is a tiny table holding data for 12
+        stores. Initially, before any statistics are gathered by a <codeph>COMPUTE
+        STATS</codeph> statement, most of the numeric fields show placeholder values of -1,
+        indicating that the figures are unknown. The figures that are filled in are values that
+        are easily countable or deducible at the physical level, such as the number of files,
+        total data size of the files, and the maximum and average sizes for data types that have
+        a constant size such as <codeph>INT</codeph>, <codeph>FLOAT</codeph>, and
+        <codeph>TIMESTAMP</codeph>.
       </p>
 
 <codeblock>[localhost:21000] &gt; show table stats store;
@@ -897,11 +883,13 @@ Returned 1 row(s) in 0.03s
 Returned 29 row(s) in 0.04s</codeblock>
 
       <p>
-        With the Hive <codeph>ANALYZE TABLE</codeph> statement for column statistics, you had to specify each
-        column for which to gather statistics. The Impala <codeph>COMPUTE STATS</codeph> statement automatically
-        gathers statistics for all columns, because it reads through the entire table relatively quickly and can
-        efficiently compute the values for all the columns. This example shows how after running the
-        <codeph>COMPUTE STATS</codeph> statement, statistics are filled in for both the table and all its columns:
+        With the Hive <codeph>ANALYZE TABLE</codeph> statement for column statistics, you had to
+        specify each column for which to gather statistics. The Impala <codeph>COMPUTE
+        STATS</codeph> statement automatically gathers statistics for all columns, because it
+        reads through the entire table relatively quickly and can efficiently compute the values
+        for all the columns. This example shows how after running the <codeph>COMPUTE
+        STATS</codeph> statement, statistics are filled in for both the table and all its
+        columns:
       </p>
 
 <codeblock>[localhost:21000] &gt; compute stats store;
@@ -955,11 +943,12 @@ Returned 1 row(s) in 0.02s
 Returned 29 row(s) in 0.04s</codeblock>
 
       <p>
-        The following example shows how statistics are represented for a partitioned table. In this case, we have
-        set up a table to hold the world's most trivial census data, a single <codeph>STRING</codeph> field,
-        partitioned by a <codeph>YEAR</codeph> column. The table statistics include a separate entry for each
-        partition, plus final totals for the numeric fields. The column statistics include some easily deducible
-        facts for the partitioning column, such as the number of distinct values (the number of partition
+        The following example shows how statistics are represented for a partitioned table. In
+        this case, we have set up a table to hold the world's most trivial census data, a single
+        <codeph>STRING</codeph> field, partitioned by a <codeph>YEAR</codeph> column. The table
+        statistics include a separate entry for each partition, plus final totals for the
+        numeric fields. The column statistics include some easily deducible facts for the
+        partitioning column, such as the number of distinct values (the number of partition
         subdirectories).
 <!-- and the number of <codeph>NULL</codeph> values (none in this case). -->
       </p>
@@ -996,8 +985,8 @@ Returned 8 row(s) in 0.02s
 Returned 2 row(s) in 0.02s</codeblock>
 
       <p>
-        The following example shows how the statistics are filled in by a <codeph>COMPUTE STATS</codeph> statement
-        in Impala.
+        The following example shows how the statistics are filled in by a <codeph>COMPUTE
+        STATS</codeph> statement in Impala.
       </p>
 
 <codeblock>[localhost:21000] &gt; compute stats census;
@@ -1031,13 +1020,17 @@ Returned 8 row(s) in 0.02s
 Returned 2 row(s) in 0.02s</codeblock>
 
       <p rev="1.4.0">
-        For examples showing how some queries work differently when statistics are available, see
-        <xref href="impala_perf_joins.xml#perf_joins_examples"/>. You can see how Impala executes a query
-        differently in each case by observing the <codeph>EXPLAIN</codeph> output before and after collecting
-        statistics. Measure the before and after query times, and examine the throughput numbers in before and
-        after <codeph>SUMMARY</codeph> or <codeph>PROFILE</codeph> output, to verify how much the improved plan
-        speeds up performance.
+        For examples showing how some queries work differently when statistics are available,
+        see <xref href="impala_perf_joins.xml#perf_joins_examples"/>. You can see how Impala
+        executes a query differently in each case by observing the <codeph>EXPLAIN</codeph>
+        output before and after collecting statistics. Measure the before and after query times,
+        and examine the throughput numbers in before and after <codeph>SUMMARY</codeph> or
+        <codeph>PROFILE</codeph> output, to verify how much the improved plan speeds up
+        performance.
       </p>
+
     </conbody>
+
   </concept>
+
 </concept>
