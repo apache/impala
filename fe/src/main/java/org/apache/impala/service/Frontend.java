@@ -1008,6 +1008,11 @@ public class Frontend {
       queryExecRequest.setLineage_graph(thriftLineageGraph);
     }
 
+    // Override the per_host_mem_estimate sent to the backend if needed. The explain
+    // string is already generated at this point so this does not change the estimate
+    // shown in the plan.
+    checkAndOverrideMemEstimate(queryExecRequest, queryOptions);
+
     if (analysisResult.isExplainStmt()) {
       // Return the EXPLAIN request
       createExplainRequest(explainString.toString(), result);
@@ -1062,6 +1067,21 @@ public class Frontend {
     timeline.markEvent("Planning finished");
     result.setTimeline(timeline.toThrift());
     return result;
+  }
+
+  /**
+   * The MAX_MEM_ESTIMATE_FOR_ADMISSION query option can override the planner memory
+   * estimate if set. Sets queryOptions.per_host_mem_estimate if the override is
+   * effective.
+   */
+  private void checkAndOverrideMemEstimate(TQueryExecRequest queryExecRequest,
+      TQueryOptions queryOptions) {
+    if (queryOptions.isSetMax_mem_estimate_for_admission()
+        && queryOptions.getMax_mem_estimate_for_admission() > 0) {
+      long effectiveMemEstimate = Math.min(queryExecRequest.getPer_host_mem_estimate(),
+              queryOptions.getMax_mem_estimate_for_admission());
+      queryExecRequest.setPer_host_mem_estimate(effectiveMemEstimate);
+    }
   }
 
   /**

@@ -387,16 +387,22 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
           pool_max_mem=10 * 1024 * 1024, proc_mem_limit=1024 * 1024 * 1024),
       statestored_args=_STATESTORED_ARGS)
-  def test_reject_min_reservation(self, vector):
-    """Test that the query will be rejected by admission control if:
-       a) the largest per-backend min buffer reservation is larger than the query mem
-          limit
-       b) the largest per-backend min buffer reservation is larger than the
-          buffer_pool_limit query option
-       c) the cluster-wide min-buffer reservation size is larger than the pool memory
-          resources.
-    """
+  def test_memory_rejection(self, vector):
+    """Test that rejection of queries based on reservation and estimates works as
+    expected."""
+    # Test that the query will be rejected by admission control if:
+    # a) the largest per-backend min buffer reservation is larger than the query mem limit
+    # b) the largest per-backend min buffer reservation is larger than the
+    #    buffer_pool_limit query option
+    # c) the cluster-wide min-buffer reservation size is larger than the pool memory
+    #    resources.
     self.run_test_case('QueryTest/admission-reject-min-reservation', vector)
+
+    # Test that queries are rejected based on memory estimates. Set num_nodes=1 to
+    # avoid unpredictability from scheduling on different backends.
+    exec_options = vector.get_value('exec_option')
+    exec_options['num_nodes'] = 1
+    self.run_test_case('QueryTest/admission-reject-mem-estimate', vector)
 
   # Process mem_limit used in test_mem_limit_upper_bound
   PROC_MEM_TEST_LIMIT = 1024 * 1024 * 1024
