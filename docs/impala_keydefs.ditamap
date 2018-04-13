@@ -10936,7 +10936,6 @@ under the License.
   <keydef href="topics/impala_perf_joins.xml#straight_join" keys="straight_join"/>
   <keydef href="topics/impala_perf_joins.xml#perf_joins_examples" keys="perf_joins_examples"/>
   <keydef href="topics/impala_perf_stats.xml" keys="perf_stats"/>
-  <keydef href="topics/impala_perf_stats.xml#perf_column_stats_manual" keys="perf_column_stats_manual"/>
 
   <keydef href="topics/impala_perf_benchmarking.xml" keys="perf_benchmarks"/>
   <keydef href="topics/impala_perf_resources.xml" keys="mem_limits"/>
