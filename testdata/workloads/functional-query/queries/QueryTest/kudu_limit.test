@@ -1,0 +1,112 @@
+====
+---- QUERY
+# limit 0
+select * from functional_kudu.alltypes limit 0
+---- RESULTS
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp,int,int
+====
+---- QUERY
+# no predicate, nondeterministic (no order by) so only check number of rows returned
+select count(*) from (select * from functional_kudu.alltypes limit 2) v
+---- RESULTS
+2
+---- TYPES
+bigint
+====
+---- QUERY
+# no predicate, deterministic (limit doesn't exclude any rows) so check actual values
+select * from functional_kudu.alltypestiny limit 100
+---- RESULTS : VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+5,false,1,1,1,10,1.100000023841858,10.1,'03/01/09','1',2009-03-01 00:01:00,2009,3
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00,2009,4
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp,int,int
+====
+---- QUERY
+# Kudu predicate on PK col, nondeterministic
+select count(id) from (select * from functional_kudu.alltypes where id > 0 limit 3) v
+---- RESULTS
+3
+---- TYPES
+bigint
+====
+---- QUERY
+# Kudu predicate on PK col, deterministic
+select * from functional_kudu.alltypestiny where id > 4 limit 3
+---- RESULTS : VERIFY_IS_EQUAL_SORTED
+5,false,1,1,1,10,1.100000023841858,10.1,'03/01/09','1',2009-03-01 00:01:00,2009,3
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00,2009,4
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp,int,int
+====
+---- QUERY
+# Kudu predicate on non-PK col, nondeterministic
+select count(tinyint_col) from (select * from functional_kudu.alltypes where tinyint_col = 6 limit 4) v
+---- RESULTS
+4
+---- TYPES
+bigint
+====
+---- QUERY
+# Kudu predicate on non-PK col, deterministic
+select * from functional_kudu.alltypestiny where tinyint_col = 1 limit 4
+---- RESULTS : VERIFY_IS_EQUAL_SORTED
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+5,false,1,1,1,10,1.100000023841858,10.1,'03/01/09','1',2009-03-01 00:01:00,2009,3
+7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00,2009,4
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp,int,int
+====
+---- QUERY
+# Impala predicate, nondeterministic
+select count(string_col) from (select * from functional_kudu.alltypes where id % 2 = 0 limit 2) v
+---- RESULTS
+2
+---- TYPES
+bigint
+====
+---- QUERY
+# Impala predicate, deterministic
+select * from functional_kudu.alltypestiny where id % 2 = 0 limit 100
+---- RESULTS : VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp,int,int
+====
+---- QUERY
+# Both Impala and Kudu predicates, nondeterministic
+select count(month) from
+  (select * from functional_kudu.alltypes where id % 2 = 0 and id > 4 limit 5) v
+---- RESULTS
+5
+---- TYPES
+bigint
+====
+---- QUERY
+# Both Impala and Kudu predicates, deterministic
+select * from functional_kudu.alltypestiny where id % 2 = 0 and id > 4 limit 5
+---- RESULTS
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp,int,int
+====
+---- QUERY
+# large limit, nondeterministic
+select count(*) from (select * from functional_kudu.alltypes where id % 2 = 0 and id > 1 limit 1000) v;
+---- RESULTS
+1000
+---- TYPES
+bigint
+====
