@@ -25,6 +25,7 @@
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
 
+#include "common/hdfs.h"
 #include "exec/data-sink.h"
 #include "exec/plan-root-sink.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -39,6 +40,7 @@
 #include "runtime/query-state.h"
 #include "scheduling/admission-controller.h"
 #include "scheduling/scheduler.h"
+#include "scheduling/query-schedule.h"
 #include "util/bloom-filter.h"
 #include "util/counting-barrier.h"
 #include "util/hdfs-bulk-ops.h"
@@ -51,16 +53,13 @@
 
 using namespace apache::thrift;
 using namespace rapidjson;
-using namespace strings;
 using boost::algorithm::iequals;
 using boost::algorithm::is_any_of;
 using boost::algorithm::join;
 using boost::algorithm::token_compress_on;
 using boost::algorithm::split;
 using boost::filesystem::path;
-using std::unique_ptr;
 
-DECLARE_int32(be_port);
 DECLARE_string(hostname);
 
 using namespace impala;
@@ -76,11 +75,9 @@ Coordinator::Coordinator(
     query_events_(events) {}
 
 Coordinator::~Coordinator() {
-  DCHECK(released_exec_resources_)
-      << "ReleaseExecResources() must be called before Coordinator is destroyed";
-  DCHECK(released_admission_control_resources_)
-      << "ReleaseAdmissionControlResources() must be called before Coordinator is "
-      << "destroyed";
+  // Must have entered a terminal exec state guaranteeing resources were released.
+  DCHECK_NE(exec_state_, ExecState::EXECUTING);
+  // Release the coordinator's reference to the query control structures.
   if (query_state_ != nullptr) {
     ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(query_state_);
   }
@@ -109,12 +106,6 @@ Status Coordinator::Exec() {
   bool is_mt_execution = request.query_ctx.client_request.query_options.mt_dop > 0;
   if (is_mt_execution) filter_mode_ = TRuntimeFilterMode::OFF;
 
-  // to keep things simple, make async Cancel() calls wait until plan fragment
-  // execution has been initiated, otherwise we might try to cancel fragment
-  // execution at Impala daemons where it hasn't even started
-  // TODO: revisit this, it may not be true anymore
-  lock_guard<mutex> l(lock_);
-
   query_state_ = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(query_ctx());
   query_state_->AcquireExecResourceRefcount(); // Decremented in ReleaseExecResources().
   filter_mem_tracker_ = query_state_->obj_pool()->Add(new MemTracker(
@@ -138,9 +129,9 @@ Status Coordinator::Exec() {
     InitFilterRoutingTable();
   }
 
-  // At this point, all static setup is done and all structures are initialized.
-  // Only runtime-related state changes past this point (examples:
-  // num_remaining_backends_, fragment instance profiles, etc.)
+  // At this point, all static setup is done and all structures are initialized. Only
+  // runtime-related state changes past this point (examples: fragment instance
+  // profiles, etc.)
 
   StartBackendExec();
   RETURN_IF_ERROR(FinishBackendStartup());
@@ -155,7 +146,7 @@ Status Coordinator::Exec() {
       // which means we failed Prepare
       Status prepare_status = query_state_->WaitForPrepare();
       DCHECK(!prepare_status.ok());
-      return prepare_status;
+      return UpdateExecState(prepare_status, nullptr, FLAGS_hostname);
     }
 
     // When GetFInstanceState() returns the coordinator instance, the Prepare phase
@@ -169,7 +160,6 @@ Status Coordinator::Exec() {
     coord_sink_ = coord_instance_->root_sink();
     DCHECK(coord_sink_ != nullptr);
   }
-
   return Status::OK();
 }
 
@@ -208,6 +198,8 @@ void Coordinator::InitFragmentStats() {
 void Coordinator::InitBackendStates() {
   int num_backends = schedule_.per_backend_exec_params().size();
   DCHECK_GT(num_backends, 0);
+
+  lock_guard<SpinLock> l(backend_states_init_lock_);
   backend_states_.resize(num_backends);
 
   RuntimeProfile::Counter* num_backends_counter =
@@ -215,19 +207,13 @@ void Coordinator::InitBackendStates() {
   num_backends_counter->Set(num_backends);
 
   // create BackendStates
-  bool has_coord_fragment = schedule_.GetCoordFragment() != nullptr;
-  const TNetworkAddress& coord_address = ExecEnv::GetInstance()->backend_address();
   int backend_idx = 0;
   for (const auto& entry: schedule_.per_backend_exec_params()) {
-    if (has_coord_fragment && coord_address == entry.first) {
-      coord_backend_idx_ = backend_idx;
-    }
     BackendState* backend_state = obj_pool()->Add(
         new BackendState(query_id(), backend_idx, filter_mode_));
     backend_state->Init(entry.second, fragment_stats_, obj_pool());
     backend_states_[backend_idx++] = backend_state;
   }
-  DCHECK(!has_coord_fragment || coord_backend_idx_ != -1);
 }
 
 void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
@@ -341,8 +327,8 @@ void Coordinator::InitFilterRoutingTable() {
 
 void Coordinator::StartBackendExec() {
   int num_backends = backend_states_.size();
-  exec_complete_barrier_.reset(new CountingBarrier(num_backends));
-  num_remaining_backends_ = num_backends;
+  exec_rpcs_complete_barrier_.reset(new CountingBarrier(num_backends));
+  backend_exec_complete_barrier_.reset(new CountingBarrier(num_backends));
 
   DebugOptions debug_options(schedule_.query_options());
 
@@ -354,11 +340,11 @@ void Coordinator::StartBackendExec() {
     ExecEnv::GetInstance()->exec_rpc_thread_pool()->Offer(
         [backend_state, this, &debug_options]() {
           backend_state->Exec(query_ctx(), debug_options, filter_routing_table_,
-            exec_complete_barrier_.get());
+              exec_rpcs_complete_barrier_.get());
         });
   }
+  exec_rpcs_complete_barrier_->Wait();
 
-  exec_complete_barrier_->Wait();
   VLOG_QUERY << "started execution on " << num_backends << " backends for query_id="
              << PrintId(query_id());
   query_events_->MarkEvent(
@@ -367,26 +353,24 @@ void Coordinator::StartBackendExec() {
 }
 
 Status Coordinator::FinishBackendStartup() {
-  Status status = Status::OK();
   const TMetricDef& def =
       MakeTMetricDef("backend-startup-latencies", TMetricKind::HISTOGRAM, TUnit::TIME_MS);
   // Capture up to 30 minutes of start-up times, in ms, with 4 s.f. accuracy.
   HistogramMetric latencies(def, 30 * 60 * 1000, 4);
+  Status status = Status::OK();
+  string error_hostname;
   for (BackendState* backend_state: backend_states_) {
     // preserve the first non-OK, if there is one
     Status backend_status = backend_state->GetStatus();
-    if (!backend_status.ok() && status.ok()) status = backend_status;
+    if (!backend_status.ok() && status.ok()) {
+      status = backend_status;
+      error_hostname = backend_state->impalad_address().hostname;
+    }
     latencies.Update(backend_state->rpc_latency());
   }
-
   query_profile_->AddInfoString(
       "Backend startup latencies", latencies.ToHumanReadable());
-
-  if (!status.ok()) {
-    query_status_ = status;
-    CancelInternal();
-  }
-  return status;
+  return UpdateExecState(status, nullptr, error_hostname);
 }
 
 string Coordinator::FilterDebugString() {
@@ -446,40 +430,115 @@ string Coordinator::FilterDebugString() {
   return Substitute("\n$0", table_printer.ToString());
 }
 
-Status Coordinator::GetStatus() {
-  lock_guard<mutex> l(lock_);
-  return query_status_;
+const char* Coordinator::ExecStateToString(const ExecState state) {
+  static const unordered_map<ExecState, const char *> exec_state_to_str{
+    {ExecState::EXECUTING,        "EXECUTING"},
+    {ExecState::RETURNED_RESULTS, "RETURNED_RESULTS"},
+    {ExecState::CANCELLED,        "CANCELLED"},
+    {ExecState::ERROR,            "ERROR"}};
+  return exec_state_to_str.at(state);
 }
 
-Status Coordinator::UpdateStatus(const Status& status, const string& backend_hostname,
-    bool is_fragment_failure, const TUniqueId& instance_id) {
+Status Coordinator::SetNonErrorTerminalState(const ExecState state) {
+  DCHECK(state == ExecState::RETURNED_RESULTS || state == ExecState::CANCELLED);
+  Status ret_status;
   {
-    lock_guard<mutex> l(lock_);
-
-    // The query is done and we are just waiting for backends to clean up.
-    // Ignore their cancelled updates.
-    if (returned_all_results_ && status.IsCancelled()) return query_status_;
-
-    // nothing to update
-    if (status.ok()) return query_status_;
-
-    // don't override an error status; also, cancellation has already started
-    if (!query_status_.ok()) return query_status_;
-
-    query_status_ = status;
-    CancelInternal();
+    lock_guard<SpinLock> l(exec_state_lock_);
+    // May have already entered a terminal state, in which case nothing to do.
+    if (exec_state_ != ExecState::EXECUTING) return exec_status_;
+    DCHECK(exec_status_.ok()) << exec_status_;
+    exec_state_ = state;
+    if (state == ExecState::CANCELLED) exec_status_ = Status::CANCELLED;
+    ret_status = exec_status_;
   }
+  VLOG_QUERY << Substitute("ExecState: query id=$0 execution $1", PrintId(query_id()),
+      state == ExecState::CANCELLED ? "cancelled" : "completed");
+  HandleExecStateTransition(ExecState::EXECUTING, state);
+  return ret_status;
+}
 
-  if (is_fragment_failure) {
-    // Log the id of the fragment that first failed so we can track it down more easily.
-    VLOG_QUERY << "query_id=" << PrintId(query_id())
-               << " failed because fragment_instance_id=" << PrintId(instance_id)
-               << " on host=" << backend_hostname << " failed.";
+Status Coordinator::UpdateExecState(const Status& status,
+    const TUniqueId* failed_finst, const string& instance_hostname) {
+  Status ret_status;
+  ExecState old_state, new_state;
+  {
+    lock_guard<SpinLock> l(exec_state_lock_);
+    old_state = exec_state_;
+    if (old_state == ExecState::EXECUTING) {
+      DCHECK(exec_status_.ok()) << exec_status_;
+      if (!status.ok()) {
+        // Error while executing - go to ERROR state.
+        exec_status_ = status;
+        exec_state_ = ExecState::ERROR;
+      }
+    } else if (old_state == ExecState::RETURNED_RESULTS) {
+      // Already returned all results. Leave exec status as ok, stay in this state.
+      DCHECK(exec_status_.ok()) << exec_status_;
+    } else if (old_state == ExecState::CANCELLED) {
+      // Client requested cancellation already, stay in this state.  Ignores errors
+      // after requested cancellations.
+      DCHECK(exec_status_.IsCancelled()) << exec_status_;
+    } else {
+      // Already in the ERROR state, stay in this state but update status to be the
+      // first non-cancelled status.
+      DCHECK_EQ(old_state, ExecState::ERROR);
+      DCHECK(!exec_status_.ok());
+      if (!status.ok() && !status.IsCancelled() && exec_status_.IsCancelled()) {
+        exec_status_ = status;
+      }
+    }
+    new_state = exec_state_;
+    ret_status = exec_status_;
+  }
+  // Log interesting status: a non-cancelled error or a cancellation if was executing.
+  if (!status.ok() && (!status.IsCancelled() || old_state == ExecState::EXECUTING)) {
+    VLOG_QUERY << Substitute(
+        "ExecState: query id=$0 finstance=$1 on host=$2 ($3 -> $4) status=$5",
+        PrintId(query_id()), failed_finst != nullptr ? PrintId(*failed_finst) : "N/A",
+        instance_hostname, ExecStateToString(old_state), ExecStateToString(new_state),
+        status.GetDetail());
+  }
+  // After dropping the lock, apply the state transition (if any) side-effects.
+  HandleExecStateTransition(old_state, new_state);
+  return ret_status;
+}
+
+bool Coordinator::ReturnedAllResults() {
+  lock_guard<SpinLock> l(exec_state_lock_);
+  return exec_state_ == ExecState::RETURNED_RESULTS;
+}
+
+void Coordinator::HandleExecStateTransition(
+    const ExecState old_state, const ExecState new_state) {
+  static const unordered_map<ExecState, const char *> exec_state_to_event{
+    {ExecState::EXECUTING,        "Executing"},
+    {ExecState::RETURNED_RESULTS, "Last row fetched"},
+    {ExecState::CANCELLED,        "Execution cancelled"},
+    {ExecState::ERROR,            "Execution error"}};
+  if (old_state == new_state) return;
+  // Once we enter a terminal state, we stay there, guaranteeing this code runs only once.
+  DCHECK_EQ(old_state, ExecState::EXECUTING);
+  // Should never transition to the initial state.
+  DCHECK_NE(new_state, ExecState::EXECUTING);
+
+  query_events_->MarkEvent(exec_state_to_event.at(new_state));
+  // TODO: IMPALA-7011 is this needed? This will also happen on the "backend" side of
+  // cancel rpc. And in the case of EOS, sink already knows this.
+  if (coord_sink_ != nullptr) coord_sink_->CloseConsumer();
+  // This thread won the race to transitioning into a terminal state - terminate
+  // execution and release resources.
+  ReleaseExecResources();
+  if (new_state == ExecState::RETURNED_RESULTS) {
+    // TODO: IMPALA-6984: cancel all backends in this case too.
+    WaitForBackends();
   } else {
-    VLOG_QUERY << "query_id=" << PrintId(query_id()) << " failed due to error on host="
-               << backend_hostname;
+    CancelBackends();
   }
-  return query_status_;
+  ReleaseAdmissionControlResources();
+  // Can compute summary only after we stop accepting reports from the backends. Both
+  // WaitForBackends() and CancelBackends() ensures that.
+  // TODO: should move this off of the query execution path?
+  ComputeQuerySummary();
 }
 
 Status Coordinator::FinalizeHdfsInsert() {
@@ -491,7 +550,7 @@ Status Coordinator::FinalizeHdfsInsert() {
 
   VLOG_QUERY << "Finalizing query: " << PrintId(query_id());
   SCOPED_TIMER(finalization_timer_);
-  Status return_status = GetStatus();
+  Status return_status = UpdateExecState(Status::OK(), nullptr, FLAGS_hostname);
   if (return_status.ok()) {
     HdfsTableDescriptor* hdfs_table;
     RETURN_IF_ERROR(DescriptorTbl::CreateHdfsTblDescriptor(query_ctx().desc_tbl,
@@ -517,22 +576,13 @@ Status Coordinator::FinalizeHdfsInsert() {
   return return_status;
 }
 
-Status Coordinator::WaitForBackendCompletion() {
-  unique_lock<mutex> l(lock_);
-  while (num_remaining_backends_ > 0 && query_status_.ok()) {
-    VLOG_QUERY << "Coordinator waiting for backends to finish, "
-               << num_remaining_backends_ << " remaining. query_id="
-               << PrintId(query_id());
-    backend_completion_cv_.Wait(l);
+void Coordinator::WaitForBackends() {
+  int32_t num_remaining = backend_exec_complete_barrier_->pending();
+  if (num_remaining > 0) {
+    VLOG_QUERY << "Coordinator waiting for backends to finish, " << num_remaining
+               << " remaining. query_id=" << PrintId(query_id());
+    backend_exec_complete_barrier_->Wait();
   }
-  if (query_status_.ok()) {
-    VLOG_QUERY << "All backends finished successfully. query_id=" << PrintId(query_id());
-  } else {
-    VLOG_QUERY << "All backends finished due to one or more errors. query_id="
-               << PrintId(query_id()) << ". " << query_status_.GetDetail();
-  }
-
-  return query_status_;
 }
 
 Status Coordinator::Wait() {
@@ -543,34 +593,22 @@ Status Coordinator::Wait() {
 
   if (stmt_type_ == TStmtType::QUERY) {
     DCHECK(coord_instance_ != nullptr);
-    return UpdateStatus(coord_instance_->WaitForOpen(), FLAGS_hostname, true,
-        runtime_state()->fragment_instance_id());
+    return UpdateExecState(coord_instance_->WaitForOpen(),
+        &coord_instance_->runtime_state()->fragment_instance_id(), FLAGS_hostname);
   }
-
   DCHECK_EQ(stmt_type_, TStmtType::DML);
-  // Query finalization can only happen when all backends have reported relevant
-  // state. They only have relevant state to report in the parallel INSERT case,
-  // otherwise all the relevant state is from the coordinator fragment which will be
-  // available after Open() returns.  Ignore the returned status if finalization is
-  // required., since FinalizeHdfsInsert() will pick it up and needs to execute
-  // regardless.
-  Status status = WaitForBackendCompletion();
-  if (finalize_params() == nullptr && !status.ok()) return status;
-
-  // Execution of query fragments has finished. We don't need to hold onto query execution
-  // resources while we finalize the query.
-  ReleaseExecResources();
-  // Query finalization is required only for HDFS table sinks
-  if (finalize_params() != nullptr) RETURN_IF_ERROR(FinalizeHdfsInsert());
-  // Release admission control resources after we'd done the potentially heavyweight
-  // finalization.
-  ReleaseAdmissionControlResources();
-
+  // DML finalization can only happen when all backends have completed all side-effects
+  // and reported relevant state.
+  WaitForBackends();
+  if (finalize_params() != nullptr) {
+    RETURN_IF_ERROR(UpdateExecState(
+            FinalizeHdfsInsert(), nullptr, FLAGS_hostname));
+  }
+  // DML requests are finished at this point.
+  RETURN_IF_ERROR(SetNonErrorTerminalState(ExecState::RETURNED_RESULTS));
   query_profile_->AddInfoString(
       "DML Stats", dml_exec_state_.OutputPartitionStats("\n"));
-  // For DML queries, when Wait is done, the query is complete.
-  ComputeQuerySummary();
-  return status;
+  return Status::OK();
 }
 
 Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
@@ -578,88 +616,54 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
   DCHECK(has_called_wait_);
   SCOPED_TIMER(query_profile_->total_time_counter());
 
-  if (returned_all_results_) {
-    // May be called after the first time we set *eos. Re-set *eos and return here;
-    // already torn-down coord_sink_ so no more work to do.
+  // exec_state_lock_ not needed here though since this path won't execute concurrently
+  // with itself or DML finalization.
+  if (exec_state_ == ExecState::RETURNED_RESULTS) {
+    // Nothing left to do: already in a terminal state and no more results.
     *eos = true;
     return Status::OK();
   }
+  DCHECK(coord_instance_ != nullptr) << "Exec() should be called first";
+  DCHECK(coord_sink_ != nullptr)     << "Exec() should be called first";
+  RuntimeState* runtime_state = coord_instance_->runtime_state();
 
-  DCHECK(coord_sink_ != nullptr)
-      << "GetNext() called without result sink. Perhaps Prepare() failed and was not "
-      << "checked?";
-  Status status = coord_sink_->GetNext(runtime_state(), results, max_rows, eos);
-
-  // if there was an error, we need to return the query's error status rather than
-  // the status we just got back from the local executor (which may well be CANCELLED
-  // in that case).  Coordinator fragment failed in this case so we log the query_id.
-  RETURN_IF_ERROR(UpdateStatus(status, FLAGS_hostname, true,
-      runtime_state()->fragment_instance_id()));
-
-  if (*eos) {
-    returned_all_results_ = true;
-    query_events_->MarkEvent("Last row fetched");
-    // release query execution resources here, since we won't be fetching more result rows
-    ReleaseExecResources();
-    // wait for all backends to complete before computing the summary
-    // TODO: relocate this so GetNext() won't have to wait for backends to complete?
-    RETURN_IF_ERROR(WaitForBackendCompletion());
-    // Release admission control resources after backends are finished.
-    ReleaseAdmissionControlResources();
-    // if the query completed successfully, compute the summary
-    if (query_status_.ok()) ComputeQuerySummary();
-  }
-
+  Status status = coord_sink_->GetNext(runtime_state, results, max_rows, eos);
+  RETURN_IF_ERROR(UpdateExecState(
+          status, &runtime_state->fragment_instance_id(), FLAGS_hostname));
+  if (*eos) RETURN_IF_ERROR(SetNonErrorTerminalState(ExecState::RETURNED_RESULTS));
   return Status::OK();
 }
 
-void Coordinator::Cancel(const Status* cause) {
-  lock_guard<mutex> l(lock_);
-  // if the query status indicates an error, cancellation has already been initiated;
-  // prevent others from cancelling a second time
-  if (!query_status_.ok()) return;
-
-  // TODO: This should default to OK(), not CANCELLED if there is no cause (or callers
-  // should explicitly pass Status::OK()). Fragment instances may be cancelled at the end
-  // of a successful query. Need to clean up relationship between query_status_ here and
-  // in QueryExecState. See IMPALA-4279.
-  query_status_ = (cause != nullptr && !cause->ok()) ? *cause : Status::CANCELLED;
-  CancelInternal();
+void Coordinator::Cancel() {
+  // Illegal to call Cancel() before Exec() returns, so there's no danger of the cancel
+  // RPC passing the exec RPC.
+  DCHECK(exec_rpcs_complete_barrier_ != nullptr &&
+      exec_rpcs_complete_barrier_->pending() <= 0) << "Exec() must be called first";
+  discard_result(SetNonErrorTerminalState(ExecState::CANCELLED));
 }
 
-void Coordinator::CancelInternal() {
-  VLOG_QUERY << "Cancel() query_id=" << PrintId(query_id());
-  // TODO: remove when restructuring cancellation, which should happen automatically
-  // as soon as the coordinator knows that the query is finished
-  DCHECK(!query_status_.ok());
-
+void Coordinator::CancelBackends() {
   int num_cancelled = 0;
   for (BackendState* backend_state: backend_states_) {
     DCHECK(backend_state != nullptr);
     if (backend_state->Cancel()) ++num_cancelled;
   }
+  backend_exec_complete_barrier_->NotifyRemaining();
+
   VLOG_QUERY << Substitute(
       "CancelBackends() query_id=$0, tried to cancel $1 backends",
       PrintId(query_id()), num_cancelled);
-  backend_completion_cv_.NotifyAll();
-
-  ReleaseExecResourcesLocked();
-  ReleaseAdmissionControlResourcesLocked();
-  // Report the summary with whatever progress the query made before being cancelled.
-  ComputeQuerySummary();
 }
 
 Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& params) {
-  VLOG_FILE << "UpdateBackendExecStatus()  backend_idx=" << params.coord_state_idx;
+  VLOG_FILE << "UpdateBackendExecStatus() query_id=" << PrintId(query_id())
+            << " backend_idx=" << params.coord_state_idx;
   if (params.coord_state_idx >= backend_states_.size()) {
     return Status(TErrorCode::INTERNAL_ERROR,
         Substitute("Unknown backend index $0 (max known: $1)",
             params.coord_state_idx, backend_states_.size() - 1));
   }
   BackendState* backend_state = backend_states_[params.coord_state_idx];
-  // TODO: return here if returned_all_results_?
-  // TODO: return CANCELLED in that case? Although that makes the cancellation propagation
-  // path more irregular.
 
   // TODO: only do this when the sink is done; probably missing a done field
   // in TReportExecStatus for that
@@ -668,46 +672,30 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
   }
 
   if (backend_state->ApplyExecStatusReport(params, &exec_summary_, &progress_)) {
-    // This report made this backend done, so update the status and
-    // num_remaining_backends_.
-
-    // for now, abort the query if we see any error except if returned_all_results_ is
-    // true (UpdateStatus() initiates cancellation, if it hasn't already been)
-    // TODO: clarify control flow here, it's unclear we should even process this status
-    // report if returned_all_results_ is true
+    // This backend execution has completed.
     bool is_fragment_failure;
     TUniqueId failed_instance_id;
     Status status = backend_state->GetStatus(&is_fragment_failure, &failed_instance_id);
-    if (!status.ok() && !returned_all_results_) {
-      Status ignored =
-          UpdateStatus(status, TNetworkAddressToString(backend_state->impalad_address()),
-              is_fragment_failure, failed_instance_id);
-      return Status::OK();
-    }
-
-    lock_guard<mutex> l(lock_);
-    DCHECK_GT(num_remaining_backends_, 0);
-    if (VLOG_QUERY_IS_ON && num_remaining_backends_ > 1) {
-      VLOG_QUERY << "Backend completed: "
-          << " host=" << TNetworkAddressToString(backend_state->impalad_address())
-          << " remaining=" << num_remaining_backends_ - 1
-          << " query_id=" << PrintId(query_id());
+    int pending_backends = backend_exec_complete_barrier_->Notify();
+    if (VLOG_QUERY_IS_ON && pending_backends >= 0) {
+      VLOG_QUERY << "Backend completed:"
+                 << " host=" << TNetworkAddressToString(backend_state->impalad_address())
+                 << " remaining=" << pending_backends
+                 << " query_id=" << PrintId(query_id());
       BackendState::LogFirstInProgress(backend_states_);
     }
-    if (--num_remaining_backends_ == 0 || !status.ok()) {
-      backend_completion_cv_.NotifyAll();
+    if (!status.ok()) {
+      // TODO: IMPALA-5119: call UpdateExecState() asynchronously rather than
+      // from within this RPC handler (since it can make RPCs).
+      discard_result(UpdateExecState(status,
+              is_fragment_failure ? &failed_instance_id : nullptr,
+              TNetworkAddressToString(backend_state->impalad_address())));
     }
-    return Status::OK();
   }
   // If all results have been returned, return a cancelled status to force the fragment
   // instance to stop executing.
-  if (returned_all_results_) return Status::CANCELLED;
-
-  return Status::OK();
-}
-
-RuntimeState* Coordinator::runtime_state() {
-  return coord_instance_ == nullptr ? nullptr : coord_instance_->runtime_state();
+  // TODO: Make returning CANCELLED unnecessary with IMPALA-6984.
+  return ReturnedAllResults() ? Status::CANCELLED : Status::OK();
 }
 
 // TODO: add histogram/percentile
@@ -740,20 +728,14 @@ void Coordinator::ComputeQuerySummary() {
 
 string Coordinator::GetErrorLog() {
   ErrorLogMap merged;
-  for (BackendState* state: backend_states_) {
-    state->MergeErrorLog(&merged);
+  {
+    lock_guard<SpinLock> l(backend_states_init_lock_);
+    for (BackendState* state: backend_states_) state->MergeErrorLog(&merged);
   }
   return PrintErrorMapToString(merged);
 }
 
 void Coordinator::ReleaseExecResources() {
-  lock_guard<mutex> l(lock_);
-  ReleaseExecResourcesLocked();
-}
-
-void Coordinator::ReleaseExecResourcesLocked() {
-  if (released_exec_resources_) return;
-  released_exec_resources_ = true;
   if (filter_routing_table_.size() > 0) {
     query_profile_->AddInfoString("Final filter table", FilterDebugString());
   }
@@ -767,8 +749,6 @@ void Coordinator::ReleaseExecResourcesLocked() {
   }
   // This may be NULL while executing UDFs.
   if (filter_mem_tracker_ != nullptr) filter_mem_tracker_->Close();
-  // Need to protect against failed Prepare(), where root_sink() would not be set.
-  if (coord_sink_ != nullptr) coord_sink_->CloseConsumer();
   // Now that we've released our own resources, can release query-wide resources.
   if (query_state_ != nullptr) query_state_->ReleaseExecResourceRefcount();
   // At this point some tracked memory may still be used in the coordinator for result
@@ -776,27 +756,20 @@ void Coordinator::ReleaseExecResourcesLocked() {
 }
 
 void Coordinator::ReleaseAdmissionControlResources() {
-  lock_guard<mutex> l(lock_);
-  ReleaseAdmissionControlResourcesLocked();
-}
-
-void Coordinator::ReleaseAdmissionControlResourcesLocked() {
-  if (released_admission_control_resources_) return;
-  LOG(INFO) << "Release admission control resources for query_id="
-            << PrintId(query_ctx().query_id);
+  LOG(INFO) << "Release admission control resources for query_id=" << PrintId(query_id());
   AdmissionController* admission_controller =
       ExecEnv::GetInstance()->admission_controller();
   if (admission_controller != nullptr) admission_controller->ReleaseQuery(schedule_);
-  released_admission_control_resources_ = true;
   query_events_->MarkEvent("Released admission control resources");
 }
 
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
   DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
       << "UpdateFilter() called although runtime filters are disabled";
-  DCHECK(exec_complete_barrier_.get() != nullptr)
+  DCHECK(exec_rpcs_complete_barrier_.get() != nullptr)
       << "Filters received before fragments started!";
-  exec_complete_barrier_->Wait();
+
+  exec_rpcs_complete_barrier_->Wait();
   DCHECK(filter_routing_table_complete_)
       << "Filter received before routing table complete";
 
@@ -867,6 +840,7 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
   rpc_params.__set_dst_query_id(query_id());
   rpc_params.__set_filter_id(params.filter_id);
 
+  // Waited for exec_rpcs_complete_barrier_ so backend_states_ is valid.
   for (BackendState* bs: backend_states_) {
     for (int fragment_idx: target_fragment_idxs) {
       rpc_params.__set_dst_fragment_idx(fragment_idx);
@@ -940,23 +914,19 @@ void Coordinator::FilterState::Disable(MemTracker* tracker) {
   }
 }
 
-const TUniqueId& Coordinator::query_id() const {
-  return query_ctx().query_id;
-}
-
 void Coordinator::GetTExecSummary(TExecSummary* exec_summary) {
   lock_guard<SpinLock> l(exec_summary_.lock);
   *exec_summary = exec_summary_.thrift_exec_summary;
 }
 
 MemTracker* Coordinator::query_mem_tracker() const {
-  return query_state()->query_mem_tracker();
+  return query_state_->query_mem_tracker();
 }
 
 void Coordinator::BackendsToJson(Document* doc) {
   Value states(kArrayType);
   {
-    lock_guard<mutex> l(lock_);
+    lock_guard<SpinLock> l(backend_states_init_lock_);
     for (BackendState* state : backend_states_) {
       Value val(kObjectType);
       state->ToJson(&val, doc);
@@ -969,7 +939,7 @@ void Coordinator::BackendsToJson(Document* doc) {
 void Coordinator::FInstanceStatsToJson(Document* doc) {
   Value states(kArrayType);
   {
-    lock_guard<mutex> l(lock_);
+    lock_guard<SpinLock> l(backend_states_init_lock_);
     for (BackendState* state : backend_states_) {
       Value val(kObjectType);
       state->InstanceStatsToJson(&val, doc);
@@ -977,6 +947,14 @@ void Coordinator::FInstanceStatsToJson(Document* doc) {
     }
   }
   doc->AddMember("backend_instances", states, doc->GetAllocator());
+}
+
+const TQueryCtx& Coordinator::query_ctx() const {
+  return schedule_.request().query_ctx;
+}
+
+const TUniqueId& Coordinator::query_id() const {
+  return query_ctx().query_id;
 }
 
 const TFinalizeParams* Coordinator::finalize_params() const {
