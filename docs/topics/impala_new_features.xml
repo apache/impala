@@ -46,6 +46,23 @@ under the License.
 
   </conbody>
 
+<!-- All 2.12.x new features go under here -->
+
+  <concept rev="2.12.0" id="new_features_2120">
+
+    <title>New Features in <keyword keyref="impala212_full"/></title>
+
+    <conbody>
+
+      <p>
+        For the full list of issues closed in this release, including the issues
+        marked as <q>new features</q> or <q>improvements</q>, see the
+        <xref keyref="changelog_212">changelog for <keyword keyref="impala212"/></xref>.
+      </p>
+
+    </conbody>
+  </concept>
+
 <!-- All 2.11.x new features go under here -->
 
   <concept rev="2.11.0" id="new_features_2110">

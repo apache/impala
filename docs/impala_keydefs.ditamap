@@ -10601,6 +10601,8 @@ under the License.
   <keydef keys="impala13_full"><topicmeta><keywords><keyword>Impala 1.3</keyword></keywords></topicmeta></keydef>
 
 <!-- Pointers to changelog pages -->
+  <keydef keys="changelog_300" href="https://impala.apache.org/docs/changelog-3.0.html" scope="external" format="html"/>
+  <keydef keys="changelog_212" href="https://impala.apache.org/docs/changelog-2.12.html" scope="external" format="html"/>
   <keydef keys="changelog_211" href="https://impala.apache.org/docs/changelog-2.11.html" scope="external" format="html"/>
   <keydef keys="changelog_210" href="https://impala.apache.org/docs/changelog-2.10.html" scope="external" format="html"/>
   <keydef keys="changelog_29" href="https://impala.apache.org/docs/changelog-2.9.html" scope="external" format="html"/>

@@ -46,11 +46,27 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
+<!-- All 2.12.x subsections go under here -->
+
+  <concept rev="2.12.0" id="fixed_issues_2_12_0">
+
+    <title>Issues Fixed in <keyword keyref="impala212"/></title>
+
+    <conbody>
+
+      <p>
+        For the full list of issues closed in this release, including bug fixes,
+        see the <xref keyref="changelog_212">changelog for <keyword keyref="impala212"/></xref>.
+      </p>
+
+    </conbody>
+  </concept>
+
 <!-- All 2.11.x subsections go under here -->
 
   <concept rev="2.11.0" id="fixed_issues_2_11_0">
 
-    <title>Issues Fixed in <keyword keyref="impala2110"/></title>
+    <title>Issues Fixed in <keyword keyref="impala211"/></title>
 
     <conbody>
 
@@ -66,7 +82,7 @@ under the License.
 
   <concept rev="2.10.0" id="fixed_issues_2100">
 
-    <title>Issues Fixed in <keyword keyref="impala2100"/></title>
+    <title>Issues Fixed in <keyword keyref="impala210"/></title>
 
     <conbody>
 

@@ -53,6 +53,22 @@ under the License.
     <p outputclass="toc inpage"/>
   </conbody>
 
+  <concept rev="2.12.0" id="incompatible_changes_212x">
+
+    <title>Incompatible Changes Introduced in Impala 2.12.x</title>
+
+    <conbody>
+
+      <p>
+        For the full list of issues closed in this release, including any that introduce
+        behavior changes or incompatibilities, see the
+        <xref keyref="changelog_212">changelog for <keyword keyref="impala212"/></xref>.
+      </p>
+
+    </conbody>
+
+  </concept>
+
   <concept rev="2.11.0" id="incompatible_changes_211x">
 
     <title>Incompatible Changes Introduced in Impala 2.11.x</title>
