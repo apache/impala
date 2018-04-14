@@ -49,7 +49,11 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
-<codeblock rev="2.1.0">COMPUTE STATS [<varname>db_name</varname>.]<varname>table_name</varname>
+<codeblock rev="impala-3562">COMPUTE STATS
+  [<varname>db_name</varname>.]<varname>table_name</varname> [ ( <varname>column_list</varname> ) ]
+
+<varname>column_list</varname> ::= <varname>column_name</varname> [ , <varname>column_name</varname>, ... ]
+
 COMPUTE INCREMENTAL STATS [<varname>db_name</varname>.]<varname>table_name</varname> [PARTITION (<varname>partition_spec</varname>)]
 
 <varname>partition_spec</varname> ::= <varname>simple_partition_spec</varname> | <ph rev="IMPALA-1654"><varname>complex_partition_spec</varname></ph>
@@ -64,12 +68,40 @@ COMPUTE INCREMENTAL STATS [<varname>db_name</varname>.]<varname>table_name</varn
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
     <p>
-      Originally, Impala relied on users to run the Hive <codeph>ANALYZE TABLE</codeph> statement, but that method
-      of gathering statistics proved unreliable and difficult to use. The Impala <codeph>COMPUTE STATS</codeph>
-      statement is built from the ground up to improve the reliability and user-friendliness of this operation.
-      <codeph>COMPUTE STATS</codeph> does not require any setup steps or special configuration. You only run a
-      single Impala <codeph>COMPUTE STATS</codeph> statement to gather both table and column statistics, rather
-      than separate Hive <codeph>ANALYZE TABLE</codeph> statements for each kind of statistics.
+      Originally, Impala relied on users to run the Hive <codeph>ANALYZE
+        TABLE</codeph> statement, but that method of gathering statistics proved
+      unreliable and difficult to use. The Impala <codeph>COMPUTE STATS</codeph>
+      statement was built to improve the reliability and user-friendliness of
+      this operation. <codeph>COMPUTE STATS</codeph> does not require any setup
+      steps or special configuration. You only run a single Impala
+        <codeph>COMPUTE STATS</codeph> statement to gather both table and column
+      statistics, rather than separate Hive <codeph>ANALYZE TABLE</codeph>
+      statements for each kind of statistics.
+    </p>
+
+    <p rev="impala-3562">
+      For non-incremental <codeph>COMPUTE STATS</codeph>
+      statement, the columns for which statistics are computed can be specified
+      with an optional comma-separate list of columns.
+    </p>
+
+    <p rev="impala-3562">
+      If no column list is given, the <codeph>COMPUTE STATS</codeph> statement
+      computes column-level statistics for all columns of the table. This adds
+      potentially unneeded work for columns whose stats are not needed by
+      queries. It can be especially costly for very wide tables and unneeded
+      large string fields.
+    </p>
+    <p rev="impala-3562">
+      <codeph>COMPUTE STATS</codeph> returns an error when a specified column
+      cannot be analyzed, such as when the column does not exist, the column is
+      of an unsupported type for COMPUTE STATS, e.g. colums of complex types,
+      or the column is a partitioning column.
+
+    </p>
+    <p rev="impala-3562">
+      If an empty column list is given, no column is analyzed by <codeph>COMPUTE
+        STATS</codeph>.
     </p>
 
     <p rev="2.1.0">
@@ -92,39 +124,45 @@ COMPUTE INCREMENTAL STATS [<varname>db_name</varname>.]<varname>table_name</varn
       <codeph>COMPUTE STATS</codeph> statement. Such tables display <codeph>false</codeph> under the
       <codeph>Incremental stats</codeph> column of the <codeph>SHOW TABLE STATS</codeph> output.
     </p>
-
     <note>
-      Because many of the most performance-critical and resource-intensive operations rely on table and column
-      statistics to construct accurate and efficient plans, <codeph>COMPUTE STATS</codeph> is an important step at
-      the end of your ETL process. Run <codeph>COMPUTE STATS</codeph> on all tables as your first step during
-      performance tuning for slow queries, or troubleshooting for out-of-memory conditions:
-      <ul>
-        <li>
-          Accurate statistics help Impala construct an efficient query plan for join queries, improving performance
-          and reducing memory usage.
-        </li>
-
-        <li>
-          Accurate statistics help Impala distribute the work effectively for insert operations into Parquet
-          tables, improving performance and reducing memory usage.
-        </li>
-
-        <li rev="1.3.0">
-          Accurate statistics help Impala estimate the memory required for each query, which is important when you
-          use resource management features, such as admission control and the YARN resource management framework.
-          The statistics help Impala to achieve high concurrency, full utilization of available memory, and avoid
-          contention with workloads from other Hadoop components.
-        </li>
-        <li rev="IMPALA-4572">
-          In <keyword keyref="impala28_full"/> and higher, when you run the
-          <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL STATS</codeph>
-          statement against a Parquet table, Impala automatically applies the query
-          option setting <codeph>MT_DOP=4</codeph> to increase the amount of intra-node
-          parallelism during this CPU-intensive operation. See <xref keyref="mt_dop"/>
-          for details about what this query option does and how to use it with
-          CPU-intensive <codeph>SELECT</codeph> statements.
-        </li>
-      </ul>
+      <p>
+        Because many of the most performance-critical and resource-intensive
+        operations rely on table and column statistics to construct accurate and
+        efficient plans, <codeph>COMPUTE STATS</codeph> is an important step at
+        the end of your ETL process. Run <codeph>COMPUTE STATS</codeph> on all
+        tables as your first step during performance tuning for slow queries, or
+        troubleshooting for out-of-memory conditions:
+        <ul>
+          <li>
+            Accurate statistics help Impala construct an efficient query plan
+            for join queries, improving performance and reducing memory usage.
+          </li>
+          <li>
+            Accurate statistics help Impala distribute the work effectively
+            for insert operations into Parquet tables, improving performance and
+            reducing memory usage.
+          </li>
+          <li rev="1.3.0">
+            Accurate statistics help Impala estimate the memory
+            required for each query, which is important when you use resource
+            management features, such as admission control and the YARN resource
+            management framework. The statistics help Impala to achieve high
+            concurrency, full utilization of available memory, and avoid
+            contention with workloads from other Hadoop components.
+          </li>
+          <li rev="IMPALA-4572">
+            In <keyword keyref="impala28_full"/> and
+            higher, when you run the <codeph>COMPUTE STATS</codeph> or
+              <codeph>COMPUTE INCREMENTAL STATS</codeph> statement against a
+            Parquet table, Impala automatically applies the query option setting
+              <codeph>MT_DOP=4</codeph> to increase the amount of intra-node
+            parallelism during this CPU-intensive operation. See <xref
+              keyref="mt_dop"/> for details about what this query option does
+            and how to use it with CPU-intensive <codeph>SELECT</codeph>
+            statements.
+          </li>
+        </ul>
+      </p>
     </note>
 
     <p rev="IMPALA-1654">
