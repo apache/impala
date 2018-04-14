@@ -40,12 +40,8 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="hidden">REVOKE statement</indexterm>
-<!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
-      The <codeph>REVOKE</codeph> statement revokes roles or privileges on a specified object from groups. Only
-      Sentry administrative users can revoke the role from a group. The revocation has a cascading effect. For
-      example, revoking the <codeph>ALL</codeph> privilege on a database also revokes the same privilege for all
-      the tables in that database.
+      The <codeph>REVOKE</codeph> statement revokes roles or
+      privileges on a specified object from groups.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
@@ -55,9 +51,27 @@ under the License.
 REVOKE <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
   FROM [ROLE] <varname>role_name</varname>
 
-<ph rev="2.3.0">privilege ::= SELECT | SELECT(<varname>column_name</varname>) | INSERT | ALL</ph>
-object_type ::= TABLE | DATABASE | SERVER | URI
+<ph rev="3.0">
+  privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)
+</ph>
+<ph rev="3.0">
+  object_type ::= TABLE | DATABASE | SERVER | URI
+</ph>
 </codeblock>
+
+    <p>
+      See <keyword keyref="grant"/> for the required privileges and the scope
+      for SQL operations.
+    </p>
+
+    <p>
+      The <codeph>ALL</codeph> privilege is a distinct privilege and not a
+      union of all other privileges. Revoking <codeph>SELECT</codeph>,
+        <codeph>INSERT</codeph>, etc. from a role that only has the
+        <codeph>ALL</codeph> privilege has no effect. To reduce the privileges
+      of that role you must <codeph>REVOKE ALL</codeph> and
+        <codeph>GRANT</codeph> the desired privileges.
+    </p>
 
     <p>
       Typically, the object name is an identifier. For URIs, it is a string literal.
@@ -75,16 +89,15 @@ object_type ::= TABLE | DATABASE | SERVER | URI
       Only administrative users (those with <codeph>ALL</codeph> privileges on the server, defined in the Sentry
       policy file) can use this statement.
     </p>
-
-<!-- Turn compatibility info into a conref or series of conrefs. (In both GRANT and REVOKE.) -->
+    <p>Only Sentry administrative users can revoke the role from a group.</p>
 
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
 
     <p>
       <ul>
         <li>
-          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements are available in <keyword keyref="impala20_full"/> and
-          higher.
+          The <codeph>REVOKE</codeph> statements are available in <keyword
+            keyref="impala20_full"/> and higher.
         </li>
 
         <li>
@@ -94,9 +107,9 @@ object_type ::= TABLE | DATABASE | SERVER | URI
         </li>
 
         <li>
-          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements do not require the
-          <codeph>ROLE</codeph> keyword to be repeated before each role name, unlike the equivalent Hive
-          statements.
+          The Impala <codeph>REVOKE</codeph> statements do not require the
+            <codeph>ROLE</codeph> keyword to be repeated before each role name,
+          unlike the equivalent Hive statements.
         </li>
 
         <li conref="../shared/impala_common.xml#common/grant_revoke_single"/>
