@@ -136,8 +136,156 @@ $ ps ax | grep [i]mpalad
       </note>
     </conbody>
   </concept>
+
   <concept id="concept_a2p_szq_jdb">
     <title>Impala Upgrade Considerations</title>
+    <concept id="IMPALA-3916">
+      <title>List of Reserved Words Updated in <keyword keyref="impala30_full"
+        /></title>
+      <conbody>
+        <p>
+          The list of <keyword keyref="reserved_words">reserved
+            words</keyword> in Impala was updated in <keyword
+            keyref="impala30_full"/>. If you need to use a reserved word as an
+          identifier, e.g. a table name, enclose the word in back-ticks.
+        </p>
+
+        <p>
+          If you need to use the reserved words from previous versions of
+          Impala, set the <codeph>impalad</codeph> and <codeph>catalogd</codeph>
+          startup flag. Note that this startup option will be deprecated in a
+          future release.
+<codeblock>--reserved_words_version=2.11.0</codeblock>
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="IMPALA-4924">
+      <title>Decimal V2 Used by Default in <keyword keyref="impala30_full"/></title>
+      <conbody>
+        <p>
+          In Impala, two different implementations of <codeph>DECIMAL</codeph>
+          types are supported. Starting in <keyword keyref="impala30_full"/>,
+            <codeph>DECIMAL</codeph> V2 is used by default. See <keyword
+            keyref="decimal">DECIMAL Type</keyword> for detail information.
+        </p>
+
+        <p>
+          If you need to continue using the first version of the
+            <codeph>DECIMAL</codeph> type for the backward compatibility of your
+          queries, set the <codeph>DECIMAL_V2</codeph> query option to
+            <codeph>FALSE</codeph>:
+<codeblock>SET DECIMAL_V2=FALSE;</codeblock>
+        </p>
+      </conbody>
+    </concept>
+    <concept id="IMPALA-5191">
+      <title>Behavior of Column Aliases Changed in <keyword
+          keyref="impala30_full"/></title>
+      <conbody>
+        <p>
+          To conform to the SQL standard, Impala no longer performs alias
+          substitution in the subexpressions of <codeph>GROUP BY</codeph>,
+            <codeph>HAVING</codeph>, and <codeph>ORDER BY</codeph>. See <keyword
+            keyref="aliases"/> for examples of supported and unsupported aliases
+          syntax.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="IMPALA-5037">
+      <title>Default PARQUET_ARRAY_RESOLUTION Changed in <keyword
+          keyref="impala30_full"/></title>
+      <conbody>
+        <p>
+          The default value for the <codeph>PARQUET_ARRAY_RESOLUTION</codeph>
+          was changed to <codeph>THREE_LEVEL</codeph> in <keyword
+            keyref="impala30_full"/>, to match the Parquet standard 3-level
+          encoding.
+        </p>
+
+        <p>
+          See <keyword keyref="parquet_array_resolution"/> for the information
+          about the query option.
+        </p>
+      </conbody>
+    </concept>
+    <concept id="IMPALA-5293">
+      <title>Enable Clustering Hint for Inserts</title>
+      <conbody>
+        <p>
+          In <keyword keyref="impala30_full"/>, the <keyword keyref="hints"
+            >clustered</keyword> hint is enabled by default. The hint adds a
+          local sort by the partitioning columns to a query plan. </p>
+        <p> The <codeph>clustered</codeph> hint is only effective for HDFS and
+          Kudu tables.
+        </p>
+
+        <p>
+          As in previous versions, the <codeph>noclustered</codeph> hint
+          prevents clustering. If a table has ordering columns defined, the
+            <codeph>noclustered</codeph> hint is ignored with a warning.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="IMPALA-4319">
+      <title>Deprecated Query Options Removed in <keyword keyref="impala30_full"
+        /></title>
+      <conbody>
+        <p> The following query options have been deprecated for several
+          releases and removed: <ul>
+            <li><codeph>DEFAULT_ORDER_BY_LIMIT</codeph></li>
+            <li><codeph>ABORT_ON_DEFAULT_LIMIT_EXCEEDED</codeph></li>
+            <li><codeph>V_CPU_CORES</codeph></li>
+            <li><codeph>RESERVATION_REQUEST_TIMEOUT</codeph></li>
+            <li><codeph>RM_INITIAL_MEM</codeph></li>
+            <li><codeph>SCAN_NODE_CODEGEN_THRESHOLD</codeph></li>
+            <li><codeph>MAX_IO_BUFFERS</codeph></li>
+            <li><codeph>RM_INITIAL_MEM</codeph></li>
+            <li><codeph>DISABLE_CACHED_READS</codeph></li>
+          </ul>
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="impala-6648">
+      <title>Fine-grained Privileges Added in <keyword keyref="impala30_full"
+        /></title>
+      <conbody>
+        <p>
+          Starting in <keyword keyref="impala30_full"/>, finer grained
+          privileges are enforced, such as the <codeph>REFRESH</codeph>,
+            <codeph>CREATE</codeph>, <codeph>DROP</codeph>, and
+            <codeph>ALTER</codeph> privileges. In particular, running
+            <codeph>REFRESH</codeph> or <codeph>INVALIDATE METADATA</codeph> now
+          requires the new <codeph>REFRESH</codeph> privilege. Users who did not
+          previously have the <codeph>ALL</codeph> privilege will no longer be
+          able to run <codeph>REFRESH</codeph> or <codeph>INVALIDATE
+            METADATA</codeph> after an upgrade. Those users need to have the
+            <codeph>REFRESH</codeph> or <codeph>ALL</codeph> privilege granted
+          to run <codeph>REFRESH</codeph> or <codeph>INVALIDATE
+            METADATA</codeph>.
+        </p>
+
+        <p>
+          See <keyword keyref="grant"/> for the new privileges, the scope, and
+          other information about the new privileges.
+        </p>
+      </conbody>
+    </concept>
+
+    <concept id="IMPALA-3998">
+      <title>refresh_after_connect Impala Shell Option Removed in <keyword
+          keyref="impala30_full"/></title>
+      <conbody>
+        <p>
+          The deprecated <codeph>refresh_after_connect</codeph> option was
+          removed from Impala Shell in <keyword keyref="impala30_full"/>
+        </p>
+      </conbody>
+    </concept>
+
     <concept id="concept_mkn_ygr_jdb">
       <title>Default Setting Changes</title>
       <conbody>
@@ -149,13 +297,21 @@ $ ps ax | grep [i]mpalad
           </sthead>
           <strow>
             <stentry><keyword keyref="impala212_full"/></stentry>
-            <stentry><codeph>compact_catalog_topic</codeph></stentry>
+            <stentry><codeph>compact_catalog_topic</codeph>
+              <codeph>impalad</codeph> flag</stentry>
             <stentry><codeph>true</codeph></stentry>
           </strow>
           <strow>
             <stentry><keyword keyref="impala212_full"/></stentry>
-            <stentry><codeph>max_cached_file_handle</codeph></stentry>
+            <stentry><codeph>max_cached_file_handles</codeph>
+              <codeph>impalad</codeph> flag</stentry>
             <stentry><codeph>20000</codeph></stentry>
+          </strow>
+          <strow>
+            <stentry><keyword keyref="impala30_full"/></stentry>
+            <stentry><codeph>PARQUET_ARRAY_RESOLUTION</codeph> query
+              option</stentry>
+            <stentry><codeph>THREE_LEVEL</codeph></stentry>
           </strow>
         </simpletable>
       </conbody>
