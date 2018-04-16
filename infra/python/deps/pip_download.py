@@ -28,7 +28,7 @@ import re
 import sys
 from random import randint
 from time import sleep
-from urllib import urlopen, URLopener
+from urllib import urlopen, FancyURLopener
 
 NUM_DOWNLOAD_ATTEMPTS = 8
 
@@ -114,7 +114,7 @@ def download_package(pkg_name, pkg_version):
       expected_digest):
     print 'File with matching digest already exists, skipping {0}'.format(file_name)
     return True
-  downloader = URLopener()
+  downloader = FancyURLopener()
   pkg_url = '{0}/packages/{1}'.format(PYPI_MIRROR, path)
   print 'Downloading {0} from {1}'.format(file_name, pkg_url)
   downloader.retrieve(pkg_url, file_name)
