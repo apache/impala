@@ -68,8 +68,17 @@ public enum Privilege {
 
     private final BitFieldAction bitFieldAction_;
 
+    // In Sentry 1.5.1, BitFieldAction is an abstract class. In Sentry 2.0.0,
+    // BitFieldAction is no longer an absract class. To support both versions,
+    // we can extend BitFieldAction.
+    private static class ImpalaBitFieldAction extends BitFieldAction {
+      public ImpalaBitFieldAction(String name, int code) {
+        super(name, code);
+      }
+    }
+
     ImpalaAction(String value, int code) {
-      bitFieldAction_ = new BitFieldAction(value, code);
+      bitFieldAction_ = new ImpalaBitFieldAction(value, code);
     }
 
     @Override

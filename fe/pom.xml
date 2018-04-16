@@ -434,6 +434,18 @@ under the License.
               </sources>
             </configuration>
           </execution>
+          <execution>
+            <id>add-test-source</id>
+            <phase>generate-test-sources</phase>
+            <goals>
+              <goal>add-test-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>${project.basedir}/src/compat-minicluster-profile-${env.IMPALA_MINICLUSTER_PROFILE}/test/java</source>
+              </sources>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
 
