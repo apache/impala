@@ -52,6 +52,15 @@ under the License.
 
     <p outputclass="toc inpage"/>
   </conbody>
+  <concept rev="3.0.0" id="incompatible_changes_300x">
+    <title>Incompatible Changes Introduced in Impala 3.0.x</title>
+    <conbody>
+      <p> For the full list of issues closed in this release, including any that
+        introduce behavior changes or incompatibilities, see the <xref
+          keyref="changelog_300">changelog for <keyword keyref="impala30"
+          /></xref>. </p>
+    </conbody>
+  </concept>
 
   <concept rev="2.12.0" id="incompatible_changes_212x">
 
