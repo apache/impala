@@ -220,6 +220,7 @@ under the License.
           <topicref rev="2.8.0 IMPALA-3671" href="topics/impala_scratch_limit.xml"/>
           <!-- This option is for internal use only and might go away without ever being documented. -->
           <!-- <topicref href="topics/impala_seq_compression_mode.xml"/> -->
+          <topicref href="topics/impala_shuffle_distinct_exprs.xml"/>
           <topicref href="topics/impala_support_start_over.xml"/>
           <topicref href="topics/impala_sync_ddl.xml"/>
         </topicref>
