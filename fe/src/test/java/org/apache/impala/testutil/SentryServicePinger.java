@@ -21,12 +21,12 @@ import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
+import org.apache.impala.authorization.SentryConfig;
+import org.apache.impala.authorization.User;
+import org.apache.impala.util.SentryPolicyService;
+import org.apache.log4j.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.impala.authorization.User;
-import org.apache.impala.authorization.SentryConfig;
-import org.apache.impala.util.SentryPolicyService;
 
 /**
  * Simple class that issues a read-only RPC to the Sentry Service to check if it
@@ -41,6 +41,11 @@ public class SentryServicePinger {
   // Suppress warnings from OptionBuilder.
   @SuppressWarnings("static-access")
   public static void main(String[] args) throws Exception {
+    // Programmatically disable Sentry Thrift logging since Sentry error logging can be
+    // pretty noisy and verbose.
+    org.apache.log4j.Logger logger4j = org.apache.log4j.Logger.getLogger("sentry");
+    logger4j.setLevel(Level.OFF);
+
     // Parse command line options to get config file path.
     Options options = new Options();
     options.addOption(OptionBuilder.withLongOpt("config_file")
@@ -69,6 +74,7 @@ public class SentryServicePinger {
     int sleepSecs = Integer.parseInt(cmdArgs.getOptionValue("sleep_secs"));
 
     sentryConfig.loadConfig();
+    Exception exception = null;
     while (numPings > 0) {
       SentryPolicyService policyService = new SentryPolicyService(sentryConfig);
       try {
@@ -76,11 +82,15 @@ public class SentryServicePinger {
         LOG.info("Sentry Service ping succeeded.");
         System.exit(0);
       } catch (Exception e) {
-        LOG.error(String.format("Error issuing RPC to Sentry Service (attempt %d/%d): ",
-            maxPings - numPings + 1, maxPings), e);
+        exception = e;
+        LOG.error(String.format("Error issuing RPC to Sentry Service (attempt %d/%d)",
+            maxPings - numPings + 1, maxPings));
         Thread.sleep(sleepSecs * 1000);
       }
       --numPings;
+    }
+    if (exception != null) {
+      LOG.error("Error starting Sentry Service: ", exception);
     }
     System.exit(1);
   }
