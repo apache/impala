@@ -962,24 +962,20 @@ While these authentication requests are being processed, any submitted Impala qu
 During this period, the KDC and DNS may be slow to respond to requests from components other than Impala,
 so other secure services might be affected temporarily.
 </p>
-
-<p>
-  To reduce the frequency  of the <codeph>kinit</codeph> renewal that initiates
-  a new set of authentication requests, increase the <codeph>kerberos_reinit_interval</codeph>
-  configuration setting for the <cmdname>impalad</cmdname> daemons. Currently, the default is 60 minutes.
-  Consider using a higher value such as 360 (6 hours).
-</p>
+  <p>
+    In <keyword keyref="impala212_full"/> or earlier, to reduce the
+    frequency of the <codeph>kinit</codeph> renewal that initiates a new set
+    of authentication requests, increase the <codeph>kerberos_reinit_interval</codeph>
+    configuration setting for the <codeph>impalad</codeph> daemons. Currently,
+    the default is 60 minutes. Consider using a higher value such as 360 (6 hours).
+      </p>
+  <p>
+    The <codeph>kerberos_reinit_interval</codeph> configuration setting is removed
+    in <keyword keyref="impala30_full"/>, and the above step is no longer needed.
+  </p>
 
 </conbody>
 </concept>
-
-  <concept rev="IMPALA-2294" id="kerberos_overhead_memory_usage">
-  <title>Kerberos-Related Memory Overhead for Large Clusters</title>
-  <conbody>
-    <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_intro"/>
-    <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_start" conrefend="../shared/impala_common.xml#common/vm_overcommit_memory_end"/>
-  </conbody>
-  </concept>
 
   <concept id="scalability_hotspots" rev="2.5.0 IMPALA-2696">
     <title>Avoiding CPU Hotspots for HDFS Cached Data</title>
