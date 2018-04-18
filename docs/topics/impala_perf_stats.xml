@@ -392,6 +392,12 @@ show column stats year_month_day;
               This feature is available since Impala 2.8.
             </p>
           </li>
+          <li>
+            <p>
+              Consider the experimental extrapolation and sampling features (see below)
+              to further increase the efficiency of computing stats.
+            </p>
+          </li>
           </ul>
         </p>
 
@@ -415,6 +421,135 @@ show column stats year_month_day;
 
       </conbody>
 
+      <concept id="experimental_stats_features">
+        <title>Experimental: Extrapolation and Sampling</title>
+        <conbody>
+          <p>
+            Impala 2.12 and higher includes two experimental features to alleviate
+            common issues for computing and maintaining statistics on very large tables.
+            The following shortcomings are improved upon:
+            <ul>
+            <li>
+              <p>
+                Newly added partitions do not have row count statistics. Table scans
+                that only access those new partitions are treated as not having stats.
+                Similarly, table scans that access both new and old partitions estimate
+                the scan cardinality based on those old partitions that have stats, and
+                the new partitions without stats are treated as having 0 rows.
+              </p>
+            </li>
+            <li>
+              <p>
+                The row counts of existing partitions become stale when data is added
+                or dropped.
+              </p>
+            </li>
+            <li>
+              <p>
+                Computing stats for tables with a 100,000 or more partitions might fail
+                or be very slow due to the high cost of updating the partition metadata
+                in the Hive Metastore.
+              </p>
+            </li>
+            <li>
+              <p>
+                With transient compute resources it is important to minimize the time
+                from starting a new cluster to successfully running queries.
+                Since the cluster might be relatively short-lived, users might prefer to
+                quickly collect stats that are "good enough" as opposed to spending
+                a lot of time and resouces on computing full-fidelity stats.
+              </p>
+            </li>
+            </ul>
+            For very large tables, it is often wasteful or impractical to run a full
+            COMPUTE STATS to address the scenarios above on a frequent basis.
+          </p>
+          <p>
+            The sampling feature makes COMPUTE STATS more efficient by processing a
+            fraction of the table data, and the extrapolation feature aims to reduce
+            the frequency at which COMPUTE STATS needs to be re-run by estimating
+            the row count of new and modified partitions.
+          </p>
+          <p>
+            The sampling and extrapolation features are disabled by default.
+            They can be enabled globally or for specific tables, as follows.
+            Set the impalad start-up configuration "--enable_stats_extrapolation" to
+            enable the features globally. To enable them only for a specific table, set
+            the "impala.enable.stats.extrapolation" table property to "true" for the
+            desired table. The tbale-level property overrides the global setting, so
+            it is also possible to enable sampling and extrapolation globally, but
+            disable it for specific tables by setting the table property to "false".
+            Example:
+            ALTER TABLE mytable test_table SET TBLPROPERTIES("impala.enable.stats.extrapolation"="true")
+          </p>
+          <note>
+            Why are these features experimental? Due to their probabilistic nature
+            it is possible that these features perform pathologically poorly on tables
+            with extreme data/file/size distributions. Since it is not feasible for us
+            to test all possible scenarios we only cautiously advertise these new
+            capabilities. That said, the features have been thoroughly tested and
+            are considered functionally stable. If you decide to give these features
+            a try, please tell us about your experience at user@impala.apache.org!
+            We rely on user feedback to guide future inprovements in statistics
+            collection.
+          </note>
+        </conbody>
+
+        <concept id="experimental_stats_extrapolation">
+          <title>Stats Extrapolation</title>
+          <conbody>
+            <p>
+              The main idea of stats extrapolation is to estimate the row count of new
+              and modified partitions based on the result of the last COMPUTE STATS.
+              Enabling stats extrapolation changes the behavior of COMPUTE STATS,
+              as well as the cardinality estimation of table scans. COMPUTE STATS no
+              longer computes and stores per-partition row counts, and instead, only
+              computes a table-level row count together with the total number of file
+              bytes in the table at that time. No partition metadata is modified. The
+              input cardinality of a table scan is estimated by converting the data
+              volume of relevant partitions to a row count, based on the table-level
+              row count and file bytes statistics. It is assumed that within the same
+              table, different sets of files with the same data volume correspond
+              to the similar number of rows on average. With extrapolation enabled,
+              the scan cardinality estimation ignores per-partition row counts. It
+              only relies on the table-level statistics and the scanned data volume.
+            </p>
+            <p>
+              The SHOW TABLE STATS and EXPLAIN commands distinguish between row counts
+              stored in the Hive Metastore, and the row counts extrapolated based on the
+              above process. Consult the SHOW TABLE STATS and EXPLAIN documentation
+              for more details.
+            </p>
+          </conbody>
+        </concept>
+
+        <concept id="experimental_stats_sampling">
+          <title>Sampling</title>
+          <conbody>
+            <p>
+              A TABLESAMPLE clause may be added to COMPUTE STATS to limit the
+              percentage of data to be processed. The final statistics are obtained
+              by extrapolating the statistics from the data sample over the entire table.
+              The extrapolated statistics are stored in the Hive Metastore, just as if no
+              sampling was used. The following example runs COMPUTE STATS over a 10 percent
+              data sample: COMPUTE STATS test_table TABLESAMPLE SYSTEM(10)
+            </p>
+            <p>
+            We have found that a 10 percent sampling rate typically offers a good
+            tradeoff between statistics accuracy and execution cost. A sampling rate
+            well below 10 percent has shown poor results and is not recommended.
+            </p>
+            <note type="important">
+              Sampling-based techniques sacrifice result accuracy for execution
+              efficiency, so your mileage may vary for different tables and columns
+              depending on their data distribution. The extrapolation procedure Impala
+              uses for estimating the number of distinct values per column is inherently
+              non-detetministic, so your results may even vary between runs of
+              COMPUTE STATS TABLESAMPLE, even if no data has changed.
+            </note>
+          </conbody>
+        </concept>
+      </concept>
     </concept>
 
     <concept id="concept_bmk_pfl_mdb">
