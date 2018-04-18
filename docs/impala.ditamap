@@ -47,7 +47,7 @@ under the License.
   </topicref>
   <topicref href="topics/impala_planning.xml">
     <topicref href="topics/impala_prereqs.xml#prereqs"/>
-    <topicref href="topics/impala_cluster_sizing.xml"/>
+    <!-- Removed per Alan Choi's request on 4/18/2018 <topicref href="topics/impala_cluster_sizing.xml"/> -->
     <topicref href="topics/impala_schema_design.xml"/>
   </topicref>
   <topicref audience="standalone" href="topics/impala_install.xml#install">
