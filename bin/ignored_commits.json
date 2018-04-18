@@ -14,7 +14,9 @@
       { "hash": "89b29d3a89cca041c541476e25435dc0d34344c1",
         "comment": "Only made sense for Hadoop 3 given implementation. IMPALA-6769: Avoid pulling incoherent Hadoop dependencies." },
       { "hash": "6b18b00310fbdae64bc3d8aec0b58385884fe76f",
-        "comment": "Not applicable to 2.x; new HBase splitter code there.  IMPALA-6776: Increase region move timeout." }
+        "comment": "Not applicable to 2.x; new HBase splitter code there.  IMPALA-6776: Increase region move timeout." },
+      { "hash": "5417e712f33dfb963b4646723ec173a5f3c4f49b",
+        "comment": "Only applies to master; Existing privileges available at server level." }
     ]
   }
 ]
