@@ -15,7 +15,8 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*0 of 1 Runtime Filter Published, 1 Disabled.*
+# TODO: reenable once IMPALA-6338 is fixed
+#row_regex: .*0 of 1 Runtime Filter Published, 1 Disabled.*
 ====
 
 
