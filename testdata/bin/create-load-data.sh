@@ -540,8 +540,10 @@ elif [ "${TARGET_FILESYSTEM}" = "hdfs" ];  then
       load-data "functional-query" "core" "hbase/none"
 fi
 
-if $KUDU_IS_SUPPORTED; then
+if [[ $SKIP_METADATA_LOAD -eq 1 && $KUDU_IS_SUPPORTED ]]; then
   # Tests depend on the kudu data being clean, so load the data from scratch.
+  # This is only necessary if this is not a full dataload, because a full dataload
+  # already loads Kudu functional and TPC-H tables from scratch.
   run-step-backgroundable "Loading Kudu functional" load-kudu.log \
         load-data "functional-query" "core" "kudu/none/none" force
   run-step-backgroundable "Loading Kudu TPCH" load-kudu-tpch.log \
