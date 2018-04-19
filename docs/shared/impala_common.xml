@@ -1338,7 +1338,7 @@ drop database temp;
       </p>
       <p>Leading zeroes are not required in the numbers representing the date
         component, such as month and date, or the time component, such as
-        month, date, hour, minute, second. For example, Impala accepts both
+        hour, minute, and second. For example, Impala accepts both
         <codeph>"2018-1-1 01:02:03"</codeph> and
           <codeph>"2018-01-01 1:2:3"</codeph> as valid.</p>
 
