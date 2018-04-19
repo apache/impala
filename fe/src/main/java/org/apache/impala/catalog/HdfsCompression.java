@@ -27,10 +27,11 @@ import com.google.common.collect.ImmutableMap;
  * Support for recognizing compression suffixes on data files.
  * Compression of a file is recognized in mapreduce by looking for suffixes of
  * supported codecs.
- * For now Impala supports LZO, GZIP, SNAPPY, and BZIP2. LZO can use the specific HIVE
- * input class.
+ * For now Impala supports LZO, GZIP, SNAPPY, BZIP2 and some additional formats if plugins
+ * are available. Even if a plugin is available, we need to add the file suffixes here so
+ * that we can resolve the compression type from the file name. LZO can use the specific
+ * HIVE input class.
  */
-// TODO: Add LZ4?
 public enum HdfsCompression {
   NONE,
   DEFLATE,
@@ -38,7 +39,9 @@ public enum HdfsCompression {
   BZIP2,
   SNAPPY,
   LZO,
-  LZO_INDEX; //Lzo index file.
+  LZO_INDEX, //Lzo index file.
+  LZ4,
+  ZSTD;
 
   /* Map from a suffix to a compression type */
   private static final ImmutableMap<String, HdfsCompression> SUFFIX_MAP =
@@ -49,6 +52,8 @@ public enum HdfsCompression {
           put("snappy", SNAPPY).
           put("lzo", LZO).
           put("index", LZO_INDEX).
+          put("lz4", LZ4).
+          put("zst", ZSTD).
           build();
 
   /* Given a file name return its compression type, if any. */
@@ -71,6 +76,8 @@ public enum HdfsCompression {
     case BZIP2: return THdfsCompression.BZIP2;
     case SNAPPY: return THdfsCompression.SNAPPY_BLOCKED;
     case LZO: return THdfsCompression.LZO;
+    case LZ4: return THdfsCompression.LZ4;
+    case ZSTD: return THdfsCompression.ZSTD;
     default: throw new IllegalStateException("Unexpected codec: " + this);
     }
   }
@@ -83,13 +90,14 @@ public enum HdfsCompression {
       case BZIP2: return FbCompression.BZIP2;
       case SNAPPY: return FbCompression.SNAPPY;
       case LZO: return FbCompression.LZO;
+      case LZ4: return FbCompression.LZ4;
+      case ZSTD: return FbCompression.ZSTD;
       default: throw new IllegalStateException("Unexpected codec: " + this);
     }
   }
 
   /* Returns a compression type based on (Hive's) intput format. Special case for LZO. */
   public static HdfsCompression fromHdfsInputFormatClass(String inputFormatClass) {
-    // TODO: Remove when we have the native LZO writer.
     Preconditions.checkNotNull(inputFormatClass);
     if (inputFormatClass.equals(HdfsFileFormat.LZO_TEXT.inputFormat())) {
       return LZO;

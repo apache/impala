@@ -16,9 +16,10 @@
 // under the License.
 
 #include "exec/hdfs-scan-node-base.h"
+
+#include "exec/hdfs-plugin-text-scanner.h"
 #include "exec/base-sequence-scanner.h"
 #include "exec/hdfs-text-scanner.h"
-#include "exec/hdfs-lzo-text-scanner.h"
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-rcfile-scanner.h"
 #include "exec/hdfs-avro-scanner.h"
@@ -641,12 +642,15 @@ Status HdfsScanNodeBase::CreateAndOpenScanner(HdfsPartitionDescriptor* partition
   // Create a new scanner for this file format and compression.
   switch (partition->file_format()) {
     case THdfsFileFormat::TEXT:
-      // Lzo-compressed text files are scanned by a scanner that it is implemented as a
-      // dynamic library, so that Impala does not include GPL code.
-      if (compression == THdfsCompression::LZO) {
-        scanner->reset(HdfsLzoTextScanner::GetHdfsLzoTextScanner(this, runtime_state_));
-      } else {
+      if (HdfsTextScanner::HasBuiltinSupport(compression)) {
         scanner->reset(new HdfsTextScanner(this, runtime_state_));
+      } else {
+        // No builtin support - we must have loaded the plugin in IssueInitialRanges().
+        auto it = _THdfsCompression_VALUES_TO_NAMES.find(compression);
+        DCHECK(it != _THdfsCompression_VALUES_TO_NAMES.end())
+            << "Already issued ranges for this compression type.";
+        scanner->reset(HdfsPluginTextScanner::GetHdfsPluginTextScanner(
+            this, runtime_state_, it->second));
       }
       break;
     case THdfsFileFormat::SEQUENCE_FILE:

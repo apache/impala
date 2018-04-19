@@ -22,7 +22,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/delimited-text-parser.h"
 #include "exec/delimited-text-parser.inline.h"
-#include "exec/hdfs-lzo-text-scanner.h"
+#include "exec/hdfs-plugin-text-scanner.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/scanner-context.inline.h"
 #include "exec/text-converter.h"
@@ -77,7 +77,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   vector<ScanRange*> compressed_text_scan_ranges;
   int compressed_text_files = 0;
-  vector<HdfsFileDesc*> lzo_text_files;
+  map<string, vector<HdfsFileDesc*>> plugin_text_files;
   for (int i = 0; i < files.size(); ++i) {
     THdfsCompression::type compression = files[i]->file_compression;
     switch (compression) {
@@ -124,35 +124,36 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
         }
         break;
 
-      case THdfsCompression::LZO:
-        // lzo-compressed text need to be processed by the specialized HdfsLzoTextScanner.
-        // Note that any LZO_INDEX files (no matter what the case of their suffix) will be
-        // filtered by the planner.
-        {
-        #ifndef NDEBUG
-          // No straightforward way to do this in one line inside a DCHECK, so for once
-          // we'll explicitly use NDEBUG to avoid executing debug-only code.
-          string lower_filename = files[i]->filename;
-          to_lower(lower_filename);
-          DCHECK(!ends_with(lower_filename, LZO_INDEX_SUFFIX));
-        #endif
-          lzo_text_files.push_back(files[i]);
+      default: {
+        // Other compression formats are only supported by a plugin.
+        auto it = _THdfsCompression_VALUES_TO_NAMES.find(compression);
+        if (it == _THdfsCompression_VALUES_TO_NAMES.end()) {
+          return Status(Substitute(
+                "Unexpected compression enum value: $0", static_cast<int>(compression)));
         }
-        break;
-
-      default:
-        DCHECK(false);
+#ifndef NDEBUG
+        // Note any LZO_INDEX files (no matter what the case of their suffix) should be
+        // filtered by the planner.
+        // No straightforward way to do this in one line inside a DCHECK, so for once
+        // we'll explicitly use NDEBUG to avoid executing debug-only code.
+        string lower_filename = files[i]->filename;
+        to_lower(lower_filename);
+        DCHECK(!ends_with(lower_filename, LZO_INDEX_SUFFIX));
+#endif
+        plugin_text_files[it->second].push_back(files[i]);
+      }
     }
   }
   if (compressed_text_scan_ranges.size() > 0) {
     RETURN_IF_ERROR(scan_node->AddDiskIoRanges(compressed_text_scan_ranges,
         compressed_text_files));
   }
-  if (lzo_text_files.size() > 0) {
-    // This will dlopen the lzo binary and can fail if the lzo binary is not present.
-    RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(scan_node, lzo_text_files));
+  for (const auto& entry : plugin_text_files) {
+    DCHECK_GT(entry.second.size(), 0) << "List should be non-empty";
+    // This can fail if the plugin library can't be loaded.
+    RETURN_IF_ERROR(HdfsPluginTextScanner::IssueInitialRanges(
+          scan_node, entry.second, entry.first));
   }
-
   return Status::OK();
 }
 

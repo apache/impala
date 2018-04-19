@@ -1,0 +1,28 @@
+====
+---- QUERY
+# Test that querying only partitions with supported formats works as expected.
+select count(*)
+from multi_text_compression where month <= 2
+---- TYPES
+BIGINT
+---- RESULTS
+590
+====
+---- QUERY
+# Test that querying partition with unsupported plugin fails gracefully.
+select count(*)
+from multi_text_compression where month <= 3
+---- CATCH
+Scanner plugin 'LZ4' is not one of the enabled plugins: 'LZO'
+====
+---- QUERY
+# Unknown compression suffix is treated as uncompressed text.
+select id
+from multi_text_compression where month = 4
+---- RESULTS
+---- TYPES
+INT
+---- ERRORS
+Error converting column: 0 to INT
+Error parsing row: file: __HDFS_FILENAME__, before offset: 16
+====

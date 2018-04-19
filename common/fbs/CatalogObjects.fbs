@@ -29,7 +29,8 @@ enum FbCompression: byte {
   SNAPPY_BLOCKED,
   LZO,
   LZ4,
-  ZLIB
+  ZLIB,
+  ZSTD
 }
 
 table FbFileBlock {
