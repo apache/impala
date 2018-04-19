@@ -68,7 +68,7 @@ alter_functional_alltypes_view =\
     server=server1->db=functional->table=alltypes_view->action=alter
 insert_functional_text_lzo = server=server1->db=functional_text_lzo->action=insert
 create_functional_text_lzo = server=server1->db=functional_text_lzo->action=create
-alter_functionl_text_lzo = server=server1->db=functional_text_lzo->action=alter
+alter_functional_text_lzo = server=server1->db=functional_text_lzo->action=alter
 drop_functional_text_lzo = server=server1->db=functional_text_lzo->action=drop
 select_column_level_functional =\
     server=server1->db=functional->table=alltypessmall->column=id->action=select,\

@@ -1472,6 +1472,26 @@ public class AuthorizationTest extends FrontendTestBase {
     AuthzOk("ALTER TABLE functional.alltypeserror SET CACHED IN 'testPool'");
     AuthzOk("ALTER TABLE functional.alltypeserror RECOVER PARTITIONS");
 
+    // User has ALTER privilege on functional_text_lzo database.
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror ADD COLUMNS (c1 int)");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror REPLACE COLUMNS (c1 int)");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror CHANGE id c1 int");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror DROP id");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror RENAME TO " +
+        "functional_seq_snap.t1");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror SET FILEFORMAT PARQUET");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror SET LOCATION " +
+        "'/test-warehouse/new_table'");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror SET TBLPROPERTIES " +
+        "('a'='b', 'c'='d')");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror SET LOCATION " +
+        "'hdfs://localhost:20500/test-warehouse/new_table'");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror " +
+        "PARTITION(year=2009, month=1) SET LOCATION " +
+        "'hdfs://localhost:20500/test-warehouse/new_table'");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror SET CACHED IN 'testPool'");
+    AuthzOk("ALTER TABLE functional_text_lzo.alltypeserror RECOVER PARTITIONS");
+
     // Alter table and set location to a path the user does not have access to.
     // User needs ALTER on table and ALL on URI.
     AuthzError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
