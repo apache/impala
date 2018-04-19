@@ -912,6 +912,10 @@ class TestOrc(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'orc')
 
+  @SkipIfS3.hdfs_block_size
+  @SkipIfADLS.hdfs_block_size
+  @SkipIfIsilon.hdfs_block_size
+  @SkipIfLocal.multiple_impalad
   def test_misaligned_orc_stripes(self, vector, unique_database):
     self._build_lineitem_table_helper(unique_database, 'lineitem_threeblocks',
         'lineitem_threeblocks.orc')
