@@ -449,6 +449,12 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
     }
 
     while (uncompressed_block_len > 0) {
+      // Check that input length should not be negative.
+      if (input_len < 0) {
+        stringstream ss;
+        ss << " Corruption snappy decomp input_len " << input_len;
+        return Status(ss.str());
+      }
       // Read the length of the next snappy compressed block.
       size_t compressed_len = ReadWriteUtil::GetInt<uint32_t>(input);
       input += sizeof(uint32_t);
@@ -462,6 +468,10 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
       size_t uncompressed_len;
       if (!snappy::GetUncompressedLength(reinterpret_cast<const char*>(input),
               compressed_len, &uncompressed_len)) {
+        return Status(TErrorCode::SNAPPY_DECOMPRESS_UNCOMPRESSED_LENGTH_FAILED);
+      }
+      // Check that uncompressed length should be greater than 0.
+      if (uncompressed_len <= 0) {
         return Status(TErrorCode::SNAPPY_DECOMPRESS_UNCOMPRESSED_LENGTH_FAILED);
       }
       DCHECK_GT(uncompressed_len, 0);

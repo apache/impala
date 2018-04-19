@@ -71,7 +71,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
     # TODO(IMPALA-6772): enable for ORC formats once a new version after release-1.4.3
     # of ORC library is released.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ('avro', 'parquet') or
+        v.get_value('table_format').file_format in ('avro', 'parquet', 'rc', 'seq') or
         (v.get_value('table_format').file_format == 'text' and
           v.get_value('table_format').compression_codec in ('none', 'lzo')))
 
@@ -89,6 +89,9 @@ class TestScannersFuzzing(ImpalaTestSuite):
       table_name = "avro_decimal_tbl"
       if table_format.compression_codec != 'snap' or \
           table_format.compression_type != 'block':
+        pytest.skip()
+    elif table_format.file_format == 'rc' or \
+      table_format.file_format == 'seq':
         pytest.skip()
     elif table_format.file_format == 'text' and \
         table_format.compression_codec != 'none':
@@ -208,8 +211,10 @@ class TestScannersFuzzing(ImpalaTestSuite):
         # (IMPALA-4013).
         table_format = vector.get_value('table_format')
         if table_format.file_format != 'parquet' \
-            and not (table_format.file_format == 'text' and
-            table_format.compression_codec != 'none'):
+            and not (table_format.file_format == 'text' and \
+            table_format.compression_codec != 'none') \
+            and not table_format.file_format == 'rc' \
+            and not table_format.file_format == 'seq':
           raise
 
   def walk_and_corrupt_table_data(self, tmp_table_dir, num_copies, rng):
