@@ -53,8 +53,8 @@ add_library(Exec
   hdfs-avro-scanner.cc
   hdfs-avro-table-writer.cc
   hdfs-avro-scanner-ir.cc
+  hdfs-plugin-text-scanner.cc
   hdfs-text-scanner.cc
-  hdfs-lzo-text-scanner.cc
   hdfs-text-table-writer.cc
   hdfs-sequence-table-writer.cc
   hdfs-parquet-scanner.cc

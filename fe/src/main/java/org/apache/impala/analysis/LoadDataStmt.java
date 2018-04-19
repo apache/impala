@@ -223,17 +223,6 @@ public class LoadDataStmt extends StatementBase {
         }
       }
       Preconditions.checkNotNull(partition);
-
-      // Verify the files being loaded are supported.
-      for (FileStatus fStatus: fs.listStatus(source)) {
-        if (fs.isDirectory(fStatus.getPath())) continue;
-        StringBuilder errorMsg = new StringBuilder();
-        HdfsFileFormat fileFormat = partition.getInputFormatDescriptor().getFileFormat();
-        if (!fileFormat.isFileCompressionTypeSupported(fStatus.getPath().toString(),
-          errorMsg)) {
-          throw new AnalysisException(errorMsg.toString());
-        }
-      }
     } catch (FileNotFoundException e) {
       throw new AnalysisException("File not found: " + e.getMessage(), e);
     } catch (IOException e) {

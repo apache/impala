@@ -1,0 +1,7 @@
+====
+---- QUERY
+# Test that running with plugin disabled fails gracefully.
+select * from functional_text_lzo.alltypes
+---- CATCH
+Scanner plugin 'LZO' is not one of the enabled plugins: ''
+====

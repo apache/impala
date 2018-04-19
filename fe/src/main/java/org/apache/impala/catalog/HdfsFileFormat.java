@@ -201,45 +201,6 @@ public enum HdfsFileFormat {
     }
   }
 
-  /*
-   * Checks whether a file is supported in Impala based on the file extension.
-   * Returns true if the file format is supported. If the file format is not
-   * supported, then it returns false and 'errorMsg' contains details on the
-   * incompatibility.
-   *
-   * Impala supports LZO, GZIP, SNAPPY and BZIP2 on text files for partitions that have
-   * been declared in the metastore as TEXT. LZO files can have their own input format.
-   * For now, raise an error on any other type.
-   */
-  public boolean isFileCompressionTypeSupported(String fileName,
-      StringBuilder errorMsg) {
-    // Check to see if the file has a compression suffix.
-    // TODO: Add LZ4
-    HdfsCompression compressionType = HdfsCompression.fromFileName(fileName);
-    switch (compressionType) {
-      case LZO:
-      case LZO_INDEX:
-        // Index files are read by the LZO scanner directly.
-      case GZIP:
-      case SNAPPY:
-      case BZIP2:
-      case NONE:
-        return true;
-      case DEFLATE:
-        // TODO: Ensure that text/deflate works correctly
-        if (this == TEXT) {
-          errorMsg.append("Expected compressed text file with {.lzo,.gzip,.snappy,.bz2} "
-              + "suffix: " + fileName);
-          return false;
-        } else {
-          return true;
-        }
-      default:
-        errorMsg.append("Unknown compression suffix: " + fileName);
-        return false;
-    }
-  }
-
   /**
    * Returns true if this file format with the given compression format is splittable.
    */

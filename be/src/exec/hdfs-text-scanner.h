@@ -65,6 +65,21 @@ class HdfsTextScanner : public HdfsScanner {
       const std::vector<ScalarExpr*>& conjuncts,
       llvm::Function** write_aligned_tuples_fn) WARN_UNUSED_RESULT;
 
+  /// Return true if we have builtin support for scanning text files compressed with this
+  /// codec.
+  static bool HasBuiltinSupport(THdfsCompression::type compression) {
+    switch (compression) {
+      case THdfsCompression::NONE:
+      case THdfsCompression::GZIP:
+      case THdfsCompression::SNAPPY:
+      case THdfsCompression::SNAPPY_BLOCKED:
+      case THdfsCompression::BZIP2:
+        return true;
+      default:
+        return false;
+    }
+  }
+
   /// Suffix for lzo index files.
   const static std::string LZO_INDEX_SUFFIX;
 

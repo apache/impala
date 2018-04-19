@@ -17,8 +17,9 @@
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
-from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.common.test_dimensions import (create_single_exec_option_dimension,
+    create_uncompressed_text_dimension)
+from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
 
 # Map from the test dimension file_format string to the SQL "STORED AS"
 # argument.
@@ -145,3 +146,80 @@ class TestPartitionMetadata(ImpalaTestSuite):
     self.client.execute("select * from %s" % FQ_TBL_IMP)
     # Make sure the table remains accessible in HIVE
     self.run_stmt_in_hive("select * from %s" % FQ_TBL_IMP)
+
+
+class TestPartitionMetadataUncompressedTextOnly(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestPartitionMetadataUncompressedTextOnly, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+
+  @SkipIfLocal.hdfs_client
+  def test_unsupported_text_compression(self, vector, unique_database):
+    """Test querying tables with a mix of supported and unsupported compression codecs.
+    Should be able to query partitions with supported codecs."""
+    TBL_NAME = "multi_text_compression"
+    FQ_TBL_NAME = unique_database + "." + TBL_NAME
+    TBL_LOCATION = get_fs_path(
+        '{0}/{1}.db/{2}'.format(WAREHOUSE, unique_database, TBL_NAME))
+
+    file_format = vector.get_value('table_format').file_format
+    # Clean up any existing data in the table directory.
+    self.filesystem_client.delete_file_dir(TBL_NAME, recursive=True)
+    # Create the table
+    self.client.execute(
+        "create external table {0} like functional.alltypes location '{1}'".format(
+        FQ_TBL_NAME, TBL_LOCATION))
+
+    self.__add_alltypes_partition(vector, FQ_TBL_NAME, "functional", 2009, 1)
+    self.__add_alltypes_partition(vector, FQ_TBL_NAME, "functional_text_lzo", 2009, 2)
+
+    # Create a new partition with a bogus file with the unsupported LZ4 suffix.
+    lz4_year = 2009
+    lz4_month = 3
+    lz4_ym_partition_loc = self.__make_ym_partition_dir(TBL_LOCATION, lz4_year, lz4_month)
+    self.filesystem_client.create_file("{0}/fake.lz4".format(lz4_ym_partition_loc)[1:],
+        "some test data")
+    self.client.execute(
+        "alter table {0} add partition (year={1}, month={2}) location '{3}'".format(
+        FQ_TBL_NAME, lz4_year, lz4_month, lz4_ym_partition_loc))
+
+    # Create a new partition with a bogus compression codec.
+    fake_comp_year = 2009
+    fake_comp_month = 4
+    fake_comp_ym_partition_loc = self.__make_ym_partition_dir(
+        TBL_LOCATION, fake_comp_year, fake_comp_month)
+    self.filesystem_client.create_file(
+        "{0}/fake.fake_comp".format(fake_comp_ym_partition_loc)[1:], "fake compression")
+    self.client.execute(
+        "alter table {0} add partition (year={1}, month={2}) location '{3}'".format(
+        FQ_TBL_NAME, fake_comp_year, fake_comp_month, fake_comp_ym_partition_loc))
+
+    show_files_result = self.client.execute("show files in {0}".format(FQ_TBL_NAME))
+    assert len(show_files_result.data) == 4, "Expected one file per partition dir"
+
+    self.run_test_case('QueryTest/unsupported-compression-partitions', vector,
+        unique_database)
+
+  def __add_alltypes_partition(self, vector, dst_tbl, src_db, year, month):
+    """Add the (year, month) partition from ${db_name}.alltypes to dst_tbl."""
+    tbl_location = self._get_table_location("{0}.alltypes".format(src_db), vector)
+    part_location = "{0}/year={1}/month={2}".format(tbl_location, year, month)
+    self.client.execute(
+        "alter table {0} add partition (year={1}, month={2}) location '{3}'".format(
+        dst_tbl, year, month, part_location))
+
+  def __make_ym_partition_dir(self, tbl_location, year, month):
+    """Create the year/month partition directory and return the path."""
+    y_partition_loc = "{0}/year={1}".format(tbl_location, year)
+    ym_partition_loc = "{0}/month={1}".format(y_partition_loc, month)
+    self.filesystem_client.delete_file_dir(tbl_location[1:], recursive=True)
+    self.filesystem_client.make_dir(tbl_location[1:])
+    self.filesystem_client.make_dir(y_partition_loc[1:])
+    self.filesystem_client.make_dir(ym_partition_loc[1:])
+    return ym_partition_loc

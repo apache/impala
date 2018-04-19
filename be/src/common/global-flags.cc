@@ -243,6 +243,7 @@ REMOVED_FLAG(rm_default_cpu_vcores);
 REMOVED_FLAG(rm_default_memory);
 REMOVED_FLAG(rpc_cnxn_attempts);
 REMOVED_FLAG(rpc_cnxn_retry_interval_ms);
+REMOVED_FLAG(skip_lzo_version_check);
 REMOVED_FLAG(staging_cgroup);
 REMOVED_FLAG(suppress_unknown_disk_id_warnings);
 REMOVED_FLAG(use_statestore);
