@@ -2648,9 +2648,7 @@ under the License.
         <li>
           <p>
             The documentation provides additional guidance for planning tasks. <ph audience="PDF">See
-            <xref href="impala_planning.xml#planning"/>.</ph> <ph audience="PDF">In particular, see
-            <xref href="impala_cluster_sizing.xml#cluster_sizing"/> before you purchase or repurpose hardware for a
-            cluster to run Impala.</ph>
+            <xref href="impala_planning.xml#planning"/>.</ph>
           </p>
         </li>
 
