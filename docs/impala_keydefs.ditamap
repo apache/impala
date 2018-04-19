@@ -10618,7 +10618,7 @@ under the License.
   <keydef href="topics/impala_hadoop.xml" keys="intro_hadoop"/>
   <keydef href="topics/impala_planning.xml" keys="planning"/>
   <keydef href="topics/impala_prereqs.xml" keys="prereqs"/>
-  <keydef href="topics/impala_cluster_sizing.xml" keys="cluster_sizing"/>
+  <!-- Removed <keydef href="topics/impala_cluster_sizing.xml" keys="cluster_sizing"/> -->
   <keydef href="topics/impala_schema_design.xml" keys="schema_design"/>
   <keydef href="topics/impala_install.xml" keys="install"/>
   <keydef href="topics/impala_config.xml" keys="config"/>
