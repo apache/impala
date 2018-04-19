@@ -120,7 +120,7 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
     int64_t in_size = current_block_length_ - current_key_length_;
     if (in_size < 0) {
       stringstream ss;
-      ss << "Invalid record size: " << in_size;
+      ss << stream_->filename() << " Invalid record size: " << in_size;
       return Status(ss.str());
     }
     uint8_t* compressed_data;
@@ -136,15 +136,19 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
     }
     *record_ptr = unparsed_data_buffer_;
     // Read the length of the record.
-    int size = ReadWriteUtil::GetVLong(*record_ptr, record_len);
-    if (size == -1) return Status("Invalid record sizse");
+    int size = ReadWriteUtil::GetVLong(*record_ptr, record_len, in_size);
+    if (size == -1) {
+      stringstream ss;
+      ss << stream_->filename() << " Invalid record size: " << in_size;
+      return Status(ss.str());
+    }
     *record_ptr += size;
   } else {
     // Uncompressed records
     RETURN_IF_FALSE(stream_->ReadVLong(record_len, &parse_status_));
     if (*record_len < 0) {
       stringstream ss;
-      ss << "Invalid record length: " << *record_len;
+      ss << stream_->filename() << " Invalid record length: " << *record_len;
       return Status(ss.str());
     }
     RETURN_IF_FALSE(
@@ -199,9 +203,9 @@ Status HdfsSequenceScanner::ProcessBlockCompressedScanRange(RowBatch* row_batch)
     if (sync_indicator != -1) {
       if (state_->LogHasSpace()) {
         stringstream ss;
-        ss << "Expecting sync indicator (-1) at file offset "
-            << (stream_->file_offset() - sizeof(int)) << ".  "
-            << "Sync indicator found " << sync_indicator << ".";
+        ss << stream_->filename() << " Expecting sync indicator (-1) at file offset "
+           << (stream_->file_offset() - sizeof(int)) << ".  "
+           << "Sync indicator found " << sync_indicator << ".";
         state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
       }
       return Status("Bad sync hash");
@@ -229,15 +233,34 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock(RowBatch* row_batch) {
   // Parse record starts and lengths
   int field_location_offset = 0;
   for (int i = 0; i < num_to_process; ++i) {
-    DCHECK_LT(i, record_locations_.size());
-    int bytes_read = ReadWriteUtil::GetVLong(
-        next_record_in_compressed_block_, &record_locations_[i].len);
+    if (i >= record_locations_.size() || record_locations_[i].len < 0
+        || next_record_in_compressed_block_ > data_buffer_end_) {
+      stringstream ss;
+      ss << stream_->filename() << " Invalid compressed block";
+      return Status(ss.str());
+    }
+    int bytes_read = ReadWriteUtil::GetVLong(next_record_in_compressed_block_,
+        &record_locations_[i].len, next_record_in_compressed_block_len_);
     if (UNLIKELY(bytes_read == -1)) {
-      return Status("Invalid record sizes in compressed block.");
+      stringstream ss;
+      ss << stream_->filename() << " Invalid compressed block";
+      return Status(ss.str());
     }
     next_record_in_compressed_block_ += bytes_read;
+    next_record_in_compressed_block_len_ -= bytes_read;
+    if (next_record_in_compressed_block_len_ <= 0) {
+      stringstream ss;
+      ss << stream_->filename() << " Invalid compressed block";
+      return Status(ss.str());
+    }
     record_locations_[i].record = next_record_in_compressed_block_;
     next_record_in_compressed_block_ += record_locations_[i].len;
+    next_record_in_compressed_block_len_ -= record_locations_[i].len;
+    if (next_record_in_compressed_block_len_ < 0) {
+      stringstream ss;
+      ss << stream_->filename() << " Invalid compressed block";
+      return Status(ss.str());
+    }
   }
 
   // Parse records to find field locations.
@@ -254,9 +277,17 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock(RowBatch* row_batch) {
           reinterpret_cast<char*>(record_locations_[i].record),
           &field_locations_[field_location_offset], &num_fields));
     }
-    DCHECK_EQ(num_fields, scan_node_->materialized_slots().size());
+    if (num_fields != scan_node_->materialized_slots().size()) {
+      stringstream ss;
+      ss << stream_->filename() << " Invalid compressed block";
+      return Status(ss.str());
+    }
     field_location_offset += num_fields;
-    DCHECK_LE(field_location_offset, field_locations_.size());
+    if (field_location_offset > field_locations_.size()) {
+      stringstream ss;
+      ss << stream_->filename() << " Invalid compressed block";
+      return Status(ss.str());
+    }
   }
 
   int max_added_tuples = (scan_node_->limit() == -1) ?
@@ -377,7 +408,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
 
   if (memcmp(header, SEQFILE_VERSION_HEADER, sizeof(SEQFILE_VERSION_HEADER))) {
     stringstream ss;
-    ss << "Invalid SEQFILE_VERSION_HEADER: '"
+    ss << stream_->filename() << " Invalid SEQFILE_VERSION_HEADER: '"
        << ReadWriteUtil::HexDump(header, sizeof(SEQFILE_VERSION_HEADER)) << "'";
     return Status(ss.str());
   }
@@ -390,7 +421,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   RETURN_IF_FALSE(stream_->ReadText(&class_name, &len, &parse_status_));
   if (memcmp(class_name, HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME, len)) {
     stringstream ss;
-    ss << "Invalid SEQFILE_VALUE_CLASS_NAME: '"
+    ss << stream_->filename() << " Invalid SEQFILE_VALUE_CLASS_NAME: '"
        << string(reinterpret_cast<char*>(class_name), len) << "'";
     return Status(ss.str());
   }
@@ -408,7 +439,9 @@ Status HdfsSequenceScanner::ReadFileHeader() {
     RETURN_IF_FALSE(stream_->ReadText(&codec_ptr, &len, &parse_status_));
     header_->codec = string(reinterpret_cast<char*>(codec_ptr), len);
     Codec::CodecMap::const_iterator it = Codec::CODEC_MAP.find(header_->codec);
-    DCHECK(it != Codec::CODEC_MAP.end());
+    if (it == Codec::CODEC_MAP.end()) {
+      return Status(TErrorCode::COMPRESSED_FILE_BLOCK_CORRUPTED, header_->codec);
+    }
     header_->compression_type = it->second;
   } else {
     header_->compression_type = THdfsCompression::NONE;
@@ -449,7 +482,8 @@ Status HdfsSequenceScanner::ReadBlockHeader() {
     stringstream ss;
     int64_t position = stream_->file_offset();
     position -= sizeof(int32_t);
-    ss << "Bad block length: " << current_block_length_ << " at offset " << position;
+    ss << stream_->filename() << " Bad block length: " << current_block_length_
+       << " at offset " << position;
     return Status(ss.str());
   }
 
@@ -458,7 +492,8 @@ Status HdfsSequenceScanner::ReadBlockHeader() {
     stringstream ss;
     int64_t position = stream_->file_offset();
     position -= sizeof(int32_t);
-    ss << "Bad key length: " << current_key_length_ << " at offset " << position;
+    ss << stream_->filename() << " Bad key length: " << current_key_length_
+       << " at offset " << position;
     return Status(ss.str());
   }
 
@@ -472,8 +507,8 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   if (num_buffered_records < 0) {
     if (state_->LogHasSpace()) {
       stringstream ss;
-      ss << "Bad compressed block record count: "
-         << num_buffered_records;
+      ss << stream_->filename()
+         << " Bad compressed block record count: " << num_buffered_records;
       state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
     }
     return Status("bad record count");
@@ -493,7 +528,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   // Check for a reasonable size
   if (block_size > MAX_BLOCK_SIZE || block_size < 0) {
     stringstream ss;
-    ss << "Compressed block size is: " << block_size;
+    ss << stream_->filename() << " Compressed block size is: " << block_size;
     return Status(ss.str());
   }
 
@@ -507,6 +542,8 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
                                                 &len, &unparsed_data_buffer_));
     VLOG_FILE << "Decompressed " << block_size << " to " << len;
     next_record_in_compressed_block_ = unparsed_data_buffer_;
+    next_record_in_compressed_block_len_ = len;
+    data_buffer_end_ = unparsed_data_buffer_ + len;
   }
   num_buffered_records_in_compressed_block_ = num_buffered_records;
   return Status::OK();

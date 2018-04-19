@@ -49,6 +49,9 @@ const char* const HdfsRCFileScanner::RCFILE_METADATA_KEY_NUM_COLS =
 
 const uint8_t HdfsRCFileScanner::RCFILE_VERSION_HEADER[4] = {'R', 'C', 'F', 1};
 
+// Check max column limit, set to 8 million
+const int HdfsRCFileScanner::MAX_NCOLS = 8000000;
+
 // Macro to convert between SerdeUtil errors to Status returns.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
@@ -82,6 +85,13 @@ Status HdfsRCFileScanner::InitNewRange() {
         reuse_row_group_buffer_, header_->codec, &decompressor_));
   }
 
+  int ncols = reinterpret_cast<RcFileHeader*>(header_)->num_cols;
+  if (ncols < 0 || ncols > MAX_NCOLS) {
+    stringstream ss;
+    ss << stream_->filename() << " Column limit has exceeded " << MAX_NCOLS
+       << " limit, the number of columns are " << ncols;
+    return Status(ss.str());
+  }
   // Allocate the buffers for the key information that is used to read and decode
   // the column data.
   columns_.resize(reinterpret_cast<RcFileHeader*>(header_)->num_cols);
@@ -116,7 +126,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
     rc_header->version = RCF1;
   } else {
     stringstream ss;
-    ss << "Invalid RCFILE_VERSION_HEADER: '"
+    ss << stream_->filename() << " Invalid RCFILE_VERSION_HEADER: '"
        << ReadWriteUtil::HexDump(header, sizeof(RCFILE_VERSION_HEADER)) << "'";
     return Status(ss.str());
   }
@@ -130,9 +140,8 @@ Status HdfsRCFileScanner::ReadFileHeader() {
     if (len != strlen(HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME) ||
         memcmp(class_name_key, HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME, len)) {
       stringstream ss;
-      ss << "Invalid RCFILE_KEY_CLASS_NAME: '"
-         << string(reinterpret_cast<char*>(class_name_key), len)
-         << "' len=" << len;
+      ss << stream_->filename() << " Invalid RCFILE_KEY_CLASS_NAME: '"
+         << string(reinterpret_cast<char*>(class_name_key), len) << "' len=" << len;
       return Status(ss.str());
     }
 
@@ -142,9 +151,8 @@ Status HdfsRCFileScanner::ReadFileHeader() {
     if (len != strlen(HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME) ||
         memcmp(class_name_val, HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME, len)) {
       stringstream ss;
-      ss << "Invalid RCFILE_VALUE_CLASS_NAME: '"
-         << string(reinterpret_cast<char*>(class_name_val), len)
-         << "' len=" << len;
+      ss << stream_->filename() << " Invalid RCFILE_VALUE_CLASS_NAME: '"
+         << string(reinterpret_cast<char*>(class_name_val), len) << "' len=" << len;
       return Status(ss.str());
     }
   }
@@ -161,7 +169,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
         stream_->ReadBoolean(&is_blk_compressed, &parse_status_));
     if (is_blk_compressed) {
       stringstream ss;
-      ss << "RC files do no support block compression.";
+      ss << stream_->filename() << " RC files does not support block compression.";
       return Status(ss.str());
     }
   }
@@ -172,7 +180,11 @@ Status HdfsRCFileScanner::ReadFileHeader() {
     RETURN_IF_FALSE(stream_->ReadText(&codec_ptr, &len, &parse_status_));
     header_->codec = string(reinterpret_cast<char*>(codec_ptr), len);
     Codec::CodecMap::const_iterator it = Codec::CODEC_MAP.find(header_->codec);
-    DCHECK(it != Codec::CODEC_MAP.end());
+    if (it == Codec::CODEC_MAP.end()) {
+      stringstream ss;
+      ss << stream_->filename() << " Invalid codec: " << header_->codec;
+      return Status(ss.str());
+    }
     header_->compression_type = it->second;
   } else {
     header_->compression_type = THdfsCompression::NONE;
@@ -208,10 +220,10 @@ Status HdfsRCFileScanner::ReadNumColumnsMetadata() {
       StringParser::ParseResult result;
       int num_cols =
           StringParser::StringToInt<int>(value_str.c_str(), value_str.size(), &result);
-      if (result != StringParser::PARSE_SUCCESS) {
+      if (result != StringParser::PARSE_SUCCESS || num_cols < 0) {
         stringstream ss;
-        ss << "Could not parse number of columns in file " << stream_->filename()
-           << ": " << value_str;
+        ss << " Could not parse number of columns in file " << stream_->filename()
+           << " : " << value_str;
         if (result == StringParser::PARSE_OVERFLOW) ss << " (result overflowed)";
         return Status(ss.str());
       }
@@ -271,7 +283,8 @@ Status HdfsRCFileScanner::ReadRowGroupHeader() {
     stringstream ss;
     int64_t position = stream_->file_offset();
     position -= sizeof(int32_t);
-    ss << "Bad record length: " << record_length << " at offset: " << position;
+    ss << stream_->filename() << " Bad record length: " << record_length
+       << " at offset: " << position;
     return Status(ss.str());
   }
   RETURN_IF_FALSE(stream_->ReadInt(&key_length_, &parse_status_));
@@ -279,7 +292,8 @@ Status HdfsRCFileScanner::ReadRowGroupHeader() {
     stringstream ss;
     int64_t position = stream_->file_offset();
     position -= sizeof(int32_t);
-    ss << "Bad key length: " << key_length_ << " at offset: " << position;
+    ss << stream_->filename() << " Bad key length: " << key_length_
+       << " at offset: " << position;
     return Status(ss.str());
   }
   RETURN_IF_FALSE(stream_->ReadInt(&compressed_key_length_, &parse_status_));
@@ -287,7 +301,7 @@ Status HdfsRCFileScanner::ReadRowGroupHeader() {
     stringstream ss;
     int64_t position = stream_->file_offset();
     position -= sizeof(int32_t);
-    ss << "Bad compressed key length: " << compressed_key_length_
+    ss << stream_->filename() << " Bad compressed key length: " << compressed_key_length_
        << " at offset: " << position;
     return Status(ss.str());
   }
@@ -316,42 +330,98 @@ Status HdfsRCFileScanner::ReadKeyBuffers() {
     memcpy(key_buffer, buffer, key_length_);
   }
 
-  row_group_length_ = 0;
   uint8_t* key_buf_ptr = key_buffer;
-  int bytes_read = ReadWriteUtil::GetVInt(key_buf_ptr, &num_rows_);
-  key_buf_ptr += bytes_read;
-
-  for (int col_idx = 0; col_idx < columns_.size(); ++col_idx) {
-    GetCurrentKeyBuffer(col_idx, !columns_[col_idx].materialize_column, &key_buf_ptr);
-    DCHECK_LE(key_buf_ptr, key_buffer + key_length_);
+  row_group_length_ = 0;
+  int remain_len = key_length_;
+  int bytes_read = ReadWriteUtil::GetVInt(key_buf_ptr, &num_rows_, key_length_);
+  if (bytes_read == -1 || num_rows_ < 0) {
+    stringstream ss;
+    ss << stream_->filename() << " Bad row group key buffer, key length: " << key_length_;
+    return Status(ss.str());
   }
-  DCHECK_EQ(key_buf_ptr, key_buffer + key_length_);
+  key_buf_ptr += bytes_read;
+  remain_len = remain_len - bytes_read;
+
+  // Track the starting position in the buffer.
+  uint8_t* start_key_buf_ptr = key_buf_ptr;
+  for (int col_idx = 0; col_idx < columns_.size(); ++col_idx) {
+    if (key_buf_ptr < start_key_buf_ptr || (key_buf_ptr > key_buffer + key_length_)
+        || remain_len <= 0) {
+      stringstream ss;
+      ss << stream_->filename() << " Bad row group key buffer, column idx: " << col_idx;
+      return Status(ss.str());
+    }
+    RETURN_IF_ERROR(GetCurrentKeyBuffer(
+        col_idx, !columns_[col_idx].materialize_column, &key_buf_ptr, remain_len));
+    remain_len = remain_len - (key_buf_ptr - start_key_buf_ptr);
+    start_key_buf_ptr = key_buf_ptr;
+  }
 
   return Status::OK();
 }
 
-void HdfsRCFileScanner::GetCurrentKeyBuffer(int col_idx, bool skip_col_data,
-                                            uint8_t** key_buf_ptr) {
+Status HdfsRCFileScanner::BadColumnInfo(int col_idx) {
+  stringstream ss;
+  ss << stream_->filename() << " Corrupt column at index: " << col_idx;
+  return Status(ss.str());
+}
+
+Status HdfsRCFileScanner::GetCurrentKeyBuffer(
+    int col_idx, bool skip_col_data, uint8_t** key_buf_ptr, int buf_length) {
   ColumnInfo& col_info = columns_[col_idx];
+  int remain_len = buf_length;
 
-  int bytes_read = ReadWriteUtil::GetVInt(*key_buf_ptr, &col_info.buffer_len);
-  *key_buf_ptr += bytes_read;
+  if (remain_len <= 0) {
+    return BadColumnInfo(col_idx);
+  }
 
-  bytes_read = ReadWriteUtil::GetVInt(*key_buf_ptr, &col_info.uncompressed_buffer_len);
+  DCHECK_GT(remain_len, 0);
+  int bytes_read = ReadWriteUtil::GetVInt(*key_buf_ptr, &col_info.buffer_len, remain_len);
+  if (bytes_read == -1) {
+    return BadColumnInfo(col_idx);
+  }
   *key_buf_ptr += bytes_read;
+  remain_len -= bytes_read;
+  DCHECK_GT(remain_len, 0);
+
+  bytes_read =
+      ReadWriteUtil::GetVInt(*key_buf_ptr, &col_info.uncompressed_buffer_len, remain_len);
+  if (bytes_read == -1) {
+    return BadColumnInfo(col_idx);
+  }
+  *key_buf_ptr += bytes_read;
+  remain_len -= bytes_read;
+  if (remain_len <= 0) {
+    return BadColumnInfo(col_idx);
+  }
 
   int col_key_buf_len;
-  bytes_read = ReadWriteUtil::GetVInt(*key_buf_ptr , &col_key_buf_len);
+  bytes_read = ReadWriteUtil::GetVInt(*key_buf_ptr, &col_key_buf_len, remain_len);
+  if (bytes_read == -1) {
+    return BadColumnInfo(col_idx);
+  }
+
   *key_buf_ptr += bytes_read;
+  remain_len -= bytes_read;
+  if (col_info.uncompressed_buffer_len < 0 || remain_len <= 0) {
+    return BadColumnInfo(col_idx);
+  }
 
   if (!skip_col_data) {
     col_info.key_buffer = *key_buf_ptr;
+
+    DCHECK_GE(col_info.uncompressed_buffer_len, 0);
 
     // Set the offset for the start of the data for this column in the allocated buffer.
     col_info.start_offset = row_group_length_;
     row_group_length_ += col_info.uncompressed_buffer_len;
   }
+  col_info.buf_length = col_key_buf_len;
   *key_buf_ptr += col_key_buf_len;
+  remain_len -= bytes_read;
+  DCHECK_GE(remain_len, 0);
+
+  return Status::OK();
 }
 
 inline Status HdfsRCFileScanner::NextField(int col_idx) {
@@ -366,11 +436,11 @@ inline Status HdfsRCFileScanner::NextField(int col_idx) {
     int64_t length = 0;
     uint8_t* col_key_buf = col_info.key_buffer;
     int bytes_read = ReadWriteUtil::GetVLong(
-        col_key_buf, col_info.key_buffer_pos, &length);
+        col_key_buf, col_info.key_buffer_pos, &length, col_info.buf_length);
     if (bytes_read == -1) {
         int64_t position = stream_->file_offset();
         stringstream ss;
-        ss << "Invalid column length at offset: " << position;
+        ss << stream_->filename() << " Invalid column length at offset: " << position;
         return Status(ss.str());
     }
     col_info.key_buffer_pos += bytes_read;
@@ -403,6 +473,11 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
   for (int col_idx = 0; col_idx < columns_.size(); ++col_idx) {
     ColumnInfo& column = columns_[col_idx];
     if (!columns_[col_idx].materialize_column) {
+      if (column.buffer_len < 0) {
+        stringstream ss;
+        ss << stream_->filename() << " Bad column buffer len: " << column.buffer_len;
+        return Status(ss.str());
+      }
       // Not materializing this column, just skip it.
       RETURN_IF_FALSE(
           stream_->SkipBytes(column.buffer_len, &parse_status_));
@@ -411,7 +486,17 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
 
     // TODO: Stream through these column buffers instead of reading everything
     // in at once.
-    DCHECK_LE(column.uncompressed_buffer_len + column.start_offset, row_group_length_);
+    // Uncompressed buffer size for a column should not exceed the row_group_length_
+    // as row_group_length_ is a sum of uncompressed buffer length for all the columns
+    // so this check ensures that there is enough space in row_group_buffer for the
+    // uncompressed data.
+    if (column.uncompressed_buffer_len + column.start_offset > row_group_length_) {
+      stringstream ss;
+      ss << stream_->filename() << " Bad column buffer uncompressed buffer length: "
+         << column.uncompressed_buffer_len << " at offset " << column.start_offset;
+      return Status(ss.str());
+    }
+
     if (header_->is_compressed) {
       uint8_t* compressed_input;
       RETURN_IF_FALSE(stream_->ReadBytes(
@@ -493,8 +578,16 @@ Status HdfsRCFileScanner::ProcessRange(RowBatch* row_batch) {
         const char* col_start = reinterpret_cast<const char*>(
             row_group_buffer_ + column.start_offset + column.buffer_pos);
         const int field_len = column.current_field_len;
-        DCHECK_LE(col_start + field_len,
-            reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_));
+        const char* row_group_end =
+            reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_);
+        const char* col_end = col_start + field_len;
+        if (col_end > row_group_end || column.start_offset < 0 || column.buffer_pos < 0
+            || col_start > row_group_end || field_len < 0) {
+          stringstream ss;
+          ss << stream_->filename()
+             << " Bad column index at offset : " << column.start_offset;
+          return Status(ss.str());
+        }
 
         if (!text_converter_->WriteSlot(slot_desc, tuple, col_start, field_len,
             false, false, row_batch->tuple_data_pool())) {

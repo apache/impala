@@ -251,8 +251,14 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   /// Buffer for data read from the 'stream_' directly or after decompression.
   uint8_t* unparsed_data_buffer_ = nullptr;
 
+  /// End of data buffer used to check out of bound error.
+  uint8_t* data_buffer_end_ = nullptr;
+
   /// Number of buffered records unparsed_data_buffer_ from block compressed data.
   int64_t num_buffered_records_in_compressed_block_ = 0;
+
+  /// Next record from block compressed data.
+  int64_t next_record_in_compressed_block_len_ = 0;
 
   /// Next record from block compressed data.
   uint8_t* next_record_in_compressed_block_ = nullptr;

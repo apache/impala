@@ -68,6 +68,7 @@ inline bool ScannerContext::Stream::ReadBytes(int64_t length, uint8_t** buf,
 }
 
 inline bool ScannerContext::Stream::SkipBytes(int64_t length, Status* status) {
+  DCHECK_GE(length, 0);
   int64_t bytes_left = length;
   // Skip bytes from the boundary buffer first.
   if (boundary_buffer_bytes_left_ > 0) {
@@ -102,6 +103,10 @@ inline bool ScannerContext::Stream::SkipBytes(int64_t length, Status* status) {
 inline bool ScannerContext::Stream::SkipText(Status* status) {
   int64_t len;
   RETURN_IF_FALSE(ReadVLong(&len, status));
+  if (len < 0) {
+    *status = Status("SkipText: length is negative");
+    return false;
+  }
   RETURN_IF_FALSE(SkipBytes(len, status));
   return true;
 }

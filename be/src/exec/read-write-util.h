@@ -53,11 +53,12 @@ class ReadWriteUtil {
   template<typename T>
   static T GetInt(const uint8_t* buffer);
 
-  /// Get a variable-length Long or int value from a byte buffer.
+  /// Get a variable-length Long or int value from a byte buffer of length size. Access
+  /// beyond the buffer size will return -1.
   /// Returns the length of the long/int
   /// If the size byte is corrupted then return -1;
-  static int GetVLong(uint8_t* buf, int64_t* vlong);
-  static int GetVInt(uint8_t* buf, int32_t* vint);
+  static int GetVLong(uint8_t* buf, int64_t* vlong, int32_t size);
+  static int GetVInt(uint8_t* buf, int32_t* vint, int32_t size);
 
   /// Writes a variable-length Long or int value to a byte buffer.
   /// Returns the number of bytes written.
@@ -68,8 +69,9 @@ class ReadWriteUtil {
   static int VLongRequiredBytes(int64_t val);
 
   /// Read a variable-length Long value from a byte buffer starting at the specified
-  /// byte offset.
-  static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
+  /// byte offset and the buffer passed is of length size, accessing beyond the
+  /// buffer length will result in returning -1 value to the caller.
+  static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong, int32_t size);
 
   /// Put an Integer into a buffer in big endian order.  The buffer must be big
   /// enough.
@@ -177,22 +179,30 @@ inline void ReadWriteUtil::PutInt(uint8_t* buf, uint64_t integer) {
   memcpy(buf, &big_endian, sizeof(uint64_t));
 }
 
-inline int ReadWriteUtil::GetVInt(uint8_t* buf, int32_t* vint) {
+inline int ReadWriteUtil::GetVInt(uint8_t* buf, int32_t* vint, int32_t size) {
   int64_t vlong = 0;
-  int len = GetVLong(buf, &vlong);
+  int len = GetVLong(buf, &vlong, size);
   *vint = static_cast<int32_t>(vlong);
   return len;
 }
 
-inline int ReadWriteUtil::GetVLong(uint8_t* buf, int64_t* vlong) {
-  return GetVLong(buf, 0, vlong);
+inline int ReadWriteUtil::GetVLong(uint8_t* buf, int64_t* vlong, int32_t size) {
+  return GetVLong(buf, 0, vlong, size);
 }
 
-inline int ReadWriteUtil::GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong) {
+inline int ReadWriteUtil::GetVLong(
+    uint8_t* buf, int64_t offset, int64_t* vlong, int32_t size) {
+  // Buffer access out of bounds.
+  if (size == 0) return -1;
+
+  // Buffer access out of bounds.
+  if (offset > size) return -1;
   int8_t firstbyte = (int8_t) buf[0 + offset];
 
   int len = DecodeVIntSize(firstbyte);
-  if (len > MAX_VINT_LEN) return -1;
+
+  // Buffer access out of bounds.
+  if (len > MAX_VINT_LEN || len > size) return -1;
   if (len == 1) {
     *vlong = static_cast<int64_t>(firstbyte);
     return len;

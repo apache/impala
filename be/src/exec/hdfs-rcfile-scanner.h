@@ -257,6 +257,9 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   /// of the file {'R', 'C', 'F' 1}
   static const uint8_t RCFILE_VERSION_HEADER[4];
 
+  // Check max column limit
+  static const int MAX_NCOLS;
+
   /// Implementation of superclass functions.
   virtual FileHeader* AllocateFileHeader();
   virtual Status ReadFileHeader() WARN_UNUSED_RESULT;
@@ -289,12 +292,14 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   /// Input/Output:
   ///   key_buf_ptr: Pointer to the buffered file data, this will be moved
   ///                past the data for this column.
+  ///   buf_len: Length of the buffer that will be read.
   /// Sets:
   ///   col_buf_len_
   ///   col_buf_uncompressed_len_
   ///   col_key_bufs_
   ///   col_bufs_off_
-  void GetCurrentKeyBuffer(int col_idx, bool skip_col_data, uint8_t** key_buf_ptr);
+  Status GetCurrentKeyBuffer(
+      int col_idx, bool skip_col_data, uint8_t** key_buf_ptr, int buf_length);
 
   /// Read the rowgroup column buffers
   /// Sets:
@@ -322,6 +327,13 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
   /// Modifies:
   ///   row_pos_
   Status NextRow() WARN_UNUSED_RESULT;
+
+  /// Error message printed on a formatted stream when a bad column idex is encountered.
+  /// Input:
+  ///   col_idx: column to print.
+  /// Output:
+  ///   Error status, with formatted stream.
+  Status BadColumnInfo(int col_idx);
 
   enum Version {
     SEQ6,     // Version for sequence file and pre hive-0.9 rc files
@@ -352,6 +364,8 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
     int32_t key_buffer_len;
     /// This is a ptr into the scanner's key_buffer_ for this column.
     uint8_t* key_buffer;
+    /// Length of the key buffer
+    int32_t buf_length;
 
     /// Current position in the key buffer
     int32_t key_buffer_pos;

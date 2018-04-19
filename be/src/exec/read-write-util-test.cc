@@ -83,12 +83,19 @@ TEST(ReadWriteUtil, ZeroCompressedLongRequiredBytes) {
 }
 
 void TestPutGetZeroCompressedLong(int64_t val) {
-  uint8_t buffer[9];
+  const int32_t BUFSZ = 9;
+  uint8_t buffer[BUFSZ];
   int64_t read_val;
   int64_t num_bytes = ReadWriteUtil::PutVLong(val, buffer);
-  int64_t read_bytes = ReadWriteUtil::GetVLong(buffer, &read_val);
+  int64_t read_bytes = ReadWriteUtil::GetVLong(buffer, &read_val, BUFSZ);
   EXPECT_EQ(read_bytes, num_bytes);
   EXPECT_EQ(read_val, val);
+  // Out of bound access check, -1 should be returned because buffer size is passed
+  // as 1 byte.
+  if (read_bytes > 1) {
+    read_bytes = ReadWriteUtil::GetVLong(buffer, &read_val, 1);
+    EXPECT_EQ(read_bytes, -1);
+  }
 }
 
 TEST(ReadWriteUtil, ZeroCompressedLong) {
