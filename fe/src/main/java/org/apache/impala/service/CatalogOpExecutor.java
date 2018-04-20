@@ -702,7 +702,7 @@ public class CatalogOpExecutor {
       }
 
       // Set the altered view attributes and update the metastore.
-      setViewAttributes(params, msTbl);
+      setAlterViewAttributes(params, msTbl);
       if (LOG.isTraceEnabled()) {
         LOG.trace(String.format("Altering view %s", tableName));
       }
@@ -1802,7 +1802,7 @@ public class CatalogOpExecutor {
     // Create new view.
     org.apache.hadoop.hive.metastore.api.Table view =
         new org.apache.hadoop.hive.metastore.api.Table();
-    setViewAttributes(params, view);
+    setCreateViewAttributes(params, view);
     LOG.trace(String.format("Creating view %s", tableName));
     if (!createTable(view, params.if_not_exists, null, response)) {
       addSummary(response, "View already exists.");
@@ -1901,9 +1901,10 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Sets the given params in the metastore table as appropriate for a view.
+   * Sets the given params in the metastore table as appropriate for a
+   * create view operation.
    */
-  private void setViewAttributes(TCreateOrAlterViewParams params,
+  private void setCreateViewAttributes(TCreateOrAlterViewParams params,
       org.apache.hadoop.hive.metastore.api.Table view) {
     view.setTableType(TableType.VIRTUAL_VIEW.toString());
     view.setViewOriginalText(params.getOriginal_view_def());
@@ -1912,16 +1913,30 @@ public class CatalogOpExecutor {
     view.setTableName(params.getView_name().getTable_name());
     view.setOwner(params.getOwner());
     if (view.getParameters() == null) view.setParameters(new HashMap<String, String>());
-    if (params.isSetComment() &&  params.getComment() != null) {
+    if (params.isSetComment() && params.getComment() != null) {
       view.getParameters().put("comment", params.getComment());
     }
-
-    // Add all the columns to a new storage descriptor.
     StorageDescriptor sd = new StorageDescriptor();
+    // Add all the columns to a new storage descriptor.
     sd.setCols(buildFieldSchemaList(params.getColumns()));
     // Set a dummy SerdeInfo for Hive.
     sd.setSerdeInfo(new SerDeInfo());
     view.setSd(sd);
+  }
+
+  /**
+   * Sets the given params in the metastore table as appropriate for an
+   * alter view operation.
+   */
+  private void setAlterViewAttributes(TCreateOrAlterViewParams params,
+      org.apache.hadoop.hive.metastore.api.Table view) {
+    view.setViewOriginalText(params.getOriginal_view_def());
+    view.setViewExpandedText(params.getExpanded_view_def());
+    if (params.isSetComment() && params.getComment() != null) {
+      view.getParameters().put("comment", params.getComment());
+    }
+    // Add all the columns to a new storage descriptor.
+    view.getSd().setCols(buildFieldSchemaList(params.getColumns()));
   }
 
   /**
