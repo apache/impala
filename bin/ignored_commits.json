@@ -16,7 +16,10 @@
       { "hash": "6b18b00310fbdae64bc3d8aec0b58385884fe76f",
         "comment": "Not applicable to 2.x; new HBase splitter code there.  IMPALA-6776: Increase region move timeout." },
       { "hash": "5417e712f33dfb963b4646723ec173a5f3c4f49b",
-        "comment": "Only applies to master; Existing privileges available at server level." }
+        "comment": "Only applies to master; Existing privileges available at server level." },
+      { "hash": "08a1a7a967f19e41e8523a9020320bbad5cdac77",
+        "comment": "Not applicable to 2.x: Fix typo in authz-policy.ini.template." }
+
     ]
   }
 ]
