@@ -26,6 +26,7 @@ from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIf, SkipIfADLS, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE, IS_HDFS, IS_S3, IS_ADLS
+from tests.common.impala_cluster import ImpalaCluster
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):
@@ -360,6 +361,37 @@ class TestDdlStatements(TestDdlBase):
 |--05:EXCHANGE [BROADCAST]
 |  01:SCAN HDFS [functional.alltypes b]
 00:SCAN HDFS [functional.alltypestiny a]""" in '\n'.join(plan.data)
+
+  def test_views_describe(self, vector, unique_database):
+    # IMPALA-6896: Tests that altered views can be described by all impalads.
+    impala_cluster = ImpalaCluster()
+    impalads = impala_cluster.impalads
+    first_client = impalads[0].service.create_beeswax_client()
+    try:
+      self.execute_query_expect_success(first_client,
+                                        "create view {0}.test_describe_view as "
+                                        "select * from functional.alltypes"
+                                        .format(unique_database), {'sync_ddl': 1})
+      self.execute_query_expect_success(first_client,
+                                        "alter view {0}.test_describe_view as "
+                                        "select * from functional.alltypesagg"
+                                        .format(unique_database))
+    finally:
+      first_client.close()
+
+    for impalad in impalads:
+      client = impalad.service.create_beeswax_client()
+      try:
+        while True:
+          result = self.execute_query_expect_success(
+              client, "describe formatted {0}.test_describe_view"
+              .format(unique_database))
+          if any("select * from functional.alltypesagg" in s.lower()
+                 for s in result.data):
+            break
+          time.sleep(1)
+      finally:
+        client.close()
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_functions_ddl(self, vector, unique_database):
