@@ -22,6 +22,7 @@
 # This script requires Python 2.6+.
 
 import hashlib
+import multiprocessing.pool
 import os
 import os.path
 import re
@@ -130,30 +131,29 @@ def main():
     download_package(pkg_name, pkg_version)
     return
 
+  pool = multiprocessing.pool.ThreadPool(processes=min(multiprocessing.cpu_count(), 4))
+  results = []
+
   for requirements_file in REQUIREMENTS_FILES:
     # If the package name and version are not specified in the command line arguments,
     # download the packages that in requirements.txt.
-    f = open(requirements_file, 'r')
-    try:
-      # requirements.txt follows the standard pip grammar.
-      for line in f:
-        # A hash symbol ("#") represents a comment that should be ignored.
-        hash_index = line.find('#')
-        if hash_index != -1:
-          line = line[:hash_index]
-        # A semi colon (";") specifies some additional condition for when the package
-        # should be installed (for example a specific OS). We can ignore this and download
-        # the package anyways because the installation script(bootstrap_virtualenv.py) can
-        # take it into account.
-        semi_colon_index = line.find(';')
-        if semi_colon_index != -1:
-          line = line[:semi_colon_index]
-        l = line.strip()
-        if len(l) > 0:
-          pkg_name, pkg_version = l.split('==')
-          download_package(pkg_name.strip(), pkg_version.strip())
-    finally:
-      f.close()
+    # requirements.txt follows the standard pip grammar.
+    for line in open(requirements_file):
+      # A hash symbol ("#") represents a comment that should be ignored.
+      line = line.split("#")[0]
+      # A semi colon (";") specifies some additional condition for when the package
+      # should be installed (for example a specific OS). We can ignore this and download
+      # the package anyways because the installation script(bootstrap_virtualenv.py) can
+      # take it into account.
+      l = line.split(";")[0].strip()
+      if not l:
+        continue
+      pkg_name, pkg_version = l.split('==')
+      results.append(pool.apply_async(
+        download_package, args=[pkg_name.strip(), pkg_version.strip()]))
+
+    for x in results:
+      x.get()
 
 if __name__ == '__main__':
   main()

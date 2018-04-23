@@ -35,6 +35,7 @@
 #
 #     python bootstrap_toolchain.py
 import logging
+import multiprocessing.pool
 import os
 import random
 import re
@@ -350,19 +351,12 @@ extern "C" void %s() {
 
 def execute_many(f, args):
   """
-  Executes f(a) for a in args. If possible, uses a threadpool
-  to execute in parallel. The pool uses the number of CPUs
-  in the system as the default size.
+  Executes f(a) for a in args using a threadpool to execute in parallel.
+  The pool uses the smaller of 4 and the number of CPUs in the system
+  as the pool size.
   """
-  pool = None
-  try:
-    import multiprocessing.pool
-    pool = multiprocessing.pool.ThreadPool(processes=min(multiprocessing.cpu_count(), 4))
-    return pool.map(f, args, 1)
-  except ImportError:
-    # multiprocessing was introduced in Python 2.6.
-    # For older Pythons (CentOS 5), degrade to single-threaded execution:
-    return [ f(a) for a in args ]
+  pool = multiprocessing.pool.ThreadPool(processes=min(multiprocessing.cpu_count(), 4))
+  return pool.map(f, args, 1)
 
 def download_cdh_components(toolchain_root, cdh_components):
   """Downloads and unpacks the CDH components into $CDH_COMPONENTS_HOME if not found."""
