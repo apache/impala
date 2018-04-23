@@ -38,26 +38,22 @@ under the License.
   <conbody>
 
     <p>
-      The following sections describe known issues and workarounds in Impala, as of the current
-      production release. This page summarizes the most serious or frequently encountered issues
-      in the current release, to help you make planning decisions about installing and
-      upgrading. Any workarounds are listed here. The bug links take you to the Impala issues
-      site, where you can see the diagnosis and whether a fix is in the pipeline.
+      The following sections describe known issues and workarounds in Impala, as of the current production release. This page summarizes the
+      most serious or frequently encountered issues in the current release, to help you make planning decisions about installing and
+      upgrading. Any workarounds are listed here. The bug links take you to the Impala issues site, where you can see the diagnosis and
+      whether a fix is in the pipeline.
     </p>
 
     <note>
-      The online issue tracking system for Impala contains comprehensive information and is
-      updated in real time. To verify whether an issue you are experiencing has already been
-      reported, or which release an issue is fixed in, search on the
-      <xref href="https://issues.apache.org/jira/" scope="external" format="html">issues.apache.org
-      JIRA tracker</xref>.
+      The online issue tracking system for Impala contains comprehensive information and is updated in real time. To verify whether an issue
+      you are experiencing has already been reported, or which release an issue is fixed in, search on the
+      <xref href="https://issues.apache.org/jira/" scope="external" format="html">issues.apache.org JIRA tracker</xref>.
     </note>
 
     <p outputclass="toc inpage"/>
 
     <p>
-      For issues fixed in various Impala releases, see
-      <xref href="impala_fixed_issues.xml#fixed_issues"/>.
+      For issues fixed in various Impala releases, see <xref href="impala_fixed_issues.xml#fixed_issues"/>.
     </p>
 
 <!-- Use as a template for new issues.
@@ -77,6 +73,62 @@ under the License.
 
   </conbody>
 
+<!-- New known issues for Impala 2.3.
+
+Title: Server-to-server SSL and Kerberos do not work together
+Description: If server<->server SSL is enabled (with ssl_client_ca_certificate), and Kerberos auth is used between servers, the cluster will fail to start.
+Upstream & Internal JIRAs: https://issues.apache.org/jira/browse/IMPALA-2598
+Severity: Medium.  Server-to-server SSL is practically unusable but this is a new feature.
+Workaround: No known workaround.
+
+Title: Queries may hang on server-to-server exchange errors
+Description: The DataStreamSender::Channel::CloseInternal() does not close the channel on an error. This will cause the node on the other side of the channel to wait indefinitely causing a hang.
+Upstream & Internal JIRAs: https://issues.apache.org/jira/browse/IMPALA-2592
+Severity: Low.  This does not occur frequently.
+Workaround: No known workaround.
+
+Title: Catalogd may crash when loading metadata for tables with many partitions, many columns and with incremental stats
+Description: Incremental stats use up about 400 bytes per partition X column.  So for a table with 20K partitions and 100 columns this is about 800 MB.  When serialized this goes past the 2 GB Java array size limit and leads to a catalog crash.
+Upstream & Internal JIRAs: https://issues.apache.org/jira/browse/IMPALA-2648, IMPALA-2647, IMPALA-2649.
+Severity: Low.  This does not occur frequently.
+Workaround:  Reduce the number of partitions.
+
+More from the JIRA report of blocker/critical issues:
+
+IMPALA-2093
+Wrong plan of NOT IN aggregate subquery when a constant is used in subquery predicate
+IMPALA-1652
+Incorrect results with basic predicate on CHAR typed column.
+IMPALA-1459
+Incorrect assignment of predicates through an outer join in an inline view.
+IMPALA-2665
+Incorrect assignment of On-clause predicate inside inline view with an outer join.
+IMPALA-2603
+Crash: impala::Coordinator::ValidateCollectionSlots
+IMPALA-2375
+Fix issues with the legacy join and agg nodes using enable_partitioned_hash_join=false and enable_partitioned_aggregation=false
+IMPALA-1862
+Invalid bool value not reported as a scanner error
+IMPALA-1792
+ImpalaODBC: Can not get the value in the SQLGetData(m-x th column) after the SQLBindCol(m th column)
+IMPALA-1578
+Impala incorrectly handles text data when the new line character \n\r is split between different HDFS block
+IMPALA-2643
+Duplicated column in inline view causes dropping null slots during scan
+IMPALA-2005
+A failed CTAS does not drop the table if the insert fails.
+IMPALA-1821
+Casting scenarios with invalid/inconsistent results
+
+Another list from Alex, of correctness problems with predicates; might overlap with ones I already have:
+
+https://issues.apache.org/jira/browse/IMPALA-2665 - Already have
+https://issues.apache.org/jira/browse/IMPALA-2643 - Already have
+https://issues.apache.org/jira/browse/IMPALA-1459 - Already have
+https://issues.apache.org/jira/browse/IMPALA-2144 - Don't have
+
+-->
+
   <concept id="known_issues_startup">
 
     <title>Impala Known Issues: Startup</title>
@@ -84,60 +136,42 @@ under the License.
     <conbody>
 
       <p>
-        These issues can prevent one or more Impala-related daemons from starting properly.
+        These issues can prevent one or more Impala-related daemons
+        from starting properly.
       </p>
 
     </conbody>
 
     <concept id="IMPALA-4978">
-
       <title id="IMPALA-5253">Problem retrieving FQDN causes startup problem on kerberized clusters</title>
-
       <conbody>
-
         <p>
           The method Impala uses to retrieve the host name while constructing the Kerberos
-          principal is the <codeph>gethostname()</codeph> system call. This function might not
-          always return the fully qualified domain name, depending on the network configuration.
-          If the daemons cannot determine the FQDN, Impala does not start on a kerberized
-          cluster.
+          principal is the <codeph>gethostname()</codeph> system call. This function might
+          not always return the fully qualified domain name, depending on the network
+          configuration. If the daemons cannot determine the FQDN, Impala does not start
+          on a kerberized cluster.
         </p>
-
         <p>
           This problem might occur immediately after an upgrade of a CDH cluster, due to changes
-          in Cloudera Manager that supplies the <codeph>--hostname</codeph> flag automatically
-          to the Impala-related daemons. (See the issue <q>hostname parameter is not passed to
-          Impala catalog role</q> at
-          <xref href="https://www.cloudera.com/documentation/enterprise/release-notes/topics/cm_rn_known_issues.html" scope="external" format="html">the
-          Cloudera Manager Known Issues page</xref>.)
+          in Cloudera Manager that supplies the <codeph>--hostname</codeph> flag automatically to
+          the Impala-related daemons. (See the issue <q>hostname parameter is not passed to Impala catalog role</q>
+          at <xref href="https://www.cloudera.com/documentation/enterprise/release-notes/topics/cm_rn_known_issues.html" scope="external" format="html">the Cloudera Manager Known Issues page</xref>.)
         </p>
-
-        <p>
-          <b>Bugs:</b> <xref keyref="IMPALA-4978">IMPALA-4978</xref>,
-          <xref keyref="IMPALA-5253">IMPALA-5253</xref>
+        <p><b>Bugs:</b> <xref keyref="IMPALA-4978">IMPALA-4978</xref>, <xref keyref="IMPALA-5253">IMPALA-5253</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Resolution:</b> The issue is expected to occur less frequently on systems
+          with fixes for <xref keyref="IMPALA-4978">IMPALA-4978</xref>, <xref keyref="IMPALA-5253">IMPALA-5253</xref>,
+          or both. Even on systems with fixes for both of these issues, the workaround might still
+          be required in some cases.
         </p>
-
-        <p>
-          <b>Severity:</b> High
+        <p><b>Workaround:</b> Test if a host is affected by checking whether the output of the
+          <cmdname>hostname</cmdname> command includes the FQDN. On hosts where <cmdname>hostname</cmdname>
+          only returns the short name, pass the command-line flag
+          <codeph>--hostname=<varname>fully_qualified_domain_name</varname></codeph>
+          in the startup options of all Impala-related daemons.
         </p>
-
-        <p>
-          <b>Resolution:</b> The issue is expected to occur less frequently on systems with
-          fixes for <xref keyref="IMPALA-4978">IMPALA-4978</xref>,
-          <xref keyref="IMPALA-5253">IMPALA-5253</xref>, or both. Even on systems with fixes for
-          both of these issues, the workaround might still be required in some cases.
-        </p>
-
-        <p>
-          <b>Workaround:</b> Test if a host is affected by checking whether the output of the
-          <cmdname>hostname</cmdname> command includes the FQDN. On hosts where
-          <cmdname>hostname</cmdname> only returns the short name, pass the command-line flag
-          <codeph>--hostname=<varname>fully_qualified_domain_name</varname></codeph> in the
-          startup options of all Impala-related daemons.
-        </p>
-
       </conbody>
-
     </concept>
 
   </concept>
@@ -154,100 +188,23 @@ under the License.
 
     </conbody>
 
-    <concept id="impala-6841">
-
-      <title>Unable to view large catalog objects in catalogd Web UI</title>
-
-      <conbody>
-
-        <p>
-          In <codeph>catalogd</codeph> Web UI, you can list metadata objects and view their
-          details. These details are accessed via a link and printed to a string formatted using
-          thrift's <codeph>DebugProtocol</codeph>. Printing large objects (> 1 GB) in Web UI can
-          crash <codeph>catalogd</codeph>.
-        </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-6841">IMPALA-6841</xref>
-        </p>
-
-      </conbody>
-
-    </concept>
-
-    <concept id="impala-6389">
-
-      <title><b>Crash when querying tables with "\0" as a row delimiter</b></title>
-
-      <conbody>
-
-        <p>
-          When querying a textfile-based Impala table that uses <codeph>\0</codeph> as a new
-          line separator, Impala crashes.
-        </p>
-
-        <p>
-          The following sequence causes <codeph>impalad</codeph> to crash:
-        </p>
-
-<pre>create table tab_separated(id bigint, s string, n int, t timestamp, b boolean)
-  row format delimited
-  fields terminated by '\t' escaped by '\\' lines terminated by '\000'
-  stored as textfile;
-select * from tab_separated; -- Done. 0 results.
-insert into tab_separated (id, s) values (100, ''); -- Success.
-select * from tab_separated; -- 20 second delay before getting "Cancelled due to unreachable impalad(s): xxxx:22000"</pre>
-
-        <p>
-          <b>Bug:</b>
-          <xref keyref="IMPALA-6389" scope="external" format="html"
-            >IMPALA-6389</xref>
-        </p>
-
-        <p>
-          <b>Workaround:</b> Use an alternative delimiter, e.g. <codeph>\001</codeph>.
-        </p>
-
-      </conbody>
-
-    </concept>
-
     <concept id="IMPALA-4828">
-
       <title>Altering Kudu table schema outside of Impala may result in crash on read</title>
-
       <conbody>
-
         <p>
-          Creating a table in Impala, changing the column schema outside of Impala, and then
-          reading again in Impala may result in a crash. Neither Impala nor the Kudu client
-          validates the schema immediately before reading, so Impala may attempt to dereference
-          pointers that aren't there. This happens if a string column is dropped and then a new,
-          non-string column is added with the old string column's name.
+          Creating a table in Impala, changing the column schema outside of Impala,
+          and then reading again in Impala may result in a crash. Neither Impala nor
+          the Kudu client validates the schema immediately before reading, so Impala may attempt to
+          dereference pointers that aren't there. This happens if a string column is dropped
+          and then a new, non-string column is added with the old string column's name.
         </p>
-
-        <p>
-          <b>Bug:</b>
-          <xref keyref="IMPALA-4828" scope="external" format="html">IMPALA-4828</xref>
+        <p><b>Bug:</b> <xref keyref="IMPALA-4828" scope="external" format="html">IMPALA-4828</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Workaround:</b> Run the statement <codeph>REFRESH <varname>table_name</varname></codeph>
+          after any occasion when the table structure, such as the number, names, and data types
+          of columns, are modified outside of Impala using the Kudu API.
         </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala290"/>.
-        </p>
-
-        <p>
-          <b>Workaround:</b> Run the statement <codeph>REFRESH
-          <varname>table_name</varname></codeph> after any occasion when the table structure,
-          such as the number, names, and data types of columns, are modified outside of Impala
-          using the Kudu API.
-        </p>
-
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-1972" rev="IMPALA-1972">
@@ -257,9 +214,10 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
       <conbody>
 
         <p>
-          Trying to get the details of a query through the debug web page while the query is
-          planning will block new queries that had not started when the web page was requested.
-          The web UI becomes unresponsive until the planning phase is finished.
+          Trying to get the details of a query through the debug web page
+          while the query is planning will block new queries that had not
+          started when the web page was requested. The web UI becomes
+          unresponsive until the planning phase is finished.
         </p>
 
         <p>
@@ -270,44 +228,22 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
           <b>Severity:</b> High
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala290"/>.
-        </p>
-
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-4595">
-
       <title>Linking IR UDF module to main module crashes Impala</title>
-
       <conbody>
-
         <p>
-          A UDF compiled as an LLVM module (<codeph>.ll</codeph>) could cause a crash when
-          executed.
+          A UDF compiled as an LLVM module (<codeph>.ll</codeph>) could cause a crash
+          when executed.
         </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-4595">IMPALA-4595</xref>
-        </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala28_full"/> and higher.
-        </p>
-
-        <p>
-          <b>Workaround:</b> Compile the external UDFs to a <codeph>.so</codeph> library instead
-          of a <codeph>.ll</codeph> IR module.
-        </p>
-
+        <p><b>Bug:</b> <xref keyref="IMPALA-4595">IMPALA-4595</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala28_full"/> and higher.</p>
+        <p><b>Workaround:</b> Compile the external UDFs to a <codeph>.so</codeph> library instead of a
+          <codeph>.ll</codeph> IR module.</p>
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-3069" rev="IMPALA-3069">
@@ -317,9 +253,8 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
       <conbody>
 
         <p>
-          Using a value in the millions for the <codeph>BATCH_SIZE</codeph> query option,
-          together with wide rows or large string values in columns, could cause a memory
-          allocation of more than 2 GB resulting in a crash.
+          Using a value in the millions for the <codeph>BATCH_SIZE</codeph> query option, together with wide rows or large string values in
+          columns, could cause a memory allocation of more than 2 GB resulting in a crash.
         </p>
 
         <p>
@@ -330,9 +265,7 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
           <b>Severity:</b> High
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala270"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala270"/>.</p>
 
       </conbody>
 
@@ -345,8 +278,7 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
       <conbody>
 
         <p>
-          Malformed Avro data, such as out-of-bounds integers or values in the wrong format,
-          could cause a crash when queried.
+          Malformed Avro data, such as out-of-bounds integers or values in the wrong format, could cause a crash when queried.
         </p>
 
         <p>
@@ -357,10 +289,7 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
           <b>Severity:</b> High
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala270"/> and
-          <keyword keyref="impala262"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala270"/> and <keyword keyref="impala262"/>.</p>
 
       </conbody>
 
@@ -373,9 +302,8 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
       <conbody>
 
         <p>
-          The <codeph>DataStreamSender::Channel::CloseInternal()</codeph> does not close the
-          channel on an error. This causes the node on the other side of the channel to wait
-          indefinitely, causing a hang.
+          The <codeph>DataStreamSender::Channel::CloseInternal()</codeph> does not close the channel on an error. This causes the node on
+          the other side of the channel to wait indefinitely, causing a hang.
         </p>
 
         <p>
@@ -397,18 +325,15 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
       <conbody>
 
         <p>
-          If the JAR file corresponding to a Java UDF is removed from HDFS after the Impala
-          <codeph>CREATE FUNCTION</codeph> statement is issued, the <cmdname>impalad</cmdname>
-          daemon crashes.
+          If the JAR file corresponding to a Java UDF is removed from HDFS after the Impala <codeph>CREATE FUNCTION</codeph> statement is
+          issued, the <cmdname>impalad</cmdname> daemon crashes.
         </p>
 
         <p>
           <b>Bug:</b> <xref keyref="IMPALA-2365">IMPALA-2365</xref>
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
 
       </conbody>
 
@@ -428,94 +353,30 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
 
     </conbody>
 
-    <concept id="impala-6671">
-
-      <title>Metadata operations block read-only operations on unrelated tables</title>
-
-      <conbody>
-
-        <p>
-          Metadata operations that change the state of a table, like <codeph>COMPUTE
-          STATS</codeph> or <codeph>ALTER RECOVER PARTITIONS</codeph>, may delay metadata
-          propagation of unrelated unloaded tables triggered by statements like
-          <codeph>DESCRIBE</codeph> or <codeph>SELECT</codeph> queries.
-        </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-6671">IMPALA-6671</xref>
-        </p>
-
-      </conbody>
-
-    </concept>
-
-    <concept id="impala-5200">
-
-      <title>Profile timers not updated during long-running sort</title>
-
-      <conbody>
-
-        <p>
-          If you have a query plan with a long-running sort operation, e.g. minutes, the profile
-          timers are not updated to reflect the time spent in the sort until the sort starts
-          returning rows.
-        </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-5200">IMPALA-5200</xref>
-        </p>
-
-        <p>
-          <b>Workaround:</b> Slow sorts can be identified by looking at "Peak Mem" in the
-          summary or "PeakMemoryUsage" in the profile. If a sort is consuming multiple GB of
-          memory per host, it will likely spend a significant amount of time sorting the data.
-        </p>
-
-      </conbody>
-
-    </concept>
-
     <concept id="IMPALA-3316">
-
       <title>Slow queries for Parquet tables with convert_legacy_hive_parquet_utc_timestamps=true</title>
-
       <conbody>
-
         <p>
-          The configuration setting
-          <codeph>convert_legacy_hive_parquet_utc_timestamps=true</codeph> uses an underlying
-          function that can be a bottleneck on high volume, highly concurrent queries due to the
-          use of a global lock while loading time zone information. This bottleneck can cause
-          slowness when querying Parquet tables, up to 30x for scan-heavy queries. The amount of
-          slowdown depends on factors such as the number of cores and number of threads involved
-          in the query.
+          The configuration setting <codeph>convert_legacy_hive_parquet_utc_timestamps=true</codeph>
+          uses an underlying function that can be a bottleneck on high volume, highly concurrent
+          queries due to the use of a global lock while loading time zone information. This bottleneck
+          can cause slowness when querying Parquet tables, up to 30x for scan-heavy queries. The amount
+          of slowdown depends on factors such as the number of cores and number of threads involved in the query.
         </p>
-
         <note>
           <p>
-            The slowdown only occurs when accessing <codeph>TIMESTAMP</codeph> columns within
-            Parquet files that were generated by Hive, and therefore require the on-the-fly
-            timezone conversion processing.
+            The slowdown only occurs when accessing <codeph>TIMESTAMP</codeph> columns within Parquet files that
+            were generated by Hive, and therefore require the on-the-fly timezone conversion processing.
           </p>
         </note>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-3316">IMPALA-3316</xref>
+        <p><b>Bug:</b> <xref keyref="IMPALA-3316">IMPALA-3316</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Workaround:</b> If the <codeph>TIMESTAMP</codeph> values stored in the table represent dates only,
+          with no time portion, consider storing them as strings in <codeph>yyyy-MM-dd</codeph> format.
+          Impala implicitly converts such string values to <codeph>TIMESTAMP</codeph> in calls to date/time
+          functions.
         </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Workaround:</b> If the <codeph>TIMESTAMP</codeph> values stored in the table
-          represent dates only, with no time portion, consider storing them as strings in
-          <codeph>yyyy-MM-dd</codeph> format. Impala implicitly converts such string values to
-          <codeph>TIMESTAMP</codeph> in calls to date/time functions.
-        </p>
-
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-1480" rev="IMPALA-1480">
@@ -538,37 +399,31 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
           <b>Workaround:</b> Run the DDL statement in Hive if the slowness is an issue.
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
 
       </conbody>
 
     </concept>
 
     <concept id="ki_file_handle_cache">
-
       <title>Interaction of File Handle Cache with HDFS Appends and Short-Circuit Reads</title>
-
       <conbody>
-
         <p>
-          If a data file used by Impala is being continuously appended or overwritten in place
-          by an HDFS mechanism, such as <cmdname>hdfs dfs -appendToFile</cmdname>, interaction
-          with the file handle caching feature in <keyword keyref="impala210_full"/> and higher
-          could cause short-circuit reads to sometimes be disabled on some DataNodes. When a
-          mismatch is detected between the cached file handle and a data block that was
-          rewritten because of an append, short-circuit reads are turned off on the affected
-          host for a 10-minute period.
+          If a data file used by Impala is being continuously appended or
+          overwritten in place by an HDFS mechanism, such as <cmdname>hdfs dfs
+            -appendToFile</cmdname>, interaction with the file handle caching
+          feature in <keyword keyref="impala210_full"/> and higher could cause
+          short-circuit reads to sometimes be disabled on some DataNodes. When a
+          mismatch is detected between the cached file handle and a data block
+          that was rewritten because of an append, short-circuit reads are
+          turned off on the affected host for a 10-minute period.
         </p>
-
         <p>
-          The possibility of encountering such an issue is the reason why the file handle
-          caching feature is currently turned off by default. See
-          <xref keyref="scalability_file_handle_cache"/> for information about this feature and
-          how to enable it.
+          The possibility of encountering such an issue is the reason why the
+          file handle caching feature is currently turned off by default. See
+            <xref keyref="scalability_file_handle_cache"/> for information about
+          this feature and how to enable it.
         </p>
-
         <p>
           <b>Bug:</b>
           <xref href="https://issues.apache.org/jira/browse/HDFS-12528"
@@ -579,29 +434,31 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
           <b>Severity:</b> High
         </p>
 
-        <p>
-          <b>Workaround:</b> Verify whether your ETL process is susceptible to this issue before
-          enabling the file handle caching feature. You can set the <cmdname>impalad</cmdname>
-          configuration option <codeph>unused_file_handle_timeout_sec</codeph> to a time period
+        <p><b>Workaround:</b> Verify whether your ETL process is susceptible to
+          this issue before enabling the file handle caching feature. You can
+          set the <cmdname>impalad</cmdname> configuration option
+            <codeph>unused_file_handle_timeout_sec</codeph> to a time period
           that is shorter than the HDFS setting
-          <codeph>dfs.client.read.shortcircuit.streams.cache.expiry.ms</codeph>. (Keep in mind
-          that the HDFS setting is in milliseconds while the Impala setting is in seconds.)
+            <codeph>dfs.client.read.shortcircuit.streams.cache.expiry.ms</codeph>.
+          (Keep in mind that the HDFS setting is in milliseconds while the
+          Impala setting is in seconds.)
         </p>
 
         <p>
-          <b>Resolution:</b> Fixed in HDFS 2.10 and higher. Use the new HDFS parameter
-          <codeph>dfs.domain.socket.disable.interval.seconds</codeph> to specify the amount of
-          time that short circuit reads are disabled on encountering an error. The default value
-          is 10 minutes (<codeph>600</codeph> seconds). It is recommended that you set
-          <codeph>dfs.domain.socket.disable.interval.seconds</codeph> to a small value, such as
-          <codeph>1</codeph> second, when using the file handle cache. Setting <codeph>
-          dfs.domain.socket.disable.interval.seconds</codeph> to <codeph>0</codeph> is not
-          recommended as a non-zero interval protects the system if there is a persistent
-          problem with short circuit reads.
+          <b>Resolution:</b> Fixed in HDFS 2.10 and higher. Use the new HDFS
+          parameter <codeph>dfs.domain.socket.disable.interval.seconds</codeph>
+          to specify the amount of time that short circuit reads are disabled on
+          encountering an error. The default value is 10 minutes
+            (<codeph>600</codeph> seconds). It is recommended that you set
+            <codeph>dfs.domain.socket.disable.interval.seconds</codeph> to a
+          small value, such as <codeph>1</codeph> second, when using the file
+          handle cache. Setting <codeph>
+            dfs.domain.socket.disable.interval.seconds</codeph> to
+            <codeph>0</codeph> is not recommended as a non-zero interval
+          protects the system if there is a persistent problem with short
+          circuit reads.
         </p>
-
       </conbody>
-
     </concept>
 
   </concept>
@@ -613,41 +470,24 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
     <conbody>
 
       <p>
-        These issues affect the convenience of interacting directly with Impala, typically
-        through the Impala shell or Hue.
+        These issues affect the convenience of interacting directly with Impala, typically through the Impala shell or Hue.
       </p>
 
     </conbody>
 
     <concept id="IMPALA-4570">
-
       <title>Impala shell tarball is not usable on systems with setuptools versions where '0.7' is a substring of the full version string</title>
-
       <conbody>
-
         <p>
           For example, this issue could occur on a system using setuptools version 20.7.0.
         </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-4570">IMPALA-4570</xref>
+        <p><b>Bug:</b> <xref keyref="IMPALA-4570">IMPALA-4570</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala28_full"/> and higher.</p>
+        <p><b>Workaround:</b> Change to a setuptools version that does not have <codeph>0.7</codeph> as
+          a substring.
         </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala28_full"/> and higher.
-        </p>
-
-        <p>
-          <b>Workaround:</b> Change to a setuptools version that does not have
-          <codeph>0.7</codeph> as a substring.
-        </p>
-
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-3133" rev="IMPALA-3133">
@@ -657,10 +497,9 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
       <conbody>
 
         <p>
-          Due to a timing condition in updating cached policy data from Sentry, the
-          <codeph>SHOW</codeph> statements for Sentry roles could sometimes display out-of-date
-          role settings. Because Impala rechecks authorization for each SQL statement, this
-          discrepancy does not represent a security issue for other statements.
+          Due to a timing condition in updating cached policy data from Sentry, the <codeph>SHOW</codeph> statements for Sentry roles could
+          sometimes display out-of-date role settings. Because Impala rechecks authorization for each SQL statement, this discrepancy does
+          not represent a security issue for other statements.
         </p>
 
         <p>
@@ -672,9 +511,10 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
         </p>
 
         <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala260"/> and
-          <keyword keyref="impala251"/>.
+          <b>Resolution:</b> Fixes have been issued for some but not all Impala releases. Check the JIRA for details of fix releases.
         </p>
+
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala260"/> and <keyword keyref="impala251"/>.</p>
 
       </conbody>
 
@@ -687,8 +527,7 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
       <conbody>
 
         <p>
-          Simple <codeph>SELECT</codeph> queries show less than 100% progress even though they
-          are already completed.
+          Simple <codeph>SELECT</codeph> queries show less than 100% progress even though they are already completed.
         </p>
 
         <p>
@@ -708,11 +547,8 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
         <p conref="../shared/impala_common.xml#common/int_overflow_behavior" />
 
         <p>
-          <b>Bug:</b> <xref keyref="IMPALA-3123">IMPALA-3123</xref>
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala260"/>.
+          <b>Bug:</b>
+          <xref keyref="IMPALA-3123">IMPALA-3123</xref>
         </p>
 
       </conbody>
@@ -728,8 +564,8 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
     <conbody>
 
       <p>
-        These issues affect applications that use the JDBC or ODBC APIs, such as business
-        intelligence tools or custom-written applications in languages such as Java or C++.
+        These issues affect applications that use the JDBC or ODBC APIs, such as business intelligence tools or custom-written applications
+        in languages such as Java or C++.
       </p>
 
     </conbody>
@@ -743,9 +579,8 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
       <conbody>
 
         <p>
-          If the ODBC <codeph>SQLGetData</codeph> is called on a series of columns, the function
-          calls must follow the same order as the columns. For example, if data is fetched from
-          column 2 then column 1, the <codeph>SQLGetData</codeph> call for column 1 returns
+          If the ODBC <codeph>SQLGetData</codeph> is called on a series of columns, the function calls must follow the same order as the
+          columns. For example, if data is fetched from column 2 then column 1, the <codeph>SQLGetData</codeph> call for column 1 returns
           <codeph>NULL</codeph>.
         </p>
 
@@ -770,78 +605,31 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
     <conbody>
 
       <p>
-        These issues relate to security features, such as Kerberos authentication, Sentry
-        authorization, encryption, auditing, and redaction.
+        These issues relate to security features, such as Kerberos authentication, Sentry authorization, encryption, auditing, and
+        redaction.
       </p>
 
     </conbody>
 
-    <concept id="impala-4712">
-
-      <title>Transient kerberos authentication error during table loading</title>
-
-      <conbody>
-
-        <p>
-          A transient Kerberos error can cause a table to get into a bad state with an error:
-          <codeph>Failed to load metadata for table</codeph>.
-        </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-4712">IMPALA-4712</xref>
-        </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Workaround:</b> Resolve the Kerberos authentication problem and run
-          <codeph>INVALIDATE METADATA</codeph> on the affected table.
-        </p>
-
-      </conbody>
-
-    </concept>
-
     <concept id="IMPALA-5638">
-
       <title>Malicious user can gain unauthorized access to Kudu table data via Impala</title>
-
       <conbody>
-
         <p>
-          A malicious user with <codeph>ALTER</codeph> permissions on an Impala table can access
-          any other Kudu table data by altering the table properties to make it <q>external</q>
-          and then changing the underlying table mapping to point to other Kudu tables. This
-          violates and works around the authorization requirement that creating a Kudu external
-          table via Impala requires an <codeph>ALL</codeph> privilege at the server scope. This
-          privilege requirement for <codeph>CREATE</codeph> commands is enforced to precisely
-          avoid this scenario where a malicious user can change the underlying Kudu table
-          mapping. The fix is to enforce the same privilege requirement for
-          <codeph>ALTER</codeph> commands that would make existing non-external Kudu tables
-          external.
+          A malicious user with <codeph>ALTER</codeph> permissions on an Impala table can access any
+          other Kudu table data by altering the table properties to make it <q>external</q>
+          and then changing the underlying table mapping to point to other Kudu tables.
+          This violates and works around the authorization requirement that creating a
+          Kudu external table via Impala requires an <codeph>ALL</codeph> privilege at the server scope.
+          This privilege requirement for <codeph>CREATE</codeph> commands is enforced to precisely avoid
+          this scenario where a malicious user can change the underlying Kudu table
+          mapping. The fix is to enforce the same privilege requirement for <codeph>ALTER</codeph>
+          commands that would make existing non-external Kudu tables external.
         </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-5638">IMPALA-5638</xref>
-        </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Workaround:</b> A temporary workaround is to revoke <codeph>ALTER</codeph>
-          permissions on Impala tables.
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala2100"/>.
-        </p>
-
+        <p><b>Bug:</b> <xref keyref="IMPALA-5638">IMPALA-5638</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Workaround:</b> A temporary workaround is to revoke <codeph>ALTER</codeph> permissions on Impala tables.</p>
+        <p><b>Resolution:</b> Upgrade to an Impala version containing the fix for <xref keyref="IMPALA-5638">IMPALA-5638</xref>.</p>
       </conbody>
-
     </concept>
 
     <concept id="renewable_kerberos_tickets">
@@ -853,13 +641,12 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
       <conbody>
 
         <p>
-          In a Kerberos environment, the <cmdname>impalad</cmdname> daemon might not start if
-          Kerberos tickets are not renewable.
+          In a Kerberos environment, the <cmdname>impalad</cmdname> daemon might not start if Kerberos tickets are not renewable.
         </p>
 
         <p>
-          <b>Workaround:</b> Configure your KDC to allow tickets to be renewed, and configure
-          <filepath>krb5.conf</filepath> to request renewable tickets.
+          <b>Workaround:</b> Configure your KDC to allow tickets to be renewed, and configure <filepath>krb5.conf</filepath> to request
+          renewable tickets.
         </p>
 
       </conbody>
@@ -898,38 +685,22 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
 
   </concept>
 
-  <concept id="impala-6726">
+<!--
+  <concept id="known_issues_supportability">
 
-    <title>Catalog server's kerberos ticket gets deleted after 'ticket_lifetime' on SLES11</title>
+    <title id="ki_supportability">Impala Known Issues: Supportability</title>
 
     <conbody>
 
       <p>
-        On SLES11, after 'ticket_lifetime', the kerberos ticket gets deleted by the Java krb5
-        library.
-      </p>
-
-      <p>
-        <b>Bug:</b> <xref keyref="IMPALA-6726"/>
-      </p>
-
-      <p>
-        <b>Severity:</b> High
-      </p>
-
-      <p>
-        <b>Workaround:</b> On Impala 2.11.0, set <codeph>--use_kudu_kinit=false</codeph> in
-        Impala startup flag.
-      </p>
-
-      <p>
-        On Impala 2.12.0, set <codeph>--use_kudu_kinit=false</codeph> and
-        <codeph>--use_krpc=false</codeph> in Impala startup flags.
+        These issues affect the ability to debug and troubleshoot Impala, such as incorrect output in query profiles or the query state
+        shown in monitoring applications.
       </p>
 
     </conbody>
 
   </concept>
+-->
 
   <concept id="known_issues_resources">
 
@@ -938,156 +709,92 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
     <conbody>
 
       <p>
-        These issues involve memory or disk usage, including out-of-memory conditions, the
-        spill-to-disk feature, and resource management features.
+        These issues involve memory or disk usage, including out-of-memory conditions, the spill-to-disk feature, and resource management
+        features.
       </p>
 
     </conbody>
 
     <concept id="IMPALA-5605">
-
       <title>Configuration to prevent crashes caused by thread resource limits</title>
-
       <conbody>
-
         <p>
-          Impala could encounter a serious error due to resource usage under very high
-          concurrency. The error message is similar to:
+          Impala could encounter a serious error due to resource usage under very high concurrency.
+          The error message is similar to:
         </p>
-
 <codeblock><![CDATA[
 F0629 08:20:02.956413 29088 llvm-codegen.cc:111] LLVM hit fatal error: Unable to allocate section memory!
 terminate called after throwing an instance of 'boost::exception_detail::clone_impl<boost::exception_detail::error_info_injector<boost::thread_resource_error> >'
 ]]>
 </codeblock>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-5605">IMPALA-5605</xref>
+        <p><b>Bug:</b> <xref keyref="IMPALA-5605">IMPALA-5605</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Workaround:</b>
+          To prevent such errors, configure each host running an <cmdname>impalad</cmdname>
+          daemon with the following settings:
         </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Workaround:</b> To prevent such errors, configure each host running an
-          <cmdname>impalad</cmdname> daemon with the following settings:
-        </p>
-
 <codeblock>
 echo 2000000 > /proc/sys/kernel/threads-max
 echo 2000000 > /proc/sys/kernel/pid_max
 echo 8000000 > /proc/sys/vm/max_map_count
 </codeblock>
-
         <p>
-          Add the following lines in <filepath>/etc/security/limits.conf</filepath>:
+        Add the following lines in <filepath>/etc/security/limits.conf</filepath>:
         </p>
-
 <codeblock>
 impala soft nproc 262144
 impala hard nproc 262144
 </codeblock>
-
       </conbody>
-
     </concept>
 
     <concept id="flatbuffers_mem_usage">
-
       <title>Memory usage when compact_catalog_topic flag enabled</title>
-
       <conbody>
-
         <p>
-          The efficiency improvement from <xref keyref="IMPALA-4029">IMPALA-4029</xref> can
-          cause an increase in size of the updates to Impala catalog metadata that are broadcast
-          to the <cmdname>impalad</cmdname> daemons by the <cmdname>statestored</cmdname>
-          daemon. The increase in catalog update topic size results in higher CPU and network
+          The efficiency improvement from <xref keyref="IMPALA-4029">IMPALA-4029</xref>
+          can cause an increase in size of the updates to Impala catalog metadata
+          that are broadcast to the <cmdname>impalad</cmdname> daemons
+          by the <cmdname>statestored</cmdname> daemon.
+          The increase in catalog update topic size results in higher CPU and network
           utilization. By default, the increase in topic size is about 5-7%. If the
-          <codeph>compact_catalog_topic</codeph> flag is used, the size increase is more
-          substantial, with a topic size approximately twice as large as in previous versions.
+          <codeph>compact_catalog_topic</codeph> flag is used, the
+          size increase is more substantial, with a topic size approximately twice as
+          large as in previous versions.
         </p>
-
+        <p><b>Bug:</b> <xref keyref="IMPALA-5500">IMPALA-5500</xref></p>
+        <p><b>Severity:</b> Medium</p>
         <p>
-          <b>Bug:</b> <xref keyref="IMPALA-5500">IMPALA-5500</xref>
-        </p>
-
-        <p>
-          <b>Severity:</b> Medium
-        </p>
-
-        <p>
-          <b>Workaround:</b> Consider setting the <codeph>compact_catalog_topic</codeph>
-          configuration setting to <codeph>false</codeph> until this issue is resolved.
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala210"/>.
-        </p>
-
+          <b>Workaround:</b> Consider setting the
+            <codeph>compact_catalog_topic</codeph> configuration setting to
+            <codeph>false</codeph> until this issue is resolved. </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala210"/>.</p>
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-2294">
-
       <title>Kerberos initialization errors due to high memory usage</title>
-
       <conbody>
-
         <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_intro"/>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-2294">IMPALA-2294</xref>
-        </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala211"/>.
-        </p>
-
-        <p>
-          <b>Workaround:</b>
-        </p>
-
+        <p><b>Bug:</b> <xref keyref="IMPALA-2294">IMPALA-2294</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Workaround:</b></p>
         <p conref="../shared/impala_common.xml#common/vm_overcommit_memory_start" conrefend="../shared/impala_common.xml#common/vm_overcommit_memory_end"/>
-
       </conbody>
-
     </concept>
 
     <concept id="drop_table_purge_s3a">
-
       <title>DROP TABLE PURGE on S3A table may not delete externally written files</title>
-
       <conbody>
-
         <p>
-          A <codeph>DROP TABLE PURGE</codeph> statement against an S3 table could leave the data
-          files behind, if the table directory and the data files were created with a
-          combination of <cmdname>hadoop fs</cmdname> and <cmdname>aws s3</cmdname> commands.
+          A <codeph>DROP TABLE PURGE</codeph> statement against an S3 table could leave the data files
+          behind, if the table directory and the data files were created with a combination of
+          <cmdname>hadoop fs</cmdname> and <cmdname>aws s3</cmdname> commands.
         </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-3558">IMPALA-3558</xref>
-        </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Resolution:</b> The underlying issue with the S3A connector depends on the
-          resolution of
-          <xref href="https://issues.apache.org/jira/browse/HADOOP-13230" format="html" scope="external">HADOOP-13230</xref>.
-        </p>
-
+        <p><b>Bug:</b> <xref keyref="IMPALA-3558">IMPALA-3558</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Resolution:</b> The underlying issue with the S3A connector depends on the resolution of <xref href="https://issues.apache.org/jira/browse/HADOOP-13230" format="html" scope="external">HADOOP-13230</xref>.</p>
       </conbody>
-
     </concept>
 
     <concept id="catalogd_heap">
@@ -1097,30 +804,27 @@ impala hard nproc 262144
       <conbody>
 
         <p>
-          The default heap size for Impala <cmdname>catalogd</cmdname> has changed in
-          <keyword keyref="impala25_full"/> and higher:
+          The default heap size for Impala <cmdname>catalogd</cmdname> has changed in <keyword keyref="impala25_full"/> and higher:
         </p>
 
         <ul>
           <li>
             <p>
-              Previously, by default <cmdname>catalogd</cmdname> was using the JVM's default
-              heap size, which is the smaller of 1/4th of the physical memory or 32 GB.
+              Previously, by default <cmdname>catalogd</cmdname> was using the JVM's default heap size, which is the smaller of 1/4th of the
+              physical memory or 32 GB.
             </p>
           </li>
 
           <li>
             <p>
-              Starting with <keyword keyref="impala250"/>, the default
-              <cmdname>catalogd</cmdname> heap size is 4 GB.
+              Starting with <keyword keyref="impala250"/>, the default <cmdname>catalogd</cmdname> heap size is 4 GB.
             </p>
           </li>
         </ul>
 
         <p>
-          For example, on a host with 128GB physical memory this will result in catalogd heap
-          decreasing from 32GB to 4GB. This can result in out-of-memory errors in catalogd and
-          leading to query failures.
+          For example, on a host with 128GB physical memory this will result in catalogd heap decreasing from 32GB to 4GB. This can result
+          in out-of-memory errors in catalogd and leading to query failures.
         </p>
 
         <p>
@@ -1129,6 +833,9 @@ impala hard nproc 262144
 
         <p>
           <b>Workaround:</b> Increase the <cmdname>catalogd</cmdname> memory limit as follows.
+<!-- See <xref href="impala_scalability.xml#scalability_catalog"/> for the procedure. -->
+<!-- Including full details here via conref, for benefit of PDF readers or anyone else
+             who might have trouble seeing or following the link. -->
         </p>
 
         <p conref="../shared/impala_common.xml#common/increase_catalogd_heap_size"/>
@@ -1144,9 +851,8 @@ impala hard nproc 262144
       <conbody>
 
         <p>
-          The size of the breakpad minidump files grows linearly with the number of threads. By
-          default, each thread adds 8 KB to the minidump size. Minidump files could consume
-          significant disk space when the daemons have a high number of threads.
+          The size of the breakpad minidump files grows linearly with the number of threads. By default, each thread adds 8 KB to the
+          minidump size. Minidump files could consume significant disk space when the daemons have a high number of threads.
         </p>
 
         <p>
@@ -1158,13 +864,11 @@ impala hard nproc 262144
         </p>
 
         <p>
-          <b>Workaround:</b> Add
-          <codeph>--minidump_size_limit_hint_kb=<varname>size</varname></codeph> to set a soft
-          upper limit on the size of each minidump file. If the minidump file would exceed that
-          limit, Impala reduces the amount of information for each thread from 8 KB to 2 KB.
-          (Full thread information is captured for the first 20 threads, then 2 KB per thread
-          after that.) The minidump file can still grow larger than the <q>hinted</q> size. For
-          example, if you have 10,000 threads, the minidump file can be more than 20 MB.
+          <b>Workaround:</b> Add <codeph>--minidump_size_limit_hint_kb=<varname>size</varname></codeph> to set a soft upper limit on the
+          size of each minidump file. If the minidump file would exceed that limit, Impala reduces the amount of information for each thread
+          from 8 KB to 2 KB. (Full thread information is captured for the first 20 threads, then 2 KB per thread after that.) The minidump
+          file can still grow larger than the <q>hinted</q> size. For example, if you have 10,000 threads, the minidump file can be more
+          than 20 MB.
         </p>
 
       </conbody>
@@ -1178,16 +882,14 @@ impala hard nproc 262144
       <conbody>
 
         <p>
-          The initial release of <keyword keyref="impala26_full"/> sometimes has a higher peak
-          memory usage than in previous releases while reading Parquet files.
+          The initial release of <keyword keyref="impala26_full"/> sometimes has a higher peak memory usage than in previous releases while reading
+          Parquet files.
         </p>
 
         <p>
-          <keyword keyref="impala26_full"/> addresses the issue IMPALA-2736, which improves the
-          efficiency of Parquet scans by up to 2x. The faster scans may result in a higher peak
-          memory consumption compared to earlier versions of Impala due to the new column-wise
-          row materialization strategy. You are likely to experience higher memory consumption
-          in any of the following scenarios:
+          <keyword keyref="impala26_full"/> addresses the issue IMPALA-2736, which improves the efficiency of Parquet scans by up to 2x. The faster scans
+          may result in a higher peak memory consumption compared to earlier versions of Impala due to the new column-wise row
+          materialization strategy. You are likely to experience higher memory consumption in any of the following scenarios:
           <ul>
             <li>
               <p>
@@ -1197,15 +899,14 @@ impala hard nproc 262144
 
             <li>
               <p>
-                Very large rows due to big column values, for example, long strings or nested
-                collections with many items.
+                Very large rows due to big column values, for example, long strings or nested collections with many items.
               </p>
             </li>
 
             <li>
               <p>
-                Producer/consumer speed imbalances, leading to more rows being buffered between
-                a scan (producer) and downstream (consumer) plan nodes.
+                Producer/consumer speed imbalances, leading to more rows being buffered between a scan (producer) and downstream (consumer)
+                plan nodes.
               </p>
             </li>
           </ul>
@@ -1220,16 +921,10 @@ impala hard nproc 262144
         </p>
 
         <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala280"/>.
-        </p>
-
-        <p>
-          <b>Workaround:</b> The following query options might help to reduce memory consumption
-          in the Parquet scanner:
+          <b>Workaround:</b> The following query options might help to reduce memory consumption in the Parquet scanner:
           <ul>
             <li>
-              Reduce the number of scanner threads, for example: <codeph>set
-              num_scanner_threads=30</codeph>
+              Reduce the number of scanner threads, for example: <codeph>set num_scanner_threads=30</codeph>
             </li>
 
             <li>
@@ -1255,8 +950,8 @@ impala hard nproc 262144
       <conbody>
 
         <p>
-          Some memory allocated by the JVM used internally by Impala is not counted against the
-          memory limit for the <cmdname>impalad</cmdname> daemon.
+          Some memory allocated by the JVM used internally by Impala is not counted against the memory limit for the
+          <cmdname>impalad</cmdname> daemon.
         </p>
 
         <p>
@@ -1264,9 +959,8 @@ impala hard nproc 262144
         </p>
 
         <p>
-          <b>Workaround:</b> To monitor overall memory usage, use the <cmdname>top</cmdname>
-          command, or add the memory figures in the Impala web UI <uicontrol>/memz</uicontrol>
-          tab to JVM memory usage shown on the <uicontrol>/metrics</uicontrol> tab.
+          <b>Workaround:</b> To monitor overall memory usage, use the <cmdname>top</cmdname> command, or add the memory figures in the
+          Impala web UI <uicontrol>/memz</uicontrol> tab to JVM memory usage shown on the <uicontrol>/metrics</uicontrol> tab.
         </p>
 
       </conbody>
@@ -1288,13 +982,10 @@ impala hard nproc 262144
         </p>
 
         <p>
-          <b>Workaround:</b> Transition away from the <q>old-style</q> join and aggregation
-          mechanism if practical.
+          <b>Workaround:</b> Transition away from the <q>old-style</q> join and aggregation mechanism if practical.
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
 
       </conbody>
 
@@ -1309,145 +1000,88 @@ impala hard nproc 262144
     <conbody>
 
       <p>
-        These issues can cause incorrect or unexpected results from queries. They typically only
-        arise in very specific circumstances.
+        These issues can cause incorrect or unexpected results from queries. They typically only arise in very specific circumstances.
       </p>
 
     </conbody>
 
     <concept id="IMPALA-4539">
-
       <title>Parquet scanner memory bug: I/O buffer is attached to output batch while scratch batch rows still reference it</title>
-
 <!-- TSB-225 title: Possibly incorrect results when scanning uncompressed Parquet files with Impala. -->
-
       <conbody>
-
         <p>
-          Impala queries may return incorrect results when scanning plain-encoded string columns
-          in uncompressed Parquet files. I/O buffers holding the string data are prematurely
-          freed, leading to invalid memory reads and possibly non-deterministic results. This
-          does not affect Parquet files that use a compression codec such as Snappy. Snappy is
-          both strongly recommended generally and the default choice for Impala-written Parquet
-          files.
+          Impala queries may return incorrect results when scanning plain-encoded string
+          columns in uncompressed Parquet files. I/O buffers holding the string data are
+          prematurely freed, leading to invalid memory reads and possibly
+          non-deterministic results. This does not affect Parquet files that use a
+          compression codec such as Snappy. Snappy is both strongly recommended generally
+          and the default choice for Impala-written Parquet files.
         </p>
-
         <p>
           How to determine whether a query might be affected:
         </p>
-
         <ul>
           <li>
             The query must reference <codeph>STRING</codeph> columns from a Parquet table.
           </li>
-
           <li>
             A selective filter on the Parquet table makes this issue more likely.
           </li>
-
           <li>
-            Identify any uncompressed Parquet files processed by the query. Examine the
-            <codeph>HDFS_SCAN_NODE</codeph> portion of a query profile that scans the suspected
-            table. Use a query that performs a full table scan, and materializes the column
-            values. (For example, <codeph>SELECT MIN(<varname>colname</varname>) FROM
-            <varname>tablename</varname></codeph>.) Look for <q>File Formats</q>. A value
-            containing <codeph>PARQUET/NONE</codeph> means uncompressed Parquet.
+            Identify any uncompressed Parquet files processed by the query.
+            Examine the <codeph>HDFS_SCAN_NODE</codeph> portion of a query profile that scans the
+            suspected table. Use a query that performs a full table scan, and materializes the column
+            values. (For example, <codeph>SELECT MIN(<varname>colname</varname>) FROM <varname>tablename</varname></codeph>.)
+            Look for <q>File Formats</q>. A value containing <codeph>PARQUET/NONE</codeph> means uncompressed Parquet.
           </li>
-
           <li>
-            Identify any plain-encoded string columns in the associated table. Pay special
-            attention to tables containing Parquet files generated through Hive, Spark, or other
-            mechanisms outside of Impala, because Impala uses Snappy compression by default for
-            Parquet files. Use <codeph>parquet-tools</codeph> to dump the file metadata. Note
-            that a column could have several encodings within the same file (the column data is
-            stored in several column chunks). Look for <codeph>VLE:PLAIN</codeph> in the output
-            of <codeph>parquet-tools</codeph>, which means the values are plain encoded.
+            Identify any plain-encoded string columns in the associated table. Pay special attention to tables
+            containing Parquet files generated through Hive, Spark, or other mechanisms outside of Impala,
+            because Impala uses Snappy compression by default for Parquet files. Use <codeph>parquet-tools</codeph>
+            to dump the file metadata. Note that a column could have several encodings within the same file (the column
+            data is stored in several column chunks). Look for <codeph>VLE:PLAIN</codeph> in the output of
+            <codeph>parquet-tools</codeph>, which means the values are plain encoded.
           </li>
         </ul>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-4539">IMPALA-4539</xref>
-        </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala280"/>.
-        </p>
-
-        <p>
-          <b>Workaround:</b> Use Snappy or another compression codec for Parquet files.
-        </p>
-
+        <p><b>Bug:</b> <xref keyref="IMPALA-4539">IMPALA-4539</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Resolution:</b> Upgrade to a version of Impala containing the fix for <xref keyref="IMPALA-4539">IMPALA-4539</xref>.</p>
+        <p><b>Workaround:</b> Use Snappy or another compression codec for Parquet files.</p>
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-4513">
-
       <title>ABS(n) where n is the lowest bound for the int types returns negative values</title>
-
       <conbody>
-
         <p>
-          If the <codeph>abs()</codeph> function evaluates a number that is right at the lower
-          bound for an integer data type, the positive result cannot be represented in the same
-          type, and the result is returned as a negative number. For example,
-          <codeph>abs(-128)</codeph> returns -128 because the argument is interpreted as a
-          <codeph>TINYINT</codeph> and the return value is also a <codeph>TINYINT</codeph>.
+          If the <codeph>abs()</codeph> function evaluates a number that is right at the lower bound for
+          an integer data type, the positive result cannot be represented in the same type, and the
+          result is returned as a negative number. For example, <codeph>abs(-128)</codeph> returns -128
+          because the argument is interpreted as a <codeph>TINYINT</codeph> and the return value is also
+          a <codeph>TINYINT</codeph>.
         </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-4513">IMPALA-4513</xref>
-        </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Workaround:</b> Cast the integer value to a larger type. For example, rewrite
-          <codeph>abs(<varname>tinyint_col</varname>)</codeph> as
-          <codeph>abs(cast(<varname>tinyint_col</varname> as smallint))</codeph>.
-        </p>
-
+        <p><b>Bug:</b> <xref keyref="IMPALA-4513">IMPALA-4513</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Workaround:</b> Cast the integer value to a larger type. For example, rewrite
+          <codeph>abs(<varname>tinyint_col</varname>)</codeph> as <codeph>abs(cast(<varname>tinyint_col</varname> as smallint))</codeph>.</p>
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-4266">
-
       <title>Java udf expression returning string in group by can give incorrect results.</title>
-
       <conbody>
-
         <p>
-          If the <codeph>GROUP BY</codeph> clause included a call to a Java UDF that returned a
-          string value, the UDF could return an incorrect result.
+          If the <codeph>GROUP BY</codeph> clause included a call to a Java UDF that returned a string value,
+          the UDF could return an incorrect result.
         </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-4266">IMPALA-4266</xref>
-        </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala28_full"/> and higher.
-        </p>
-
-        <p>
-          <b>Workaround:</b> Rewrite the expression to concatenate the results of the Java UDF
-          with an empty string call. For example, rewrite <codeph>my_hive_udf()</codeph> as
+        <p><b>Bug:</b> <xref keyref="IMPALA-4266">IMPALA-4266</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala28_full"/> and higher.</p>
+        <p><b>Workaround:</b> Rewrite the expression to concatenate the results of the Java UDF with an
+          empty string call. For example, rewrite <codeph>my_hive_udf()</codeph> as
           <codeph>concat(my_hive_udf(), '')</codeph>.
         </p>
-
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-3084" rev="IMPALA-3084">
@@ -1457,9 +1091,8 @@ impala hard nproc 262144
       <conbody>
 
         <p>
-          A query could return wrong results (too many or too few <codeph>NULL</codeph> values)
-          if it referenced an outer-joined nested collection and also contained a null-checking
-          predicate (<codeph>IS NULL</codeph>, <codeph>IS NOT NULL</codeph>, or the
+          A query could return wrong results (too many or too few <codeph>NULL</codeph> values) if it referenced an outer-joined nested
+          collection and also contained a null-checking predicate (<codeph>IS NULL</codeph>, <codeph>IS NOT NULL</codeph>, or the
           <codeph>&lt;=&gt;</codeph> operator) in the <codeph>WHERE</codeph> clause.
         </p>
 
@@ -1471,9 +1104,7 @@ impala hard nproc 262144
           <b>Severity:</b> High
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala270"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala270"/>.</p>
 
       </conbody>
 
@@ -1486,8 +1117,8 @@ impala hard nproc 262144
       <conbody>
 
         <p>
-          An <codeph>OUTER JOIN</codeph> query could omit some expected result rows due to a
-          constant such as <codeph>FALSE</codeph> in another join clause. For example:
+          An <codeph>OUTER JOIN</codeph> query could omit some expected result rows due to a constant such as <codeph>FALSE</codeph> in
+          another join clause. For example:
         </p>
 
 <codeblock><![CDATA[
@@ -1510,6 +1141,10 @@ explain SELECT 1 FROM alltypestiny a1
 
         <p>
           <b>Severity:</b> High
+        </p>
+
+        <p>
+          <b>Resolution:</b>
         </p>
 
         <p>
@@ -1539,8 +1174,8 @@ explain SELECT 1 FROM alltypestiny a1
 
           <li>
             <p>
-              The INNER JOIN has an On-clause with a predicate that references at least two
-              tables that are on the nullable side of the preceding OUTER JOINs.
+              The INNER JOIN has an On-clause with a predicate that references at least two tables that are on the nullable side of the
+              preceding OUTER JOINs.
             </p>
           </li>
         </ul>
@@ -1623,19 +1258,13 @@ on b.int_col = c.int_col;
         </p>
 
         <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala280"/>.
-        </p>
-
-        <p>
           <b>Workaround:</b> High
         </p>
 
         <p>
-          For some queries, this problem can be worked around by placing the problematic
-          <codeph>ON</codeph> clause predicate in the <codeph>WHERE</codeph> clause instead, or
-          changing the preceding <codeph>OUTER JOIN</codeph>s to <codeph>INNER JOIN</codeph>s
-          (if the <codeph>ON</codeph> clause predicate would discard <codeph>NULL</codeph>s).
-          For example, to fix the problematic query above:
+          For some queries, this problem can be worked around by placing the problematic <codeph>ON</codeph> clause predicate in the
+          <codeph>WHERE</codeph> clause instead, or changing the preceding <codeph>OUTER JOIN</codeph>s to <codeph>INNER JOIN</codeph>s (if
+          the <codeph>ON</codeph> clause predicate would discard <codeph>NULL</codeph>s). For example, to fix the problematic query above:
         </p>
 
 <codeblock><![CDATA[
@@ -1711,8 +1340,7 @@ where b.int_col = c.int_col
       <conbody>
 
         <p>
-          Parquet <codeph>BIT_PACKED</codeph> encoding as implemented by Impala is LSB first.
-          The parquet standard says it is MSB first.
+          Parquet <codeph>BIT_PACKED</codeph> encoding as implemented by Impala is LSB first. The parquet standard says it is MSB first.
         </p>
 
         <p>
@@ -1720,8 +1348,8 @@ where b.int_col = c.int_col
         </p>
 
         <p>
-          <b>Severity:</b> High, but rare in practice because BIT_PACKED is infrequently used,
-          is not written by Impala, and is deprecated in Parquet 2.0.
+          <b>Severity:</b> High, but rare in practice because BIT_PACKED is infrequently used, is not written by Impala, and is deprecated
+          in Parquet 2.0.
         </p>
 
       </conbody>
@@ -1735,11 +1363,10 @@ where b.int_col = c.int_col
       <conbody>
 
         <p>
-          The calculation of start and end times for the BST (British Summer Time) time zone
-          could be incorrect between 1972 and 1995. Between 1972 and 1995, BST began and ended
-          at 02:00 GMT on the third Sunday in March (or second Sunday when Easter fell on the
-          third) and fourth Sunday in October. For example, both function calls should return
-          13, but actually return 12, in a query such as:
+          The calculation of start and end times for the BST (British Summer Time) time zone could be incorrect between 1972 and 1995.
+          Between 1972 and 1995, BST began and ended at 02:00 GMT on the third Sunday in March (or second Sunday when Easter fell on the
+          third) and fourth Sunday in October. For example, both function calls should return 13, but actually return 12, in a query such
+          as:
         </p>
 
 <codeblock>
@@ -1767,18 +1394,15 @@ select
       <conbody>
 
         <p>
-          If a URL contains an <codeph>@</codeph> character, the <codeph>parse_url()</codeph>
-          function could return an incorrect value for the hostname field.
+          If a URL contains an <codeph>@</codeph> character, the <codeph>parse_url()</codeph> function could return an incorrect value for
+          the hostname field.
         </p>
 
         <p>
           <b>Bug:</b> <xref keyref="IMPALA-1170"></xref>IMPALA-1170
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/> and
-          <keyword keyref="impala234"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/> and <keyword keyref="impala234"/>.</p>
 
       </conbody>
 
@@ -1791,9 +1415,8 @@ select
       <conbody>
 
         <p>
-          If the final character in the RHS argument of a <codeph>LIKE</codeph> operator is an
-          escaped <codeph>\%</codeph> character, it does not match a <codeph>%</codeph> final
-          character of the LHS argument.
+          If the final character in the RHS argument of a <codeph>LIKE</codeph> operator is an escaped <codeph>\%</codeph> character, it
+          does not match a <codeph>%</codeph> final character of the LHS argument.
         </p>
 
         <p>
@@ -1811,9 +1434,8 @@ select
       <conbody>
 
         <p>
-          Because the value for <codeph>rand()</codeph> is computed early in a query, using an
-          <codeph>ORDER BY</codeph> expression involving a call to <codeph>rand()</codeph> does
-          not actually randomize the results.
+          Because the value for <codeph>rand()</codeph> is computed early in a query, using an <codeph>ORDER BY</codeph> expression
+          involving a call to <codeph>rand()</codeph> does not actually randomize the results.
         </p>
 
         <p>
@@ -1831,9 +1453,8 @@ select
       <conbody>
 
         <p>
-          If the same column is queried twice within a view, <codeph>NULL</codeph> values for
-          that column are omitted. For example, the result of <codeph>COUNT(*)</codeph> on the
-          view could be less than expected.
+          If the same column is queried twice within a view, <codeph>NULL</codeph> values for that column are omitted. For example, the
+          result of <codeph>COUNT(*)</codeph> on the view could be less than expected.
         </p>
 
         <p>
@@ -1844,10 +1465,7 @@ select
           <b>Workaround:</b> Avoid selecting the same column twice within an inline view.
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/>,
-          <keyword keyref="impala232"/>, and <keyword keyref="impala2210"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>, <keyword keyref="impala232"/>, and <keyword keyref="impala2210"/>.</p>
 
       </conbody>
 
@@ -1862,19 +1480,15 @@ select
       <conbody>
 
         <p>
-          A query involving an <codeph>OUTER JOIN</codeph> clause where one of the table
-          references is an inline view might apply predicates from the <codeph>ON</codeph>
-          clause incorrectly.
+          A query involving an <codeph>OUTER JOIN</codeph> clause where one of the table references is an inline view might apply predicates
+          from the <codeph>ON</codeph> clause incorrectly.
         </p>
 
         <p>
           <b>Bug:</b> <xref keyref="IMPALA-1459">IMPALA-1459</xref>
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/>,
-          <keyword keyref="impala232"/>, and <keyword keyref="impala229"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>, <keyword keyref="impala232"/>, and <keyword keyref="impala229"/>.</p>
 
       </conbody>
 
@@ -1887,8 +1501,8 @@ select
       <conbody>
 
         <p>
-          A query could encounter a serious error if includes multiple nested levels of
-          <codeph>INNER JOIN</codeph> clauses involving subqueries.
+          A query could encounter a serious error if includes multiple nested levels of <codeph>INNER JOIN</codeph> clauses involving
+          subqueries.
         </p>
 
         <p>
@@ -1906,8 +1520,7 @@ select
       <conbody>
 
         <p>
-          A query might return incorrect results due to wrong predicate assignment in the
-          following scenario:
+          A query might return incorrect results due to wrong predicate assignment in the following scenario:
         </p>
 
         <ol>
@@ -1920,8 +1533,8 @@ select
           </li>
 
           <li>
-            That join has an On-clause containing a predicate that only references columns
-            originating from the outer-joined tables inside the inline view
+            That join has an On-clause containing a predicate that only references columns originating from the outer-joined tables inside
+            the inline view
           </li>
         </ol>
 
@@ -1929,10 +1542,7 @@ select
           <b>Bug:</b> <xref keyref="IMPALA-2665">IMPALA-2665</xref>
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/>,
-          <keyword keyref="impala232"/>, and <keyword keyref="impala229"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>, <keyword keyref="impala232"/>, and <keyword keyref="impala229"/>.</p>
 
       </conbody>
 
@@ -1945,18 +1555,15 @@ select
       <conbody>
 
         <p>
-          In an <codeph>OUTER JOIN</codeph> query with a <codeph>HAVING</codeph> clause, the
-          comparison from the <codeph>HAVING</codeph> clause might be applied at the wrong stage
-          of query processing, leading to incorrect results.
+          In an <codeph>OUTER JOIN</codeph> query with a <codeph>HAVING</codeph> clause, the comparison from the <codeph>HAVING</codeph>
+          clause might be applied at the wrong stage of query processing, leading to incorrect results.
         </p>
 
         <p>
           <b>Bug:</b> <xref keyref="IMPALA-2144">IMPALA-2144</xref>
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
 
       </conbody>
 
@@ -1969,18 +1576,15 @@ select
       <conbody>
 
         <p>
-          A <codeph>NOT IN</codeph> operator with a subquery that calls an aggregate function,
-          such as <codeph>NOT IN (SELECT SUM(...))</codeph>, could return incorrect results.
+          A <codeph>NOT IN</codeph> operator with a subquery that calls an aggregate function, such as <codeph>NOT IN (SELECT
+          SUM(...))</codeph>, could return incorrect results.
         </p>
 
         <p>
           <b>Bug:</b> <xref keyref="IMPALA-2093">IMPALA-2093</xref>
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/> and
-          <keyword keyref="impala234"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/> and <keyword keyref="impala234"/>.</p>
 
       </conbody>
 
@@ -1995,9 +1599,8 @@ select
     <conbody>
 
       <p>
-        These issues affect how Impala interacts with metadata. They cover areas such as the
-        metastore database, the <codeph>COMPUTE STATS</codeph> statement, and the Impala
-        <cmdname>catalogd</cmdname> daemon.
+        These issues affect how Impala interacts with metadata. They cover areas such as the metastore database, the <codeph>COMPUTE
+        STATS</codeph> statement, and the Impala <cmdname>catalogd</cmdname> daemon.
       </p>
 
     </conbody>
@@ -2009,11 +1612,9 @@ select
       <conbody>
 
         <p>
-          Incremental stats use up about 400 bytes per partition for each column. For example,
-          for a table with 20K partitions and 100 columns, the memory overhead from incremental
-          statistics is about 800 MB. When serialized for transmission across the network, this
-          metadata exceeds the 2 GB Java array size limit and leads to a
-          <codeph>catalogd</codeph> crash.
+          Incremental stats use up about 400 bytes per partition for each column. For example, for a table with 20K partitions and 100
+          columns, the memory overhead from incremental statistics is about 800 MB. When serialized for transmission across the network,
+          this metadata exceeds the 2 GB Java array size limit and leads to a <codeph>catalogd</codeph> crash.
         </p>
 
         <p>
@@ -2023,9 +1624,8 @@ select
         </p>
 
         <p>
-          <b>Workaround:</b> If feasible, compute full stats periodically and avoid computing
-          incremental stats for that table. The scalability of incremental stats computation is
-          a continuing work item.
+          <b>Workaround:</b> If feasible, compute full stats periodically and avoid computing incremental stats for that table. The
+          scalability of incremental stats computation is a continuing work item.
         </p>
 
       </conbody>
@@ -2047,21 +1647,17 @@ select
         </p>
 
         <p>
-          <b>Workaround:</b> On <keyword keyref="impala20"/>, when adjusting table statistics
-          manually by setting the <codeph>numRows</codeph>, you must also enable the Boolean
-          property <codeph>STATS_GENERATED_VIA_STATS_TASK</codeph>. For example, use a statement
-          like the following to set both properties with a single <codeph>ALTER TABLE</codeph>
-          statement:
+          <b>Workaround:</b> On <keyword keyref="impala20"/>, when adjusting table statistics manually by setting the <codeph>numRows</codeph>, you must also
+          enable the Boolean property <codeph>STATS_GENERATED_VIA_STATS_TASK</codeph>. For example, use a statement like the following to
+          set both properties with a single <codeph>ALTER TABLE</codeph> statement:
         </p>
 
 <codeblock>ALTER TABLE <varname>table_name</varname> SET TBLPROPERTIES('numRows'='<varname>new_value</varname>', 'STATS_GENERATED_VIA_STATS_TASK' = 'true');</codeblock>
 
         <p>
           <b>Resolution:</b> The underlying cause is the issue
-          <xref
-            href="https://issues.apache.org/jira/browse/HIVE-8648"
-            scope="external" format="html">HIVE-8648</xref>
-          that affects the metastore in Hive 0.13.
+          <xref href="https://issues.apache.org/jira/browse/HIVE-8648" scope="external" format="html">HIVE-8648</xref> that affects the
+          metastore in Hive 0.13. The workaround is only needed until the fix for this issue is incorporated into release of <keyword keyref="distro"/>.
         </p>
 
       </conbody>
@@ -2077,8 +1673,8 @@ select
     <conbody>
 
       <p>
-        These issues affect the ability to interchange data between Impala and other database
-        systems. They cover areas such as data types and file formats.
+        These issues affect the ability to interchange data between Impala and other database systems. They cover areas such as data types
+        and file formats.
       </p>
 
     </conbody>
@@ -2092,32 +1688,26 @@ select
       <conbody>
 
         <p>
-          This issue can occur either on old Avro tables (created prior to Hive 1.1) or when
-          changing the Avro schema file by adding or removing columns. Columns added to the
-          schema file will not show up in the output of the <codeph>DESCRIBE FORMATTED</codeph>
-          command. Removing columns from the schema file will trigger a
-          <codeph>NullPointerException</codeph>.
+          This issue can occur either on old Avro tables (created prior to Hive 1.1) or when changing the Avro schema file by
+          adding or removing columns. Columns added to the schema file will not show up in the output of the <codeph>DESCRIBE
+          FORMATTED</codeph> command. Removing columns from the schema file will trigger a <codeph>NullPointerException</codeph>.
         </p>
 
         <p>
-          As a workaround, you can use the output of <codeph>SHOW CREATE TABLE</codeph> to drop
-          and recreate the table. This will populate the Hive metastore database with the
-          correct column definitions.
+          As a workaround, you can use the output of <codeph>SHOW CREATE TABLE</codeph> to drop and recreate the table. This will populate
+          the Hive metastore database with the correct column definitions.
         </p>
 
         <note type="warning">
-          <p>
-            Only use this for external tables, or Impala will remove the data files. In case of
-            an internal table, set it to external first:
+          <p>Only use this for external tables, or Impala will remove the data
+            files. In case of an internal table, set it to external first:
 <codeblock>
 ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 </codeblock>
-            (The part in parentheses is case sensitive.) Make sure to pick the right choice
-            between internal and external when recreating the table. See
-            <xref href="impala_tables.xml#tables"/> for the differences between internal and
-            external tables.
-          </p>
-        </note>
+          (The part in parentheses is case sensitive.) Make sure to pick the
+          right choice between internal and external when recreating the table.
+          See <xref href="impala_tables.xml#tables"/> for the differences
+          between internal and external tables. </p></note>
 
         <p>
           <b>Severity:</b> High
@@ -2156,8 +1746,8 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          Impala behavior differs from Hive with respect to out of range float/double values.
-          Out of range values are returned as maximum allowed value of type (Hive returns NULL).
+          Impala behavior differs from Hive with respect to out of range float/double values. Out of range values are returned as maximum
+          allowed value of type (Hive returns NULL).
         </p>
 
         <p>
@@ -2177,16 +1767,14 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          For compatibility with Impala, the value for the Flume HDFS Sink
-          <codeph>hdfs.writeFormat</codeph> must be set to <codeph>Text</codeph>, rather than
-          its default value of <codeph>Writable</codeph>. The <codeph>hdfs.writeFormat</codeph>
-          setting must be changed to <codeph>Text</codeph> before creating data files with
-          Flume; otherwise, those files cannot be read by either Impala or Hive.
+          For compatibility with Impala, the value for the Flume HDFS Sink <codeph>hdfs.writeFormat</codeph> must be set to
+          <codeph>Text</codeph>, rather than its default value of <codeph>Writable</codeph>. The <codeph>hdfs.writeFormat</codeph> setting
+          must be changed to <codeph>Text</codeph> before creating data files with Flume; otherwise, those files cannot be read by either
+          Impala or Hive.
         </p>
 
         <p>
-          <b>Resolution:</b> This information has been requested to be added to the upstream
-          Flume documentation.
+          <b>Resolution:</b> This information has been requested to be added to the upstream Flume documentation.
         </p>
 
       </conbody>
@@ -2202,8 +1790,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          Querying certain Avro tables could cause a crash or return no rows, even though Impala
-          could <codeph>DESCRIBE</codeph> the table.
+          Querying certain Avro tables could cause a crash or return no rows, even though Impala could <codeph>DESCRIBE</codeph> the table.
         </p>
 
         <p>
@@ -2211,14 +1798,13 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Workaround:</b> Swap the order of the fields in the schema specification. For
-          example, <codeph>["null", "string"]</codeph> instead of <codeph>["string",
-          "null"]</codeph>.
+          <b>Workaround:</b> Swap the order of the fields in the schema specification. For example, <codeph>["null", "string"]</codeph>
+          instead of <codeph>["string", "null"]</codeph>.
         </p>
 
         <p>
-          <b>Resolution:</b> Not allowing this syntax agrees with the Avro specification, so it
-          may still cause an error even when the crashing issue is resolved.
+          <b>Resolution:</b> Not allowing this syntax agrees with the Avro specification, so it may still cause an error even when the
+          crashing issue is resolved.
         </p>
 
       </conbody>
@@ -2234,8 +1820,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          If an Avro table has a schema definition with a trailing semicolon, Impala encounters
-          an error when the table is queried.
+          If an Avro table has a schema definition with a trailing semicolon, Impala encounters an error when the table is queried.
         </p>
 
         <p>
@@ -2259,9 +1844,8 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          Currently, Impala can only read gzipped files containing a single stream. If a gzipped
-          file contains multiple concatenated streams, the Impala query only processes the data
-          from the first stream.
+          Currently, Impala can only read gzipped files containing a single stream. If a gzipped file contains multiple concatenated
+          streams, the Impala query only processes the data from the first stream.
         </p>
 
         <p>
@@ -2272,9 +1856,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
           <b>Workaround:</b> Use a different gzip tool to compress file to a single stream file.
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala250"/>.</p>
 
       </conbody>
 
@@ -2289,9 +1871,8 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          If a carriage return / newline pair of characters in a text table is split between
-          HDFS data blocks, Impala incorrectly processes the row following the
-          <codeph>\n\r</codeph> pair twice.
+          If a carriage return / newline pair of characters in a text table is split between HDFS data blocks, Impala incorrectly processes
+          the row following the <codeph>\n\r</codeph> pair twice.
         </p>
 
         <p>
@@ -2302,9 +1883,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
           <b>Workaround:</b> Use the Parquet format for large volumes of data where practical.
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala260"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala260"/>.</p>
 
       </conbody>
 
@@ -2319,18 +1898,13 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          In some cases, an invalid <codeph>BOOLEAN</codeph> value read from a table does not
-          produce a warning message about the bad value. The result is still
-          <codeph>NULL</codeph> as expected. Therefore, this is not a query correctness issue,
-          but it could lead to overlooking the presence of invalid data.
+          In some cases, an invalid <codeph>BOOLEAN</codeph> value read from a table does not produce a warning message about the bad value.
+          The result is still <codeph>NULL</codeph> as expected. Therefore, this is not a query correctness issue, but it could lead to
+          overlooking the presence of invalid data.
         </p>
 
         <p>
           <b>Bug:</b> <xref keyref="IMPALA-1862">IMPALA-1862</xref>
-        </p>
-
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala280"/>.
         </p>
 
       </conbody>
@@ -2339,13 +1913,15 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     <concept id="IMPALA-1652" rev="IMPALA-1652">
 
+<!-- To do: Isn't this more a correctness issue? -->
+
       <title>Incorrect results with basic predicate on CHAR typed column.</title>
 
       <conbody>
 
         <p>
-          When comparing a <codeph>CHAR</codeph> column value to a string literal, the literal
-          value is not blank-padded and so the comparison might fail when it should match.
+          When comparing a <codeph>CHAR</codeph> column value to a string literal, the literal value is not blank-padded and so the
+          comparison might fail when it should match.
         </p>
 
         <p>
@@ -2353,8 +1929,8 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Workaround:</b> Use the <codeph>RPAD()</codeph> function to blank-pad literals
-          compared with <codeph>CHAR</codeph> columns to the expected length.
+          <b>Workaround:</b> Use the <codeph>RPAD()</codeph> function to blank-pad literals compared with <codeph>CHAR</codeph> columns to
+          the expected length.
         </p>
 
       </conbody>
@@ -2370,55 +1946,38 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     <conbody>
 
       <p>
-        These issues are current limitations of Impala that require evaluation as you plan how
-        to integrate Impala into your data management workflow.
+        These issues are current limitations of Impala that require evaluation as you plan how to integrate Impala into your data management
+        workflow.
       </p>
 
     </conbody>
 
     <concept id="IMPALA-4551">
-
       <title>Set limits on size of expression trees</title>
-
       <conbody>
-
         <p>
           Very deeply nested expressions within queries can exceed internal Impala limits,
           leading to excessive memory usage.
         </p>
-
-        <p>
-          <b>Bug:</b> <xref keyref="IMPALA-4551">IMPALA-4551</xref>
-        </p>
-
-        <p>
-          <b>Severity:</b> High
-        </p>
-
-        <p>
-          <b>Resolution:</b>
-        </p>
-
-        <p>
-          <b>Workaround:</b> Avoid queries with extremely large expression trees. Setting the
-          query option <codeph>disable_codegen=true</codeph> may reduce the impact, at a cost of
-          longer query runtime.
-        </p>
-
+        <p><b>Bug:</b> <xref keyref="IMPALA-4551">IMPALA-4551</xref></p>
+        <p><b>Severity:</b> High</p>
+        <p><b>Resolution:</b> </p>
+        <p><b>Workaround:</b> Avoid queries with extremely large expression trees. Setting the query option
+          <codeph>disable_codegen=true</codeph> may reduce the impact, at a cost of longer query runtime.</p>
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-77" rev="IMPALA-77">
+
+<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
 
       <title>Impala does not support running on clusters with federated namespaces</title>
 
       <conbody>
 
         <p>
-          Impala does not support running on clusters with federated namespaces. The
-          <codeph>impalad</codeph> process will not start on a node running such a filesystem
-          based on the <codeph>org.apache.hadoop.fs.viewfs.ViewFs</codeph> class.
+          Impala does not support running on clusters with federated namespaces. The <codeph>impalad</codeph> process will not start on a
+          node running such a filesystem based on the <codeph>org.apache.hadoop.fs.viewfs.ViewFs</codeph> class.
         </p>
 
         <p>
@@ -2426,7 +1985,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Resolution:</b> Fixed in Impala 1.0.
+          <b>Anticipated Resolution:</b> Limitation
         </p>
 
         <p>
@@ -2446,22 +2005,22 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     <conbody>
 
       <p>
-        These issues do not fall into one of the above categories or have not been categorized
-        yet.
+        These issues do not fall into one of the above categories or have not been categorized yet.
       </p>
 
     </conbody>
 
     <concept id="IMPALA-2005" rev="IMPALA-2005">
 
+<!-- Not part of Alex's spreadsheet -->
+
       <title>A failed CTAS does not drop the table if the insert fails.</title>
 
       <conbody>
 
         <p>
-          If a <codeph>CREATE TABLE AS SELECT</codeph> operation successfully creates the target
-          table but an error occurs while querying the source table or copying the data, the new
-          table is left behind rather than being dropped.
+          If a <codeph>CREATE TABLE AS SELECT</codeph> operation successfully creates the target table but an error occurs while querying
+          the source table or copying the data, the new table is left behind rather than being dropped.
         </p>
 
         <p>
@@ -2469,8 +2028,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Workaround:</b> Drop the new table manually after a failed <codeph>CREATE TABLE AS
-          SELECT</codeph>.
+          <b>Workaround:</b> Drop the new table manually after a failed <codeph>CREATE TABLE AS SELECT</codeph>.
         </p>
 
       </conbody>
@@ -2486,10 +2044,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          Using a <codeph>CAST()</codeph> function to convert large literal values to smaller
-          types, or to convert special values such as <codeph>NaN</codeph> or
-          <codeph>Inf</codeph>, produces values not consistent with other database systems. This
-          could lead to unexpected results from queries.
+          Using a <codeph>CAST()</codeph> function to convert large literal values to smaller types, or to convert special values such as
+          <codeph>NaN</codeph> or <codeph>Inf</codeph>, produces values not consistent with other database systems. This could lead to
+          unexpected results from queries.
         </p>
 
         <p>
@@ -2511,9 +2068,8 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          The largest single block of memory that Impala can allocate during a query is 1 GiB.
-          Therefore, a query could fail or Impala could crash if a compressed text file resulted
-          in more than 1 GiB of data in uncompressed form, or if a string function such as
+          The largest single block of memory that Impala can allocate during a query is 1 GiB. Therefore, a query could fail or Impala could
+          crash if a compressed text file resulted in more than 1 GiB of data in uncompressed form, or if a string function such as
           <codeph>group_concat()</codeph> returned a value greater than 1 GiB.
         </p>
 
@@ -2521,10 +2077,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
           <b>Bug:</b> <xref keyref="IMPALA-1619">IMPALA-1619</xref>
         </p>
 
-        <p>
-          <b>Resolution:</b> Fixed in <keyword keyref="impala270"/> and
-          <keyword keyref="impala263"/>.
-        </p>
+        <p><b>Resolution:</b> Fixed in <keyword keyref="impala270"/> and <keyword keyref="impala263"/>.</p>
 
       </conbody>
 
@@ -2539,9 +2092,8 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          A fully qualified table name starting with a number could cause a parsing error. In a
-          name such as <codeph>db.571_market</codeph>, the decimal point followed by digits is
-          interpreted as a floating-point number.
+          A fully qualified table name starting with a number could cause a parsing error. In a name such as <codeph>db.571_market</codeph>,
+          the decimal point followed by digits is interpreted as a floating-point number.
         </p>
 
         <p>
@@ -2549,8 +2101,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Workaround:</b> Surround each part of the fully qualified name with backticks
-          (<codeph>``</codeph>).
+          <b>Workaround:</b> Surround each part of the fully qualified name with backticks (<codeph>``</codeph>).
         </p>
 
       </conbody>
@@ -2566,8 +2117,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          If the <codeph>LC_*</codeph> environment variables specify an unsupported locale,
-          Impala does not start.
+          If the <codeph>LC_*</codeph> environment variables specify an unsupported locale, Impala does not start.
         </p>
 
         <p>
@@ -2575,15 +2125,12 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Workaround:</b> Add <codeph>LC_ALL="C"</codeph> to the environment settings for
-          both the Impala daemon and the Statestore daemon. See
-          <xref href="impala_config_options.xml#config_options"/> for details about modifying
-          these environment settings.
+          <b>Workaround:</b> Add <codeph>LC_ALL="C"</codeph> to the environment settings for both the Impala daemon and the Statestore
+          daemon. See <xref href="impala_config_options.xml#config_options"/> for details about modifying these environment settings.
         </p>
 
         <p>
-          <b>Resolution:</b> Fixing this issue would require an upgrade to Boost 1.47 in the
-          Impala distribution.
+          <b>Resolution:</b> Fixing this issue would require an upgrade to Boost 1.47 in the Impala distribution.
         </p>
 
       </conbody>
@@ -2592,19 +2139,19 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     <concept id="IMP-1203">
 
+<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
+
       <title>Log Level 3 Not Recommended for Impala</title>
 
       <conbody>
 
         <p>
-          The extensive logging produced by log level 3 can cause serious performance overhead
-          and capacity issues.
+          The extensive logging produced by log level 3 can cause serious performance overhead and capacity issues.
         </p>
 
         <p>
-          <b>Workaround:</b> Reduce the log level to its default value of 1, that is,
-          <codeph>GLOG_v=1</codeph>. See <xref href="impala_logging.xml#log_levels"/> for
-          details about the effects of setting different logging levels.
+          <b>Workaround:</b> Reduce the log level to its default value of 1, that is, <codeph>GLOG_v=1</codeph>. See
+          <xref href="impala_logging.xml#log_levels"/> for details about the effects of setting different logging levels.
         </p>
 
       </conbody>
