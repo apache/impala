@@ -63,6 +63,18 @@ class QueryTestResult(object):
   def __str__(self):
     return '\n'.join(['%s' % row for row in self.rows])
 
+  def separate_rows(self):
+    """Returns rows that are literal rows and rows that are not literals (e.g. regex)
+    in two lists."""
+    literal_rows = []
+    non_literal_rows = []
+    for row in self.rows:
+      if row.regex is None:
+        literal_rows.append(row)
+      else:
+        non_literal_rows.append(row)
+    return (literal_rows, non_literal_rows)
+
 
 # Represents a row in a result set
 class ResultRow(object):
@@ -207,24 +219,42 @@ def assert_args_not_none(*args):
   for arg in args:
     assert arg is not None
 
-def convert_results_to_sets(expected_results, actual_results):
-  assert_args_not_none(expected_results, actual_results)
-  expected_set = set(map(str, expected_results.rows))
-  actual_set = set(map(str, actual_results.rows))
-  return expected_set, actual_set
-
 def verify_query_result_is_subset(expected_results, actual_results):
   """Check whether the results in expected_results are a subset of the results in
   actual_results. This uses set semantics, i.e. any duplicates are ignored."""
-  expected_set, actual_set = convert_results_to_sets(expected_results, actual_results)
-  assert expected_set <= actual_set
+  expected_literals, expected_non_literals = expected_results.separate_rows()
+  expected_literal_strings = set([str(row) for row in expected_literals])
+  actual_literal_strings = set([str(row) for row in actual_results.rows])
+  # Expected literal strings must all be present in the actual strings.
+  assert expected_literal_strings <= actual_literal_strings
+  # Expected patterns must be present in the actual strings.
+  for expected_row in expected_non_literals:
+    matched = False
+    for actual_row in actual_results.rows:
+      if actual_row == expected_row:
+        matched = True
+        break
+    assert matched, "Could not find expected row {0} in actual rows:\n{1}".format(
+        str(expected_row), str(actual_results))
 
 def verify_query_result_is_superset(expected_results, actual_results):
   """Check whether the results in expected_results are a superset of the results in
   actual_results. This uses set semantics, i.e. any duplicates are ignored."""
-  expected_set, actual_set = convert_results_to_sets(expected_results, actual_results)
-  assert expected_set >= actual_set
-
+  expected_literals, expected_non_literals = expected_results.separate_rows()
+  expected_literal_strings = set([str(row) for row in expected_literals])
+  # Check that all actual rows are present in either expected_literal_strings or
+  # expected_non_literals.
+  for actual_row in actual_results.rows:
+    if str(actual_row) in expected_literal_strings:
+      # Matched to a literal string
+      continue
+    matched = False
+    for expected_row in expected_non_literals:
+      if actual_row == expected_row:
+        matched = True
+        break
+    assert matched, "Could not find actual row {0} in expected rows:\n{1}".format(
+        str(actual_row), str(expected_results))
 
 def verify_query_result_is_equal(expected_results, actual_results):
   assert_args_not_none(expected_results, actual_results)
