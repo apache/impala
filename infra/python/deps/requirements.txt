@@ -34,6 +34,10 @@ boto3 == 1.2.3
 cm-api == 10.0.0
   # Already available as part of python on Linux.
   readline == 6.2.4.1; sys_platform == 'darwin'
+flake8 == 2.6.2
+  mccabe == 0.3.1
+  pycodestyle == 2.0.0
+  pyflakes == 1.2.3
 Flask == 0.10.1
   Jinja2 == 2.8
   MarkupSafe == 0.23
