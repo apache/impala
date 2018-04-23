@@ -14,8 +14,7 @@ explain select id from alltypes;
 '     table: rows=unavailable size=unavailable'
 '     partitions: 0/12 rows=unavailable'
 '     columns: unavailable'
-'   extrapolated-rows=unavailable'
-'   mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.* extrapolated-rows=unavailable.*
 '   tuple-ids=0 row-size=4B cardinality=unavailable'
 ---- TYPES
 STRING
@@ -68,8 +67,8 @@ row_regex:.*partitions=12/12 files=12 size=.*
 row_regex:.*table: rows=3650 size=.*
 '     partitions: 0/12 rows=unavailable'
 '     columns: all'
-'   extrapolated-rows=3650'
-'   mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.* extrapolated-rows=3650.*
+row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3650'
 ---- TYPES
 STRING
@@ -93,8 +92,8 @@ row_regex:.*partitions=3/12 files=3 size=.*
 row_regex:.*table: rows=3650 size=.*
 '     partitions: 0/3 rows=unavailable'
 '     columns: all'
-'   extrapolated-rows=904'
-'   mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.* extrapolated-rows=904.*
+row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=904'
 ---- TYPES
 STRING
@@ -119,8 +118,8 @@ row_regex:.*partitions=12/12 files=24 size=.*
 row_regex:.*table: rows=3650 size=.*
 '     partitions: 0/12 rows=unavailable'
 '     columns: all'
-'   extrapolated-rows=7300'
-'   mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.* extrapolated-rows=7300.*
+row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=7300'
 ---- TYPES
 STRING
@@ -146,8 +145,8 @@ row_regex:.*partitions=12/24 files=12 size=.*
 row_regex:.*table: rows=3650 size=.*
 '     partitions: 0/12 rows=unavailable'
 '     columns: all'
-'   extrapolated-rows=3651'
-'   mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.* extrapolated-rows=3651.*
+row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3651'
 ---- TYPES
 STRING
@@ -172,8 +171,8 @@ row_regex:.*partitions=12/24 files=12 size=.*
 row_regex:.*table: rows=10950 size=.*
 '     partitions: 0/12 rows=unavailable'
 '     columns: all'
-'   extrapolated-rows=3651'
-'   mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.* extrapolated-rows=3651
+row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3651'
 ---- TYPES
 STRING
@@ -187,8 +186,7 @@ explain select id from alltypes;
 '     table: rows=unavailable size=unavailable'
 '     partitions: 0/24 rows=unavailable'
 '     columns: unavailable'
-'   extrapolated-rows=unavailable'
-'   mem-estimate=16.00MB mem-reservation=0B'
+row_regex:.* extrapolated-rows=unavailable.*
 '   tuple-ids=0 row-size=4B cardinality=unavailable'
 ---- TYPES
 STRING
