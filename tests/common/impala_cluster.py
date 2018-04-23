@@ -109,12 +109,19 @@ class ImpalaCluster(object):
           if "uid not found" in str(e):
             continue
           raise
-        if process.name == 'impalad' and len(process.cmdline) >= 1:
-          impalads.append(ImpaladProcess(process.cmdline))
-        elif process.name == 'statestored' and len(process.cmdline) >= 1:
-          statestored.append(StateStoreProcess(process.cmdline))
-        elif process.name == 'catalogd' and len(process.cmdline) >= 1:
-          catalogd = CatalogdProcess(process.cmdline)
+        # IMPALA-6889: When a process shuts down and becomes a zombie its cmdline becomes
+        # empty for a brief moment, before it gets reaped by its parent (see man proc). We
+        # copy the cmdline to prevent it from changing between the following checks and
+        # the construction of the *Process objects.
+        cmdline = process.cmdline
+        if len(cmdline) == 0:
+          continue
+        if process.name == 'impalad':
+          impalads.append(ImpaladProcess(cmdline))
+        elif process.name == 'statestored':
+          statestored.append(StateStoreProcess(cmdline))
+        elif process.name == 'catalogd':
+          catalogd = CatalogdProcess(cmdline)
       except psutil.NoSuchProcess, e:
         # A process from get_pid_list() no longer exists, continue.
         LOG.info(e)
