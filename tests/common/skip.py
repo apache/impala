@@ -44,6 +44,8 @@ class SkipIfS3:
   jira = partial(pytest.mark.skipif, IS_S3)
   hdfs_encryption = pytest.mark.skipif(IS_S3,
       reason="HDFS encryption is not supported with S3")
+  empty_directory = pytest.mark.skipif(IS_S3,
+      reason="Empty directories are not supported on S3")
 
   # These ones need test infra work to re-enable.
   udfs = pytest.mark.skipif(IS_S3, reason="udas/udfs not copied to S3")
