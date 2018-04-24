@@ -693,6 +693,54 @@ select instr('foo bar bletch', 'b', 1, null);
 
       </dlentry>
 
+      <dlentry rev="3.0" id="regexp_escape">
+
+        <dt>
+          <codeph>regexp_escape(string source)</codeph>
+        </dt>
+
+        <dd>
+          <b>Purpose:</b> The <codeph>regexp_escape</codeph> function returns
+          a string escaped for the special character in RE2 library so that the
+          special characters are interpreted literally rather than as special
+          characters. The following special characters are escaped by the
+          function:
+<codeblock><![CDATA[.\+*?[^]$(){}=!<>|:-]]></codeblock>
+
+          <p>
+            <b>Return type:</b>
+            <codeph>string</codeph>
+          </p>
+
+          <p conref="../shared/impala_common.xml#common/regexp_re2"/>
+          <p conref="../shared/impala_common.xml#common/regexp_re2_warning"/>
+          <p conref="../shared/impala_common.xml#common/regexp_escapes"/>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            This example shows escaping one of special characters in RE2.
+          </p>
+<codeblock>
++------------------------------------------------------+
+| regexp_escape('Hello.world')                         |
++------------------------------------------------------+
+| Hello\.world                                         |
++------------------------------------------------------+
+</codeblock>
+          <p>
+            This example shows escaping all the special characters in RE2.
+          </p>
+<codeblock><![CDATA[
++------------------------------------------------------------+
+| regexp_escape('a.b\\c+d*e?f[g]h$i(j)k{l}m=n!o<p>q|r:s-t')  |
++------------------------------------------------------------+
+| a\.b\\c\+d\*e\?f\[g\]h\$i\(j\)k\{l\}m\=n\!o\<p\>q\|r\:s\-t |
++------------------------------------------------------------+
+]]>
+</codeblock>
+        </dd>
+
+      </dlentry>
+
       <dlentry id="regexp_extract">
 
         <dt>
