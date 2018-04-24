@@ -23,13 +23,13 @@
 #include <kudu/client/client.h>
 
 #include "exec/kudu-scan-node-base.h"
-#include "runtime/thread-resource-mgr.h"
 #include "gutil/gscoped_ptr.h"
 #include "util/thread.h"
 
 namespace impala {
 
 class KuduScanner;
+class ThreadResourcePool;
 
 /// A scan node that scans a Kudu table.
 ///
@@ -77,6 +77,12 @@ class KuduScanNode : public KuduScanNodeBase {
   /// Thread group for all scanner worker threads
   ThreadGroup scanner_threads_;
 
+  /// Maximum number of scanner threads. Set to 'NUM_SCANNER_THREADS' if that query
+  /// option is set. Otherwise, it's set to the number of cpu cores. Scanner threads
+  /// are generally cpu bound so there is no benefit in spinning up more threads than
+  /// the number of cores.
+  int max_num_scanner_threads_;
+
   /// The id of the callback added to the thread resource manager when a thread
   /// is available. Used to remove the callback before this scan node is destroyed.
   /// -1 if no callback is registered.
@@ -84,13 +90,16 @@ class KuduScanNode : public KuduScanNodeBase {
 
   /// Called when scanner threads are available for this scan node. This will
   /// try to spin up as many scanner threads as the quota allows.
-  void ThreadAvailableCb(ThreadResourceMgr::ResourcePool* pool);
+  void ThreadAvailableCb(ThreadResourcePool* pool);
 
   /// Main function for scanner thread which executes a KuduScanner. Begins by processing
-  /// 'initial_token', and continues processing scan tokens returned by
-  /// 'GetNextScanToken()' until there are none left, an error occurs, or the limit is
-  /// reached.
-  void RunScannerThread(const std::string& name, const std::string* initial_token);
+  /// 'initial_token', and continues processing scan tokens returned by GetNextScanToken()
+  /// until there are none left, an error occurs, or the limit is reached. The caller must
+  /// have acquired a thread token from the ThreadResourceMgr for this thread. The token
+  /// is released before this function returns. 'first_thread' is true if this was the
+  /// first scanner thread to start and it acquired a "required" thread token.
+  void RunScannerThread(
+      bool first_thread, const std::string& name, const std::string* initial_token);
 
   /// Processes a single scan token. Row batches are fetched using 'scanner' and enqueued
   /// in 'materialized_row_batches_' until the scanner reports eos, an error occurs, or

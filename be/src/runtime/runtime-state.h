@@ -26,7 +26,6 @@
 // NOTE: try not to add more headers here: runtime-state.h is included in many many files.
 #include "common/global-types.h"  // for PlanNodeId
 #include "runtime/client-cache-types.h"
-#include "runtime/thread-resource-mgr.h"
 #include "runtime/dml-exec-state.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -45,6 +44,7 @@ class RuntimeFilterBank;
 class ScalarFnCall;
 class Status;
 class TimestampValue;
+class ThreadResourcePool;
 class TUniqueId;
 class ExecEnv;
 class DataStreamMgrBase;
@@ -116,7 +116,7 @@ class RuntimeState {
   ReservationTracker* instance_buffer_reservation() {
     return instance_buffer_reservation_.get();
   }
-  ThreadResourceMgr::ResourcePool* resource_pool() { return resource_pool_; }
+  ThreadResourcePool* resource_pool() { return resource_pool_.get(); }
 
   void set_fragment_root_id(PlanNodeId id) {
     DCHECK_EQ(root_node_id_, -1) << "Should not set this twice.";
@@ -322,7 +322,7 @@ class RuntimeState {
 
   /// Thread resource management object for this fragment's execution.  The runtime
   /// state is responsible for returning this pool to the thread mgr.
-  ThreadResourceMgr::ResourcePool* resource_pool_ = nullptr;
+  std::unique_ptr<ThreadResourcePool> resource_pool_;
 
   /// Execution state for DML statements.
   DmlExecState dml_exec_state_;

@@ -42,6 +42,7 @@
 #include "runtime/query-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
+#include "runtime/thread-resource-mgr.h"
 #include "scheduling/query-schedule.h"
 #include "util/debug-util.h"
 #include "util/container-util.h"
@@ -141,7 +142,7 @@ Status FragmentInstanceState::Prepare() {
   // Reserve one main thread from the pool
   runtime_state_->resource_pool()->AcquireThreadToken();
   avg_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
-      bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
+      bind<int64_t>(mem_fn(&ThreadResourcePool::num_threads),
           runtime_state_->resource_pool()));
   mem_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("MemoryUsage",
       TUnit::BYTES,
@@ -149,7 +150,7 @@ Status FragmentInstanceState::Prepare() {
           runtime_state_->instance_mem_tracker()));
   thread_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("ThreadUsage",
       TUnit::UNIT,
-      bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
+      bind<int64_t>(mem_fn(&ThreadResourcePool::num_threads),
           runtime_state_->resource_pool()));
 
   // set up plan
