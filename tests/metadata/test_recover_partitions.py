@@ -17,8 +17,9 @@
 #
 # Impala tests for ALTER TABLE RECOVER PARTITIONS statement
 
+import os
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfLocal
+from tests.common.skip import SkipIfLocal, SkipIfS3
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE, IS_S3
@@ -78,9 +79,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     # Create a path for a new partition using hdfs client and add a file with some values.
     # Test that the partition can be recovered and that the inserted data are accessible.
-    self.filesystem_client.make_dir(TBL_LOCATION + LEAF_DIR)
-    self.filesystem_client.create_file(TBL_LOCATION + LEAF_DIR + FILE_PATH,
-                                       INSERTED_VALUE)
+    self.create_fs_partition(TBL_LOCATION, LEAF_DIR, FILE_PATH, INSERTED_VALUE)
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
     assert not self.has_value(PART_NAME, result.data)
@@ -100,7 +99,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
     old_length = len(result.data)
-    self.filesystem_client.make_dir(TBL_LOCATION + MALFORMED_DIR)
+    self.create_fs_partition(TBL_LOCATION, MALFORMED_DIR, FILE_PATH, INSERTED_VALUE)
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
@@ -111,9 +110,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     # Create a directory whose subdirectory names contain __HIVE_DEFAULT_PARTITION__
     # and check that is recovered as a NULL partition.
-    self.filesystem_client.make_dir(TBL_LOCATION + NULL_DIR)
-    self.filesystem_client.create_file(
-        TBL_LOCATION + NULL_DIR + FILE_PATH, NULL_INSERTED_VALUE)
+    self.create_fs_partition(TBL_LOCATION, NULL_DIR, FILE_PATH, NULL_INSERTED_VALUE)
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
     assert not self.has_value(self.DEF_NULL_PART_KEY, result.data)
@@ -150,9 +147,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "ALTER TABLE %s PARTITION (i=1, p='p3') SET LOCATION '%s/%s.db/tmp' "
         % (FQ_TBL_NAME, WAREHOUSE, unique_database))
     self.filesystem_client.delete_file_dir(TBL_LOCATION + LEAF_DIR, recursive=True)
-    self.filesystem_client.make_dir(TBL_LOCATION + LEAF_DIR);
-    self.filesystem_client.create_file(TBL_LOCATION + LEAF_DIR + FILE_PATH,
-                                       INSERTED_VALUE)
+    self.create_fs_partition(TBL_LOCATION, LEAF_DIR, FILE_PATH, INSERTED_VALUE)
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
     # Ensure that no duplicate partitions are recovered.
@@ -184,12 +179,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
         PART_DIR = "s=part%d/" % i
         FILE_PATH = "test"
         INSERTED_VALUE = "666"
-        self.filesystem_client.make_dir(TBL_LOCATION + PART_DIR)
-        if IS_S3:
-            # S3 is a key/value store and directory creation is a NOP; actually
-            # create the file.
-            self.filesystem_client.create_file(TBL_LOCATION + PART_DIR + FILE_PATH,
-                                               INSERTED_VALUE)
+        self.create_fs_partition(TBL_LOCATION, PART_DIR, FILE_PATH, INSERTED_VALUE)
 
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
@@ -230,8 +220,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s ADD PARTITION(i=1, p='p4')" % FQ_TBL_NAME)
-    self.filesystem_client.make_dir(TBL_LOCATION + LEAF_DIR);
-    self.filesystem_client.create_file(TBL_LOCATION + LEAF_DIR + FILE_PATH, INSERTED_VALUE)
+    self.create_fs_partition(TBL_LOCATION, LEAF_DIR, FILE_PATH, INSERTED_VALUE)
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
@@ -245,8 +234,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
     result = self.execute_query_expect_success(self.client,
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
     old_length = len(result.data)
-    self.filesystem_client.make_dir(TBL_LOCATION + SAME_VALUE_DIR1)
-    self.filesystem_client.make_dir(TBL_LOCATION + SAME_VALUE_DIR2)
+    self.create_fs_partition(TBL_LOCATION, SAME_VALUE_DIR1, FILE_PATH, INSERTED_VALUE)
+    self.create_fs_partition(TBL_LOCATION, SAME_VALUE_DIR2, FILE_PATH, INSERTED_VALUE)
     # Only one partition will be added.
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
@@ -274,9 +263,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
     # Test that the recovered partitions are properly stored in Hive MetaStore.
     # Invalidate the table metadata and then check if the recovered partitions
     # are accessible.
-    self.filesystem_client.make_dir(TBL_LOCATION + LEAF_DIR)
-    self.filesystem_client.create_file(TBL_LOCATION + LEAF_DIR + FILE_PATH,
-                                       INSERTED_VALUE)
+    self.create_fs_partition(TBL_LOCATION, LEAF_DIR, FILE_PATH, INSERTED_VALUE)
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
     result = self.execute_query_expect_success(self.client,
@@ -323,7 +310,7 @@ class TestRecoverPartitions(ImpalaTestSuite):
         "SHOW PARTITIONS %s" % FQ_TBL_NAME)
     old_length = len(result.data)
     normal_dir = '/'.join(normal_values)
-    self.filesystem_client.make_dir(TBL_LOCATION + normal_dir)
+    self.create_fs_partition(TBL_LOCATION, normal_dir, "test", "5")
     # One partition will be added.
     self.execute_query_expect_success(self.client,
         "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
@@ -365,6 +352,51 @@ class TestRecoverPartitions(ImpalaTestSuite):
       assert (self.count_value('p=100%25', result.data) == 1,
         "ALTER TABLE %s RECOVER PARTITIONS failed to handle encoded partitioned value" %
         FQ_TBL_NAME)
+
+  @SkipIfLocal.hdfs_client
+  @SkipIfS3.empty_directory
+  def test_empty_directory(self, vector, unique_database):
+    """Explicitly test how empty directories are handled when partitions are recovered."""
+
+    TBL_NAME = "test_recover_partitions"
+    FQ_TBL_NAME = unique_database + "." + TBL_NAME
+    TBL_LOCATION = self.__get_fs_location(unique_database, TBL_NAME)
+
+    self.execute_query_expect_success(self.client,
+        "CREATE TABLE %s (c int) PARTITIONED BY (i int, s string)" % (FQ_TBL_NAME))
+
+    # Adds partition directories.
+    num_partitions = 10
+    for i in xrange(1, num_partitions):
+        PART_DIR = "i=%d/s=part%d" % (i,i)
+        self.filesystem_client.make_dir(TBL_LOCATION + PART_DIR)
+
+    # Adds a duplicate directory name.
+    self.filesystem_client.make_dir(TBL_LOCATION + "i=001/s=part1")
+
+    # Adds a malformed directory name.
+    self.filesystem_client.make_dir(TBL_LOCATION + "i=wrong_type/s=part1")
+
+    result = self.execute_query_expect_success(self.client,
+        "SHOW PARTITIONS %s" % FQ_TBL_NAME)
+    assert 0 == self.count_partition(result.data)
+    self.execute_query_expect_success(self.client,
+        "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
+    result = self.execute_query_expect_success(self.client,
+        "SHOW PARTITIONS %s" % FQ_TBL_NAME)
+    assert num_partitions - 1 == self.count_partition(result.data)
+    for i in xrange(1, num_partitions):
+        PART_DIR = "part%d\t" % i
+        assert self.has_value(PART_DIR, result.data)
+
+  def create_fs_partition(self, root_path, new_dir, new_file, value):
+    """Creates an fs directory and writes a file to it. Empty directories are no-op's
+       for S3, so enforcing a non-empty directory is less error prone across
+       filesystems."""
+    partition_dir = os.path.join(root_path, new_dir)
+    self.filesystem_client.make_dir(partition_dir);
+    self.filesystem_client.create_file(os.path.join(partition_dir, new_file),
+                                       value)
 
   def check_invalid_partition_values(self, fq_tbl_name, tbl_location,
     normal_values, invalid_values):
