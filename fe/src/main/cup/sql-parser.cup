@@ -409,6 +409,7 @@ nonterminal Qualifier union_op;
 
 nonterminal PartitionDef partition_def;
 nonterminal List<PartitionDef> partition_def_list;
+nonterminal CommentOnStmt comment_on_stmt;
 nonterminal AlterTableStmt alter_tbl_stmt;
 nonterminal StatementBase alter_view_stmt;
 nonterminal ComputeStatsStmt compute_stats_stmt;
@@ -443,7 +444,7 @@ nonterminal ArrayList<StructField> struct_field_def_list;
 // Options for DDL commands - CREATE/DROP/ALTER
 nonterminal HdfsCachingOp cache_op_val, opt_cache_op_val;
 nonterminal BigDecimal opt_cache_op_replication;
-nonterminal String comment_val, opt_comment_val;
+nonterminal String comment_val, opt_comment_val, nullable_comment_val;
 nonterminal Boolean external_val;
 nonterminal Boolean purge_val;
 nonterminal String opt_init_string_val;
@@ -650,6 +651,8 @@ stmt ::=
   {: RESULT = grant_privilege; :}
   | revoke_privilege_stmt:revoke_privilege
   {: RESULT = revoke_privilege; :}
+  | comment_on_stmt:comment_on
+  {: RESULT = comment_on; :}
   | stmt:s SEMICOLON
   {: RESULT = s; :}
   ;
@@ -1007,6 +1010,11 @@ partition_def_list ::=
     list.add(item);
     RESULT = list;
   :}
+  ;
+
+comment_on_stmt ::=
+  KW_COMMENT KW_ON KW_DATABASE ident_or_default:db_name KW_IS nullable_comment_val:comment
+  {: RESULT = new CommentOnDbStmt(db_name, comment); :}
   ;
 
 alter_tbl_stmt ::=
@@ -1471,6 +1479,13 @@ opt_comment_val ::=
   KW_COMMENT STRING_LITERAL:comment
   {: RESULT = comment; :}
   | /* empty */
+  {: RESULT = null; :}
+  ;
+
+nullable_comment_val ::=
+  STRING_LITERAL:comment
+  {: RESULT = comment; :}
+  | KW_NULL
   {: RESULT = null; :}
   ;
 

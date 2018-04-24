@@ -3882,4 +3882,13 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       }
     }
   }
+
+  @Test
+  public void TestCommentOn() {
+    AnalyzesOk("comment on database functional is 'comment'");
+    AnalyzesOk("comment on database functional is ''");
+    AnalyzesOk("comment on database functional is null");
+    AnalysisError("comment on database doesntexist is 'comment'",
+        "Database does not exist: doesntexist");
+  }
 }

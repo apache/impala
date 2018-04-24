@@ -2801,6 +2801,17 @@ public class AuthorizationTest extends FrontendTestBase {
     }
   }
 
+  @Test
+  public void TestCommentOn() throws ImpalaException {
+    // User has ALTER privilege on functional_text_lzo database.
+    AuthzOk("comment on database functional_text_lzo is 'comment'");
+    // User does not have ALTER privilege on functional database.
+    AuthzError("comment on database functional is 'comment'",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional");
+    AuthzError("comment on database doesntexist is 'comment'",
+        "User '%s' does not have privileges to execute 'ALTER' on: doesntexist");
+  }
+
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
       throws ImpalaException {
     Frontend fe = new Frontend(authzConfig, ctx_.catalog);

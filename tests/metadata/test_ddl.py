@@ -194,6 +194,22 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/create-database', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
 
+  def test_comment_on_database(self, vector, unique_database):
+    comment = self._get_db_comment(unique_database)
+    assert '' == comment
+
+    self.client.execute("comment on database {0} is 'comment'".format(unique_database))
+    comment = self._get_db_comment(unique_database)
+    assert 'comment' == comment
+
+    self.client.execute("comment on database {0} is ''".format(unique_database))
+    comment = self._get_db_comment(unique_database)
+    assert '' == comment
+
+    self.client.execute("comment on database {0} is null".format(unique_database))
+    comment = self._get_db_comment(unique_database)
+    assert '' == comment
+
   # There is a query in QueryTest/create-table that references nested types, which is not
   # supported if old joins and aggs are enabled. Since we do not get any meaningful
   # additional coverage by running a DDL test under the old aggs and joins, it can be

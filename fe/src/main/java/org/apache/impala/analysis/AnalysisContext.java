@@ -149,6 +149,7 @@ public class AnalysisContext {
     public UpdateStmt getUpdateStmt() { return (UpdateStmt) stmt_; }
     public boolean isDeleteStmt() { return stmt_ instanceof DeleteStmt; }
     public DeleteStmt getDeleteStmt() { return (DeleteStmt) stmt_; }
+    public boolean isCommentOnStmt() { return stmt_ instanceof CommentOnStmt; }
 
     public boolean isCatalogOp() {
       return isUseStmt() || isViewMetadataStmt() || isDdlStmt();
@@ -161,7 +162,8 @@ public class AnalysisContext {
           isAlterViewStmt() || isComputeStatsStmt() || isCreateUdfStmt() ||
           isCreateUdaStmt() || isDropFunctionStmt() || isCreateTableAsSelectStmt() ||
           isCreateDataSrcStmt() || isDropDataSrcStmt() || isDropStatsStmt() ||
-          isCreateDropRoleStmt() || isGrantRevokeStmt() || isTruncateStmt();
+          isCreateDropRoleStmt() || isGrantRevokeStmt() || isTruncateStmt() ||
+          isCommentOnStmt();
     }
 
     private boolean isViewMetadataStmt() {
@@ -347,6 +349,11 @@ public class AnalysisContext {
     public ShowCreateFunctionStmt getShowCreateFunctionStmt() {
       Preconditions.checkState(isShowCreateFunctionStmt());
       return (ShowCreateFunctionStmt) stmt_;
+    }
+
+    public CommentOnStmt getCommentOnStmt() {
+      Preconditions.checkState(isCommentOnStmt());
+      return (CommentOnStmt) stmt_;
     }
 
     public StatementBase getStmt() { return stmt_; }

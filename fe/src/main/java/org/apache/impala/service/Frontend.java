@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
+import org.apache.impala.analysis.CommentOnStmt;
 import org.apache.impala.analysis.CreateDataSrcStmt;
 import org.apache.impala.analysis.CreateDropRoleStmt;
 import org.apache.impala.analysis.CreateUdaStmt;
@@ -98,6 +99,7 @@ import org.apache.impala.thrift.TCatalogOpType;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TCommentOnParams;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlType;
@@ -495,6 +497,14 @@ public class Frontend {
       req.setDdl_type(params.isIs_grant() ?
           TDdlType.GRANT_PRIVILEGE : TDdlType.REVOKE_PRIVILEGE);
       req.setGrant_revoke_priv_params(params);
+      ddl.op_type = TCatalogOpType.DDL;
+      ddl.setDdl_params(req);
+    } else if (analysis.isCommentOnStmt()) {
+      CommentOnStmt commentOnStmt = analysis.getCommentOnStmt();
+      TCommentOnParams params = commentOnStmt.toThrift();
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(TDdlType.COMMENT_ON);
+      req.setComment_on_params(params);
       ddl.op_type = TCatalogOpType.DDL;
       ddl.setDdl_params(req);
     } else {
