@@ -318,9 +318,9 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_cancellation(self):
     """Test cancellation (Ctrl+C event)."""
-    args = '-q "select sleep(10000)"'
+    args = '-q "select sleep(100000)"'
     p = ImpalaShell(args)
-    sleep(3)
+    sleep(6)
     os.kill(p.pid(), signal.SIGINT)
     result = p.get_result()
 
