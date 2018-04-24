@@ -324,6 +324,10 @@ class TestUdfExecution(TestUdfBase):
     drop_another_fn = """drop function if exists {0}.other(float)"""
     udf_path = get_fs_path('/test-warehouse/libTestUdfs.so')
 
+    # Tracks number of impalads prior to tests to check that none have crashed.
+    cluster = ImpalaCluster()
+    exp_num_impalads = len(cluster.impalads)
+
     setup_client = self.create_impala_client()
     setup_query = create_fn_to_use.format(unique_database, udf_path)
     try:
@@ -372,9 +376,11 @@ class TestUdfExecution(TestUdfBase):
     # join all threads.
     for t in runner_threads: t.join();
 
-    # Check for any errors.
     for e in errors: print e
-    assert len(errors) == 0
+
+    # Checks that no impalad has crashed.
+    cluster.refresh()
+    assert len(cluster.impalads) == exp_num_impalads
 
   def test_ir_functions(self, vector, unique_database):
     if vector.get_value('exec_option')['disable_codegen']:
