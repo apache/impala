@@ -39,6 +39,7 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.DecimalColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -109,6 +110,7 @@ import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TCommentOnParams;
 import org.apache.impala.thrift.TCreateDataSourceParams;
 import org.apache.impala.thrift.TCreateDbParams;
 import org.apache.impala.thrift.TCreateDropRoleParams;
@@ -324,6 +326,9 @@ public class CatalogOpExecutor {
       case REVOKE_PRIVILEGE:
         grantRevokeRolePrivilege(requestingUser,
             ddlRequest.getGrant_revoke_priv_params(), response);
+        break;
+      case COMMENT_ON:
+        alterCommentOn(ddlRequest.getComment_on_params(), response);
         break;
       default: throw new IllegalStateException("Unexpected DDL exec request type: " +
           ddlRequest.ddl_type);
@@ -3502,5 +3507,51 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(tbl);
     Preconditions.checkState(tbl.isLoaded());
     return tbl;
+  }
+
+  private void alterCommentOn(TCommentOnParams params, TDdlExecResponse response)
+      throws ImpalaRuntimeException, CatalogException, InternalException {
+    if (params.getDb() != null) {
+      alterCommentOnDb(params.getDb(), params.getComment(), response);
+    }
+  }
+
+  private void alterCommentOnDb(String dbName, String comment, TDdlExecResponse response)
+      throws ImpalaRuntimeException, CatalogException, InternalException {
+    Db db = catalog_.getDb(dbName);
+    if (db == null) {
+      throw new CatalogException("Database: " + db.getName() + " does not exist.");
+    }
+    synchronized (metastoreDdlLock_) {
+      Database msDb = db.getMetaStoreDb();
+      String originalComment = msDb.getDescription();
+      msDb.setDescription(comment);
+      try {
+        applyAlterDatabase(db);
+      } catch (ImpalaRuntimeException e) {
+        msDb.setDescription(originalComment);
+        throw e;
+      }
+    }
+    addDbToCatalogUpdate(db, response.result);
+    addSummary(response, "Updated database.");
+  }
+
+  private void addDbToCatalogUpdate(Db db, TCatalogUpdateResult result) {
+    Preconditions.checkNotNull(db);
+    // Updating the new catalog version and setting it to the DB catalog version while
+    // holding the catalog version lock for an atomic operation. Most DB operations are
+    // short-lived. It is unnecessary to have a fine-grained DB lock.
+    catalog_.getLock().writeLock().lock();
+    try {
+      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+      db.setCatalogVersion(newCatalogVersion);
+      TCatalogObject updatedCatalogObject = db.toTCatalogObject();
+      updatedCatalogObject.setCatalog_version(newCatalogVersion);
+      result.addToUpdated_catalog_objects(updatedCatalogObject);
+      result.setVersion(updatedCatalogObject.getCatalog_version());
+    } finally {
+      catalog_.getLock().writeLock().unlock();
+    }
   }
 }

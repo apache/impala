@@ -3233,9 +3233,9 @@ public class ParserTest extends FrontendTestBase {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: ALTER, COMPUTE, CREATE, DELETE, DESCRIBE, DROP, EXPLAIN, GRANT, " +
-        "INSERT, INVALIDATE, LOAD, REFRESH, REVOKE, SELECT, SET, SHOW, TRUNCATE, " +
-        "UPDATE, UPSERT, USE, VALUES, WITH\n");
+        "Expected: ALTER, COMMENT, COMPUTE, CREATE, DELETE, DESCRIBE, DROP, EXPLAIN, " +
+        "GRANT, INSERT, INVALIDATE, LOAD, REFRESH, REVOKE, SELECT, SET, SHOW, " +
+        "TRUNCATE, UPDATE, UPSERT, USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",
@@ -3735,5 +3735,14 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("CREATE TABLE functional.test_table (col INT);");
     ParsesOk("DESCRIBE functional.alltypes;");
     ParsesOk("SET num_nodes=1;");
+  }
+
+  @Test
+  public void TestCommentOn() {
+    ParsesOk("COMMENT ON DATABASE db IS 'comment'");
+    ParsesOk("COMMENT ON DATABASE db IS ''");
+    ParsesOk("COMMENT ON DATABASE db IS NULL");
+    ParserError("COMMENT ON DATABASE IS 'comment'");
+    ParserError("COMMENT ON DATABASE db IS");
   }
 }

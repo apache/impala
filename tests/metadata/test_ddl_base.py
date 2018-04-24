@@ -87,3 +87,8 @@ class TestDdlBase(ImpalaTestSuite):
           break
         properties[row[1].rstrip()] = row[2].rstrip()
     return properties
+
+  def _get_db_comment(self, db_name):
+    """Extracts the DB comment from the output of DESCRIBE DATABASE"""
+    result = self.client.execute("describe database {0}".format(db_name))
+    return result.data[0].split('\t')[2]
