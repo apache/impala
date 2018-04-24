@@ -10777,7 +10777,7 @@ under the License.
   <keydef href="topics/impala_batch_size.xml" keys="batch_size"/>
   <keydef rev="2.10.0 IMPALA-3200" href="topics/impala_buffer_pool_limit.xml" keys="buffer_pool_limit"/>
   <keydef href="topics/impala_compression_codec.xml" keys="compression_codec"/>
-  <keydef href="topics/impala_compute_stats_min_sample_size.xml" keys="comute_stats_min_sample_size"/>
+  <keydef href="topics/impala_compute_stats_min_sample_size.xml" keys="compute_stats_min_sample_size"/>
   <keydef href="topics/impala_debug_action.xml" keys="debug_action"/>
   <keydef href="topics/impala_default_join_distribution_mode.xml" keys="default_join_distribution_mode"/>
   <keydef href="topics/impala_default_order_by_limit.xml" keys="default_order_by_limit"/>
