@@ -39,6 +39,7 @@ class DescriptorTbl;
 class ObjectPool;
 class RuntimeState;
 class RowBatch;
+class ThreadResourcePool;
 class TPlanNode;
 
 /// Legacy ScanNode implementation used in the non-multi-threaded execution mode
@@ -155,12 +156,14 @@ class HdfsScanNode : public HdfsScanNodeBase {
 
   /// Tries to spin up as many scanner threads as the quota allows. Called explicitly
   /// (e.g., when adding new ranges) or when threads are available for this scan node.
-  void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);
+  void ThreadTokenAvailableCb(ThreadResourcePool* pool);
 
   /// Main function for scanner thread. This thread pulls the next range to be
   /// processed from the IoMgr and then processes the entire range end to end.
   /// This thread terminates when all scan ranges are complete or an error occurred.
-  void ScannerThread();
+  /// 'first_thread' is true if this was the first scanner thread to start and
+  /// it acquired a "required" thread token from ThreadResourceMgr.
+  void ScannerThread(bool first_thread);
 
   /// Process the entire scan range with a new scanner object. Executed in scanner
   /// thread. 'filter_ctxs' is a clone of the class-wide filter_ctxs_, used to filter rows

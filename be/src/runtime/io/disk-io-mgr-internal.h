@@ -27,7 +27,6 @@
 #include "runtime/io/request-context.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/thread-resource-mgr.h"
 #include "util/condition-variable.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"

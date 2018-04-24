@@ -33,7 +33,6 @@
 #include "runtime/io/handle-cache.h"
 #include "runtime/io/local-file-system.h"
 #include "runtime/io/request-ranges.h"
-#include "runtime/thread-resource-mgr.h"
 #include "util/aligned-new.h"
 #include "util/bit-util.h"
 #include "util/condition-variable.h"
