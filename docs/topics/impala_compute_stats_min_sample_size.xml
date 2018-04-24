@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="compute_stats_sample_min_sample_size" rev="2.12.0">
+  <title>COMPUTE_STATS_MIN_SAMPLE_SIZE Query Option</title>
+  <titlealts audience="PDF">
+    <navtitle>COMPUTE_STATS_MIN_SAMPLE_SIZE</navtitle>
+  </titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  <conbody>
+    <p>The <codeph>COMPUTE_STATS_MIN_SAMPLE_SIZE</codeph> query option specifies
+      the minimum number of bytes that will be scanned in <codeph>COMPUTE STATS
+        TABLESAMPLE</codeph>, regardless of the user-supplied sampling percent.
+      This query option prevents sampling for very small tables where accurate
+      stats can be obtained cheaply without sampling because the minimum sample
+      size is required to get meaningful stats.</p>
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+    <p><b>Default:</b> 1GB</p>
+    <p><b>Added in</b>: <keyword keyref="impala212_full"/></p>
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+  </conbody>
+</concept>
