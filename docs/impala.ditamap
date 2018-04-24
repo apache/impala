@@ -175,6 +175,7 @@ under the License.
           <topicref href="topics/impala_batch_size.xml"/>
           <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_buffer_pool_limit.xml"/>
           <topicref href="topics/impala_compression_codec.xml"/>
+          <topicref href="topics/impala_compute_stats_min_sample_size.xml"/>
           <topicref href="topics/impala_debug_action.xml"/>
           <topicref rev="2.9.0" href="topics/impala_decimal_v2.xml"/>
           <topicref rev="2.9.0 IMPALA-5381" href="topics/impala_default_join_distribution_mode.xml"/>
