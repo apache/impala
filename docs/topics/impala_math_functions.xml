@@ -186,8 +186,7 @@ under the License.
           <indexterm audience="hidden">ceil() function</indexterm>
           <b>Purpose:</b> Returns the smallest integer that is greater than or equal to the argument.
           <p>
-            <b>Return type:</b> <codeph>int</codeph> or <codeph>decimal(p,s)</codeph> depending on the type of the
-            input argument
+            <b>Return type:</b> Same as the input value
           </p>
         </dd>
 
@@ -380,8 +379,7 @@ select factorial(-100);
           <indexterm audience="hidden">floor() function</indexterm>
           <b>Purpose:</b> Returns the largest integer that is less than or equal to the argument.
           <p>
-            <b>Return type:</b> <codeph>bigint</codeph> or <codeph>decimal(p,s)</codeph> depending on the type of
-            the input argument
+            <b>Return type:</b> Same as the input type
           </p>
         </dd>
 
@@ -1255,17 +1253,15 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
         <dd>
           <indexterm audience="hidden">round() function</indexterm>
           <indexterm audience="hidden">dround() function</indexterm>
-          <b>Purpose:</b> Rounds a floating-point value. By default (with a single argument), rounds to the nearest
-          integer. Values ending in .5 are rounded up for positive numbers, down for negative numbers (that is,
-          away from zero). The optional second argument specifies how many digits to leave after the decimal point;
-          values greater than zero produce a floating-point return value rounded to the requested number of digits
-          to the right of the decimal point.
+          <b>Purpose:</b> Rounds a floating-point value. By default (with a
+          single argument), rounds to the nearest integer. Values ending in .5
+          are rounded up for positive numbers, down for negative numbers (that
+          is, away from zero). The optional second argument specifies how many
+          digits to leave after the decimal point; values greater than zero
+          produce a floating-point return value rounded to the requested number
+          of digits to the right of the decimal point.
           <p rev="1.4.0">
-            <b>Return type:</b> <codeph>bigint</codeph> for single <codeph>double</codeph> argument.
-            <codeph>double</codeph> for two-argument signature when second argument greater than zero.
-            For <codeph>DECIMAL</codeph> values, the smallest
-            <codeph>DECIMAL(<varname>p</varname>,<varname>s</varname>)</codeph> type with appropriate precision and
-            scale.
+            <b>Return type:</b> Same as the input type
           </p>
         </dd>
 
@@ -1429,8 +1425,7 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
             same function.
           </p>
           <p>
-            <b>Return type:</b> <codeph>decimal</codeph> for <codeph>DECIMAL</codeph> arguments;
-            <codeph>bigint</codeph> for <codeph>DOUBLE</codeph> arguments
+            <b>Return type:</b> Same as the input type
           </p>
           <p>
             <b>Added in:</b> The <codeph>trunc()</codeph> alias was added in
