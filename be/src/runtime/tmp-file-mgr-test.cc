@@ -31,6 +31,7 @@
 #include "service/fe-support.h"
 #include "testutil/gtest-util.h"
 #include "util/condition-variable.h"
+#include "util/cpu-info.h"
 #include "util/filesystem-util.h"
 #include "util/metrics.h"
 
@@ -168,6 +169,9 @@ class TmpFileMgrTest : public ::testing::Test {
     unique_lock<mutex> lock(cb_cv_lock_);
     while (cb_counter_ < val) cb_cv_.Wait(lock);
   }
+
+  /// Implementation of TestBlockVerification(), which is run with different environments.
+  void TestBlockVerification();
 
   ObjectPool obj_pool_;
   scoped_ptr<MetricGroup> metrics_;
@@ -504,6 +508,55 @@ TEST_F(TmpFileMgrTest, TestEncryptionDuringCancellation) {
         << file_path << "@" << pos;
   }
   fclose(file);
+  file_group.Close();
+  test_env_->TearDownQueries();
+}
+
+TEST_F(TmpFileMgrTest, TestBlockVerification) {
+  TestBlockVerification();
+}
+
+TEST_F(TmpFileMgrTest, TestBlockVerificationGcmDisabled) {
+  // Disable AES-GCM to test that errors from non-AES-GCM verification are also correct.
+  CpuInfo::TempDisable t1(CpuInfo::PCLMULQDQ);
+  TestBlockVerification();
+}
+
+void TmpFileMgrTest::TestBlockVerification() {
+  FLAGS_disk_spill_encryption = true;
+  TUniqueId id;
+  TmpFileMgr::FileGroup file_group(test_env_->tmp_file_mgr(), io_mgr(), profile_, id);
+  string data = "the quick brown fox jumped over the lazy dog";
+  MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), data.size());
+
+  // Start a write in flight, which should encrypt the data and write it to disk.
+  unique_ptr<TmpFileMgr::WriteHandle> handle;
+  WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+  ASSERT_OK(file_group.Write(data_mem_range, callback, &handle));
+  string file_path = handle->TmpFilePath();
+
+  WaitForWrite(handle.get());
+  WaitForCallbacks(1);
+
+  // Modify the data in the scratch file and check that a read error occurs.
+  FILE* file = fopen(file_path.c_str(), "rb+");
+  fputc('?', file);
+  fclose(file);
+  vector<uint8_t> tmp;
+  tmp.resize(data.size());
+  Status read_status = file_group.Read(handle.get(), MemRange(tmp.data(), tmp.size()));
+  LOG(INFO) << read_status.GetDetail();
+  EXPECT_EQ(TErrorCode::SCRATCH_READ_VERIFY_FAILED, read_status.code())
+      << read_status.GetDetail();
+
+  // Modify the data in memory. Restoring the data should fail.
+  data[0] = '?';
+  Status restore_status = file_group.RestoreData(move(handle), data_mem_range);
+  LOG(INFO) << restore_status.GetDetail();
+  EXPECT_EQ(TErrorCode::SCRATCH_READ_VERIFY_FAILED, restore_status.code())
+      << restore_status.GetDetail();
+
   file_group.Close();
   test_env_->TearDownQueries();
 }

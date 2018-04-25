@@ -608,15 +608,26 @@ Status TmpFileMgr::WriteHandle::EncryptAndHash(MemRange buffer) {
 
 Status TmpFileMgr::WriteHandle::CheckHashAndDecrypt(MemRange buffer) {
   DCHECK(FLAGS_disk_spill_encryption);
+  DCHECK(write_range_ != nullptr);
   SCOPED_TIMER(encryption_timer_);
 
   // GCM mode will verify the integrity by itself
   if (!key_.IsGcmMode()) {
     if (!hash_.Verify(buffer.data(), buffer.len())) {
-      return Status("Block verification failure");
+      return Status(TErrorCode::SCRATCH_READ_VERIFY_FAILED, buffer.len(),
+        write_range_->file(), GetBackendString(), write_range_->offset());
     }
   }
-  return key_.Decrypt(buffer.data(), buffer.len(), buffer.data());
+  Status decrypt_status = key_.Decrypt(buffer.data(), buffer.len(), buffer.data());
+  if (!decrypt_status.ok()) {
+    // Treat decryption failing as a verification failure, but include extra info from
+    // the decryption status.
+    Status result_status(TErrorCode::SCRATCH_READ_VERIFY_FAILED, buffer.len(),
+          write_range_->file(), GetBackendString(), write_range_->offset());
+    result_status.MergeStatus(decrypt_status);
+    return result_status;
+  }
+  return Status::OK();
 }
 
 string TmpFileMgr::WriteHandle::DebugString() {
