@@ -181,9 +181,11 @@ class TestWebPage(ImpalaTestSuite):
     self.get_and_check_status(self.TABLE_METRICS_URL +
       "?name=%s.%s" % (db_name, tbl_name), metric, ports_to_test=self.CATALOG_TEST_PORT)
 
-  def __run_query_and_get_debug_page(self, query, page_url):
+  def __run_query_and_get_debug_page(self, query, page_url, query_options=None):
     """Runs a query to obtain the content of the debug page pointed to by page_url, then
     cancels the query."""
+    if query_options:
+      self.client.set_configuration(query_options)
     query_handle =  self.client.execute_async(query)
     response_json = ""
     try:
@@ -224,6 +226,16 @@ class TestWebPage(ImpalaTestSuite):
         assert len(response_json['backend_instances']) > 0
       else:
         assert 'backend_instances' not in response_json
+
+  def test_backend_instances_mt_dop(self, unique_database):
+    """Test that accessing /query_finstances does not crash the backend when running with
+    mt_dop."""
+    # vector.get_value('exec_option')['mt_dop'] = 4
+    QUERY = "select * from tpch.lineitem where l_orderkey < 3"
+    QUERY_OPTIONS = dict(mt_dop=4)
+    response_json = self.__run_query_and_get_debug_page(QUERY, self.QUERY_FINSTANCES_URL,
+                                                        QUERY_OPTIONS)
+    assert len(response_json['backend_instances']) > 0
 
   def test_io_mgr_threads(self):
     """Test that IoMgr threads have readable names. This test assumed that all systems we
