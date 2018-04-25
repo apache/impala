@@ -25,8 +25,7 @@ from tests.util.filesystem_utils import IS_S3, IS_ADLS, IS_ISILON
 SLOW_BUILD_TIMEOUT=20000
 DELAY_MS = specific_build_type_timeout(10000, slow_build_timeout=SLOW_BUILD_TIMEOUT)
 # IMPALA-6381: Isilon can behave as a slow build.
-# IMPALA-6811: S3/ADLS can also have a slow scan that requires a longer delay.
-if IS_S3 or IS_ADLS or IS_ISILON:
+if IS_ISILON:
   DELAY_MS = SLOW_BUILD_TIMEOUT
 
 @SkipIfBuildType.not_dev_build
@@ -60,9 +59,20 @@ class TestExchangeDelays(CustomClusterTestSuite):
     """
     self.run_test_case('QueryTest/exchange-delays', vector)
 
-    # Test the special case when no batches are sent and the EOS message times out.
-    # IMPALA-6811: For future reference, the SQL used for this test case requires
-    # that the scan complete before the fragment sends the EOS message. A slow scan can
-    # cause this test to fail, because the receivers could be set up before the
-    # fragment starts sending (and thus can't time out).
+  # The SQL used for test_exchange_large_delay_zero_rows requires that the scan complete
+  # before the fragment sends the EOS message. A slow scan can cause this test to fail,
+  # because the receivers could be set up before the fragment starts sending (and thus
+  # can't time out). Use a longer delay for platforms that have slow scans:
+  # IMPALA-6811: S3/ADLS have slow scans.
+  # IMPALA-6866: Isilon has slow scans (and is counted as a slow build above).
+  SLOW_SCAN_EXTRA_DELAY_MS = 10000
+  if IS_S3 or IS_ADLS or IS_ISILON:
+    DELAY_MS += SLOW_SCAN_EXTRA_DELAY_MS
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      "--stress_datastream_recvr_delay_ms={0}".format(DELAY_MS)
+      + " --datastream_sender_timeout_ms=1")
+  def test_exchange_large_delay_zero_rows(self, vector):
+    """Test the special case when no batches are sent and the EOS message times out."""
     self.run_test_case('QueryTest/exchange-delays-zero-rows', vector)
