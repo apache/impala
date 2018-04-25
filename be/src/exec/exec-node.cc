@@ -68,9 +68,6 @@
 
 using strings::Substitute;
 
-DECLARE_int32(be_port);
-DECLARE_string(hostname);
-
 namespace impala {
 
 const string ExecNode::ROW_THROUGHPUT_COUNTER = "RowsReturnedRate";
