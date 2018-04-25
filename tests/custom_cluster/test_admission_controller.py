@@ -30,6 +30,9 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import specific_build_type_timeout, IMPALAD_BUILD
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import (
+    SkipIfS3,
+    SkipIfADLS)
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -379,6 +382,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       assert re.search("Rejected query from pool default-pool: request memory needed "
           ".* is greater than pool max mem resources 10.00 MB", str(ex))
 
+  @SkipIfS3.hdfs_block_size
+  @SkipIfADLS.hdfs_block_size
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,
@@ -386,7 +391,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       statestored_args=_STATESTORED_ARGS)
   def test_memory_rejection(self, vector):
     """Test that rejection of queries based on reservation and estimates works as
-    expected."""
+    expected. The test depends on scanner memory estimates, which different on remote
+    filesystems with different (synthetic) block sizes."""
     # Test that the query will be rejected by admission control if:
     # a) the largest per-backend min buffer reservation is larger than the query mem limit
     # b) the largest per-backend min buffer reservation is larger than the
