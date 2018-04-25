@@ -616,7 +616,6 @@ void Coordinator::BackendState::InstanceStatsToJson(Value* value, Document* docu
       elem.second->ToJson(&val, document);
       instance_stats.PushBack(val, document->GetAllocator());
     }
-    DCHECK_EQ(instance_stats.Size(), fragments_.size());
   }
   value->AddMember("instance_stats", instance_stats, document->GetAllocator());
 
