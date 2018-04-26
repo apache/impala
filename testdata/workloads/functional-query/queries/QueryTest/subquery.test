@@ -836,3 +836,17 @@ WHERE EXISTS
 ---- TYPES
 TINYINT
 ====
+---- QUERY
+# EXISTS subquery containing ORDER BY, LIMIT, and OFFSET (IMPALA-6934)
+SELECT count(*)
+FROM functional.alltypestiny t
+WHERE EXISTS
+  (SELECT id
+   FROM functional.alltypestiny
+   WHERE id < 5
+   ORDER BY id LIMIT 10 OFFSET 6)
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
