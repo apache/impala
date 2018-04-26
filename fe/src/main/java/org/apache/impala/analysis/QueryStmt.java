@@ -382,7 +382,7 @@ public abstract class QueryStmt extends StatementBase {
     Preconditions.checkState(limit >= 0);
     long newLimit = hasLimit() ? Math.min(limit, getLimit()) : limit;
     limitElement_ = new LimitElement(new NumericLiteral(Long.toString(newLimit),
-        Type.BIGINT), null);
+        Type.BIGINT), limitElement_.getOffsetExpr());
   }
 
   /**

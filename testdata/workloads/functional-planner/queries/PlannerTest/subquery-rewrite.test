@@ -2318,3 +2318,24 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 files=24 size=478.45KB
 ====
+# EXISTS subquery containing ORDER BY, LIMIT, and OFFSET (IMPALA-6934)
+select count(*) from functional.alltypestiny t where exists
+(select id from functional.alltypestiny where id < 5 order by id limit 10 offset 6)
+---- PLAN
+PLAN-ROOT SINK
+|
+04:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+03:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|
+|--00:SCAN HDFS [functional.alltypestiny t]
+|     partitions=4/4 files=4 size=460B
+|
+02:TOP-N [LIMIT=1 OFFSET=6]
+|  order by: id ASC
+|
+01:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+   predicates: id < 5
+====
