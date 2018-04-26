@@ -681,3 +681,19 @@ else
   unset `grep export "${MINIKDC_ENV}" | sed "s/.*export \([^=]*\)=.*/\1/" \
       | sort | uniq`
 fi
+
+if [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 3 ]]; then
+  # Check for minimum required Java version
+  # Only issue Java version warning when running Java 7.
+  if $JAVA -version 2>&1 | grep -q 'java version "1.7'; then
+    cat << EOF
+
+WARNING: Your development environment is configured for Hadoop 3 and Java 7. Hadoop 3
+requires at least Java 8. Your JAVA binary currently points to $JAVA
+and reports the following version:
+
+EOF
+    $JAVA -version
+    echo
+  fi
+fi
