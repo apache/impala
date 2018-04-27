@@ -230,6 +230,13 @@ class DictEncoder : public DictEncoderBase {
   int AddToTable(const T& value, NodeIndex* bucket);
 };
 
+/// Number of decoded values to buffer at a time. A multiple of 32 is chosen to allow
+/// efficient reading in batches from data_decoder_. Increasing the batch size up to
+/// 128 seems to improve performance, but increasing further did not make a noticeable
+/// difference. Defined outside DictDecoderBase to get static linkage because there is
+/// no dict-encoding.cc file.
+static constexpr int32_t DICT_DECODER_BUFFER_SIZE = 128;
+
 /// Decoder class for dictionary encoded data. This class does not allocate any
 /// buffers. The input buffers (dictionary buffer and RLE buffer) must be maintained
 /// by the caller and valid as long as this object is.
@@ -274,12 +281,6 @@ class DictDecoderBase {
   }
 
  protected:
-  /// Number of decoded values to buffer at a time. A multiple of 32 is chosen to allow
-  /// efficient reading in batches from data_decoder_. Increasing the batch size up to
-  /// 128 seems to improve performance, but increasing further did not make a noticeable
-  /// difference.
-  static const int DECODED_BUFFER_SIZE = 128;
-
   RleBatchDecoder<uint32_t> data_decoder_;
 
   /// Greater than zero if we've started decoding a repeated run.
@@ -362,7 +363,7 @@ class DictDecoder : public DictDecoderBase {
   /// a repeated run, the first element is the current dict value. If in a literal run,
   /// this contains 'num_literal_values_' values, with the next value to be returned at
   /// 'next_literal_idx_'.
-  T decoded_values_[DECODED_BUFFER_SIZE];
+  T decoded_values_[DICT_DECODER_BUFFER_SIZE];
 
   /// Slow path for GetNextValue() where we need to decode new values. Should not be
   /// inlined everywhere.
@@ -450,7 +451,8 @@ template <typename T>
 bool DictDecoder<T>::DecodeNextValue(T* value) {
   // IMPALA-959: Use memcpy() instead of '=' to set *value: addresses are not always 16
   // byte aligned for Decimal16Values.
-  uint32_t num_repeats = data_decoder_.NextNumRepeats();
+  int32_t num_repeats = data_decoder_.NextNumRepeats();
+  DCHECK_GE(num_repeats, 0);
   if (num_repeats > 0) {
     uint32_t idx = data_decoder_.GetRepeatedValue(num_repeats);
     if (UNLIKELY(idx >= dict_.size())) return false;
@@ -459,10 +461,11 @@ bool DictDecoder<T>::DecodeNextValue(T* value) {
     num_repeats_ = num_repeats - 1;
     return true;
   } else {
-    uint32_t num_literals = data_decoder_.NextNumLiterals();
+    int32_t num_literals = data_decoder_.NextNumLiterals();
     if (UNLIKELY(num_literals == 0)) return false;
 
-    uint32_t num_to_decode = std::min<uint32_t>(num_literals, DECODED_BUFFER_SIZE);
+    DCHECK_GT(num_literals, 0);
+    int32_t num_to_decode = std::min(num_literals, DICT_DECODER_BUFFER_SIZE);
     if (UNLIKELY(!data_decoder_.DecodeLiteralValues(
             num_to_decode, dict_.data(), dict_.size(), &decoded_values_[0]))) {
       return false;

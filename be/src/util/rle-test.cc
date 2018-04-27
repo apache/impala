@@ -484,6 +484,45 @@ TEST(Rle, ZeroLiteralOrRepeatCount) {
   }
 }
 
+// Regression test for handing of repeat counts >= 2^31: IMPALA-6946.
+TEST(Rle, RepeatCountOverflow) {
+  const int BUFFER_LEN = 1024;
+  uint8_t buffer[BUFFER_LEN];
+
+  for (bool literal_run : {true, false}) {
+    memset(buffer, 0, BUFFER_LEN);
+    LOG(INFO) << "Testing negative " << (literal_run ? "literal" : "repeated");
+    BitWriter writer(buffer, BUFFER_LEN);
+    // Literal runs have lowest bit 1. Repeated runs have lowest bit 0. All other bits
+    // are 1.
+    const uint32_t REPEATED_RUN_HEADER = 0xfffffffe;
+    const uint32_t LITERAL_RUN_HEADER = 0xffffffff;
+    writer.PutUleb128Int(literal_run ? LITERAL_RUN_HEADER : REPEATED_RUN_HEADER);
+    writer.Flush();
+
+    RleBatchDecoder<uint64_t> decoder(buffer, BUFFER_LEN, 1);
+    // Repeated run length fits in an int32_t.
+    if (literal_run) {
+      EXPECT_EQ(0, decoder.NextNumRepeats()) << "Not a repeated run";
+      // Literal run length would overflow int32_t - should gracefully fail decoding.
+      EXPECT_EQ(0, decoder.NextNumLiterals());
+    } else {
+      EXPECT_EQ(0x7fffffff, decoder.NextNumRepeats());
+      EXPECT_EQ(0, decoder.NextNumLiterals()) << "Not a literal run";
+    }
+
+    // IMPALA-6946: reading back run lengths that don't fit in int32_t hit various
+    // DCHECKs.
+    uint64_t val;
+    if (literal_run) {
+      EXPECT_EQ(0, decoder.GetValues(1, &val)) << "Decoding failed above.";
+    } else {
+      EXPECT_EQ(1, decoder.GetValues(1, &val));
+      EXPECT_EQ(0, val) << "Buffer was initialized with all zeroes";
+    }
+  }
+}
+
 }
 
 IMPALA_TEST_MAIN();

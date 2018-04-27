@@ -61,11 +61,10 @@ class BitWriter {
   template<typename T>
   bool PutAligned(T v, int num_bytes);
 
-  /// Write a Vlq encoded int to the buffer.  Returns false if there was not enough
-  /// room.  The value is written byte aligned.
-  /// For more details on vlq:
-  /// en.wikipedia.org/wiki/Variable-length_quantity
-  bool PutVlqInt(int32_t v);
+  /// Write an unsigned ULEB-128 encoded int to the buffer. Return false if there was not
+  /// enough room. The value is written byte aligned. For more details on ULEB-128:
+  /// https://en.wikipedia.org/wiki/LEB128
+  bool PutUleb128Int(uint32_t v);
 
   /// Get a pointer to the next aligned byte and advance the underlying buffer
   /// by num_bytes.
@@ -148,10 +147,11 @@ class BatchedBitReader {
   template<typename T>
   bool GetBytes(int num_bytes, T* v);
 
-  /// Reads a vlq encoded int from the stream.  The encoded int must start at the
-  /// beginning of a byte. Return false if there were not enough bytes in the buffer or
-  /// the int is invalid.
-  bool GetVlqInt(int32_t* v);
+  /// Read an unsigned ULEB-128 encoded int from the stream. The encoded int must start
+  /// at the beginning of a byte. Return false if there were not enough bytes in the
+  /// buffer or the int is invalid. For more details on ULEB-128:
+  /// https://en.wikipedia.org/wiki/LEB128
+  bool GetUleb128Int(uint32_t* v);
 
   /// Returns the number of bytes left in the stream.
   int bytes_left() { return buffer_end_ - buffer_pos_; }
