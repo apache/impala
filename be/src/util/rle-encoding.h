@@ -323,7 +323,8 @@ inline bool RleEncoder::Put(uint64_t value) {
   DCHECK(bit_width_ == 64 || value < (1LL << bit_width_));
   if (UNLIKELY(buffer_full_)) return false;
 
-  if (LIKELY(current_value_ == value)) {
+  if (LIKELY(current_value_ == value
+      && repeat_count_ <= std::numeric_limits<int32_t>::max())) {
     ++repeat_count_;
     if (repeat_count_ > 8) {
       // This is just a continuation of the current run, no need to buffer the
@@ -333,8 +334,9 @@ inline bool RleEncoder::Put(uint64_t value) {
     }
   } else {
     if (repeat_count_ >= 8) {
-      // We had a run that was long enough but it has ended.  Flush the
-      // current repeated run.
+      // We had a run that was long enough but it ended, either because of a different
+      // value or because it exceeded the maximum run length. Flush the current repeated
+      // run.
       DCHECK_EQ(literal_count_, 0);
       FlushRepeatedRun();
     }
@@ -384,8 +386,8 @@ inline void RleEncoder::FlushRepeatedRun() {
   DCHECK_GT(repeat_count_, 0);
   bool result = true;
   // The lsb of 0 indicates this is a repeated run
-  int32_t indicator_value = repeat_count_ << 1 | 0;
-  result &= bit_writer_.PutVlqInt(indicator_value);
+  uint32_t indicator_value = static_cast<uint32_t>(repeat_count_) << 1;
+  result &= bit_writer_.PutUleb128Int(indicator_value);
   result &= bit_writer_.PutAligned(current_value_, BitUtil::Ceil(bit_width_, 8));
   DCHECK(result);
   num_buffered_values_ = 0;
@@ -603,21 +605,28 @@ inline void RleBatchDecoder<T>::NextCounts() {
   DCHECK_EQ(0, literal_count_);
   DCHECK_EQ(0, repeat_count_);
   // Read the next run's indicator int, it could be a literal or repeated run.
-  // The int is encoded as a vlq-encoded value.
-  int32_t indicator_value = 0;
-  if (UNLIKELY(!bit_reader_.GetVlqInt(&indicator_value))) return;
+  // The int is encoded as a ULEB128-encoded value.
+  uint32_t indicator_value = 0;
+  if (UNLIKELY(!bit_reader_.GetUleb128Int(&indicator_value))) return;
 
   // lsb indicates if it is a literal run or repeated run
   bool is_literal = indicator_value & 1;
+  // Don't try to handle run lengths that don't fit in an int32_t - just fail gracefully.
+  // The Parquet standard does not allow longer runs - see PARQUET-1290.
+  uint32_t run_len = indicator_value >> 1;
+  DCHECK_LE(run_len, std::numeric_limits<int32_t>::max())
+      << "Right-shifted uint32_t should fit in int32_t";
   if (is_literal) {
-    literal_count_ = (indicator_value >> 1) * 8;
+    // Use int64_t to avoid overflowing multiplication.
+    int64_t literal_count = static_cast<int64_t>(run_len) * 8;
+    if (UNLIKELY(literal_count > std::numeric_limits<int32_t>::max())) return;
+    literal_count_ = literal_count;
   } else {
-    int32_t repeat_count = indicator_value >> 1;
-    if (UNLIKELY(repeat_count == 0)) return;
+    if (UNLIKELY(run_len == 0)) return;
     bool result =
         bit_reader_.GetBytes<T>(BitUtil::Ceil(bit_width_, 8), &repeated_value_);
     if (UNLIKELY(!result)) return;
-    repeat_count_ = repeat_count;
+    repeat_count_ = run_len;
   }
 }
 
@@ -668,10 +677,10 @@ inline int32_t RleBatchDecoder<T>::GetValues(int32_t num_values_to_consume, T* v
   int32_t num_consumed = 0;
   while (num_consumed < num_values_to_consume) {
     // Add RLE encoded values by repeating the current value this number of times.
-    uint32_t num_repeats = NextNumRepeats();
+    int32_t num_repeats = NextNumRepeats();
     if (num_repeats > 0) {
-       uint32_t num_repeats_to_set =
-           std::min<uint32_t>(num_repeats, num_values_to_consume - num_consumed);
+       int32_t num_repeats_to_set =
+           std::min(num_repeats, num_values_to_consume - num_consumed);
        T repeated_value = GetRepeatedValue(num_repeats_to_set);
        for (int i = 0; i < num_repeats_to_set; ++i) {
          values[num_consumed + i] = repeated_value;
@@ -681,10 +690,10 @@ inline int32_t RleBatchDecoder<T>::GetValues(int32_t num_values_to_consume, T* v
     }
 
     // Add remaining literal values, if any.
-    uint32_t num_literals = NextNumLiterals();
+    int32_t num_literals = NextNumLiterals();
     if (num_literals == 0) break;
-    uint32_t num_literals_to_set =
-        std::min<uint32_t>(num_literals, num_values_to_consume - num_consumed);
+    int32_t num_literals_to_set =
+        std::min(num_literals, num_values_to_consume - num_consumed);
     if (!GetLiteralValues(num_literals_to_set, values + num_consumed)) {
       return 0;
     }

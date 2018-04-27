@@ -76,7 +76,7 @@ inline bool BitWriter::PutAligned(T val, int num_bytes) {
   return true;
 }
 
-inline bool BitWriter::PutVlqInt(int32_t v) {
+inline bool BitWriter::PutUleb128Int(uint32_t v) {
   bool result = true;
   while ((v & 0xFFFFFF80) != 0L) {
     result &= PutAligned<uint8_t>((v & 0x7F) | 0x80, 1);
@@ -135,7 +135,7 @@ inline bool BatchedBitReader::GetBytes(int num_bytes, T* v) {
   return true;
 }
 
-inline bool BatchedBitReader::GetVlqInt(int32_t* v) {
+inline bool BatchedBitReader::GetUleb128Int(uint32_t* v) {
   *v = 0;
   int shift = 0;
   uint8_t byte = 0;
