@@ -183,7 +183,9 @@ function build_impdev() {
   # Note that IMPALA-6494 prevents us from using shared library builds,
   # which are smaller and thereby speed things up. We use "-notests"
   # to avoid building backend tests, which are sizable, and
-  # can be built when executing those tests.
+  # can be built when executing those tests. We use "-noclean" to
+  # avoid deleting the log for this invocation which is in logs/,
+  # and, this is a first build anyway.
   ./buildall.sh -noclean -format -testdata -notests
 
   # Dump current memory usage to logs, before shutting things down.
@@ -257,8 +259,13 @@ function test_suite() {
   boot_container
   impala_environment
 
+  if [[ ${REBUILD_ASAN:-false} = true ]]; then
+    # Note: we're not redoing data loading.
+    SKIP_TOOLCHAIN_BOOTSTRAP=true ./buildall.sh -noclean -notests -asan
+  fi
+
   # BE tests don't require the minicluster, so we can run them directly.
-  if [[ $1 = BE_TEST ]]; then
+  if [[ $1 = BE_TEST* ]]; then
     make -j$(nproc) --load-average=$(nproc) be-test be-benchmarks
     if ! bin/run-backend-tests.sh; then
       echo "Tests $1 failed!"
