@@ -113,6 +113,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 if __name__ == '__main__' and __package__ is None:
@@ -178,6 +179,8 @@ def main():
   parser.add_argument('--ccache-dir', metavar='DIR',
                       help="CCache directory to use",
                       default=os.path.expanduser("~/.ccache"))
+  parser.add_argument('--tail', action="store_true",
+      help="Run tail on all container log files.")
   parser.add_argument('--test', action="store_true")
   args = parser.parse_args()
 
@@ -193,7 +196,8 @@ def main():
       cleanup_image=args.cleanup_image, ccache_dir=args.ccache_dir, test_mode=args.test,
       parallel_test_concurrency=args.parallel_test_concurrency,
       suite_concurrency=args.suite_concurrency,
-      impalad_mem_limit_bytes=args.impalad_mem_limit_bytes)
+      impalad_mem_limit_bytes=args.impalad_mem_limit_bytes,
+      tail=args.tail)
 
   fh = logging.FileHandler(os.path.join(_make_dir_if_not_exist(t.log_dir), "log.txt"))
   fh.setFormatter(logging.Formatter(LOG_FORMAT))
@@ -296,6 +300,12 @@ class Suite(object):
     r.timeout_minutes = 240
     return r
 
+  def asan(self):
+    """Returns an ASAN copy of this suite."""
+    r = self.copy(self.name + "_ASAN", REBUILD_ASAN="true")
+    r.timeout_minutes = self.timeout_minutes * 2.0 + 10
+    return r
+
   def sharded(self, shards):
     """Returns a list of sharded copies of the list.
 
@@ -311,6 +321,7 @@ class Suite(object):
     return ret
 
 # Definitions of all known suites:
+be_test = Suite("BE_TEST")
 ee_test_serial = Suite("EE_TEST_SERIAL", EE_TEST="true",
     RUN_TESTS_ARGS="--skip-parallel --skip-stress")
 ee_test_serial.shard_at_concurrency = 4
@@ -339,6 +350,13 @@ OTHER_SUITES = [
     ee_test_parallel_exhaustive,
     ee_test_serial_exhaustive,
     cluster_test_exhaustive,
+
+    # ASAN
+    be_test.asan(),
+    cluster_test.asan(),
+    ee_test_parallel.asan(),
+    ee_test_serial.asan(),
+
     Suite("RAT_CHECK"),
     # These are used for testing this script
     Suite("NOOP"),
@@ -388,6 +406,9 @@ class Container(object):
     self.end = None
     self.removed = False
 
+    # Protects multiple calls to "docker rm <self.id>"
+    self.lock = threading.Lock()
+
     # Updated by Timeline class
     self.total_user_cpu = -1
     self.total_system_cpu = -1
@@ -409,7 +430,7 @@ class TestWithDocker(object):
   def __init__(self, build_image, suite_names, name, cleanup_containers,
                cleanup_image, ccache_dir, test_mode,
                suite_concurrency, parallel_test_concurrency,
-               impalad_mem_limit_bytes):
+               impalad_mem_limit_bytes, tail):
     self.build_image = build_image
     self.name = name
     self.containers = []
@@ -442,6 +463,7 @@ class TestWithDocker(object):
     self.suite_concurrency = suite_concurrency
     self.parallel_test_concurrency = parallel_test_concurrency
     self.impalad_mem_limit_bytes = impalad_mem_limit_bytes
+    self.tail = tail
 
     # Map suites back into objects; we ignore case for this mapping.
     suites = []
@@ -518,8 +540,13 @@ class TestWithDocker(object):
     run through annotate.py to add timestamps and saved into the container's log file.
     """
     container.running = True
+    tailer = None
 
-    with file(container.logfile, "w") as log_output:
+    with open(container.logfile, "aw") as log_output:
+      if self.tail:
+        tailer = subprocess.Popen(
+            ["tail", "-f", "--pid", str(os.getpid()), "-v", container.logfile])
+
       container.start = time.time()
       # Sets up a "docker start ... | annotate.py > logfile" pipeline using
       # subprocess.
@@ -542,6 +569,8 @@ class TestWithDocker(object):
       container.exitcode = ret
       container.running = False
       container.end = time.time()
+      if tailer:
+        tailer.kill()
       return ret == 0
 
   @staticmethod
@@ -555,8 +584,13 @@ class TestWithDocker(object):
   @staticmethod
   def _rm_container(container):
     """Removes container."""
-    if not container.removed:
-      _call(["docker", "rm", container.id], check=False)
+    # We can have multiple threads trying to call "docker rm" on a container.
+    # Docker will fail one of those with "already running", but we actually
+    # want to block until it's removed. Using a lock to serialize the "docker # rm"
+    # calls handles that.
+    with container.lock:
+      if not container.removed:
+        _call(["docker", "rm", container.id], check=False)
       container.removed = True
 
   def _create_build_image(self):
