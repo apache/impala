@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/io/disk-io-mgr-internal.h"
 #include "util/error-util.h"
@@ -206,7 +207,7 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
     buffer_desc->scan_range_offset_ = bytes_read_ - buffer_desc->len_;
 
     COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, buffer_desc->len_);
-    COUNTER_ADD(&io_mgr_->total_bytes_read_counter_, buffer_desc->len_);
+    COUNTER_ADD(io_mgr_->total_bytes_read_counter(), buffer_desc->len_);
     COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, -1L);
   }
 
@@ -215,7 +216,7 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
   if (!read_status.ok()) {
     // Free buffer to release resources before we cancel the range so that all buffers
     // are freed at cancellation.
-    reader_->FreeBuffer(buffer_desc.get());
+    buffer_desc->Free();
     buffer_desc.reset();
 
     // Propagate 'read_status' to the scan range. This will also wake up any waiting
@@ -250,7 +251,7 @@ void ScanRange::CleanUpBuffer(
   DCHECK(scan_range_lock.mutex() == &lock_ && scan_range_lock.owns_lock());
   DCHECK(buffer_desc != nullptr);
   DCHECK_EQ(this, buffer_desc->scan_range_);
-  buffer_desc->reader_->FreeBuffer(buffer_desc.get());
+  buffer_desc->Free();
 
   if (all_buffers_returned(scan_range_lock) && num_buffers_in_reader_.Load() == 0) {
     // Close the scan range if there are no more buffers in the reader and no more buffers
@@ -593,7 +594,7 @@ Status ScanRange::Read(
     int64_t max_chunk_size = MaxReadChunkSize();
     Status status = Status::OK();
     {
-      ScopedTimer<MonotonicStopWatch> io_mgr_read_timer(&io_mgr_->read_timer_);
+      ScopedTimer<MonotonicStopWatch> io_mgr_read_timer(io_mgr_->read_timer());
       ScopedTimer<MonotonicStopWatch> req_context_read_timer(reader_->read_timer_);
       while (*bytes_read < bytes_to_read) {
         int chunk_size = min(bytes_to_read - *bytes_read, max_chunk_size);
@@ -716,7 +717,7 @@ Status ScanRange::ReadFromCache(
     DCHECK(exclusive_hdfs_fh_ != nullptr);
     DCHECK(external_buffer_tag_ == ExternalBufferTag::NO_BUFFER);
     cached_buffer_ =
-      hadoopReadZero(exclusive_hdfs_fh_->file(), io_mgr_->cached_read_options_, len());
+      hadoopReadZero(exclusive_hdfs_fh_->file(), io_mgr_->cached_read_options(), len());
     if (cached_buffer_ != nullptr) {
       external_buffer_tag_ = ExternalBufferTag::CACHED_BUFFER;
     }
@@ -774,4 +775,44 @@ void ScanRange::GetHdfsStatistics(hdfsFile hdfs_file) {
     }
     hdfsFileClearReadStatistics(hdfs_file);
   }
+}
+
+BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr,
+    RequestContext* reader, ScanRange* scan_range, uint8_t* buffer,
+    int64_t buffer_len)
+  : io_mgr_(io_mgr),
+    reader_(reader),
+    scan_range_(scan_range),
+    buffer_(buffer),
+    buffer_len_(buffer_len) {
+  DCHECK(io_mgr != nullptr);
+  DCHECK(scan_range != nullptr);
+  DCHECK(buffer != nullptr);
+  DCHECK_GE(buffer_len, 0);
+}
+
+BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr, RequestContext* reader,
+    ScanRange* scan_range, BufferPool::ClientHandle* bp_client,
+    BufferPool::BufferHandle handle) :
+  io_mgr_(io_mgr),
+  reader_(reader),
+  scan_range_(scan_range),
+  buffer_(handle.data()),
+  buffer_len_(handle.len()),
+  bp_client_(bp_client),
+  handle_(move(handle)) {
+  DCHECK(io_mgr != nullptr);
+  DCHECK(scan_range != nullptr);
+  DCHECK(bp_client_->is_registered());
+  DCHECK(handle_.is_open());
+}
+
+void BufferDescriptor::Free() {
+  DCHECK(buffer_ != nullptr);
+  if (!is_cached() && !is_client_buffer()) {
+    // Only buffers that were allocated by DiskIoMgr need to be freed.
+    ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
+        bp_client_, &handle_);
+  }
+  buffer_ = nullptr;
 }

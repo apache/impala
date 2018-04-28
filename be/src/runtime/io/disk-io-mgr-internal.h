@@ -21,17 +21,11 @@
 #include <unistd.h>
 #include <queue>
 #include <boost/thread/locks.hpp>
-#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "runtime/io/request-context.h"
 #include "runtime/io/disk-io-mgr.h"
-#include "runtime/mem-tracker.h"
 #include "util/condition-variable.h"
-#include "util/cpu-info.h"
-#include "util/debug-util.h"
-#include "util/disk-info.h"
-#include "util/filesystem-util.h"
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
 #include "util/runtime-profile-counters.h"
@@ -63,36 +57,66 @@ static inline bool is_file_handle_caching_enabled() {
   return FLAGS_max_cached_file_handles > 0;
 }
 
-/// Per disk state
-struct DiskQueue {
-  /// Disk id (0-based)
-  int disk_id;
+/// Global queue of requests for a disk. One or more disk threads pull requests off
+/// a given queue. RequestContexts are scheduled in round-robin order to provide some
+/// level of fairness between RequestContexts.
+class DiskQueue {
+ public:
+  DiskQueue(int disk_id) : disk_id_(disk_id) {}
+  // Destructor is only run in backend tests - in a daemon the singleton DiskIoMgr
+  // is not destroyed.
+  ~DiskQueue();
 
-  /// Lock that protects access to 'request_contexts' and 'work_available'
-  boost::mutex lock;
+  /// Disk worker thread loop. This function retrieves the next range to process on
+  /// the disk queue and invokes ScanRange::DoRead() or Write() depending on the type
+  /// of Range. There can be multiple threads per disk running this loop.
+  void DiskThreadLoop(DiskIoMgr* io_mgr);
+
+  /// Enqueue the request context to the disk queue.
+  void EnqueueContext(RequestContext* worker) {
+    {
+      boost::unique_lock<boost::mutex> disk_lock(lock_);
+      // Check that the reader is not already on the queue
+      DCHECK(find(request_contexts_.begin(), request_contexts_.end(), worker) ==
+          request_contexts_.end());
+      request_contexts_.push_back(worker);
+    }
+    work_available_.NotifyAll();
+  }
+
+  /// Signals that disk threads for this queue should stop processing new work and
+  /// terminate once done.
+  void ShutDown();
+
+  /// Append debug string to 'ss'. Acquires the DiskQueue lock.
+  void DebugString(std::stringstream* ss);
+
+ private:
+  /// Called from the disk thread to get the next range to process. Wait until a scan
+  /// is available to process, a write range is available, or 'shut_down_' is set to
+  /// true. Returns the range to process and the RequestContext that the range belongs
+  /// to. Only returns NULL if the disk thread should be shut down.
+  RequestRange* GetNextRequestRange(RequestContext** request_context);
+
+  /// Disk id (0-based)
+  const int disk_id_;
+
+  /// Lock that protects below members.
+  boost::mutex lock_;
 
   /// Condition variable to signal the disk threads that there is work to do or the
   /// thread should shut down.  A disk thread will be woken up when there is a reader
   /// added to the queue. A reader is only on the queue when it has at least one
   /// scan range that is not blocked on available buffers.
-  ConditionVariable work_available;
+  ConditionVariable work_available_;
 
   /// list of all request contexts that have work queued on this disk
-  std::list<RequestContext*> request_contexts;
+  std::list<RequestContext*> request_contexts_;
 
-  /// Enqueue the request context to the disk queue.  The DiskQueue lock must not be taken.
-  inline void EnqueueContext(RequestContext* worker) {
-    {
-      boost::unique_lock<boost::mutex> disk_lock(lock);
-      /// Check that the reader is not already on the queue
-      DCHECK(find(request_contexts.begin(), request_contexts.end(), worker) ==
-          request_contexts.end());
-      request_contexts.push_back(worker);
-    }
-    work_available.NotifyAll();
-  }
-
-  DiskQueue(int id) : disk_id(id) {}
+  /// True if the IoMgr should be torn down. Worker threads check this when dequeueing
+  /// from 'request_contexts_' and terminate themselves once it is true. Only used in
+  /// backend tests - in a daemon the singleton DiskIOMgr is never shut down.
+  bool shut_down_ = false;
 };
 }
 }

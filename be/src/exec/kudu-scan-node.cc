@@ -24,6 +24,7 @@
 #include "exprs/scalar-expr.h"
 #include "gutil/gscoped_ptr.h"
 #include "runtime/fragment-instance-state.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/mem-pool.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"

@@ -234,6 +234,7 @@ REMOVED_FLAG(llama_port);
 REMOVED_FLAG(llama_registration_timeout_secs);
 REMOVED_FLAG(llama_registration_wait_secs);
 REMOVED_FLAG(local_nodemanager_url);
+REMOVED_FLAG(max_free_io_buffers);
 REMOVED_FLAG(resource_broker_cnxn_attempts);
 REMOVED_FLAG(resource_broker_cnxn_retry_interval_ms);
 REMOVED_FLAG(resource_broker_recv_timeout);

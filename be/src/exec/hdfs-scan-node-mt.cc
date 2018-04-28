@@ -19,6 +19,7 @@
 
 #include <sstream>
 
+#include "exec/scanner-context.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "util/debug-util.h"

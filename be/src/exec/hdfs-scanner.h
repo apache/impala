@@ -30,6 +30,7 @@
 #include "common/status.h"
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/scanner-context.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple.h"
 

@@ -24,46 +24,6 @@
 using namespace impala;
 using namespace impala::io;
 
-BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr,
-    RequestContext* reader, ScanRange* scan_range, uint8_t* buffer,
-    int64_t buffer_len)
-  : io_mgr_(io_mgr),
-    reader_(reader),
-    scan_range_(scan_range),
-    buffer_(buffer),
-    buffer_len_(buffer_len) {
-  DCHECK(io_mgr != nullptr);
-  DCHECK(scan_range != nullptr);
-  DCHECK(buffer != nullptr);
-  DCHECK_GE(buffer_len, 0);
-}
-
-BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr, RequestContext* reader,
-    ScanRange* scan_range, BufferPool::ClientHandle* bp_client,
-    BufferPool::BufferHandle handle) :
-  io_mgr_(io_mgr),
-  reader_(reader),
-  scan_range_(scan_range),
-  buffer_(handle.data()),
-  buffer_len_(handle.len()),
-  bp_client_(bp_client),
-  handle_(move(handle)) {
-  DCHECK(io_mgr != nullptr);
-  DCHECK(scan_range != nullptr);
-  DCHECK(bp_client_->is_registered());
-  DCHECK(handle_.is_open());
-}
-
-void RequestContext::FreeBuffer(BufferDescriptor* buffer) {
-  DCHECK(buffer->buffer_ != nullptr);
-  if (!buffer->is_cached() && !buffer->is_client_buffer()) {
-    // Only buffers that were allocated by DiskIoMgr need to be freed.
-    ExecEnv::GetInstance()->buffer_pool()->FreeBuffer(
-        buffer->bp_client_, &buffer->handle_);
-  }
-  buffer->buffer_ = nullptr;
-}
-
 void RequestContext::ReadDone(int disk_id, ReadOutcome outcome, ScanRange* range) {
   // TODO: IMPALA-4249: it is safe to touch 'range' until DecrementDiskThread() is
   // called because all clients of DiskIoMgr keep ScanRange objects alive until they
@@ -140,13 +100,13 @@ void RequestContext::Cancel() {
       RequestRange* range;
       while ((range = disk_state.in_flight_ranges()->Dequeue()) != nullptr) {
         if (range->request_type() == RequestType::WRITE) {
-          write_callbacks.push_back(static_cast<WriteRange*>(range)->callback_);
+          write_callbacks.push_back(static_cast<WriteRange*>(range)->callback());
         }
       }
       while (disk_state.unstarted_scan_ranges()->Dequeue() != nullptr);
       WriteRange* write_range;
       while ((write_range = disk_state.unstarted_write_ranges()->Dequeue()) != nullptr) {
-        write_callbacks.push_back(write_range->callback_);
+        write_callbacks.push_back(write_range->callback());
       }
     }
     // Clear out the lists of scan ranges.
@@ -248,6 +208,76 @@ void RequestContext::RemoveActiveScanRangeLocked(
   active_scan_ranges_.erase(range);
 }
 
+// This function gets the next RequestRange to work on for this RequestContext and disk
+// combination this disk. It checks for cancellation and:
+// a) Updates ready_to_start_ranges if there are no scan ranges queued for this disk.
+// b) Adds an unstarted write range to in_flight_ranges_. The write range is processed
+//    immediately if there are no preceding scan ranges in in_flight_ranges_
+RequestRange* RequestContext::GetNextRequestRange(int disk_id) {
+  PerDiskState* request_disk_state = &disk_states_[disk_id];
+  // NOTE: no locks are held, so other threads could have modified the state of the reader
+  // and disk state since this context was pulled off the queue. Only one disk thread can
+  // be in this function for this reader, since the reader was removed from the queue and
+  // has not be re-added. Other disk threads may be operating on this reader in other
+  // functions though.
+  unique_lock<mutex> request_lock(lock_);
+  VLOG_FILE << "Disk (id=" << disk_id << ") reading for " << DebugString();
+
+  // Check if reader has been cancelled
+  if (state_ == RequestContext::Cancelled) {
+    request_disk_state->DecrementDiskThread(request_lock, this);
+    return nullptr;
+  }
+  DCHECK_EQ(state_, RequestContext::Active) << DebugString();
+  if (request_disk_state->next_scan_range_to_start() == nullptr &&
+      !request_disk_state->unstarted_scan_ranges()->empty()) {
+    // We don't have a range queued for this disk for what the caller should
+    // read next. Populate that.  We want to have one range waiting to minimize
+    // wait time in GetNextUnstartedRange().
+    ScanRange* new_range = request_disk_state->unstarted_scan_ranges()->Dequeue();
+    num_unstarted_scan_ranges_.Add(-1);
+    ready_to_start_ranges_.Enqueue(new_range);
+    request_disk_state->set_next_scan_range_to_start(new_range);
+
+    if (num_unstarted_scan_ranges_.Load() == 0) {
+      // All the ranges have been started, notify everyone blocked on
+      // GetNextUnstartedRange(). Only one of them will get work so make sure to return
+      // nullptr to the other caller threads.
+      ready_to_start_ranges_cv_.NotifyAll();
+    } else {
+      ready_to_start_ranges_cv_.NotifyOne();
+    }
+  }
+
+  // Always enqueue a WriteRange to be processed into in_flight_ranges_.
+  // This is done so in_flight_ranges_ does not exclusively contain ScanRanges.
+  // For now, enqueuing a WriteRange on each invocation of GetNextRequestRange()
+  // does not flood in_flight_ranges() with WriteRanges because the entire
+  // WriteRange is processed and removed from the queue after GetNextRequestRange()
+  // returns.
+  if (!request_disk_state->unstarted_write_ranges()->empty()) {
+    WriteRange* write_range = request_disk_state->unstarted_write_ranges()->Dequeue();
+    request_disk_state->in_flight_ranges()->Enqueue(write_range);
+  }
+
+  // Get the next scan range to work on from the reader. Only in_flight_ranges
+  // are eligible since the disk threads do not start new ranges on their own.
+  if (request_disk_state->in_flight_ranges()->empty()) {
+    // There are no inflight ranges, nothing to do.
+    request_disk_state->DecrementDiskThread(request_lock, this);
+    return nullptr;
+  }
+  DCHECK_GT(request_disk_state->num_remaining_ranges(), 0);
+  RequestRange* range = request_disk_state->in_flight_ranges()->Dequeue();
+  DCHECK(range != nullptr);
+
+  // Now that we've picked a request range, put the context back on the queue so
+  // another thread can pick up another request range for this context.
+  request_disk_state->ScheduleContext(request_lock, this, disk_id);
+  DCHECK(Validate()) << endl << DebugString();
+  return range;
+}
+
 RequestContext::RequestContext(DiskIoMgr* parent, int num_disks)
   : parent_(parent), disk_states_(num_disks) {}
 
@@ -276,6 +306,13 @@ string RequestContext::DebugString() const {
   }
   ss << ")";
   return ss.str();
+}
+
+void RequestContext::UnregisterDiskQueue(int disk_id) {
+  unique_lock<mutex> lock(lock_);
+  DCHECK_EQ(disk_states_[disk_id].num_threads_in_op(), 0);
+  DCHECK(disk_states_[disk_id].done());
+  DecrementDiskRefCount(lock);
 }
 
 bool RequestContext::Validate() const {
@@ -375,6 +412,6 @@ void RequestContext::PerDiskState::ScheduleContext(const unique_lock<mutex>& con
   DCHECK(context_lock.mutex() == &context->lock_ && context_lock.owns_lock());
   if (is_on_queue_.Load() == 0 && !done_) {
     is_on_queue_.Store(1);
-    context->parent_->disk_queues_[disk_id]->EnqueueContext(context);
+    context->parent_->GetDiskQueue(disk_id)->EnqueueContext(context);
   }
 }

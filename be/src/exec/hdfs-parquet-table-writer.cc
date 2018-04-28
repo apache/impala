@@ -17,6 +17,8 @@
 
 #include "exec/hdfs-parquet-table-writer.h"
 
+#include <boost/unordered_set.hpp>
+
 #include "common/version.h"
 #include "exec/hdfs-table-sink.h"
 #include "exec/parquet-column-stats.inline.h"

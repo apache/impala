@@ -31,6 +31,7 @@
 #include "rpc/thrift-util.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "runtime/runtime-state.h"
