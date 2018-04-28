@@ -30,7 +30,6 @@
 #include "common/atomic.h"
 #include "exec/filter-context.h"
 #include "exec/hdfs-scan-node-base.h"
-#include "runtime/io/disk-io-mgr.h"
 #include "util/counting-barrier.h"
 #include "util/thread.h"
 

@@ -29,6 +29,7 @@
 #include "runtime/thread-resource-mgr.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
+#include "util/thread.h"
 #include "util/time.h"
 
 #include "gen-cpp/PlanNodes_types.h"

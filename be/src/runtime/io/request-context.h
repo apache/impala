@@ -18,6 +18,8 @@
 #ifndef IMPALA_RUNTIME_IO_REQUEST_CONTEXT_H
 #define IMPALA_RUNTIME_IO_REQUEST_CONTEXT_H
 
+#include <boost/unordered_set.hpp>
+
 #include "runtime/io/disk-io-mgr.h"
 #include "util/condition-variable.h"
 
@@ -141,12 +143,11 @@ class RequestContext {
     disks_accessed_bitmap_ = disks_accessed_bitmap;
   }
 
- private:
-  DISALLOW_COPY_AND_ASSIGN(RequestContext);
+ protected:
+  // Protected methods are accessed by other classes in io:: but not external classes.
+  friend class DiskQueue;
   friend class DiskIoMgr;
   friend class ScanRange;
-
-  class PerDiskState;
 
   enum State {
     /// Reader is initialized and maps to a client
@@ -164,23 +165,20 @@ class RequestContext {
 
   RequestContext(DiskIoMgr* parent, int num_disks);
 
-  /// Cleans up a buffer. If the buffer was allocated with AllocateBuffersForRange(),
-  /// frees the buffer. Otherwise (e.g. a client or HDFS cache buffer), just prepares the
-  /// descriptor to be destroyed. After this is called, buffer->buffer() is NULL.
-  /// Does not acquire 'lock_'.
-  void FreeBuffer(BufferDescriptor* buffer);
+  /// Called when dequeueing this RequestContext from the disk queue to increment the
+  /// count of disk threads with a reference to this context for 'disk_id. These threads
+  /// do not hold any locks while reading from HDFS, so we need to prevent the
+  /// RequestContext from being destroyed underneath them.
+  void IncrementDiskThreadAfterDequeue(int disk_id);
+
+  /// Called when the disk queue for disk 'disk_id' shuts down. Only used in backend
+  /// tests - disk queues are not shut down for the singleton DiskIoMgr in a daemon.
+  void UnregisterDiskQueue(int disk_id);
 
   /// Decrements the number of active disks for this reader.  If the disk count
   /// goes to 0, the disk complete condition variable is signaled.
   /// 'lock_' must be held via 'lock'.
-  void DecrementDiskRefCount(const boost::unique_lock<boost::mutex>& lock) {
-    DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
-    DCHECK_GT(num_disks_with_ranges_, 0);
-    if (--num_disks_with_ranges_ == 0) {
-      disks_complete_cond_var_.NotifyAll();
-    }
-    DCHECK(Validate()) << std::endl << DebugString();
-  }
+  void DecrementDiskRefCount(const boost::unique_lock<boost::mutex>& lock);
 
   /// Reader & Disk Scheduling: Readers that currently can't do work are not on
   /// the disk's queue. These readers are ones that don't have any ranges in the
@@ -192,14 +190,14 @@ class RequestContext {
   /// Adds range to in_flight_ranges, scheduling this reader on the disk threads
   /// if necessary.
   /// 'lock_' must be held via 'lock'. Only valid to call if this context is active.
-  void ScheduleScanRange(const boost::unique_lock<boost::mutex>& lock, ScanRange* range) {
-    DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
-    DCHECK_EQ(state_, Active);
-    DCHECK(range != nullptr);
-    RequestContext::PerDiskState& state = disk_states_[range->disk_id()];
-    state.in_flight_ranges()->Enqueue(range);
-    state.ScheduleContext(lock, this, range->disk_id());
-  }
+  void ScheduleScanRange(const boost::unique_lock<boost::mutex>& lock, ScanRange* range);
+
+  // Called from the disk thread for 'disk_id' to get the next request range to process
+  // for this context for the disk. Returns nullptr if there are no ranges currently
+  // available. The calling disk thread should hold no locks and must hold a refcount
+  // obtained from IncrementDiskThreadAfterDequeue() to ensure that the context is not
+  // destroyed while executing this function.
+  RequestRange* GetNextRequestRange(int disk_id);
 
   /// Called from a disk thread when a read completes. Decrements the disk thread count
   /// and other bookkeeping and re-schedules 'range' if there are more reads to do.
@@ -239,14 +237,7 @@ class RequestContext {
   void RemoveActiveScanRangeLocked(
       const boost::unique_lock<boost::mutex>& lock, ScanRange* range);
 
-  /// Validates invariants of reader.  Reader lock must be taken beforehand.
-  bool Validate() const;
-
-  /// Dumps out reader information.  Lock should be taken by caller
-  std::string DebugString() const;
-
-  /// Parent object
-  DiskIoMgr* const parent_;
+  // Counters are updated by other classes - expose to other io:: classes for convenience.
 
   /// Total bytes read for this reader
   RuntimeProfile::Counter* bytes_read_counter_ = nullptr;
@@ -291,6 +282,18 @@ class RequestContext {
   /// Total number of file handle opens where the file handle was not in the cache
   AtomicInt32 cached_file_handles_miss_count_{0};
 
+ private:
+  DISALLOW_COPY_AND_ASSIGN(RequestContext);
+
+  /// Validates invariants of reader. 'lock_' must be held by caller.
+  bool Validate() const;
+
+  /// Dumps out reader information. 'lock_' must be held by caller.
+  std::string DebugString() const;
+
+  /// Parent object
+  DiskIoMgr* const parent_;
+
   /// All fields below are accessed by multiple threads and the lock needs to be
   /// taken before accessing them. Must be acquired before ScanRange::lock_ if both
   /// are held simultaneously.
@@ -332,166 +335,189 @@ class RequestContext {
   /// Condition variable for UnregisterContext() to wait for all disks to complete
   ConditionVariable disks_complete_cond_var_;
 
-  /// Struct containing state per disk. See comments in the disk read loop on how
-  /// they are used.
-  class PerDiskState {
-   public:
-    bool done() const { return done_; }
-    void set_done(bool b) { done_ = b; }
-
-    int num_remaining_ranges() const { return num_remaining_ranges_; }
-    int& num_remaining_ranges() { return num_remaining_ranges_; }
-
-    ScanRange* next_scan_range_to_start() { return next_scan_range_to_start_; }
-    void set_next_scan_range_to_start(ScanRange* range) {
-      next_scan_range_to_start_ = range;
-    }
-
-    bool is_on_queue() const { return is_on_queue_.Load() != 0; }
-
-    int num_threads_in_op() const { return num_threads_in_op_.Load(); }
-
-    const InternalQueue<ScanRange>* unstarted_scan_ranges() const {
-      return &unstarted_scan_ranges_;
-    }
-    const InternalQueue<WriteRange>* unstarted_write_ranges() const {
-      return &unstarted_write_ranges_;
-    }
-    const InternalQueue<RequestRange>* in_flight_ranges() const {
-      return &in_flight_ranges_;
-    }
-
-    InternalQueue<ScanRange>* unstarted_scan_ranges() { return &unstarted_scan_ranges_; }
-    InternalQueue<WriteRange>* unstarted_write_ranges() {
-      return &unstarted_write_ranges_;
-    }
-    InternalQueue<RequestRange>* in_flight_ranges() { return &in_flight_ranges_; }
-
-    /// Schedules the request context on this disk if it's not already on the queue.
-    /// context->lock_ must be held by the caller via 'context_lock'.
-    void ScheduleContext(const boost::unique_lock<boost::mutex>& context_lock,
-        RequestContext* context, int disk_id);
-
-    /// Called when dequeueing this RequestContext from the disk queue to increment the
-    /// count of disk threads with a reference to this context. These threads do not hold
-    /// any locks while reading from HDFS, so we need to prevent the RequestContext from
-    /// being destroyed underneath them.
-    ///
-    /// The caller does not need to hold 'lock_', so this can execute concurrently with
-    /// itself and DecrementDiskThread().
-    void IncrementDiskThreadAfterDequeue() {
-      /// Incrementing 'num_threads_in_op_' first so that there is no window when other
-      /// threads see 'is_on_queue_ == num_threads_in_op_ == 0' and think there are no
-      /// references left to this context.
-      num_threads_in_op_.Add(1);
-      is_on_queue_.Store(0);
-    }
-
-    /// Decrement the count of disks threads with a reference to this context. Does final
-    /// cleanup if the context is cancelled and this is the last thread for the disk.
-    /// context->lock_ must be held by the caller via 'context_lock'.
-    void DecrementDiskThread(const boost::unique_lock<boost::mutex>& context_lock,
-        RequestContext* context) {
-      DCHECK(context_lock.mutex() == &context->lock_ && context_lock.owns_lock());
-      num_threads_in_op_.Add(-1);
-
-      if (context->state_ != Cancelled) {
-        DCHECK_EQ(context->state_, Active);
-        return;
-      }
-      // The state is cancelled, check to see if we're the last thread to touch the
-      // context on this disk. We need to load 'is_on_queue_' and 'num_threads_in_op_'
-      // in this order to avoid a race with IncrementDiskThreadAfterDequeue().
-      if (is_on_queue_.Load() == 0 && num_threads_in_op_.Load() == 0 && !done_) {
-        context->DecrementDiskRefCount(context_lock);
-        done_ = true;
-      }
-    }
-
-   private:
-    /// If true, this disk is all done for this request context, including any cleanup.
-    /// If done is true, it means that this request must not be on this disk's queue
-    /// *AND* there are no threads currently working on this context. To satisfy
-    /// this, only the last thread (per disk) can set this to true.
-    bool done_ = true;
-
-    /// For each disk, keeps track if the context is on this disk's queue, indicating
-    /// the disk must do some work for this context. 1 means that the context is on the
-    /// disk queue, 0 means that it's not on the queue (either because it has on ranges
-    /// active for the disk or because a disk thread dequeued the context and is
-    /// currently processing a request).
-    ///
-    /// The disk needs to do work in 4 cases:
-    ///  1) in_flight_ranges is not empty, the disk needs to read for this reader.
-    ///  2) next_range_to_start is NULL, the disk needs to prepare a scan range to be
-    ///     read next.
-    ///  3) the reader has been cancelled and this disk needs to participate in the
-    ///     cleanup.
-    ///  4) A write range is added to queue.
-    /// In general, we only want to put a context on the disk queue if there is something
-    /// useful that can be done. If there's nothing useful, the disk queue will wake up
-    /// and then remove the reader from the queue. Doing this causes thrashing of the
-    /// threads.
-    ///
-    /// This variable is important during context cancellation because it indicates
-    /// whether a queue has a reference to the context that must be released before
-    /// the context is considered unregistered. Atomically set to false after
-    /// incrementing 'num_threads_in_op_' when dequeueing so that there is no window
-    /// when other threads see 'is_on_queue_ == num_threads_in_op_ == 0' and think there
-    /// are no references left to this context.
-    /// TODO: this could be combined with 'num_threads_in_op_' to be a single refcount.
-    AtomicInt32 is_on_queue_{0};
-
-    /// For each disks, the number of request ranges that have not been fully read.
-    /// In the non-cancellation path, this will hit 0, and done will be set to true
-    /// by the disk thread. This is undefined in the cancellation path (the various
-    /// threads notice by looking at the RequestContext's state_).
-    int num_remaining_ranges_ = 0;
-
-    /// Queue of ranges that have not started being read.  This list is exclusive
-    /// with in_flight_ranges.
-    InternalQueue<ScanRange> unstarted_scan_ranges_;
-
-    /// Queue of pending IO requests for this disk in the order that they will be
-    /// processed. A ScanRange is added to this queue when it is returned in
-    /// GetNextUnstartedRange(), or when it is added with schedule_mode == IMMEDIATELY.
-    /// A WriteRange is added to this queue from unstarted_write_ranges_ for each
-    /// invocation of GetNextRequestRange() in WorkLoop().
-    /// The size of this queue is always less than or equal to num_remaining_ranges.
-    InternalQueue<RequestRange> in_flight_ranges_;
-
-    /// The next range to start for this reader on this disk. Each disk (for each reader)
-    /// picks the next range to start. The range is set here and also added to the
-    /// ready_to_start_ranges_ queue. The reader pulls from the queue in FIFO order,
-    /// so the ranges from different disks are round-robined. When the range is pulled
-    /// off the ready_to_start_ranges_ queue, it sets this variable to NULL, so the disk
-    /// knows to populate it again and add it to ready_to_start_ranges_ i.e. it is used
-    /// as a flag by DiskIoMgr::GetNextScanRange to determine if it needs to add another
-    /// range to ready_to_start_ranges_.
-    ScanRange* next_scan_range_to_start_ = nullptr;
-
-    /// For each disk, the number of disk threads issuing the underlying read/write on
-    /// behalf of this context. There are a few places where we release the context lock,
-    /// do some work, and then grab the lock again.  Because we don't hold the lock for
-    /// the entire operation, we need this ref count to keep track of which thread should
-    /// do final resource cleanup during cancellation.
-    /// Only the thread that sees the count at 0 should do the final cleanup.
-    AtomicInt32 num_threads_in_op_{0};
-
-    /// Queue of write ranges to process for this disk. A write range is always added
-    /// to in_flight_ranges_ in GetNextRequestRange(). There is a separate
-    /// unstarted_read_ranges_ and unstarted_write_ranges_ to alternate between reads
-    /// and writes. (Otherwise, since next_scan_range_to_start is set
-    /// in GetNextRequestRange() whenever it is null, repeated calls to
-    /// GetNextRequestRange() and GetNextUnstartedRange() may result in only reads being
-    /// processed)
-    InternalQueue<WriteRange> unstarted_write_ranges_;
-  };
-
+ private:
   /// Per disk states to synchronize multiple disk threads accessing the same request
   /// context.
+  class PerDiskState;
   std::vector<PerDiskState> disk_states_;
 };
+
+/// Struct containing state per disk. See comments in the disk read loop on how
+/// they are used.
+class RequestContext::PerDiskState {
+ public:
+  bool done() const { return done_; }
+  void set_done(bool b) { done_ = b; }
+
+  int num_remaining_ranges() const { return num_remaining_ranges_; }
+  int& num_remaining_ranges() { return num_remaining_ranges_; }
+
+  ScanRange* next_scan_range_to_start() { return next_scan_range_to_start_; }
+  void set_next_scan_range_to_start(ScanRange* range) {
+    next_scan_range_to_start_ = range;
+  }
+
+  bool is_on_queue() const { return is_on_queue_.Load() != 0; }
+
+  int num_threads_in_op() const { return num_threads_in_op_.Load(); }
+
+  const InternalQueue<ScanRange>* unstarted_scan_ranges() const {
+    return &unstarted_scan_ranges_;
+  }
+  const InternalQueue<WriteRange>* unstarted_write_ranges() const {
+    return &unstarted_write_ranges_;
+  }
+  const InternalQueue<RequestRange>* in_flight_ranges() const {
+    return &in_flight_ranges_;
+  }
+
+  InternalQueue<ScanRange>* unstarted_scan_ranges() { return &unstarted_scan_ranges_; }
+  InternalQueue<WriteRange>* unstarted_write_ranges() {
+    return &unstarted_write_ranges_;
+  }
+  InternalQueue<RequestRange>* in_flight_ranges() { return &in_flight_ranges_; }
+
+  /// Schedules the request context on this disk if it's not already on the queue.
+  /// context->lock_ must be held by the caller via 'context_lock'.
+  void ScheduleContext(const boost::unique_lock<boost::mutex>& context_lock,
+      RequestContext* context, int disk_id);
+
+  /// See RequestContext::IncrementDiskThreadAfterDequeue() comment for usage.
+  ///
+  /// The caller does not need to hold 'lock_', so this can execute concurrently with
+  /// itself and DecrementDiskThread().
+  void IncrementDiskThreadAfterDequeue() {
+    /// Incrementing 'num_threads_in_op_' first so that there is no window when other
+    /// threads see 'is_on_queue_ == num_threads_in_op_ == 0' and think there are no
+    /// references left to this context.
+    num_threads_in_op_.Add(1);
+    is_on_queue_.Store(0);
+  }
+
+  /// Decrement the count of disks threads with a reference to this context. Does final
+  /// cleanup if the context is cancelled and this is the last thread for the disk.
+  /// context->lock_ must be held by the caller via 'context_lock'.
+  void DecrementDiskThread(const boost::unique_lock<boost::mutex>& context_lock,
+      RequestContext* context) {
+    DCHECK(context_lock.mutex() == &context->lock_ && context_lock.owns_lock());
+    num_threads_in_op_.Add(-1);
+
+    if (context->state_ != Cancelled) {
+      DCHECK_EQ(context->state_, Active);
+      return;
+    }
+    // The state is cancelled, check to see if we're the last thread to touch the
+    // context on this disk. We need to load 'is_on_queue_' and 'num_threads_in_op_'
+    // in this order to avoid a race with IncrementDiskThreadAfterDequeue().
+    if (is_on_queue_.Load() == 0 && num_threads_in_op_.Load() == 0 && !done_) {
+      context->DecrementDiskRefCount(context_lock);
+      done_ = true;
+    }
+  }
+
+ private:
+  /// If true, this disk is all done for this request context, including any cleanup.
+  /// If done is true, it means that this request must not be on this disk's queue
+  /// *AND* there are no threads currently working on this context. To satisfy
+  /// this, only the last thread (per disk) can set this to true.
+  bool done_ = true;
+
+  /// For each disk, keeps track if the context is on this disk's queue, indicating
+  /// the disk must do some work for this context. 1 means that the context is on the
+  /// disk queue, 0 means that it's not on the queue (either because it has on ranges
+  /// active for the disk or because a disk thread dequeued the context and is
+  /// currently processing a request).
+  ///
+  /// The disk needs to do work in 4 cases:
+  ///  1) in_flight_ranges is not empty, the disk needs to read for this reader.
+  ///  2) next_range_to_start is NULL, the disk needs to prepare a scan range to be
+  ///     read next.
+  ///  3) the reader has been cancelled and this disk needs to participate in the
+  ///     cleanup.
+  ///  4) A write range is added to queue.
+  /// In general, we only want to put a context on the disk queue if there is something
+  /// useful that can be done. If there's nothing useful, the disk queue will wake up
+  /// and then remove the reader from the queue. Doing this causes thrashing of the
+  /// threads.
+  ///
+  /// This variable is important during context cancellation because it indicates
+  /// whether a queue has a reference to the context that must be released before
+  /// the context is considered unregistered. Atomically set to false after
+  /// incrementing 'num_threads_in_op_' when dequeueing so that there is no window
+  /// when other threads see 'is_on_queue_ == num_threads_in_op_ == 0' and think there
+  /// are no references left to this context.
+  /// TODO: this could be combined with 'num_threads_in_op_' to be a single refcount.
+  AtomicInt32 is_on_queue_{0};
+
+  /// For each disks, the number of request ranges that have not been fully read.
+  /// In the non-cancellation path, this will hit 0, and done will be set to true
+  /// by the disk thread. This is undefined in the cancellation path (the various
+  /// threads notice by looking at the RequestContext's state_).
+  int num_remaining_ranges_ = 0;
+
+  /// Queue of ranges that have not started being read.  This list is exclusive
+  /// with in_flight_ranges.
+  InternalQueue<ScanRange> unstarted_scan_ranges_;
+
+  /// Queue of pending IO requests for this disk in the order that they will be
+  /// processed. A ScanRange is added to this queue when it is returned in
+  /// GetNextUnstartedRange(), or when it is added with schedule_mode == IMMEDIATELY.
+  /// A WriteRange is added to this queue from unstarted_write_ranges_ for each
+  /// invocation of GetNextRequestRange() in WorkLoop().
+  /// The size of this queue is always less than or equal to num_remaining_ranges.
+  InternalQueue<RequestRange> in_flight_ranges_;
+
+  /// The next range to start for this reader on this disk. Each disk (for each reader)
+  /// picks the next range to start. The range is set here and also added to the
+  /// ready_to_start_ranges_ queue. The reader pulls from the queue in FIFO order,
+  /// so the ranges from different disks are round-robined. When the range is pulled
+  /// off the ready_to_start_ranges_ queue, it sets this variable to NULL, so the disk
+  /// knows to populate it again and add it to ready_to_start_ranges_ i.e. it is used
+  /// as a flag by DiskIoMgr::GetNextScanRange to determine if it needs to add another
+  /// range to ready_to_start_ranges_.
+  ScanRange* next_scan_range_to_start_ = nullptr;
+
+  /// For each disk, the number of disk threads issuing the underlying read/write on
+  /// behalf of this context. There are a few places where we release the context lock,
+  /// do some work, and then grab the lock again.  Because we don't hold the lock for
+  /// the entire operation, we need this ref count to keep track of which thread should
+  /// do final resource cleanup during cancellation.
+  /// Only the thread that sees the count at 0 should do the final cleanup.
+  AtomicInt32 num_threads_in_op_{0};
+
+  /// Queue of write ranges to process for this disk. A write range is always added
+  /// to in_flight_ranges_ in GetNextRequestRange(). There is a separate
+  /// unstarted_read_ranges_ and unstarted_write_ranges_ to alternate between reads
+  /// and writes. (Otherwise, since next_scan_range_to_start is set
+  /// in GetNextRequestRange() whenever it is null, repeated calls to
+  /// GetNextRequestRange() and GetNextUnstartedRange() may result in only reads being
+  /// processed)
+  InternalQueue<WriteRange> unstarted_write_ranges_;
+};
+
+inline void RequestContext::IncrementDiskThreadAfterDequeue(int disk_id) {
+  disk_states_[disk_id].IncrementDiskThreadAfterDequeue();
+}
+
+inline void RequestContext::DecrementDiskRefCount(
+    const boost::unique_lock<boost::mutex>& lock) {
+  DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
+  DCHECK_GT(num_disks_with_ranges_, 0);
+  if (--num_disks_with_ranges_ == 0) {
+    disks_complete_cond_var_.NotifyAll();
+  }
+  DCHECK(Validate()) << std::endl << DebugString();
+}
+
+inline void RequestContext::ScheduleScanRange(
+    const boost::unique_lock<boost::mutex>& lock, ScanRange* range) {
+  DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
+  DCHECK_EQ(state_, Active);
+  DCHECK(range != nullptr);
+  RequestContext::PerDiskState& state = disk_states_[range->disk_id()];
+  state.in_flight_ranges()->Enqueue(range);
+  state.ScheduleContext(lock, this, range->disk_id());
+}
 }
 }
 

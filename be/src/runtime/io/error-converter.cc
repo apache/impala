@@ -16,7 +16,11 @@
 // under the License.
 
 #include "runtime/io/error-converter.h"
+
 #include "gutil/strings/substitute.h"
+#include "util/debug-util.h"
+#include "util/error-util.h"
+
 #include "common/names.h"
 
 namespace impala {

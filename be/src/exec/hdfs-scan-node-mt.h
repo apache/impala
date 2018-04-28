@@ -23,7 +23,6 @@
 
 #include "exec/hdfs-scanner.h"
 #include "exec/hdfs-scan-node-base.h"
-#include "exec/scanner-context.h"
 
 namespace impala {
 
@@ -31,6 +30,7 @@ class DescriptorTbl;
 class ObjectPool;
 class RuntimeState;
 class RowBatch;
+class ScannerContext;
 class TPlanNode;
 
 /// Scan node that materializes tuples, evaluates conjuncts and runtime filters

@@ -73,15 +73,15 @@ Status LocalFileSystem::Fwrite(FILE* file_handle, const WriteRange* write_range)
   DCHECK(file_handle != nullptr);
   DCHECK(write_range != nullptr);
   int64_t bytes_written = FwriteAux(file_handle, write_range);
-  if (bytes_written < write_range->len_) {
+  if (bytes_written < write_range->len()) {
     return ErrorConverter::GetErrorStatusFromErrno("fwrite()", write_range->file(),
-        errno, {{"range_length", SimpleItoa(write_range->len_)}});
+        errno, {{"range_length", SimpleItoa(write_range->len())}});
   }
   return Status::OK();
 }
 
 size_t LocalFileSystem::FwriteAux(FILE* file_handle, const WriteRange* write_range) {
-  return fwrite(write_range->data_, 1, write_range->len_, file_handle);
+  return fwrite(write_range->data(), 1, write_range->len(), file_handle);
 }
 
 Status LocalFileSystem::Fclose(FILE* file_handle, const WriteRange* write_range) {

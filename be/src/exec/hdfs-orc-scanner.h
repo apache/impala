@@ -21,6 +21,7 @@
 
 #include <orc/OrcFile.hh>
 
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/runtime-state.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/hdfs-scan-node.h"

@@ -18,26 +18,18 @@
 #ifndef IMPALA_RUNTIME_IO_DISK_IO_MGR_H
 #define IMPALA_RUNTIME_IO_DISK_IO_MGR_H
 
-#include <deque>
-#include <functional>
 #include <vector>
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/unordered_set.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "common/atomic.h"
 #include "common/hdfs.h"
-#include "common/object-pool.h"
 #include "common/status.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/io/handle-cache.h"
 #include "runtime/io/local-file-system.h"
 #include "runtime/io/request-ranges.h"
 #include "util/aligned-new.h"
-#include "util/bit-util.h"
-#include "util/condition-variable.h"
-#include "util/error-util.h"
 #include "util/runtime-profile.h"
 #include "util/thread.h"
 
@@ -45,7 +37,7 @@ namespace impala {
 
 namespace io {
 
-struct DiskQueue;
+class DiskQueue;
 /// Manager object that schedules IO for all queries on all disks and remote filesystems
 /// (such as S3). Each query maps to one or more RequestContext objects, each of which
 /// has its own queue of scan ranges and/or write ranges.
@@ -394,12 +386,30 @@ class DiskIoMgr : public CacheLineAligned {
   /// See "Buffer Management" in the class comment for explanation.
   static const int64_t IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE = 3;
 
- private:
-  friend class BufferDescriptor;
+ protected:
+  // Protected methods are used by other classes in io::.
+  friend class DiskQueue;
+  friend class ScanRange;
   friend class RequestContext;
-  // TODO: remove io:: prefix - it is required for the "using ScanRange" workaround above.
-  friend class io::ScanRange;
 
+  /// Write the specified range to disk and calls HandleWriteFinished() when done.
+  /// Responsible for opening and closing the file that is written.
+  void Write(RequestContext* writer_context, WriteRange* write_range);
+
+  DiskQueue* GetDiskQueue(int disk_id) {
+    DCHECK_GE(disk_id, 0);
+    DCHECK_LT(disk_id, disk_queues_.size());
+    return disk_queues_[disk_id];
+  }
+
+  RuntimeProfile::Counter* total_bytes_read_counter() {
+    return &total_bytes_read_counter_;
+  }
+  RuntimeProfile::Counter* read_timer() { return &read_timer_; }
+  struct hadoopRzOptions* cached_read_options() { return cached_read_options_; }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(DiskIoMgr);
   friend class DiskIoMgrTest_Buffers_Test;
   friend class DiskIoMgrTest_BufferSizeSelection_Test;
   friend class DiskIoMgrTest_VerifyNumThreadsParameter_Test;
@@ -427,10 +437,6 @@ class DiskIoMgr : public CacheLineAligned {
   /// Options object for cached hdfs reads. Set on startup and never modified.
   struct hadoopRzOptions* cached_read_options_ = nullptr;
 
-  /// True if the IoMgr should be torn down. Worker threads watch for this to
-  /// know to terminate. This variable is read/written to by different threads.
-  volatile bool shut_down_;
-
   /// Total bytes read by the IoMgr.
   RuntimeProfile::Counter total_bytes_read_counter_;
 
@@ -452,34 +458,16 @@ class DiskIoMgr : public CacheLineAligned {
   // handles are closed.
   FileHandleCache file_handle_cache_;
 
-  /// Disk worker thread loop. This function retrieves the next range to process on
-  /// the disk queue and invokes ScanRange::DoRead() or Write() depending on the type
-  /// of Range. There can be multiple threads per disk running this loop.
-  void WorkLoop(DiskQueue* queue);
-
-  /// This is called from the disk thread to get the next range to process. It will
-  /// wait until a scan range and buffer are available, or a write range is available.
-  /// This functions returns the range to process.
-  /// Only returns false if the disk thread should be shut down.
-  /// No locks should be taken before this function call and none are left taken after.
-  bool GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
-      RequestContext** request_context);
-
   /// Invokes write_range->callback_  after the range has been written and
   /// updates per-disk state and handle state. The status of the write OK/RUNTIME_ERROR
   /// etc. is passed via write_status and to the callback.
   /// The write_status does not affect the writer->status_. That is, an write error does
   /// not cancel the writer context - that decision is left to the callback handler.
-  /// TODO: On the read path, consider not canceling the reader context on error.
   void HandleWriteFinished(
       RequestContext* writer, WriteRange* write_range, const Status& write_status);
 
   /// Validates that range is correctly initialized
   Status ValidateScanRange(ScanRange* range) WARN_UNUSED_RESULT;
-
-  /// Write the specified range to disk and calls HandleWriteFinished when done.
-  /// Responsible for opening and closing the file that is written.
-  void Write(RequestContext* writer_context, WriteRange* write_range);
 
   /// Helper method to write a range using the specified FILE handle. Returns Status:OK
   /// if the write succeeded, or a RUNTIME_ERROR with an appropriate message otherwise.
