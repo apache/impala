@@ -237,6 +237,14 @@ class Statestore : public CacheLineAligned {
     /// Acquires an exclusive write lock for the topic.
     std::vector<TopicEntry::Version> Put(const std::vector<TTopicItem>& entries);
 
+    /// Deletes all the topic entries and updates the topic metrics. It doesn't
+    /// reset the last_version_ to ensure that versions are monotonically
+    /// increasing.
+    ///
+    /// Safe to call concurrently from multiple threads (for different
+    /// subscribers). Acquires an exclusive lock for the topic.
+    void ClearAllEntries();
+
     /// Utility method to support removing transient entries. We track the version numbers
     /// of entries added by subscribers, and remove entries with the same version number
     /// when that subscriber fails (the same entry may exist, but may have been updated by
@@ -388,7 +396,7 @@ class Statestore : public CacheLineAligned {
     /// processed. Will never decrease.
     TopicEntry::Version LastTopicVersionProcessed(const TopicId& topic_id) const;
 
-    /// Sets the subscriber's last processed version of the topic to the given value.  This
+    /// Sets the subscriber's last processed version of the topic to the given value. This
     /// should only be set when once a subscriber has succesfully processed the given
     /// update corresponding to this version. Should not be called concurrently from
     /// multiple threads for a given 'topic_id'.

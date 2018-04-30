@@ -241,6 +241,12 @@ void CatalogServer::UpdateCatalogTopicCallback(
     TTopicDelta& update = subscriber_topic_updates->back();
     update.topic_name = IMPALA_CATALOG_TOPIC;
     update.topic_entries = std::move(pending_topic_updates_);
+    // If this is the first update sent to the statestore, instruct the
+    // statestore to clear any entries it may already have for the catalog
+    // update topic. This is to guarantee that upon catalog restart, the
+    // statestore entries of the catalog update topic are in sync with the
+    // catalog objects stored in the catalog (see IMPALA-6948).
+    update.__set_clear_topic_entries((last_sent_catalog_version_ == 0));
 
     VLOG(1) << "A catalog update with " << update.topic_entries.size()
             << " entries is assembled. Catalog version: "
