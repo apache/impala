@@ -336,3 +336,13 @@ select * from ctas_decimal;
 ---- TYPES
 DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL,DECIMAL
 ====
+---- QUERY
+# IMPALA-6954: CTAS with an expr rewrite.
+create table ctas_rewrite primary key(id)
+partition by range(id) (partition 0 <= values < 100) stored as kudu
+as select id, tinyint_col from functional.alltypes
+where id between 0 and 1;
+show range partitions ctas_rewrite;
+---- RESULTS
+'0 <= VALUES < 100'
+====

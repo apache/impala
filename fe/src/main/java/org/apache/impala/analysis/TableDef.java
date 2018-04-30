@@ -161,7 +161,6 @@ class TableDef {
 
   public void reset() {
     primaryKeyColDefs_.clear();
-    dataLayout_.reset();
     columnDefs_.clear();
     isAnalyzed_ = false;
     generatedKuduProperties_.clear();
