@@ -4,9 +4,9 @@ select * from functional.stringpartitionkey
 where string_col=cast("2009-01-01 00:00:00" as timestamp);
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=8.00KB
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=2
 PLAN-ROOT SINK
-|  mem-estimate=0B mem-reservation=0B
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.stringpartitionkey]
    partitions=1/2 files=1 size=2B
@@ -15,6 +15,6 @@ PLAN-ROOT SINK
      partitions: 1/1 rows=1
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=1
-   mem-estimate=32.00MB mem-reservation=8.00KB
+   mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=1
 ====

@@ -1261,7 +1261,7 @@ public class HdfsScanNode extends ScanNode {
     List<Long> columnReservations = null;
     if (fileFormats_.contains(HdfsFileFormat.PARQUET)
         || fileFormats_.contains(HdfsFileFormat.ORC)) {
-      columnReservations = computeMinColumnReservations();
+      columnReservations = computeMinColumnMemReservations();
     }
 
     int perHostScanRanges;
@@ -1277,6 +1277,8 @@ public class HdfsScanNode extends ScanNode {
           (double) scanRanges_.size() / (double) numNodes_) * SCAN_RANGE_SKEW_FACTOR);
     }
 
+    // The non-MT scan node requires at least one scanner thread.
+    int requiredThreads = useMtScanNode_ ? 0 : 1;
     int maxScannerThreads;
     if (queryOptions.getMt_dop() >= 1) {
       maxScannerThreads = 1;
@@ -1313,15 +1315,16 @@ public class HdfsScanNode extends ScanNode {
 
     nodeResourceProfile_ = new ResourceProfileBuilder()
         .setMemEstimateBytes(perInstanceMemEstimate)
-        .setMinReservationBytes(computeMinReservation(columnReservations)).build();
+        .setMinMemReservationBytes(computeMinMemReservation(columnReservations))
+        .setThreadReservation(requiredThreads).build();
   }
 
   /**
-   *  Compute the minimum reservation to process a single scan range (i.e. hdfs split).
-   *  We aim to choose a reservation that is as low as possible while still giving OK
-   *  performance when running with only the minimum reservation. The lower bound is one
-   *  minimum-sized buffer per IoMgr scan range - the absolute minimum required to scan
-   *  the data. The upper bounds are:
+   *  Compute the minimum memory reservation to process a single scan range
+   *  (i.e. hdfs split). We aim to choose a reservation that is as low as possible while
+   *  still giving OK performance when running with only the minimum reservation. The
+   *  lower bound is one minimum-sized buffer per IoMgr scan range - the absolute minimum
+   *  required to scan the data. The upper bounds are:
    * - One max-sized I/O buffer per IoMgr scan range. One max-sized I/O buffer avoids
    *   issuing small I/O unnecessarily. The backend can try to increase the reservation
    *   further if more memory would speed up processing.
@@ -1330,7 +1333,7 @@ public class HdfsScanNode extends ScanNode {
    * - The hdfs split size, to avoid reserving excessive memory for small files or ranges,
    *   e.g. small dimension tables with very few rows.
    */
-  private long computeMinReservation(List<Long> columnReservations) {
+  private long computeMinMemReservation(List<Long> columnReservations) {
     Preconditions.checkState(largestScanRangeBytes_ >= 0);
     long maxIoBufferSize =
         BitUtil.roundUpToPowerOf2(BackendConfig.INSTANCE.getReadSize());
@@ -1364,7 +1367,8 @@ public class HdfsScanNode extends ScanNode {
     //   the amount of buffers required to read it all at once.
     int iomgrScanRangesPerSplit = columnReservations != null ?
         Math.max(1, columnReservations.size()) : 1;
-    long maxReservationBytes = roundUpToIoBuffer(largestScanRangeBytes_, maxIoBufferSize);
+    long maxReservationBytes =
+        roundUpToIoBuffer(largestScanRangeBytes_, maxIoBufferSize);
     return Math.max(iomgrScanRangesPerSplit * BackendConfig.INSTANCE.getMinBufferSize(),
         Math.min(reservationBytes, maxReservationBytes));
   }
@@ -1380,7 +1384,7 @@ public class HdfsScanNode extends ScanNode {
    * logic for nested types in non-shredded columnar formats (e.g. IMPALA-6503 - ORC)
    * if/when that is added.
    */
-  private List<Long> computeMinColumnReservations() {
+  private List<Long> computeMinColumnMemReservations() {
     List<Long> columnByteSizes = Lists.newArrayList();
     HdfsTable table = (HdfsTable) desc_.getTable();
     boolean havePosSlot = false;
@@ -1399,10 +1403,10 @@ public class HdfsScanNode extends ScanNode {
             // collections.
             columnByteSizes.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
           } else {
-            columnByteSizes.add(computeMinScalarColumnReservation(column));
+            columnByteSizes.add(computeMinScalarColumnMemReservation(column));
           }
         } else {
-          appendMinColumnReservationsForCollection(slot, columnByteSizes);
+          appendMinColumnMemReservationsForCollection(slot, columnByteSizes);
         }
       }
     }
@@ -1415,12 +1419,12 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Helper for computeMinColumnReservations() - compute minimum memory reservations for
-   * all of the scalar columns read from disk when materializing collectionSlot. Appends
-   * one number per scalar column to columnByteSizes.
+   * Helper for computeMinColumnMemReservations() - compute minimum memory reservations
+   * for all of the scalar columns read from disk when materializing collectionSlot.
+   * Appends one number per scalar column to columnMemReservations.
    */
-  private void appendMinColumnReservationsForCollection(SlotDescriptor collectionSlot,
-      List<Long> columnByteSizes) {
+  private void appendMinColumnMemReservationsForCollection(SlotDescriptor collectionSlot,
+      List<Long> columnMemReservations) {
     Preconditions.checkState(collectionSlot.getType().isCollectionType());
     boolean addedColumn = false;
     for (SlotDescriptor nestedSlot: collectionSlot.getItemTupleDesc().getSlots()) {
@@ -1429,16 +1433,16 @@ public class HdfsScanNode extends ScanNode {
       if (nestedSlot.getType().isScalarType()) {
         // No column stats are available for nested collections so use the default
         // reservation.
-        columnByteSizes.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
+        columnMemReservations.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
         addedColumn = true;
       } else {
-        appendMinColumnReservationsForCollection(nestedSlot, columnByteSizes);
+        appendMinColumnMemReservationsForCollection(nestedSlot, columnMemReservations);
       }
     }
     // Need to scan at least one column to materialize the pos virtual slot and/or
     // determine the size of the nested array. Assume it is the size of a single I/O
     // buffer.
-    if (!addedColumn) columnByteSizes.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
+    if (!addedColumn) columnMemReservations.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
   }
 
   /**
@@ -1449,12 +1453,12 @@ public class HdfsScanNode extends ScanNode {
    * infer that the column data is smaller than this starting value (and therefore the
    * extra memory would not be useful). These estimates are quite conservative so this
    * will still often overestimate the column size. An overestimate does not necessarily
-   * result in memory being wasted becase the Parquet scanner distributes the total
+   * result in memory being wasted because the Parquet scanner distributes the total
    * reservation between columns based on actual column size, so if multiple columns are
    * scanned, memory over-reserved for one column can be used to help scan a different
    * larger column.
    */
-  private long computeMinScalarColumnReservation(Column column) {
+  private long computeMinScalarColumnMemReservation(Column column) {
     Preconditions.checkNotNull(column);
     long reservationBytes = DEFAULT_COLUMN_SCAN_RANGE_RESERVATION;
     ColumnStats stats = column.getStats();

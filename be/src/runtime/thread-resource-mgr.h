@@ -122,7 +122,11 @@ class ThreadResourcePool {
   /// Acquire a thread for the pool. This will always succeed; the pool will go over the
   /// quota if needed. Pools should use this API to reserve threads they need in order to
   /// make progress.
-  void AcquireThreadToken() { num_threads_.Add(1); }
+  void AcquireThreadToken() {
+    int64_t num_threads = num_threads_.Add(1);
+    int64_t num_required = num_threads & REQUIRED_MASK;
+    DCHECK_LE(num_required, max_required_threads_);
+  }
 
   /// Try to acquire a thread for this pool. If the pool is at the quota, this will
   /// return false and the pool should not run. Pools should use this API for resources
@@ -149,11 +153,11 @@ class ThreadResourcePool {
   void RemoveThreadAvailableCb(int id);
 
   /// Returns the number of threads that are from AcquireThreadToken.
-  int num_required_threads() const { return num_threads_.Load() & 0xFFFFFFFF; }
+  int num_required_threads() const { return num_threads_.Load() & REQUIRED_MASK; }
 
   /// Returns the number of thread resources returned by successful calls
   /// to TryAcquireThreadToken.
-  int num_optional_threads() const { return num_threads_.Load() >> 32; }
+  int num_optional_threads() const { return num_threads_.Load() >> OPTIONAL_SHIFT; }
 
   /// Returns the total number of thread resources for this pool
   /// (i.e. num_optional_threads + num_required_threads).
@@ -165,8 +169,8 @@ class ThreadResourcePool {
   bool optional_exceeded() {
     // Cache this so optional/required are computed based on the same value.
     int64_t num_threads = num_threads_.Load();
-    int64_t optional_threads = num_threads >> 32;
-    int64_t required_threads = num_threads & 0xFFFFFFFF;
+    int64_t optional_threads = num_threads >> OPTIONAL_SHIFT;
+    int64_t required_threads = num_threads & REQUIRED_MASK;
     return optional_threads + required_threads > quota();
   }
 
@@ -179,8 +183,21 @@ class ThreadResourcePool {
   /// number of registered resource pools.
   int quota() const { return parent_->per_pool_quota_.Load(); }
 
+  /// Set the maximum number of required threads that will be running at one time.
+  /// The caller should not create more required threads than this, otherwise this
+  /// will DCHECK. Not thread-safe.
+  void set_max_required_threads(int max_required_threads) {
+    max_required_threads_ = max_required_threads;
+  }
+
  private:
   friend class ThreadResourceMgr;
+
+  /// Mask to extract required threads from 'num_threads_'.
+  static constexpr int64_t REQUIRED_MASK = 0xFFFFFFFF;
+
+  /// Shift to extract optional threads from 'num_threads_'.
+  static constexpr int OPTIONAL_SHIFT = 32;
 
   ThreadResourcePool(ThreadResourceMgr* parent);
 
@@ -189,6 +206,10 @@ class ThreadResourcePool {
 
   /// The parent resource manager. Set to NULL when unregistered.
   ThreadResourceMgr* parent_;
+
+  /// Maximum number of required threads that should be running at one time. DCHECKs
+  /// if this is exceeded.
+  int64_t max_required_threads_ = std::numeric_limits<int32_t>::max();
 
   /// A single 64 bit value to store both the number of optional and required threads.
   /// This is combined to allow atomic compare-and-swap of both fields. The number of

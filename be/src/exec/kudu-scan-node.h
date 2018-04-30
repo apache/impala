@@ -97,7 +97,10 @@ class KuduScanNode : public KuduScanNodeBase {
   /// until there are none left, an error occurs, or the limit is reached. The caller must
   /// have acquired a thread token from the ThreadResourceMgr for this thread. The token
   /// is released before this function returns. 'first_thread' is true if this was the
-  /// first scanner thread to start and it acquired a "required" thread token.
+  /// first scanner thread to start and it acquired a "required" thread token. The first
+  /// thread will continue running until 'done_' is true or an error is encountered. Other
+  /// threads may terminate early if the optional tokens in
+  /// runtime_state_->resource_pool() are exceeded.
   void RunScannerThread(
       bool first_thread, const std::string& name, const std::string* initial_token);
 

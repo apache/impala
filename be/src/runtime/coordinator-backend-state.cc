@@ -75,14 +75,15 @@ void Coordinator::BackendState::Init(
   }
 }
 
-void Coordinator::BackendState::SetRpcParams(
-    const DebugOptions& debug_options, const FilterRoutingTable& filter_routing_table,
+void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
+    const FilterRoutingTable& filter_routing_table,
     TExecQueryFInstancesParams* rpc_params) {
   rpc_params->__set_protocol_version(ImpalaInternalServiceVersion::V1);
   rpc_params->__set_coord_state_idx(state_idx_);
-  rpc_params->__set_min_reservation_bytes(backend_exec_params_->min_reservation_bytes);
-  rpc_params->__set_initial_reservation_total_claims(
-      backend_exec_params_->initial_reservation_total_claims);
+  rpc_params->__set_min_mem_reservation_bytes(
+      backend_exec_params_->min_mem_reservation_bytes);
+  rpc_params->__set_initial_mem_reservation_total_claims(
+      backend_exec_params_->initial_mem_reservation_total_claims);
 
   // set fragment_ctxs and fragment_instance_ctxs
   rpc_params->__isset.fragment_ctxs = true;

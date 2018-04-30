@@ -19,11 +19,8 @@ package org.apache.impala.planner;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.PrintUtils;
@@ -111,13 +108,13 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // computeResourceProfile().
   private ResourceProfile resourceProfile_ = ResourceProfile.invalid();
 
-  // The total of initial reservations (in bytes) that will be claimed over the lifetime
-  // of this fragment. Computed in computeResourceProfile().
-  private long initialReservationTotalClaims_ = -1;
+  // The total of initial memory reservations (in bytes) that will be claimed over the
+  // lifetime of this fragment. Computed in computeResourceProfile().
+  private long initialMemReservationTotalClaims_ = -1;
 
   // The total memory (in bytes) required for the runtime filters used by the plan nodes
   // managed by this fragment.
-  private long runtimeFiltersReservationBytes_ = 0;
+  private long runtimeFiltersMemReservationBytes_ = 0;
 
   /**
    * C'tor for fragment with specific partition; the output is by default broadcast.
@@ -239,7 +236,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         // so only add it once.
         if (!filterSet.contains(filter.getFilterId())) {
           filterSet.add(filter.getFilterId());
-          runtimeFiltersReservationBytes_ += filter.getFilterSize();
+          runtimeFiltersMemReservationBytes_ += filter.getFilterSize();
         }
       }
     }
@@ -257,15 +254,17 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     // The sink is opened after the plan tree.
     ResourceProfile fInstancePostOpenProfile =
         planTreeProfile.postOpenProfile.sum(sink_.getResourceProfile());
+    // One thread is required to execute the plan tree.
     resourceProfile_ = new ResourceProfileBuilder()
-        .setMemEstimateBytes(runtimeFiltersReservationBytes_)
-        .setMinReservationBytes(runtimeFiltersReservationBytes_).build()
+        .setMemEstimateBytes(runtimeFiltersMemReservationBytes_)
+        .setMinMemReservationBytes(runtimeFiltersMemReservationBytes_)
+        .setThreadReservation(1).build()
         .sum(planTreeProfile.duringOpenProfile.max(fInstancePostOpenProfile));
-    initialReservationTotalClaims_ = sink_.getResourceProfile().getMinReservationBytes() +
-        runtimeFiltersReservationBytes_;
+    initialMemReservationTotalClaims_ = sink_.getResourceProfile().getMinMemReservationBytes() +
+        runtimeFiltersMemReservationBytes_;
     for (PlanNode node: collectPlanNodes()) {
-      initialReservationTotalClaims_ +=
-          node.getNodeResourceProfile().getMinReservationBytes();
+      initialMemReservationTotalClaims_ +=
+          node.getNodeResourceProfile().getMinMemReservationBytes();
     }
   }
 
@@ -337,13 +336,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     if (sink_ != null) result.setOutput_sink(sink_.toThrift());
     result.setPartition(dataPartition_.toThrift());
     if (resourceProfile_.isValid()) {
-      Preconditions.checkArgument(initialReservationTotalClaims_ > -1);
-      result.setMin_reservation_bytes(resourceProfile_.getMinReservationBytes());
-      result.setInitial_reservation_total_claims(initialReservationTotalClaims_);
-      result.setRuntime_filters_reservation_bytes(runtimeFiltersReservationBytes_);
+      Preconditions.checkArgument(initialMemReservationTotalClaims_ > -1);
+      result.setMin_mem_reservation_bytes(resourceProfile_.getMinMemReservationBytes());
+      result.setInitial_mem_reservation_total_claims(initialMemReservationTotalClaims_);
+      result.setRuntime_filters_reservation_bytes(runtimeFiltersMemReservationBytes_);
+      result.setThread_reservation(resourceProfile_.getThreadReservation());
     } else {
-      result.setMin_reservation_bytes(0);
-      result.setInitial_reservation_total_claims(0);
+      result.setMin_mem_reservation_bytes(0);
+      result.setInitial_mem_reservation_total_claims(0);
       result.setRuntime_filters_reservation_bytes(0);
     }
     return result;
@@ -428,9 +428,9 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     } else {
       builder.append(resourceProfile_.multiply(getNumInstancesPerHost(mt_dop))
           .getExplainString());
-      if (resourceProfile_.isValid() && runtimeFiltersReservationBytes_ > 0) {
+      if (resourceProfile_.isValid() && runtimeFiltersMemReservationBytes_ > 0) {
         builder.append(" runtime-filters-memory=");
-        builder.append(PrintUtils.printBytes(runtimeFiltersReservationBytes_));
+        builder.append(PrintUtils.printBytes(runtimeFiltersMemReservationBytes_));
       }
     }
     builder.append("\n");

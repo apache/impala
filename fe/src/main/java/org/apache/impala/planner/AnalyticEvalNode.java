@@ -253,10 +253,10 @@ public class AnalyticEvalNode extends PlanNode {
         queryOptions.getDefault_spillable_buffer_size(), queryOptions.getMax_row_size());
 
     // Must be kept in sync with MIN_REQUIRED_BUFFERS in AnalyticEvalNode in be.
-    long perInstanceMinBufferBytes = 2 * bufferSize;
+    long perInstanceMinMemReservation = 2 * bufferSize;
     nodeResourceProfile_ = new ResourceProfileBuilder()
         .setMemEstimateBytes(perInstanceMemEstimate)
-        .setMinReservationBytes(perInstanceMinBufferBytes)
+        .setMinMemReservationBytes(perInstanceMinMemReservation)
         .setSpillableBufferBytes(bufferSize).setMaxRowBufferBytes(bufferSize).build();
   }
 }

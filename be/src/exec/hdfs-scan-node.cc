@@ -338,25 +338,11 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
   while (!done_) {
     // Prevent memory accumulating across scan ranges.
     expr_results_pool.Clear();
-    {
-      // Check if we have enough resources (thread token and memory) to keep using
-      // this thread.
-      unique_lock<mutex> l(lock_);
-      if (active_scanner_thread_counter_.value() > 1) {
-        if (runtime_state_->resource_pool()->optional_exceeded()) {
-          // We can't break here. We need to update the counter with the lock held or else
-          // all threads might see active_scanner_thread_counter_.value > 1
-          COUNTER_ADD(&active_scanner_thread_counter_, -1);
-          // Unlock before releasing the thread token to avoid deadlock in
-          // ThreadTokenAvailableCb().
-          l.unlock();
-          goto exit;
-        }
-      } else {
-        // If this is the only scanner thread, it should keep running regardless
-        // of resource constraints.
-      }
-    }
+    // Check if we have enough thread tokens to keep using this optional thread. This
+    // check is racy: multiple threads may notice that the optional tokens are exceeded
+    // and shut themselves down. If we shut down too many and there are more optional
+    // tokens, ThreadAvailableCb() will be invoked again.
+    if (!first_thread && runtime_state_->resource_pool()->optional_exceeded()) break;
 
     bool unused = false;
     // Wake up every SCANNER_THREAD_COUNTERS to yield scanner threads back if unused, or
@@ -367,9 +353,6 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
     // We don't want num_unqueued_files_ to go to zero between the return from
     // StartNextScanRange() and the check for when all ranges are complete.
     int num_unqueued_files = num_unqueued_files_.Load();
-    // TODO: the Load() acts as an acquire barrier.  Is this needed? (i.e. any earlier
-    // stores that need to complete?)
-    AtomicUtil::MemoryBarrier();
     ScanRange* scan_range;
     Status status = StartNextScanRange(&scanner_thread_reservation, &scan_range);
     if (status.ok() && scan_range != nullptr) {
@@ -401,9 +384,7 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
       break;
     }
 
-    if (scan_range == NULL && num_unqueued_files == 0) {
-      // TODO: Based on the usage pattern of all_ranges_started_, it looks like it is not
-      // needed to acquire the lock in x86.
+    if (scan_range == nullptr && num_unqueued_files == 0) {
       unique_lock<mutex> l(lock_);
       // All ranges have been queued and DiskIoMgr has no more new ranges for this scan
       // node to process. This means that every range is either done or being processed by
@@ -412,30 +393,28 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
       break;
     }
   }
-  COUNTER_ADD(&active_scanner_thread_counter_, -1);
 
-exit:
   {
     unique_lock<mutex> l(lock_);
     ReturnReservationFromScannerThread(l, scanner_thread_reservation);
   }
-  runtime_state_->resource_pool()->ReleaseThreadToken(first_thread);
   for (auto& ctx: filter_ctxs) ctx.expr_eval->Close(runtime_state_);
   filter_mem_pool.FreeAll();
   expr_results_pool.FreeAll();
+  runtime_state_->resource_pool()->ReleaseThreadToken(first_thread);
+  COUNTER_ADD(&active_scanner_thread_counter_, -1);
 }
 
 Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     MemPool* expr_results_pool, ScanRange* scan_range,
     int64_t* scanner_thread_reservation) {
-  DCHECK(scan_range != NULL);
-
+  DCHECK(scan_range != nullptr);
   ScanRangeMetadata* metadata = static_cast<ScanRangeMetadata*>(scan_range->meta_data());
   int64_t partition_id = metadata->partition_id;
   HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
-  DCHECK(partition != NULL) << "table_id=" << hdfs_table_->id()
-                            << " partition_id=" << partition_id
-                            << "\n" << PrintThrift(runtime_state_->instance_ctx());
+  DCHECK(partition != nullptr) << "table_id=" << hdfs_table_->id()
+                               << " partition_id=" << partition_id
+                               << "\n" << PrintThrift(runtime_state_->instance_ctx());
 
   if (!PartitionPassesFilters(partition_id, FilterStats::SPLITS_KEY, filter_ctxs)) {
     // Avoid leaking unread buffers in scan_range.

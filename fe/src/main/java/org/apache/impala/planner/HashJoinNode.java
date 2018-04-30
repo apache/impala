@@ -243,11 +243,11 @@ public class HashJoinNode extends JoinNode {
     // to serve as input and output buffers while repartitioning.
     long maxRowBufferSize =
         computeMaxSpillableBufferSize(bufferSize, queryOptions.getMax_row_size());
-    long perInstanceMinBufferBytes =
+    long perInstanceMinMemReservation =
         bufferSize * (minBuffers - 2) + maxRowBufferSize * 2;
     nodeResourceProfile_ = new ResourceProfileBuilder()
         .setMemEstimateBytes(perInstanceMemEstimate)
-        .setMinReservationBytes(perInstanceMinBufferBytes)
+        .setMinMemReservationBytes(perInstanceMinMemReservation)
         .setSpillableBufferBytes(bufferSize)
         .setMaxRowBufferBytes(maxRowBufferSize).build();
   }

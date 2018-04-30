@@ -58,13 +58,13 @@ struct BackendExecParams {
   // concurrently-executing operators at any point in query execution. It may be less
   // than the initial reservation total claims (below) if execution of some operators
   // never overlaps, which allows reuse of reservations.
-  int64_t min_reservation_bytes;
+  int64_t min_mem_reservation_bytes;
 
   // Total of the initial buffer reservations that we expect to be claimed on this
   // backend for all fragment instances in instance_params. I.e. the sum over all
   // operators in all fragment instances that execute on this backend. This is used for
   // an optimization in InitialReservation. Measured in bytes.
-  int64_t initial_reservation_total_claims;
+  int64_t initial_mem_reservation_total_claims;
 };
 
 /// map from an impalad host address to the list of assigned fragment instance params.

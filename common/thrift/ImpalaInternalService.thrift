@@ -531,19 +531,19 @@ struct TExecQueryFInstancesParams {
   // required in V1
   5: optional list<TPlanFragmentInstanceCtx> fragment_instance_ctxs
 
-  // The minimum query-wide buffer reservation size (in bytes) required for the backend
+  // The minimum query-wide memory reservation (in bytes) required for the backend
   // executing the instances in fragment_instance_ctxs. This is the peak minimum
   // reservation that may be required by the concurrently-executing operators at any
   // point in query execution. It may be less than the initial reservation total claims
   // (below) if execution of some operators never overlaps, which allows reuse of
   // reservations. required in V1
-  6: optional i64 min_reservation_bytes
+  6: optional i64 min_mem_reservation_bytes
 
   // Total of the initial buffer reservations that we expect to be claimed on this
   // backend for all fragment instances in fragment_instance_ctxs. I.e. the sum over all
   // operators in all fragment instances that execute on this backend. This is used for
   // an optimization in InitialReservation. Measured in bytes. required in V1
-  7: optional i64 initial_reservation_total_claims
+  7: optional i64 initial_mem_reservation_total_claims
 }
 
 struct TExecQueryFInstancesResult {
