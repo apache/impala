@@ -891,8 +891,8 @@ INSERT INTO decimals_11_8 VALUES (CAST(1 AS TINYINT));</codeblock>
               <stentry>DECIMAL in <keyword keyref="impala30_full"/> or
                 higher</stentry>
 
-              <stentry>DECIMAL in <keyword keyref="impala212_full"> or
-                  lower</keyword>
+              <stentry>DECIMAL in <keyword keyref="impala212_full"/> or
+                  lower
 
               </stentry>
 
