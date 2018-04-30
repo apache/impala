@@ -408,8 +408,13 @@ struct TQueryExecRequest {
   9: optional i64 per_host_mem_estimate
 
   // Maximum possible (in the case all fragments are scheduled on all hosts with
-  // max DOP) minimum reservation required per host, in bytes.
-  10: optional i64 max_per_host_min_reservation;
+  // max DOP) minimum memory reservation required per host, in bytes.
+  10: optional i64 max_per_host_min_mem_reservation;
+
+  // Maximum possible (in the case all fragments are scheduled on all hosts with
+  // max DOP) required threads per host, i.e. the number of threads that this query
+  // needs to execute successfully. Does not include "optional" threads.
+  11: optional i64 max_per_host_thread_reservation;
 }
 
 enum TCatalogOpType {

@@ -403,35 +403,35 @@ bool AdmissionController::RejectImmediately(QuerySchedule* schedule,
   // the checks isn't particularly important, though some thought was given to ordering
   // them in a way that might make the sense for a user.
 
-  // Compute the max (over all backends) min_reservation_bytes and the cluster total
-  // (across all backends) min_reservation_bytes.
-  int64_t max_min_reservation_bytes = -1;
-  int64_t cluster_min_reservation_bytes = 0;
-  for (const auto& e: schedule->per_backend_exec_params()) {
-    cluster_min_reservation_bytes += e.second.min_reservation_bytes;
-    if (e.second.min_reservation_bytes > max_min_reservation_bytes) {
-      max_min_reservation_bytes = e.second.min_reservation_bytes;
+  // Compute the max (over all backends) min_mem_reservation_bytes and the cluster total
+  // (across all backends) min_mem_reservation_bytes.
+  int64_t max_min_mem_reservation_bytes = -1;
+  int64_t cluster_min_mem_reservation_bytes = 0;
+  for (const auto& e : schedule->per_backend_exec_params()) {
+    cluster_min_mem_reservation_bytes += e.second.min_mem_reservation_bytes;
+    if (e.second.min_mem_reservation_bytes > max_min_mem_reservation_bytes) {
+      max_min_mem_reservation_bytes = e.second.min_mem_reservation_bytes;
     }
   }
 
   // Checks related to the min buffer reservation against configured query memory limits:
-  if (schedule->query_options().__isset.buffer_pool_limit &&
-      schedule->query_options().buffer_pool_limit > 0) {
-    if (max_min_reservation_bytes > schedule->query_options().buffer_pool_limit) {
+  if (schedule->query_options().__isset.buffer_pool_limit
+      && schedule->query_options().buffer_pool_limit > 0) {
+    if (max_min_mem_reservation_bytes > schedule->query_options().buffer_pool_limit) {
       *rejection_reason = Substitute(REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION,
-          PrintBytes(max_min_reservation_bytes));
+          PrintBytes(max_min_mem_reservation_bytes));
       return true;
     }
-  } else if (schedule->query_options().__isset.mem_limit &&
-      schedule->query_options().mem_limit > 0) {
+  } else if (schedule->query_options().__isset.mem_limit
+      && schedule->query_options().mem_limit > 0) {
     const int64_t mem_limit = schedule->query_options().mem_limit;
     const int64_t max_reservation =
         ReservationUtil::GetReservationLimitFromMemLimit(mem_limit);
-    if (max_min_reservation_bytes > max_reservation) {
+    if (max_min_mem_reservation_bytes > max_reservation) {
       const int64_t required_mem_limit =
-          ReservationUtil::GetMinMemLimitFromReservation(max_min_reservation_bytes);
+          ReservationUtil::GetMinMemLimitFromReservation(max_min_mem_reservation_bytes);
       *rejection_reason = Substitute(REASON_MEM_LIMIT_TOO_LOW_FOR_RESERVATION,
-          PrintBytes(max_min_reservation_bytes), PrintBytes(required_mem_limit));
+          PrintBytes(max_min_mem_reservation_bytes), PrintBytes(required_mem_limit));
       return true;
     }
   }
@@ -447,15 +447,15 @@ bool AdmissionController::RejectImmediately(QuerySchedule* schedule,
     *rejection_reason = REASON_DISABLED_MAX_MEM_RESOURCES;
     return true;
   }
-  if (pool_cfg.max_mem_resources > 0 &&
-      cluster_min_reservation_bytes > pool_cfg.max_mem_resources) {
+  if (pool_cfg.max_mem_resources > 0
+      && cluster_min_mem_reservation_bytes > pool_cfg.max_mem_resources) {
     *rejection_reason = Substitute(REASON_MIN_RESERVATION_OVER_POOL_MEM,
         PrintBytes(pool_cfg.max_mem_resources),
-        PrintBytes(cluster_min_reservation_bytes));
+        PrintBytes(cluster_min_mem_reservation_bytes));
     return true;
   }
-  if (pool_cfg.max_mem_resources > 0 &&
-      schedule->GetClusterMemoryEstimate() > pool_cfg.max_mem_resources) {
+  if (pool_cfg.max_mem_resources > 0
+      && schedule->GetClusterMemoryEstimate() > pool_cfg.max_mem_resources) {
     *rejection_reason = Substitute(REASON_REQ_OVER_POOL_MEM,
         PrintBytes(schedule->GetClusterMemoryEstimate()),
         PrintBytes(pool_cfg.max_mem_resources));

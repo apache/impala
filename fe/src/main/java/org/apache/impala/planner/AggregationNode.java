@@ -300,12 +300,12 @@ public class AggregationNode extends PlanNode {
     }
 
     // Must be kept in sync with PartitionedAggregationNode::MinReservation() in be.
-    long perInstanceMinReservation;
+    long perInstanceMinMemReservation;
     long bufferSize = queryOptions.getDefault_spillable_buffer_size();
     long maxRowBufferSize =
         computeMaxSpillableBufferSize(bufferSize, queryOptions.getMax_row_size());
     if (aggInfo_.getGroupingExprs().isEmpty()) {
-      perInstanceMinReservation = 0;
+      perInstanceMinMemReservation = 0;
     } else {
       // This is a grouping pre-aggregation or merge aggregation.
       final int PARTITION_FANOUT = 16;
@@ -327,19 +327,19 @@ public class AggregationNode extends PlanNode {
         // and at least 64kb for hash tables per partition. We must reserve at least one
         // full buffer for hash tables for the suballocator to subdivide. We don't need to
         // reserve memory for large rows since they can be passed through if needed.
-        perInstanceMinReservation = bufferSize * PARTITION_FANOUT +
+        perInstanceMinMemReservation = bufferSize * PARTITION_FANOUT +
             Math.max(64 * 1024 * PARTITION_FANOUT, bufferSize);
       } else {
         long minBuffers = PARTITION_FANOUT + 1 + (aggInfo_.needsSerialize() ? 1 : 0);
         // Two of the buffers need to be buffers large enough to hold the maximum-sized
         // row to serve as input and output buffers while repartitioning.
-        perInstanceMinReservation = bufferSize * (minBuffers - 2) + maxRowBufferSize * 2;
+        perInstanceMinMemReservation = bufferSize * (minBuffers - 2) + maxRowBufferSize * 2;
       }
     }
 
     nodeResourceProfile_ = new ResourceProfileBuilder()
         .setMemEstimateBytes(perInstanceMemEstimate)
-        .setMinReservationBytes(perInstanceMinReservation)
+        .setMinMemReservationBytes(perInstanceMinMemReservation)
         .setSpillableBufferBytes(bufferSize)
         .setMaxRowBufferBytes(maxRowBufferSize).build();
   }

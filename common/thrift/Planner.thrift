@@ -61,19 +61,23 @@ struct TPlanFragment {
   // output, which is specified by output_sink.output_partitioning.
   6: required Partitions.TDataPartition partition
 
-  // The minimum reservation size (in bytes) required for an instance of this plan
+  // The minimum memory reservation (in bytes) required for an instance of this plan
   // fragment to execute on a single host.
-  7: optional i64 min_reservation_bytes
+  7: optional i64 min_mem_reservation_bytes
 
-  // Total of the initial buffer reservations that we expect to be claimed by this
+  // Total of the initial memory reservations that we expect to be claimed by this
   // fragment. I.e. the sum of the min reservations over all operators (including the
   // sink) in a single instance of this fragment. This is used for an optimization in
   // InitialReservation. Measured in bytes. required in V1
-  8: optional i64 initial_reservation_total_claims
+  8: optional i64 initial_mem_reservation_total_claims
 
   // The total memory (in bytes) required for the runtime filters used by the plan nodes
   // managed by this fragment. Is included in min_reservation_bytes.
   9: optional i64 runtime_filters_reservation_bytes
+
+  // Maximum number of required threads that will be executing concurrently for this plan
+  // fragment, i.e. the number of threads that this query needs to execute successfully.
+  10: optional i64 thread_reservation
 }
 
 // location information for a single scan range

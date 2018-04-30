@@ -125,10 +125,10 @@ void ThreadResourceMgr::UpdatePoolQuotas(ThreadResourcePool* new_pool) {
 bool ThreadResourcePool::TryAcquireThreadToken() {
   while (true) {
     int64_t previous_num_threads = num_threads_.Load();
-    int64_t new_optional_threads = (previous_num_threads >> 32) + 1;
-    int64_t new_required_threads = previous_num_threads & 0xFFFFFFFF;
+    int64_t new_optional_threads = (previous_num_threads >> OPTIONAL_SHIFT) + 1;
+    int64_t new_required_threads = previous_num_threads & REQUIRED_MASK;
     if (new_optional_threads + new_required_threads > quota()) return false;
-    int64_t new_value = new_optional_threads << 32 | new_required_threads;
+    int64_t new_value = new_optional_threads << OPTIONAL_SHIFT | new_required_threads;
     // Atomically swap the new value if no one updated num_threads_.  We do not
     // care about the ABA problem here.
     if (num_threads_.CompareAndSwap(previous_num_threads, new_value)) return true;
@@ -144,9 +144,9 @@ void ThreadResourcePool::ReleaseThreadToken(
     DCHECK_GT(num_optional_threads(), 0);
     while (true) {
       int64_t previous_num_threads = num_threads_.Load();
-      int64_t new_optional_threads = (previous_num_threads >> 32) - 1;
-      int64_t new_required_threads = previous_num_threads & 0xFFFFFFFF;
-      int64_t new_value = new_optional_threads << 32 | new_required_threads;
+      int64_t new_optional_threads = (previous_num_threads >> OPTIONAL_SHIFT) - 1;
+      int64_t new_required_threads = previous_num_threads & REQUIRED_MASK;
+      int64_t new_value = new_optional_threads << OPTIONAL_SHIFT | new_required_threads;
       if (num_threads_.CompareAndSwap(previous_num_threads, new_value)) break;
     }
   }

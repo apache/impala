@@ -109,6 +109,10 @@ void RuntimeState::Init() {
   // Register with the thread mgr
   resource_pool_ = exec_env_->thread_mgr()->CreatePool();
   DCHECK(resource_pool_ != nullptr);
+  if (fragment_ctx_ != nullptr) {
+    // Ensure that the planner correctly determined the required threads.
+    resource_pool_->set_max_required_threads(fragment_ctx_->fragment.thread_reservation);
+  }
 
   total_thread_statistics_ = ADD_THREAD_COUNTERS(runtime_profile(), "TotalThreads");
   total_storage_wait_timer_ = ADD_TIMER(runtime_profile(), "TotalStorageWaitTime");

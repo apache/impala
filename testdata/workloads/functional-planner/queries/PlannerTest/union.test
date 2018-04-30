@@ -3224,19 +3224,19 @@ select int_col from functional.alltypes
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
-|  mem-estimate=0B mem-reservation=0B
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=0B mem-reservation=0B
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=2 row-size=4B cardinality=7300
 |
 F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
+Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=2
 00:UNION
 |  pass-through-operands: all
-|  mem-estimate=0B mem-reservation=0B
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=2 row-size=4B cardinality=7300
 |
 |--02:SCAN HDFS [functional.alltypes, RANDOM]
@@ -3246,7 +3246,7 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
 |       partitions: 24/24 rows=7300
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=310
-|     mem-estimate=128.00MB mem-reservation=32.00KB
+|     mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=1 row-size=4B cardinality=7300
 |
 01:SCAN HDFS [functional.emptytable, RANDOM]
@@ -3256,7 +3256,7 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
      partitions: 0/0 rows=unavailable
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=0
-   mem-estimate=0B mem-reservation=0B
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
    tuple-ids=0 row-size=4B cardinality=0
 ====
 # IMPALA-6388: Verify that the order of the union operands does not impact the
@@ -3268,19 +3268,19 @@ select f2 from functional.emptytable
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=0B mem-reservation=0B
+|  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
-|  mem-estimate=0B mem-reservation=0B
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=0B mem-reservation=0B
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=2 row-size=4B cardinality=7300
 |
 F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
+Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=2
 00:UNION
 |  pass-through-operands: all
-|  mem-estimate=0B mem-reservation=0B
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=2 row-size=4B cardinality=7300
 |
 |--02:SCAN HDFS [functional.emptytable, RANDOM]
@@ -3290,7 +3290,7 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
 |       partitions: 0/0 rows=unavailable
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=0
-|     mem-estimate=0B mem-reservation=0B
+|     mem-estimate=0B mem-reservation=0B thread-reservation=0
 |     tuple-ids=1 row-size=4B cardinality=0
 |
 01:SCAN HDFS [functional.alltypes, RANDOM]
@@ -3300,6 +3300,6 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
-   mem-estimate=128.00MB mem-reservation=32.00KB
+   mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=4B cardinality=7300
 ====

@@ -288,7 +288,7 @@ public class SortNode extends PlanNode {
     // Must be kept in sync with ComputeMinReservation() in Sorter in be.
     int pageMultiplier = usesVarLenBlocks ? 2 : 1;
     long perInstanceMemEstimate;
-    long perInstanceMinReservation;
+    long perInstanceMinMemReservation;
     if (type_ == TSortType.PARTIAL) {
       // The memory limit cannot be less than the size of the required blocks.
       long mem_limit = Math.max(PARTIAL_SORT_MEM_LIMIT, bufferSize * pageMultiplier);
@@ -296,16 +296,16 @@ public class SortNode extends PlanNode {
       perInstanceMemEstimate = fullInputSize < 0 ?
           mem_limit :
           Math.min((long) Math.ceil(fullInputSize), mem_limit);
-      perInstanceMinReservation = bufferSize * pageMultiplier;
+      perInstanceMinMemReservation = bufferSize * pageMultiplier;
     } else {
       double numInputBlocks = Math.ceil(fullInputSize / (bufferSize * pageMultiplier));
       perInstanceMemEstimate =
           bufferSize * (long) Math.ceil(Math.sqrt(numInputBlocks));
-      perInstanceMinReservation = 3 * bufferSize * pageMultiplier;
+      perInstanceMinMemReservation = 3 * bufferSize * pageMultiplier;
     }
     nodeResourceProfile_ = new ResourceProfileBuilder()
         .setMemEstimateBytes(perInstanceMemEstimate)
-        .setMinReservationBytes(perInstanceMinReservation)
+        .setMinMemReservationBytes(perInstanceMinMemReservation)
         .setSpillableBufferBytes(bufferSize).setMaxRowBufferBytes(bufferSize).build();
   }
 

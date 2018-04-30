@@ -143,7 +143,7 @@ void KuduScanNode::ThreadAvailableCb(ThreadResourcePool* pool) {
     unique_lock<mutex> lock(lock_);
     // All done or all tokens are assigned.
     if (done_ || !HasScanToken()) break;
-    bool first_thread = active_scanner_thread_counter_.value() == 0;
+    bool first_thread = num_active_scanners_ == 0;
 
     // Check if we can get a token. We need at least one thread to run.
     if (first_thread) {
@@ -211,12 +211,9 @@ Status KuduScanNode::ProcessScanToken(KuduScanner* scanner, const string& scan_t
 
 void KuduScanNode::RunScannerThread(
     bool first_thread, const string& name, const string* initial_token) {
-  DCHECK(initial_token != NULL);
+  DCHECK(initial_token != nullptr);
   SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
   SCOPED_THREAD_COUNTER_MEASUREMENT(runtime_state_->total_thread_statistics());
-  // Set to true if this thread observes that the number of optional threads has been
-  // exceeded and is exiting early.
-  bool optional_thread_exiting = false;
   KuduScanner scanner(this, runtime_state_);
 
   const string* scan_token = initial_token;
@@ -224,21 +221,16 @@ void KuduScanNode::RunScannerThread(
   if (status.ok()) {
     // Here, even though a read of 'done_' may conflict with a write to it,
     // ProcessScanToken() will return early, as will GetNextScanToken().
-    while (!done_ && scan_token != NULL) {
+    while (!done_ && scan_token != nullptr) {
       status = ProcessScanToken(&scanner, *scan_token);
       if (!status.ok()) break;
 
-      // Check if the number of optional threads has been exceeded.
-      if (runtime_state_->resource_pool()->optional_exceeded()) {
-        unique_lock<mutex> l(lock_);
-        // Don't exit if this is the last thread. Otherwise, the scan will indicate it's
-        // done before all scan tokens have been processed.
-        if (num_active_scanners_ > 1) {
-          --num_active_scanners_;
-          optional_thread_exiting = true;
-          break;
-        }
-      }
+      // Check if we have enough thread tokens to keep using this optional thread. This
+      // check is racy: multiple threads may notice that the optional tokens are exceeded
+      // and shut themselves down. If we shut down too many and there are more optional
+      // tokens, ThreadAvailableCb() will be invoked again.
+      if (!first_thread && runtime_state_->resource_pool()->optional_exceeded()) break;
+
       unique_lock<mutex> l(lock_);
       if (!done_) {
         scan_token = GetNextScanToken();
@@ -255,12 +247,7 @@ void KuduScanNode::RunScannerThread(
       status_ = status;
       SetDoneInternal();
     }
-    // Decrement num_active_scanners_ unless handling the case of an early exit when
-    // optional threads have been exceeded, in which case it already was decremented.
-    if (!optional_thread_exiting) --num_active_scanners_;
-    if (num_active_scanners_ == 0) {
-      SetDoneInternal();
-    }
+    if (--num_active_scanners_ == 0) SetDoneInternal();
   }
 
   // lock_ is released before calling ThreadResourceMgr::ReleaseThreadToken() which

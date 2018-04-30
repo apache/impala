@@ -28,8 +28,8 @@ public class ResourceProfileBuilder {
   private long memEstimateBytes_ = -1;
 
   // Assume no reservation is used unless the caller explicitly sets it.
-  private long minReservationBytes_ = 0;
-  private long maxReservationBytes_ = 0;
+  private long minMemReservationBytes_ = 0;
+  private long maxMemReservationBytes_ = 0;
 
   // The spillable buffer size is only set by plan nodes that use it.
   private long spillableBufferBytes_= -1;
@@ -37,17 +37,20 @@ public class ResourceProfileBuilder {
   // Must be set if spillableBufferBytes_ is set.
   private long maxRowBufferBytes_= -1;
 
+  // Defaults to zero, because most ExecNodes do not create additional threads.
+  private long threadReservation_ = 0;
+
   public ResourceProfileBuilder setMemEstimateBytes(long memEstimateBytes) {
     memEstimateBytes_ = memEstimateBytes;
     return this;
   }
 
   /**
-   * Sets the minimum reservation and an unbounded maximum reservation.
+   * Sets the minimum memory reservation and an unbounded maximum memory reservation.
    */
-  public ResourceProfileBuilder setMinReservationBytes(long minReservationBytes) {
-    minReservationBytes_ = minReservationBytes;
-    maxReservationBytes_ = Long.MAX_VALUE;
+  public ResourceProfileBuilder setMinMemReservationBytes(long minMemReservationBytes) {
+    minMemReservationBytes_ = minMemReservationBytes;
+    maxMemReservationBytes_ = Long.MAX_VALUE;
     return this;
   }
 
@@ -61,9 +64,15 @@ public class ResourceProfileBuilder {
     return this;
   }
 
+  public ResourceProfileBuilder setThreadReservation(long threadReservation) {
+    threadReservation_ = threadReservation;
+    return this;
+  }
+
   ResourceProfile build() {
     Preconditions.checkState(memEstimateBytes_ >= 0, "Mem estimate must be set");
-    return new ResourceProfile(true, memEstimateBytes_, minReservationBytes_,
-        maxReservationBytes_, spillableBufferBytes_, maxRowBufferBytes_);
+    return new ResourceProfile(true, memEstimateBytes_, minMemReservationBytes_,
+        maxMemReservationBytes_, spillableBufferBytes_, maxRowBufferBytes_,
+        threadReservation_);
   }
 }

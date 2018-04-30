@@ -271,7 +271,10 @@ public class KuduScanNode extends ScanNode {
 
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
-    nodeResourceProfile_ = ResourceProfile.noReservation(0);
+    // TODO: add a memory estimate when we revisit memory estimates overall.
+    nodeResourceProfile_ = new ResourceProfileBuilder()
+        .setMemEstimateBytes(0)
+        .setThreadReservation(useMtScanNode_ ? 0 : 1).build();
   }
 
   @Override

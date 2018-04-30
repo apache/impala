@@ -170,7 +170,10 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// processed from the IoMgr and then processes the entire range end to end.
   /// This thread terminates when all scan ranges are complete or an error occurred.
   /// 'first_thread' is true if this was the first scanner thread to start and
-  /// it acquired a "required" thread token from ThreadResourceMgr.
+  /// it acquired a "required" thread token from ThreadResourceMgr. The first thread
+  /// will continue running until 'done_' is true or an error is encountered. Other
+  /// threads may terminate early if the optional tokens in
+  /// runtime_state_->resource_pool() are exceeded.
   /// The caller must have reserved 'scanner_thread_reservation' bytes of memory for
   /// this thread. Before returning, this function releases the reservation with
   /// ReturnReservationFromScannerThread().

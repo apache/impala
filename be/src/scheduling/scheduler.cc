@@ -714,21 +714,21 @@ void Scheduler::ComputeBackendExecParams(QuerySchedule* schedule) {
       // instances on this backend can consume their peak resources at the same time,
       // i.e. that this backend's peak resources is the sum of the per-fragment-instance
       // peak resources for the instances executing on this backend.
-      be_params.min_reservation_bytes += f.fragment.min_reservation_bytes;
-      be_params.initial_reservation_total_claims +=
-          f.fragment.initial_reservation_total_claims;
+      be_params.min_mem_reservation_bytes += f.fragment.min_mem_reservation_bytes;
+      be_params.initial_mem_reservation_total_claims +=
+          f.fragment.initial_mem_reservation_total_claims;
     }
   }
   schedule->set_per_backend_exec_params(per_backend_params);
 
-  stringstream min_reservation_ss;
+  stringstream min_mem_reservation_ss;
   for (const auto& e: per_backend_params) {
-    min_reservation_ss << TNetworkAddressToString(e.first) << "("
-         << PrettyPrinter::Print(e.second.min_reservation_bytes, TUnit::BYTES)
+    min_mem_reservation_ss << TNetworkAddressToString(e.first) << "("
+         << PrettyPrinter::Print(e.second.min_mem_reservation_bytes, TUnit::BYTES)
          << ") ";
   }
-  schedule->summary_profile()->AddInfoString("Per Host Min Reservation",
-      min_reservation_ss.str());
+  schedule->summary_profile()->AddInfoString("Per Host Min Memory Reservation",
+      min_mem_reservation_ss.str());
 }
 
 Scheduler::AssignmentCtx::AssignmentCtx(const BackendConfig& executor_config,
