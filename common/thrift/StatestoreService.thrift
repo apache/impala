@@ -122,6 +122,10 @@ struct TTopicDelta {
   // keys with a version < min_subscriber_topic_version. Only used when sending an update
   // from the statestore to a subscriber.
   6: optional i64 min_subscriber_topic_version
+
+  // If set and true the statestore must clear the existing topic entries (if any) before
+  // applying the entries in topic_entries.
+  7: optional bool clear_topic_entries
 }
 
 // Description of a topic to subscribe to as part of a RegisterSubscriber call

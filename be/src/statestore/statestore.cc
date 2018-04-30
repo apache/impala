@@ -207,6 +207,23 @@ void Statestore::Topic::DeleteIfVersionsMatch(TopicEntry::Version version,
   }
 }
 
+void Statestore::Topic::ClearAllEntries() {
+  lock_guard<shared_mutex> write_lock(lock_);
+  entries_.clear();
+  topic_update_log_.clear();
+  int64_t key_size_metric_val = key_size_metric_->GetValue();
+  key_size_metric_->SetValue(std::max(static_cast<int64_t>(0),
+      key_size_metric_val - total_key_size_bytes_));
+  int64_t value_size_metric_val = value_size_metric_->GetValue();
+  value_size_metric_->SetValue(std::max(static_cast<int64_t>(0),
+      value_size_metric_val - total_value_size_bytes_));
+  int64_t topic_size_metric_val = topic_size_metric_->GetValue();
+  topic_size_metric_->SetValue(std::max(static_cast<int64_t>(0),
+      topic_size_metric_val - (total_value_size_bytes_ + total_key_size_bytes_)));
+  total_value_size_bytes_ = 0;
+  total_key_size_bytes_ = 0;
+}
+
 void Statestore::Topic::BuildDelta(const SubscriberId& subscriber_id,
     TopicEntry::Version last_processed_version, TTopicDelta* delta) {
   // If the subscriber version is > 0, send this update as a delta. Otherwise, this is
@@ -655,6 +672,15 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, UpdateKind update_kin
       }
 
       Topic& topic = topic_it->second;
+      // Check if the subscriber indicated that the topic entries should be
+      // cleared.
+      if (update.__isset.clear_topic_entries && update.clear_topic_entries) {
+        DCHECK(!update.__isset.from_version);
+        LOG(INFO) << "Received request for clearing the entries of topic: "
+                  << update.topic_name << " from: " << subscriber->id();
+        topic.ClearAllEntries();
+      }
+
       // Update the topic and add transient entries separately to avoid holding both
       // locks at the same time and preventing concurrent topic updates.
       vector<TopicEntry::Version> entry_versions = topic.Put(update.topic_entries);

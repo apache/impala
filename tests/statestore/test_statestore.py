@@ -323,13 +323,14 @@ class StatestoreSubscriber(object):
 
 class TestStatestore():
   def make_topic_update(self, topic_name, key_template="foo", value_template="bar",
-                        num_updates=1):
+                        num_updates=1, clear_topic_entries=False):
     topic_entries = [
       Subscriber.TTopicItem(key=key_template + str(x), value=value_template + str(x))
       for x in xrange(num_updates)]
     return Subscriber.TTopicDelta(topic_name=topic_name,
                                   topic_entries=topic_entries,
-                                  is_delta=False)
+                                  is_delta=False,
+                                  clear_topic_entries=clear_topic_entries)
 
   def test_registration_ids_different(self):
     """Test that if a subscriber with the same id registers twice, the registration ID is
@@ -517,6 +518,54 @@ class TestStatestore():
           .register(topics=reg)
           .wait_for_update(persistent_topic_name, 1)
           .wait_for_update(transient_topic_name, 1)
+    )
+
+  def test_update_with_clear_entries_flag(self):
+    """Test that the statestore clears all topic entries when a subscriber
+    sets the clear_topic_entries flag in a topic update message (IMPALA-6948)."""
+    topic_name = "test_topic_%s" % str(uuid.uuid1())
+
+    def add_entries(sub, args):
+      updates = []
+      if (topic_name in args.topic_deltas and sub.update_counts[topic_name] == 1):
+        updates.append(self.make_topic_update(topic_name, num_updates=2,
+            key_template="old"))
+
+      if (topic_name in args.topic_deltas and sub.update_counts[topic_name] == 2):
+        updates.append(self.make_topic_update(topic_name, num_updates=1,
+            key_template="new", clear_topic_entries=True))
+
+      if len(updates) > 0:
+        return TUpdateStateResponse(status=STATUS_OK, topic_updates=updates,
+            skipped=False)
+
+      return DEFAULT_UPDATE_STATE_RESPONSE
+
+    def check_entries(sub, args):
+      if (topic_name in args.topic_deltas and sub.update_counts[topic_name] == 1):
+        assert len(args.topic_deltas[topic_name].topic_entries) == 1
+        assert args.topic_deltas[topic_name].topic_entries[0].key == "new0"
+
+      return DEFAULT_UPDATE_STATE_RESPONSE
+
+    reg = [TTopicRegistration(topic_name=topic_name, is_transient=False)]
+    sub1 = StatestoreSubscriber(update_cb=add_entries)
+    (
+      sub1.start()
+        .register(topics=reg)
+        .wait_for_update(topic_name, 1)
+        .kill()
+        .wait_for_failure()
+        .start()
+        .register(topics=reg)
+        .wait_for_update(topic_name, 1)
+    )
+
+    sub2 = StatestoreSubscriber(update_cb=check_entries)
+    (
+      sub2.start()
+        .register(topics=reg)
+        .wait_for_update(topic_name, 2)
     )
 
   def test_heartbeat_failure_reset(self):
