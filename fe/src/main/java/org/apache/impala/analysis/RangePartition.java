@@ -121,8 +121,9 @@ public class RangePartition implements ParseNode {
   public void analyze(Analyzer analyzer, List<ColumnDef> partColDefs)
       throws AnalysisException {
     // Reanalyzing not supported because TIMESTAMPs are converted to BIGINT (unixtime
-    // micros) in place.
-    Preconditions.checkArgument(!isAnalyzed_);
+    // micros) in place. We can just return because none of the state will have changed
+    // since the first time we did the analysis.
+    if (isAnalyzed_) return;
     analyzeBoundaryValues(lowerBound_, partColDefs, analyzer);
     if (!isSingletonRange_) {
       analyzeBoundaryValues(upperBound_, partColDefs, analyzer);

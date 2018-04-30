@@ -253,6 +253,9 @@ public class CreateTableAsSelectStmt extends StatementBase {
   public void reset() {
     super.reset();
     createStmt_.reset();
+    // This is populated for CTAS in analyze(), so it needs to be cleared here. For other
+    // types of CreateTableStmts it is set by the parser and should not be reset.
+    createStmt_.getPartitionColumnDefs().clear();
     insertStmt_.reset();
   }
 }
