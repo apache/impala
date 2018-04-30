@@ -1038,7 +1038,7 @@ template <bool HAS_NULLABLE_TUPLE>
 void BufferedTupleStream::UnflattenTupleRow(uint8_t** data, TupleRow* row) const {
   const int tuples_per_row = desc_->tuple_descriptors().size();
   uint8_t* ptr = *data;
-  if (has_nullable_tuple_) {
+  if (HAS_NULLABLE_TUPLE) {
     // Stitch together the tuples from the page and the NULL ones.
     const uint8_t* null_indicators = ptr;
     ptr += NullIndicatorBytesPerRow();
