@@ -304,6 +304,29 @@ TEST(BitUtil, RoundUpDown) {
   EXPECT_EQ(BitUtil::RoundDownNumi64(65), 1);
 }
 
+// Prevent inlining so that the compiler can't optimize out the check.
+__attribute__((noinline))
+int CpuInfoIsSupportedHoistHelper(int64_t cpu_info_flag, int arg) {
+  if (CpuInfo::IsSupported(cpu_info_flag)) {
+    // Assembly follows similar pattern to popcnt instruction but executes
+    // illegal instruction.
+    int64_t result;
+    __asm__ __volatile__("ud2" : "=a"(result): "mr"(arg): "cc");
+    return result;
+  } else {
+    return 12345;
+  }
+}
+
+// Regression test for IMPALA-6882 - make sure illegal instruction isn't hoisted out of
+// CpuInfo::IsSupported() checks. This doesn't test the bug precisely but is a canary for
+// this kind of optimization happening.
+TEST(BitUtil, CpuInfoIsSupportedHoist) {
+  constexpr int64_t CPU_INFO_FLAG = CpuInfo::SSSE3;
+  CpuInfo::TempDisable disable_sssse3(CPU_INFO_FLAG);
+  EXPECT_EQ(12345, CpuInfoIsSupportedHoistHelper(CPU_INFO_FLAG, 0));
+}
+
 }
 
 IMPALA_TEST_MAIN();
