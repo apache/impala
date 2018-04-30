@@ -557,6 +557,15 @@ under the License.
                 This feature is available in <keyword keyref="impala25_full"/> and higher.
               </entry>
             </row>
+            <row rev="2.3.0 IMPALA-2143">
+              <entry>--auth_creds_ok_in_clear</entry>
+              <entry>N/A</entry>
+              <entry>
+                Allows LDAP authentication to be used with an insecure connection to the shell.
+                WARNING: This will allow authentication credentials to be sent unencrypted,
+                and hence may be vulnerable to an attack.
+              </entry>
+            </row>
           </tbody>
         </tgroup>
       </table>
