@@ -57,16 +57,6 @@ using namespace apache::thrift::server;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::concurrency;
 
-// IsRecvTimeoutTException() and IsSendFailTException() make assumption about the
-// implementation of read(), write() and write_partial() in TSocket.cpp and those
-// functions may change between different versions of Thrift.
-static_assert(PACKAGE_VERSION[0] == '0', "");
-static_assert(PACKAGE_VERSION[1] == '.', "");
-static_assert(PACKAGE_VERSION[2] == '9', "");
-static_assert(PACKAGE_VERSION[3] == '.', "");
-static_assert(PACKAGE_VERSION[4] == '0', "");
-static_assert(PACKAGE_VERSION[5] == '\0', "");
-
 // Thrift defines operator< but does not implement it. This is a stub
 // implementation so we can link.
 bool Apache::Hadoop::Hive::Partition::operator<(
@@ -185,6 +175,16 @@ bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& 
   return false;
 }
 
+// IsRecvTimeoutTException() and IsConnResetTException() make assumptions about the
+// implementation of read(), write() and write_partial() in TSocket.cpp and those
+// functions may change between different versions of Thrift.
+static_assert(PACKAGE_VERSION[0] == '0', "");
+static_assert(PACKAGE_VERSION[1] == '.', "");
+static_assert(PACKAGE_VERSION[2] == '9', "");
+static_assert(PACKAGE_VERSION[3] == '.', "");
+static_assert(PACKAGE_VERSION[4] == '0', "");
+static_assert(PACKAGE_VERSION[5] == '\0', "");
+
 bool IsRecvTimeoutTException(const TTransportException& e) {
   // String taken from TSocket::read() Thrift's TSocket.cpp.
   return (e.getType() == TTransportException::TIMED_OUT &&
@@ -198,10 +198,14 @@ bool IsConnResetTException(const TTransportException& e) {
   // As readAll() is reading non-zero length payload, this can only mean recv() called
   // by read() returns 0. According to man page of recv(), this implies a stream socket
   // peer has performed an orderly shutdown.
+  // "ECONNRESET" is only returned in 0.9.0, since in 0.9.3, we get
+  // END_OF_FILE: "No more data to read." instead, for the same error code.
   return (e.getType() == TTransportException::END_OF_FILE &&
              strstr(e.what(), "No more data to read.") != nullptr) ||
          (e.getType() == TTransportException::INTERNAL_ERROR &&
-             strstr(e.what(), "SSL_read: Connection reset by peer") != nullptr);
+             strstr(e.what(), "SSL_read: Connection reset by peer") != nullptr) ||
+         (e.getType() == TTransportException::NOT_OPEN &&
+             strstr(e.what(), "ECONNRESET") != nullptr);
 }
 
 }

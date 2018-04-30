@@ -77,6 +77,9 @@ void FaultInjectionUtil::InjectRpcException(bool is_send, int freq) {
         case RPC_EXCEPTION_SEND_STALE_CONNECTION:
           throw TTransportException(TTransportException::END_OF_FILE,
              "No more data to read.");
+        case RPC_EXCEPTION_SEND_STALE_CONNECTION_RESET:
+          throw TTransportException(TTransportException::NOT_OPEN,
+             "ECONNRESET");
         case RPC_EXCEPTION_SSL_SEND_STALE_CONNECTION:
           throw TSSLException("SSL_read: Connection reset by peer");
         // fall through for the default case.
