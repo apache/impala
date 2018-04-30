@@ -72,9 +72,13 @@ namespace SSEUtil {
   };
 }
 
-/// Define the SSE 4.2 intrinsics.  The caller must first verify at runtime (or codegen
-/// IR load time) that the processor supports SSE 4.2 before calling these.  These are
-/// defined outside the namespace because the IR w/ SSE 4.2 case needs to use macros.
+/// Define the SSE 4.2 intrinsics. The caller must first verify at runtime (or codegen
+/// IR load time) that the processor supports SSE 4.2 before calling these. All __asm__
+/// blocks are marked __volatile__ to prevent hoisting the ASM out of checks for CPU
+/// support (e.g. IMPALA-6882).
+///
+/// These intrinsics are defined outside the namespace because the IR w/ SSE 4.2 case
+/// needs to use macros.
 #ifndef IR_COMPILE
 /// When compiling to native code (i.e. not IR), we cannot use the -msse4.2 compiler
 /// flag.  Otherwise, the compiler will emit SSE 4.2 instructions outside of the runtime
@@ -99,11 +103,11 @@ static inline __m128i SSE4_cmpestrm(__m128i str1, int len1, __m128i str2, int le
   /// Use asm reg rather than Yz output constraint to workaround LLVM bug 13199 -
   /// clang doesn't support Y-prefixed asm constraints.
   register volatile __m128i result asm ("xmm0");
-  __asm__ volatile ("pcmpestrm %5, %2, %1"
+  __asm__ __volatile__ ("pcmpestrm %5, %2, %1"
       : "=x"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(MODE) : "cc");
 #else
   __m128i result;
-  __asm__ volatile ("pcmpestrm %5, %2, %1"
+  __asm__ __volatile__ ("pcmpestrm %5, %2, %1"
       : "=Yz"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(MODE) : "cc");
 #endif
   return result;
@@ -112,35 +116,35 @@ static inline __m128i SSE4_cmpestrm(__m128i str1, int len1, __m128i str2, int le
 template<int MODE>
 static inline int SSE4_cmpestri(__m128i str1, int len1, __m128i str2, int len2) {
   int result;
-  __asm__("pcmpestri %5, %2, %1"
+  __asm__ __volatile__("pcmpestri %5, %2, %1"
       : "=c"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(MODE) : "cc");
   return result;
 }
 
 static inline uint32_t SSE4_crc32_u8(uint32_t crc, uint8_t v) {
-  __asm__("crc32b %1, %0" : "+r"(crc) : "rm"(v));
+  __asm__ __volatile__("crc32b %1, %0" : "+r"(crc) : "rm"(v));
   return crc;
 }
 
 static inline uint32_t SSE4_crc32_u16(uint32_t crc, uint16_t v) {
-  __asm__("crc32w %1, %0" : "+r"(crc) : "rm"(v));
+  __asm__ __volatile__("crc32w %1, %0" : "+r"(crc) : "rm"(v));
   return crc;
 }
 
 static inline uint32_t SSE4_crc32_u32(uint32_t crc, uint32_t v) {
-  __asm__("crc32l %1, %0" : "+r"(crc) : "rm"(v));
+  __asm__ __volatile__("crc32l %1, %0" : "+r"(crc) : "rm"(v));
   return crc;
 }
 
 static inline uint32_t SSE4_crc32_u64(uint32_t crc, uint64_t v) {
   uint64_t result = crc;
-  __asm__("crc32q %1, %0" : "+r"(result) : "rm"(v));
+  __asm__ __volatile__("crc32q %1, %0" : "+r"(result) : "rm"(v));
   return result;
 }
 
 static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
   int64_t result;
-  __asm__("popcntq %1, %0" : "=r"(result) : "mr"(a) : "cc");
+  __asm__ __volatile__("popcntq %1, %0" : "=r"(result) : "mr"(a) : "cc");
   return result;
 }
 
