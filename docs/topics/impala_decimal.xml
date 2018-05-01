@@ -208,20 +208,20 @@ under the License.
     </p>
 
     <p>
-      For all arithmetic options, the resulting precision is at most 38.
+      For all arithmetic operations, the resulting precision is at most 38.
     </p>
 
     <p>
-      If the precision of the result would be greater than 38, Impala truncates the result from
-      the back, but keeps at least 6 fractional digits in scale and rounds.
+      If the resulting precision would be greater than 38, Impala truncates the result from the
+      back, but keeps at least 6 fractional digits in scale and rounds.
     </p>
 
     <p>
       For example, <codeph>DECIMAL(38, 20) * DECIMAL(38, 20)</codeph> returns
       <codeph>DECIMAL(38, 6)</codeph>. According to the table below, the resulting precision and
       scale would be <codeph>(77, 40)</codeph>, but they are higher than the maximum precision
-      and scale. So, Impala sets the precision to the maximum allowed 38, and truncates the
-      scale to 6.
+      and scale for <codeph>DECIMAL</codeph>. So, Impala sets the precision to the maximum
+      allowed 38, and truncates the scale to 6.
     </p>
 
     <p>
@@ -401,8 +401,7 @@ INSERT INTO flt SELECT CAST(1e37 AS DECIMAL(38, 0));
 SELECT CAST(c AS DECIMAL(38, 0)) FROM flt;
 
 Result: 9999999933815812510711506376257961984</codeblock>
-          <p
-            dir="ltr">
+          <p dir="ltr">
             The result has a loss of information due to implicit casting. This is why we
             discourage using the <codeph>DOUBLE</codeph> and <codeph>FLOAT</codeph> types in
             general.
@@ -426,7 +425,7 @@ Result: 9999999933815812510711506376257961984</codeblock>
 
         <li>
           Integer values can be implicitly converted to <codeph>DECIMAL</codeph> when there is
-          enough room in the <codeph>DECIMAL</codeph> to guarantee that all digits will fit. The
+          enough room in the <codeph>DECIMAL</codeph> to guarantee that all digits fit. The
           integer types require the following numbers of digits to the left of the decimal point
           when converted to <codeph>DECIMAL</codeph>:
           <ul>
@@ -594,11 +593,8 @@ INSERT INTO decimals_11_8 VALUES (CAST(1 AS TINYINT));</codeblock>
       <ul>
         <li dir="ltr">
           <p dir="ltr">
-            If scale in <codeph>STRING</codeph> > scale in <codeph>DECIMAL</codeph>:
-          </p>
-
-          <p dir="ltr">
-            The fractional digits are rounded to the <codeph>DECIMAL</codeph> scale.
+            If scale in <codeph>STRING</codeph> > scale in <codeph>DECIMAL</codeph>, the
+            fractional digits are rounded to the <codeph>DECIMAL</codeph> scale.
           </p>
 
           <p dir="ltr">
@@ -724,15 +720,10 @@ INSERT INTO decimals_11_8 VALUES (CAST(1 AS TINYINT));</codeblock>
 
     <p conref="../shared/impala_common.xml#common/file_format_blurb"/>
 
-    <p>
+    <p dir="ltr">
+      The <codeph>DECIMAL</codeph> data type can be stored in any of the file formats supported
+      by Impala.
       <ul>
-        <li dir="ltr">
-          <p dir="ltr">
-            The <codeph>DECIMAL</codeph> data type can be stored in any of the file formats
-            supported by Impala.
-          </p>
-        </li>
-
         <li dir="ltr">
           <p dir="ltr">
             Impala can query Avro, RCFile, or SequenceFile tables that contain
@@ -834,10 +825,10 @@ INSERT INTO decimals_11_8 VALUES (CAST(1 AS TINYINT));</codeblock>
                 Although an <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> statement that
                 changes the precision or scale of a <codeph>DECIMAL</codeph> column succeeds,
                 any subsequent attempt to query the changed column results in a fatal error.
-                (The other columns can still be queried successfully.) This is because the
-                metadata about the columns is stored in the data files themselves, and
-                <codeph>ALTER TABLE</codeph> does not actually make any updates to the data
-                files.
+                This is because the metadata about the columns is stored in the data files
+                themselves, and <codeph>ALTER TABLE</codeph> does not actually make any updates
+                to the data files. The other unaltered columns can still be queried
+                successfully.
               </p>
             </li>
 
@@ -870,102 +861,101 @@ INSERT INTO decimals_11_8 VALUES (CAST(1 AS TINYINT));</codeblock>
       STATS</codeph> statement.
     </p>
 
-    <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
+    <p>
+      <b>Compatibility with older version of DECIMAL:</b>
+    </p>
 
     <p>
-      <ul>
-        <li dir="ltr">
-          <p dir="ltr">
-            This version of <codeph>DECIMAL</codeph> type is the default in
-            <keyword keyref="impala30_full"/> and higher. The key differences between this
-            version of <codeph>DECIMAL</codeph> and the previous <codeph>DECIMAL</codeph> V1 in
-            Impala 2.x include the following.
-          </p>
-          <simpletable frame="all" relcolwidth="1* 1* 1*"
-            id="simpletable_bdr_rzc_qdb">
+      This version of <codeph>DECIMAL</codeph> type is the default in
+      <keyword
+        keyref="impala30_full"/> and higher. The key differences between this
+      version of <codeph>DECIMAL</codeph> and the previous <codeph>DECIMAL</codeph> V1 in Impala
+      2.x include the following.
+    </p>
 
-            <sthead>
+    <p>
+      <simpletable frame="all" relcolwidth="1* 1* 1*"
+        id="simpletable_bwl_khm_rdb">
 
-              <stentry/>
+        <sthead>
 
-              <stentry>DECIMAL in <keyword keyref="impala30_full"/> or
-                higher</stentry>
+          <stentry/>
 
-              <stentry>DECIMAL in <keyword keyref="impala212_full"/> or
-                  lower
+          <stentry>DECIMAL in <keyword keyref="impala30_full"/> or
+            higher</stentry>
 
-              </stentry>
+          <stentry>DECIMAL in <keyword keyref="impala212_full"/> or lower
+          </stentry>
 
-            </sthead>
+        </sthead>
 
-            <strow>
+        <strow>
 
-              <stentry>Overall behavior</stentry>
+          <stentry>Overall behavior</stentry>
 
-              <stentry>Returns either the result or an error.</stentry>
+          <stentry>Returns either the result or an error.</stentry>
 
-              <stentry>Returns either the result or <codeph>NULL</codeph> with a
-                warning.</stentry>
+          <stentry>Returns either the result or <codeph>NULL</codeph> with a
+            warning.</stentry>
 
-            </strow>
+        </strow>
 
-            <strow>
+        <strow>
 
-              <stentry>Overflow behavior</stentry>
+          <stentry>Overflow behavior</stentry>
 
-              <stentry>Aborts with an error.</stentry>
+          <stentry>Aborts with an error.</stentry>
 
-              <stentry>Issues a warning and returns
-                <codeph>NULL</codeph>.</stentry>
+          <stentry>Issues a warning and returns <codeph>NULL</codeph>.</stentry>
 
-            </strow>
+        </strow>
 
-            <strow>
+        <strow>
 
-              <stentry>Truncation / rounding behavior in arithmetic</stentry>
+          <stentry>Truncation / rounding behavior in arithmetic</stentry>
 
-              <stentry>Truncates and rounds digits from the back.</stentry>
+          <stentry>Truncates and rounds digits from the back.</stentry>
 
-              <stentry>Truncates digits from the front.</stentry>
+          <stentry>Truncates digits from the front.</stentry>
 
-            </strow>
+        </strow>
 
-            <strow>
+        <strow>
 
-              <stentry>String cast</stentry>
+          <stentry>String cast</stentry>
 
-              <stentry>Truncates from the back and rounds.</stentry>
+          <stentry>Truncates from the back and rounds.</stentry>
 
-              <stentry>Truncates from the back.</stentry>
+          <stentry>Truncates from the back.</stentry>
 
-            </strow>
+        </strow>
 
-          </simpletable>
-          <p>
-            If you need to continue using the first version of the <codeph>DECIMAL</codeph> type
-            for the backward compatibility of your queries, set the <codeph>DECIMAL_V2</codeph>
-            query option to <codeph>FALSE</codeph>:
+      </simpletable>
+    </p>
+
+    <p>
+      If you need to continue using the first version of the <codeph>DECIMAL</codeph> type for
+      the backward compatibility of your queries, set the <codeph>DECIMAL_V2</codeph> query
+      option to <codeph>FALSE</codeph>:
 <codeblock>SET DECIMAL_V2=FALSE;</codeblock>
-          </p>
-        </li>
+    </p>
 
-        <li dir="ltr">
-          <p dir="ltr">
-            Use the <codeph>DECIMAL</codeph> data type in Impala for applications where you used
-            the <codeph>NUMBER</codeph> data type in Oracle.
-          </p>
+    <p>
+      <b>Compatibility with other databases:</b>
+    </p>
 
-          <p dir="ltr">
-            The Impala <codeph>DECIMAL</codeph> type does not support the Oracle idioms of
-            <codeph>*</codeph> for scale.
-          </p>
+    <p dir="ltr">
+      Use the <codeph>DECIMAL</codeph> data type in Impala for applications where you used the
+      <codeph>NUMBER</codeph> data type in Oracle.
+    </p>
 
-          <p dir="ltr">
-            The Impala <codeph>DECIMAL</codeph> type does not support negative values for
-            precision.
-          </p>
-        </li>
-      </ul>
+    <p dir="ltr">
+      The Impala <codeph>DECIMAL</codeph> type does not support the Oracle idioms of
+      <codeph>*</codeph> for scale.
+    </p>
+
+    <p dir="ltr">
+      The Impala <codeph>DECIMAL</codeph> type does not support negative values for precision.
     </p>
 
   </conbody>
