@@ -18,8 +18,11 @@
       { "hash": "5417e712f33dfb963b4646723ec173a5f3c4f49b",
         "comment": "Only applies to master; Existing privileges available at server level." },
       { "hash": "08a1a7a967f19e41e8523a9020320bbad5cdac77",
-        "comment": "Not applicable to 2.x: Fix typo in authz-policy.ini.template." }
-
+        "comment": "Not applicable to 2.x: Fix typo in authz-policy.ini.template." },
+      { "hash": "22c7ded07eb2710aba3e1aa07ed7ec1a448f7c61",
+        "comment": "Not applicable to 2.x: Related to Hadoop 3" },
+      { "hash": "8a609b3513c4a181cd06bb82e2aeb97908590184",
+        "comment": "Not applicable to 2.x: Revert commit above" }
     ]
   }
 ]
