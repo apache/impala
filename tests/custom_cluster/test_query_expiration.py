@@ -38,7 +38,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
     assert actual == expected
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--idle_query_timeout=6 --logbuflevel=-1")
+  @CustomClusterTestSuite.with_args("--idle_query_timeout=8 --logbuflevel=-1")
   def test_query_expiration(self, vector):
     """Confirm that single queries expire if not fetched"""
     impalad = self.cluster.get_first_impalad()
@@ -46,7 +46,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
     num_expired = impalad.service.get_metric_value('impala-server.num-queries-expired')
     handles = []
 
-    # This query will time out with the default idle timeout (6s).
+    # This query will time out with the default idle timeout (8s).
     query1 = "SELECT SLEEP(1000000)"
     default_timeout_expire_handle = client.execute_async(query1)
     handles.append(default_timeout_expire_handle)
@@ -109,7 +109,7 @@ class TestQueryExpiration(CustomClusterTestSuite):
 
     # Check that we didn't wait too long to be expired (double the timeout is sufficiently
     # large to avoid most noise in measurement)
-    assert time() - before < 12
+    assert time() - before < 16
 
     client.execute("SET QUERY_TIMEOUT_S=0")
     # Synchronous execution; calls fetch() and query should not time out.
@@ -176,11 +176,9 @@ class TestQueryExpiration(CustomClusterTestSuite):
     """Try to fetch 'expected_state' from 'client' within 'timeout' seconds.
     Fail if unable."""
     start_time = time()
-    actual_state = None
-    while (time() - start_time < timeout):
+    actual_state = client.get_state(handle)
+    while (actual_state != expected_state and time() - start_time < timeout):
       actual_state = client.get_state(handle)
-      if actual_state == expected_state:
-        break
     assert expected_state == actual_state
 
   @pytest.mark.execute_serially
