@@ -46,6 +46,9 @@ shift $(($OPTIND-1))
 DIR=$(dirname $0)
 NODES_DIR="$DIR/cdh$CDH_MAJOR_VERSION"
 NODE_COUNT=3
+if [[ "$TARGET_FILESYSTEM" == "hdfs" && "$ERASURE_CODING" = true ]]; then
+  NODE_COUNT=5
+fi
 NODE_PREFIX=node-
 COMMON_NODE_TEMPLATE="$DIR/node_templates/common"
 NODE_TEMPLATE="$DIR/node_templates/cdh$CDH_MAJOR_VERSION"

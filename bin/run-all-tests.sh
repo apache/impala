@@ -69,6 +69,12 @@ else
   TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} --cluster_size=3"
 fi
 
+if [[ "${ERASURE_CODING}" = true ]]; then
+  # We do not run FE tests when erasure coding is enabled because planner tests
+  # would fail.
+  FE_TEST=false
+fi
+
 # If KRPC tests are disabled, pass the flag to disable KRPC during cluster start.
 if [[ "${DISABLE_KRPC}" == "true" ]]; then
   TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} --disable_krpc"

@@ -95,6 +95,14 @@ do
   shift;
 done
 
+# The hdfs environment script sets up kms (encryption) and cache pools (hdfs caching).
+# On a non-hdfs filesystem, we don't test encryption or hdfs caching, so this setup is not
+# needed.
+if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
+  run-step "Setting up HDFS environment" setup-hdfs-env.log \
+      ${IMPALA_HOME}/testdata/bin/setup-hdfs-env.sh
+fi
+
 if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
   if [[ -z "$REMOTE_LOAD" ]]; then
     run-step "Loading Hive Builtins" load-hive-builtins.log \
@@ -502,14 +510,6 @@ if [[ -z "$REMOTE_LOAD" ]]; then
   run-step "Starting Impala cluster" start-impala-cluster.log \
     ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_DATA_LOADING_LOGS_DIR} \
     ${START_CLUSTER_ARGS}
-fi
-
-# The hdfs environment script sets up kms (encryption) and cache pools (hdfs caching).
-# On a non-hdfs filesystem, we don't test encryption or hdfs caching, so this setup is not
-# needed.
-if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
-  run-step "Setting up HDFS environment" setup-hdfs-env.log \
-      ${IMPALA_HOME}/testdata/bin/setup-hdfs-env.sh
 fi
 
 if [ $SKIP_METADATA_LOAD -eq 0 ]; then

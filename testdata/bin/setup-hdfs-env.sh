@@ -72,3 +72,9 @@ hdfs cacheadmin -addPool testPool ${CACHEADMIN_ARGS}
 if [ "${PREVIOUS_PRINCIPAL}" != "" ]; then
   kinit -k -t ${KRB5_KTNAME} ${PREVIOUS_PRINCIPAL}
 fi
+
+if [[ -n "${HDFS_ERASURECODE_POLICY:-}" ]]; then
+  hdfs ec -enablePolicy -policy "${HDFS_ERASURECODE_POLICY}"
+  hdfs ec -setPolicy -policy "${HDFS_ERASURECODE_POLICY}" \
+    -path "${HDFS_ERASURECODE_PATH:=/}"
+fi

@@ -333,6 +333,7 @@ export HADOOP_LZO="${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}"
 export IMPALA_LZO="${IMPALA_LZO-$IMPALA_HOME/../Impala-lzo}"
 export IMPALA_AUX_TEST_HOME="${IMPALA_AUX_TEST_HOME-$IMPALA_HOME/../Impala-auxiliary-tests}"
 export TARGET_FILESYSTEM="${TARGET_FILESYSTEM-hdfs}"
+export ERASURE_CODING="${ERASURE_CODING-false}"
 export FILESYSTEM_PREFIX="${FILESYSTEM_PREFIX-}"
 export S3_BUCKET="${S3_BUCKET-}"
 export azure_tenant_id="${azure_tenant_id-DummyAdlsTenantId}"
@@ -446,7 +447,16 @@ elif [ "${TARGET_FILESYSTEM}" = "local" ]; then
   fi
   export DEFAULT_FS="${LOCAL_FS}"
   export FILESYSTEM_PREFIX="${LOCAL_FS}"
-elif [ "${TARGET_FILESYSTEM}" != "hdfs" ]; then
+elif [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
+  if [[ "${ERASURE_CODING}" = true ]]; then
+    if [[ "${IMPALA_MINICLUSTER_PROFILE}" -lt 3 ]]; then
+      echo "Hadoop 3 is required for HDFS erasure coding."
+      return 1
+    fi
+    export HDFS_ERASURECODE_POLICY="RS-3-2-1024k"
+    export HDFS_ERASURECODE_PATH="/"
+  fi
+else
   echo "Unsupported filesystem '$TARGET_FILESYSTEM'"
   echo "Valid values are: hdfs, isilon, s3, local"
   return 1
