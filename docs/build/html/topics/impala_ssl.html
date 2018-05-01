@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="ssl"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Configuring TLS/SSL for Impala</title></head><body id="ssl"><main role="main"><article role="article" aria-labelledby="ssl__tls">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="ssl"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Configuring TLS/SSL for Impala</title></head><body id="ssl"><main role="main"><article role="article" aria-labelledby="ssl__tls">
 
   <h1 class="title topictitle1" id="ssl__tls">Configuring TLS/SSL for Impala</h1>
 
@@ -155,16 +155,6 @@
           </p>
         </li>
       </ul>
-      <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
-        <p class="p">
-          As of <span class="keyword">Impala 2.10</span>, TLSv1.2 may not work for Impala on RHEL 6
-          or CentOS 6, even if OpenSSL 1.0.1 is available. The daemons fail to start, with a
-          socket error stating the TLS version is not supported. The underlying cause is related to
-          <a class="xref" href="https://bugzilla.redhat.com/show_bug.cgi?id=1497859" target="_blank">Red Hat issue 1497859</a>.
-          The issue applies if you build on a RHEL 6 or CentOS 6 system with OpenSSL 1.0.0, and
-          run on a RHEL 6 or CentOS 6 system with OpenSSL 1.0.1.
-        </p>
-      </div>
 
       <p class="p">
         Along with specifying the version, you can also specify the allowed set of TLS ciphers

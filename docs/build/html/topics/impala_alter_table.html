@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="alter_table"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>ALTER TABLE Statement</title></head><body id="alter_table"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="alter_table"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>ALTER TABLE Statement</title></head><body id="alter_table"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">ALTER TABLE Statement</h1>
   
@@ -46,7 +46,7 @@ ALTER TABLE <var class="keyword varname">name</var> ALTER [COLUMN] <var class="k
 ALTER TABLE <var class="keyword varname">name</var> ADD [IF NOT EXISTS] PARTITION (<var class="keyword varname">partition_spec</var>)
   <span class="ph">[<var class="keyword varname">location_spec</var>]</span>
   <span class="ph">[<var class="keyword varname">cache_spec</var>]</span>
-<span class="ph">ALTER TABLE <var class="keyword varname">name</var> ADD [IF NOT EXISTS] RANGE PARTITION (<var class="keyword varname">kudu_partition_spec</var>)</span>
+<span class="ph">ALTER TABLE <var class="keyword varname">name</var> ADD [IF NOT EXISTS] RANGE PARTITION <var class="keyword varname">kudu_partition_spec</var></span>
 
 ALTER TABLE <var class="keyword varname">name</var> DROP [IF EXISTS] PARTITION (<var class="keyword varname">partition_spec</var>)
   <span class="ph">[PURGE]</span>
@@ -477,7 +477,7 @@ yes,no</code></pre>
     <p class="p">
       Use the <code class="ph codeph">DESCRIBE FORMATTED</code> statement to see the current values of these properties for an
       existing table. See <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a> for more details about these clauses.
-      See <a class="xref" href="impala_perf_stats.html#perf_table_stats_manual">Setting the NUMROWS Value Manually through ALTER TABLE</a> for an example of using table properties to
+      See <a class="xref" href="impala_perf_stats.html#perf_table_stats_manual">impala_perf_stats.html#perf_table_stats_manual</a> for an example of using table properties to
       fine-tune the performance-related table statistics.
     </p>
 
@@ -510,7 +510,7 @@ alter table analysis_data set tblproperties('numRows'='1001000000', 'STATS_GENER
 -- change the numRows property for the partition and the overall table.
 alter table partitioned_data partition(year=2009, month=4) set tblproperties ('numRows'='30000', 'STATS_GENERATED_VIA_STATS_TASK'='true');
 alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENERATED_VIA_STATS_TASK'='true');</code></pre>
-      See <a class="xref" href="impala_perf_stats.html#perf_table_stats_manual">Setting the NUMROWS Value Manually through ALTER TABLE</a> for details.
+      See <a class="xref" href="impala_perf_stats.html#perf_table_stats_manual">impala_perf_stats.html#perf_table_stats_manual</a> for details.
     </div>
 
     <p class="p">

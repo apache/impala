@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_kudu"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala to Query Kudu Tables</title></head><body id="impala_kudu"><main role="main"><article role="article" aria-labelledby="impala_kudu__kudu">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_kudu"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala to Query Kudu Tables</title></head><body id="impala_kudu"><main role="main"><article role="article" aria-labelledby="impala_kudu__kudu">
 
   <h1 class="title topictitle1" id="impala_kudu__kudu">Using Impala to Query Kudu Tables</h1>
 
@@ -485,8 +485,7 @@ CREATE TABLE default_vals
             Each column in a Kudu table can optionally use an encoding, a low-overhead form of
             compression that reduces the size on disk, then requires additional CPU cycles to
             reconstruct the original values during queries. Typically, highly compressible data
-            benefits from the reduced I/O to read the data back from disk. By default, each
-            column uses the <span class="q">"plain"</span> encoding where the data is stored unchanged.
+            benefits from the reduced I/O to read the data back from disk.
           </p>
 
           <div class="p">
@@ -495,9 +494,9 @@ CREATE TABLE default_vals
             <ul class="ul">
               <li class="li">
                 <p class="p">
-                  <code class="ph codeph">AUTO_ENCODING</code>: use the default encoding based on the column
-                  type; currently always the same as <code class="ph codeph">PLAIN_ENCODING</code>, but subject to
-                  change in the future.
+                  <code class="ph codeph">AUTO_ENCODING</code>: use the default encoding based
+                  on the column type, which are bitshuffle for the numeric type
+                  columns and dictionary for the string type columns.
                 </p>
               </li>
               <li class="li">
@@ -1318,16 +1317,38 @@ kudu.table_name  | impala::some_database.table_name_demo
           <p class="p">
             Sentry authorization.
           </p>
-          <p class="p">
-        Access to Kudu tables must be granted to and revoked from roles as usual.
-        Only users with <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> can create external Kudu tables.
-        Currently, access to a Kudu table is <span class="q">"all or nothing"</span>:
-        enforced at the table level rather than the column level, and applying to all
-        SQL operations rather than individual statements such as <code class="ph codeph">INSERT</code>.
+          <div class="p">
+        Access to Kudu tables must be granted to and revoked from roles with the
+        following considerations:
+        <ul class="ul">
+          <li class="li">
+            Only users with the <code class="ph codeph">ALL</code> privilege on
+              <code class="ph codeph">SERVER</code> can create external Kudu tables.
+          </li>
+          <li class="li">
+            The <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> is
+            required to specify the <code class="ph codeph">kudu.master_addresses</code>
+            property in the <code class="ph codeph">CREATE TABLE</code> statements for managed
+            tables as well as external tables.
+          </li>
+          <li class="li">
+            Access to Kudu tables is enforced at the table level and at the
+            column level.
+          </li>
+          <li class="li">
+            The <code class="ph codeph">SELECT</code>- and <code class="ph codeph">INSERT</code>-specific
+            permissions are supported.
+          </li>
+          <li class="li">
+            The <code class="ph codeph">DELETE</code>, <code class="ph codeph">UPDATE</code>, and
+            <code class="ph codeph">UPSERT</code> operations require the <code class="ph codeph">ALL</code>
+            privilege.
+          </li>
+        </ul>
         Because non-SQL APIs can access Kudu data without going through Sentry
         authorization, currently the Sentry support is considered preliminary
         and subject to change.
-      </p>
+      </div>
         </li>
 
         <li class="li">

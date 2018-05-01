@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="partitioning"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Partitioning for Impala Tables</title></head><body id="partitioning"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="partitioning"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Partitioning for Impala Tables</title></head><body id="partitioning"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Partitioning for Impala Tables</h1>
 
@@ -370,7 +370,7 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
         <p class="p">
         In queries involving both analytic functions and partitioned tables, partition pruning only occurs for columns named in the <code class="ph codeph">PARTITION BY</code>
         clause of the analytic function call. For example, if an analytic function query has a clause such as <code class="ph codeph">WHERE year=2016</code>,
-        the way to make the query prune all other <code class="ph codeph">YEAR</code> partitions is to include <code class="ph codeph">PARTITION BY year</code>in the analytic function call;
+        the way to make the query prune all other <code class="ph codeph">YEAR</code> partitions is to include <code class="ph codeph">PARTITION BY year</code> in the analytic function call;
         for example, <code class="ph codeph">OVER (PARTITION BY year,<var class="keyword varname">other_columns</var> <var class="keyword varname">other_analytic_clauses</var>)</code>.
 
       </p>
@@ -663,11 +663,11 @@ explain select s from yy2 where year in (select year from yy where year between 
       <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
         <p class="p">
         For a particular table, use either <code class="ph codeph">COMPUTE STATS</code> or
-        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, but never combine the two or alternate
-        between them. If you switch from <code class="ph codeph">COMPUTE STATS</code> to
-        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> during the lifetime of a table, or vice
-        versa, drop all statistics (by running both <code class="ph codeph">DROP STATS</code> and
-        <code class="ph codeph">DROP INCREMENTAL STATS</code>) before making the switch.
+        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, but never combine the two or
+        alternate between them. If you switch from <code class="ph codeph">COMPUTE STATS</code> to
+        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> during the lifetime of a table, or
+        vice versa, drop all statistics by running <code class="ph codeph">DROP STATS</code> before
+        making the switch.
       </p>
         <p class="p">
         When you run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> on a table for the first time,
@@ -690,7 +690,7 @@ explain select s from yy2 where year in (select year from yy where year between 
         added or changed since the last <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> statement, rather than the entire
         table. It is typically used for tables where a full <code class="ph codeph">COMPUTE STATS</code>
         operation takes too long to be practical each time a partition is added or dropped. See
-        <a class="xref" href="impala_perf_stats.html#perf_stats_incremental">Overview of Incremental Statistics</a> for full usage details.
+        <a class="xref" href="impala_perf_stats.html#perf_stats_incremental">impala_perf_stats.html#perf_stats_incremental</a> for full usage details.
       </p>
 
 <pre class="pre codeblock"><code>-- Initially the table has no incremental stats, as indicated

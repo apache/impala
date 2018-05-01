@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="insert"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>INSERT Statement</title></head><body id="insert"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="insert"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>INSERT Statement</title></head><body id="insert"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">INSERT Statement</h1>
   
@@ -19,7 +19,7 @@
       </p>
 
 <pre class="pre codeblock"><code>[<var class="keyword varname">with_clause</var>]
-INSERT { INTO | OVERWRITE } [TABLE] <var class="keyword varname">table_name</var>
+  INSERT <span class="ph">[<var class="keyword varname">hint_clause</var>]</span> { INTO | OVERWRITE } [TABLE] <var class="keyword varname">table_name</var>
   [(<var class="keyword varname">column_list</var>)]
   [ PARTITION (<var class="keyword varname">partition_clause</var>)]
 {
@@ -163,32 +163,10 @@ hint_with_brackets ::= [SHUFFLE] | [NOSHUFFLE]
       </li>
 
       <li class="li">
-        <p class="p">
-          For a partitioned table, the optional <code class="ph codeph">PARTITION</code> clause identifies which partition or
-          partitions the new values go into. If a partition key column is given a constant value such as
-          <code class="ph codeph">PARTITION (year=2012)</code> or <code class="ph codeph">PARTITION (year=2012, month=2)</code>, all the
-          inserted rows use those same values for those partition key columns and you omit any corresponding
-          columns in the source table from the <code class="ph codeph">SELECT</code> list. This form is known as <span class="q">"static
-          partitioning"</span>.
-        </p>
-        <p class="p">
-          If a partition key column is mentioned but not assigned a value, such as in <code class="ph codeph">PARTITION (year,
-          region)</code> (both columns unassigned) or <code class="ph codeph">PARTITION(year, region='CA')</code>
-          (<code class="ph codeph">year</code> column unassigned), the unassigned columns are filled in with the final columns of
-          the <code class="ph codeph">SELECT</code> list. In this case, the number of columns in the <code class="ph codeph">SELECT</code> list
-          must equal the number of columns in the column permutation plus the number of partition key columns not
-          assigned a constant value. This form is known as <span class="q">"dynamic partitioning"</span>.
-        </p>
-        <p class="p">
-          See <a class="xref" href="impala_partitioning.html#partition_static_dynamic">Static and Dynamic Partitioning Clauses</a> for examples and performance
-          characteristics of static and dynamic partitioned inserts.
-        </p>
-      </li>
-
-      <li class="li">
-        An optional hint clause immediately before the <code class="ph codeph">SELECT</code> keyword, to fine-tune the behavior
-        when doing an <code class="ph codeph">INSERT ... SELECT</code> operation into partitioned Parquet tables. The hint
-        keywords are <code class="ph codeph">[SHUFFLE]</code> and <code class="ph codeph">[NOSHUFFLE]</code>, including the square brackets.
+        An optional hint clause immediately either before the <code class="ph codeph">SELECT</code> keyword or after the
+        <code class="ph codeph">INSERT</code> keyword, to fine-tune the behavior when doing an <code class="ph codeph">INSERT ... SELECT</code>
+        operation into partitioned Parquet tables. The hint clause cannot be specified in multiple places.
+        The hint keywords are <code class="ph codeph">[SHUFFLE]</code> and <code class="ph codeph">[NOSHUFFLE]</code>, including the square brackets.
         Inserting into partitioned Parquet tables can be a resource-intensive operation because it potentially
         involves many files being written to HDFS simultaneously, and separate
         <span class="ph">large</span> memory buffers being allocated to buffer the data for each
@@ -393,28 +371,6 @@ Remote error
 Backend 0:SEQUENCE_FILE not implemented. </code></pre>
 
     <p class="p">
-      Inserting data into partitioned tables requires slightly different syntax that divides the partitioning
-      columns from the others:
-    </p>
-
-<pre class="pre codeblock"><code>create table t1 (i int) <strong class="ph b">partitioned by (x int, y string)</strong>;
--- Select an INT column from another table.
--- All inserted rows will have the same x and y values, as specified in the INSERT statement.
--- This technique of specifying all the partition key values is known as static partitioning.
-insert into t1 <strong class="ph b">partition(x=10, y='a')</strong> select c1 from some_other_table;
--- Select two INT columns from another table.
--- All inserted rows will have the same y value, as specified in the INSERT statement.
--- Values from c2 go into t1.x.
--- Any partitioning columns whose value is not specified are filled in
--- from the columns specified last in the SELECT list.
--- This technique of omitting some partition key values is known as dynamic partitioning.
-insert into t1 <strong class="ph b">partition(x, y='b')</strong> select c1, c2 from some_other_table;
--- Select an INT and a STRING column from another table.
--- All inserted rows will have the same x value, as specified in the INSERT statement.
--- Values from c3 go into t1.y.
-insert into t1 <strong class="ph b">partition(x=20, y)</strong> select c1, c3  from some_other_table;</code></pre>
-
-    <p class="p">
       The following examples show how you can copy the data in all the columns from one table to another, copy the
       data from only some columns, or specify the columns in the select list in a different order than they
       actually appear in the table:
@@ -441,42 +397,6 @@ insert into t2 (c2, c1) select c1, c2 from t1;
 -- But the number and type of selected columns must match the columns mentioned in the () part.
 alter table t2 replace columns (x int, y int);
 insert into t2 (y) select c1 from t1;
-
--- For partitioned tables, all the partitioning columns must be mentioned in the () column list
--- or a PARTITION clause; these columns cannot be defaulted to NULL.
-create table pt1 (x int, y int) partitioned by (z int);
--- The values from c1 are copied into the column x in the new table,
--- all in the same partition based on a constant value for z.
--- The values of y in the new table are all NULL.
-insert into pt1 (x) partition (z=5) select c1 from t1;
--- Again we omit the values for column y so they are all NULL.
--- The inserted x values can go into different partitions, based on
--- the different values inserted into the partitioning column z.
-insert into pt1 (x,z) select x, z from t2;
-</code></pre>
-
-    <p class="p">
-      <code class="ph codeph">SELECT *</code> for a partitioned table requires that all partition key columns in the source table
-      be declared as the last columns in the <code class="ph codeph">CREATE TABLE</code> statement. You still include a
-      <code class="ph codeph">PARTITION BY</code> clause listing all the partition key columns. These partition columns are
-      automatically mapped to the last columns from the <code class="ph codeph">SELECT *</code> list.
-    </p>
-
-<pre class="pre codeblock"><code>create table source (x int, y int, year int, month int, day int);
-create table destination (x int, y int) partitioned by (year int, month int, day int);
-...load some data into the unpartitioned source table...
--- Insert a single partition of data.
--- The SELECT * means you cannot specify partition (year=2014, month, day).
-insert overwrite destination partition (year, month, day) select * from source where year=2014;
--- Insert the data for all year/month/day combinations.
-insert overwrite destination partition (year, month, day) select * from source;
-
--- If one of the partition columns is omitted from the source table,
--- then you can specify a specific value for that column in the PARTITION clause.
--- Here the source table holds only data from 2014, and so does not include a year column.
-create table source_2014 (x int, y int, month, day);
-...load some data into the unpartitioned source_2014 table...
-insert overwrite destination partition (year=2014, month, day) select * from source_2014;
 </code></pre>
 
     <p class="p">
@@ -825,6 +745,167 @@ Inserted 2 rows in 0.16s
       </p>
     </div>
   </article>
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="insert__partition_insert">
+    <h2 class="title topictitle2" id="ariaid-title3">Inserting Into Partitioned Tables with PARTITION Clause</h2>
+    <div class="body conbody">
+      <p class="p">
+        For a partitioned table, the optional <code class="ph codeph">PARTITION</code> clause
+        identifies which partition or partitions the values are inserted
+        into.
+      </p>
+      <p class="p">
+        All examples in this section will use the table declared as below:
+      </p>
+<pre class="pre codeblock"><code>CREATE TABLE t1 (w INT) PARTITIONED BY (x INT, y STRING);</code></pre>
+    </div>
 
-
-</article></main></body></html>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title4" id="partition_insert__static_partition_insert">
+      <h3 class="title topictitle3" id="ariaid-title4">Static Partition Inserts</h3>
+      <div class="body conbody">
+        <p class="p">
+          In a static partition insert where a partition key column is given a
+          constant value, such as <code class="ph codeph">PARTITION</code>
+          <code class="ph codeph">(year=2012, month=2)</code>, the rows are inserted with the
+          same values specified for those partition key columns.
+        </p>
+        <p class="p">
+          The number of columns in the <code class="ph codeph">SELECT</code> list must equal
+          the number of columns in the column permutation.
+        </p>
+        <p class="p">
+          The <code class="ph codeph">PARTITION</code> clause must be used for static
+          partitioning inserts.
+        </p>
+        <p class="p">
+          Example:
+        </p>
+        <div class="p">
+          The following statement will insert the
+            <code class="ph codeph">some_other_table.c1</code> values for the
+            <code class="ph codeph">w</code> column, and all the rows inserted will have the
+          same <code class="ph codeph">x</code> value of <code class="ph codeph">10</code>, and the same
+            <code class="ph codeph">y</code> value of
+          <code class="ph codeph">‘a’</code>.<pre class="pre codeblock"><code>INSERT INTO t1 PARTITION (x=10, y='a')
+            SELECT c1 FROM some_other_table;</code></pre>
+        </div>
+      </div>
+    </article>
+    <article class="topic concept nested2" aria-labelledby="ariaid-title5" id="partition_insert__dynamic_partition_insert">
+        <h3 class="title topictitle3" id="ariaid-title5">Dynamic Partition Inserts</h3>
+        <div class="body conbody">
+          <p class="p">
+            In a dynamic partition insert where a partition key
+          column is in the <code class="ph codeph">INSERT</code> statement but not assigned a
+          value, such as in <code class="ph codeph">PARTITION (year, region)</code>(both
+          columns unassigned) or <code class="ph codeph">PARTITION(year, region='CA')</code>
+            (<code class="ph codeph">year</code> column unassigned), the unassigned columns
+          are filled in with the final columns of the <code class="ph codeph">SELECT</code> or
+            <code class="ph codeph">VALUES</code> clause. In this case, the number of columns
+          in the <code class="ph codeph">SELECT</code> list must equal the number of columns
+          in the column permutation plus the number of partition key columns not
+          assigned a constant value.
+          </p>
+          <p class="p">
+            See <a class="xref" href="https://www.cloudera.com/documentation/enterprise/latest/topics/impala_partitioning.html#partition_static_dynamic" target="_blank"><u class="ph u">Static and Dynamic Partitioning
+                Clauses</u></a> for examples and performance characteristics
+            of static and dynamic partitioned inserts.
+          </p>
+          <p class="p">
+            The following rules apply to dynamic partition
+            inserts.
+          </p>
+          <ul class="ul">
+            <li class="li">
+              <p class="p">
+                The columns are bound in the order they appear in the
+                  <code class="ph codeph">INSERT</code> statement.
+              </p>
+              <p class="p">
+                The table below shows the values inserted with the
+                <code class="ph codeph">INSERT</code> statements of different column
+              orders.
+              </p>
+            </li>
+          </ul>
+          <table class="table frame-all" id="dynamic_partition_insert__table_vyx_dp3_ldb"><caption></caption><colgroup><col><col><col><col></colgroup><tbody class="tbody">
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"></td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1">Column <code class="ph codeph">w</code> Value</td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1">Column <code class="ph codeph">x</code> Value</td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1">Column <code class="ph codeph">y</code> Value</td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">INSERT INTO t1 (w, x, y) VALUES (1, 2,
+                      'c');</code></td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">1</code></td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">2</code></td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">‘c’</code></td>
+                </tr>
+                <tr class="row">
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">INSERT INTO t1 (x,w) PARTITION (y) VALUES (1,
+                      2, 'c');</code></td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">2</code></td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">1</code></td>
+                  <td class="entry cellrowborder align-left colsep-1 rowsep-1"><code class="ph codeph">‘c’</code></td>
+                </tr>
+              </tbody></table>
+          <ul class="ul">
+            <li class="li">
+              When a partition clause is specified but the non-partition
+            columns are not specified in the <code class="ph codeph">INSERT</code> statement,
+            as in the first example below, the non-partition columns are treated
+            as though they had been specified before the
+              <code class="ph codeph">PARTITION</code> clause in the SQL.
+              <p class="p">
+                Example: These
+              three statements are equivalent, inserting <code class="ph codeph">1</code> to
+                <code class="ph codeph">w</code>, <code class="ph codeph">2</code> to <code class="ph codeph">x</code>,
+              and <code class="ph codeph">‘c’</code> to <code class="ph codeph">y</code>
+            columns.
+              </p>
+<pre class="pre codeblock"><code>INSERT INTO t1 PARTITION (x,y) VALUES (1, 2, ‘c’);
+INSERT INTO t1 (w) PARTITION (x, y) VALUES (1, 2, ‘c’);
+INSERT INTO t1 PARTITION (x, y='c') VALUES (1, 2);</code></pre>
+            </li>
+            <li class="li">
+              The <code class="ph codeph">PARTITION</code> clause is not required for
+            dynamic partition, but all the partition columns must be explicitly
+            present in the <code class="ph codeph">INSERT</code> statement in the column list
+            or in the <code class="ph codeph">PARTITION</code> clause. The partition columns
+            cannot be defaulted to <code class="ph codeph">NULL</code>.
+              <p class="p">
+                Example:
+              </p>
+              <p class="p">The following statements are valid because the partition
+              columns, <code class="ph codeph">x</code> and <code class="ph codeph">y</code>, are present in
+              the <code class="ph codeph">INSERT</code> statements, either in the
+                <code class="ph codeph">PARTITION</code> clause or in the column
+              list.
+              </p>
+<pre class="pre codeblock"><code>INSERT INTO t1 PARTITION (x,y) VALUES (1, 2, ‘c’);
+INSERT INTO t1 (w, x) PARTITION (y) VALUES (1, 2, ‘c’);</code></pre>
+              <p class="p">
+                The following statement is not valid for the partitioned table as
+              defined above because the partition columns, <code class="ph codeph">x</code>
+              and <code class="ph codeph">y</code>, are not present in the
+                <code class="ph codeph">INSERT</code> statement.
+              </p>
+<pre class="pre codeblock"><code>INSERT INTO t1 VALUES (1, 2, 'c');</code></pre>
+          </li>
+            <li class="li">
+              If partition columns do not exist in the source table, you can
+              specify a specific value for that column in the
+              <code class="ph codeph">PARTITION</code> clause.
+              <p class="p">
+                Example: The <code class="ph codeph">source</code> table only contains the column
+                <code class="ph codeph">w</code> and <code class="ph codeph">y</code>. The value,
+                <code class="ph codeph">20</code>, specified in the <code class="ph codeph">PARTITION</code>
+              clause, is inserted into the <code class="ph codeph">x</code> column.
+              </p>
+<pre class="pre codeblock"><code>INSERT INTO t1 PARTITION (x=20, y) SELECT * FROM source;</code></pre>
+          </li>
+          </ul>
+        </div>
+      </article>
+    </article>
+  </article></main></body></html>

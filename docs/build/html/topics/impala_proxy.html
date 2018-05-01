@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="proxy"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala through a Proxy for High Availability</title></head><body id="proxy"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="proxy"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala through a Proxy for High Availability</title></head><body id="proxy"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Using Impala through a Proxy for High Availability</h1>
   
@@ -71,9 +71,12 @@
 
       <ol class="ol">
         <li class="li">
-          Download the load-balancing proxy software. It should only need to be installed and configured on a
-          single host. Pick a host other than the DataNodes where <span class="keyword cmdname">impalad</span> is running,
-          because the intention is to protect against the possibility of one or more of these DataNodes becoming unavailable.
+          Select and download the load-balancing proxy software or other
+          load-balancing hardware appliance. It should only need to be installed
+          and configured on a single host, typically on an edge node. Pick a
+          host other than the DataNodes where <span class="keyword cmdname">impalad</span> is
+          running, because the intention is to protect against the possibility
+          of one or more of these DataNodes becoming unavailable.
         </li>
 
         <li class="li">
@@ -81,38 +84,26 @@
           In particular:
           <ul class="ul">
             <li class="li">
-              <p class="p">
-                Set up a port that the load balancer will listen on to relay Impala requests back and forth.
-              </p>
+              Set up a port that the load balancer will listen on to relay
+              Impala requests back and forth. </li>
+            <li class="li">
+              See <a class="xref" href="#proxy_balancing">Choosing the Load-Balancing Algorithm</a> for load
+              balancing algorithm options.
             </li>
             <li class="li">
-              <p class="p">
-                Consider enabling <span class="q">"sticky sessions"</span>. Where practical, enable this setting
-                so that stateless client applications such as <span class="keyword cmdname">impalad</span> and Hue
-                are not disconnected from long-running queries. Evaluate whether this setting is
-                appropriate for your combination of workload and client applications.
-              </p>
-            </li>
-            <li class="li">
-              <p class="p">
-                For Kerberized clusters, follow the instructions in <a class="xref" href="impala_proxy.html#proxy_kerberos">Special Proxy Considerations for Clusters Using Kerberos</a>.
-              </p>
+              For Kerberized clusters, follow the instructions in <a class="xref" href="impala_proxy.html#proxy_kerberos">Special Proxy Considerations for Clusters Using Kerberos</a>.
             </li>
           </ul>
         </li>
 
         <li class="li">
-          Specify the host and port settings for each Impala node. These are the hosts that the load balancer will
-          choose from when relaying each Impala query. See <a class="xref" href="impala_ports.html#ports">Ports Used by Impala</a> for when to use
-          port 21000, 21050, or another value depending on what type of connections you are load balancing.
-          <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
-            <p class="p">
-              In particular, if you are using Hue or JDBC-based applications,
-              you typically set up load balancing for both ports 21000 and 21050, because
-              these client applications connect through port 21050 while the <span class="keyword cmdname">impala-shell</span>
-              command connects through port 21000.
-            </p>
-          </div>
+          If you are using Hue or JDBC-based applications, you typically set
+          up load balancing for both ports 21000 and 21050, because these client
+          applications connect through port 21050 while the
+            <span class="keyword cmdname">impala-shell</span> command connects through port
+          21000. See <a class="xref" href="impala_ports.html#ports">Ports Used by Impala</a> for when to use port
+          21000, 21050, or another value depending on what type of connections
+          you are load balancing.
         </li>
 
         <li class="li">
@@ -120,9 +111,11 @@
         </li>
 
         <li class="li">
-          For any scripts, jobs, or configuration settings for applications that formerly connected to a specific
-          datanode to run Impala SQL statements, change the connection information (such as the <code class="ph codeph">-i</code>
-          option in <span class="keyword cmdname">impala-shell</span>) to point to the load balancer instead.
+          For any scripts, jobs, or configuration settings for applications
+          that formerly connected to a specific DataNode to run Impala SQL
+          statements, change the connection information (such as the
+            <code class="ph codeph">-i</code> option in <span class="keyword cmdname">impala-shell</span>) to
+          point to the load balancer instead.
         </li>
       </ol>
 
@@ -135,20 +128,122 @@
 
   </article>
 
-  
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="proxy__proxy_balancing">
+    <h2 class="title topictitle2" id="ariaid-title3">Choosing the Load-Balancing Algorithm</h2>
+    <div class="body conbody">
+      <p class="p">
+        Load-balancing software offers a number of algorithms to distribute requests.
+        Each algorithm has its own characteristics that make it suitable in some situations
+        but not others.
+      </p>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="proxy__proxy_kerberos">
+      <dl class="dl">
 
-    <h2 class="title topictitle2" id="ariaid-title3">Special Proxy Considerations for Clusters Using Kerberos</h2>
+          <dt class="dt dlterm">Leastconn</dt>
+          <dd class="dd">
+            Connects sessions to the coordinator with the fewest connections,
+            to balance the load evenly. Typically used for workloads consisting
+            of many independent, short-running queries. In configurations with
+            only a few client machines, this setting can avoid having all
+            requests go to only a small set of coordinators.
+          </dd>
+          <dd class="dd ddexpand">
+            Recommended for Impala with F5.
+          </dd>
+
+
+          <dt class="dt dlterm">Source IP Persistence</dt>
+          <dd class="dd">
+            <p class="p">
+              Sessions from the same IP address always go to the same
+              coordinator. A good choice for Impala workloads containing a mix
+              of queries and DDL statements, such as <code class="ph codeph">CREATE TABLE</code>
+              and <code class="ph codeph">ALTER TABLE</code>. Because the metadata changes from
+              a DDL statement take time to propagate across the cluster, prefer
+              to use the Source IP Persistence in this case. If you are unable
+              to choose Source IP Persistence, run the DDL and subsequent queries
+              that depend on the results of the DDL through the same session,
+              for example by running <code class="ph codeph">impala-shell -f <var class="keyword varname">script_file</var></code>
+              to submit several statements through a single session.
+            </p>
+          </dd>
+          <dd class="dd ddexpand">
+            <p class="p">
+              Required for setting up high availability with Hue.
+            </p>
+          </dd>
+
+
+          <dt class="dt dlterm">Round-robin</dt>
+          <dd class="dd">
+            <p class="p">
+              Distributes connections to all coordinator nodes.
+              Typically not recommended for Impala.
+            </p>
+          </dd>
+
+      </dl>
+
+      <p class="p">
+        You might need to perform benchmarks and load testing to determine
+        which setting is optimal for your use case. Always set up using two
+        load-balancing algorithms: Source IP Persistence for Hue and Leastconn
+        for others.
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="proxy__proxy_kerberos">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Special Proxy Considerations for Clusters Using Kerberos</h2>
   
 
     <div class="body conbody">
 
       <p class="p">
-        In a cluster using Kerberos, applications check host credentials to verify that the host they are
-        connecting to is the same one that is actually processing the request, to prevent man-in-the-middle
-        attacks. To clarify that the load-balancing proxy server is legitimate, perform these extra Kerberos setup
-        steps:
+        In a cluster using Kerberos, applications check host credentials to
+        verify that the host they are connecting to is the same one that is
+        actually processing the request, to prevent man-in-the-middle attacks.
+      </p>
+      <p class="p">
+        In <span class="keyword">Impala 2.11</span> and lower
+        versions, once you enable a proxy server in a Kerberized cluster, users
+        will not be able to connect to individual impala daemons directly from
+        impala-shell.
+      </p>
+
+      <p class="p">
+        In <span class="keyword">Impala 2.12</span> and higher,
+        if you enable a proxy server in a Kerberized cluster, users have an
+        option to connect to Impala daemons directly from
+          <span class="keyword cmdname">impala-shell</span> using the <code class="ph codeph">-b</code> /
+          <code class="ph codeph">--kerberos_host_fqdn</code> option when you start
+          <span class="keyword cmdname">impala-shell</span>. This option can be used for testing or
+        troubleshooting purposes, but not recommended for live production
+        environments as it defeats the purpose of a load balancer/proxy.
+      </p>
+
+      <div class="p">
+        Example:
+<pre class="pre codeblock"><code>
+impala-shell -i impalad-1.mydomain.com -k -b loadbalancer-1.mydomain.com
+</code></pre>
+      </div>
+
+      <div class="p">
+        Alternatively, with the fully qualified
+        configurations:
+<pre class="pre codeblock"><code>impala-shell --impalad=impalad-1.mydomain.com:21000 --kerberos --kerberos_host_fqdn=loadbalancer-1.mydomain.com</code></pre>
+      </div>
+      <p class="p">
+        See <a class="xref" href="impala_shell_options.html#shell_options">impala-shell Configuration Options</a> for
+        information about the option.
+      </p>
+
+      <p class="p">
+        To clarify that the load-balancing proxy server is legitimate, perform
+        these extra Kerberos setup steps:
       </p>
 
       <ol class="ol">
@@ -248,9 +343,9 @@ klist -k <var class="keyword varname">keytabfile</var>
 
   </article>
 
-  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="proxy__tut_proxy">
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="proxy__tut_proxy">
 
-    <h2 class="title topictitle2" id="ariaid-title4">Example of Configuring HAProxy Load Balancer for Impala</h2>
+    <h2 class="title topictitle2" id="ariaid-title5">Example of Configuring HAProxy Load Balancer for Impala</h2>
   
 
     <div class="body conbody">
@@ -375,11 +470,18 @@ listen impalajdbc :21051
     mode tcp
     option tcplog
     balance source
-    server <var class="keyword varname">symbolic_name_5</var> impala-host-1.example.com:21050
-    server <var class="keyword varname">symbolic_name_6</var> impala-host-2.example.com:21050
-    server <var class="keyword varname">symbolic_name_7</var> impala-host-3.example.com:21050
-    server <var class="keyword varname">symbolic_name_8</var> impala-host-4.example.com:21050
+    server <var class="keyword varname">symbolic_name_5</var> impala-host-1.example.com:21050 check
+    server <var class="keyword varname">symbolic_name_6</var> impala-host-2.example.com:21050 check
+    server <var class="keyword varname">symbolic_name_7</var> impala-host-3.example.com:21050 check
+    server <var class="keyword varname">symbolic_name_8</var> impala-host-4.example.com:21050 check
 </code></pre>
+      <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+        Hue requires the <code class="ph codeph">check</code> option at end of each line in
+        the above file to ensure HAProxy can detect any unreachable Impalad
+        server, and failover can be successful. Without the TCP check, you may hit
+        an error when the <span class="keyword cmdname">impalad</span> daemon to which Hue tries to
+        connect is down.
+      </div>
 
       <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
         If your JDBC or ODBC application connects to Impala through a load balancer such as

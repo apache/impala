@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="parquet_fallback_schema_resolution"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>PARQUET_FALLBACK_SCHEMA_RESOLUTION Query Option (Impala 2.6 or higher only)</title></head><body id="parquet_fallback_schema_resolution"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="parquet_fallback_schema_resolution"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>PARQUET_FALLBACK_SCHEMA_RESOLUTION Query Option (Impala 2.6 or higher only)</title></head><body id="parquet_fallback_schema_resolution"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">PARQUET_FALLBACK_SCHEMA_RESOLUTION Query Option (<span class="keyword">Impala 2.6</span> or higher only)</h1>
   
@@ -8,11 +8,21 @@
 
   <div class="body conbody">
 
-    <p class="p">
+    <div class="p">
       
-      Allows Impala to look up columns within Parquet files by column name, rather than column order,
+      The <code class="ph codeph">PARQUET_FALLBACK_SCHEMA_RESOLUTION</code> query option allows Impala to look
+      up columns within Parquet files by column name, rather than column order,
       when necessary.
-    </p>
+      The allowed values are:
+      <ul class="ul">
+        <li class="li">
+          POSITION (0)
+        </li>
+        <li class="li">
+          NAME (1)
+        </li>
+      </ul>
+    </div>
 
     <p class="p">
         <strong class="ph b">Usage notes:</strong>
@@ -20,15 +30,14 @@
     <p class="p">
       By default, Impala looks up columns within a Parquet file based on
       the order of columns in the table.
-      The <code class="ph codeph">name</code> setting for this option enables behavior for Impala queries
-      similar to the Hive setting <code class="ph codeph">parquet.column.index.access=false</code>.
+      The <code class="ph codeph">name</code> setting for this option enables behavior for
+      Impala queries similar to the Hive setting <code class="ph codeph">parquet.column.index access=false</code>.
       It also allows Impala to query Parquet files created by Hive with the
       <code class="ph codeph">parquet.column.index.access=false</code> setting in effect.
     </p>
 
     <p class="p">
-      <strong class="ph b">Type:</strong> integer or string.
-      Allowed values are 0 or <code class="ph codeph">position</code> (default), 1 or <code class="ph codeph">name</code>.
+      <strong class="ph b">Type:</strong> integer or string
     </p>
 
     <p class="p">

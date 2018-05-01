@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="analytic_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Analytic Functions</title></head><body id="analytic_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="analytic_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Analytic Functions</title></head><body id="analytic_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Analytic Functions</h1>
 
@@ -126,7 +126,7 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
       <p class="p">
         In queries involving both analytic functions and partitioned tables, partition pruning only occurs for columns named in the <code class="ph codeph">PARTITION BY</code>
         clause of the analytic function call. For example, if an analytic function query has a clause such as <code class="ph codeph">WHERE year=2016</code>,
-        the way to make the query prune all other <code class="ph codeph">YEAR</code> partitions is to include <code class="ph codeph">PARTITION BY year</code>in the analytic function call;
+        the way to make the query prune all other <code class="ph codeph">YEAR</code> partitions is to include <code class="ph codeph">PARTITION BY year</code> in the analytic function call;
         for example, <code class="ph codeph">OVER (PARTITION BY year,<var class="keyword varname">other_columns</var> <var class="keyword varname">other_analytic_clauses</var>)</code>.
 
       </p>
@@ -749,7 +749,7 @@ order by kind, ordering desc, name;
 
       <p class="p">
         Partitioning by the <code class="ph codeph">X</code> column groups all the duplicate numbers together and returns the
-        place each each value within the group; because each value occurs only 1 or 2 times,
+        place each value within the group; because each value occurs only 1 or 2 times,
         <code class="ph codeph">DENSE_RANK()</code> designates each <code class="ph codeph">X</code> value as either first or second within its
         group.
       </p>
@@ -1585,7 +1585,7 @@ insert into animals values ('Fire-breathing dragon', 'Mythical', NULL);
 
       <p class="p">
         Partitioning by the <code class="ph codeph">X</code> column groups all the duplicate numbers together and returns the
-        place each each value within the group; because each value occurs only 1 or 2 times,
+        place each value within the group; because each value occurs only 1 or 2 times,
         <code class="ph codeph">RANK()</code> designates each <code class="ph codeph">X</code> value as either first or second within its
         group.
       </p>

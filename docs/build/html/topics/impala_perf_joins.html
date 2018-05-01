@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="perf_joins"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Performance Considerations for Join Queries</title></head><body id="perf_joins"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="perf_joins"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Performance Considerations for Join Queries</title></head><body id="perf_joins"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Performance Considerations for Join Queries</h1>
   
@@ -90,7 +90,7 @@
       To see which join strategy is used for a particular query, issue an <code class="ph codeph">EXPLAIN</code> statement for
       the query. If you find that a query uses a broadcast join when you know through benchmarking that a
       partitioned join would be more efficient, or vice versa, add a hint to the query to specify the precise join
-      mechanism to use. See <a class="xref" href="impala_hints.html#hints">Query Hints in Impala SELECT Statements</a> for details.
+      mechanism to use. See <a class="xref" href="impala_hints.html#hints">Optimizer Hints</a> for details.
     </p>
   </div>
 

@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="compute_stats"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>COMPUTE STATS Statement</title></head><body id="compute_stats"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="compute_stats"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>COMPUTE STATS Statement</title></head><body id="compute_stats"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">COMPUTE STATS Statement</h1>
   
@@ -9,19 +9,25 @@
   <div class="body conbody">
 
     <p class="p">
-      
-      Gathers information about volume and distribution of data in a table and all associated columns and
-      partitions. The information is stored in the metastore database, and used by Impala to help optimize queries.
-      For example, if Impala can determine that a table is large or small, or has many or few distinct values it
-      can organize parallelize the work appropriately for a join query or insert operation. For details about the
-      kinds of information gathered by this statement, see <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a>.
+       The
+      COMPUTE STATS statement gathers information about volume and distribution
+      of data in a table and all associated columns and partitions. The
+      information is stored in the metastore database, and used by Impala to
+      help optimize queries. For example, if Impala can determine that a table
+      is large or small, or has many or few distinct values it can organize and
+      parallelize the work appropriately for a join query or insert operation.
+      For details about the kinds of information gathered by this statement, see
+        <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a>.
     </p>
 
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
 
-<pre class="pre codeblock"><code>COMPUTE STATS [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
+<pre class="pre codeblock"><code><span class="ph">COMPUTE STATS [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>  [ ( <var class="keyword varname">column_list</var> ) ] [TABLESAMPLE SYSTEM(<var class="keyword varname">percentage</var>) [REPEATABLE(<var class="keyword varname">seed</var>)]]</span>
+
+<var class="keyword varname">column_list</var> ::= <var class="keyword varname">column_name</var> [ , <var class="keyword varname">column_name</var>, ... ]
+
 COMPUTE INCREMENTAL STATS [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var> [PARTITION (<var class="keyword varname">partition_spec</var>)]
 
 <var class="keyword varname">partition_spec</var> ::= <var class="keyword varname">simple_partition_spec</var> | <span class="ph"><var class="keyword varname">complex_partition_spec</var></span>
@@ -45,30 +51,70 @@ COMPUTE INCREMENTAL STATS [<var class="keyword varname">db_name</var>.]<var clas
       </p>
 
     <p class="p">
-      Originally, Impala relied on users to run the Hive <code class="ph codeph">ANALYZE TABLE</code> statement, but that method
-      of gathering statistics proved unreliable and difficult to use. The Impala <code class="ph codeph">COMPUTE STATS</code>
-      statement is built from the ground up to improve the reliability and user-friendliness of this operation.
-      <code class="ph codeph">COMPUTE STATS</code> does not require any setup steps or special configuration. You only run a
-      single Impala <code class="ph codeph">COMPUTE STATS</code> statement to gather both table and column statistics, rather
-      than separate Hive <code class="ph codeph">ANALYZE TABLE</code> statements for each kind of statistics.
+      Originally, Impala relied on users to run the Hive <code class="ph codeph">ANALYZE
+        TABLE</code> statement, but that method of gathering statistics proved
+      unreliable and difficult to use. The Impala <code class="ph codeph">COMPUTE STATS</code>
+      statement was built to improve the reliability and user-friendliness of
+      this operation. <code class="ph codeph">COMPUTE STATS</code> does not require any setup
+      steps or special configuration. You only run a single Impala
+        <code class="ph codeph">COMPUTE STATS</code> statement to gather both table and column
+      statistics, rather than separate Hive <code class="ph codeph">ANALYZE TABLE</code>
+      statements for each kind of statistics.
+    </p>
+
+    <p class="p">
+      For non-incremental <code class="ph codeph">COMPUTE STATS</code>
+      statement, the columns for which statistics are computed can be specified
+      with an optional comma-separate list of columns.
+    </p>
+
+    <p class="p">
+      If no column list is given, the <code class="ph codeph">COMPUTE STATS</code> statement
+      computes column-level statistics for all columns of the table. This adds
+      potentially unneeded work for columns whose stats are not needed by
+      queries. It can be especially costly for very wide tables and unneeded
+      large string fields.
+    </p>
+    <p class="p">
+      <code class="ph codeph">COMPUTE STATS</code> returns an error when a specified column
+      cannot be analyzed, such as when the column does not exist, the column is
+      of an unsupported type for COMPUTE STATS, e.g. colums of complex types,
+      or the column is a partitioning column.
+
+    </p>
+    <p class="p">
+      If an empty column list is given, no column is analyzed by <code class="ph codeph">COMPUTE
+        STATS</code>.
+    </p>
+
+    <p class="p">
+      In <span class="keyword">Impala 2.12</span> and
+      higher, an optional <code class="ph codeph">TABLESAMPLE</code> clause immediately after
+      a table reference specifies that the <code class="ph codeph">COMPUTE STATS</code>
+      operation only processes a specified percentage of the table data. For
+      tables that are so large that a full <code class="ph codeph">COMPUTE STATS</code>
+      operation is impractical, you can use <code class="ph codeph">COMPUTE STATS</code> with
+      a <code class="ph codeph">TABLESAMPLE</code> clause to extrapolate statistics from a
+      sample of the table data. See <a href="impala_perf_stats.html"><span class="keyword">Table and Column Statistics</span></a>about the
+      experimental stats extrapolation and sampling features.
     </p>
 
     <p class="p">
       The <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> variation is a shortcut for partitioned tables that works on a
       subset of partitions rather than the entire table. The incremental nature makes it suitable for large tables
       with many partitions, where a full <code class="ph codeph">COMPUTE STATS</code> operation takes too long to be practical
-      each time a partition is added or dropped. See <a class="xref" href="impala_perf_stats.html#perf_stats_incremental">Overview of Incremental Statistics</a>
+      each time a partition is added or dropped. See <a class="xref" href="impala_perf_stats.html#perf_stats_incremental">impala_perf_stats.html#perf_stats_incremental</a>
       for full usage details.
     </p>
 
     <div class="note important note_important"><span class="note__title importanttitle">Important:</span> 
       <p class="p">
         For a particular table, use either <code class="ph codeph">COMPUTE STATS</code> or
-        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, but never combine the two or alternate
-        between them. If you switch from <code class="ph codeph">COMPUTE STATS</code> to
-        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> during the lifetime of a table, or vice
-        versa, drop all statistics (by running both <code class="ph codeph">DROP STATS</code> and
-        <code class="ph codeph">DROP INCREMENTAL STATS</code>) before making the switch.
+        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, but never combine the two or
+        alternate between them. If you switch from <code class="ph codeph">COMPUTE STATS</code> to
+        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> during the lifetime of a table, or
+        vice versa, drop all statistics by running <code class="ph codeph">DROP STATS</code> before
+        making the switch.
       </p>
       <p class="p">
         When you run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> on a table for the first time,
@@ -92,39 +138,44 @@ COMPUTE INCREMENTAL STATS [<var class="keyword varname">db_name</var>.]<var clas
       <code class="ph codeph">COMPUTE STATS</code> statement. Such tables display <code class="ph codeph">false</code> under the
       <code class="ph codeph">Incremental stats</code> column of the <code class="ph codeph">SHOW TABLE STATS</code> output.
     </p>
-
     <div class="note note note_note"><span class="note__title notetitle">Note:</span> 
-      Because many of the most performance-critical and resource-intensive operations rely on table and column
-      statistics to construct accurate and efficient plans, <code class="ph codeph">COMPUTE STATS</code> is an important step at
-      the end of your ETL process. Run <code class="ph codeph">COMPUTE STATS</code> on all tables as your first step during
-      performance tuning for slow queries, or troubleshooting for out-of-memory conditions:
-      <ul class="ul">
-        <li class="li">
-          Accurate statistics help Impala construct an efficient query plan for join queries, improving performance
-          and reducing memory usage.
-        </li>
-
-        <li class="li">
-          Accurate statistics help Impala distribute the work effectively for insert operations into Parquet
-          tables, improving performance and reducing memory usage.
-        </li>
-
-        <li class="li">
-          Accurate statistics help Impala estimate the memory required for each query, which is important when you
-          use resource management features, such as admission control and the YARN resource management framework.
-          The statistics help Impala to achieve high concurrency, full utilization of available memory, and avoid
-          contention with workloads from other Hadoop components.
-        </li>
-        <li class="li">
-          In <span class="keyword">Impala 2.8</span> and higher, when you run the
-          <code class="ph codeph">COMPUTE STATS</code> or <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
-          statement against a Parquet table, Impala automatically applies the query
-          option setting <code class="ph codeph">MT_DOP=4</code> to increase the amount of intra-node
-          parallelism during this CPU-intensive operation. See <a class="xref" href="impala_mt_dop.html">MT_DOP Query Option</a>
-          for details about what this query option does and how to use it with
-          CPU-intensive <code class="ph codeph">SELECT</code> statements.
-        </li>
-      </ul>
+      <div class="p">
+        Because many of the most performance-critical and resource-intensive
+        operations rely on table and column statistics to construct accurate and
+        efficient plans, <code class="ph codeph">COMPUTE STATS</code> is an important step at
+        the end of your ETL process. Run <code class="ph codeph">COMPUTE STATS</code> on all
+        tables as your first step during performance tuning for slow queries, or
+        troubleshooting for out-of-memory conditions:
+        <ul class="ul">
+          <li class="li">
+            Accurate statistics help Impala construct an efficient query plan
+            for join queries, improving performance and reducing memory usage.
+          </li>
+          <li class="li">
+            Accurate statistics help Impala distribute the work effectively
+            for insert operations into Parquet tables, improving performance and
+            reducing memory usage.
+          </li>
+          <li class="li">
+            Accurate statistics help Impala estimate the memory
+            required for each query, which is important when you use resource
+            management features, such as admission control and the YARN resource
+            management framework. The statistics help Impala to achieve high
+            concurrency, full utilization of available memory, and avoid
+            contention with workloads from other Hadoop components.
+          </li>
+          <li class="li">
+            In <span class="keyword">Impala 2.8</span> and
+            higher, when you run the <code class="ph codeph">COMPUTE STATS</code> or
+              <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> statement against a
+            Parquet table, Impala automatically applies the query option setting
+              <code class="ph codeph">MT_DOP=4</code> to increase the amount of intra-node
+            parallelism during this CPU-intensive operation. See <a class="xref" href="impala_mt_dop.html">MT_DOP Query Option</a> for details about what this query option does
+            and how to use it with CPU-intensive <code class="ph codeph">SELECT</code>
+            statements.
+          </li>
+        </ul>
+      </div>
     </div>
 
     <p class="p">

@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="string_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala String Functions</title></head><body id="string_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="string_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala String Functions</title></head><body id="string_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala String Functions</h1>
   
@@ -428,7 +428,7 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
         argument and the presence of trailing spaces for <code class="ph codeph">CHAR</code>
         values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code> values are
         displayed with enclosing quotation marks to show any trailing spaces.
-<pre class="pre codeblock" id="string_functions__d6e2549"><code>create table length_demo (s string, c char(5));
+<pre class="pre codeblock" id="string_functions__d6e2588"><code>create table length_demo (s string, c char(5));
 insert into length_demo values
   ('a',cast('a' as char(5))),
   ('abc',cast('abc' as char(5))),
@@ -795,6 +795,14 @@ select instr('foo bar bletch', 'b', 1, null);
 
       
 
+        <dt class="dt dlterm" id="string_functions__left">
+          <code class="ph codeph">left(string a, int num_chars)</code>
+        </dt>
+        <dd class="dd">
+          See the <code class="ph codeph">strleft</code> function.
+        </dd>
+
+
       
 
         <dt class="dt dlterm" id="string_functions__length">
@@ -836,7 +844,7 @@ select instr('foo bar bletch', 'b', 1, null);
         argument and the presence of trailing spaces for <code class="ph codeph">CHAR</code>
         values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code> values are
         displayed with enclosing quotation marks to show any trailing spaces.
-<pre class="pre codeblock" id="string_functions__d6e2549"><code>create table length_demo (s string, c char(5));
+<pre class="pre codeblock" id="string_functions__d6e2588"><code>create table length_demo (s string, c char(5));
 insert into length_demo values
   ('a',cast('a' as char(5))),
   ('abc',cast('abc' as char(5))),
@@ -924,12 +932,14 @@ from length_demo;
       
 
         <dt class="dt dlterm" id="string_functions__ltrim">
-          <code class="ph codeph">ltrim(string a)</code>
+          <code class="ph codeph">ltrim(string a [, string chars_to_trim])</code>
         </dt>
 
         <dd class="dd">
           
-          <strong class="ph b">Purpose:</strong> Returns the argument string with any leading spaces removed from the left side.
+          <strong class="ph b">Purpose:</strong> Returns the argument string with all occurrences
+          of characters specified by the second argument removed from
+          the left side. Removes spaces if the second argument is not specified.
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
           </p>
@@ -966,6 +976,73 @@ from length_demo;
       
 
       
+
+        <dt class="dt dlterm" id="string_functions__regexp_escape">
+          <code class="ph codeph">regexp_escape(string source)</code>
+        </dt>
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> The <code class="ph codeph">regexp_escape</code> function returns
+          a string escaped for the special character in RE2 library so that the
+          special characters are interpreted literally rather than as special
+          characters. The following special characters are escaped by the
+          function:
+<pre class="pre codeblock"><code>.\+*?[^]$(){}=!&lt;&gt;|:-</code></pre>
+
+          <p class="p">
+            <strong class="ph b">Return type:</strong>
+            <code class="ph codeph">string</code>
+          </p>
+
+          <p class="p">
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
+        Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
+        has most idioms familiar from regular expressions in Perl, Python, and so on, including
+        <code class="ph codeph">.*?</code> for non-greedy matches.
+      </p>
+          <p class="p">
+        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
+        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
+        adjust the expression patterns if necessary. See
+        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+      </p>
+          <p class="p">
+        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code> character for escaping,
+        use <code class="ph codeph">\\</code> to represent the regular expression escape character in any regular expressions
+        that you submit through <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character
+        class names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you would have to
+        escape as <code class="ph codeph">\\d</code>.
+      </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+          <p class="p">
+            This example shows escaping one of special characters in RE2.
+          </p>
+<pre class="pre codeblock"><code>
++------------------------------------------------------+
+| regexp_escape('Hello.world')                         |
++------------------------------------------------------+
+| Hello\.world                                         |
++------------------------------------------------------+
+</code></pre>
+          <p class="p">
+            This example shows escaping all the special characters in RE2.
+          </p>
+<pre class="pre codeblock"><code>
++------------------------------------------------------------+
+| regexp_escape('a.b\\c+d*e?f[g]h$i(j)k{l}m=n!o&lt;p&gt;q|r:s-t')  |
++------------------------------------------------------------+
+| a\.b\\c\+d\*e\?f\[g\]h\$i\(j\)k\{l\}m\=n\!o\&lt;p\&gt;q\|r\:s\-t |
++------------------------------------------------------------+
+
+</code></pre>
+        </dd>
+
+
+
+
 
         <dt class="dt dlterm" id="string_functions__regexp_extract">
           <code class="ph codeph">regexp_extract(string subject, string pattern, int index)</code>
@@ -1349,6 +1426,14 @@ select replace('hello world','xyz','abc');
 
       
 
+        <dt class="dt dlterm" id="string_functions__right">
+          <code class="ph codeph">right(string a, int num_chars)</code>
+        </dt>
+        <dd class="dd">
+          See the <code class="ph codeph">strright</code> function.
+        </dd>
+
+
       
 
         <dt class="dt dlterm" id="string_functions__rpad">
@@ -1370,12 +1455,14 @@ select replace('hello world','xyz','abc');
       
 
         <dt class="dt dlterm" id="string_functions__rtrim">
-          <code class="ph codeph">rtrim(string a)</code>
+          <code class="ph codeph">rtrim(string a [, string chars_to_trim])</code>
         </dt>
 
         <dd class="dd">
           
-          <strong class="ph b">Purpose:</strong> Returns the argument string with any trailing spaces removed from the right side.
+          <strong class="ph b">Purpose:</strong> Returns the argument string with all occurrences
+          of characters specified by the second argument removed from
+          the right side. Removes spaces if the second argument is not specified.
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
           </p>
@@ -1408,11 +1495,10 @@ select replace('hello world','xyz','abc');
 
         <dd class="dd">
           
-          <strong class="ph b">Purpose:</strong> Returns the nth field within a delimited string.
-          The fields are numbered starting from 1.
-          The delimiter can consist of multiple characters, not just a
-          single character. All matching of the delimiter is done exactly, not using any
-          regular expression patterns.
+          <strong class="ph b">Purpose:</strong> Returns the nth field within a delimited string. The
+          fields are numbered starting from 1. The delimiter can consist of
+          multiple characters, not just a single character. All matching of the
+          delimiter is done exactly, not using any regular expression patterns.
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
           </p>
@@ -1440,7 +1526,8 @@ select replace('hello world','xyz','abc');
         <strong class="ph b">Examples:</strong>
       </p>
           <p class="p">
-            These examples show how to retrieve the nth field from a delimited string:
+            These examples show how to retrieve the nth field from a delimited
+            string:
           </p>
 <pre class="pre codeblock"><code>
 select split_part('x,y,z',',',1);
@@ -1463,15 +1550,15 @@ select split_part('x,y,z',',',3);
 +-----------------------------+
 | z                           |
 +-----------------------------+
-&lt;/codeblock&gt;
 
-          &lt;p&gt;
+</code></pre>
+          <p class="p">
             These examples show what happens for out-of-range field positions.
             Specifying a value less than 1 produces an error. Specifying a value
             greater than the number of fields returns a zero-length string
-            (which is not the same as &lt;codeph&gt;NULL&lt;/codeph&gt;).
-          &lt;/p&gt;
-&lt;codeblock&gt;&lt;![CDATA[
+            (which is not the same as <code class="ph codeph">NULL</code>).
+          </p>
+<pre class="pre codeblock"><code>
 select split_part('x,y,z',',',0);
 ERROR: Invalid field position: 0
 
@@ -1486,12 +1573,12 @@ from t1
 +-------------------+-------------------------------------+---------------------------+
 |                   | []                                  | 0                         |
 +-------------------+-------------------------------------+---------------------------+
-&lt;/codeblock&gt;
 
-          &lt;p&gt;
+</code></pre>
+          <p class="p">
             These examples show how the delimiter can be a multi-character value:
-          &lt;/p&gt;
-&lt;codeblock&gt;&lt;![CDATA[
+          </p>
+<pre class="pre codeblock"><code>
 select split_part('one***two***three','***',2);
 +-------------------------------------------+
 | split_part('one***two***three', '***', 2) |
@@ -1524,8 +1611,8 @@ select split_part('one\|/two\|/three','\|/',3);
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
           </p>
-        </dd>
 
+        </dd>
       
 
       

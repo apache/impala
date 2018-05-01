@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="scalability"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Scalability Considerations for Impala</title></head><body id="scalability"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="scalability"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Scalability Considerations for Impala</title></head><body id="scalability"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Scalability Considerations for Impala</h1>
   
@@ -575,7 +575,7 @@
                   If Impala still chooses a suboptimal execution strategy even with statistics available, or if it
                   is impractical to keep the statistics up to date for huge or rapidly changing tables, add hints
                   to the most resource-intensive queries to select the right execution strategy. See
-                  <a class="xref" href="impala_hints.html#hints">Query Hints in Impala SELECT Statements</a> for details.
+                  <a class="xref" href="impala_hints.html#hints">Optimizer Hints</a> for details.
                 </li>
               </ul>
             </li>
@@ -897,26 +897,26 @@ vm.overcommit_memory=1
         (that is, increase latency) to Impala queries, and reduce overall throughput for non-Impala
         workloads that also require accessing HDFS files.
       </p>
-      <p class="p">
-        In <span class="keyword">Impala 2.10</span> and higher, you can reduce NameNode overhead by enabling
-        a caching feature for HDFS file handles. Data files that are accessed by different queries,
-        or even multiple times within the same query, can be accessed without a new <span class="q">"open"</span>
-        call and without fetching the file details again from the NameNode.
-      </p>
+      <p class="p"> In <span class="keyword">Impala 2.10</span> and higher, you can reduce
+        NameNode overhead by enabling a caching feature for HDFS file handles.
+        Data files that are accessed by different queries, or even multiple
+        times within the same query, can be accessed without a new <span class="q">"open"</span>
+        call and without fetching the file details again from the NameNode. </p>
       <p class="p">
         Because this feature only involves HDFS data files, it does not apply to non-HDFS tables,
         such as Kudu or HBase tables, or tables that store their data on cloud services such as
         S3 or ADLS. Any read operations that perform remote reads also skip the cached file handles.
       </p>
-      <p class="p">
-        This feature is turned off by default. To enable it, set the configuration option
-        <code class="ph codeph">max_cached_file_handles</code> to a non-zero value for each <span class="keyword cmdname">impalad</span>
-        daemon. Consider an initial starting value of 20 thousand, and adjust upward if NameNode
-        overhead is still significant, or downward if it is more important to reduce the extra memory usage
-        on each host. Each cache entry consumes 6 KB, meaning that caching 20,000 file handles requires
-        up to 120 MB on each DataNode. The exact memory usage varies depending on how many file handles
-        have actually been cached; memory is freed as file handles are evicted from the cache.
-      </p>
+      <p class="p"> The feature is enabled by default with 20,000 file handles to be
+        cached. To change the value, set the configuration option
+          <code class="ph codeph">max_cached_file_handles</code> to a non-zero value for each
+          <span class="keyword cmdname">impalad</span> daemon. From the initial default value of
+        20000, adjust upward if NameNode request load is still significant, or
+        downward if it is more important to reduce the extra memory usage on
+        each host. Each cache entry consumes 6 KB, meaning that caching 20,000
+        file handles requires up to 120 MB on each Impala executor. The exact
+        memory usage varies depending on how many file handles have actually
+        been cached; memory is freed as file handles are evicted from the cache. </p>
       <p class="p">
         If a manual HDFS operation moves a file to the HDFS Trashcan while the file handle is cached,
         Impala still accesses the contents of that file. This is a change from prior behavior. Previously,

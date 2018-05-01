@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="datetime_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Date and Time Functions</title></head><body id="datetime_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="datetime_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Date and Time Functions</title></head><body id="datetime_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Date and Time Functions</h1>
   
@@ -25,7 +25,7 @@
 
     <p class="p">
       Some of these functions are affected by the setting of the
-      <code class="ph codeph">-use_local_tz_for_unix_timestamp_conversions</code> startup flag for the
+      <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions</code> startup flag for the
       <span class="keyword cmdname">impalad</span> daemon. This setting is off by default, meaning that
       functions such as <code class="ph codeph">from_unixtime()</code> and <code class="ph codeph">unix_timestamp()</code>
       consider the input values to always represent the UTC time zone.
@@ -550,7 +550,6 @@ select now() as right_now, datediff(now(), now() - interval 18 hours) as 18_hour
       
 
         <dt class="dt dlterm" id="datetime_functions__day">
-          
           <code class="ph codeph">day(timestamp date), <span class="ph" id="datetime_functions__dayofmonth">dayofmonth(timestamp date)</span></code>
         </dt>
 
@@ -673,7 +672,6 @@ select now() + interval 1 day as tomorrow,
       
 
         <dt class="dt dlterm" id="datetime_functions__dayofweek">
-          
           <code class="ph codeph">dayofweek(timestamp date)</code>
         </dt>
 
@@ -808,45 +806,51 @@ select now() as right_now, days_sub(now(), 31) as 31_days_ago;
       
 
         <dt class="dt dlterm" id="datetime_functions__extract">
-          <code class="ph codeph">extract(timestamp, string unit)</code><code class="ph codeph">extract(unit FROM timestamp)</code>
+          <code class="ph codeph">extract(timestamp, string unit)</code>, <code class="ph codeph">extract(unit FROM timestamp)</code>
         </dt>
 
         <dd class="dd">
           
-          <strong class="ph b">Purpose:</strong> Returns one of the numeric date or time fields from a <code class="ph codeph">TIMESTAMP</code> value.
+          <strong class="ph b">Purpose:</strong> Returns one of the numeric date or time fields from a
+            <code class="ph codeph">TIMESTAMP</code> value.
           <p class="p">
-            <strong class="ph b">Unit argument:</strong> The <code class="ph codeph">unit</code> string can be one of <code class="ph codeph">epoch</code>,
-            <code class="ph codeph">year</code>, <code class="ph codeph">month</code>, <code class="ph codeph">day</code>, <code class="ph codeph">hour</code>,
-            <code class="ph codeph">minute</code>, <code class="ph codeph">second</code>, or <code class="ph codeph">millisecond</code>.
-            This argument value is case-insensitive.
+            <strong class="ph b">Unit argument:</strong> The <code class="ph codeph">unit</code> string can be one of
+              <code class="ph codeph">epoch</code>, <code class="ph codeph">year</code>,
+              <code class="ph codeph">quarter</code>, <code class="ph codeph">month</code>,
+              <code class="ph codeph">day</code>, <code class="ph codeph">hour</code>,
+              <code class="ph codeph">minute</code>, <code class="ph codeph">second</code>, or
+              <code class="ph codeph">millisecond</code>. This argument value is
+            case-insensitive.
           </p>
-          <div class="p">
-            In Impala 2.0 and higher, you can use special syntax rather than a regular function call, for
-            compatibility with code that uses the SQL-99 format with the <code class="ph codeph">FROM</code> keyword. With this
-            style, the unit names are identifiers rather than <code class="ph codeph">STRING</code> literals. For example, the
-            following calls are both equivalent:
-<pre class="pre codeblock"><code>extract(year from now());
+          <div class="p"> In Impala 2.0 and higher, you can use special syntax
+            rather than a regular function call, for compatibility with code
+            that uses the SQL-99 format with the <code class="ph codeph">FROM</code> keyword.
+            With this style, the unit names are identifiers rather than
+              <code class="ph codeph">STRING</code> literals. For example, the following calls
+            are both equivalent:
+            <pre class="pre codeblock"><code>extract(year from now());
 extract(now(), "year");
 </code></pre>
           </div>
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
+          <p class="p"> Typically used in <code class="ph codeph">GROUP BY</code> queries to arrange
+            results by hour, day, month, and so on. You can also use this
+            function in an <code class="ph codeph">INSERT ... SELECT</code> into a partitioned
+            table to split up <code class="ph codeph">TIMESTAMP</code> values into individual
+            parts, if the partitioned table has separate partition key columns
+            representing year, month, day, and so on. If you need to divide by
+            more complex units of time, such as by week or by quarter, use the
+              <code class="ph codeph">TRUNC()</code> function instead. </p>
           <p class="p">
-            Typically used in <code class="ph codeph">GROUP BY</code> queries to arrange results by hour,
-            day, month, and so on. You can also use this function in an <code class="ph codeph">INSERT ... SELECT</code> into a
-            partitioned table to split up <code class="ph codeph">TIMESTAMP</code> values into individual parts, if the
-            partitioned table has separate partition key columns representing year, month, day, and so on. If you
-            need to divide by more complex units of time, such as by week or by quarter, use the
-            <code class="ph codeph">TRUNC()</code> function instead.
-          </p>
-          <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+            <strong class="ph b">Return type:</strong>
+            <code class="ph codeph">int</code>
           </p>
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
-<pre class="pre codeblock"><code>
+          <pre class="pre codeblock"><code>
 select now() as right_now,
   extract(year from now()) as this_year,
   extract(month from now()) as this_month;
@@ -985,7 +989,7 @@ select from_timestamp('1984-09-25 16:45:30.125', 'MMM dd, yyyy HH:mm:ss.SSS');
           </p>
           <p class="p">
         The way this function deals with time zones when converting to or from <code class="ph codeph">TIMESTAMP</code>
-        values is affected by the <code class="ph codeph">-use_local_tz_for_unix_timestamp_conversions</code> startup flag for the
+        values is affected by the <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions</code> startup flag for the
         <span class="keyword cmdname">impalad</span> daemon. See <a class="xref" href="../shared/../topics/impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for details about
         how Impala handles time zone considerations for the <code class="ph codeph">TIMESTAMP</code> data type.
       </p>
@@ -1615,7 +1619,6 @@ select now() as right_now, minutes_sub(now(), 90) as 90_minutes_ago;
       
 
         <dt class="dt dlterm" id="datetime_functions__month">
-          
           <code class="ph codeph">month(timestamp date)</code>
         </dt>
 
@@ -1639,6 +1642,19 @@ select now() as right_now, month(now()) as current_month;
         </dd>
 
       
+
+        <dt class="dt dlterm" id="datetime_functions__monthname">
+          <code class="ph codeph">monthname(timestamp date)</code>
+        </dt>
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the month field from a
+            <code class="ph codeph">TIMESTAMP</code> value, converted to the string
+          corresponding to that month name.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">string</code>
+          </p>
+        </dd>
+
 
       
 
@@ -2072,6 +2088,19 @@ select now() as right_now,
         </dd>
 
       
+
+        <dt class="dt dlterm" id="datetime_functions__quarter">
+          <code class="ph codeph">quarter(timestamp date)</code>
+        </dt>
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the quarter in the input
+          <code class="ph codeph">TIMESTAMP</code> expression as an integer value, 1, 2, 3, or
+          4, where 1 represents January 1 through March 31.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">int</code>
+          </p>
+        </dd>
+
 
       
 
@@ -2677,9 +2706,12 @@ select now() + interval 2 weeks as 2_weeks_from_now,
 
         <dd class="dd">
           
-          <strong class="ph b">Purpose:</strong> Returns an integer value representing the current date and time as a delta from the Unix
-          epoch, or converts from a specified date and time value represented as a <code class="ph codeph">TIMESTAMP</code> or
-          <code class="ph codeph">STRING</code>.
+          <strong class="ph b">Purpose:</strong> Returns a Unix time, which is a number of seconds
+          elapsed since '1970-01-01 00:00:00' UTC. If called with no
+          argument, the current date and time is converted to its Unix time. If
+          called with arguments, the first argument represented as the
+          <code class="ph codeph">TIMESTAMP</code> or <code class="ph codeph">STRING</code> is converted to
+          its Unix time.
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">bigint</code>
           </p>
@@ -2728,7 +2760,7 @@ select now() + interval 2 weeks as 2_weeks_from_now,
       </div>
           <p class="p">
         The way this function deals with time zones when converting to or from <code class="ph codeph">TIMESTAMP</code>
-        values is affected by the <code class="ph codeph">-use_local_tz_for_unix_timestamp_conversions</code> startup flag for the
+        values is affected by the <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions</code> startup flag for the
         <span class="keyword cmdname">impalad</span> daemon. See <a class="xref" href="../shared/../topics/impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for details about
         how Impala handles time zone considerations for the <code class="ph codeph">TIMESTAMP</code> data type.
       </p>
@@ -2870,8 +2902,7 @@ select current_timestamp(), utc_timestamp();
       
 
         <dt class="dt dlterm" id="datetime_functions__weekofyear">
-          
-          <code class="ph codeph">weekofyear(timestamp date)</code>
+          <code class="ph codeph">week(timestamp date)</code>, <code class="ph codeph">weekofyear(timestamp date)</code>
         </dt>
 
         <dd class="dd">

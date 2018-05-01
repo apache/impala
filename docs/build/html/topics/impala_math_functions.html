@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="math_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Mathematical Functions</title></head><body id="math_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="math_functions"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Mathematical Functions</title></head><body id="math_functions"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Mathematical Functions</h1>
   
@@ -886,6 +886,81 @@ select mod(9.9,3.0);
       
 
       
+
+        <dt class="dt dlterm" id="math_functions__murmur_hash">
+          <code class="ph codeph">murmur_hash(type v)</code>
+        </dt>
+
+        <dd class="dd">
+
+          <strong class="ph b">Purpose:</strong> Returns a consistent 64-bit value derived from the input argument, for convenience of
+          implementing <a class="xref" href="https://en.wikipedia.org/wiki/MurmurHash" target="_blank"> MurmurHash2</a> non-cryptographic hash function.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">BIGINT</code>
+          </p>
+          <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+          <p class="p">
+            You might use the return value in an application where you perform load balancing, bucketing, or some
+            other technique to divide processing or storage. This function provides a good performance for all kinds
+            of keys such as number, ascii string and UTF-8. It can be recommended as general-purpose hashing function.
+          </p>
+          <p class="p">
+            Regarding comparison of murmur_hash with fnv_hash, murmur_hash is based on Murmur2 hash algorithm and fnv_hash
+            function is based on FNV-1a hash algorithm. Murmur2 and FNV-1a can show very good randomness and performance
+            compared with well known other hash algorithms, but Murmur2 slightly show better randomness and performance than FNV-1a.
+            See <a class="xref" href="https://www.strchr.com/hash_functions" target="_blank">[1]</a><a class="xref" href="https://aras-p.info/blog/2016/08/09/More-Hash-Function-Tests" target="_blank">[2]</a><a class="xref" href="https://www.strchr.com/hash_functions" target="_blank">[3]</a> for details.
+          </p>
+          <p class="p">
+            Similar input values of different types could produce different hash values, for example the same
+            numeric value represented as <code class="ph codeph">SMALLINT</code> or <code class="ph codeph">BIGINT</code>,
+            <code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>, or <code class="ph codeph">DECIMAL(5,2)</code> or
+            <code class="ph codeph">DECIMAL(20,5)</code>.
+          </p>
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table h (x int, s string);
+[localhost:21000] &gt; insert into h values (0, 'hello'), (1,'world'), (1234567890,'antidisestablishmentarianism');
+[localhost:21000] &gt; select x, murmur_hash(x) from h;
++------------+----------------------+
+| x          | murmur_hash(x)       |
++------------+----------------------+
+| 0          | 6960269033020761575  |
+| 1          | -780611581681153783  |
+| 1234567890 | -5754914572385924334 |
++------------+----------------------+
+[localhost:21000] &gt; select s, murmur_hash(s) from h;
++------------------------------+----------------------+
+| s                            | murmur_hash(s)       |
++------------------------------+----------------------+
+| hello                        | 2191231550387646743  |
+| world                        | 5568329560871645431  |
+| antidisestablishmentarianism | -2261804666958489663 |
++------------------------------+----------------------+ </code></pre>
+          <p class="p">
+            For short argument values, the high-order bits of the result have relatively higher entropy than fnv_hash:
+          </p>
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table b (x boolean);
+[localhost:21000] &gt; insert into b values (true), (true), (false), (false);
+[localhost:21000] &gt; select x, murmur_hash(x) from b;
++-------+----------------------+
+| x     | murmur_hash(x)       |
++-------+---------------------++
+| true  | -5720937396023583481 |
+| true  | -5720937396023583481 |
+| false | 6351753276682545529  |
+| false | 6351753276682545529  |
++-------+--------------------+-+</code></pre>
+          <p class="p">
+            <strong class="ph b">Added in:</strong> Impala 2.12.0
+          </p>
+        </dd>
+
+
+
+
 
         <dt class="dt dlterm" id="math_functions__negative">
           <code class="ph codeph">negative(numeric_type a)</code>

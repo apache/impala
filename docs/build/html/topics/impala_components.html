@@ -1,6 +1,6 @@
 <!DOCTYPE html
   SYSTEM "about:legacy-compat">
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_concepts.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="version" content="Impala 2.8.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="intro_components"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Components of the Impala Server</title></head><body id="intro_components"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_concepts.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="version" content="Impala 2.12x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="intro_components"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Components of the Impala Server</title></head><body id="intro_components"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
 
   <h1 class="title topictitle1" id="ariaid-title1">Components of the Impala Server</h1>
   
@@ -119,7 +119,7 @@
 
       <p class="p">
         The Impala component known as the <dfn class="term">catalog service</dfn> relays the metadata changes from Impala SQL
-        statements to all the DataNodes in a cluster. It is physically represented by a daemon process named
+        statements to all the Impala daemons in a cluster. It is physically represented by a daemon process named
         <code class="ph codeph">catalogd</code>; you only need such a process on one host in the cluster. Because the requests
         are passed through the statestore daemon, it makes sense to run the <span class="keyword cmdname">statestored</span> and
         <span class="keyword cmdname">catalogd</span> services on the same host.
@@ -162,12 +162,41 @@
         </li>
       </ul>
 
-      <p class="p">
-        By default, the metadata loading and caching on startup happens asynchronously, so Impala can begin
-        accepting requests promptly. To enable the original behavior, where Impala waited until all metadata was
-        loaded before accepting any requests, set the <span class="keyword cmdname">catalogd</span> configuration option
-        <code class="ph codeph">--load_catalog_in_background=false</code>.
-      </p>
+      <div class="p">
+        Use <code class="ph codeph">--load_catalog_in_background</code> option to control when
+        the metadata of a table is loaded.
+        <ul class="ul">
+          <li class="li">
+            If set to <code class="ph codeph">false</code>, the metadata of a table is
+            loaded when it is referenced for the first time. This means that the
+            first run of a particular query can be slower than subsequent runs.
+            Starting in Impala 2.2, the default for
+            <code class="ph codeph">load_catalog_in_background</code> is
+            <code class="ph codeph">false</code>.
+          </li>
+          <li class="li">
+            If set to <code class="ph codeph">true</code>, the catalog service attempts to
+            load metadata for a table even if no query needed that metadata. So
+            metadata will possibly be already loaded when the first query that
+            would need it is run. However, for the following reasons, we
+            recommend not to set the option to <code class="ph codeph">true</code>.
+            <ul class="ul">
+              <li class="li">
+                Background load can interfere with query-specific metadata
+                loading. This can happen on startup or after invalidating
+                metadata, with a duration depending on the amount of metadata,
+                and can lead to a seemingly random long running queries that are
+                difficult to diagnose.
+              </li>
+              <li class="li">
+                Impala may load metadata for tables that are possibly never
+                used, potentially increasing catalog size and consequently memory
+                usage for both catalog service and Impala Daemon.
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </div>
 
       <p class="p">
         Most considerations for load balancing and high availability apply to the <span class="keyword cmdname">impalad</span> daemon.
