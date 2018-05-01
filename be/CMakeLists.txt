@@ -311,7 +311,7 @@ set(CLANG_INCLUDE_FLAGS
 )
 
 # allow linking of static libs into dynamic lib
-add_definitions(-fPIC)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # set compile output directory
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG" OR
