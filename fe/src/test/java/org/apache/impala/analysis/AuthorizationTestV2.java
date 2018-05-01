@@ -18,7 +18,6 @@
 package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.authorization.AuthorizationConfig;
@@ -91,7 +90,7 @@ public class AuthorizationTestV2 extends FrontendTestBase {
   @Test
   public void testPrivilegeRequests() throws ImpalaException {
     // Select *
-    Set<String> expectedPrivileges = Sets.newHashSet(
+    Set<String> expectedAuthorizables = Sets.newHashSet(
         "functional.alltypes",
         "functional.alltypes.id",
         "functional.alltypes.bool_col",
@@ -107,29 +106,63 @@ public class AuthorizationTestV2 extends FrontendTestBase {
         "functional.alltypes.year",
         "functional.alltypes.month"
     );
-    verifyPrivilegeReqs("select * from functional.alltypes", expectedPrivileges);
-    verifyPrivilegeReqs("select alltypes.* from functional.alltypes", expectedPrivileges);
+    verifyPrivilegeReqs("select * from functional.alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs("select alltypes.* from functional.alltypes", expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"), "select * from alltypes",
-        expectedPrivileges);
+        expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"),
-        "select alltypes.* from alltypes", expectedPrivileges);
-    verifyPrivilegeReqs("select a.* from functional.alltypes a", expectedPrivileges);
+        "select alltypes.* from alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs("select a.* from functional.alltypes a", expectedAuthorizables);
 
     // Select a specific column.
-    expectedPrivileges = Sets.newHashSet(
+    expectedAuthorizables = Sets.newHashSet(
         "functional.alltypes",
         "functional.alltypes.id"
     );
-    verifyPrivilegeReqs("select id from functional.alltypes", expectedPrivileges);
+    verifyPrivilegeReqs("select id from functional.alltypes", expectedAuthorizables);
     verifyPrivilegeReqs("select alltypes.id from functional.alltypes",
-        expectedPrivileges);
+        expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"),
-        "select alltypes.id from alltypes", expectedPrivileges);
+        "select alltypes.id from alltypes", expectedAuthorizables);
     verifyPrivilegeReqs(createAnalysisCtx("functional"), "select id from alltypes",
-        expectedPrivileges);
+        expectedAuthorizables);
     verifyPrivilegeReqs("select alltypes.id from functional.alltypes",
-        expectedPrivileges);
-    verifyPrivilegeReqs("select a.id from functional.alltypes a", expectedPrivileges);
+        expectedAuthorizables);
+    verifyPrivilegeReqs("select a.id from functional.alltypes a", expectedAuthorizables);
+
+    // Insert.
+    expectedAuthorizables = Sets.newHashSet("functional.alltypes");
+    verifyPrivilegeReqs("insert into functional.alltypes(id) partition(month, year) " +
+        "values(1, 1, 2018)", expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"), "insert into alltypes(id) " +
+        "partition(month, year) values(1, 1, 2018)", expectedAuthorizables);
+
+    // Insert with constant select.
+    expectedAuthorizables = Sets.newHashSet("functional.zipcode_incomes");
+    verifyPrivilegeReqs("insert into functional.zipcode_incomes(id) select '123'",
+        expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "insert into zipcode_incomes(id) select '123'", expectedAuthorizables);
+
+    // Truncate.
+    expectedAuthorizables = Sets.newHashSet("functional.alltypes");
+    verifyPrivilegeReqs("truncate table functional.alltypes", expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"),
+        "truncate table alltypes", expectedAuthorizables);
+
+    // Load
+    expectedAuthorizables = Sets.newHashSet(
+        "functional.alltypes",
+        "hdfs://localhost:20500/test-warehouse/tpch.lineitem"
+    );
+    verifyPrivilegeReqs("load data inpath " +
+        "'hdfs://localhost:20500/test-warehouse/tpch.lineitem' " +
+        "into table functional.alltypes partition(month=10, year=2009)",
+        expectedAuthorizables);
+    verifyPrivilegeReqs(createAnalysisCtx("functional"), "load data inpath " +
+        "'hdfs://localhost:20500/test-warehouse/tpch.lineitem' " +
+        "into table alltypes partition(month=10, year=2009)",
+        expectedAuthorizables);
   }
 
   @Test
@@ -370,8 +403,239 @@ public class AuthorizationTestV2 extends FrontendTestBase {
             TPrivilegeLevel.SELECT)));
   }
 
+  @Test
+  public void testInsert() throws ImpalaException {
+    // Basic insert into a table.
+    authorize("insert into functional.zipcode_incomes(id) values('123')")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.INSERT))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.INSERT))
+        .ok(onTable("functional", "zipcode_incomes", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "zipcode_incomes", TPrivilegeLevel.INSERT))
+        .error(insertError("functional.zipcode_incomes"))
+        .error(insertError("functional.zipcode_incomes"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT)))
+        .error(insertError("functional.zipcode_incomes"), onDatabase("functional",
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT)))
+        .error(insertError("functional.zipcode_incomes"), onTable("functional",
+            "zipcode_incomes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT)));
+
+    // Insert with select on a target table.
+    authorize("insert into functional.alltypes partition(month, year) " +
+        "select * from functional.alltypestiny where id < 100")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL),
+            onTable("functional", "alltypestiny", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
+            onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
+            onColumn("functional", "alltypestiny", new String[]{"id", "bool_col",
+                "tinyint_col", "smallint_col", "int_col", "bigint_col", "float_col",
+                "double_col", "date_string_col", "string_col", "timestamp_col", "year",
+                "month"}, TPrivilegeLevel.SELECT))
+        .error(selectError("functional.alltypestiny"))
+        .error(selectError("functional.alltypestiny"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT)))
+        .error(selectError("functional.alltypestiny"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT)))
+        .error(insertError("functional.alltypes"), onTable("functional",
+            "alltypestiny", TPrivilegeLevel.SELECT), onTable("functional",
+            "alltypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT)))
+        .error(selectError("functional.alltypestiny"), onTable("functional",
+            "alltypestiny", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)),
+            onTable("functional", "alltypes", TPrivilegeLevel.INSERT));
+
+    // Insert with select on a target view.
+    // Column-level privileges on views are not currently supported.
+    authorize("insert into functional.alltypes partition(month, year) " +
+        "select * from functional.alltypes_view where id < 100")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL),
+            onTable("functional", "alltypes_view", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
+            onTable("functional", "alltypes_view", TPrivilegeLevel.SELECT))
+        .error(selectError("functional.alltypes_view"))
+        .error(selectError("functional.alltypes_view"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT)))
+        .error(selectError("functional.alltypes_view"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT)))
+        .error(insertError("functional.alltypes"), onTable("functional",
+            "alltypes_view", TPrivilegeLevel.SELECT), onTable("functional",
+            "alltypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT)))
+        .error(selectError("functional.alltypes_view"), onTable("functional",
+            "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)),
+            onTable("functional", "alltypes", TPrivilegeLevel.INSERT));
+
+    // Insert with inline view.
+    authorize("insert into functional.alltypes partition(month, year) " +
+        "select b.* from functional.alltypesagg a join (select * from " +
+        "functional.alltypestiny) b on (a.int_col = b.int_col)")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL),
+            onTable("functional", "alltypesagg", TPrivilegeLevel.ALL),
+            onTable("functional", "alltypestiny", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
+            onTable("functional", "alltypesagg", TPrivilegeLevel.SELECT),
+            onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT))
+        .error(selectError("functional.alltypesagg"))
+        .error(selectError("functional.alltypesagg"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT)))
+        .error(selectError("functional.alltypesagg"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT)))
+        .error(insertError("functional.alltypes"), onTable("functional",
+            "alltypesagg", TPrivilegeLevel.SELECT), onTable("functional",
+            "alltypestiny", TPrivilegeLevel.SELECT), onTable("functional",
+            "alltypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT)))
+        .error(selectError("functional.alltypesagg"), onTable("functional",
+            "alltypesagg", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)),
+            onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT),
+            onTable("functional", "alltypes", TPrivilegeLevel.INSERT))
+        .error(selectError("functional.alltypestiny"), onTable("functional",
+            "alltypesagg", TPrivilegeLevel.SELECT), onTable("functional",
+            "alltypestiny", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)),
+            onTable("functional", "alltypes", TPrivilegeLevel.INSERT));
+
+    // Inserting into a view is not allowed.
+    authorize("insert into functional.alltypes_view(id) values(123)")
+        .error(insertError("functional.alltypes_view"));
+
+    // Inserting into a non-existent database.
+    authorize("insert into nodb.alltypes(id) values(1)")
+        .error(insertError("nodb.alltypes"));
+
+    // Inserting into a non-existent table.
+    authorize("insert into functional.notbl(id) values(1)")
+        .error(insertError("functional.notbl"));
+  }
+
+  @Test
+  public void testUseDb() throws ImpalaException {
+    AuthzTest test = authorize("use functional");
+    for (TPrivilegeLevel privilege : TPrivilegeLevel.values()) {
+      test.ok(onServer(privilege))
+          .ok(onDatabase("functional", privilege))
+          .ok(onTable("functional", "alltypes", privilege))
+          .ok(onColumn("functional", "alltypes", "id", privilege));
+    }
+    test.error(accessError("functional.*.*"));
+
+    // Accessing default database should always be allowed.
+    authorize("use default").ok();
+
+    // Accessing system database should always be allowed.
+    authorize("use _impala_builtins").ok();
+
+    // Use a non-existent database.
+    authorize("use nodb").error(accessError("nodb.*.*"));
+  }
+
+  @Test
+  public void testTruncate() throws ImpalaException {
+    // Truncate a table.
+    authorize("truncate table functional.alltypes")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.INSERT))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.INSERT))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT))
+        .error(insertError("functional.alltypes"))
+        .error(insertError("functional.alltypes"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT)))
+        .error(insertError("functional.alltypes"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT)))
+        .error(insertError("functional.alltypes"), onTable("functional", "alltypes",
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.INSERT)));
+
+    // Truncate a non-existent database.
+    authorize("truncate table nodb.alltypes")
+        .error(insertError("nodb.alltypes"));
+
+    // Truncate a non-existent table.
+    authorize("truncate table functional.notbl")
+        .error(insertError("functional.notbl"));
+
+    // Truncating a view is not supported.
+    authorize("truncate table functional.alltypes_view")
+        .error(insertError("functional.alltypes_view"));
+  }
+
+  @Test
+  public void testLoad() throws ImpalaException {
+    // Load into a table.
+    authorize("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem' " +
+        "into table functional.alltypes partition(month=10, year=2009)")
+      .ok(onServer(TPrivilegeLevel.ALL))
+      .ok(onDatabase("functional", TPrivilegeLevel.ALL),
+          onUri("hdfs://localhost:20500/test-warehouse/tpch.lineitem",
+          TPrivilegeLevel.ALL))
+      .ok(onDatabase("functional", TPrivilegeLevel.INSERT),
+          onUri("hdfs://localhost:20500/test-warehouse/tpch.lineitem",
+          TPrivilegeLevel.ALL))
+      .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL),
+          onUri("hdfs://localhost:20500/test-warehouse/tpch.lineitem",
+          TPrivilegeLevel.ALL))
+      .ok(onTable("functional", "alltypes", TPrivilegeLevel.INSERT),
+          onUri("hdfs://localhost:20500/test-warehouse/tpch.lineitem",
+          TPrivilegeLevel.ALL))
+      .error(insertError("functional.alltypes"))
+      .error(accessError("hdfs://localhost:20500/test-warehouse/tpch.lineitem"),
+          onDatabase("functional", TPrivilegeLevel.INSERT))
+      .error(accessError("hdfs://localhost:20500/test-warehouse/tpch.lineitem"),
+          onTable("functional", "alltypes", TPrivilegeLevel.INSERT))
+      .error(insertError("functional.alltypes"),
+          onUri("hdfs://localhost:20500/test-warehouse/tpch.lineitem",
+          TPrivilegeLevel.ALL));
+
+    // Load from non-existent URI.
+    authorize("load data inpath 'hdfs://localhost:20500/test-warehouse/nouri' " +
+        "into table functional.alltypes partition(month=10, year=2009)")
+        .error(insertError("functional.alltypes"))
+        .error(accessError("hdfs://localhost:20500/test-warehouse/nouri"),
+            onDatabase("functional", TPrivilegeLevel.INSERT))
+        .error(accessError("hdfs://localhost:20500/test-warehouse/nouri"),
+            onTable("functional", "alltypes", TPrivilegeLevel.INSERT));
+
+    // Load into non-existent database.
+    authorize("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem' " +
+        "into table nodb.alltypes partition(month=10, year=2009)")
+        .error(insertError("nodb.alltypes"))
+        .error(insertError("nodb.alltypes"), onUri(
+            "hdfs://localhost:20500/test-warehouse/tpch.nouri", TPrivilegeLevel.ALL));
+
+    // Load into non-existent table.
+    authorize("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem' " +
+        "into table functional.notbl partition(month=10, year=2009)")
+        .error(insertError("functional.notbl"))
+        .error(insertError("functional.notbl"), onUri(
+            "hdfs://localhost:20500/test-warehouse/tpch.nouri", TPrivilegeLevel.ALL));
+
+    // Load into a view is not supported.
+    authorize("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem' " +
+        "into table functional.alltypes_view")
+        .error(insertError("functional.alltypes_view"));
+  }
+
   private static String selectError(String object) {
     return "User '%s' does not have privileges to execute 'SELECT' on: " + object;
+  }
+
+  private static String insertError(String object) {
+    return "User '%s' does not have privileges to execute 'INSERT' on: " + object;
+  }
+
+  private static String accessError(String object) {
+    return "User '%s' does not have privileges to access: " + object;
   }
 
   private static TPrivilegeLevel[] allExcept(TPrivilegeLevel... excludedPrivLevels) {
@@ -624,15 +888,10 @@ public class AuthorizationTestV2 extends FrontendTestBase {
   private void verifyPrivilegeReqs(AnalysisContext ctx, String stmt,
       Set<String> expectedPrivilegeNames) throws ImpalaException {
     AnalysisResult analysisResult = parseAndAnalyze(stmt, ctx, frontend_);
-    ImmutableList<PrivilegeRequest> privilegeReqs =
-        analysisResult.getAnalyzer().getPrivilegeReqs();
-
-    assertEquals(expectedPrivilegeNames.size(), privilegeReqs.size());
-
-    for (PrivilegeRequest privilegeReq : privilegeReqs) {
-      assertTrue(String.format("Privilege on %s should not exist.",
-          privilegeReq.getName()),
-          expectedPrivilegeNames.contains(privilegeReq.getName()));
+    Set<String> actualPrivilegeNames = Sets.newHashSet();
+    for (PrivilegeRequest privReq : analysisResult.getAnalyzer().getPrivilegeReqs()) {
+      actualPrivilegeNames.add(privReq.getName());
     }
+    assertEquals(expectedPrivilegeNames, actualPrivilegeNames);
   }
 }
