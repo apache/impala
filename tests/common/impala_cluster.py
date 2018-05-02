@@ -18,6 +18,7 @@
 # Basic object model of an Impala cluster (set of Impala processes).
 #
 import logging
+import os
 import psutil
 import socket
 from getpass import getuser
@@ -34,6 +35,9 @@ from tests.util.shell_util import exec_process, exec_process_async
 logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('impala_cluster')
 LOG.setLevel(level=logging.DEBUG)
+
+IMPALA_HOME = os.environ['IMPALA_HOME']
+CATALOGD_PATH = os.path.join(IMPALA_HOME, 'bin/start-catalogd.sh')
 
 # Represents a set of Impala processes. Each Impala process must be created with
 # a basic set of command line options (beeswax_port, webserver_port, etc)
@@ -252,3 +256,12 @@ class CatalogdProcess(BaseImpalaProcess):
 
   def __get_port(self, default=None):
     return int(self._get_arg_value('catalog_service_port', default))
+
+  def start(self, wait_until_ready=True):
+    """Starts catalogd and waits until the service is ready to accept connections."""
+    restart_cmd = [CATALOGD_PATH] + self.cmd[1:] + ["&"]
+    LOG.info("Starting Catalogd process: %s" % ' '.join(restart_cmd))
+    os.system(' '.join(restart_cmd))
+    if wait_until_ready:
+      self.service.wait_for_metric_value('statestore-subscriber.connected',
+                                         expected_value=1, timeout=30)

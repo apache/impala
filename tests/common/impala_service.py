@@ -134,6 +134,35 @@ class BaseImpalaService(object):
                json.dumps(self.read_debug_webpage('threadz?json')),
                json.dumps(self.read_debug_webpage('rpcz?json')))
 
+  def get_catalog_object_dump(self, object_type, object_name):
+    """ Gets the web-page for the given 'object_type' and 'object_name'."""
+    return self.read_debug_webpage('catalog_object?object_type=%s&object_name=%s' %\
+        (object_type, object_name))
+
+  def get_catalog_objects(self, excludes=['_impala_builtins']):
+    """ Returns a dictionary containing all catalog objects. Each entry's key is the fully
+        qualified object name and the value is a tuple of the form (type, version).
+        Does not return databases listed in the 'excludes' list."""
+    catalog = self.get_debug_webpage_json('catalog')
+    objects = {}
+    for db_desc in catalog["databases"]:
+      db_name = db_desc["name"]
+      if db_name in excludes:
+        continue
+      db = self.get_catalog_object_dump('DATABASE', db_name)
+      objects[db_name] = ('DATABASE', self.extract_catalog_object_version(db))
+      for table_desc in db_desc["tables"]:
+        table_name = table_desc["fqtn"]
+        table = self.get_catalog_object_dump('TABLE', table_name)
+        objects[table_name] = ('TABLE', self.extract_catalog_object_version(table))
+    return objects
+
+  def extract_catalog_object_version(self, thrift_txt):
+    """ Extracts and returns the version of the catalog object's 'thrift_txt' representation."""
+    result = re.search(r'catalog_version \(i64\) = (\d+)', thrift_txt)
+    assert result, 'Unable to find catalog version in object: ' + thrift_txt
+    return int(result.group(1))
+
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
@@ -260,10 +289,6 @@ class ImpaladService(BaseImpalaService):
     hs2_client = TCLIService.Client(protocol)
     return hs2_client
 
-  def get_catalog_object_dump(self, object_type, object_name):
-    return self.read_debug_webpage('catalog_objects?object_type=%s&object_name=%s' %\
-        (object_type, object_name))
-
 
 # Allows for interacting with the StateStore service to perform operations such as
 # accessing the debug webpage.
@@ -283,6 +308,6 @@ class CatalogdService(BaseImpalaService):
     super(CatalogdService, self).__init__(hostname, webserver_port)
     self.service_port = service_port
 
-  def get_catalog_object_dump(self, object_type, object_name):
-    return self.read_debug_webpage('catalog_objects?object_type=%s&object_name=%s' %\
-        (object_type, object_name))
+  def get_catalog_version(self):
+    """ Gets catalogd's latest catalog version. """
+    return self.get_debug_webpage_json('catalog')["version"]

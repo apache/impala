@@ -265,7 +265,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
 [[noreturn]] void CatalogServer::GatherCatalogUpdatesThread() {
   while (1) {
     unique_lock<mutex> unique_lock(catalog_lock_);
-    // Protect against spurious wakups by checking the value of topic_updates_ready_.
+    // Protect against spurious wake-ups by checking the value of topic_updates_ready_.
     // It is only safe to continue on and update the shared pending_topic_updates_
     // when topic_updates_ready_ is false, otherwise we may be in the middle of
     // processing a heartbeat.
@@ -310,6 +310,16 @@ void CatalogServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
     Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
+  }
+  long current_catalog_version;
+  status = catalog_->GetCatalogVersion(&current_catalog_version);
+  if (status.ok()) {
+    Value version_value;
+    version_value.SetInt(current_catalog_version);
+    document->AddMember("version", version_value, document->GetAllocator());
+  } else {
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    document->AddMember("versionError", error, document->GetAllocator());
   }
   Value databases(kArrayType);
   for (const TDatabase& db: get_dbs_result.dbs) {
