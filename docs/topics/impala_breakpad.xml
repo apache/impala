@@ -61,10 +61,26 @@ under the License.
     <title>Enabling or Disabling Minidump Generation</title>
     <conbody>
       <p>
-        By default, a minidump file is generated when an Impala-related daemon crashes.
-        To turn off generation of the minidump files, change the
-        <uicontrol>minidump_path</uicontrol> configuration setting of one or more Impala-related daemons
-        to the empty string, and restart the corresponding services or daemons.
+        By default, a minidump file is generated when an Impala-related daemon
+        crashes.
+      </p>
+
+      <p>
+        To turn off generation of the minidump files, use one of the following
+        options:
+
+        <ul>
+          <li>
+            Set the <codeph>--enable_minidumps</codeph> configuration setting
+            to <codeph>false</codeph>. Restart the corresponding services or
+            daemons.
+          </li>
+
+          <li>
+            Set the <codeph>--minidump_path</codeph> configuration setting to
+            an empty string. Restart the corresponding services or daemons.
+          </li>
+        </ul>
       </p>
 
       <p rev="IMPALA-3677">
