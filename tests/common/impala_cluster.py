@@ -38,6 +38,7 @@ LOG.setLevel(level=logging.DEBUG)
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
 CATALOGD_PATH = os.path.join(IMPALA_HOME, 'bin/start-catalogd.sh')
+IMPALAD_PATH = os.path.join(IMPALA_HOME, 'bin/start-impalad.sh -build_type=latest')
 
 # Represents a set of Impala processes. Each Impala process must be created with
 # a basic set of command line options (beeswax_port, webserver_port, etc)
@@ -160,14 +161,11 @@ class Process(object):
 
   def start(self):
     LOG.info("Starting process: %s" % ' '.join(self.cmd))
-    self.process = exec_process_async(' '.join(self.cmd))
-
-  def wait(self):
-    """Wait until the current process has exited, and returns
-    (return code, stdout, stderr)"""
-    LOG.info("Waiting for process: %s" % ' '.join(self.cmd))
-    stdout, stderr = self.process.communicate()
-    return self.process.returncode, stdout, stderr
+    # Use os.system() to start 'cmd' in the background via a shell so its parent will be
+    # init after the shell exits. Otherwise, the parent of 'cmd' will be py.test and we
+    # cannot cleanly kill it until py.test exits. In theory, Popen(shell=True) should
+    # achieve the same thing but it doesn't work on some platforms for some reasons.
+    os.system(' '.join(self.cmd) + ' &')
 
   def kill(self, signal=SIGKILL):
     """
@@ -180,7 +178,6 @@ class Process(object):
       assert 0, "No processes %s found" % self.cmd
     LOG.info('Killing: %s (PID: %d) with signal %s'  % (' '.join(self.cmd), pid, signal))
     exec_process("kill -%d %d" % (signal, pid))
-
     return pid
 
   def restart(self):
@@ -233,7 +230,9 @@ class ImpaladProcess(BaseImpalaProcess):
 
   def start(self, wait_until_ready=True):
     """Starts the impalad and waits until the service is ready to accept connections."""
-    super(ImpaladProcess, self).start()
+    restart_cmd = [IMPALAD_PATH] + self.cmd[1:] + ['&']
+    LOG.info("Starting Impalad process: %s" % ' '.join(restart_cmd))
+    os.system(' '.join(restart_cmd))
     if wait_until_ready:
       self.service.wait_for_metric_value('impala-server.ready',
                                          expected_value=1, timeout=30)
