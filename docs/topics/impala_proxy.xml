@@ -469,6 +469,9 @@ The setup of the -principal and -be_principal has to be set through safety valve
 # use if not designated in their block
 #
 # You might need to adjust timing values to prevent timeouts.
+#
+# The timeout values should be dependant on how you use the cluster
+# and how long your queries run.
 #---------------------------------------------------------------------
 defaults
     mode                    http
@@ -480,9 +483,9 @@ defaults
     option                  redispatch
     retries                 3
     maxconn                 3000
-    contimeout 5000
-    clitimeout 50000
-    srvtimeout 50000
+    timeout connect 5000
+    timeout client 3600s
+    timeout server 3600s
 
 #
 # This sets up the admin page for HA Proxy at port 25002.
