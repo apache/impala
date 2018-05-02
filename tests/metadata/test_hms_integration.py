@@ -34,6 +34,7 @@ from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
+from tests.util.hive_utils import HiveDbWrapper, HiveTableWrapper
 
 import logging
 
@@ -147,45 +148,6 @@ class TestHmsIntegration(ImpalaTestSuite):
     def __exit__(self, typ, value, traceback):
       self.impala.client.execute('drop table if exists %s' % self.table_name)
 
-  class HiveDbWrapper(object):
-    """
-    A wrapper class for using `with` guards with databases created through Hive
-    ensuring deletion even if an exception occurs.
-    """
-
-    def __init__(self, hive, db_name):
-      self.hive = hive
-      self.db_name = db_name
-
-    def __enter__(self):
-      self.hive.run_stmt_in_hive(
-          'create database if not exists ' + self.db_name)
-      return self.db_name
-
-    def __exit__(self, typ, value, traceback):
-      self.hive.run_stmt_in_hive(
-          'drop database if exists %s cascade' % self.db_name)
-
-  class HiveTableWrapper(object):
-    """
-    A wrapper class for using `with` guards with tables created through Hive
-    ensuring deletion even if an exception occurs.
-    """
-
-    def __init__(self, hive, table_name, table_spec):
-      self.hive = hive
-      self.table_name = table_name
-      self.table_spec = table_spec
-
-    def __enter__(self):
-      self.hive.run_stmt_in_hive(
-          'create table if not exists %s %s' %
-          (self.table_name, self.table_spec))
-      return self.table_name
-
-    def __exit__(self, typ, value, traceback):
-      self.hive.run_stmt_in_hive('drop table if exists %s' % self.table_name)
-
   def impala_table_stats(self, table):
     """Returns a dictionary of stats for a table according to Impala."""
     output = self.client.execute('show table stats %s' % table).get_data()
@@ -288,13 +250,11 @@ class TestHmsIntegration(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_hive_db_hive_table_add_partition(self, vector):
-    self.add_hive_partition_helper(vector, self.HiveDbWrapper,
-                                   self.HiveTableWrapper)
+    self.add_hive_partition_helper(vector, HiveDbWrapper, HiveTableWrapper)
 
   @pytest.mark.execute_serially
   def test_hive_db_impala_table_add_partition(self, vector):
-    self.add_hive_partition_helper(vector, self.HiveDbWrapper,
-                                   self.ImpalaTableWrapper)
+    self.add_hive_partition_helper(vector, HiveDbWrapper, self.ImpalaTableWrapper)
 
   @pytest.mark.execute_serially
   def test_impala_db_impala_table_add_partition(self, vector):
@@ -304,7 +264,7 @@ class TestHmsIntegration(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_impala_db_hive_table_add_partition(self, vector):
     self.add_hive_partition_helper(vector, self.ImpalaDbWrapper,
-                                   self.HiveTableWrapper)
+                                   HiveTableWrapper)
 
   @pytest.mark.xfail(run=False, reason="This is a bug: IMPALA-2426")
   @pytest.mark.execute_serially
@@ -493,9 +453,9 @@ class TestHmsIntegration(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_compute_stats_get_to_impala(self, vector):
     """Column stats computed in Hive are also visible in Impala."""
-    with self.HiveDbWrapper(self, self.unique_string()) as db_name:
-      with self.HiveTableWrapper(self, db_name + '.' + self.unique_string(),
-                                 '(x int)') as table_name:
+    with HiveDbWrapper(self, self.unique_string()) as db_name:
+      with HiveTableWrapper(self, db_name + '.' + self.unique_string(),
+                            '(x int)') as table_name:
         hive_stats = self.hive_column_stats(table_name, 'x')
         self.client.execute('invalidate metadata')
         self.client.execute('refresh %s' % table_name)
@@ -577,7 +537,7 @@ class TestHmsIntegration(ImpalaTestSuite):
     """
 
     test_db = self.unique_string()
-    with self.HiveDbWrapper(self, test_db) as db_name:
+    with HiveDbWrapper(self, test_db) as db_name:
       pass
     self.assert_sql_error(
         self.client.execute,
@@ -596,9 +556,9 @@ class TestHmsIntegration(ImpalaTestSuite):
     """
     # TODO: check results of insert, then select * before and after
     # storage format change.
-    with self.HiveDbWrapper(self, self.unique_string()) as db_name:
-      with self.HiveTableWrapper(self, db_name + '.' + self.unique_string(),
-                                 '(x int, y int) stored as parquet') as table_name:
+    with HiveDbWrapper(self, self.unique_string()) as db_name:
+      with HiveTableWrapper(self, db_name + '.' + self.unique_string(),
+                            '(x int, y int) stored as parquet') as table_name:
         self.client.execute('invalidate metadata')
         self.client.execute('invalidate metadata %s' % table_name)
         print self.impala_table_stats(table_name)
@@ -612,9 +572,9 @@ class TestHmsIntegration(ImpalaTestSuite):
   def test_change_column_type(self, vector):
     """Hive column type changes propagate to Impala."""
 
-    with self.HiveDbWrapper(self, self.unique_string()) as db_name:
-      with self.HiveTableWrapper(self, db_name + '.' + self.unique_string(),
-                                 '(x int, y int)') as table_name:
+    with HiveDbWrapper(self, self.unique_string()) as db_name:
+      with HiveTableWrapper(self, db_name + '.' + self.unique_string(),
+                            '(x int, y int)') as table_name:
         self.run_stmt_in_hive(
             'insert into table %s values (33,44)' % table_name)
         self.run_stmt_in_hive('alter table %s change y y string' % table_name)
@@ -633,9 +593,9 @@ class TestHmsIntegration(ImpalaTestSuite):
     known issue with changing column types in Hive/parquet.
     """
 
-    with self.HiveDbWrapper(self, self.unique_string()) as db_name:
-      with self.HiveTableWrapper(self, db_name + '.' + self.unique_string(),
-                                 '(x int, y int) stored as parquet') as table_name:
+    with HiveDbWrapper(self, self.unique_string()) as db_name:
+      with HiveTableWrapper(self, db_name + '.' + self.unique_string(),
+                            '(x int, y int) stored as parquet') as table_name:
         self.run_stmt_in_hive(
             'insert into table %s values (33,44)' % table_name)
         assert '33,44' == self.run_stmt_in_hive(
@@ -661,9 +621,9 @@ class TestHmsIntegration(ImpalaTestSuite):
     metadata'.
     """
 
-    with self.HiveDbWrapper(self, self.unique_string()) as db_name:
-      with self.HiveTableWrapper(self, db_name + '.' + self.unique_string(),
-                                 '(x int, y int)') as table_name:
+    with HiveDbWrapper(self, self.unique_string()) as db_name:
+      with HiveTableWrapper(self, db_name + '.' + self.unique_string(),
+                            '(x int, y int)') as table_name:
         self.client.execute('invalidate metadata')
         int_column = {'type': 'int', 'comment': ''}
         expected_columns = {'x': int_column, 'y': int_column}
