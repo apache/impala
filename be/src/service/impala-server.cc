@@ -1533,10 +1533,15 @@ void ImpalaServer::MembershipCallback(
     // clear the saved mapping of known backends.
     if (!delta.is_delta) known_backends_.clear();
 
-    // Process membership additions.
+    // Process membership additions/deletions.
     for (const TTopicItem& item: delta.topic_entries) {
       if (item.deleted) {
-        known_backends_.erase(item.key);
+        auto entry = known_backends_.find(item.key);
+        // Remove stale connections to removed members.
+        if (entry != known_backends_.end()) {
+          exec_env_->impalad_client_cache()->CloseConnections(entry->second.address);
+          known_backends_.erase(item.key);
+        }
         continue;
       }
       uint32_t len = item.value.size();
@@ -1594,7 +1599,6 @@ void ImpalaServer::MembershipCallback(
             vector<TNetworkAddress>& failed_hosts = queries_to_cancel[*query_id];
             failed_hosts.push_back(loc_entry->first);
           }
-          exec_env_->impalad_client_cache()->CloseConnections(loc_entry->first);
           // We can remove the location wholesale once we know backend's failed. To do so
           // safely during iteration, we have to be careful not in invalidate the current
           // iterator, so copy the iterator to do the erase(..) and advance the original.
