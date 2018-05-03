@@ -85,8 +85,7 @@ DEFINE_int64(tcmalloc_max_total_thread_cache_bytes, 0, "(Advanced) Bound on the 
 DEFINE_bool(abort_on_config_error, true, "Abort Impala startup if there are improper "
     "configs or running on unsupported hardware.");
 
-DEFINE_bool(disable_mem_pools, false, "Set to true to disable memory pooling. "
-    "This can be used to help diagnose memory corruption issues.");
+DEFINE_bool_hidden(disable_mem_pools, false, "Removed - has no effect.");
 
 DEFINE_bool(compact_catalog_topic, true, "If true, catalog updates sent via the "
     "statestore are compacted before transmission. This saves network bandwidth at the"

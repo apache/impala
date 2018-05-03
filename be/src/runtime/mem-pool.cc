@@ -30,8 +30,6 @@ using namespace impala;
 
 #define MEM_POOL_POISON (0x66aa77bb)
 
-DECLARE_bool(disable_mem_pools);
-
 const int MemPool::INITIAL_CHUNK_SIZE;
 const int MemPool::MAX_CHUNK_SIZE;
 
@@ -128,16 +126,8 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) noexcept {
   // Didn't find a big enough free chunk - need to allocate new chunk.
   int64_t chunk_size;
   DCHECK_LE(next_chunk_size_, MAX_CHUNK_SIZE);
-
-  if (FLAGS_disable_mem_pools) {
-    // Disable pooling by sizing the chunk to fit only this allocation.
-    // Make sure the alignment guarantees are respected.
-    chunk_size = std::max<int64_t>(min_size, alignof(std::max_align_t));
-  } else {
-    DCHECK_GE(next_chunk_size_, INITIAL_CHUNK_SIZE);
-    chunk_size = max<int64_t>(min_size, next_chunk_size_);
-  }
-
+  DCHECK_GE(next_chunk_size_, INITIAL_CHUNK_SIZE);
+  chunk_size = max<int64_t>(min_size, next_chunk_size_);
   if (check_limits) {
     if (!mem_tracker_->TryConsume(chunk_size)) return false;
   } else {
@@ -251,9 +241,6 @@ int64_t MemPool::GetTotalChunkSizes() const {
 bool MemPool::CheckIntegrity(bool check_current_chunk_empty) {
   DCHECK_EQ(zero_length_region_, MEM_POOL_POISON);
   DCHECK_LT(current_chunk_idx_, static_cast<int>(chunks_.size()));
-
-  // Without pooling, there are way too many chunks and this takes too long.
-  if (FLAGS_disable_mem_pools) return true;
 
   // check that current_chunk_idx_ points to the last chunk with allocated data
   int64_t total_allocated = 0;

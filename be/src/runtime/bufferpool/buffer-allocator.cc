@@ -30,8 +30,6 @@
 
 #include "common/names.h"
 
-DECLARE_bool(disable_mem_pools);
-
 namespace impala {
 
 /// Decrease 'bytes_remaining' by up to 'max_decrease', down to a minimum of 0.
@@ -482,12 +480,6 @@ BufferPool::FreeBufferArena::~FreeBufferArena() {
 
 void BufferPool::FreeBufferArena::AddFreeBuffer(BufferHandle&& buffer) {
   lock_guard<SpinLock> al(lock_);
-  if (FLAGS_disable_mem_pools) {
-    int64_t len = buffer.len();
-    parent_->system_allocator_->Free(move(buffer));
-    parent_->system_bytes_remaining_.Add(len);
-    return;
-  }
   PerSizeLists* lists = GetListsForSize(buffer.len());
   lists->AddFreeBuffer(move(buffer));
 }
@@ -625,8 +617,7 @@ pair<int64_t, int64_t> BufferPool::FreeBufferArena::FreeSystemMemory(
 }
 
 void BufferPool::FreeBufferArena::AddCleanPage(Page* page) {
-  bool eviction_needed = FLAGS_disable_mem_pools
-    || DecreaseBytesRemaining(
+  bool eviction_needed = DecreaseBytesRemaining(
         page->len, true, &parent_->clean_page_bytes_remaining_) == 0;
   lock_guard<SpinLock> al(lock_);
   PerSizeLists* lists = GetListsForSize(page->len);
