@@ -177,6 +177,11 @@ export KUDU_JAVA_VERSION=1.8.0-cdh5.16.0-SNAPSHOT
 # ------------------------------------------
 export CDH_MAJOR_VERSION=5
 export IMPALA_HADOOP_VERSION=2.6.0-cdh5.16.0-SNAPSHOT
+export IMPALA_MINICLUSTER_PROFILE=2
+# IMPALA-6972: Temporarily disable Hive parallelism during dataload
+# The Hive version used for IMPALA_MINICLUSTER_PROFIILE=2 has a concurrency issue
+# that intermittent fails parallel dataload.
+export IMPALA_SERIAL_DATALOAD=1
 unset IMPALA_HADOOP_URL
 export IMPALA_HBASE_VERSION=1.2.0-cdh5.16.0-SNAPSHOT
 unset IMPALA_HBASE_URL
