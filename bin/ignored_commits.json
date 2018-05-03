@@ -22,7 +22,9 @@
       { "hash": "22c7ded07eb2710aba3e1aa07ed7ec1a448f7c61",
         "comment": "Not applicable to 2.x: Related to Hadoop 3" },
       { "hash": "8a609b3513c4a181cd06bb82e2aeb97908590184",
-        "comment": "Not applicable to 2.x: Revert commit above" }
+        "comment": "Not applicable to 2.x: Revert commit above" },
+      { "hash": "167ed627febe5a10d8a4a7474a34efde1ac6f1c2",
+        "comment": "Not applicable to 2.x: decimal_v2" }
     ]
   }
 ]
