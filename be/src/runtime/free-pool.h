@@ -30,8 +30,6 @@
 #include "runtime/mem-pool.h"
 #include "util/bit-util.h"
 
-DECLARE_bool(disable_mem_pools);
-
 namespace impala {
 
 /// Implementation of a free pool to recycle allocations. The pool is broken
@@ -63,9 +61,6 @@ class FreePool {
     /// Return a non-nullptr dummy pointer. nullptr is reserved for failures.
     if (UNLIKELY(requested_size == 0)) return mem_pool_->EmptyAllocPtr();
     ++net_allocations_;
-    if (FLAGS_disable_mem_pools) {
-      return reinterpret_cast<uint8_t*>(malloc(requested_size));
-    }
     /// MemPool allocations are 8-byte aligned, so making allocations < 8 bytes
     /// doesn't save memory and eliminates opportunities to recycle allocations.
     int64_t actual_size = std::max<int64_t>(8, requested_size);
@@ -103,10 +98,6 @@ class FreePool {
   void Free(uint8_t* ptr) {
     if (UNLIKELY(ptr == nullptr || ptr == mem_pool_->EmptyAllocPtr())) return;
     --net_allocations_;
-    if (FLAGS_disable_mem_pools) {
-      free(ptr);
-      return;
-    }
     FreeListNode* node = reinterpret_cast<FreeListNode*>(ptr - sizeof(FreeListNode));
     FreeListNode* list = node->list;
 #ifndef NDEBUG
@@ -133,9 +124,6 @@ class FreePool {
   /// free the memory buffer pointed to by "ptr" in this case.
   uint8_t* Reallocate(uint8_t* ptr, int64_t size) {
     if (UNLIKELY(ptr == nullptr || ptr == mem_pool_->EmptyAllocPtr())) return Allocate(size);
-    if (FLAGS_disable_mem_pools) {
-      return reinterpret_cast<uint8_t*>(realloc(reinterpret_cast<void*>(ptr), size));
-    }
     FreeListNode* node = reinterpret_cast<FreeListNode*>(ptr - sizeof(FreeListNode));
     FreeListNode* list = node->list;
 #ifndef NDEBUG

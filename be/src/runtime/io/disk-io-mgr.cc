@@ -30,7 +30,6 @@
 #include "util/hdfs-util.h"
 #include "util/time.h"
 
-DECLARE_bool(disable_mem_pools);
 #ifndef NDEBUG
 DECLARE_int32(stress_scratch_write_delay_ms);
 #endif

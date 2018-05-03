@@ -85,9 +85,6 @@ DEFINE_int64(tcmalloc_max_total_thread_cache_bytes, 0, "(Advanced) Bound on the 
 DEFINE_bool(abort_on_config_error, true, "Abort Impala startup if there are improper "
     "configs or running on unsupported hardware.");
 
-DEFINE_bool(disable_mem_pools, false, "Set to true to disable memory pooling. "
-    "This can be used to help diagnose memory corruption issues.");
-
 DEFINE_bool(compact_catalog_topic, true, "If true, catalog updates sent via the "
     "statestore are compacted before transmission. This saves network bandwidth at the"
     " cost of a small quantity of CPU time. Enable this option in cluster with large"
@@ -251,3 +248,4 @@ REMOVED_FLAG(suppress_unknown_disk_id_warnings);
 REMOVED_FLAG(use_statestore);
 REMOVED_FLAG(use_kudu_kinit);
 REMOVED_FLAG(disable_admission_control);
+REMOVED_FLAG(disable_mem_pools);
