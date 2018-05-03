@@ -213,7 +213,7 @@ AdmissionController::AdmissionController(StatestoreSubscriber* subscriber,
     const TNetworkAddress& host_addr)
     : subscriber_(subscriber),
       request_pool_service_(request_pool_service),
-      metrics_group_(metrics),
+      metrics_group_(metrics->GetOrCreateChildGroup("admission-controller")),
       host_id_(TNetworkAddressToString(host_addr)),
       thrift_serializer_(false),
       done_(false) {}
