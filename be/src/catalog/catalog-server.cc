@@ -375,9 +375,8 @@ void CatalogServer::GetCatalogUsage(Document* document) {
         large_table.table_name.table_name).c_str(), document->GetAllocator());
     tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
     DCHECK(large_table.__isset.memory_estimate_bytes);
-    Value memory_estimate(PrettyPrinter::Print(large_table.memory_estimate_bytes,
-        TUnit::BYTES).c_str(), document->GetAllocator());
-    tbl_obj.AddMember("mem_estimate", memory_estimate, document->GetAllocator());
+    tbl_obj.AddMember("mem_estimate", large_table.memory_estimate_bytes,
+        document->GetAllocator());
     large_tables.PushBack(tbl_obj, document->GetAllocator());
   }
   Value has_large_tables;
