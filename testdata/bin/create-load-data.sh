@@ -41,6 +41,7 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 : ${IMPALAD=localhost:21000}
 : ${REMOTE_LOAD=}
 : ${CM_HOST=}
+: ${IMPALA_SERIAL_DATALOAD=}
 
 SKIP_METADATA_LOAD=0
 SKIP_SNAPSHOT_LOAD=0
@@ -215,6 +216,11 @@ function load-data {
   ARGS+=("--impalad ${IMPALAD}")
   ARGS+=("--hive_hs2_hostport ${HS2_HOST_PORT}")
   ARGS+=("--hdfs_namenode ${HDFS_NN}")
+
+  # Disable parallelism for dataload if IMPALA_SERIAL_DATALOAD is set
+  if [[ "${IMPALA_SERIAL_DATALOAD}" -eq 1 ]]; then
+    ARGS+=("--num_processes 1")
+  fi
 
   if [[ -n ${TABLE_FORMATS} ]]; then
     # TBL_FMT_STR replaces slashes with underscores,

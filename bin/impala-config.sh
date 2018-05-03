@@ -208,6 +208,10 @@ if [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 2 ]]; then
   export IMPALA_KITE_VERSION=1.0.0-cdh5.16.0-SNAPSHOT
   # Kudu version used to identify Java client jar from maven
   export KUDU_JAVA_VERSION=1.8.0-cdh5.16.0-SNAPSHOT
+  # IMPALA-6972: Temporarily disable Hive parallelism during dataload
+  # The Hive version used for IMPALA_MINICLUSTER_PROFIILE=2 has a concurrency issue
+  # that intermittent fails parallel dataload.
+  export IMPALA_SERIAL_DATALOAD=1
 
 elif [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 3 ]]; then
   export IMPALA_MINICLUSTER_PROFILE=3
