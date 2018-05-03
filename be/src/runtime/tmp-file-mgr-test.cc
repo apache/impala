@@ -541,9 +541,12 @@ void TmpFileMgrTest::TestBlockVerification() {
   WaitForCallbacks(1);
 
   // Modify the data in the scratch file and check that a read error occurs.
+  LOG(INFO) << "Corrupting " << file_path;
+  uint8_t corrupt_byte = data[0] ^ 1;
   FILE* file = fopen(file_path.c_str(), "rb+");
-  fputc('?', file);
-  fclose(file);
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(corrupt_byte, fputc(corrupt_byte, file));
+  ASSERT_EQ(0, fclose(file));
   vector<uint8_t> tmp;
   tmp.resize(data.size());
   Status read_status = file_group.Read(handle.get(), MemRange(tmp.data(), tmp.size()));
@@ -552,7 +555,8 @@ void TmpFileMgrTest::TestBlockVerification() {
       << read_status.GetDetail();
 
   // Modify the data in memory. Restoring the data should fail.
-  data[0] = '?';
+  LOG(INFO) << "Corrupting data in memory";
+  data[0] = corrupt_byte;
   Status restore_status = file_group.RestoreData(move(handle), data_mem_range);
   LOG(INFO) << restore_status.GetDetail();
   EXPECT_EQ(TErrorCode::SCRATCH_READ_VERIFY_FAILED, restore_status.code())
