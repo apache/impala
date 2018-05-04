@@ -173,9 +173,6 @@ class ExecEnv;
 /// above. Note the pool's max_mem_resources (#1) is not contented.
 /// TODO: Improve the dequeuing policy. IMPALA-2968.
 ///
-/// TODO: Assumes all impalads have the same proc mem limit. Should send proc mem limit
-///       via statestore (e.g. ideally in TBackendDescriptor) and check per-node
-///       reservations against this value.
 /// TODO: Remove less important debug logging after more cluster testing. Should have a
 ///       better idea of what is perhaps unnecessary.
 class AdmissionController {
