@@ -246,7 +246,8 @@ Status ExecNode::ClaimBufferReservation(RuntimeState* state) {
 }
 
 Status ExecNode::ReleaseUnusedReservation() {
-  return buffer_pool_client_.DecreaseReservationTo(resource_profile_.min_reservation);
+  return buffer_pool_client_.DecreaseReservationTo(
+      buffer_pool_client_.GetUnusedReservation(), resource_profile_.min_reservation);
 }
 
 Status ExecNode::EnableDenyReservationDebugAction() {

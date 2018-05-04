@@ -253,7 +253,7 @@ class BufferPool::Client {
       int64_t len, bool reserved, bool* success) WARN_UNUSED_RESULT;
 
   /// Implementation of ClientHandle::DecreaseReservationTo().
-  Status DecreaseReservationTo(int64_t target_bytes) WARN_UNUSED_RESULT;
+  Status DecreaseReservationTo(int64_t max_decrease, int64_t target_bytes) WARN_UNUSED_RESULT;
 
   /// Called after a buffer of 'len' is freed via the FreeBuffer() API to update
   /// internal accounting and release the buffer to the client's reservation. No page or

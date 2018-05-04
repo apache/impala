@@ -341,21 +341,23 @@ class BufferPool::ClientHandle {
 
   /// Request to increase reservation for this client by 'bytes' by calling
   /// ReservationTracker::IncreaseReservation(). Returns true if the reservation was
-  /// successfully increased.
+  /// successfully increased. Thread-safe.
   bool IncreaseReservation(int64_t bytes) WARN_UNUSED_RESULT;
 
   /// Tries to ensure that 'bytes' of unused reservation is available for this client
   /// to use by calling ReservationTracker::IncreaseReservationToFit(). Returns true
-  /// if successful, after which 'bytes' can be used.
+  /// if successful, after which 'bytes' can be used. Thread-safe.
   bool IncreaseReservationToFit(int64_t bytes) WARN_UNUSED_RESULT;
 
   /// Try to decrease this client's reservation down to a minimum of 'target_bytes' by
-  /// releasing unused reservation to ancestor ReservationTrackers, all the way up to
-  /// the root of the ReservationTracker tree. May block waiting for unpinned pages to
-  /// be flushed. This client's reservation must be at least 'target_bytes' before
-  /// calling this method. May fail if decreasing the reservation requires flushing
-  /// unpinned pages to disk and a write to disk fails.
-  Status DecreaseReservationTo(int64_t target_bytes) WARN_UNUSED_RESULT;
+  /// releasing up to 'max_decrease' bytes of unused reservation to ancestor
+  /// ReservationTrackers, all the way up to the root of the ReservationTracker tree.
+  /// May block waiting for unpinned pages to be flushed. This client's reservation
+  /// must be at least 'target_bytes' before calling this method. May fail if decreasing
+  /// the reservation requires flushing unpinned pages to disk and a write to disk fails.
+  /// Thread-safe.
+  Status DecreaseReservationTo(
+      int64_t max_decrease, int64_t target_bytes) WARN_UNUSED_RESULT;
 
   /// Move some of this client's reservation to the SubReservation. 'bytes' of unused
   /// reservation must be available in this tracker.
@@ -372,7 +374,8 @@ class BufferPool::ClientHandle {
   int64_t GetUnusedReservation() const;
 
   /// Try to transfer 'bytes' of reservation from 'src' to this client using
-  /// ReservationTracker::TransferReservationTo().
+  /// ReservationTracker::TransferReservationTo(). Not valid to call if 'this'
+  /// has unpinned pages.
   bool TransferReservationFrom(ReservationTracker* src, int64_t bytes);
 
   /// Transfer 'bytes' of reservation from this client to 'dst' using

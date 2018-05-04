@@ -219,16 +219,11 @@ Status HdfsScanNode::AddDiskIoRanges(const vector<ScanRange*>& ranges,
 void HdfsScanNode::ReturnReservationFromScannerThread(const unique_lock<mutex>& lock,
     int64_t bytes) {
   DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
-  int64_t curr_reservation = buffer_pool_client_.GetReservation();
-  DCHECK_GE(curr_reservation, resource_profile_.min_reservation);
   // Release as much memory as possible. Must hold onto the minimum reservation, though.
-  int64_t reservation_decrease =
-      min(bytes, curr_reservation - resource_profile_.min_reservation);
-  if (reservation_decrease > 0) {
-    Status status =
-        buffer_pool_client_.DecreaseReservationTo(curr_reservation - reservation_decrease);
-    DCHECK(status.ok()) << "Not possible, scans don't unpin pages" << status.GetDetail();
-  }
+  Status status =
+      buffer_pool_client_.DecreaseReservationTo(bytes, resource_profile_.min_reservation);
+  DCHECK(status.ok()) << "Not possible, scans don't unpin pages" << status.GetDetail();
+  DCHECK_GE(buffer_pool_client_.GetReservation(), resource_profile_.min_reservation);
 }
 
 void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {

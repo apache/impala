@@ -240,7 +240,8 @@ class ExecNode {
 
   /// Release any unused reservation in excess of the node's initial reservation. Returns
   /// an error if releasing the reservation requires flushing pages to disk, and that
-  /// fails.
+  /// fails. Not thread-safe if other threads are accessing this ExecNode or
+  /// 'buffer_pool_client_'.
   Status ReleaseUnusedReservation() WARN_UNUSED_RESULT;
 
   /// Enable the increase reservation denial probability on 'buffer_pool_client_' based on
