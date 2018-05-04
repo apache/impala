@@ -58,7 +58,7 @@ under the License.
 
 ALTER TABLE <varname>name</varname> ADD COLUMNS (<varname>col_spec</varname>[, <varname>col_spec</varname> ...])
 ALTER TABLE <varname>name</varname> DROP [COLUMN] <varname>column_name</varname>
-ALTER TABLE <varname>name</varname> CHANGE <varname>column_name</varname> <varname>new_name</varname> <varname>new_type</varname>
+ALTER TABLE <varname>name</varname> CHANGE <varname>column_name</varname> <varname>col_spec</varname>
 
 ALTER TABLE <varname>name</varname> REPLACE COLUMNS (<varname>col_spec</varname>[, <varname>col_spec</varname> ...])
 
@@ -99,7 +99,7 @@ statsKey ::= numDVs | numNulls | avgSize | maxSize</ph>
 
 <varname>new_name</varname> ::= [<varname>new_database</varname>.]<varname>new_table_name</varname>
 
-<varname>col_spec</varname> ::= <varname>col_name</varname> <varname>type_name</varname> <ph rev="2.9.0 IMPALA-4616">[<varname>kudu_attributes</varname>]</ph>
+<varname>col_spec</varname> ::= <varname>col_name</varname> <varname>type_name</varname> <ph rev="2.9.0 IMPALA-4616"> COMMENT '<varname>column-comment</varname>' [<varname>kudu_attributes</varname>]</ph>
 
 <ph rev="2.9.0 IMPALA-4616"><varname>kudu_attributes</varname> ::= { [NOT] NULL | ENCODING <varname>codec</varname> | COMPRESSION <varname>algorithm</varname> |
   DEFAULT <varname>constant</varname> | BLOCK_SIZE <varname>number</varname> }</ph>
