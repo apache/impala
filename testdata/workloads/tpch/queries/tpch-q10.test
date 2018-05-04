@@ -2,6 +2,7 @@
 ---- QUERY: TPCH-Q10
 # Q10 - Returned Item Reporting Query
 # Converted select from multiple tables to joins
+# IMPALA-6781: add c_custkey to ORDER BY list for determinstic results
 select
   c_custkey,
   c_name,
@@ -32,7 +33,8 @@ group by
   c_address,
   c_comment
 order by
-  revenue desc
+  revenue desc,
+  c_custkey
 limit 20
 ---- RESULTS
 57040,'Customer#000057040',734235.2455,632.87,'JAPAN','Eioyzjf4pp','22-895-641-3466','sits. slyly regular requests sleep alongside of the regular inst'
