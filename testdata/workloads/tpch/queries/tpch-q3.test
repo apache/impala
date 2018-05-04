@@ -1,6 +1,7 @@
 ====
 ---- QUERY: TPCH-Q3
 # Q3 - Shipping Priority Query
+# IMPALA-6781: add order by l_orderkey for determinstic results
 select
   l_orderkey,
   sum(l_extendedprice * (1 - l_discount)) as revenue,
@@ -22,7 +23,8 @@ group by
   o_shippriority
 order by
   revenue desc,
-  o_orderdate
+  o_orderdate,
+  l_orderkey
 limit 10
 ---- RESULTS
 2456423,406181.0111,'1995-03-05',0

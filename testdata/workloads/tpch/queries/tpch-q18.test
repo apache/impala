@@ -1,6 +1,7 @@
 ====
 ---- QUERY: TPCH-Q18
 # Q18 - Large Value Customer Query
+# IMPALA-6781: add o_orderkey to ORDER BY list for determinstic results
 select
   c_name,
   c_custkey,
@@ -33,7 +34,8 @@ group by
   o_totalprice
 order by
   o_totalprice desc,
-  o_orderdate
+  o_orderdate,
+  o_orderkey
 limit 100
 ---- RESULTS
 'Customer#000128120',128120,4722021,'1994-04-07',544089.09,323.00
