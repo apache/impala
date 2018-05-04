@@ -21,7 +21,13 @@ under the License.
 <concept rev="1.1" id="create_view">
 
   <title>CREATE VIEW Statement</title>
-  <titlealts audience="PDF"><navtitle>CREATE VIEW</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>CREATE VIEW</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -38,21 +44,23 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="hidden">CREATE VIEW statement</indexterm>
-      The <codeph>CREATE VIEW</codeph> statement lets you create a shorthand abbreviation for a more complicated
-      query. The base query can involve joins, expressions, reordered columns, column aliases, and other SQL
-      features that can make a query hard to understand or maintain.
+      The <codeph>CREATE VIEW</codeph> statement lets you create a shorthand abbreviation for a
+      more complicated query. The base query can involve joins, expressions, reordered columns,
+      column aliases, and other SQL features that can make a query hard to understand or
+      maintain.
     </p>
 
     <p>
-      Because a view is purely a logical construct (an alias for a query) with no physical data behind it,
-      <codeph>ALTER VIEW</codeph> only involves changes to metadata in the metastore database, not any data files
-      in HDFS.
+      Because a view is purely a logical construct (an alias for a query) with no physical data
+      behind it, <codeph>ALTER VIEW</codeph> only involves changes to metadata in the metastore
+      database, not any data files in HDFS.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
-<codeblock>CREATE VIEW [IF NOT EXISTS] <varname>view_name</varname> [(<varname>column_list</varname>)]
+<codeblock>CREATE VIEW [IF NOT EXISTS] <varname>view_name</varname>
+    [(<varname>column_name</varname> [COMMENT '<varname>column_comment</varname>'][, ...])]
+    [COMMENT '<varname>view_comment</varname>']
   AS <varname>select_statement</varname></codeblock>
 
     <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
@@ -60,59 +68,70 @@ under the License.
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
     <p>
-      The <codeph>CREATE VIEW</codeph> statement can be useful in scenarios such as the following:
+      The <codeph>CREATE VIEW</codeph> statement can be useful in scenarios such as the
+      following:
     </p>
 
     <ul>
       <li>
-        To turn even the most lengthy and complicated SQL query into a one-liner. You can issue simple queries
-        against the view from applications, scripts, or interactive queries in <cmdname>impala-shell</cmdname>.
-        For example:
+        To turn even the most lengthy and complicated SQL query into a one-liner. You can issue
+        simple queries against the view from applications, scripts, or interactive queries in
+        <cmdname>impala-shell</cmdname>. For example:
 <codeblock>select * from <varname>view_name</varname>;
 select * from <varname>view_name</varname> order by c1 desc limit 10;</codeblock>
-        The more complicated and hard-to-read the original query, the more benefit there is to simplifying the
-        query using a view.
+        The more complicated and hard-to-read the original query, the more benefit there is to
+        simplifying the query using a view.
       </li>
 
       <li>
-        To hide the underlying table and column names, to minimize maintenance problems if those names change. In
-        that case, you re-create the view using the new names, and all queries that use the view rather than the
-        underlying tables keep running with no changes.
+        To hide the underlying table and column names, to minimize maintenance problems if those
+        names change. In that case, you re-create the view using the new names, and all queries
+        that use the view rather than the underlying tables keep running with no changes.
       </li>
 
       <li>
-        To experiment with optimization techniques and make the optimized queries available to all applications.
-        For example, if you find a combination of <codeph>WHERE</codeph> conditions, join order, join hints, and so
-        on that works the best for a class of queries, you can establish a view that incorporates the
-        best-performing techniques. Applications can then make relatively simple queries against the view, without
-        repeating the complicated and optimized logic over and over. If you later find a better way to optimize the
-        original query, when you re-create the view, all the applications immediately take advantage of the
-        optimized base query.
+        To experiment with optimization techniques and make the optimized queries available to
+        all applications. For example, if you find a combination of <codeph>WHERE</codeph>
+        conditions, join order, join hints, and so on that works the best for a class of
+        queries, you can establish a view that incorporates the best-performing techniques.
+        Applications can then make relatively simple queries against the view, without repeating
+        the complicated and optimized logic over and over. If you later find a better way to
+        optimize the original query, when you re-create the view, all the applications
+        immediately take advantage of the optimized base query.
       </li>
 
       <li>
-        To simplify a whole class of related queries, especially complicated queries involving joins between
-        multiple tables, complicated expressions in the column list, and other SQL syntax that makes the query
-        difficult to understand and debug. For example, you might create a view that joins several tables, filters
-        using several <codeph>WHERE</codeph> conditions, and selects several columns from the result set.
-        Applications might issue queries against this view that only vary in their <codeph>LIMIT</codeph>,
-        <codeph>ORDER BY</codeph>, and similar simple clauses.
+        To simplify a whole class of related queries, especially complicated queries involving
+        joins between multiple tables, complicated expressions in the column list, and other SQL
+        syntax that makes the query difficult to understand and debug. For example, you might
+        create a view that joins several tables, filters using several <codeph>WHERE</codeph>
+        conditions, and selects several columns from the result set. Applications might issue
+        queries against this view that only vary in their <codeph>LIMIT</codeph>, <codeph>ORDER
+        BY</codeph>, and similar simple clauses.
       </li>
     </ul>
 
     <p>
-      For queries that require repeating complicated clauses over and over again, for example in the select list,
-      <codeph>ORDER BY</codeph>, and <codeph>GROUP BY</codeph> clauses, you can use the <codeph>WITH</codeph>
-      clause as an alternative to creating a view.
+      For queries that require repeating complicated clauses over and over again, for example in
+      the select list, <codeph>ORDER BY</codeph>, and <codeph>GROUP BY</codeph> clauses, you can
+      use the <codeph>WITH</codeph> clause as an alternative to creating a view.
+    </p>
+
+    <p>
+      You can optionally specify the table-level and the column-level comments as in the
+      <codeph>CREATE TABLE</codeph> statement.
     </p>
 
     <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+
     <p conref="../shared/impala_common.xml#common/complex_types_views"/>
+
     <p conref="../shared/impala_common.xml#common/complex_types_views_caveat"/>
 
     <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
 
     <p conref="../shared/impala_common.xml#common/security_blurb"/>
+
     <p conref="../shared/impala_common.xml#common/redaction_yes"/>
 
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
@@ -121,37 +140,38 @@ select * from <varname>view_name</varname> order by c1 desc limit 10;</codeblock
 
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
-<!-- TK: Elaborate on these, show queries and real output. -->
-
 <codeblock>-- Create a view that is exactly the same as the underlying table.
-create view v1 as select * from t1;
+CREATE VIEW v1 AS SELECT * FROM t1;
 
 -- Create a view that includes only certain columns from the underlying table.
-create view v2 as select c1, c3, c7 from t1;
+CREATE VIEW v2 AS SELECT c1, c3, c7 FROM t1;
 
 -- Create a view that filters the values from the underlying table.
-create view v3 as select distinct c1, c3, c7 from t1 where c1 is not null and c5 &gt; 0;
+CREATE VIEW v3 AS SELECT DISTINCT c1, c3, c7 FROM t1 WHERE c1 IS NOT NULL AND c5 &gt; 0;
 
 -- Create a view that that reorders and renames columns from the underlying table.
-create view v4 as select c4 as last_name, c6 as address, c2 as birth_date from t1;
+CREATE VIEW v4 AS SELECT c4 AS last_name, c6 AS address, c2 AS birth_date FROM t1;
 
 -- Create a view that runs functions to convert or transform certain columns.
-create view v5 as select c1, cast(c3 as string) c3, concat(c4,c5) c5, trim(c6) c6, "Constant" c8 from t1;
+CREATE VIEW v5 AS SELECT c1, CAST(c3 AS STRING) c3, CONCAT(c4,c5) c5, TRIM(c6) c6, "Constant" c8 FROM t1;
 
 -- Create a view that hides the complexity of a view query.
-create view v6 as select t1.c1, t2.c2 from t1 join t2 on t1.id = t2.id;
+CREATE VIEW v6 AS SELECT t1.c1, t2.c2 FROM t1 JOIN t2 ON t1.id = t2.id;
+
+-- Create a view with a column comment and a table comment.
+CREATE VIEW v7 (c1 COMMENT 'Comment for c1', c2) COMMENT 'Comment for v7' AS SELECT t1.c1, t1.c2 FROM t1;
 </codeblock>
-
-<!-- These examples show CREATE VIEW and corresponding DROP VIEW statements, with different combinations
-     of qualified and unqualified names. -->
-
-    <p conref="../shared/impala_common.xml#common/create_drop_view_examples"/>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
-      <xref href="impala_views.xml#views"/>, <xref href="impala_alter_view.xml#alter_view"/>,
-      <xref href="impala_drop_view.xml#drop_view"/>
+      <xref href="impala_views.xml#views"/>,
+      <xref
+        href="impala_alter_view.xml#alter_view"/>,
+      <xref
+        href="impala_drop_view.xml#drop_view"/>
     </p>
+
   </conbody>
+
 </concept>
