@@ -312,7 +312,7 @@ from alltypes a join [SHUFFLE] alltypessmall c
 
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
-SET MEM_LIMIT=200MB;
+SET MEM_LIMIT=250MB;
 select straight_join count(*)
 from tpch_parquet.lineitem l1 join tpch_parquet.lineitem l2
     on lower(upper(lower(upper(lower(l1.l_comment))))) = concat(l2.l_comment, 'foo')
