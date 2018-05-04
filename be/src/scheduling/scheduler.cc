@@ -685,7 +685,7 @@ Status Scheduler::Schedule(QuerySchedule* schedule) {
   ExecutorsConfigPtr config_ptr = GetExecutorsConfig();
   RETURN_IF_ERROR(ComputeScanRangeAssignment(*config_ptr, schedule));
   ComputeFragmentExecParams(*config_ptr, schedule);
-  ComputeBackendExecParams(schedule);
+  ComputeBackendExecParams(*config_ptr, schedule);
 #ifndef NDEBUG
   schedule->Validate();
 #endif
@@ -702,7 +702,8 @@ Status Scheduler::Schedule(QuerySchedule* schedule) {
   return Status::OK();
 }
 
-void Scheduler::ComputeBackendExecParams(QuerySchedule* schedule) {
+void Scheduler::ComputeBackendExecParams(
+    const BackendConfig& executor_config, QuerySchedule* schedule) {
   PerBackendExecParams per_backend_params;
   for (const FragmentExecParams& f : schedule->fragment_exec_params()) {
     for (const FInstanceExecParams& i : f.instance_exec_params) {
@@ -718,6 +719,12 @@ void Scheduler::ComputeBackendExecParams(QuerySchedule* schedule) {
       be_params.initial_mem_reservation_total_claims +=
           f.fragment.initial_mem_reservation_total_claims;
     }
+  }
+
+  for (auto& backend: per_backend_params) {
+    const TNetworkAddress& host = backend.first;
+    backend.second.proc_mem_limit =
+        LookUpBackendDesc(executor_config, host).proc_mem_limit;
   }
   schedule->set_per_backend_exec_params(per_backend_params);
 

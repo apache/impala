@@ -24,6 +24,7 @@ import pytest
 import re
 import sys
 import threading
+from copy import copy
 from time import sleep, time
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
@@ -424,6 +425,61 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Setting requested memory equal to process memory limit
     exec_options['mem_limit'] = self.PROC_MEM_TEST_LIMIT
     self.execute_query_expect_success(self.client, query, exec_options)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=2, max_queued=1,
+      pool_max_mem=10 * PROC_MEM_TEST_LIMIT,
+      queue_wait_timeout_ms=2 * STATESTORE_RPC_FREQUENCY_MS),
+      start_args="--per_impalad_args=-mem_limit=3G;-mem_limit=3G;-mem_limit=2G",
+      statestored_args=_STATESTORED_ARGS)
+  def test_heterogeneous_proc_mem_limit(self, vector):
+    """ Test to ensure that the admission controller takes into account the actual proc
+    mem limits of each impalad. Starts a cluster where the last impalad has a smaller
+    proc mem limit than other impalads and runs queries where admission/rejection decision
+    depends on the coordinator knowing the other impalad's mem limits.
+    The queue_wait_timeout_ms has been set to be more than the prioritized statestore
+    update time, so that the queries don't time out before receiving updates to pool
+    stats"""
+    # Choose a query that runs on all 3 backends.
+    query = "select * from functional.alltypesagg, (select 1) B limit 1"
+    # Successfully run a query with mem limit equal to the lowest process memory among
+    # impalads
+    exec_options = copy(vector.get_value('exec_option'))
+    exec_options['mem_limit'] = "2G"
+    self.execute_query_expect_success(self.client, query, exec_options)
+    # Test that a query scheduled to run on a single node and submitted to the impalad
+    # with higher proc mem limit succeeds.
+    exec_options = copy(vector.get_value('exec_option'))
+    exec_options['mem_limit'] = "3G"
+    exec_options['num_nodes'] = "1"
+    self.execute_query_expect_success(self.client, query, exec_options)
+    # Exercise rejection checks in admission controller.
+    try:
+      exec_options = copy(vector.get_value('exec_option'))
+      exec_options['mem_limit'] = "3G"
+      self.execute_query(query, exec_options)
+    except ImpalaBeeswaxException as e:
+      assert re.search("Rejected query from pool \S+: request memory needed 3.00 GB per "
+          "node is greater than process mem limit 2.00 GB of \S+", str(e)), str(e)
+    # Exercise queuing checks in admission controller.
+    try:
+      impalad_with_2g_mem = self.cluster.impalads[2].service.create_beeswax_client()
+      impalad_with_2g_mem.set_configuration_option('mem_limit', '1G')
+      impalad_with_2g_mem.execute_async("select sleep(1000)")
+      # Wait for statestore update to update the mem admitted in each node.
+      sleep(STATESTORE_RPC_FREQUENCY_MS/1000)
+      exec_options = copy(vector.get_value('exec_option'))
+      exec_options['mem_limit'] = "2G"
+      # Since Queuing is synchronous and we can't close the previous query till this
+      # returns, we wait for this to timeout instead.
+      self.execute_query(query, exec_options)
+    except ImpalaBeeswaxException as e:
+      assert re.search("Queued reason: Not enough memory available on host \S+.Needed "
+          "2.00 GB but only 1.00 GB out of 2.00 GB was available.", str(e)), str(e)
+    finally:
+      if impalad_with_2g_mem is not None:
+        impalad_with_2g_mem.close()
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions

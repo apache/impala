@@ -53,6 +53,7 @@
 #include "runtime/data-stream-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/lib-cache.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tmp-file-mgr.h"
@@ -1649,6 +1650,8 @@ void ImpalaServer::AddLocalBackendToStatestore(
   local_backend_descriptor.__set_is_executor(FLAGS_is_executor);
   local_backend_descriptor.__set_address(exec_env_->backend_address());
   local_backend_descriptor.ip_address = exec_env_->ip_address();
+  local_backend_descriptor.__set_proc_mem_limit(
+      exec_env_->process_mem_tracker()->limit());
   if (FLAGS_use_krpc) {
     const TNetworkAddress& krpc_address = exec_env_->krpc_address();
     DCHECK(IsResolvedAddress(krpc_address));

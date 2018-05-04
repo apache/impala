@@ -84,6 +84,10 @@ parser.add_option("--kudu_master_hosts", default=KUDU_MASTER_HOSTS,
 # replica initialization. The ith delay is applied to the ith impalad.
 parser.add_option("--catalog_init_delays", dest="catalog_init_delays", default="",
                   help=SUPPRESS_HELP)
+# For testing: Semi-colon separated list of startup arguments to be passed per impalad.
+# The ith group of options is applied to the ith impalad.
+parser.add_option("--per_impalad_args", dest="per_impalad_args", type="string"
+                  ,default="", help=SUPPRESS_HELP)
 
 options, args = parser.parse_args()
 
@@ -236,6 +240,10 @@ def start_impalad_instances(cluster_size, num_coordinators, use_exclusive_coordi
   if options.catalog_init_delays != "":
     delay_list = [delay.strip() for delay in options.catalog_init_delays.split(",")]
 
+  per_impalad_args = []
+  if options.per_impalad_args != "":
+    per_impalad_args = [args.strip() for args in options.per_impalad_args.split(";")]
+
   # Start each impalad instance and optionally redirect the output to a log file.
   for i in range(cluster_size):
     if i == 0:
@@ -272,6 +280,10 @@ def start_impalad_instances(cluster_size, num_coordinators, use_exclusive_coordi
 
     if options.disable_krpc:
       args = "-use_krpc=false %s" % (args)
+
+    # Appended at the end so they can override previous args.
+    if i < len(per_impalad_args):
+      args = "%s %s" % (args, per_impalad_args[i])
 
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
     exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)

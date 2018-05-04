@@ -404,7 +404,8 @@ class Scheduler {
 
   /// Computes BackendExecParams for all backends assigned in the query. Must be called
   /// after ComputeFragmentExecParams().
-  void ComputeBackendExecParams(QuerySchedule* schedule);
+  void ComputeBackendExecParams(
+      const BackendConfig& executor_config, QuerySchedule* schedule);
 
   /// Compute the FragmentExecParams for all plans in the schedule's
   /// TQueryExecRequest.plan_exec_info.

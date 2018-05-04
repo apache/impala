@@ -65,6 +65,10 @@ struct BackendExecParams {
   // operators in all fragment instances that execute on this backend. This is used for
   // an optimization in InitialReservation. Measured in bytes.
   int64_t initial_mem_reservation_total_claims;
+
+  // The process memory limit of this backend. Obtained from the scheduler's executors
+  // configuration which is updated by membership updates from the statestore.
+  int64_t proc_mem_limit;
 };
 
 /// map from an impalad host address to the list of assigned fragment instance params.

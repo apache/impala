@@ -46,10 +46,6 @@ std::string PrintBytes(int64_t value) {
   return PrettyPrinter::Print(value, TUnit::BYTES);
 }
 
-int64_t GetProcMemLimit() {
-  return ExecEnv::GetInstance()->process_mem_tracker()->limit();
-}
-
 // Delimiter used for topic keys of the form "<pool_name><delimiter><backend_id>".
 // "!" is used because the backend id contains a colon, but it should not contain "!".
 // When parsing the topic key we need to be careful to find the last instance in
@@ -136,7 +132,7 @@ const string REASON_REQ_OVER_POOL_MEM =
     "The total memory needed is the per-node MEM_LIMIT times the number of nodes "
     "executing the query. See the Admission Control documentation for more information.";
 const string REASON_REQ_OVER_NODE_MEM =
-    "request memory needed $0 per node is greater than process mem limit $1.\n\n"
+    "request memory needed $0 per node is greater than process mem limit $1 of $2.\n\n"
     "Use the MEM_LIMIT query option to indicate how much memory is required per node.";
 
 // Queue decision details
@@ -150,7 +146,7 @@ const string POOL_MEM_NOT_AVAILABLE = "Not enough aggregate memory available in 
     "with max mem resources $1. Needed $2 but only $3 was available.";
 // $0 = host name, $1 = host mem needed, $3 = host mem available
 const string HOST_MEM_NOT_AVAILABLE = "Not enough memory available on host $0."
-    "Needed $1 but only $2 was available.";
+    "Needed $1 but only $2 out of $3 was available.";
 
 // Parses the pool name and backend_id from the topic key if it is valid.
 // Returns true if the topic key is valid and pool_name and backend_id are set.
@@ -348,10 +344,10 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   }
 
   // Case 2:
-  int64_t proc_mem_limit = GetProcMemLimit();
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host = entry.first;
     const string host_id = TNetworkAddressToString(host);
+    int64_t proc_mem_limit = entry.second.proc_mem_limit;
     int64_t mem_reserved = host_mem_reserved_[host_id];
     int64_t mem_admitted = host_mem_admitted_[host_id];
     VLOG_ROW << "Checking memory on host=" << host_id
@@ -363,7 +359,8 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
     if (effective_host_mem_reserved + per_node_mem_needed > proc_mem_limit) {
       *mem_unavailable_reason = Substitute(HOST_MEM_NOT_AVAILABLE, host_id,
           PrintBytes(per_node_mem_needed),
-          PrintBytes(max(proc_mem_limit - effective_host_mem_reserved, 0L)));
+          PrintBytes(max(proc_mem_limit - effective_host_mem_reserved, 0L)),
+          PrintBytes(proc_mem_limit));
       return false;
     }
   }
@@ -403,14 +400,21 @@ bool AdmissionController::RejectImmediately(QuerySchedule* schedule,
   // the checks isn't particularly important, though some thought was given to ordering
   // them in a way that might make the sense for a user.
 
-  // Compute the max (over all backends) min_mem_reservation_bytes and the cluster total
-  // (across all backends) min_mem_reservation_bytes.
+  // Compute the max (over all backends) min_mem_reservation_bytes, the cluster total
+  // (across all backends) min_mem_reservation_bytes and the min (over all backends)
+  // min_proc_mem_limit.
   int64_t max_min_mem_reservation_bytes = -1;
   int64_t cluster_min_mem_reservation_bytes = 0;
+  pair<const TNetworkAddress*, int64_t> min_proc_mem_limit(
+      nullptr, std::numeric_limits<int64_t>::max());
   for (const auto& e : schedule->per_backend_exec_params()) {
     cluster_min_mem_reservation_bytes += e.second.min_mem_reservation_bytes;
     if (e.second.min_mem_reservation_bytes > max_min_mem_reservation_bytes) {
       max_min_mem_reservation_bytes = e.second.min_mem_reservation_bytes;
+    }
+    if (e.second.proc_mem_limit < min_proc_mem_limit.second) {
+      min_proc_mem_limit.first = &e.first;
+      min_proc_mem_limit.second = e.second.proc_mem_limit;
     }
   }
 
@@ -447,25 +451,26 @@ bool AdmissionController::RejectImmediately(QuerySchedule* schedule,
     *rejection_reason = REASON_DISABLED_MAX_MEM_RESOURCES;
     return true;
   }
-  if (pool_cfg.max_mem_resources > 0
-      && cluster_min_mem_reservation_bytes > pool_cfg.max_mem_resources) {
-    *rejection_reason = Substitute(REASON_MIN_RESERVATION_OVER_POOL_MEM,
-        PrintBytes(pool_cfg.max_mem_resources),
-        PrintBytes(cluster_min_mem_reservation_bytes));
-    return true;
-  }
-  if (pool_cfg.max_mem_resources > 0
-      && schedule->GetClusterMemoryEstimate() > pool_cfg.max_mem_resources) {
-    *rejection_reason = Substitute(REASON_REQ_OVER_POOL_MEM,
-        PrintBytes(schedule->GetClusterMemoryEstimate()),
-        PrintBytes(pool_cfg.max_mem_resources));
-    return true;
-  }
-  if (pool_cfg.max_mem_resources > 0 &&
-      schedule->GetPerHostMemoryEstimate() > GetProcMemLimit()) {
-    *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
-        PrintBytes(schedule->GetPerHostMemoryEstimate()), PrintBytes(GetProcMemLimit()));
-    return true;
+  if (pool_cfg.max_mem_resources > 0) {
+    if (cluster_min_mem_reservation_bytes > pool_cfg.max_mem_resources) {
+      *rejection_reason = Substitute(REASON_MIN_RESERVATION_OVER_POOL_MEM,
+          PrintBytes(pool_cfg.max_mem_resources),
+          PrintBytes(cluster_min_mem_reservation_bytes));
+      return true;
+    }
+    if (schedule->GetClusterMemoryEstimate() > pool_cfg.max_mem_resources) {
+      *rejection_reason = Substitute(REASON_REQ_OVER_POOL_MEM,
+          PrintBytes(schedule->GetClusterMemoryEstimate()),
+          PrintBytes(pool_cfg.max_mem_resources));
+      return true;
+    }
+    int64_t perHostMemoryEstimate = schedule->GetPerHostMemoryEstimate();
+    if (perHostMemoryEstimate > min_proc_mem_limit.second) {
+      *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
+          PrintBytes(perHostMemoryEstimate), PrintBytes(min_proc_mem_limit.second),
+          TNetworkAddressToString(*min_proc_mem_limit.first));
+      return true;
+    }
   }
 
   // Checks related to the pool queue size:
@@ -537,7 +542,8 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     }
 
     // We cannot immediately admit but do not need to reject, so queue the request
-    VLOG_QUERY << "Queuing, query id=" << PrintId(schedule->query_id());
+    VLOG_QUERY << "Queuing, query id=" << PrintId(schedule->query_id())
+               << " reason: " << not_admitted_reason;
     stats->Queue(*schedule);
     queue->Enqueue(&queue_node);
   }
@@ -875,8 +881,8 @@ void AdmissionController::DequeueLoop() {
         // TODO: Requests further in the queue may be blocked unnecessarily. Consider a
         // better policy once we have better test scenarios.
         if (!CanAdmitRequest(schedule, pool_config, true, &not_admitted_reason)) {
-          VLOG_RPC << "Could not dequeue query id=" << PrintId(schedule.query_id())
-                   << " reason: " << not_admitted_reason;
+          VLOG_QUERY << "Could not dequeue query id=" << PrintId(schedule.query_id())
+                     << " reason: " << not_admitted_reason;
           break;
         }
         VLOG_RPC << "Dequeuing query=" << PrintId(schedule.query_id());
