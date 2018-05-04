@@ -184,7 +184,7 @@ void Benchmark(int batch_size, void* data) {
   BufferPool::ClientHandle client;
   CHECK(env->buffer_pool()
             ->RegisterClient("", nullptr, env->buffer_reservation(), nullptr,
-                std::numeric_limits<int64>::max(), profile, &client).ok());
+                numeric_limits<int64_t>::max(), profile, &client).ok());
   int* d = reinterpret_cast<int*>(data);
   CHECK(client.IncreaseReservation(BloomFilter::GetExpectedMemoryUsed(*d)));
   for (int i = 0; i < batch_size; ++i) {
@@ -305,7 +305,7 @@ void RunBenchmarks() {
   BufferPool::ClientHandle client;
   CHECK(env->buffer_pool()
             ->RegisterClient("", nullptr, env->buffer_reservation(), nullptr,
-                std::numeric_limits<int64>::max(), profile, &client).ok());
+                numeric_limits<int64_t>::max(), profile, &client).ok());
   char name[120];
 
   {
@@ -325,7 +325,7 @@ void RunBenchmarks() {
     }
     cout << suite.Measure() << endl;
   }
-  CHECK(client.DecreaseReservationTo(0).ok());
+  CHECK(client.DecreaseReservationTo(numeric_limits<int64_t>::max(), 0).ok());
 
   {
     Benchmark suite("find");
@@ -347,7 +347,7 @@ void RunBenchmarks() {
     }
     cout << suite.Measure() << endl;
   }
-  CHECK(client.DecreaseReservationTo(0).ok());
+  CHECK(client.DecreaseReservationTo(numeric_limits<int64_t>::max(), 0).ok());
 
   {
     Benchmark suite("union", false /* micro_heuristics */);
@@ -367,7 +367,7 @@ void RunBenchmarks() {
     cout << suite.Measure() << endl;
   }
 
-  CHECK(client.DecreaseReservationTo(0).ok());
+  CHECK(client.DecreaseReservationTo(numeric_limits<int64_t>::max(), 0).ok());
   env->buffer_pool()->DeregisterClient(&client);
   pool.Clear();
 }

@@ -2122,14 +2122,16 @@ TEST_F(BufferPoolTest, DecreaseReservation) {
 
   // Unpin pages and decrease reservation while the writes are in flight.
   UnpinAll(&pool, &client, &pages);
-  ASSERT_OK(client.DecreaseReservationTo(2 * TEST_BUFFER_LEN));
+  ASSERT_OK(client.DecreaseReservationTo(
+      numeric_limits<int64_t>::max(), 2 * TEST_BUFFER_LEN));
   // Two pages must be clean to stay within reservation
   EXPECT_GE(pool.GetNumCleanPages(), 2);
   EXPECT_EQ(2 * TEST_BUFFER_LEN, client.GetReservation());
 
   // Decrease it further after the pages are evicted.
   WaitForAllWrites(&client);
-  ASSERT_OK(client.DecreaseReservationTo(TEST_BUFFER_LEN));
+  ASSERT_OK(client.DecreaseReservationTo(
+      numeric_limits<int64_t>::max(), TEST_BUFFER_LEN));
   EXPECT_GE(pool.GetNumCleanPages(), 3);
   EXPECT_EQ(TEST_BUFFER_LEN, client.GetReservation());
 
@@ -2137,10 +2139,38 @@ TEST_F(BufferPoolTest, DecreaseReservation) {
   ASSERT_OK(AllocateAndFree(&pool, &client, TEST_BUFFER_LEN));
   EXPECT_EQ(1, NumEvicted(pages));
 
-  // Check that we can decrease it to zero.
-  ASSERT_OK(client.DecreaseReservationTo(0));
+  // Check that we can decrease it to zero, with the max decrease applied.
+  const int64_t MAX_DECREASE = 123;
+  ASSERT_OK(client.DecreaseReservationTo(MAX_DECREASE, 0));
+  EXPECT_EQ(TEST_BUFFER_LEN - MAX_DECREASE, client.GetReservation());
+  ASSERT_OK(client.DecreaseReservationTo(numeric_limits<int64_t>::max(), 0));
   EXPECT_EQ(0, client.GetReservation());
 
+  // Test concurrent increases and decreases do not race. All increases go through
+  // and each decrease reduces the reservation by DECREASE_SIZE or less.
+  const int NUM_CONCURRENT_INCREASES = 50;
+  const int NUM_CONCURRENT_DECREASES = 50;
+  const int64_t INCREASE_SIZE = 13;
+  const int64_t DECREASE_SIZE = 7;
+  const int64_t START_RESERVATION = 1000;
+  const int64_t MIN_RESERVATION = 500;
+  ASSERT_TRUE(client.IncreaseReservation(START_RESERVATION));
+  thread increaser([&] {
+    for (int i = 0; i < NUM_CONCURRENT_INCREASES; ++i) {
+      ASSERT_TRUE(client.IncreaseReservation(INCREASE_SIZE));
+      SleepForMs(0);
+    }
+  });
+  for (int i = 0; i < NUM_CONCURRENT_DECREASES; ++i) {
+    ASSERT_OK(client.DecreaseReservationTo(DECREASE_SIZE, MIN_RESERVATION));
+  }
+  increaser.join();
+  // All increases and decreased should have been applied.
+  EXPECT_EQ(START_RESERVATION + INCREASE_SIZE * NUM_CONCURRENT_INCREASES
+      - DECREASE_SIZE * NUM_CONCURRENT_DECREASES, client.GetReservation());
+
+  ASSERT_OK(client.DecreaseReservationTo(numeric_limits<int64_t>::max(), 0));
+  EXPECT_EQ(0, client.GetReservation());
   DestroyAll(&pool, &client, &pages);
   pool.DeregisterClient(&client);
   global_reservations_.Close();

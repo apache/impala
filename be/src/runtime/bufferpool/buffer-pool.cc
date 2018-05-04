@@ -313,8 +313,9 @@ bool BufferPool::ClientHandle::IncreaseReservationToFit(int64_t bytes) {
   return impl_->reservation()->IncreaseReservationToFit(bytes);
 }
 
-Status BufferPool::ClientHandle::DecreaseReservationTo(int64_t target_bytes) {
-  return impl_->DecreaseReservationTo(target_bytes);
+Status BufferPool::ClientHandle::DecreaseReservationTo(
+    int64_t max_decrease, int64_t target_bytes) {
+  return impl_->DecreaseReservationTo(max_decrease, target_bytes);
 }
 
 int64_t BufferPool::ClientHandle::GetReservation() const {
@@ -331,6 +332,7 @@ int64_t BufferPool::ClientHandle::GetUnusedReservation() const {
 
 bool BufferPool::ClientHandle::TransferReservationFrom(
     ReservationTracker* src, int64_t bytes) {
+  DCHECK(!impl_->has_unpinned_pages());
   return src->TransferReservationTo(impl_->reservation(), bytes);
 }
 
@@ -588,12 +590,19 @@ Status BufferPool::Client::PrepareToAllocateBuffer(
   return Status::OK();
 }
 
-Status BufferPool::Client::DecreaseReservationTo(int64_t target_bytes) {
+Status BufferPool::Client::DecreaseReservationTo(
+    int64_t max_decrease, int64_t target_bytes) {
   unique_lock<mutex> lock(lock_);
+  // Get a snapshot of the current reservation. Reservation may be increased concurrently
+  // without holding 'lock_' but cannot be decreased, so the end result may be higher
+  // than 'target_bytes' if another thread concurrently increases reservation. This
+  // interleaving of threads gives the same result as IncreaseReservation() running
+  // after DecreaseReservationTo(). Similarly, running IncreaseReservationToFit() and
+  // DecreaseReservationTo() concurrently can lead to a range of outcomes, but that
+  // is unavoidable by the nature of the methods.
   int64_t current_reservation = reservation_.GetReservation();
   DCHECK_GE(current_reservation, target_bytes);
-  int64_t amount_to_free =
-      min(reservation_.GetUnusedReservation(), current_reservation - target_bytes);
+  int64_t amount_to_free = min(max_decrease, current_reservation - target_bytes);
   if (amount_to_free == 0) return Status::OK();
   // Clean enough pages to allow us to safely release reservation.
   RETURN_IF_ERROR(CleanPages(&lock, amount_to_free));
