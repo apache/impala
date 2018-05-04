@@ -378,11 +378,10 @@ function main() {
   # Dump environment, for debugging
   env | grep -vE "AWS_(SECRET_)?ACCESS_KEY"
   set -x
-  if "${CMD}" "$@"; then
-    ret=0
-  else
-    ret=$?
-  fi
+  # The "| cat" here avoids "set -e"/errexit from exiting the
+  # script right away.
+  "${CMD}" "$@" | cat
+  ret=${PIPESTATUS[0]}
   set +x
   echo ">>> ${CMD} $@ ($ret) (end)"
   exit $ret
