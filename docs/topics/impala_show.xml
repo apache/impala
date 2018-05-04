@@ -47,6 +47,7 @@ SHOW SCHEMAS [[LIKE] '<varname>pattern</varname>'] - an alias for SHOW DATABASES
 SHOW TABLES [IN <varname>database_name</varname>] [[LIKE] '<varname>pattern</varname>']
 <ph rev="1.2.0">SHOW [AGGREGATE | ANALYTIC] FUNCTIONS [IN <varname>database_name</varname>] [[LIKE] '<varname>pattern</varname>']</ph>
 <ph rev="1.2.1">SHOW CREATE TABLE [<varname>database_name</varname>].<varname>table_name</varname></ph>
+<ph rev="1.2.1">SHOW CREATE VIEW [<varname>database_name</varname>].<varname>view_name</varname></ph>
 <ph rev="1.2.1">SHOW TABLE STATS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
 <ph rev="1.2.1">SHOW COLUMN STATS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
 <ph rev="1.4.0">SHOW PARTITIONS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
@@ -738,6 +739,16 @@ show tables like '*dim*|t*';
         to change things such as the database name, <codeph>LOCATION</codeph> field, and so on that might be
         different on the destination system.
       </p>
+      <p>
+        If you specify a view name in the <codeph>SHOW CREATE TABLE</codeph>,
+        it returns a <codeph>CREATE VIEW</codeph> statement with column names
+        and the original SQL statement to reproduce the view. You need the
+          <codeph>VIEW_METADATA</codeph> privilege on the view and
+          <codeph>SELECT</codeph> privilege on all underlying views and tables to
+        successfully run the <codeph>SHOW CREATE VIEW</codeph> statement for a
+        view. The <codeph>SHOW CREATE VIEW</codeph> is available as an alias for
+          <codeph>SHOW CREATE TABLE</codeph>.
+      </p>
 
       <p conref="../shared/impala_common.xml#common/security_blurb"/>
 
@@ -861,6 +872,22 @@ show create table show_create_table_demo;
       <p>
         <xref href="impala_create_table.xml#create_table"/>, <xref href="impala_describe.xml#describe"/>,
         <xref href="impala_show.xml#show_tables"/>
+      </p>
+    </conbody>
+  </concept>
+  <concept id="show_create_view">
+    <title>SHOW CREATE VIEW Statement</title>
+    <conbody>
+      <p> The <codeph>SHOW CREATE VIEW</codeph>, it returns a <codeph>CREATE
+          VIEW</codeph> statement with column names and the original SQL
+        statement to reproduce the view. You need the
+          <codeph>VIEW_METADATA</codeph> privilege on the view and
+          <codeph>SELECT</codeph> privilege on all underlying views and tables to
+        successfully run the <codeph>SHOW CREATE VIEW</codeph> statement for a
+        view. </p>
+      <p>
+        The <codeph>SHOW CREATE VIEW</codeph> is an alias for <codeph>SHOW
+          CREATE TABLE</codeph>.
       </p>
     </conbody>
   </concept>
