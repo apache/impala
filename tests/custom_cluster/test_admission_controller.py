@@ -527,10 +527,26 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     metrics = {'admitted': 0, 'queued': 0, 'dequeued': 0, 'rejected' : 0,
         'released': 0, 'timed-out': 0}
     for impalad in self.impalads:
-      for short_name in metrics.keys():
-        metrics[short_name] += impalad.service.get_metric_value(\
-            metric_key(self.pool_name, 'total-%s' % short_name), 0)
+      keys = [metric_key(self.pool_name, 'total-%s' % short_name)
+              for short_name in metrics.keys()]
+      values = impalad.service.get_metric_values(keys, [0] * len(keys))
+      for short_name, value in zip(metrics.keys(), values):
+        metrics[short_name] += value
     return metrics
+
+  def get_consistent_admission_metrics(self, num_submitted):
+    """Same as get_admission_metrics() except retries until it gets consistent metrics for
+    num_submitted queries. See IMPALA-6227 for an example of problems with inconsistent
+    metrics where a dequeued query is reflected in dequeued but not admitted."""
+    ATTEMPTS = 5
+    for i in xrange(ATTEMPTS):
+      metrics = self.get_admission_metrics()
+      admitted_immediately = num_submitted - metrics['queued'] - metrics['rejected']
+      if admitted_immediately + metrics['dequeued'] == metrics['admitted']:
+        return metrics
+      LOG.info("Got inconsistent metrics {0}".format(metrics))
+    assert False, "Could not get consistent metrics for {0} queries after {1} attempts: "\
+        "{2}".format(num_submitted, ATTEMPTS, metrics)
 
   def wait_for_metric_changes(self, metric_names, initial, expected_delta):
     """
@@ -847,7 +863,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     # Admit queries in waves until all queries are done. A new wave of admission
     # is started by killing some of the running queries.
     while len(self.executing_threads) > 0:
-      curr_metrics = self.get_admission_metrics();
+      curr_metrics = self.get_consistent_admission_metrics(num_queries);
       log_metrics("Main loop, curr_metrics: ", curr_metrics);
       num_to_end = len(self.executing_threads)
       LOG.info("Main loop, will request %s queries to end", num_to_end)
@@ -869,7 +885,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       # state or we may find an impalad dequeue more requests after we capture metrics.
       self.wait_for_statestore_updates(10)
 
-    final_metrics = self.get_admission_metrics();
+    final_metrics = self.get_consistent_admission_metrics(num_queries);
     log_metrics("Final metrics: ", final_metrics);
     metric_deltas = compute_metric_deltas(final_metrics, initial_metrics)
     assert metric_deltas['timed-out'] == 0

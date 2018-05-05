@@ -337,8 +337,8 @@ def wait_for_catalog(impalad, timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS
   num_tbls = 0
   while (time() - start_time < timeout_in_seconds):
     try:
-      num_dbs = impalad.service.get_metric_value('catalog.num-databases')
-      num_tbls = impalad.service.get_metric_value('catalog.num-tables')
+      num_dbs, num_tbls = impalad.service.get_metric_values(
+          ['catalog.num-databases', 'catalog.num-tables'])
       client_beeswax = impalad.service.create_beeswax_client()
       client_hs2 = impalad.service.create_hs2_client()
       break
