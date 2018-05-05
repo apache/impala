@@ -169,7 +169,7 @@ function build_impdev() {
   mkdir /home/impdev/Impala
   pushd /home/impdev/Impala
   git init
-  git fetch /repo --no-tags HEAD
+  git fetch /git_common_dir --no-tags "$GIT_HEAD_REV"
   git checkout -b test-with-docker FETCH_HEAD
 
   # Link in logs. Logs are on the host since that's the most important thing to
