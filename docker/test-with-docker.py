@@ -414,6 +414,20 @@ class TestWithDocker(object):
     self.name = name
     self.containers = []
     self.git_root = _check_output(["git", "rev-parse", "--show-toplevel"]).strip()
+
+    # If using worktrees, we need to find $GIT_COMMON_DIR; rev-parse
+    # supports finding it as of vesion 2.5.0; for older versions, we
+    # use $GIT_DIR.
+    git_common_dir = _check_output(["git", "rev-parse", "--git-common-dir"]).strip()
+    if git_common_dir == "--git-common-dir":
+      git_common_dir = _check_output(["git", "rev-parse", "--git-dir"]).strip()
+    self.git_common_dir = os.path.realpath(git_common_dir)
+    assert os.path.exists(self.git_common_dir)
+
+    self.git_head_rev = _check_output(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip()
+    assert self.git_head_rev, \
+        "Could not get reference to HEAD using git rev-parse --abbrev-ref HEAD."
     self.cleanup_containers = cleanup_containers
     self.cleanup_image = cleanup_image
     self.image = None
@@ -476,8 +490,13 @@ class TestWithDocker(object):
         "-e", "LC_ALL=C",
         "-e", "IMPALAD_MEM_LIMIT_BYTES=" +
         str(self.impalad_mem_limit_bytes),
-        # Mount the git directory so that clones can be local
+        # Mount the git directory so that clones can be local.
+        # We use /repo to have access to certain scripts,
+        # and we use /git_common_dir to have local clones,
+        # even when "git worktree" is being used.
         "-v", self.git_root + ":/repo:ro",
+        "-v", self.git_common_dir + ":/git_common_dir:ro",
+        "-e", "GIT_HEAD_REV=" + self.git_head_rev,
         "-v", self.ccache_dir + ":/ccache",
         # Share timezone between host and container
         "-v", "/etc/localtime:/mnt/localtime",
