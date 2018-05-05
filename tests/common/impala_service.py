@@ -93,8 +93,18 @@ class BaseImpalaService(object):
 
   def get_metric_value(self, metric_name, default_value=None):
     """Returns the value of the the given metric name from the Impala debug webpage"""
+    return self.get_metric_values([metric_name], [default_value])[0]
+
+  def get_metric_values(self, metric_names, default_values=None):
+    """Returns the value of the given metrics from the Impala debug webpage. If
+    default_values is provided and a metric is not present, the default value
+    is returned instead."""
+    if default_values is None:
+      default_values = [None for m in metric_names]
+    assert len(metric_names) == len(default_values)
     metrics = json.loads(self.read_debug_webpage('jsonmetrics?json'))
-    return metrics.get(metric_name, default_value)
+    return [metrics.get(metric_name, default_value)
+            for metric_name, default_value in zip(metric_names, default_values)]
 
   def wait_for_metric_value(self, metric_name, expected_value, timeout=10, interval=1):
     start_time = time()
