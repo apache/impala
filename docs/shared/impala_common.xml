@@ -814,16 +814,27 @@ The above raises an error at parse-time.
     </p>
 
     <p id="refresh_vs_invalidate">
-      <codeph>INVALIDATE METADATA</codeph> and <codeph>REFRESH</codeph> are counterparts: <codeph>INVALIDATE
-      METADATA</codeph> waits to reload the metadata when needed for a subsequent query, but reloads all the
-      metadata for the table, which can be an expensive operation, especially for large tables with many
-      partitions. <codeph>REFRESH</codeph> reloads the metadata immediately, but only loads the block location
-      data for newly added data files, making it a less expensive operation overall. If data was altered in some
-      more extensive way, such as being reorganized by the HDFS balancer, use <codeph>INVALIDATE
-      METADATA</codeph> to avoid a performance penalty from reduced local reads. If you used Impala version 1.0,
-      the <codeph>INVALIDATE METADATA</codeph> statement works just like the Impala 1.0 <codeph>REFRESH</codeph>
-      statement did, while the Impala 1.1 <codeph>REFRESH</codeph> is optimized for the common use case of adding
-      new data files to an existing table, thus the table name argument is now required.
+        <codeph>INVALIDATE METADATA</codeph> and <codeph>REFRESH</codeph> are
+        counterparts:
+      <ul>
+          <li>
+            <codeph>INVALIDATE METADATA</codeph> is an asynchronous operations
+            that simply discards the loaded metadata from the catalog and
+            coordinator caches. After that operation, the catalog and all the
+            Impala coordinators only know about the existence of databases and
+            tables and nothing more. Metadata loading for tables is triggered by
+            any subsequent queries.
+          </li>
+
+          <li>
+            <codeph>REFRESH</codeph> reloads the metadata synchronously.
+              <codeph>REFRESH</codeph> is more lightweight than doing a full
+            metadata load after a table has been invalidated.
+              <codeph>REFRESH</codeph> cannot detect changes in block locations
+            triggered by operations like HDFS balancer, hence causing remote
+            reads during query execution with negative performance implications.
+          </li>
+        </ul>
     </p>
 
   </section>
@@ -1280,13 +1291,6 @@ drop database temp;
         performance of queries against Kudu tables.
       </p>
 
-      <p rev="2.9.0 IMPALA-5333" id="adls_dml_performance">
-        <draft-comment>
-          Currently nothing to say on this subject. Leaving this placeholder
-          in case there are DML performance implications to discuss in future.
-        </draft-comment>
-      </p>
-
       <p rev="2.6.0 IMPALA-1878" id="s3_dml_performance">
         Because of differences between S3 and traditional filesystems, DML operations
         for S3 tables can take longer than for tables on HDFS. For example, both the
@@ -1379,13 +1383,14 @@ drop database temp;
         <!-- Formerly part of s3_dml element. Moved out to avoid a circular link in the S3 topic itelf. -->
         <!-- See <xref href="../topics/impala_s3.xml#s3"/> for details about reading and writing S3 data with Impala. -->
 
-      <p rev="2.2.0" id="s3_metadata">
-        The <codeph>REFRESH</codeph> and <codeph>INVALIDATE METADATA</codeph> statements also cache metadata
-        for tables where the data resides in the Amazon Simple Storage Service (S3).
-        In particular, issue a <codeph>REFRESH</codeph> for a table after adding or removing files
-        in the associated S3 data directory.
-        See <xref href="../topics/impala_s3.xml#s3"/> for details about working with S3 tables.
-      </p>
+      <p rev="2.2.0" id="s3_metadata"> Impala caches metadata for tables where
+        the data resides in the Amazon Simple Storage Service (S3), and the
+          <codeph>REFRESH</codeph> and <codeph>INVALIDATE METADATA</codeph>
+        statements are supported for the S3 tables. In particular, issue a
+          <codeph>REFRESH</codeph> for a table after adding or removing files in
+        the associated S3 data directory. See <xref
+          href="../topics/impala_s3.xml#s3"/> for details about working with S3
+        tables. </p>
 
       <p id="y2k38" rev="2.2.0">
         In Impala 2.2.0 and higher, built-in functions that accept or return integers representing <codeph>TIMESTAMP</codeph> values
@@ -3974,8 +3979,7 @@ sudo pip-python install ssl</codeblock>
         Run <codeph>REFRESH <varname>table_name</varname></codeph> or
         <codeph>INVALIDATE METADATA <varname>table_name</varname></codeph>
         for a Kudu table only after making a change to the Kudu table schema,
-        such as adding or dropping a column, by a mechanism other than
-        Impala.
+        such as adding or dropping a column.
       </p>
 
       <p id="kudu_internal_external_tables">
