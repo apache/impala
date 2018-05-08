@@ -27,6 +27,8 @@
 #include "runtime/timestamp-value.h"
 #include "util/string-parser.h"
 
+#include "common/names.h"
+
 namespace assign = boost::assign;
 using boost::unordered_map;
 using boost::gregorian::date;
@@ -82,6 +84,12 @@ bool TimestampParser::initialized_ = false;
 
 /// Lazily initialized pseudo-constant hashmap for mapping month names to an index.
 static unordered_map<StringValue, int> REV_MONTH_INDEX;
+
+const int TimestampParser::DEFAULT_DATE_FMT_LEN;
+const int TimestampParser::DEFAULT_TIME_FMT_LEN;
+const int TimestampParser::DEFAULT_TIME_FRAC_FMT_LEN;
+const int TimestampParser::DEFAULT_SHORT_DATE_TIME_FMT_LEN;
+const int TimestampParser::DEFAULT_DATE_TIME_FMT_LEN;
 
 DateTimeFormatContext TimestampParser::DEFAULT_SHORT_DATE_TIME_CTX;
 DateTimeFormatContext TimestampParser::DEFAULT_SHORT_ISO_DATE_TIME_CTX;
@@ -360,51 +368,55 @@ bool TimestampParser::ParseFormatTokensByStr(DateTimeFormatContext* dt_ctx) {
   return true;
 }
 
+// Helper for TimestampParse::Parse to produce return value and set output parameters
+// when parsing fails. 'd' and 't' must be non-NULL.
+static bool IndicateTimestampParseFailure(date* d, time_duration* t) {
+  *d = date();
+  *t = time_duration(not_a_date_time);
+  return false;
+}
+
 bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
     boost::posix_time::time_duration* t) {
-  int lazy_len;
-
   DCHECK(TimestampParser::initialized_);
-  DCHECK(d != NULL);
-  DCHECK(t != NULL);
-  if (UNLIKELY(str == NULL || len <= 0)) {
-    *d = boost::gregorian::date();
-    *t = boost::posix_time::time_duration(boost::posix_time::not_a_date_time);
-    return false;
-  }
+  DCHECK(d != nullptr);
+  DCHECK(t != nullptr);
+  if (UNLIKELY(str == nullptr)) return IndicateTimestampParseFailure(d, t);
+
+  int trimmed_len = len;
   // Remove leading white space.
-  while (len > 0 && isspace(*str)) {
+  while (trimmed_len > 0 && isspace(*str)) {
     ++str;
-    --len;
+    --trimmed_len;
   }
   // Strip the trailing blanks.
-  while (len > 0 && isspace(str[len - 1])) --len;
+  while (trimmed_len > 0 && isspace(str[trimmed_len - 1])) --trimmed_len;
   // Strip if there is a 'Z' suffix
-  if (len > 0 && str[len - 1] == 'Z') {
-    --len;
-  } else if (len > DEFAULT_TIME_FMT_LEN && (str[4] == '-' || str[2] == ':')) {
+  if (trimmed_len > 0 && str[trimmed_len - 1] == 'Z') {
+    --trimmed_len;
+  } else if (trimmed_len > DEFAULT_TIME_FMT_LEN && (str[4] == '-' || str[2] == ':')) {
     // Strip timezone offset if it seems like a valid timestamp string.
     int curr_pos = DEFAULT_TIME_FMT_LEN;
     // Timezone offset will be at least two bytes long, no need to check last
     // two bytes.
-    while (curr_pos < len - 2) {
+    while (curr_pos < trimmed_len - 2) {
       if (str[curr_pos] == '+' || str[curr_pos] == '-') {
-        len = curr_pos;
+        trimmed_len = curr_pos;
         break;
       }
       ++curr_pos;
     }
   }
+  if (UNLIKELY(trimmed_len <= 0)) return IndicateTimestampParseFailure(d, t);
 
-  lazy_len = len;
-  // Only process what we have to.
-  if (len > DEFAULT_DATE_TIME_FMT_LEN) len = DEFAULT_DATE_TIME_FMT_LEN;
+  // Determine the length of relevant input, if we're using one of the default formats.
+  int default_fmt_len = min(trimmed_len, DEFAULT_DATE_TIME_FMT_LEN);
   // Determine the default formatting context that's required for parsing.
   DateTimeFormatContext* dt_ctx = NULL;
-  if (LIKELY(len >= DEFAULT_TIME_FMT_LEN)) {
+  if (LIKELY(default_fmt_len >= DEFAULT_TIME_FMT_LEN)) {
     // This string starts with a date component
     if (str[4] == '-' && str[7] == '-') {
-      switch (len) {
+      switch (default_fmt_len) {
         case DEFAULT_DATE_FMT_LEN: {
           dt_ctx = &DEFAULT_DATE_CTX;
           break;
@@ -439,17 +451,17 @@ bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
           // There is likely a fractional component that's below the expected 9 chars.
           // We will need to work out which default context to use that corresponds to
           // the fractional length in the string.
-          if (LIKELY(len > DEFAULT_SHORT_DATE_TIME_FMT_LEN) && LIKELY(str[19] == '.')
-              && LIKELY(str[13] == ':')) {
+          if (LIKELY(default_fmt_len > DEFAULT_SHORT_DATE_TIME_FMT_LEN)
+              && LIKELY(str[19] == '.') && LIKELY(str[13] == ':')) {
             switch (str[10]) {
               case ' ': {
-                dt_ctx =
-                    &DEFAULT_DATE_TIME_CTX[len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+                dt_ctx = &DEFAULT_DATE_TIME_CTX
+                    [default_fmt_len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
                 break;
               }
               case 'T': {
                 dt_ctx = &DEFAULT_ISO_DATE_TIME_CTX
-                    [len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+                    [default_fmt_len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
                 break;
               }
             }
@@ -458,32 +470,23 @@ bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
         }
       }
     } else if (str[2] == ':' && str[5] == ':' && isdigit(str[7])) {
-      if (len > DEFAULT_TIME_FRAC_FMT_LEN) len = DEFAULT_TIME_FRAC_FMT_LEN;
-      if (len > DEFAULT_TIME_FMT_LEN && str[8] == '.') {
-        dt_ctx = &DEFAULT_TIME_FRAC_CTX[len - DEFAULT_TIME_FMT_LEN - 1];
+      default_fmt_len = min(default_fmt_len, DEFAULT_TIME_FRAC_FMT_LEN);
+      if (default_fmt_len > DEFAULT_TIME_FMT_LEN && str[8] == '.') {
+        dt_ctx = &DEFAULT_TIME_FRAC_CTX[default_fmt_len - DEFAULT_TIME_FMT_LEN - 1];
       } else {
         dt_ctx = &DEFAULT_TIME_CTX;
       }
     }
   }
 
+  if (dt_ctx != nullptr) return Parse(str, default_fmt_len, *dt_ctx, d, t);
   // Generating context lazily as a fall back if default formats fail.
   // ParseFormatTokenByStr() does not require a template format string.
-  if (dt_ctx != nullptr) {
-    return Parse(str, len, *dt_ctx, d, t);
-  } else {
-    DateTimeFormatContext lazy_ctx;
-    lazy_ctx.Reset(str, lazy_len);
-    if (ParseFormatTokensByStr(&lazy_ctx)) {
-      dt_ctx = &lazy_ctx;
-      len = lazy_len;
-      return Parse(str, len, *dt_ctx, d, t);
-    } else {
-      *d = boost::gregorian::date();
-      *t = boost::posix_time::time_duration(boost::posix_time::not_a_date_time);
-      return false;
-    }
-  }
+  DateTimeFormatContext lazy_ctx;
+  lazy_ctx.Reset(str, trimmed_len);
+  if (!ParseFormatTokensByStr(&lazy_ctx)) return IndicateTimestampParseFailure(d, t);
+  dt_ctx = &lazy_ctx;
+  return Parse(str, trimmed_len, *dt_ctx, d, t);
 }
 
 date TimestampParser::RealignYear(const DateTimeParseResult& dt_result,
@@ -522,9 +525,7 @@ bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContex
   int day_offset = 0;
   if (UNLIKELY(str == NULL || len <= 0 ||
           !ParseDateTime(str, len, dt_ctx, &dt_result))) {
-    *d = date();
-    *t = time_duration(not_a_date_time);
-    return false;
+    return IndicateTimestampParseFailure(d, t);
   }
   if (dt_ctx.has_time_toks) {
     *t = time_duration(dt_result.hour, dt_result.minute,
@@ -560,9 +561,7 @@ bool TimestampParser::Parse(const char* str, int len, const DateTimeFormatContex
     } catch (boost::exception&) {
       VLOG_ROW << "Invalid date: " << dt_result.year << "-" << dt_result.month << "-"
                << dt_result.day;
-      *d = date();
-      *t = time_duration(not_a_date_time);
-      return false;
+      return IndicateTimestampParseFailure(d, t);
     }
   } else {
     *d = date();
