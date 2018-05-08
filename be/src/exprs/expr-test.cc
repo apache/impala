@@ -3157,6 +3157,12 @@ TEST_F(ExprTest, CastExprs) {
   TestTimestampValue("cast('  \t\r\n      2001-1-9    \t\r\n    ' as timestamp)",
       TimestampValue::Parse("2001-01-09"));
 
+  // IMPALA-6995: whitespace-only strings should return NULL.
+  TestIsNull("cast(' ' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('\n' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('\t' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('  \t\r\n' as timestamp)", TYPE_TIMESTAMP);
+
   // Test valid multi-space and 'T' separators between date and time
   // components
   TestTimestampValue("cast('2001-01-09   01:05:01' as timestamp)",
