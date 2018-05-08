@@ -96,7 +96,7 @@ under the License.
   [WITH SERDEPROPERTIES ('<varname>key1</varname>'='<varname>value1</varname>', '<varname>key2</varname>'='<varname>value2</varname>', ...)]
   [STORED AS <varname>file_format</varname>]
   [LOCATION '<varname>hdfs_path</varname>']
-<ph rev="1.4.0">  CACHED IN '<varname>pool_name</varname>'</ph> <ph rev="2.2.0">[WITH REPLICATION = <varname>integer</varname>]</ph> | UNCACHED]
+  <ph rev="1.4.0">[CACHED IN '<varname>pool_name</varname>'</ph> <ph rev="2.2.0">[WITH REPLICATION = <varname>integer</varname>]</ph> | UNCACHED]
   [TBLPROPERTIES ('<varname>key1</varname>'='<varname>value1</varname>', '<varname>key2</varname>'='<varname>value2</varname>', ...)]
 </codeblock>
 
