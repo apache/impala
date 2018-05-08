@@ -447,7 +447,10 @@ class ImpalaDiagnosticsHandler(object):
       # around that.
       with closing(tarfile.open(self.collection_root_dir + '.tar.gz', mode='w:gz')) as\
           archive:
-        archive.add(self.collection_root_dir)
+        # collection_root_dir is an absoulte path. There is no point in preserving its
+        # entire directory structure in the archive, so set the arcname accordingly.
+        archive.add(self.collection_root_dir,
+            arcname=os.path.basename(self.collection_root_dir))
       return True
     except Exception:
       logging.exception("Encountered an exception archiving diagnostics, cleaning up.")
