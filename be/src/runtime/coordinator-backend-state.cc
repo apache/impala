@@ -190,7 +190,7 @@ void Coordinator::BackendState::Exec(
     const string& err_msg = Substitute(ERR_TEMPLATE, PrintId(query_id_),
         exec_status.msg().GetFullMessageDetails());
     VLOG_QUERY << err_msg;
-    status_ = Status(err_msg);
+    status_ = Status::Expected(err_msg);
     return;
   }
 
