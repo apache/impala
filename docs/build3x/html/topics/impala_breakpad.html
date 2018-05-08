@@ -1,0 +1,239 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_troubleshooting.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="breakpad"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Breakpad Minidumps for Impala (Impala 2.6 or higher only)</title></head><body id="breakpad"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Breakpad Minidumps for Impala (<span class="keyword">Impala 2.6</span> or higher only)</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <a class="xref" href="https://chromium.googlesource.com/breakpad/breakpad/" target="_blank">breakpad</a>
+      project is an open-source framework for crash reporting.
+      In <span class="keyword">Impala 2.6</span> and higher, Impala can use <code class="ph codeph">breakpad</code> to record stack information and
+      register values when any of the Impala-related daemons crash due to an error such as <code class="ph codeph">SIGSEGV</code>
+      or unhandled exceptions.
+      The dump files are much smaller than traditional core dump files. The dump mechanism itself uses very little
+      memory, which improves reliability if the crash occurs while the system is low on memory.
+    </p>
+
+    <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+      Because of the internal mechanisms involving Impala memory allocation and Linux
+      signalling for out-of-memory (OOM) errors, if an Impala-related daemon experiences a
+      crash due to an OOM condition, it does <em class="ph i">not</em> generate a minidump for that error.
+    <p class="p">
+
+    </p>
+    </div>
+
+
+    <p class="p toc inpage"></p>
+
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="breakpad__breakpad_minidump_enable">
+    <h2 class="title topictitle2" id="ariaid-title2">Enabling or Disabling Minidump Generation</h2>
+    <div class="body conbody">
+      <p class="p">
+        By default, a minidump file is generated when an Impala-related daemon
+        crashes.
+      </p>
+
+      <div class="p">
+        To turn off generation of the minidump files, use one of the following
+        options:
+
+        <ul class="ul">
+          <li class="li">
+            Set the <code class="ph codeph">--enable_minidumps</code> configuration setting
+            to <code class="ph codeph">false</code>. Restart the corresponding services or
+            daemons.
+          </li>
+
+          <li class="li">
+            Set the <code class="ph codeph">--minidump_path</code> configuration setting to
+            an empty string. Restart the corresponding services or daemons.
+          </li>
+        </ul>
+      </div>
+
+      <p class="p">
+        In <span class="keyword">Impala 2.7</span> and higher,
+        you can send a <code class="ph codeph">SIGUSR1</code> signal to any Impala-related daemon to write a
+        Breakpad minidump. For advanced troubleshooting, you can now produce a minidump
+        without triggering a crash.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="breakpad__breakpad_minidump_location">
+    <h2 class="title topictitle2" id="ariaid-title3">Specifying the Location for Minidump Files</h2>
+    <div class="body conbody">
+      <div class="p">
+        By default, all minidump files are written to the following location
+        on the host where a crash occurs:
+
+         <ul class="ul">
+          <li class="li">
+            <p class="p">
+              Clusters not managed by cluster management software:
+              <span class="ph filepath"><var class="keyword varname">impala_log_dir</var>/<var class="keyword varname">daemon_name</var>/minidumps/<var class="keyword varname">daemon_name</var></span>
+            </p>
+          </li>
+        </ul>
+        The minidump files for <span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">catalogd</span>,
+        and <span class="keyword cmdname">statestored</span> are each written to a separate directory.
+      </div>
+      <p class="p">
+        To specify a different location, set the
+
+        <span class="ph uicontrol">minidump_path</span>
+        configuration setting of one or more Impala-related daemons, and restart the corresponding services or daemons.
+      </p>
+      <p class="p">
+        If you specify a relative path for this setting, the value is interpreted relative to
+        the default <span class="ph uicontrol">minidump_path</span> directory.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="breakpad__breakpad_minidump_number">
+    <h2 class="title topictitle2" id="ariaid-title4">Controlling the Number of Minidump Files</h2>
+    <div class="body conbody">
+      <p class="p">
+        Like any files used for logging or troubleshooting, consider limiting the number of
+        minidump files, or removing unneeded ones, depending on the amount of free storage
+        space on the hosts in the cluster.
+      </p>
+      <p class="p">
+        Because the minidump files are only used for problem resolution, you can remove any such files that
+        are not needed to debug current issues.
+      </p>
+      <p class="p">
+        To control how many minidump files Impala keeps around at any one time,
+        set the <span class="ph uicontrol">max_minidumps</span> configuration setting for
+        of one or more Impala-related daemon, and restart the corresponding services or daemons.
+        The default for this setting is 9. A zero or negative value is interpreted as
+        <span class="q">"unlimited"</span>.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="breakpad__breakpad_minidump_logging">
+    <h2 class="title topictitle2" id="ariaid-title5">Detecting Crash Events</h2>
+    <div class="body conbody">
+
+      <p class="p">
+        You can see in the Impala log files when crash events occur that generate
+        minidump files. Because each restart begins a new log file, the <span class="q">"crashed"</span> message
+        is always at or near the bottom of the log file. There might be another later message
+        if core dumps are also enabled.
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="breakpad__breakpad_demo">
+    <h2 class="title topictitle2" id="ariaid-title6">Demonstration of Breakpad Feature</h2>
+    <div class="body conbody">
+      <p class="p">
+        The following example uses the command <span class="keyword cmdname">kill -11</span> to
+        simulate a <code class="ph codeph">SIGSEGV</code> crash for an <span class="keyword cmdname">impalad</span>
+        process on a single DataNode, then examines the relevant log files and minidump file.
+      </p>
+
+      <p class="p">
+        First, as root on a worker node, kill the <span class="keyword cmdname">impalad</span> process with a
+        <code class="ph codeph">SIGSEGV</code> error. The original process ID was 23114.
+      </p>
+
+<pre class="pre codeblock"><code>
+# ps ax | grep impalad
+23114 ?        Sl     0:18 /opt/local/parcels/&lt;parcel_version&gt;/lib/impala/sbin/impalad --flagfile=/var/run/impala/process/114-impala-IMPALAD/impala-conf/impalad_flags
+31259 pts/0    S+     0:00 grep impalad
+#
+# kill -11 23114
+#
+# ps ax | grep impalad
+31374 ?        Rl     0:04 /opt/local/parcels/&lt;parcel_version&gt;/lib/impala/sbin/impalad --flagfile=/var/run/impala/process/114-impala-IMPALAD/impala-conf/impalad_flags
+31475 pts/0    S+     0:00 grep impalad
+
+</code></pre>
+
+      <p class="p">
+        We locate the log directory underneath <span class="ph filepath">/var/log</span>.
+        There is a <code class="ph codeph">.INFO</code>, <code class="ph codeph">.WARNING</code>, and <code class="ph codeph">.ERROR</code>
+        log file for the 23114 process ID. The minidump message is written to the
+        <code class="ph codeph">.INFO</code> file and the <code class="ph codeph">.ERROR</code> file, but not the
+        <code class="ph codeph">.WARNING</code> file. In this case, a large core file was also produced.
+      </p>
+<pre class="pre codeblock"><code>
+# cd /var/log/impalad
+# ls -la | grep 23114
+-rw-------   1 impala impala 3539079168 Jun 23 15:20 core.23114
+-rw-r--r--   1 impala impala      99057 Jun 23 15:20 hs_err_pid23114.log
+-rw-r--r--   1 impala impala        351 Jun 23 15:20 impalad.worker_node_123.impala.log.ERROR.20160623-140343.23114
+-rw-r--r--   1 impala impala      29101 Jun 23 15:20 impalad.worker_node_123.impala.log.INFO.20160623-140343.23114
+-rw-r--r--   1 impala impala        228 Jun 23 14:03 impalad.worker_node_123.impala.log.WARNING.20160623-140343.23114
+
+</code></pre>
+      <p class="p">
+        The <code class="ph codeph">.INFO</code> log includes the location of the minidump file, followed by
+        a report of a core dump. With the breakpad minidump feature enabled, now we might
+        disable core dumps or keep fewer of them around.
+      </p>
+<pre class="pre codeblock"><code>
+# cat impalad.worker_node_123.impala.log.INFO.20160623-140343.23114
+...
+Wrote minidump to /var/log/impala-minidumps/impalad/0980da2d-a905-01e1-25ff883a-04ee027a.dmp
+#
+# A fatal error has been detected by the Java Runtime Environment:
+#
+#  SIGSEGV (0xb) at pc=0x00000030c0e0b68a, pid=23114, tid=139869541455968
+#
+# JRE version: Java(TM) SE Runtime Environment (7.0_67-b01) (build 1.7.0_67-b01)
+# Java VM: Java HotSpot(TM) 64-Bit Server VM (24.65-b04 mixed mode linux-amd64 compressed oops)
+# Problematic frame:
+# C  [libpthread.so.0+0xb68a]  pthread_cond_wait+0xca
+#
+# Core dump written. Default location: /var/log/impalad/core or core.23114
+#
+# An error report file with more information is saved as:
+# /var/log/impalad/hs_err_pid23114.log
+#
+# If you would like to submit a bug report, please visit:
+#   http://bugreport.sun.com/bugreport/crash.jsp
+# The crash happened outside the Java Virtual Machine in native code.
+# See problematic frame for where to report the bug.
+...
+
+# cat impalad.worker_node_123.impala.log.ERROR.20160623-140343.23114
+
+Log file created at: 2016/06/23 14:03:43
+Running on machine:.worker_node_123
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+E0623 14:03:43.911002 23114 logging.cc:118] stderr will be logged to this file.
+Wrote minidump to /var/log/impala-minidumps/impalad/0980da2d-a905-01e1-25ff883a-04ee027a.dmp
+
+</code></pre>
+
+      <p class="p">
+        The resulting minidump file is much smaller than the corresponding core file,
+        making it much easier to supply diagnostic information to <span class="keyword">the appropriate support channel</span>.
+      </p>
+
+<pre class="pre codeblock"><code>
+# pwd
+/var/log/impalad
+# cd ../impala-minidumps/impalad
+# ls
+0980da2d-a905-01e1-25ff883a-04ee027a.dmp
+# du -kh *
+2.4M  0980da2d-a905-01e1-25ff883a-04ee027a.dmp
+
+</code></pre>
+    </div>
+  </article>
+
+</article></main></body></html>

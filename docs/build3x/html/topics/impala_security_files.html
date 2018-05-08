@@ -1,0 +1,58 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="secure_files"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Securing Impala Data and Log Files</title></head><body id="secure_files"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Securing Impala Data and Log Files</h1>
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      One aspect of security is to protect files from unauthorized access at the filesystem level. For example, if
+      you store sensitive data in HDFS, you specify permissions on the associated files and directories in HDFS to
+      restrict read and write permissions to the appropriate users and groups.
+    </p>
+
+    <p class="p">
+      If you issue queries containing sensitive values in the <code class="ph codeph">WHERE</code> clause, such as financial
+      account numbers, those values are stored in Impala log files in the Linux filesystem and you must secure
+      those files also. For the locations of Impala log files, see <a class="xref" href="impala_logging.html#logging">Using Impala Logging</a>.
+    </p>
+
+    <p class="p">
+      All Impala read and write operations are performed under the filesystem privileges of the
+      <code class="ph codeph">impala</code> user. The <code class="ph codeph">impala</code> user must be able to read all directories and data
+      files that you query, and write into all the directories and data files for <code class="ph codeph">INSERT</code> and
+      <code class="ph codeph">LOAD DATA</code> statements. At a minimum, make sure the <code class="ph codeph">impala</code> user is in the
+      <code class="ph codeph">hive</code> group so that it can access files and directories shared between Impala and Hive. See
+      <a class="xref" href="impala_prereqs.html#prereqs_account">User Account Requirements</a> for more details.
+    </p>
+
+    <p class="p">
+      Setting file permissions is necessary for Impala to function correctly, but is not an effective security
+      practice by itself:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+      <p class="p">
+        The way to ensure that only authorized users can submit requests for databases and tables they are allowed
+        to access is to set up Sentry authorization, as explained in
+        <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>. With authorization enabled, the checking of the user
+        ID and group is done by Impala, and unauthorized access is blocked by Impala itself. The actual low-level
+        read and write requests are still done by the <code class="ph codeph">impala</code> user, so you must have appropriate
+        file and directory permissions for that user ID.
+      </p>
+      </li>
+
+      <li class="li">
+      <p class="p">
+        You must also set up Kerberos authentication, as described in <a class="xref" href="impala_kerberos.html#kerberos">Enabling Kerberos Authentication for Impala</a>,
+        so that users can only connect from trusted hosts. With Kerberos enabled, if someone connects a new host to
+        the network and creates user IDs that match your privileged IDs, they will be blocked from connecting to
+        Impala at all from that host.
+      </p>
+      </li>
+    </ul>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_security.html">Impala Security</a></div></div></nav></article></main></body></html>

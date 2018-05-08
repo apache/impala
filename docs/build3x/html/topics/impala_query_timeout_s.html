@@ -1,0 +1,62 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="query_timeout_s"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>QUERY_TIMEOUT_S Query Option (Impala 2.0 or higher only)</title></head><body id="query_timeout_s"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">QUERY_TIMEOUT_S Query Option (<span class="keyword">Impala 2.0</span> or higher only)</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      Sets the idle query timeout value for the session, in seconds. Queries that sit idle for longer than the
+      timeout value are automatically cancelled. If the system administrator specified the
+      <code class="ph codeph">--idle_query_timeout</code> startup option, <code class="ph codeph">QUERY_TIMEOUT_S</code> must be smaller than
+      or equal to the <code class="ph codeph">--idle_query_timeout</code> value.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+        <p class="p">
+          The timeout clock for queries and sessions only starts ticking when the query or session is idle.
+          For queries, this means the query has results ready but is waiting for a client to fetch the data. A
+          query can run for an arbitrary time without triggering a timeout, because the query is computing results
+          rather than sitting idle waiting for the results to be fetched. The timeout period is intended to prevent
+          unclosed queries from consuming resources and taking up slots in the admission count of running queries,
+          potentially preventing other queries from starting.
+        </p>
+        <p class="p">
+          For sessions, this means that no query has been submitted for some period of time.
+        </p>
+      </div>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>SET QUERY_TIMEOUT_S=<var class="keyword varname">seconds</var>;</code></pre>
+
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> numeric
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> 0 (no timeout if <code class="ph codeph">--idle_query_timeout</code> not in effect; otherwise, use
+      <code class="ph codeph">--idle_query_timeout</code> value)
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.0.0</span>
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_timeouts.html#timeouts">Setting Timeout Periods for Daemons, Queries, and Sessions</a>
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="live_summary"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>LIVE_SUMMARY Query Option (Impala 2.3 or higher only)</title></head><body id="live_summary"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">LIVE_SUMMARY Query Option (<span class="keyword">Impala 2.3</span> or higher only)</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      For queries submitted through the <span class="keyword cmdname">impala-shell</span> command,
+      displays the same output as the <code class="ph codeph">SUMMARY</code> command,
+      with the measurements updated in real time as the query progresses.
+      When the query finishes, the final <code class="ph codeph">SUMMARY</code> output remains
+      visible in the <span class="keyword cmdname">impala-shell</span> console output.
+    </p>
+
+    <p class="p">
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and <code class="ph codeph">false</code>;
+        any other value interpreted as <code class="ph codeph">false</code>
+      </p>
+    <p class="p">
+        <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code> statement)
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Command-line equivalent:</strong>
+      </p>
+    <p class="p">
+      You can enable this query option within <span class="keyword cmdname">impala-shell</span>
+      by starting the shell with the <code class="ph codeph">--live_summary</code>
+      command-line option.
+      You can still turn this setting off and on again within the shell through the
+      <code class="ph codeph">SET</code> command.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+    <p class="p">
+      The live summary output can be useful for evaluating long-running queries,
+      to evaluate which phase of execution takes up the most time, or if some hosts
+      take much longer than others for certain operations, dragging overall performance down.
+      By making the information available in real time, this feature lets you decide what
+      action to take even before you cancel a query that is taking much longer than normal.
+    </p>
+    <p class="p">
+      For example, you might see the HDFS scan phase taking a long time, and therefore revisit
+      performance-related aspects of your schema design such as constructing a partitioned table,
+      switching to the Parquet file format, running the <code class="ph codeph">COMPUTE STATS</code> statement
+      for the table, and so on.
+      Or you might see a wide variation between the average and maximum times for all hosts to
+      perform some phase of the query, and therefore investigate if one particular host
+      needed more memory or was experiencing a network problem.
+    </p>
+    <p class="p">
+        The output from this query option is printed to standard error. The output is only displayed in interactive mode,
+        that is, not when the <code class="ph codeph">-q</code> or <code class="ph codeph">-f</code> options are used.
+      </p>
+    <p class="p">
+      For a simple and concise way of tracking the progress of an interactive query, see
+      <a class="xref" href="impala_live_progress.html#live_progress">LIVE_PROGRESS Query Option (Impala 2.3 or higher only)</a>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Restrictions:</strong>
+      </p>
+    <p class="p">
+        The <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code> query options
+        currently do not produce any output during <code class="ph codeph">COMPUTE STATS</code> operations.
+      </p>
+    <div class="p">
+        Because the <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code> query options
+        are available only within the <span class="keyword cmdname">impala-shell</span> interpreter:
+        <ul class="ul">
+          <li class="li">
+            <p class="p">
+              You cannot change these query options through the SQL <code class="ph codeph">SET</code>
+              statement using the JDBC or ODBC interfaces. The <code class="ph codeph">SET</code>
+              command in <span class="keyword cmdname">impala-shell</span> recognizes these names as
+              shell-only options.
+            </p>
+          </li>
+          <li class="li">
+            <p class="p">
+              Be careful when using <span class="keyword cmdname">impala-shell</span> on a pre-<span class="keyword">Impala 2.3</span>
+              system to connect to a system running <span class="keyword">Impala 2.3</span> or higher.
+              The older <span class="keyword cmdname">impala-shell</span> does not recognize these
+              query option names. Upgrade <span class="keyword cmdname">impala-shell</span> on the
+              systems where you intend to use these query options.
+            </p>
+          </li>
+          <li class="li">
+            <p class="p">
+              Likewise, the <span class="keyword cmdname">impala-shell</span> command relies on
+              some information only available in <span class="keyword">Impala 2.3</span> and higher
+              to prepare live progress reports and query summaries. The
+              <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code>
+              query options have no effect when <span class="keyword cmdname">impala-shell</span> connects
+              to a cluster running an older version of Impala.
+            </p>
+          </li>
+        </ul>
+      </div>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      The following example shows a series of <code class="ph codeph">LIVE_SUMMARY</code> reports that
+      are displayed during the course of a query, showing how the numbers increase to
+      show the progress of different phases of the distributed query. When you do the same
+      in <span class="keyword cmdname">impala-shell</span>, only a single report is displayed at any one time,
+      with each update overwriting the previous numbers.
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; set live_summary=true;
+LIVE_SUMMARY set to true
+[localhost:21000] &gt; select count(*) from customer t1 cross join customer t2;
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 0      | 0ns      | 0ns      | 0       | 22.50B     | 0 B      | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 0      | 0ns      | 0ns      | 0       | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 0      | 0ns      | 0ns      | 0       | 150.00K    | 0 B      | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 1      | 0ns      | 0ns      | 0       | 1          | 20.00 KB | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 1      | 17.62s   | 17.62s   | 81.14M  | 22.50B     | 3.23 MB  | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 1      | 26.29ms  | 26.29ms  | 150.00K | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 1      | 247.53ms | 247.53ms | 1.02K   | 150.00K    | 24.39 MB | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+| 06:AGGREGATE        | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | FINALIZE              |
+| 05:EXCHANGE         | 0      | 0ns      | 0ns      | 0       | 1          | 0 B      | -1 B          | UNPARTITIONED         |
+| 03:AGGREGATE        | 1      | 0ns      | 0ns      | 0       | 1          | 20.00 KB | 10.00 MB      |                       |
+| 02:NESTED LOOP JOIN | 1      | 61.85s   | 61.85s   | 283.43M | 22.50B     | 3.23 MB  | 0 B           | CROSS JOIN, BROADCAST |
+| |--04:EXCHANGE      | 1      | 26.29ms  | 26.29ms  | 150.00K | 150.00K    | 0 B      | 0 B           | BROADCAST             |
+| |  01:SCAN HDFS     | 1      | 503.57ms | 503.57ms | 150.00K | 150.00K    | 24.09 MB | 64.00 MB      | tpch.customer t2      |
+| 00:SCAN HDFS        | 1      | 247.59ms | 247.59ms | 2.05K   | 150.00K    | 24.39 MB | 64.00 MB      | tpch.customer t1      |
++---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
+
+</code></pre>
+
+
+
+
+    <p class="p">
+        To see how the <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code> query options
+        work in real time, see <a class="xref" href="https://asciinema.org/a/1rv7qippo0fe7h5k1b6k4nexk" target="_blank">this animated demo</a>.
+      </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

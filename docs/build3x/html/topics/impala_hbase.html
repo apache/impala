@@ -1,0 +1,772 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="impala_hbase"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala to Query HBase Tables</title></head><body id="impala_hbase"><main role="main"><article role="article" aria-labelledby="impala_hbase__hbase">
+
+  <h1 class="title topictitle1" id="impala_hbase__hbase">Using Impala to Query HBase Tables</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      You can use Impala to query HBase tables. This capability allows convenient access to a storage system that
+      is tuned for different kinds of workloads than the default with Impala. The default Impala tables use data
+      files stored on HDFS, which are ideal for bulk loads and queries using full-table scans. In contrast, HBase
+      can do efficient queries for data organized for OLTP-style workloads, with lookups of individual rows or
+      ranges of values.
+    </p>
+
+    <p class="p">
+      From the perspective of an Impala user, coming from an RDBMS background, HBase is a kind of key-value store
+      where the value consists of multiple fields. The key is mapped to one column in the Impala table, and the
+      various fields of the value are mapped to the other columns in the Impala table.
+    </p>
+
+    <p class="p">
+      For background information on HBase, see <a class="xref" href="https://hbase.apache.org/book.html" target="_blank">the Apache HBase documentation</a>.
+    </p>
+
+    <p class="p toc inpage"></p>
+  </div>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="impala_hbase__hbase_using">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Overview of Using HBase with Impala</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        When you use Impala with HBase:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          You create the tables on the Impala side using the Hive shell, because the Impala <code class="ph codeph">CREATE
+          TABLE</code> statement currently does not support custom SerDes and some other syntax needed for these
+          tables:
+          <ul class="ul">
+            <li class="li">
+              You designate it as an HBase table using the <code class="ph codeph">STORED BY
+              'org.apache.hadoop.hive.hbase.HBaseStorageHandler'</code> clause on the Hive <code class="ph codeph">CREATE
+              TABLE</code> statement.
+            </li>
+
+            <li class="li">
+              You map these specially created tables to corresponding tables that exist in HBase, with the clause
+              <code class="ph codeph">TBLPROPERTIES("hbase.table.name" = "<var class="keyword varname">table_name_in_hbase</var>")</code> on the
+              Hive <code class="ph codeph">CREATE TABLE</code> statement.
+            </li>
+
+            <li class="li">
+              See <a class="xref" href="#hbase_queries">Examples of Querying HBase Tables from Impala</a> for a full example.
+            </li>
+          </ul>
+        </li>
+
+        <li class="li">
+          You define the column corresponding to the HBase row key as a string with the <code class="ph codeph">#string</code>
+          keyword, or map it to a <code class="ph codeph">STRING</code> column.
+        </li>
+
+        <li class="li">
+          Because Impala and Hive share the same metastore database, once you create the table in Hive, you can
+          query or insert into it through Impala. (After creating a new table through Hive, issue the
+          <code class="ph codeph">INVALIDATE METADATA</code> statement in <span class="keyword cmdname">impala-shell</span> to make Impala aware of
+          the new table.)
+        </li>
+
+        <li class="li">
+          You issue queries against the Impala tables. For efficient queries, use <code class="ph codeph">WHERE</code> clauses to
+          find a single key value or a range of key values wherever practical, by testing the Impala column
+          corresponding to the HBase row key. Avoid queries that do full-table scans, which are efficient for
+          regular Impala tables but inefficient in HBase.
+        </li>
+      </ul>
+
+      <p class="p">
+        To work with an HBase table from Impala, ensure that the <code class="ph codeph">impala</code> user has read/write
+        privileges for the HBase table, using the <code class="ph codeph">GRANT</code> command in the HBase shell. For details
+        about HBase security, see <a class="xref" href="https://hbase.apache.org/book.html#security" target="_blank">the Security chapter in the Apache HBase documentation</a>.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="impala_hbase__hbase_config">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Configuring HBase for Use with Impala</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        HBase works out of the box with Impala. There is no mandatory configuration needed to use these two
+        components together.
+      </p>
+
+      <p class="p">
+        To avoid delays if HBase is unavailable during Impala startup or after an <code class="ph codeph">INVALIDATE
+        METADATA</code> statement, set timeout values similar to the following in
+        <span class="ph filepath">/etc/impala/conf/hbase-site.xml</span>:
+      </p>
+
+<pre class="pre codeblock"><code>&lt;property&gt;
+  &lt;name&gt;hbase.client.retries.number&lt;/name&gt;
+  &lt;value&gt;3&lt;/value&gt;
+&lt;/property&gt;
+&lt;property&gt;
+  &lt;name&gt;hbase.rpc.timeout&lt;/name&gt;
+  &lt;value&gt;3000&lt;/value&gt;
+&lt;/property&gt;
+</code></pre>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="impala_hbase__hbase_types">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Supported Data Types for HBase Columns</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        To understand how Impala column data types are mapped to fields in HBase, you should have some background
+        knowledge about HBase first. You set up the mapping by running the <code class="ph codeph">CREATE TABLE</code> statement
+        in the Hive shell. See
+        <a class="xref" href="https://cwiki.apache.org/confluence/display/Hive/HBaseIntegration" target="_blank">the
+        Hive wiki</a> for a starting point, and <a class="xref" href="#hbase_queries">Examples of Querying HBase Tables from Impala</a> for examples.
+      </p>
+
+      <p class="p">
+        HBase works as a kind of <span class="q">"bit bucket"</span>, in the sense that HBase does not enforce any typing for the
+        key or value fields. All the type enforcement is done on the Impala side.
+      </p>
+
+      <p class="p">
+        For best performance of Impala queries against HBase tables, most queries will perform comparisons in the
+        <code class="ph codeph">WHERE</code> against the column that corresponds to the HBase row key. When creating the table
+        through the Hive shell, use the <code class="ph codeph">STRING</code> data type for the column that corresponds to the
+        HBase row key. Impala can translate conditional tests (through operators such as <code class="ph codeph">=</code>,
+        <code class="ph codeph">&lt;</code>, <code class="ph codeph">BETWEEN</code>, and <code class="ph codeph">IN</code>) against this column into fast
+        lookups in HBase, but this optimization (<span class="q">"predicate pushdown"</span>) only works when that column is
+        defined as <code class="ph codeph">STRING</code>.
+      </p>
+
+      <p class="p">
+        Starting in Impala 1.1, Impala also supports reading and writing to columns that are defined in the Hive
+        <code class="ph codeph">CREATE TABLE</code> statement using binary data types, represented in the Hive table definition
+        using the <code class="ph codeph">#binary</code> keyword, often abbreviated as <code class="ph codeph">#b</code>. Defining numeric
+        columns as binary can reduce the overall data volume in the HBase tables. You should still define the
+        column that corresponds to the HBase row key as a <code class="ph codeph">STRING</code>, to allow fast lookups using
+        those columns.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="impala_hbase__hbase_performance">
+
+    <h2 class="title topictitle2" id="ariaid-title5">Performance Considerations for the Impala-HBase Integration</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        To understand the performance characteristics of SQL queries against data stored in HBase, you should have
+        some background knowledge about how HBase interacts with SQL-oriented systems first. See
+        <a class="xref" href="https://cwiki.apache.org/confluence/display/Hive/HBaseIntegration" target="_blank">the
+        Hive wiki</a> for a starting point; because Impala shares the same metastore database as Hive, the
+        information about mapping columns from Hive tables to HBase tables is generally applicable to Impala too.
+      </p>
+
+      <p class="p">
+        Impala uses the HBase client API via Java Native Interface (JNI) to query data stored in HBase. This
+        querying does not read HFiles directly. The extra communication overhead makes it important to choose what
+        data to store in HBase or in HDFS, and construct efficient queries that can retrieve the HBase data
+        efficiently:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          Use HBase table for queries that return a single row or a range of rows, not queries that scan the entire
+          table. (If a query has no <code class="ph codeph">WHERE</code> clause, that is a strong indicator that it is an
+          inefficient query for an HBase table.)
+        </li>
+
+        <li class="li">
+          If you have join queries that do aggregation operations on large fact tables and join the results against
+          small dimension tables, consider using Impala for the fact tables and HBase for the dimension tables.
+          (Because Impala does a full scan on the HBase table in this case, rather than doing single-row HBase
+          lookups based on the join column, only use this technique where the HBase table is small enough that
+          doing a full table scan does not cause a performance bottleneck for the query.)
+        </li>
+      </ul>
+
+      <p class="p">
+        Query predicates are applied to row keys as start and stop keys, thereby limiting the scope of a particular
+        lookup. If row keys are not mapped to string columns, then ordering is typically incorrect and comparison
+        operations do not work. For example, if row keys are not mapped to string columns, evaluating for greater
+        than (&gt;) or less than (&lt;) cannot be completed.
+      </p>
+
+      <p class="p">
+        Predicates on non-key columns can be sent to HBase to scan as <code class="ph codeph">SingleColumnValueFilters</code>,
+        providing some performance gains. In such a case, HBase returns fewer rows than if those same predicates
+        were applied using Impala. While there is some improvement, it is not as great when start and stop rows are
+        used. This is because the number of rows that HBase must examine is not limited as it is when start and
+        stop rows are used. As long as the row key predicate only applies to a single row, HBase will locate and
+        return that row. Conversely, if a non-key predicate is used, even if it only applies to a single row, HBase
+        must still scan the entire table to find the correct result.
+      </p>
+
+      <div class="example"><h3 class="title sectiontitle">Interpreting EXPLAIN Output for HBase Queries</h3>
+
+
+
+        <p class="p">
+          For example, here are some queries against the following Impala table, which is mapped to an HBase table.
+          The examples show excerpts from the output of the <code class="ph codeph">EXPLAIN</code> statement, demonstrating what
+          things to look for to indicate an efficient or inefficient query against an HBase table.
+        </p>
+
+        <p class="p">
+          The first column (<code class="ph codeph">cust_id</code>) was specified as the key column in the <code class="ph codeph">CREATE
+          EXTERNAL TABLE</code> statement; for performance, it is important to declare this column as
+          <code class="ph codeph">STRING</code>. Other columns, such as <code class="ph codeph">BIRTH_YEAR</code> and
+          <code class="ph codeph">NEVER_LOGGED_ON</code>, are also declared as <code class="ph codeph">STRING</code>, rather than their
+          <span class="q">"natural"</span> types of <code class="ph codeph">INT</code> or <code class="ph codeph">BOOLEAN</code>, because Impala can optimize
+          those types more effectively in HBase tables. For comparison, we leave one column,
+          <code class="ph codeph">YEAR_REGISTERED</code>, as <code class="ph codeph">INT</code> to show that filtering on this column is
+          inefficient.
+        </p>
+
+<pre class="pre codeblock"><code>describe hbase_table;
+Query: describe hbase_table
++-----------------------+--------+---------+
+| name                  | type   | comment |
++-----------------------+--------+---------+
+| cust_id               | <strong class="ph b">string</strong> |         |
+| birth_year            | <strong class="ph b">string</strong> |         |
+| never_logged_on       | <strong class="ph b">string</strong> |         |
+| private_email_address | string |         |
+| year_registered       | <strong class="ph b">int</strong>    |         |
++-----------------------+--------+---------+
+</code></pre>
+
+        <p class="p">
+          The best case for performance involves a single row lookup using an equality comparison on the column
+          defined as the row key:
+        </p>
+
+<pre class="pre codeblock"><code>explain select count(*) from hbase_table where cust_id = 'some_user@example.com';
++------------------------------------------------------------------------------------+
+| Explain String                                                                     |
++------------------------------------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=1.01GB VCores=1                            |
+| WARNING: The following tables are missing relevant table and/or column statistics. |
+| hbase.hbase_table                                                                  |
+|                                                                                    |
+| 03:AGGREGATE [MERGE FINALIZE]                                                      |
+| |  output: sum(count(*))                                                           |
+| |                                                                                  |
+| 02:EXCHANGE [PARTITION=UNPARTITIONED]                                              |
+| |                                                                                  |
+| 01:AGGREGATE                                                                       |
+| |  output: count(*)                                                                |
+| |                                                                                  |
+<strong class="ph b">| 00:SCAN HBASE [hbase.hbase_table]                                                  |</strong>
+<strong class="ph b">|    start key: some_user@example.com                                                |</strong>
+<strong class="ph b">|    stop key: some_user@example.com\0                                               |</strong>
++------------------------------------------------------------------------------------+
+</code></pre>
+
+        <p class="p">
+          Another type of efficient query involves a range lookup on the row key column, using SQL operators such
+          as greater than (or equal), less than (or equal), or <code class="ph codeph">BETWEEN</code>. This example also includes
+          an equality test on a non-key column; because that column is a <code class="ph codeph">STRING</code>, Impala can let
+          HBase perform that test, indicated by the <code class="ph codeph">hbase filters:</code> line in the
+          <code class="ph codeph">EXPLAIN</code> output. Doing the filtering within HBase is more efficient than transmitting all
+          the data to Impala and doing the filtering on the Impala side.
+        </p>
+
+<pre class="pre codeblock"><code>explain select count(*) from hbase_table where cust_id between 'a' and 'b'
+  and never_logged_on = 'true';
++------------------------------------------------------------------------------------+
+| Explain String                                                                     |
++------------------------------------------------------------------------------------+
+...
+
+| 01:AGGREGATE                                                                       |
+| |  output: count(*)                                                                |
+| |                                                                                  |
+<strong class="ph b">| 00:SCAN HBASE [hbase.hbase_table]                                                  |</strong>
+<strong class="ph b">|    start key: a                                                                    |</strong>
+<strong class="ph b">|    stop key: b\0                                                                   |</strong>
+<strong class="ph b">|    hbase filters: cols:never_logged_on EQUAL 'true'                                |</strong>
++------------------------------------------------------------------------------------+
+</code></pre>
+
+        <p class="p">
+          The query is less efficient if Impala has to evaluate any of the predicates, because Impala must scan the
+          entire HBase table. Impala can only push down predicates to HBase for columns declared as
+          <code class="ph codeph">STRING</code>. This example tests a column declared as <code class="ph codeph">INT</code>, and the
+          <code class="ph codeph">predicates:</code> line in the <code class="ph codeph">EXPLAIN</code> output indicates that the test is
+          performed after the data is transmitted to Impala.
+        </p>
+
+<pre class="pre codeblock"><code>explain select count(*) from hbase_table where year_registered = 2010;
++------------------------------------------------------------------------------------+
+| Explain String                                                                     |
++------------------------------------------------------------------------------------+
+...
+
+| 01:AGGREGATE                                                                       |
+| |  output: count(*)                                                                |
+| |                                                                                  |
+<strong class="ph b">| 00:SCAN HBASE [hbase.hbase_table]                                                  |</strong>
+<strong class="ph b">|    predicates: year_registered = 2010                                              |</strong>
++------------------------------------------------------------------------------------+
+</code></pre>
+
+        <p class="p">
+          The same inefficiency applies if the key column is compared to any non-constant value. Here, even though
+          the key column is a <code class="ph codeph">STRING</code>, and is tested using an equality operator, Impala must scan
+          the entire HBase table because the key column is compared to another column value rather than a constant.
+        </p>
+
+<pre class="pre codeblock"><code>explain select count(*) from hbase_table where cust_id = private_email_address;
++------------------------------------------------------------------------------------+
+| Explain String                                                                     |
++------------------------------------------------------------------------------------+
+...
+
+| 01:AGGREGATE                                                                       |
+| |  output: count(*)                                                                |
+| |                                                                                  |
+<strong class="ph b">| 00:SCAN HBASE [hbase.hbase_table]                                                  |</strong>
+<strong class="ph b">|    predicates: cust_id = private_email_address                                    |</strong>
++------------------------------------------------------------------------------------+
+</code></pre>
+
+        <p class="p">
+          Currently, tests on the row key using <code class="ph codeph">OR</code> or <code class="ph codeph">IN</code> clauses are not
+          optimized into direct lookups either. Such limitations might be lifted in the future, so always check the
+          <code class="ph codeph">EXPLAIN</code> output to be sure whether a particular SQL construct results in an efficient
+          query or not for HBase tables.
+        </p>
+
+<pre class="pre codeblock"><code>explain select count(*) from hbase_table where
+  cust_id = 'some_user@example.com' or cust_id = 'other_user@example.com';
++----------------------------------------------------------------------------------------+
+| Explain String                                                                         |
++----------------------------------------------------------------------------------------+
+...
+
+| 01:AGGREGATE                                                                           |
+| |  output: count(*)                                                                    |
+| |                                                                                      |
+<strong class="ph b">| 00:SCAN HBASE [hbase.hbase_table]                                                      |</strong>
+<strong class="ph b">|    predicates: cust_id = 'some_user@example.com' OR cust_id = 'other_user@example.com' |</strong>
++----------------------------------------------------------------------------------------+
+
+explain select count(*) from hbase_table where
+  cust_id in ('some_user@example.com', 'other_user@example.com');
++------------------------------------------------------------------------------------+
+| Explain String                                                                     |
++------------------------------------------------------------------------------------+
+...
+
+| 01:AGGREGATE                                                                       |
+| |  output: count(*)                                                                |
+| |                                                                                  |
+<strong class="ph b">| 00:SCAN HBASE [hbase.hbase_table]                                                  |</strong>
+<strong class="ph b">|    predicates: cust_id IN ('some_user@example.com', 'other_user@example.com')      |</strong>
++------------------------------------------------------------------------------------+
+</code></pre>
+
+        <p class="p">
+          Either rewrite into separate queries for each value and combine the results in the application, or
+          combine the single-row queries using UNION ALL:
+        </p>
+
+<pre class="pre codeblock"><code>select count(*) from hbase_table where cust_id = 'some_user@example.com';
+select count(*) from hbase_table where cust_id = 'other_user@example.com';
+
+explain
+  select count(*) from hbase_table where cust_id = 'some_user@example.com'
+  union all
+  select count(*) from hbase_table where cust_id = 'other_user@example.com';
++------------------------------------------------------------------------------------+
+| Explain String                                                                     |
++------------------------------------------------------------------------------------+
+...
+
+| |  04:AGGREGATE                                                                    |
+| |  |  output: count(*)                                                             |
+| |  |                                                                               |
+<strong class="ph b">| |  03:SCAN HBASE [hbase.hbase_table]                                               |</strong>
+<strong class="ph b">| |     start key: other_user@example.com                                            |</strong>
+<strong class="ph b">| |     stop key: other_user@example.com\0                                           |</strong>
+| |                                                                                  |
+| 10:MERGE                                                                           |
+...
+
+| 02:AGGREGATE                                                                       |
+| |  output: count(*)                                                                |
+| |                                                                                  |
+<strong class="ph b">| 01:SCAN HBASE [hbase.hbase_table]                                                  |</strong>
+<strong class="ph b">|    start key: some_user@example.com                                                |</strong>
+<strong class="ph b">|    stop key: some_user@example.com\0                                               |</strong>
++------------------------------------------------------------------------------------+
+</code></pre>
+
+      </div>
+
+      <div class="example"><h3 class="title sectiontitle">Configuration Options for Java HBase Applications</h3>
+
+
+
+        <p class="p"> If you have an HBase Java application that calls the
+            <code class="ph codeph">setCacheBlocks</code> or <code class="ph codeph">setCaching</code>
+          methods of the class <a class="xref" href="http://hbase.apache.org/apidocs/org/apache/hadoop/hbase/client/Scan.html" target="_blank">org.apache.hadoop.hbase.client.Scan</a>, you can set these same
+          caching behaviors through Impala query options, to control the memory
+          pressure on the HBase RegionServer. For example, when doing queries in
+          HBase that result in full-table scans (which by default are
+          inefficient for HBase), you can reduce memory usage and speed up the
+          queries by turning off the <code class="ph codeph">HBASE_CACHE_BLOCKS</code> setting
+          and specifying a large number for the <code class="ph codeph">HBASE_CACHING</code>
+          setting.
+        </p>
+
+        <p class="p">
+          To set these options, issue commands like the following in <span class="keyword cmdname">impala-shell</span>:
+        </p>
+
+<pre class="pre codeblock"><code>-- Same as calling setCacheBlocks(true) or setCacheBlocks(false).
+set hbase_cache_blocks=true;
+set hbase_cache_blocks=false;
+
+-- Same as calling setCaching(rows).
+set hbase_caching=1000;
+</code></pre>
+
+        <p class="p">
+          Or update the <span class="keyword cmdname">impalad</span> defaults file <span class="ph filepath">/etc/default/impala</span> and
+          include settings for <code class="ph codeph">HBASE_CACHE_BLOCKS</code> and/or <code class="ph codeph">HBASE_CACHING</code> in the
+          <code class="ph codeph">-default_query_options</code> setting for <code class="ph codeph">IMPALA_SERVER_ARGS</code>. See
+          <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for details.
+        </p>
+
+        <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+          In Impala 2.0 and later, these options are settable through the JDBC or ODBC interfaces using the
+          <code class="ph codeph">SET</code> statement.
+        </div>
+
+      </div>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="impala_hbase__hbase_scenarios">
+
+    <h2 class="title topictitle2" id="ariaid-title6">Use Cases for Querying HBase through Impala</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        The following are popular use cases for using Impala to query HBase tables:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          Keeping large fact tables in Impala, and smaller dimension tables in HBase. The fact tables use Parquet
+          or other binary file format optimized for scan operations. Join queries scan through the large Impala
+          fact tables, and cross-reference the dimension tables using efficient single-row lookups in HBase.
+        </li>
+
+        <li class="li">
+          Using HBase to store rapidly incrementing counters, such as how many times a web page has been viewed, or
+          on a social network, how many connections a user has or how many votes a post received. HBase is
+          efficient for capturing such changeable data: the append-only storage mechanism is efficient for writing
+          each change to disk, and a query always returns the latest value. An application could query specific
+          totals like these from HBase, and combine the results with a broader set of data queried from Impala.
+        </li>
+
+        <li class="li">
+          <p class="p">
+            Storing very wide tables in HBase. Wide tables have many columns, possibly thousands, typically
+            recording many attributes for an important subject such as a user of an online service. These tables
+            are also often sparse, that is, most of the columns values are <code class="ph codeph">NULL</code>, 0,
+            <code class="ph codeph">false</code>, empty string, or other blank or placeholder value. (For example, any particular
+            web site user might have never used some site feature, filled in a certain field in their profile,
+            visited a particular part of the site, and so on.) A typical query against this kind of table is to
+            look up a single row to retrieve all the information about a specific subject, rather than summing,
+            averaging, or filtering millions of rows as in typical Impala-managed tables.
+          </p>
+          <p class="p">
+            Or the HBase table could be joined with a larger Impala-managed table. For example, analyze the large
+            Impala table representing web traffic for a site and pick out 50 users who view the most pages. Join
+            that result with the wide user table in HBase to look up attributes of those users. The HBase side of
+            the join would result in 50 efficient single-row lookups in HBase, rather than scanning the entire user
+            table.
+          </p>
+        </li>
+      </ul>
+    </div>
+  </article>
+
+
+
+
+
+
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="impala_hbase__hbase_loading">
+
+    <h2 class="title topictitle2" id="ariaid-title7">Loading Data into an HBase Table</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        The Impala <code class="ph codeph">INSERT</code> statement works for HBase tables. The <code class="ph codeph">INSERT ... VALUES</code>
+        syntax is ideally suited to HBase tables, because inserting a single row is an efficient operation for an
+        HBase table. (For regular Impala tables, with data files in HDFS, the tiny data files produced by
+        <code class="ph codeph">INSERT ... VALUES</code> are extremely inefficient, so you would not use that technique with
+        tables containing any significant data volume.)
+      </p>
+
+
+
+      <p class="p">
+        When you use the <code class="ph codeph">INSERT ... SELECT</code> syntax, the result in the HBase table could be fewer
+        rows than you expect. HBase only stores the most recent version of each unique row key, so if an
+        <code class="ph codeph">INSERT ... SELECT</code> statement copies over multiple rows containing the same value for the
+        key column, subsequent queries will only return one row with each key column value:
+      </p>
+
+      <p class="p">
+        Although Impala does not have an <code class="ph codeph">UPDATE</code> statement, you can achieve the same effect by
+        doing successive <code class="ph codeph">INSERT</code> statements using the same value for the key column each time:
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="impala_hbase__hbase_limitations">
+
+    <h2 class="title topictitle2" id="ariaid-title8">Limitations and Restrictions of the Impala and HBase Integration</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        The Impala integration with HBase has the following limitations and restrictions, some inherited from the
+        integration between HBase and Hive, and some unique to Impala:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            If you issue a <code class="ph codeph">DROP TABLE</code> for an internal (Impala-managed) table that is mapped to an
+            HBase table, the underlying table is not removed in HBase. The Hive <code class="ph codeph">DROP TABLE</code>
+            statement also removes the HBase table in this case.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            The <code class="ph codeph">INSERT OVERWRITE</code> statement is not available for HBase tables. You can insert new
+            data, or modify an existing row by inserting a new row with the same key value, but not replace the
+            entire contents of the table. You can do an <code class="ph codeph">INSERT OVERWRITE</code> in Hive if you need this
+            capability.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            If you issue a <code class="ph codeph">CREATE TABLE LIKE</code> statement for a table mapped to an HBase table, the
+            new table is also an HBase table, but inherits the same underlying HBase table name as the original.
+            The new table is effectively an alias for the old one, not a new table with identical column structure.
+            Avoid using <code class="ph codeph">CREATE TABLE LIKE</code> for HBase tables, to avoid any confusion.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            Copying data into an HBase table using the Impala <code class="ph codeph">INSERT ... SELECT</code> syntax might
+            produce fewer new rows than are in the query result set. If the result set contains multiple rows with
+            the same value for the key column, each row supercedes any previous rows with the same key value.
+            Because the order of the inserted rows is unpredictable, you cannot rely on this technique to preserve
+            the <span class="q">"latest"</span> version of a particular key value.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            Because the complex data types (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, and <code class="ph codeph">MAP</code>)
+            available in <span class="keyword">Impala 2.3</span> and higher are currently only supported in Parquet tables, you cannot
+            use these types in HBase tables that are queried through Impala.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+        The <code class="ph codeph">LOAD DATA</code> statement cannot be used with HBase tables.
+      </p>
+        </li>
+        <li class="li">
+          <p class="p">
+        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code>
+        statement does not apply to a table reference derived from a view, a subquery,
+        or anything other than a real base table. This clause only works for tables
+        backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
+        HBase tables.
+      </p>
+        </li>
+      </ul>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="impala_hbase__hbase_queries">
+
+    <h2 class="title topictitle2" id="ariaid-title9">Examples of Querying HBase Tables from Impala</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        The following examples create an HBase table with four column families,
+        create a corresponding table through Hive,
+        then insert and query the table through Impala.
+      </p>
+      <p class="p">
+        In HBase shell, the table
+        name is quoted in <code class="ph codeph">CREATE</code> and <code class="ph codeph">DROP</code> statements. Tables created in HBase
+        begin in <span class="q">"enabled"</span> state; before dropping them through the HBase shell, you must issue a
+        <code class="ph codeph">disable '<var class="keyword varname">table_name</var>'</code> statement.
+      </p>
+
+<pre class="pre codeblock"><code>$ hbase shell
+15/02/10 16:07:45
+HBase Shell; enter 'help&lt;RETURN&gt;' for list of supported commands.
+Type "exit&lt;RETURN&gt;" to leave the HBase Shell
+...
+
+hbase(main):001:0&gt; create 'hbasealltypessmall', 'boolsCF', 'intsCF', 'floatsCF', 'stringsCF'
+0 row(s) in 4.6520 seconds
+
+=&gt; Hbase::Table - hbasealltypessmall
+hbase(main):006:0&gt; quit
+</code></pre>
+
+        <p class="p">
+          Issue the following <code class="ph codeph">CREATE TABLE</code> statement in the Hive shell. (The Impala <code class="ph codeph">CREATE
+          TABLE</code> statement currently does not support the <code class="ph codeph">STORED BY</code> clause, so you switch into Hive to
+          create the table, then back to Impala and the <span class="keyword cmdname">impala-shell</span> interpreter to issue the
+          queries.)
+        </p>
+
+        <p class="p">
+          This example creates an external table mapped to the HBase table, usable by both Impala and Hive. It is
+          defined as an external table so that when dropped by Impala or Hive, the original HBase table is not touched at all.
+        </p>
+
+        <p class="p">
+          The <code class="ph codeph">WITH SERDEPROPERTIES</code> clause
+          specifies that the first column (<code class="ph codeph">ID</code>) represents the row key, and maps the remaining
+          columns of the SQL table to HBase column families. The mapping relies on the ordinal order of the
+          columns in the table, not the column names in the <code class="ph codeph">CREATE TABLE</code> statement.
+          The first column is defined to be the lookup key; the
+          <code class="ph codeph">STRING</code> data type produces the fastest key-based lookups for HBase tables.
+        </p>
+
+        <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+          For Impala with HBase tables, the most important aspect to ensure good performance is to use a
+          <code class="ph codeph">STRING</code> column as the row key, as shown in this example.
+        </div>
+
+<pre class="pre codeblock"><code>$ hive
+...
+hive&gt; use hbase;
+OK
+Time taken: 4.095 seconds
+hive&gt; CREATE EXTERNAL TABLE hbasestringids (
+    &gt;   id string,
+    &gt;   bool_col boolean,
+    &gt;   tinyint_col tinyint,
+    &gt;   smallint_col smallint,
+    &gt;   int_col int,
+    &gt;   bigint_col bigint,
+    &gt;   float_col float,
+    &gt;   double_col double,
+    &gt;   date_string_col string,
+    &gt;   string_col string,
+    &gt;   timestamp_col timestamp)
+    &gt; STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+    &gt; WITH SERDEPROPERTIES (
+    &gt;   "hbase.columns.mapping" =
+    &gt;   ":key,boolsCF:bool_col,intsCF:tinyint_col,intsCF:smallint_col,intsCF:int_col,intsCF:\
+    &gt;   bigint_col,floatsCF:float_col,floatsCF:double_col,stringsCF:date_string_col,\
+    &gt;   stringsCF:string_col,stringsCF:timestamp_col"
+    &gt; )
+    &gt; TBLPROPERTIES("hbase.table.name" = "hbasealltypessmall");
+OK
+Time taken: 2.879 seconds
+hive&gt; quit;
+</code></pre>
+
+        <p class="p">
+          Once you have established the mapping to an HBase table, you can issue DML statements and queries
+          from Impala. The following example shows a series of <code class="ph codeph">INSERT</code>
+          statements followed by a query.
+          The ideal kind of query from a performance standpoint
+          retrieves a row from the table based on a row key
+          mapped to a string column.
+          An initial <code class="ph codeph">INVALIDATE METADATA <var class="keyword varname">table_name</var></code>
+          statement makes the table created through Hive visible to Impala.
+        </p>
+
+<pre class="pre codeblock"><code>$ impala-shell -i localhost -d hbase
+Starting Impala Shell without Kerberos authentication
+Connected to localhost:21000
+...
+Query: use `hbase`
+[localhost:21000] &gt; invalidate metadata hbasestringids;
+Fetched 0 row(s) in 0.09s
+[localhost:21000] &gt; desc hbasestringids;
++-----------------+-----------+---------+
+| name            | type      | comment |
++-----------------+-----------+---------+
+| id              | string    |         |
+| bool_col        | boolean   |         |
+| double_col      | double    |         |
+| float_col       | float     |         |
+| bigint_col      | bigint    |         |
+| int_col         | int       |         |
+| smallint_col    | smallint  |         |
+| tinyint_col     | tinyint   |         |
+| date_string_col | string    |         |
+| string_col      | string    |         |
+| timestamp_col   | timestamp |         |
++-----------------+-----------+---------+
+Fetched 11 row(s) in 0.02s
+[localhost:21000] &gt; insert into hbasestringids values ('0001',true,3.141,9.94,1234567,32768,4000,76,'2014-12-31','Hello world',now());
+Inserted 1 row(s) in 0.26s
+[localhost:21000] &gt; insert into hbasestringids values ('0002',false,2.004,6.196,1500,8000,129,127,'2014-01-01','Foo bar',now());
+Inserted 1 row(s) in 0.12s
+[localhost:21000] &gt; select * from hbasestringids where id = '0001';
++------+----------+------------+-------------------+------------+---------+--------------+-------------+-----------------+-------------+-------------------------------+
+| id   | bool_col | double_col | float_col         | bigint_col | int_col | smallint_col | tinyint_col | date_string_col | string_col  | timestamp_col                 |
++------+----------+------------+-------------------+------------+---------+--------------+-------------+-----------------+-------------+-------------------------------+
+| 0001 | true     | 3.141      | 9.939999580383301 | 1234567    | 32768   | 4000         | 76          | 2014-12-31      | Hello world | 2015-02-10 16:36:59.764838000 |
++------+----------+------------+-------------------+------------+---------+--------------+-------------+-----------------+-------------+-------------------------------+
+Fetched 1 row(s) in 0.54s
+</code></pre>
+
+        <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+        After you create a table in Hive, such as the HBase mapping table in this example, issue an
+        <code class="ph codeph">INVALIDATE METADATA <var class="keyword varname">table_name</var></code> statement the next time you connect to
+        Impala, make Impala aware of the new table. (Prior to Impala 1.2.4, you could not specify the table name if
+        Impala was not aware of the table yet; in Impala 1.2.4 and higher, specifying the table name avoids
+        reloading the metadata for other tables that are not changed.)
+      </div>
+    </div>
+  </article>
+</article></main></body></html>

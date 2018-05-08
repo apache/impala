@@ -1,0 +1,775 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="s3"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using Impala with the Amazon S3 Filesystem</title></head><body id="s3"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Using Impala with the Amazon S3 Filesystem</h1>
+
+
+
+  <div class="body conbody">
+
+    <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+        <p class="p">
+          In <span class="keyword">Impala 2.6</span> and higher, Impala supports both queries (<code class="ph codeph">SELECT</code>)
+          and DML (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, <code class="ph codeph">CREATE TABLE AS SELECT</code>)
+          for data residing on Amazon S3. With the inclusion of write support,
+
+          the Impala support for S3 is now considered ready for production use.
+        </p>
+      </div>
+
+    <p class="p">
+
+
+
+      You can use Impala to query data residing on the Amazon S3 filesystem. This capability allows convenient
+      access to a storage system that is remotely managed, accessible from anywhere, and integrated with various
+      cloud-based services. Impala can query files in any supported file format from S3. The S3 storage location
+      can be for an entire table, or individual partitions in a partitioned table.
+    </p>
+
+    <p class="p">
+      The default Impala tables use data files stored on HDFS, which are ideal for bulk loads and queries using
+      full-table scans. In contrast, queries against S3 data are less performant, making S3 suitable for holding
+      <span class="q">"cold"</span> data that is only queried occasionally, while more frequently accessed <span class="q">"hot"</span> data resides in
+      HDFS. In a partitioned table, you can set the <code class="ph codeph">LOCATION</code> attribute for individual partitions
+      to put some partitions on HDFS and others on S3, typically depending on the age of the data.
+    </p>
+
+    <p class="p toc inpage"></p>
+
+  </div>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="s3__s3_sql">
+    <h2 class="title topictitle2" id="ariaid-title2">How Impala SQL Statements Work with S3</h2>
+    <div class="body conbody">
+      <p class="p">
+        Impala SQL statements work with data on S3 as follows:
+      </p>
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            The <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>
+            or <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a> statements
+            can specify that a table resides on the S3 filesystem by
+            encoding an <code class="ph codeph">s3a://</code> prefix for the <code class="ph codeph">LOCATION</code>
+            property. <code class="ph codeph">ALTER TABLE</code> can also set the <code class="ph codeph">LOCATION</code>
+            property for an individual partition, so that some data in a table resides on
+            S3 and other data in the same table resides on HDFS.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            Once a table or partition is designated as residing on S3, the <a class="xref" href="impala_select.html#select">SELECT Statement</a>
+            statement transparently accesses the data files from the appropriate storage layer.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            If the S3 table is an internal table, the <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a> statement
+            removes the corresponding data files from S3 when the table is dropped.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            The <a class="xref" href="impala_truncate_table.html#truncate_table">TRUNCATE TABLE Statement (Impala 2.3 or higher only)</a> statement always removes the corresponding
+            data files from S3 when the table is truncated.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            The <a class="xref" href="impala_load_data.html#load_data">LOAD DATA Statement</a> can move data files residing in HDFS into
+            an S3 table.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            The <a class="xref" href="impala_insert.html#insert">INSERT Statement</a> statement, or the <code class="ph codeph">CREATE TABLE AS SELECT</code>
+            form of the <code class="ph codeph">CREATE TABLE</code> statement, can copy data from an HDFS table or another S3
+            table into an S3 table. The <a class="xref" href="impala_s3_skip_insert_staging.html#s3_skip_insert_staging">S3_SKIP_INSERT_STAGING Query Option (Impala 2.6 or higher only)</a>
+            query option chooses whether or not to use a fast code path for these write operations to S3,
+            with the tradeoff of potential inconsistency in the case of a failure during the statement.
+          </p>
+        </li>
+      </ul>
+      <p class="p">
+        For usage information about Impala SQL statements with S3 tables, see <a class="xref" href="impala_s3.html#s3_ddl">Creating Impala Databases, Tables, and Partitions for Data Stored on S3</a>
+        and <a class="xref" href="impala_s3.html#s3_dml">Using Impala DML Statements for S3 Data</a>.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="s3__s3_creds">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Specifying Impala Credentials to Access Data in S3</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+
+
+
+
+        To allow Impala to access data in S3, specify values for the following configuration settings in your
+        <span class="ph filepath">core-site.xml</span> file:
+      </p>
+
+
+<pre class="pre codeblock"><code>
+&lt;property&gt;
+&lt;name&gt;fs.s3a.access.key&lt;/name&gt;
+&lt;value&gt;<var class="keyword varname">your_access_key</var>&lt;/value&gt;
+&lt;/property&gt;
+&lt;property&gt;
+&lt;name&gt;fs.s3a.secret.key&lt;/name&gt;
+&lt;value&gt;<var class="keyword varname">your_secret_key</var>&lt;/value&gt;
+&lt;/property&gt;
+</code></pre>
+
+      <p class="p">
+        After specifying the credentials, restart both the Impala and
+        Hive services. (Restarting Hive is required because Impala queries, CREATE TABLE statements, and so on go
+        through the Hive metastore.)
+      </p>
+
+      <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+
+          <p class="p">
+            Although you can specify the access key ID and secret key as part of the <code class="ph codeph">s3a://</code> URL in the
+            <code class="ph codeph">LOCATION</code> attribute, doing so makes this sensitive information visible in many places, such
+            as <code class="ph codeph">DESCRIBE FORMATTED</code> output and Impala log files. Therefore, specify this information
+            centrally in the <span class="ph filepath">core-site.xml</span> file, and restrict read access to that file to only
+            trusted users.
+          </p>
+
+
+
+      </div>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="s3__s3_etl">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Loading Data into S3 for Impala Queries</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        If your ETL pipeline involves moving data into S3 and then querying through Impala,
+        you can either use Impala DML statements to create, move, or copy the data, or
+        use the same data loading techniques as you would for non-Impala data.
+      </p>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title5" id="s3_etl__s3_dml">
+      <h3 class="title topictitle3" id="ariaid-title5">Using Impala DML Statements for S3 Data</h3>
+      <div class="body conbody">
+        <p class="p">
+        In <span class="keyword">Impala 2.6</span> and higher, the Impala DML statements (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>,
+        and <code class="ph codeph">CREATE TABLE AS SELECT</code>) can write data into a table or partition that resides in the
+        Amazon Simple Storage Service (S3).
+        The syntax of the DML statements is the same as for any other tables, because the S3 location for tables and
+        partitions is specified by an <code class="ph codeph">s3a://</code> prefix in the
+        <code class="ph codeph">LOCATION</code> attribute of
+        <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statements.
+        If you bring data into S3 using the normal S3 transfer mechanisms instead of Impala DML statements,
+        issue a <code class="ph codeph">REFRESH</code> statement for the table before using Impala to query the S3 data.
+      </p>
+        <p class="p">
+        Because of differences between S3 and traditional filesystems, DML operations
+        for S3 tables can take longer than for tables on HDFS. For example, both the
+        <code class="ph codeph">LOAD DATA</code> statement and the final stage of the <code class="ph codeph">INSERT</code>
+        and <code class="ph codeph">CREATE TABLE AS SELECT</code> statements involve moving files from one directory
+        to another. (In the case of <code class="ph codeph">INSERT</code> and <code class="ph codeph">CREATE TABLE AS SELECT</code>,
+        the files are moved from a temporary staging directory to the final destination directory.)
+        Because S3 does not support a <span class="q">"rename"</span> operation for existing objects, in these cases Impala
+        actually copies the data files from one location to another and then removes the original files.
+        In <span class="keyword">Impala 2.6</span>, the <code class="ph codeph">S3_SKIP_INSERT_STAGING</code> query option provides a way
+        to speed up <code class="ph codeph">INSERT</code> statements for S3 tables and partitions, with the tradeoff
+        that a problem during statement execution could leave data in an inconsistent state.
+        It does not apply to <code class="ph codeph">INSERT OVERWRITE</code> or <code class="ph codeph">LOAD DATA</code> statements.
+        See <a class="xref" href="../shared/../topics/impala_s3_skip_insert_staging.html#s3_skip_insert_staging">S3_SKIP_INSERT_STAGING Query Option (Impala 2.6 or higher only)</a> for details.
+      </p>
+      </div>
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title6" id="s3_etl__s3_manual_etl">
+      <h3 class="title topictitle3" id="ariaid-title6">Manually Loading Data into Impala Tables on S3</h3>
+      <div class="body conbody">
+        <p class="p">
+          As an alternative, or on earlier Impala releases without DML support for S3,
+          you can use the Amazon-provided methods to bring data files into S3 for querying through Impala. See
+          <a class="xref" href="http://aws.amazon.com/s3/" target="_blank">the Amazon S3 web site</a> for
+          details.
+        </p>
+
+        <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+          <div class="p">
+        For best compatibility with the S3 write support in <span class="keyword">Impala 2.6</span>
+        and higher:
+        <ul class="ul">
+        <li class="li">Use native Hadoop techniques to create data files in S3 for querying through Impala.</li>
+        <li class="li">Use the <code class="ph codeph">PURGE</code> clause of <code class="ph codeph">DROP TABLE</code> when dropping internal (managed) tables.</li>
+        </ul>
+        By default, when you drop an internal (managed) table, the data files are
+        moved to the HDFS trashcan. This operation is expensive for tables that
+        reside on the Amazon S3 filesystem. Therefore, for S3 tables, prefer to use
+        <code class="ph codeph">DROP TABLE <var class="keyword varname">table_name</var> PURGE</code> rather than the default <code class="ph codeph">DROP TABLE</code> statement.
+        The <code class="ph codeph">PURGE</code> clause makes Impala delete the data files immediately,
+        skipping the HDFS trashcan.
+        For the <code class="ph codeph">PURGE</code> clause to work effectively, you must originally create the
+        data files on S3 using one of the tools from the Hadoop ecosystem, such as
+        <code class="ph codeph">hadoop fs -cp</code>, or <code class="ph codeph">INSERT</code> in Impala or Hive.
+      </div>
+        </div>
+
+        <p class="p">
+          Alternative file creation techniques (less compatible with the <code class="ph codeph">PURGE</code> clause) include:
+        </p>
+
+        <ul class="ul">
+          <li class="li">
+            The <a class="xref" href="https://console.aws.amazon.com/s3/home" target="_blank">Amazon AWS / S3
+            web interface</a> to upload from a web browser.
+          </li>
+
+          <li class="li">
+            The <a class="xref" href="http://aws.amazon.com/cli/" target="_blank">Amazon AWS CLI</a> to
+            manipulate files from the command line.
+          </li>
+
+          <li class="li">
+            Other S3-enabled software, such as
+            <a class="xref" href="http://s3tools.org/s3cmd" target="_blank">the S3Tools client software</a>.
+          </li>
+        </ul>
+
+        <p class="p">
+          After you upload data files to a location already mapped to an Impala table or partition, or if you delete
+          files in S3 from such a location, issue the <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code>
+          statement to make Impala aware of the new set of data files.
+        </p>
+
+      </div>
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="s3__s3_ddl">
+
+    <h2 class="title topictitle2" id="ariaid-title7">Creating Impala Databases, Tables, and Partitions for Data Stored on S3</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        Impala reads data for a table or partition from S3 based on the <code class="ph codeph">LOCATION</code> attribute for the
+        table or partition. Specify the S3 details in the <code class="ph codeph">LOCATION</code> clause of a <code class="ph codeph">CREATE
+        TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statement. The notation for the <code class="ph codeph">LOCATION</code>
+        clause is <code class="ph codeph">s3a://<var class="keyword varname">bucket_name</var>/<var class="keyword varname">path/to/file</var></code>. The
+        filesystem prefix is always <code class="ph codeph">s3a://</code> because Impala does not support the <code class="ph codeph">s3://</code> or
+        <code class="ph codeph">s3n://</code> prefixes.
+      </p>
+
+      <p class="p">
+        For a partitioned table, either specify a separate <code class="ph codeph">LOCATION</code> clause for each new partition,
+        or specify a base <code class="ph codeph">LOCATION</code> for the table and set up a directory structure in S3 to mirror
+        the way Impala partitioned tables are structured in HDFS. Although, strictly speaking, S3 filenames do not
+        have directory paths, Impala treats S3 filenames with <code class="ph codeph">/</code> characters the same as HDFS
+        pathnames that include directories.
+      </p>
+
+      <p class="p">
+        You point a nonpartitioned table or an individual partition at S3 by specifying a single directory
+        path in S3, which could be any arbitrary directory. To replicate the structure of an entire Impala
+        partitioned table or database in S3 requires more care, with directories and subdirectories nested and
+        named to match the equivalent directory tree in HDFS. Consider setting up an empty staging area if
+        necessary in HDFS, and recording the complete directory structure so that you can replicate it in S3.
+
+      </p>
+
+      <p class="p">
+        For convenience when working with multiple tables with data files stored in S3, you can create a database
+        with a <code class="ph codeph">LOCATION</code> attribute pointing to an S3 path.
+        Specify a URL of the form <code class="ph codeph">s3a://<var class="keyword varname">bucket</var>/<var class="keyword varname">root/path/for/database</var></code>
+        for the <code class="ph codeph">LOCATION</code> attribute of the database.
+        Any tables created inside that database
+        automatically create directories underneath the one specified by the database
+        <code class="ph codeph">LOCATION</code> attribute.
+      </p>
+
+      <p class="p">
+        For example, the following session creates a partitioned table where only a single partition resides on S3.
+        The partitions for years 2013 and 2014 are located on HDFS. The partition for year 2015 includes a
+        <code class="ph codeph">LOCATION</code> attribute with an <code class="ph codeph">s3a://</code> URL, and so refers to data residing on
+        S3, under a specific path underneath the bucket <code class="ph codeph">impala-demo</code>.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create database db_on_hdfs;
+[localhost:21000] &gt; use db_on_hdfs;
+[localhost:21000] &gt; create table mostly_on_hdfs (x int) partitioned by (year int);
+[localhost:21000] &gt; alter table mostly_on_hdfs add partition (year=2013);
+[localhost:21000] &gt; alter table mostly_on_hdfs add partition (year=2014);
+[localhost:21000] &gt; alter table mostly_on_hdfs add partition (year=2015)
+                  &gt;   location 's3a://impala-demo/dir1/dir2/dir3/t1';
+</code></pre>
+
+      <p class="p">
+        The following session creates a database and two partitioned tables residing entirely on S3, one
+        partitioned by a single column and the other partitioned by multiple columns. Because a
+        <code class="ph codeph">LOCATION</code> attribute with an <code class="ph codeph">s3a://</code> URL is specified for the database, the
+        tables inside that database are automatically created on S3 underneath the database directory. To see the
+        names of the associated subdirectories, including the partition key values, we use an S3 client tool to
+        examine how the directory structure is organized on S3. For example, Impala partition directories such as
+        <code class="ph codeph">month=1</code> do not include leading zeroes, which sometimes appear in partition directories created
+        through Hive.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create database db_on_s3 location 's3a://impala-demo/dir1/dir2/dir3';
+[localhost:21000] &gt; use db_on_s3;
+
+[localhost:21000] &gt; create table partitioned_on_s3 (x int) partitioned by (year int);
+[localhost:21000] &gt; alter table partitioned_on_s3 add partition (year=2013);
+[localhost:21000] &gt; alter table partitioned_on_s3 add partition (year=2014);
+[localhost:21000] &gt; alter table partitioned_on_s3 add partition (year=2015);
+
+[localhost:21000] &gt; !aws s3 ls s3://impala-demo/dir1/dir2/dir3 --recursive;
+2015-03-17 13:56:34          0 dir1/dir2/dir3/
+2015-03-17 16:43:28          0 dir1/dir2/dir3/partitioned_on_s3/
+2015-03-17 16:43:49          0 dir1/dir2/dir3/partitioned_on_s3/year=2013/
+2015-03-17 16:43:53          0 dir1/dir2/dir3/partitioned_on_s3/year=2014/
+2015-03-17 16:43:58          0 dir1/dir2/dir3/partitioned_on_s3/year=2015/
+
+[localhost:21000] &gt; create table partitioned_multiple_keys (x int)
+                  &gt;   partitioned by (year smallint, month tinyint, day tinyint);
+[localhost:21000] &gt; alter table partitioned_multiple_keys
+                  &gt;   add partition (year=2015,month=1,day=1);
+[localhost:21000] &gt; alter table partitioned_multiple_keys
+                  &gt;   add partition (year=2015,month=1,day=31);
+[localhost:21000] &gt; alter table partitioned_multiple_keys
+                  &gt;   add partition (year=2015,month=2,day=28);
+
+[localhost:21000] &gt; !aws s3 ls s3://impala-demo/dir1/dir2/dir3 --recursive;
+2015-03-17 13:56:34          0 dir1/dir2/dir3/
+2015-03-17 16:47:13          0 dir1/dir2/dir3/partitioned_multiple_keys/
+2015-03-17 16:47:44          0 dir1/dir2/dir3/partitioned_multiple_keys/year=2015/month=1/day=1/
+2015-03-17 16:47:50          0 dir1/dir2/dir3/partitioned_multiple_keys/year=2015/month=1/day=31/
+2015-03-17 16:47:57          0 dir1/dir2/dir3/partitioned_multiple_keys/year=2015/month=2/day=28/
+2015-03-17 16:43:28          0 dir1/dir2/dir3/partitioned_on_s3/
+2015-03-17 16:43:49          0 dir1/dir2/dir3/partitioned_on_s3/year=2013/
+2015-03-17 16:43:53          0 dir1/dir2/dir3/partitioned_on_s3/year=2014/
+2015-03-17 16:43:58          0 dir1/dir2/dir3/partitioned_on_s3/year=2015/
+</code></pre>
+
+      <p class="p">
+        The <code class="ph codeph">CREATE DATABASE</code> and <code class="ph codeph">CREATE TABLE</code> statements create the associated
+        directory paths if they do not already exist. You can specify multiple levels of directories, and the
+        <code class="ph codeph">CREATE</code> statement creates all appropriate levels, similar to using <code class="ph codeph">mkdir
+        -p</code>.
+      </p>
+
+      <p class="p">
+        Use the standard S3 file upload methods to actually put the data files into the right locations. You can
+        also put the directory paths and data files in place before creating the associated Impala databases or
+        tables, and Impala automatically uses the data from the appropriate location after the associated databases
+        and tables are created.
+      </p>
+
+      <p class="p">
+        You can switch whether an existing table or partition points to data in HDFS or S3. For example, if you
+        have an Impala table or partition pointing to data files in HDFS or S3, and you later transfer those data
+        files to the other filesystem, use an <code class="ph codeph">ALTER TABLE</code> statement to adjust the
+        <code class="ph codeph">LOCATION</code> attribute of the corresponding table or partition to reflect that change. Because
+        Impala does not have an <code class="ph codeph">ALTER DATABASE</code> statement, this location-switching technique is not
+        practical for entire databases that have a custom <code class="ph codeph">LOCATION</code> attribute.
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title8" id="s3__s3_internal_external">
+
+    <h2 class="title topictitle2" id="ariaid-title8">Internal and External Tables Located on S3</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Just as with tables located on HDFS storage, you can designate S3-based tables as either internal (managed
+        by Impala) or external, by using the syntax <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">CREATE EXTERNAL
+        TABLE</code> respectively. When you drop an internal table, the files associated with the table are
+        removed, even if they are on S3 storage. When you drop an external table, the files associated with the
+        table are left alone, and are still available for access by other tools or components. See
+        <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a> for details.
+      </p>
+
+      <p class="p">
+        If the data on S3 is intended to be long-lived and accessed by other tools in addition to Impala, create
+        any associated S3 tables with the <code class="ph codeph">CREATE EXTERNAL TABLE</code> syntax, so that the files are not
+        deleted from S3 when the table is dropped.
+      </p>
+
+      <p class="p">
+        If the data on S3 is only needed for querying by Impala and can be safely discarded once the Impala
+        workflow is complete, create the associated S3 tables using the <code class="ph codeph">CREATE TABLE</code> syntax, so
+        that dropping the table also deletes the corresponding data files on S3.
+      </p>
+
+      <p class="p">
+        For example, this session creates a table in S3 with the same column layout as a table in HDFS, then
+        examines the S3 table and queries some data from it. The table in S3 works the same as a table in HDFS as
+        far as the expected file format of the data, table and column statistics, and other table properties. The
+        only indication that it is not an HDFS table is the <code class="ph codeph">s3a://</code> URL in the
+        <code class="ph codeph">LOCATION</code> property. Many data files can reside in the S3 directory, and their combined
+        contents form the table data. Because the data in this example is uploaded after the table is created, a
+        <code class="ph codeph">REFRESH</code> statement prompts Impala to update its cached information about the data files.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table usa_cities_s3 like usa_cities location 's3a://impala-demo/usa_cities';
+[localhost:21000] &gt; desc usa_cities_s3;
++-------+----------+---------+
+| name  | type     | comment |
++-------+----------+---------+
+| id    | smallint |         |
+| city  | string   |         |
+| state | string   |         |
++-------+----------+---------+
+
+-- Now from a web browser, upload the same data file(s) to S3 as in the HDFS table,
+-- under the relevant bucket and path. If you already have the data in S3, you would
+-- point the table LOCATION at an existing path.
+
+[localhost:21000] &gt; refresh usa_cities_s3;
+[localhost:21000] &gt; select count(*) from usa_cities_s3;
++----------+
+| count(*) |
++----------+
+| 289      |
++----------+
+[localhost:21000] &gt; select distinct state from sample_data_s3 limit 5;
++----------------------+
+| state                |
++----------------------+
+| Louisiana            |
+| Minnesota            |
+| Georgia              |
+| Alaska               |
+| Ohio                 |
++----------------------+
+[localhost:21000] &gt; desc formatted usa_cities_s3;
++------------------------------+------------------------------+---------+
+| name                         | type                         | comment |
++------------------------------+------------------------------+---------+
+| # col_name                   | data_type                    | comment |
+|                              | NULL                         | NULL    |
+| id                           | smallint                     | NULL    |
+| city                         | string                       | NULL    |
+| state                        | string                       | NULL    |
+|                              | NULL                         | NULL    |
+| # Detailed Table Information | NULL                         | NULL    |
+| Database:                    | s3_testing                   | NULL    |
+| Owner:                       | jrussell                     | NULL    |
+| CreateTime:                  | Mon Mar 16 11:36:25 PDT 2015 | NULL    |
+| LastAccessTime:              | UNKNOWN                      | NULL    |
+| Protect Mode:                | None                         | NULL    |
+| Retention:                   | 0                            | NULL    |
+| Location:                    | s3a://impala-demo/usa_cities | NULL    |
+| Table Type:                  | MANAGED_TABLE                | NULL    |
+...
++------------------------------+------------------------------+---------+
+</code></pre>
+
+
+
+      <p class="p">
+        In this case, we have already uploaded a Parquet file with a million rows of data to the
+        <code class="ph codeph">sample_data</code> directory underneath the <code class="ph codeph">impala-demo</code> bucket on S3. This
+        session creates a table with matching column settings pointing to the corresponding location in S3, then
+        queries the table. Because the data is already in place on S3 when the table is created, no
+        <code class="ph codeph">REFRESH</code> statement is required.
+      </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; create table sample_data_s3
+                  &gt; (id int, id bigint, val int, zerofill string,
+                  &gt; name string, assertion boolean, city string, state string)
+                  &gt; stored as parquet location 's3a://impala-demo/sample_data';
+[localhost:21000] &gt; select count(*) from sample_data_s3;;
++----------+
+| count(*) |
++----------+
+| 1000000  |
++----------+
+[localhost:21000] &gt; select count(*) howmany, assertion from sample_data_s3 group by assertion;
++---------+-----------+
+| howmany | assertion |
++---------+-----------+
+| 667149  | true      |
+| 332851  | false     |
++---------+-----------+
+</code></pre>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="s3__s3_queries">
+
+    <h2 class="title topictitle2" id="ariaid-title9">Running and Tuning Impala Queries for Data Stored on S3</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Once the appropriate <code class="ph codeph">LOCATION</code> attributes are set up at the table or partition level, you
+        query data stored in S3 exactly the same as data stored on HDFS or in HBase:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          Queries against S3 data support all the same file formats as for HDFS data.
+        </li>
+
+        <li class="li">
+          Tables can be unpartitioned or partitioned. For partitioned tables, either manually construct paths in S3
+          corresponding to the HDFS directories representing partition key values, or use <code class="ph codeph">ALTER TABLE ...
+          ADD PARTITION</code> to set up the appropriate paths in S3.
+        </li>
+
+        <li class="li">
+          HDFS and HBase tables can be joined to S3 tables, or S3 tables can be joined with each other.
+        </li>
+
+        <li class="li">
+          Authorization using the Sentry framework to control access to databases, tables, or columns works the
+          same whether the data is in HDFS or in S3.
+        </li>
+
+        <li class="li">
+          The <span class="keyword cmdname">catalogd</span> daemon caches metadata for both HDFS and S3 tables. Use
+          <code class="ph codeph">REFRESH</code> and <code class="ph codeph">INVALIDATE METADATA</code> for S3 tables in the same situations
+          where you would issue those statements for HDFS tables.
+        </li>
+
+        <li class="li">
+          Queries against S3 tables are subject to the same kinds of admission control and resource management as
+          HDFS tables.
+        </li>
+
+        <li class="li">
+          Metadata about S3 tables is stored in the same metastore database as for HDFS tables.
+        </li>
+
+        <li class="li">
+          You can set up views referring to S3 tables, the same as for HDFS tables.
+        </li>
+
+        <li class="li">
+          The <code class="ph codeph">COMPUTE STATS</code>, <code class="ph codeph">SHOW TABLE STATS</code>, and <code class="ph codeph">SHOW COLUMN
+          STATS</code> statements work for S3 tables also.
+        </li>
+      </ul>
+
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title10" id="s3_queries__s3_performance">
+
+      <h3 class="title topictitle3" id="ariaid-title10">Understanding and Tuning Impala Query Performance for S3 Data</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          Although Impala queries for data stored in S3 might be less performant than queries against the
+          equivalent data stored in HDFS, you can still do some tuning. Here are techniques you can use to
+          interpret explain plans and profiles for queries against S3 data, and tips to achieve the best
+          performance possible for such queries.
+        </p>
+
+        <p class="p">
+          All else being equal, performance is expected to be lower for queries running against data on S3 rather
+          than HDFS. The actual mechanics of the <code class="ph codeph">SELECT</code> statement are somewhat different when the
+          data is in S3. Although the work is still distributed across the datanodes of the cluster, Impala might
+          parallelize the work for a distributed query differently for data on HDFS and S3. S3 does not have the
+          same block notion as HDFS, so Impala uses heuristics to determine how to split up large S3 files for
+          processing in parallel. Because all hosts can access any S3 data file with equal efficiency, the
+          distribution of work might be different than for HDFS data, where the data blocks are physically read
+          using short-circuit local reads by hosts that contain the appropriate block replicas. Although the I/O to
+          read the S3 data might be spread evenly across the hosts of the cluster, the fact that all data is
+          initially retrieved across the network means that the overall query performance is likely to be lower for
+          S3 data than for HDFS data.
+        </p>
+
+        <p class="p">
+        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files stored in Amazon S3.
+        For Impala tables that use the file formats Parquet, RCFile, SequenceFile,
+        Avro, and uncompressed text, the setting <code class="ph codeph">fs.s3a.block.size</code>
+        in the <span class="ph filepath">core-site.xml</span> configuration file determines
+        how Impala divides the I/O work of reading the data files. This configuration
+        setting is specified in bytes. By default, this
+        value is 33554432 (32 MB), meaning that Impala parallelizes S3 read operations on the files
+        as if they were made up of 32 MB blocks. For example, if your S3 queries primarily access
+        Parquet files written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code>
+        to 134217728 (128 MB) to match the row group size of those files. If most S3 queries involve
+        Parquet files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code>
+        to 268435456 (256 MB) to match the row group size produced by Impala.
+      </p>
+
+        <p class="p">
+        Because of differences between S3 and traditional filesystems, DML operations
+        for S3 tables can take longer than for tables on HDFS. For example, both the
+        <code class="ph codeph">LOAD DATA</code> statement and the final stage of the <code class="ph codeph">INSERT</code>
+        and <code class="ph codeph">CREATE TABLE AS SELECT</code> statements involve moving files from one directory
+        to another. (In the case of <code class="ph codeph">INSERT</code> and <code class="ph codeph">CREATE TABLE AS SELECT</code>,
+        the files are moved from a temporary staging directory to the final destination directory.)
+        Because S3 does not support a <span class="q">"rename"</span> operation for existing objects, in these cases Impala
+        actually copies the data files from one location to another and then removes the original files.
+        In <span class="keyword">Impala 2.6</span>, the <code class="ph codeph">S3_SKIP_INSERT_STAGING</code> query option provides a way
+        to speed up <code class="ph codeph">INSERT</code> statements for S3 tables and partitions, with the tradeoff
+        that a problem during statement execution could leave data in an inconsistent state.
+        It does not apply to <code class="ph codeph">INSERT OVERWRITE</code> or <code class="ph codeph">LOAD DATA</code> statements.
+        See <a class="xref" href="../shared/../topics/impala_s3_skip_insert_staging.html#s3_skip_insert_staging">S3_SKIP_INSERT_STAGING Query Option (Impala 2.6 or higher only)</a> for details.
+      </p>
+
+        <p class="p">
+          When optimizing aspects of for complex queries such as the join order, Impala treats tables on HDFS and
+          S3 the same way. Therefore, follow all the same tuning recommendations for S3 tables as for HDFS ones,
+          such as using the <code class="ph codeph">COMPUTE STATS</code> statement to help Impala construct accurate estimates of
+          row counts and cardinality. See <a class="xref" href="impala_performance.html#performance">Tuning Impala for Performance</a> for details.
+        </p>
+
+        <p class="p">
+          In query profile reports, the numbers for <code class="ph codeph">BytesReadLocal</code>,
+          <code class="ph codeph">BytesReadShortCircuit</code>, <code class="ph codeph">BytesReadDataNodeCached</code>, and
+          <code class="ph codeph">BytesReadRemoteUnexpected</code> are blank because those metrics come from HDFS.
+          If you do see any indications that a query against an S3 table performed <span class="q">"remote read"</span>
+          operations, do not be alarmed. That is expected because, by definition, all the I/O for S3 tables involves
+          remote reads.
+        </p>
+
+      </div>
+
+    </article>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="s3__s3_restrictions">
+
+    <h2 class="title topictitle2" id="ariaid-title11">Restrictions on Impala Support for S3</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Impala requires that the default filesystem for the cluster be HDFS. You cannot use S3 as the only
+        filesystem in the cluster.
+      </p>
+
+      <p class="p">
+        Prior to <span class="keyword">Impala 2.6</span> Impala could not perform DML operations (<code class="ph codeph">INSERT</code>,
+        <code class="ph codeph">LOAD DATA</code>, or <code class="ph codeph">CREATE TABLE AS SELECT</code>) where the destination is a table
+        or partition located on an S3 filesystem. This restriction is lifted in <span class="keyword">Impala 2.6</span> and higher.
+      </p>
+
+      <p class="p">
+        Impala does not support the old <code class="ph codeph">s3://</code> block-based and <code class="ph codeph">s3n://</code> filesystem
+        schemes, only <code class="ph codeph">s3a://</code>.
+      </p>
+
+      <p class="p">
+        Although S3 is often used to store JSON-formatted data, the current Impala support for S3 does not include
+        directly querying JSON data. For Impala queries, use data files in one of the file formats listed in
+        <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a>. If you have data in JSON format, you can prepare a
+        flattened version of that data for querying by Impala as part of your ETL cycle.
+      </p>
+
+      <p class="p">
+        You cannot use the <code class="ph codeph">ALTER TABLE ... SET CACHED</code> statement for tables or partitions that are
+        located in S3.
+      </p>
+
+    </div>
+
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title12" id="s3__s3_best_practices">
+    <h2 class="title topictitle2" id="ariaid-title12">Best Practices for Using Impala with S3</h2>
+
+    <div class="body conbody">
+      <p class="p">
+        The following guidelines represent best practices derived from testing and field experience with Impala on S3:
+      </p>
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            Any reference to an S3 location must be fully qualified. (This rule applies when
+            S3 is not designated as the default filesystem.)
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            Set the safety valve <code class="ph codeph">fs.s3a.connection.maximum</code> to 1500 for <span class="keyword cmdname">impalad</span>.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            Set safety valve <code class="ph codeph">fs.s3a.block.size</code> to 134217728
+            (128 MB in bytes) if most Parquet files queried by Impala were written by Hive
+            or ParquetMR jobs. Set the block size to 268435456 (256 MB in bytes) if most Parquet
+            files queried by Impala were written by Impala.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">DROP TABLE .. PURGE</code> is much faster than the default <code class="ph codeph">DROP TABLE</code>.
+            The same applies to <code class="ph codeph">ALTER TABLE ... DROP PARTITION PURGE</code>
+            versus the default <code class="ph codeph">DROP PARTITION</code> operation.
+            However, due to the eventually consistent nature of S3, the files for that
+            table or partition could remain for some unbounded time when using <code class="ph codeph">PURGE</code>.
+            The default <code class="ph codeph">DROP TABLE/PARTITION</code> is slow because Impala copies the files to the HDFS trash folder,
+            and Impala waits until all the data is moved. <code class="ph codeph">DROP TABLE/PARTITION .. PURGE</code> is a
+            fast delete operation, and the Impala statement finishes quickly even though the change might not
+            have propagated fully throughout S3.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">INSERT</code> statements are faster than <code class="ph codeph">INSERT OVERWRITE</code> for S3.
+            The query option <code class="ph codeph">S3_SKIP_INSERT_STAGING</code>, which is set to <code class="ph codeph">true</code> by default,
+            skips the staging step for regular <code class="ph codeph">INSERT</code> (but not <code class="ph codeph">INSERT OVERWRITE</code>).
+            This makes the operation much faster, but consistency is not guaranteed: if a node fails during execution, the
+            table could end up with inconsistent data. Set this option to <code class="ph codeph">false</code> if stronger
+            consistency is required, however this setting will make the <code class="ph codeph">INSERT</code> operations slower.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            Too many files in a table can make metadata loading and updating slow on S3.
+            If too many requests are made to S3, S3 has a back-off mechanism and
+            responds slower than usual. You might have many small files because of:
+          </p>
+          <ul class="ul">
+            <li class="li">
+              <p class="p">
+                Too many partitions due to over-granular partitioning. Prefer partitions with
+                many megabytes of data, so that even a query against a single partition can
+                be parallelized effectively.
+              </p>
+            </li>
+            <li class="li">
+              <p class="p">
+                Many small <code class="ph codeph">INSERT</code> queries. Prefer bulk
+                <code class="ph codeph">INSERT</code>s so that more data is written to fewer
+                files.
+              </p>
+            </li>
+          </ul>
+        </li>
+      </ul>
+
+    </div>
+  </article>
+
+
+</article></main></body></html>

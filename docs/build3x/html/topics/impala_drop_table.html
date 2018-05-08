@@ -1,0 +1,192 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="drop_table"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DROP TABLE Statement</title></head><body id="drop_table"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">DROP TABLE Statement</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      Removes an Impala table. Also removes the underlying HDFS data files for internal tables, although not for
+      external tables.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>DROP TABLE [IF EXISTS] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var> <span class="ph">[PURGE]</span></code></pre>
+
+    <p class="p">
+      <strong class="ph b">IF EXISTS clause:</strong>
+    </p>
+
+    <p class="p">
+      The optional <code class="ph codeph">IF EXISTS</code> clause makes the statement succeed whether or not the table exists.
+      If the table does exist, it is dropped; if it does not exist, the statement has no effect. This capability is
+      useful in standardized setup scripts that remove existing schema objects and create new ones. By using some
+      combination of <code class="ph codeph">IF EXISTS</code> for the <code class="ph codeph">DROP</code> statements and <code class="ph codeph">IF NOT
+      EXISTS</code> clauses for the <code class="ph codeph">CREATE</code> statements, the script can run successfully the first
+      time you run it (when the objects do not exist yet) and subsequent times (when some or all of the objects do
+      already exist).
+    </p>
+
+    <p class="p">
+      <strong class="ph b">PURGE clause:</strong>
+    </p>
+
+    <p class="p"> The optional <code class="ph codeph">PURGE</code> keyword, available in
+      <span class="keyword">Impala 2.3</span> and higher, causes Impala to remove the associated
+      HDFS data files immediately, rather than going through the HDFS trashcan
+      mechanism. Use this keyword when dropping a table if it is crucial to
+      remove the data as quickly as possible to free up space, or if there is a
+      problem with the trashcan, such as the trash cannot being configured or
+      being in a different HDFS encryption zone than the data files. </p>
+
+    <p class="p">
+        <strong class="ph b">Statement type:</strong> DDL
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      By default, Impala removes the associated HDFS directory and data files for the table. If you issue a
+      <code class="ph codeph">DROP TABLE</code> and the data files are not deleted, it might be for the following reasons:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        If the table was created with the
+        <code class="ph codeph"><a class="xref" href="impala_tables.html#external_tables">EXTERNAL</a></code> clause, Impala leaves all
+        files and directories untouched. Use external tables when the data is under the control of other Hadoop
+        components, and Impala is only used to query the data files from their original locations.
+      </li>
+
+      <li class="li">
+        Impala might leave the data files behind unintentionally, if there is no HDFS location available to hold
+        the HDFS trashcan for the <code class="ph codeph">impala</code> user. See
+        <a class="xref" href="impala_prereqs.html#prereqs_account">User Account Requirements</a> for the procedure to set up the required HDFS home
+        directory.
+      </li>
+    </ul>
+
+    <p class="p">
+      Make sure that you are in the correct database before dropping a table, either by issuing a
+      <code class="ph codeph">USE</code> statement first or by using a fully qualified name
+      <code class="ph codeph"><var class="keyword varname">db_name</var>.<var class="keyword varname">table_name</var></code>.
+    </p>
+
+    <p class="p">
+      If you intend to issue a <code class="ph codeph">DROP DATABASE</code> statement, first issue <code class="ph codeph">DROP TABLE</code>
+      statements to remove all the tables in that database.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>create database temporary;
+use temporary;
+create table unimportant (x int);
+create table trivial (s string);
+-- Drop a table in the current database.
+drop table unimportant;
+-- Switch to a different database.
+use default;
+-- To drop a table in a different database...
+drop table trivial;
+<em class="ph i">ERROR: AnalysisException: Table does not exist: default.trivial</em>
+-- ...use a fully qualified name.
+drop table temporary.trivial;</code></pre>
+
+    <p class="p">
+        For other tips about managing and reclaiming Impala disk space, see
+        <a class="xref" href="../shared/../topics/impala_disk_space.html#disk_space">Managing Disk Space for Impala Data</a>.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Amazon S3 considerations:</strong>
+      </p>
+    <p class="p">
+      The <code class="ph codeph">DROP TABLE</code> statement can remove data files from S3
+      if the associated S3 table is an internal table.
+      In <span class="keyword">Impala 2.6</span> and higher, as part of improved support for writing
+      to S3, Impala also removes the associated folder when dropping an internal table
+      that resides on S3.
+      See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about working with S3 tables.
+    </p>
+
+    <div class="p">
+        For best compatibility with the S3 write support in <span class="keyword">Impala 2.6</span>
+        and higher:
+        <ul class="ul">
+        <li class="li">Use native Hadoop techniques to create data files in S3 for querying through Impala.</li>
+        <li class="li">Use the <code class="ph codeph">PURGE</code> clause of <code class="ph codeph">DROP TABLE</code> when dropping internal (managed) tables.</li>
+        </ul>
+        By default, when you drop an internal (managed) table, the data files are
+        moved to the HDFS trashcan. This operation is expensive for tables that
+        reside on the Amazon S3 filesystem. Therefore, for S3 tables, prefer to use
+        <code class="ph codeph">DROP TABLE <var class="keyword varname">table_name</var> PURGE</code> rather than the default <code class="ph codeph">DROP TABLE</code> statement.
+        The <code class="ph codeph">PURGE</code> clause makes Impala delete the data files immediately,
+        skipping the HDFS trashcan.
+        For the <code class="ph codeph">PURGE</code> clause to work effectively, you must originally create the
+        data files on S3 using one of the tools from the Hadoop ecosystem, such as
+        <code class="ph codeph">hadoop fs -cp</code>, or <code class="ph codeph">INSERT</code> in Impala or Hive.
+      </div>
+
+    <p class="p">
+        In <span class="keyword">Impala 2.6</span> and higher, Impala DDL statements such as
+        <code class="ph codeph">CREATE DATABASE</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">DROP DATABASE CASCADE</code>,
+        <code class="ph codeph">DROP TABLE</code>, and <code class="ph codeph">ALTER TABLE [ADD|DROP] PARTITION</code> can create or remove folders
+        as needed in the Amazon S3 system. Prior to <span class="keyword">Impala 2.6</span>, you had to create folders yourself and point
+        Impala database, tables, or partitions at them, and manually remove folders when no longer needed.
+        See <a class="xref" href="../shared/../topics/impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">HDFS permissions:</strong>
+      </p>
+    <p class="p">
+      For an internal table, the user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
+      typically the <code class="ph codeph">impala</code> user, must have write
+      permission for all the files and directories that make up the table.
+    </p>
+    <p class="p">
+      For an external table, dropping the table only involves changes to metadata in the metastore database.
+      Because Impala does not remove any HDFS files or directories when external tables are dropped,
+      no particular permissions are needed for the associated HDFS files or directories.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Kudu considerations:</strong>
+      </p>
+    <p class="p">
+      Kudu tables can be managed or external, the same as with HDFS-based
+      tables. For a managed table, the underlying Kudu table and its data
+      are removed by <code class="ph codeph">DROP TABLE</code>. For an external table,
+      the underlying Kudu table and its data remain after a
+      <code class="ph codeph">DROP TABLE</code>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a>,
+      <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a>, <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>,
+      <a class="xref" href="impala_partitioning.html#partitioning">Partitioning for Impala Tables</a>, <a class="xref" href="impala_tables.html#internal_tables">Internal Tables</a>,
+      <a class="xref" href="impala_tables.html#external_tables">External Tables</a>
+    </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

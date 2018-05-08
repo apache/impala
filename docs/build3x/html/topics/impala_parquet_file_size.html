@@ -1,0 +1,101 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="parquet_file_size"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>PARQUET_FILE_SIZE Query Option</title></head><body id="parquet_file_size"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">PARQUET_FILE_SIZE Query Option</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      Specifies the maximum size of each Parquet data file produced by Impala <code class="ph codeph">INSERT</code> statements.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+    <p class="p">
+      Specify the size in bytes, or with a trailing <code class="ph codeph">m</code> or <code class="ph codeph">g</code> character to indicate
+      megabytes or gigabytes. For example:
+    </p>
+
+<pre class="pre codeblock"><code>-- 128 megabytes.
+set PARQUET_FILE_SIZE=134217728
+INSERT OVERWRITE parquet_table SELECT * FROM text_table;
+
+-- 512 megabytes.
+set PARQUET_FILE_SIZE=512m;
+INSERT OVERWRITE parquet_table SELECT * FROM text_table;
+
+-- 1 gigabyte.
+set PARQUET_FILE_SIZE=1g;
+INSERT OVERWRITE parquet_table SELECT * FROM text_table;
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      With tables that are small or finely partitioned, the default Parquet block size (formerly 1 GB, now 256 MB
+      in Impala 2.0 and later) could be much larger than needed for each data file. For <code class="ph codeph">INSERT</code>
+      operations into such tables, you can increase parallelism by specifying a smaller
+      <code class="ph codeph">PARQUET_FILE_SIZE</code> value, resulting in more HDFS blocks that can be processed by different
+      nodes.
+
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> numeric, with optional unit specifier
+    </p>
+
+    <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+    <p class="p">
+      Currently, the maximum value for this setting is 1 gigabyte (<code class="ph codeph">1g</code>).
+      Setting a value higher than 1 gigabyte could result in errors during
+      an <code class="ph codeph">INSERT</code> operation.
+    </p>
+    </div>
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> 0 (produces files with a target size of 256 MB; files might be larger for very wide tables)
+    </p>
+
+    <p class="p">
+        Because ADLS does not expose the block sizes of data files the way HDFS does,
+        any Impala <code class="ph codeph">INSERT</code> or <code class="ph codeph">CREATE TABLE AS SELECT</code> statements
+        use the <code class="ph codeph">PARQUET_FILE_SIZE</code> query option setting to define the size of
+        Parquet data files. (Using a large block size is more important for Parquet tables than
+        for tables that use other file formats.)
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Isilon considerations:</strong>
+      </p>
+    <div class="p">
+        Because the EMC Isilon storage devices use a global value for the block size
+        rather than a configurable value for each file, the <code class="ph codeph">PARQUET_FILE_SIZE</code>
+        query option has no effect when Impala inserts data into a table or partition
+        residing on Isilon storage. Use the <code class="ph codeph">isi</code> command to set the
+        default block size globally on the Isilon device. For example, to set the
+        Isilon default block size to 256 MB, the recommended size for Parquet
+        data files for Impala, issue the following command:
+<pre class="pre codeblock"><code>isi hdfs settings modify --default-block-size=256MB</code></pre>
+      </div>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      For information about the Parquet file format, and how the number and size of data files affects query
+      performance, see <a class="xref" href="impala_parquet.html#parquet">Using the Parquet File Format with Impala Tables</a>.
+    </p>
+
+
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

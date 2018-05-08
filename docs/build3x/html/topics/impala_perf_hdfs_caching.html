@@ -1,0 +1,578 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="hdfs_caching"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using HDFS Caching with Impala (Impala 2.1 or higher only)</title></head><body id="hdfs_caching"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Using HDFS Caching with Impala (<span class="keyword">Impala 2.1</span> or higher only)</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      HDFS caching provides performance and scalability benefits in production environments where Impala queries
+      and other Hadoop jobs operate on quantities of data much larger than the physical RAM on the DataNodes,
+      making it impractical to rely on the Linux OS cache, which only keeps the most recently used data in memory.
+      Data read from the HDFS cache avoids the overhead of checksumming and memory-to-memory copying involved when
+      using data from the Linux OS cache.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+      <p class="p">
+        On a small or lightly loaded cluster, HDFS caching might not produce any speedup. It might even lead to
+        slower queries, if I/O read operations that were performed in parallel across the entire cluster are replaced by in-memory
+        operations operating on a smaller number of hosts. The hosts where the HDFS blocks are cached can become
+        bottlenecks because they experience high CPU load while processing the cached data blocks, while other hosts remain idle.
+        Therefore, always compare performance with and without this feature enabled, using a realistic workload.
+      </p>
+      <p class="p">
+        In <span class="keyword">Impala 2.2</span> and higher, you can spread the CPU load more evenly by specifying the <code class="ph codeph">WITH REPLICATION</code>
+        clause of the <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER TABLE</code> statements.
+        This clause lets you control the replication factor for
+        HDFS caching for a specific table or partition. By default, each cached block is
+        only present on a single host, which can lead to CPU contention if the same host
+        processes each cached block. Increasing the replication factor lets Impala choose
+        different hosts to process different cached blocks, to better distribute the CPU load.
+        Always use a <code class="ph codeph">WITH REPLICATION</code> setting of at least 3, and adjust upward
+        if necessary to match the replication factor for the underlying HDFS data files.
+      </p>
+      <p class="p">
+        In <span class="keyword">Impala 2.5</span> and higher, Impala automatically randomizes which host processes
+        a cached HDFS block, to avoid CPU hotspots. For tables where HDFS caching is not applied,
+        Impala designates which host to process a data block using an algorithm that estimates
+        the load on each host. If CPU hotspots still arise during queries,
+        you can enable additional randomization for the scheduling algorithm for non-HDFS cached data
+        by setting the <code class="ph codeph">SCHEDULE_RANDOM_REPLICA</code> query option.
+      </p>
+    </div>
+
+    <p class="p toc inpage"></p>
+
+
+
+    <p class="p">
+      For background information about how to set up and manage HDFS caching for a <span class="keyword"></span> cluster, see
+      <span class="xref">the documentation for your Apache Hadoop distribution</span>.
+    </p>
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="hdfs_caching__hdfs_caching_overview">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Overview of HDFS Caching for Impala</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        In <span class="keyword">Impala 1.4</span> and higher, Impala can use the HDFS caching feature to make more effective use of RAM, so that
+        repeated queries can take advantage of data <span class="q">"pinned"</span> in memory regardless of how much data is
+        processed overall. The HDFS caching feature lets you designate a subset of frequently accessed data to be
+        pinned permanently in memory, remaining in the cache across multiple queries and never being evicted. This
+        technique is suitable for tables or partitions that are frequently accessed and are small enough to fit
+        entirely within the HDFS memory cache. For example, you might designate several dimension tables to be
+        pinned in the cache, to speed up many different join queries that reference them. Or in a partitioned
+        table, you might pin a partition holding data from the most recent time period because that data will be
+        queried intensively; then when the next set of data arrives, you could unpin the previous partition and pin
+        the partition holding the new data.
+      </p>
+
+      <p class="p">
+        Because this Impala performance feature relies on HDFS infrastructure, it only applies to Impala tables
+        that use HDFS data files. HDFS caching for Impala does not apply to HBase tables, S3 tables,
+        Kudu tables,
+        or Isilon tables.
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="hdfs_caching__hdfs_caching_prereqs">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Setting Up HDFS Caching for Impala</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        To use HDFS caching with Impala, first set up that feature for your <span class="keyword"></span> cluster:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+          Decide how much memory to devote to the HDFS cache on each host. Remember that the total memory available
+          for cached data is the sum of the cache sizes on all the hosts. By default, any data block is only cached on one
+          host, although you can cache a block across multiple hosts by increasing the replication factor.
+
+          </p>
+        </li>
+
+        <li class="li">
+          <div class="p">
+          Issue <span class="keyword cmdname">hdfs cacheadmin</span> commands to set up one or more cache pools, owned by the same
+          user as the <span class="keyword cmdname">impalad</span> daemon (typically <code class="ph codeph">impala</code>). For example:
+<pre class="pre codeblock"><code>hdfs cacheadmin -addPool four_gig_pool -owner impala -limit 4000000000
+</code></pre>
+          For details about the <span class="keyword cmdname">hdfs cacheadmin</span> command, see
+          <span class="xref">the documentation for your Apache Hadoop distribution</span>.
+          </div>
+        </li>
+      </ul>
+
+      <p class="p">
+        Once HDFS caching is enabled and one or more pools are available, see
+        <a class="xref" href="impala_perf_hdfs_caching.html#hdfs_caching_ddl">Enabling HDFS Caching for Impala Tables and Partitions</a> for how to choose which Impala data to load
+        into the HDFS cache. On the Impala side, you specify the cache pool name defined by the <code class="ph codeph">hdfs
+        cacheadmin</code> command in the Impala DDL statements that enable HDFS caching for a table or partition,
+        such as <code class="ph codeph">CREATE TABLE ... CACHED IN <var class="keyword varname">pool</var></code> or <code class="ph codeph">ALTER TABLE ... SET
+        CACHED IN <var class="keyword varname">pool</var></code>.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="hdfs_caching__hdfs_caching_ddl">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Enabling HDFS Caching for Impala Tables and Partitions</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Begin by choosing which tables or partitions to cache. For example, these might be lookup tables that are
+        accessed by many different join queries, or partitions corresponding to the most recent time period that
+        are analyzed by different reports or ad hoc queries.
+      </p>
+
+      <p class="p">
+        In your SQL statements, you specify logical divisions such as tables and partitions to be cached. Impala
+        translates these requests into HDFS-level directives that apply to particular directories and files. For
+        example, given a partitioned table <code class="ph codeph">CENSUS</code> with a partition key column
+        <code class="ph codeph">YEAR</code>, you could choose to cache all or part of the data as follows:
+      </p>
+
+      <p class="p">
+        In <span class="keyword">Impala 2.2</span> and higher, the optional <code class="ph codeph">WITH REPLICATION</code> clause
+        for <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER TABLE</code> lets you specify
+        a <dfn class="term">replication factor</dfn>, the number of hosts on which to cache the same data blocks.
+        When Impala processes a cached data block, where the cache replication factor is greater than 1, Impala randomly
+        selects a host that has a cached copy of that data block. This optimization avoids excessive CPU
+        usage on a single host when the same cached data block is processed multiple times.
+        Where practical, specify a value greater than or equal to the HDFS block replication factor.
+      </p>
+
+<pre class="pre codeblock"><code>-- Cache the entire table (all partitions).
+alter table census set cached in '<var class="keyword varname">pool_name</var>';
+
+-- Remove the entire table from the cache.
+alter table census set uncached;
+
+-- Cache a portion of the table (a single partition).
+-- If the table is partitioned by multiple columns (such as year, month, day),
+-- the ALTER TABLE command must specify values for all those columns.
+alter table census partition (year=1960) set cached in '<var class="keyword varname">pool_name</var>';
+
+<span class="ph">-- Cache the data from one partition on up to 4 hosts, to minimize CPU load on any
+-- single host when the same data block is processed multiple times.
+alter table census partition (year=1970)
+  set cached in '<var class="keyword varname">pool_name</var>' with replication = 4;</span>
+
+-- At each stage, check the volume of cached data.
+-- For large tables or partitions, the background loading might take some time,
+-- so you might have to wait and reissue the statement until all the data
+-- has finished being loaded into the cache.
+show table stats census;
++-------+-------+--------+------+--------------+--------+
+| year  | #Rows | #Files | Size | Bytes Cached | Format |
++-------+-------+--------+------+--------------+--------+
+| 1900  | -1    | 1      | 11B  | NOT CACHED   | TEXT   |
+| 1940  | -1    | 1      | 11B  | NOT CACHED   | TEXT   |
+| 1960  | -1    | 1      | 11B  | 11B          | TEXT   |
+| 1970  | -1    | 1      | 11B  | NOT CACHED   | TEXT   |
+| Total | -1    | 4      | 44B  | 11B          |        |
++-------+-------+--------+------+--------------+--------+
+</code></pre>
+
+      <p class="p">
+        <strong class="ph b">CREATE TABLE considerations:</strong>
+      </p>
+
+      <p class="p">
+        The HDFS caching feature affects the Impala <code class="ph codeph">CREATE TABLE</code> statement as follows:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+        <p class="p">
+          You can put a <code class="ph codeph">CACHED IN '<var class="keyword varname">pool_name</var>'</code> clause
+          <span class="ph">and optionally a <code class="ph codeph">WITH REPLICATION = <var class="keyword varname">number_of_hosts</var></code> clause</span>
+          at the end of a
+          <code class="ph codeph">CREATE TABLE</code> statement to automatically cache the entire contents of the table,
+          including any partitions added later. The <var class="keyword varname">pool_name</var> is a pool that you previously set
+          up with the <span class="keyword cmdname">hdfs cacheadmin</span> command.
+        </p>
+        </li>
+
+        <li class="li">
+        <p class="p">
+          Once a table is designated for HDFS caching through the <code class="ph codeph">CREATE TABLE</code> statement, if new
+          partitions are added later through <code class="ph codeph">ALTER TABLE ... ADD PARTITION</code> statements, the data in
+          those new partitions is automatically cached in the same pool.
+        </p>
+        </li>
+
+        <li class="li">
+        <p class="p">
+          If you want to perform repetitive queries on a subset of data from a large table, and it is not practical
+          to designate the entire table or specific partitions for HDFS caching, you can create a new cached table
+          with just a subset of the data by using <code class="ph codeph">CREATE TABLE ... CACHED IN '<var class="keyword varname">pool_name</var>'
+          AS SELECT ... WHERE ...</code>. When you are finished with generating reports from this subset of data,
+          drop the table and both the data files and the data cached in RAM are automatically deleted.
+        </p>
+        </li>
+      </ul>
+
+      <p class="p">
+        See <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a> for the full syntax.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Other memory considerations:</strong>
+      </p>
+
+      <p class="p">
+        Certain DDL operations, such as <code class="ph codeph">ALTER TABLE ... SET LOCATION</code>, are blocked while the
+        underlying HDFS directories contain cached files. You must uncache the files first, before changing the
+        location, dropping the table, and so on.
+      </p>
+
+      <p class="p">
+        When data is requested to be pinned in memory, that process happens in the background without blocking
+        access to the data while the caching is in progress. Loading the data from disk could take some time.
+        Impala reads each HDFS data block from memory if it has been pinned already, or from disk if it has not
+        been pinned yet. When files are added to a table or partition whose contents are cached, Impala
+        automatically detects those changes and performs a <code class="ph codeph">REFRESH</code> automatically once the relevant
+        data is cached.
+      </p>
+
+      <p class="p">
+        The amount of data that you can pin on each node through the HDFS caching mechanism is subject to a quota
+        that is enforced by the underlying HDFS service. Before requesting to pin an Impala table or partition in
+        memory, check that its size does not exceed this quota.
+      </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+        Because the HDFS cache consists of combined memory from all the DataNodes in the cluster, cached tables or
+        partitions can be bigger than the amount of HDFS cache memory on any single host.
+      </div>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="hdfs_caching__hdfs_caching_etl">
+
+    <h2 class="title topictitle2" id="ariaid-title5">Loading and Removing Data with HDFS Caching Enabled</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        When HDFS caching is enabled, extra processing happens in the background when you add or remove data
+        through statements such as <code class="ph codeph">INSERT</code> and <code class="ph codeph">DROP TABLE</code>.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Inserting or loading data:</strong>
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          When Impala performs an <code class="ph codeph"><a class="xref" href="impala_insert.html#insert">INSERT</a></code> or
+          <code class="ph codeph"><a class="xref" href="impala_load_data.html#load_data">LOAD DATA</a></code> statement for a table or
+          partition that is cached, the new data files are automatically cached and Impala recognizes that fact
+          automatically.
+        </li>
+
+        <li class="li">
+          If you perform an <code class="ph codeph">INSERT</code> or <code class="ph codeph">LOAD DATA</code> through Hive, as always, Impala
+          only recognizes the new data files after a <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code>
+          statement in Impala.
+        </li>
+
+        <li class="li">
+          If the cache pool is entirely full, or becomes full before all the requested data can be cached, the
+          Impala DDL statement returns an error. This is to avoid situations where only some of the requested data
+          could be cached.
+        </li>
+
+        <li class="li">
+          When HDFS caching is enabled for a table or partition, new data files are cached automatically when they
+          are added to the appropriate directory in HDFS, without the need for a <code class="ph codeph">REFRESH</code> statement
+          in Impala. Impala automatically performs a <code class="ph codeph">REFRESH</code> once the new data is loaded into the
+          HDFS cache.
+        </li>
+      </ul>
+
+      <p class="p">
+        <strong class="ph b">Dropping tables, partitions, or cache pools:</strong>
+      </p>
+
+      <p class="p">
+        The HDFS caching feature interacts with the Impala
+        <code class="ph codeph"><a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE</a></code> and
+        <code class="ph codeph"><a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE ... DROP PARTITION</a></code>
+        statements as follows:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          When you issue a <code class="ph codeph">DROP TABLE</code> for a table that is entirely cached, or has some partitions
+          cached, the <code class="ph codeph">DROP TABLE</code> succeeds and all the cache directives Impala submitted for that
+          table are removed from the HDFS cache system.
+        </li>
+
+        <li class="li">
+          The same applies to <code class="ph codeph">ALTER TABLE ... DROP PARTITION</code>. The operation succeeds and any cache
+          directives are removed.
+        </li>
+
+        <li class="li">
+          As always, the underlying data files are removed if the dropped table is an internal table, or the
+          dropped partition is in its default location underneath an internal table. The data files are left alone
+          if the dropped table is an external table, or if the dropped partition is in a non-default location.
+        </li>
+
+        <li class="li">
+          If you designated the data files as cached through the <span class="keyword cmdname">hdfs cacheadmin</span> command, and
+          the data files are left behind as described in the previous item, the data files remain cached. Impala
+          only removes the cache directives submitted by Impala through the <code class="ph codeph">CREATE TABLE</code> or
+          <code class="ph codeph">ALTER TABLE</code> statements. It is OK to have multiple redundant cache directives pertaining
+          to the same files; the directives all have unique IDs and owners so that the system can tell them apart.
+        </li>
+
+        <li class="li">
+          If you drop an HDFS cache pool through the <span class="keyword cmdname">hdfs cacheadmin</span> command, all the Impala
+          data files are preserved, just no longer cached. After a subsequent <code class="ph codeph">REFRESH</code>,
+          <code class="ph codeph">SHOW TABLE STATS</code> reports 0 bytes cached for each associated Impala table or partition.
+        </li>
+      </ul>
+
+      <p class="p">
+        <strong class="ph b">Relocating a table or partition:</strong>
+      </p>
+
+      <p class="p">
+        The HDFS caching feature interacts with the Impala
+        <code class="ph codeph"><a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE ... SET LOCATION</a></code>
+        statement as follows:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          If you have designated a table or partition as cached through the <code class="ph codeph">CREATE TABLE</code> or
+          <code class="ph codeph">ALTER TABLE</code> statements, subsequent attempts to relocate the table or partition through
+          an <code class="ph codeph">ALTER TABLE ... SET LOCATION</code> statement will fail. You must issue an <code class="ph codeph">ALTER
+          TABLE ... SET UNCACHED</code> statement for the table or partition first. Otherwise, Impala would lose
+          track of some cached data files and have no way to uncache them later.
+        </li>
+      </ul>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="hdfs_caching__hdfs_caching_admin">
+
+    <h2 class="title topictitle2" id="ariaid-title6">Administration for HDFS Caching with Impala</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Here are the guidelines and steps to check or change the status of HDFS caching for Impala data:
+      </p>
+
+      <p class="p">
+        <strong class="ph b">hdfs cacheadmin command:</strong>
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          If you drop a cache pool with the <span class="keyword cmdname">hdfs cacheadmin</span> command, Impala queries against the
+          associated data files will still work, by falling back to reading the files from disk. After performing a
+          <code class="ph codeph">REFRESH</code> on the table, Impala reports the number of bytes cached as 0 for all associated
+          tables and partitions.
+        </li>
+
+        <li class="li">
+          You might use <span class="keyword cmdname">hdfs cacheadmin</span> to get a list of existing cache pools, or detailed
+          information about the pools, as follows:
+<pre class="pre codeblock"><code>hdfs cacheadmin -listDirectives         # Basic info
+Found 122 entries
+  ID POOL       REPL EXPIRY  PATH
+ 123 testPool      1 never   /user/hive/warehouse/tpcds.store_sales
+ 124 testPool      1 never   /user/hive/warehouse/tpcds.store_sales/ss_date=1998-01-15
+ 125 testPool      1 never   /user/hive/warehouse/tpcds.store_sales/ss_date=1998-02-01
+...
+
+hdfs cacheadmin -listDirectives -stats  # More details
+Found 122 entries
+  ID POOL       REPL EXPIRY  PATH                                                        BYTES_NEEDED  BYTES_CACHED  FILES_NEEDED  FILES_CACHED
+ 123 testPool      1 never   /user/hive/warehouse/tpcds.store_sales                                 0             0             0             0
+ 124 testPool      1 never   /user/hive/warehouse/tpcds.store_sales/ss_date=1998-01-15         143169        143169             1             1
+ 125 testPool      1 never   /user/hive/warehouse/tpcds.store_sales/ss_date=1998-02-01         112447        112447             1             1
+...
+</code></pre>
+        </li>
+      </ul>
+
+      <p class="p">
+        <strong class="ph b">Impala SHOW statement:</strong>
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          For each table or partition, the <code class="ph codeph">SHOW TABLE STATS</code> or <code class="ph codeph">SHOW PARTITIONS</code>
+          statement displays the number of bytes currently cached by the HDFS caching feature. If there are no
+          cache directives in place for that table or partition, the result set displays <code class="ph codeph">NOT
+          CACHED</code>. A value of 0, or a smaller number than the overall size of the table or partition,
+          indicates that the cache request has been submitted but the data has not been entirely loaded into memory
+          yet. See <a class="xref" href="impala_show.html#show">SHOW Statement</a> for details.
+        </li>
+      </ul>
+
+      <p class="p">
+        <strong class="ph b">Impala memory limits:</strong>
+      </p>
+
+      <p class="p">
+        The Impala HDFS caching feature interacts with the Impala memory limits as follows:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          The maximum size of each HDFS cache pool is specified externally to Impala, through the <span class="keyword cmdname">hdfs
+          cacheadmin</span> command.
+        </li>
+
+        <li class="li">
+          All the memory used for HDFS caching is separate from the <span class="keyword cmdname">impalad</span> daemon address space
+          and does not count towards the limits of the <code class="ph codeph">--mem_limit</code> startup option,
+          <code class="ph codeph">MEM_LIMIT</code> query option, or further limits imposed through YARN resource management or
+          the Linux <code class="ph codeph">cgroups</code> mechanism.
+        </li>
+
+        <li class="li">
+          Because accessing HDFS cached data avoids a memory-to-memory copy operation, queries involving cached
+          data require less memory on the Impala side than the equivalent queries on uncached data. In addition to
+          any performance benefits in a single-user environment, the reduced memory helps to improve scalability
+          under high-concurrency workloads.
+        </li>
+      </ul>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title7" id="hdfs_caching__hdfs_caching_performance">
+
+    <h2 class="title topictitle2" id="ariaid-title7">Performance Considerations for HDFS Caching with Impala</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        In Impala 1.4.0 and higher, Impala supports efficient reads from data that is pinned in memory through HDFS
+        caching. Impala takes advantage of the HDFS API and reads the data from memory rather than from disk
+        whether the data files are pinned using Impala DDL statements, or using the command-line mechanism where
+        you specify HDFS paths.
+      </p>
+
+      <p class="p">
+        When you examine the output of the <span class="keyword cmdname">impala-shell</span> <span class="keyword cmdname">SUMMARY</span> command, or
+        look in the metrics report for the <span class="keyword cmdname">impalad</span> daemon, you see how many bytes are read from
+        the HDFS cache. For example, this excerpt from a query profile illustrates that all the data read during a
+        particular phase of the query came from the HDFS cache, because the <code class="ph codeph">BytesRead</code> and
+        <code class="ph codeph">BytesReadDataNodeCache</code> values are identical.
+      </p>
+
+<pre class="pre codeblock"><code>HDFS_SCAN_NODE (id=0):(Total: 11s114ms, non-child: 11s114ms, % non-child: 100.00%)
+        - AverageHdfsReadThreadConcurrency: 0.00
+        - AverageScannerThreadConcurrency: 32.75
+<strong class="ph b">        - BytesRead: 10.47 GB (11240756479)
+        - BytesReadDataNodeCache: 10.47 GB (11240756479)</strong>
+        - BytesReadLocal: 10.47 GB (11240756479)
+        - BytesReadShortCircuit: 10.47 GB (11240756479)
+        - DecompressionTime: 27s572ms
+</code></pre>
+
+      <p class="p">
+        For queries involving smaller amounts of data, or in single-user workloads, you might not notice a
+        significant difference in query response time with or without HDFS caching. Even with HDFS caching turned
+        off, the data for the query might still be in the Linux OS buffer cache. The benefits become clearer as
+        data volume increases, and especially as the system processes more concurrent queries. HDFS caching
+        improves the scalability of the overall system. That is, it prevents query performance from declining when
+        the workload outstrips the capacity of the Linux OS cache.
+      </p>
+
+      <p class="p">
+        Due to a limitation of HDFS, zero-copy reads are not supported with
+        encryption. Where practical, avoid HDFS caching for Impala data
+        files in encryption zones. The queries fall back to the normal read
+        path during query execution, which might cause some performance overhead.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">SELECT considerations:</strong>
+      </p>
+
+      <p class="p">
+        The Impala HDFS caching feature interacts with the
+        <code class="ph codeph"><a class="xref" href="impala_select.html#select">SELECT</a></code> statement and query performance as
+        follows:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          Impala automatically reads from memory any data that has been designated as cached and actually loaded
+          into the HDFS cache. (It could take some time after the initial request to fully populate the cache for a
+          table with large size or many partitions.) The speedup comes from two aspects: reading from RAM instead
+          of disk, and accessing the data straight from the cache area instead of copying from one RAM area to
+          another. This second aspect yields further performance improvement over the standard OS caching
+          mechanism, which still results in memory-to-memory copying of cached data.
+        </li>
+
+        <li class="li">
+          For small amounts of data, the query speedup might not be noticeable in terms of wall clock time. The
+          performance might be roughly the same with HDFS caching turned on or off, due to recently used data being
+          held in the Linux OS cache. The difference is more pronounced with:
+          <ul class="ul">
+            <li class="li">
+              Data volumes (for all queries running concurrently) that exceed the size of the Linux OS cache.
+            </li>
+
+            <li class="li">
+              A busy cluster running many concurrent queries, where the reduction in memory-to-memory copying and
+              overall memory usage during queries results in greater scalability and throughput.
+            </li>
+
+            <li class="li">
+              Thus, to really exercise and benchmark this feature in a development environment, you might need to
+              simulate realistic workloads and concurrent queries that match your production environment.
+            </li>
+
+            <li class="li">
+              One way to simulate a heavy workload on a lightly loaded system is to flush the OS buffer cache (on
+              each DataNode) between iterations of queries against the same tables or partitions:
+<pre class="pre codeblock"><code>$ sync
+$ echo 1 &gt; /proc/sys/vm/drop_caches
+</code></pre>
+            </li>
+          </ul>
+        </li>
+
+        <li class="li">
+          Impala queries take advantage of HDFS cached data regardless of whether the cache directive was issued by
+          Impala or externally through the <span class="keyword cmdname">hdfs cacheadmin</span> command, for example for an external
+          table where the cached data files might be accessed by several different Hadoop components.
+        </li>
+
+        <li class="li">
+          If your query returns a large result set, the time reported for the query could be dominated by the time
+          needed to print the results on the screen. To measure the time for the underlying query processing, query
+          the <code class="ph codeph">COUNT()</code> of the big result set, which does all the same processing but only prints a
+          single line to the screen.
+        </li>
+      </ul>
+    </div>
+  </article>
+</article></main></body></html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="upsert"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>UPSERT Statement (Impala 2.8 or higher only)</title></head><body id="upsert"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">UPSERT Statement (<span class="keyword">Impala 2.8</span> or higher only)</h1>
+
+
+
+  <div class="body conbody">
+
+    <div class="p">
+
+      Acts as a combination of the <code class="ph codeph">INSERT</code>
+      and <code class="ph codeph">UPDATE</code> statements.
+      For each row processed by the <code class="ph codeph">UPSERT</code>
+      statement:
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            If another row already exists with the same set of primary key
+            values, the other columns are updated to match the values
+            from the row being <span class="q">"UPSERTed"</span>.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            If there is not any row with the same set of primary key values,
+            the row is created, the same as if the <code class="ph codeph">INSERT</code>
+            statement was used.
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+      This statement only works for Impala tables that use the Kudu storage engine.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>
+UPSERT <span class="ph">[<var class="keyword varname">hint_clause</var>]</span> INTO [TABLE] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var>
+  [(<var class="keyword varname">column_list</var>)]
+{
+    [<var class="keyword varname">hint_clause</var>] <var class="keyword varname">select_statement</var>
+  | VALUES (<var class="keyword varname">value</var> [, <var class="keyword varname">value</var> ...]) [, (<var class="keyword varname">value</var> [, <var class="keyword varname">value</var> ...]) ...]
+}
+
+hint_clause ::= [SHUFFLE] | [NOSHUFFLE]
+  (Note: the square brackets are part of the syntax.)
+</code></pre>
+
+    <p class="p">
+      The <var class="keyword varname">select_statement</var> clause can use the full syntax, such as
+      <code class="ph codeph">WHERE</code> and join clauses, as <a class="xref" href="impala_select.html#select">SELECT Statement</a>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Statement type:</strong> DML
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      If you specify a column list, any omitted columns in the inserted or updated rows are
+      set to their default value (if the column has one) or <code class="ph codeph">NULL</code> (if the
+      column does not have a default value). Therefore, if a column is not nullable and
+      has no default value, it must be included in the column list for any <code class="ph codeph">UPSERT</code>
+      statement. Because all primary key columns meet these conditions, all the primary key
+      columns must be specified in every <code class="ph codeph">UPSERT</code> statement.
+    </p>
+
+    <p class="p">
+      Because Kudu tables can efficiently handle small incremental changes, the <code class="ph codeph">VALUES</code>
+      clause is more practical to use with Kudu tables than with HDFS-based tables.
+    </p>
+
+    <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+        After adding or replacing data in a table used in performance-critical queries, issue a <code class="ph codeph">COMPUTE
+        STATS</code> statement to make sure all statistics are up-to-date. Consider updating statistics for a
+        table after any <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, or <code class="ph codeph">CREATE TABLE AS
+        SELECT</code> statement in Impala, or after loading data through Hive and doing a <code class="ph codeph">REFRESH
+        <var class="keyword varname">table_name</var></code> in Impala. This technique is especially important for tables that
+        are very large, used in join queries, or both.
+      </div>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>
+UPSERT INTO kudu_table (pk, c1, c2, c3) VALUES (0, 'hello', 50, true), (1, 'world', -1, false);
+UPSERT INTO production_table SELECT * FROM staging_table;
+UPSERT INTO production_table SELECT * FROM staging_table WHERE c1 IS NOT NULL AND c2 &gt; 0;
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_kudu.html#impala_kudu">Using Impala to Query Kudu Tables</a>,
+      <a class="xref" href="impala_insert.html#insert">INSERT Statement</a>,
+      <a class="xref" href="impala_update.html#update">UPDATE Statement (Impala 2.8 or higher only)</a>
+    </p>
+
+  </div>
+
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

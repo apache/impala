@@ -1,0 +1,200 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="truncate_table"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>TRUNCATE TABLE Statement (Impala 2.3 or higher only)</title></head><body id="truncate_table"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">TRUNCATE TABLE Statement (<span class="keyword">Impala 2.3</span> or higher only)</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      Removes the data from an Impala table while leaving the table itself.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>TRUNCATE TABLE <span class="ph">[IF EXISTS]</span> [<var class="keyword varname">db_name</var>.]<var class="keyword varname">table_name</var></code></pre>
+
+    <p class="p">
+        <strong class="ph b">Statement type:</strong> DDL
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      Often used to empty tables that are used during ETL cycles, after the data has been copied to another
+      table for the next stage of processing. This statement is a low-overhead alternative to dropping and
+      recreating the table, or using <code class="ph codeph">INSERT OVERWRITE</code> to replace the data during the
+      next ETL cycle.
+    </p>
+
+    <p class="p">
+      This statement removes all the data and associated data files in the table. It can remove data files from internal tables,
+      external tables, partitioned tables, and tables mapped to HBase or the Amazon Simple Storage Service (S3).
+      The data removal applies to the entire table, including all partitions of a partitioned table.
+    </p>
+
+    <p class="p">
+      Any statistics produced by the <code class="ph codeph">COMPUTE STATS</code> statement are reset when the data is removed.
+    </p>
+
+    <p class="p">
+      Make sure that you are in the correct database before truncating a table, either by issuing a
+      <code class="ph codeph">USE</code> statement first or by using a fully qualified name
+      <code class="ph codeph"><var class="keyword varname">db_name</var>.<var class="keyword varname">table_name</var></code>.
+    </p>
+
+    <p class="p">
+      The optional <code class="ph codeph">IF EXISTS</code> clause makes the statement succeed whether or not the table exists.
+      If the table does exist, it is truncated; if it does not exist, the statement has no effect. This capability is
+      useful in standardized setup scripts that are might be run both before and after some of the tables exist.
+      This clause is available in <span class="keyword">Impala 2.5</span> and higher.
+    </p>
+
+    <p class="p">
+      Any HDFS data files removed by this statement go into the HDFS trashcan, from which you can recover them
+      within a defined time interval if this operation turns out to be a mistake.
+    </p>
+
+    <p class="p">
+        For other tips about managing and reclaiming Impala disk space, see
+        <a class="xref" href="../shared/../topics/impala_disk_space.html#disk_space">Managing Disk Space for Impala Data</a>.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Amazon S3 considerations:</strong>
+      </p>
+    <p class="p">
+      Although Impala cannot write new data to a table stored in the Amazon
+      S3 filesystem, the <code class="ph codeph">TRUNCATE TABLE</code> statement can remove data files from S3.
+      See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about working with S3 tables.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">HDFS permissions:</strong>
+      </p>
+    <p class="p">
+      The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
+      typically the <code class="ph codeph">impala</code> user, must have write
+      permission for all the files and directories that make up the table.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Kudu considerations:</strong>
+      </p>
+    <p class="p">
+        Currently, the <code class="ph codeph">TRUNCATE TABLE</code> statement cannot be used with Kudu tables.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      The following example shows a table containing some data and with table and column statistics.
+      After the <code class="ph codeph">TRUNCATE TABLE</code> statement, the data is removed and the statistics
+      are reset.
+    </p>
+
+<pre class="pre codeblock"><code>CREATE TABLE truncate_demo (x INT);
+INSERT INTO truncate_demo VALUES (1), (2), (4), (8);
+SELECT COUNT(*) FROM truncate_demo;
++----------+
+| count(*) |
++----------+
+| 4        |
++----------+
+COMPUTE STATS truncate_demo;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 1 column(s). |
++-----------------------------------------+
+SHOW TABLE STATS truncate_demo;
++-------+--------+------+--------------+-------------------+--------+-------------------+
+| #Rows | #Files | Size | Bytes Cached | Cache Replication | Format | Incremental stats |
++-------+--------+------+--------------+-------------------+--------+-------------------+
+| 4     | 1      | 8B   | NOT CACHED   | NOT CACHED        | TEXT   | false             |
++-------+--------+------+--------------+-------------------+--------+-------------------+
+SHOW COLUMN STATS truncate_demo;
++--------+------+------------------+--------+----------+----------+
+| Column | Type | #Distinct Values | #Nulls | Max Size | Avg Size |
++--------+------+------------------+--------+----------+----------+
+| x      | INT  | 4                | -1     | 4        | 4        |
++--------+------+------------------+--------+----------+----------+
+
+-- After this statement, the data and the table/column stats will be gone.
+TRUNCATE TABLE truncate_demo;
+
+SELECT COUNT(*) FROM truncate_demo;
++----------+
+| count(*) |
++----------+
+| 0        |
++----------+
+SHOW TABLE STATS truncate_demo;
++-------+--------+------+--------------+-------------------+--------+-------------------+
+| #Rows | #Files | Size | Bytes Cached | Cache Replication | Format | Incremental stats |
++-------+--------+------+--------------+-------------------+--------+-------------------+
+| -1    | 0      | 0B   | NOT CACHED   | NOT CACHED        | TEXT   | false             |
++-------+--------+------+--------------+-------------------+--------+-------------------+
+SHOW COLUMN STATS truncate_demo;
++--------+------+------------------+--------+----------+----------+
+| Column | Type | #Distinct Values | #Nulls | Max Size | Avg Size |
++--------+------+------------------+--------+----------+----------+
+| x      | INT  | -1               | -1     | 4        | 4        |
++--------+------+------------------+--------+----------+----------+
+</code></pre>
+
+    <p class="p">
+      The following example shows how the <code class="ph codeph">IF EXISTS</code> clause allows the <code class="ph codeph">TRUNCATE TABLE</code>
+      statement to be run without error whether or not the table exists:
+    </p>
+
+<pre class="pre codeblock"><code>CREATE TABLE staging_table1 (x INT, s STRING);
+Fetched 0 row(s) in 0.33s
+
+SHOW TABLES LIKE 'staging*';
++----------------+
+| name           |
++----------------+
+| staging_table1 |
++----------------+
+Fetched 1 row(s) in 0.25s
+
+-- Our ETL process involves removing all data from several staging tables
+-- even though some might be already dropped, or not created yet.
+
+TRUNCATE TABLE IF EXISTS staging_table1;
+Fetched 0 row(s) in 5.04s
+
+TRUNCATE TABLE IF EXISTS staging_table2;
+Fetched 0 row(s) in 0.25s
+
+TRUNCATE TABLE IF EXISTS staging_table3;
+Fetched 0 row(s) in 0.25s
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_tables.html#tables">Overview of Impala Tables</a>,
+      <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a>, <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>,
+      <a class="xref" href="impala_partitioning.html#partitioning">Partitioning for Impala Tables</a>, <a class="xref" href="impala_tables.html#internal_tables">Internal Tables</a>,
+      <a class="xref" href="impala_tables.html#external_tables">External Tables</a>
+    </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

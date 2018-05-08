@@ -1,0 +1,353 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_aggregate_functions.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="count"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>COUNT Function</title></head><body id="count"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">COUNT Function</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      An aggregate function that returns the number of rows, or the number of non-<code class="ph codeph">NULL</code> rows.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>COUNT([DISTINCT | ALL] <var class="keyword varname">expression</var>) [OVER (<var class="keyword varname">analytic_clause</var>)]</code></pre>
+
+    <p class="p">
+      Depending on the argument, <code class="ph codeph">COUNT()</code> considers rows that meet certain conditions:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        The notation <code class="ph codeph">COUNT(*)</code> includes <code class="ph codeph">NULL</code> values in the total.
+      </li>
+
+      <li class="li">
+        The notation <code class="ph codeph">COUNT(<var class="keyword varname">column_name</var>)</code> only considers rows where the column
+        contains a non-<code class="ph codeph">NULL</code> value.
+      </li>
+
+      <li class="li">
+        You can also combine <code class="ph codeph">COUNT</code> with the <code class="ph codeph">DISTINCT</code> operator to eliminate
+        duplicates before counting, and to count the combinations of values across multiple columns.
+      </li>
+    </ul>
+
+    <p class="p">
+      When the query contains a <code class="ph codeph">GROUP BY</code> clause, returns one value for each combination of
+      grouping values.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Return type:</strong> <code class="ph codeph">BIGINT</code>
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+        If you frequently run aggregate functions such as <code class="ph codeph">MIN()</code>, <code class="ph codeph">MAX()</code>, and
+        <code class="ph codeph">COUNT(DISTINCT)</code> on partition key columns, consider enabling the <code class="ph codeph">OPTIMIZE_PARTITION_KEY_SCANS</code>
+        query option, which optimizes such queries. This feature is available in <span class="keyword">Impala 2.5</span> and higher.
+        See <a class="xref" href="../shared/../topics/impala_optimize_partition_key_scans.html">OPTIMIZE_PARTITION_KEY_SCANS Query Option (Impala 2.5 or higher only)</a>
+        for the kinds of queries that this option applies to, and slight differences in how partitions are
+        evaluated when this query option is enabled.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+      </p>
+
+    <p class="p">
+        To access a column with a complex type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>)
+        in an aggregation function, you unpack the individual elements using join notation in the query,
+        and then apply the function to the final scalar item, field, key, or value at the bottom of any nested type hierarchy in the column.
+        See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details about using complex types in Impala.
+      </p>
+
+    <div class="p">
+The following example demonstrates calls to several aggregation functions
+using values from a column containing nested complex types
+(an <code class="ph codeph">ARRAY</code> of <code class="ph codeph">STRUCT</code> items).
+The array is unpacked inside the query using join notation.
+The array elements are referenced using the <code class="ph codeph">ITEM</code>
+pseudocolumn, and the structure fields inside the array elements
+are referenced using dot notation.
+Numeric values such as <code class="ph codeph">SUM()</code> and <code class="ph codeph">AVG()</code>
+are computed using the numeric <code class="ph codeph">R_NATIONKEY</code> field, and
+the general-purpose <code class="ph codeph">MAX()</code> and <code class="ph codeph">MIN()</code>
+values are computed from the string <code class="ph codeph">N_NAME</code> field.
+<pre class="pre codeblock"><code>describe region;
++-------------+-------------------------+---------+
+| name        | type                    | comment |
++-------------+-------------------------+---------+
+| r_regionkey | smallint                |         |
+| r_name      | string                  |         |
+| r_comment   | string                  |         |
+| r_nations   | array&lt;struct&lt;           |         |
+|             |   n_nationkey:smallint, |         |
+|             |   n_name:string,        |         |
+|             |   n_comment:string      |         |
+|             | &gt;&gt;                      |         |
++-------------+-------------------------+---------+
+
+select r_name, r_nations.item.n_nationkey
+  from region, region.r_nations as r_nations
+order by r_name, r_nations.item.n_nationkey;
++-------------+------------------+
+| r_name      | item.n_nationkey |
++-------------+------------------+
+| AFRICA      | 0                |
+| AFRICA      | 5                |
+| AFRICA      | 14               |
+| AFRICA      | 15               |
+| AFRICA      | 16               |
+| AMERICA     | 1                |
+| AMERICA     | 2                |
+| AMERICA     | 3                |
+| AMERICA     | 17               |
+| AMERICA     | 24               |
+| ASIA        | 8                |
+| ASIA        | 9                |
+| ASIA        | 12               |
+| ASIA        | 18               |
+| ASIA        | 21               |
+| EUROPE      | 6                |
+| EUROPE      | 7                |
+| EUROPE      | 19               |
+| EUROPE      | 22               |
+| EUROPE      | 23               |
+| MIDDLE EAST | 4                |
+| MIDDLE EAST | 10               |
+| MIDDLE EAST | 11               |
+| MIDDLE EAST | 13               |
+| MIDDLE EAST | 20               |
++-------------+------------------+
+
+select
+  r_name,
+  count(r_nations.item.n_nationkey) as count,
+  sum(r_nations.item.n_nationkey) as sum,
+  avg(r_nations.item.n_nationkey) as avg,
+  min(r_nations.item.n_name) as minimum,
+  max(r_nations.item.n_name) as maximum,
+  ndv(r_nations.item.n_nationkey) as distinct_vals
+from
+  region, region.r_nations as r_nations
+group by r_name
+order by r_name;
++-------------+-------+-----+------+-----------+----------------+---------------+
+| r_name      | count | sum | avg  | minimum   | maximum        | distinct_vals |
++-------------+-------+-----+------+-----------+----------------+---------------+
+| AFRICA      | 5     | 50  | 10   | ALGERIA   | MOZAMBIQUE     | 5             |
+| AMERICA     | 5     | 47  | 9.4  | ARGENTINA | UNITED STATES  | 5             |
+| ASIA        | 5     | 68  | 13.6 | CHINA     | VIETNAM        | 5             |
+| EUROPE      | 5     | 77  | 15.4 | FRANCE    | UNITED KINGDOM | 5             |
+| MIDDLE EAST | 5     | 58  | 11.6 | EGYPT     | SAUDI ARABIA   | 5             |
++-------------+-------+-----+------+-----------+----------------+---------------+
+</code></pre>
+</div>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>-- How many rows total are in the table, regardless of NULL values?
+select count(*) from t1;
+-- How many rows are in the table with non-NULL values for a column?
+select count(c1) from t1;
+-- Count the rows that meet certain conditions.
+-- Again, * includes NULLs, so COUNT(*) might be greater than COUNT(col).
+select count(*) from t1 where x &gt; 10;
+select count(c1) from t1 where x &gt; 10;
+-- Can also be used in combination with DISTINCT and/or GROUP BY.
+-- Combine COUNT and DISTINCT to find the number of unique values.
+-- Must use column names rather than * with COUNT(DISTINCT ...) syntax.
+-- Rows with NULL values are not counted.
+select count(distinct c1) from t1;
+-- Rows with a NULL value in _either_ column are not counted.
+select count(distinct c1, c2) from t1;
+-- Return more than one result.
+select month, year, count(distinct visitor_id) from web_stats group by month, year;
+</code></pre>
+
+    <div class="p">
+      The following examples show how to use <code class="ph codeph">COUNT()</code> in an analytic context. They use a table
+      containing integers from 1 to 10. Notice how the <code class="ph codeph">COUNT()</code> is reported for each input value, as
+      opposed to the <code class="ph codeph">GROUP BY</code> clause which condenses the result set.
+<pre class="pre codeblock"><code>select x, property, count(x) over (partition by property) as count from int_t where property in ('odd','even');
++----+----------+-------+
+| x  | property | count |
++----+----------+-------+
+| 2  | even     | 5     |
+| 4  | even     | 5     |
+| 6  | even     | 5     |
+| 8  | even     | 5     |
+| 10 | even     | 5     |
+| 1  | odd      | 5     |
+| 3  | odd      | 5     |
+| 5  | odd      | 5     |
+| 7  | odd      | 5     |
+| 9  | odd      | 5     |
++----+----------+-------+
+</code></pre>
+
+Adding an <code class="ph codeph">ORDER BY</code> clause lets you experiment with results that are cumulative or apply to a moving
+set of rows (the <span class="q">"window"</span>). The following examples use <code class="ph codeph">COUNT()</code> in an analytic context
+(that is, with an <code class="ph codeph">OVER()</code> clause) to produce a running count of all the even values,
+then a running count of all the odd values. The basic <code class="ph codeph">ORDER BY x</code> clause implicitly
+activates a window clause of <code class="ph codeph">RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</code>,
+which is effectively the same as <code class="ph codeph">ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW</code>,
+therefore all of these examples produce the same results:
+<pre class="pre codeblock"><code>select x, property,
+  count(x) over (partition by property <strong class="ph b">order by x</strong>) as 'cumulative count'
+  from int_t where property in ('odd','even');
++----+----------+------------------+
+| x  | property | cumulative count |
++----+----------+------------------+
+| 2  | even     | 1                |
+| 4  | even     | 2                |
+| 6  | even     | 3                |
+| 8  | even     | 4                |
+| 10 | even     | 5                |
+| 1  | odd      | 1                |
+| 3  | odd      | 2                |
+| 5  | odd      | 3                |
+| 7  | odd      | 4                |
+| 9  | odd      | 5                |
++----+----------+------------------+
+
+select x, property,
+  count(x) over
+  (
+    partition by property
+    <strong class="ph b">order by x</strong>
+    <strong class="ph b">range between unbounded preceding and current row</strong>
+  ) as 'cumulative total'
+from int_t where property in ('odd','even');
++----+----------+------------------+
+| x  | property | cumulative count |
++----+----------+------------------+
+| 2  | even     | 1                |
+| 4  | even     | 2                |
+| 6  | even     | 3                |
+| 8  | even     | 4                |
+| 10 | even     | 5                |
+| 1  | odd      | 1                |
+| 3  | odd      | 2                |
+| 5  | odd      | 3                |
+| 7  | odd      | 4                |
+| 9  | odd      | 5                |
++----+----------+------------------+
+
+select x, property,
+  count(x) over
+  (
+    partition by property
+    <strong class="ph b">order by x</strong>
+    <strong class="ph b">rows between unbounded preceding and current row</strong>
+  ) as 'cumulative total'
+  from int_t where property in ('odd','even');
++----+----------+------------------+
+| x  | property | cumulative count |
++----+----------+------------------+
+| 2  | even     | 1                |
+| 4  | even     | 2                |
+| 6  | even     | 3                |
+| 8  | even     | 4                |
+| 10 | even     | 5                |
+| 1  | odd      | 1                |
+| 3  | odd      | 2                |
+| 5  | odd      | 3                |
+| 7  | odd      | 4                |
+| 9  | odd      | 5                |
++----+----------+------------------+
+</code></pre>
+
+The following examples show how to construct a moving window, with a running count taking into account 1 row before
+and 1 row after the current row, within the same partition (all the even values or all the odd values).
+Therefore, the count is consistently 3 for rows in the middle of the window, and 2 for
+rows near the ends of the window, where there is no preceding or no following row in the partition.
+Because of a restriction in the Impala <code class="ph codeph">RANGE</code> syntax, this type of
+moving window is possible with the <code class="ph codeph">ROWS BETWEEN</code> clause but not the <code class="ph codeph">RANGE BETWEEN</code>
+clause:
+<pre class="pre codeblock"><code>select x, property,
+  count(x) over
+  (
+    partition by property
+    <strong class="ph b">order by x</strong>
+    <strong class="ph b">rows between 1 preceding and 1 following</strong>
+  ) as 'moving total'
+  from int_t where property in ('odd','even');
++----+----------+--------------+
+| x  | property | moving total |
++----+----------+--------------+
+| 2  | even     | 2            |
+| 4  | even     | 3            |
+| 6  | even     | 3            |
+| 8  | even     | 3            |
+| 10 | even     | 2            |
+| 1  | odd      | 2            |
+| 3  | odd      | 3            |
+| 5  | odd      | 3            |
+| 7  | odd      | 3            |
+| 9  | odd      | 2            |
++----+----------+--------------+
+
+-- Doesn't work because of syntax restriction on RANGE clause.
+select x, property,
+  count(x) over
+  (
+    partition by property
+    <strong class="ph b">order by x</strong>
+    <strong class="ph b">range between 1 preceding and 1 following</strong>
+  ) as 'moving total'
+from int_t where property in ('odd','even');
+ERROR: AnalysisException: RANGE is only supported with both the lower and upper bounds UNBOUNDED or one UNBOUNDED and the other CURRENT ROW.
+</code></pre>
+    </div>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+        <p class="p">
+          By default, Impala only allows a single <code class="ph codeph">COUNT(DISTINCT <var class="keyword varname">columns</var>)</code>
+          expression in each query.
+        </p>
+        <p class="p">
+          If you do not need precise accuracy, you can produce an estimate of the distinct values for a column by
+          specifying <code class="ph codeph">NDV(<var class="keyword varname">column</var>)</code>; a query can contain multiple instances of
+          <code class="ph codeph">NDV(<var class="keyword varname">column</var>)</code>. To make Impala automatically rewrite
+          <code class="ph codeph">COUNT(DISTINCT)</code> expressions to <code class="ph codeph">NDV()</code>, enable the
+          <code class="ph codeph">APPX_COUNT_DISTINCT</code> query option.
+        </p>
+        <p class="p">
+          To produce the same result as multiple <code class="ph codeph">COUNT(DISTINCT)</code> expressions, you can use the
+          following technique for queries involving a single table:
+        </p>
+<pre class="pre codeblock"><code>select v1.c1 result1, v2.c1 result2 from
+  (select count(distinct col1) as c1 from t1) v1
+    cross join
+  (select count(distinct col2) as c1 from t1) v2;
+</code></pre>
+        <p class="p">
+          Because <code class="ph codeph">CROSS JOIN</code> is an expensive operation, prefer to use the <code class="ph codeph">NDV()</code>
+          technique wherever practical.
+        </p>
+      </div>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_analytic_functions.html#analytic_functions">Impala Analytic Functions</a>
+    </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_aggregate_functions.html">Impala Aggregate Functions</a></div></div></nav></article></main></body></html>

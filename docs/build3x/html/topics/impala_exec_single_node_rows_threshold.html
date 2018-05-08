@@ -1,0 +1,89 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="exec_single_node_rows_threshold"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>EXEC_SINGLE_NODE_ROWS_THRESHOLD Query Option (Impala 2.1 or higher only)</title></head><body id="exec_single_node_rows_threshold"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">EXEC_SINGLE_NODE_ROWS_THRESHOLD Query Option (<span class="keyword">Impala 2.1</span> or higher only)</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      This setting controls the cutoff point (in terms of number of rows scanned) below which Impala treats a query
+      as a <span class="q">"small"</span> query, turning off optimizations such as parallel execution and native code generation. The
+      overhead for these optimizations is applicable for queries involving substantial amounts of data, but it
+      makes sense to skip them for queries involving tiny amounts of data. Reducing the overhead for small queries
+      allows Impala to complete them more quickly, keeping YARN resources, admission control slots, and so on
+      available for data-intensive queries.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>SET EXEC_SINGLE_NODE_ROWS_THRESHOLD=<var class="keyword varname">number_of_rows</var></code></pre>
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> numeric
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> 100
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Usage notes:</strong> Typically, you increase the default value to make this optimization apply to more queries.
+      If incorrect or corrupted table and column statistics cause Impala to apply this optimization
+      incorrectly to queries that actually involve substantial work, you might see the queries being slower as a
+      result of remote reads. In that case, recompute statistics with the <code class="ph codeph">COMPUTE STATS</code>
+      or <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> statement. If there is a problem collecting accurate
+      statistics, you can turn this feature off by setting the value to -1.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Internal details:</strong>
+      </p>
+
+    <p class="p">
+      This setting applies to query fragments where the amount of data to scan can be accurately determined, either
+      through table and column statistics, or by the presence of a <code class="ph codeph">LIMIT</code> clause. If Impala cannot
+      accurately estimate the size of the input data, this setting does not apply.
+    </p>
+
+    <p class="p">
+      In <span class="keyword">Impala 2.3</span> and higher, where Impala supports the complex data types <code class="ph codeph">STRUCT</code>,
+      <code class="ph codeph">ARRAY</code>, and <code class="ph codeph">MAP</code>, if a query refers to any column of those types,
+      the small-query optimization is turned off for that query regardless of the
+      <code class="ph codeph">EXEC_SINGLE_NODE_ROWS_THRESHOLD</code> setting.
+    </p>
+
+    <p class="p">
+      For a query that is determined to be <span class="q">"small"</span>, all work is performed on the coordinator node. This might
+      result in some I/O being performed by remote reads. The savings from not distributing the query work and not
+      generating native code are expected to outweigh any overhead from the remote reads.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.10</span>
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      A common use case is to query just a few rows from a table to inspect typical data values. In this example,
+      Impala does not parallelize the query or perform native code generation because the result set is guaranteed
+      to be smaller than the threshold value from this query option:
+    </p>
+
+<pre class="pre codeblock"><code>SET EXEC_SINGLE_NODE_ROWS_THRESHOLD=500;
+SELECT * FROM enormous_table LIMIT 300;
+</code></pre>
+
+
+
+  </div>
+
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

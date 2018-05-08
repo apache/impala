@@ -1,0 +1,446 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="tables"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Overview of Impala Tables</title></head><body id="tables"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Overview of Impala Tables</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p"></p>
+
+    <p class="p">
+      Tables are the primary containers for data in Impala. They have the familiar row and column layout similar to
+      other database systems, plus some features such as partitioning often associated with higher-end data
+      warehouse systems.
+    </p>
+
+    <p class="p">
+      Logically, each table has a structure based on the definition of its columns, partitions, and other
+      properties.
+    </p>
+
+    <p class="p">
+      Physically, each table that uses HDFS storage is associated with a directory in HDFS. The table data consists of all the data files
+      underneath that directory:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        <a class="xref" href="impala_tables.html#internal_tables">Internal tables</a> are managed by Impala, and use directories
+        inside the designated Impala work area.
+      </li>
+
+      <li class="li">
+        <a class="xref" href="impala_tables.html#external_tables">External tables</a> use arbitrary HDFS directories, where
+        the data files are typically shared between different Hadoop components.
+      </li>
+
+      <li class="li">
+        Large-scale data is usually handled by partitioned tables, where the data files are divided among different
+        HDFS subdirectories.
+      </li>
+    </ul>
+
+    <p class="p">
+      Impala tables can also represent data that is stored in HBase, or in the Amazon S3 filesystem (<span class="keyword">Impala 2.2</span> or higher),
+      or on Isilon storage devices (<span class="keyword">Impala 2.2.3</span> or higher).  See <a class="xref" href="impala_hbase.html#impala_hbase">Using Impala to Query HBase Tables</a>,
+      <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a>, and <a class="xref" href="impala_isilon.html#impala_isilon">Using Impala with Isilon Storage</a>
+      for details about those special kinds of tables.
+    </p>
+
+    <p class="p">
+        Impala queries ignore files with extensions commonly used for temporary work files by Hadoop tools. Any
+        files with extensions <code class="ph codeph">.tmp</code> or <code class="ph codeph">.copying</code> are not considered part of the
+        Impala table. The suffix matching is case-insensitive, so for example Impala ignores both
+        <code class="ph codeph">.copying</code> and <code class="ph codeph">.COPYING</code> suffixes.
+      </p>
+
+    <p class="p toc inpage"></p>
+
+    <p class="p">
+      <strong class="ph b">Related statements:</strong> <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>,
+      <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a>, <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a>
+      <a class="xref" href="impala_insert.html#insert">INSERT Statement</a>, <a class="xref" href="impala_load_data.html#load_data">LOAD DATA Statement</a>,
+      <a class="xref" href="impala_select.html#select">SELECT Statement</a>
+    </p>
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_schema_objects.html">Impala Schema Objects and Object Names</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="tables__internal_tables">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Internal Tables</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+
+        The default kind of table produced by the <code class="ph codeph">CREATE TABLE</code> statement is known as an internal
+        table. (Its counterpart is the external table, produced by the <code class="ph codeph">CREATE EXTERNAL TABLE</code>
+        syntax.)
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            Impala creates a directory in HDFS to hold the data files.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            You can create data in internal tables by issuing <code class="ph codeph">INSERT</code> or <code class="ph codeph">LOAD DATA</code>
+            statements.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            If you add or replace data using HDFS operations, issue the <code class="ph codeph">REFRESH</code> command in
+            <span class="keyword cmdname">impala-shell</span> so that Impala recognizes the changes in data files, block locations,
+            and so on.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            When you issue a <code class="ph codeph">DROP TABLE</code> statement, Impala physically removes all the data files
+            from the directory.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+        To see whether a table is internal or external, and its associated HDFS location, issue the statement
+        <code class="ph codeph">DESCRIBE FORMATTED <var class="keyword varname">table_name</var></code>. The <code class="ph codeph">Table Type</code> field
+        displays <code class="ph codeph">MANAGED_TABLE</code> for internal tables and <code class="ph codeph">EXTERNAL_TABLE</code> for
+        external tables. The <code class="ph codeph">Location</code> field displays the path of the table directory as an HDFS
+        URI.
+      </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            When you issue an <code class="ph codeph">ALTER TABLE</code> statement to rename an internal table, all data files
+            are moved into the new HDFS directory for the table. The files are moved even if they were formerly in
+            a directory outside the Impala data directory, for example in an internal table with a
+            <code class="ph codeph">LOCATION</code> attribute pointing to an outside HDFS directory.
+          </p>
+        </li>
+      </ul>
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+      <div class="p">
+        You can switch a table from internal to external, or from external to internal, by using the <code class="ph codeph">ALTER
+        TABLE</code> statement:
+<pre class="pre codeblock"><code>
+-- Switch a table from internal to external.
+ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXTERNAL'='TRUE');
+
+-- Switch a table from external to internal.
+ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXTERNAL'='FALSE');
+</code></pre>
+      </div>
+
+      <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+      <p class="p">
+        <a class="xref" href="impala_tables.html#external_tables">External Tables</a>, <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>,
+        <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a>, <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a>,
+        <a class="xref" href="impala_describe.html#describe">DESCRIBE Statement</a>
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="tables__external_tables">
+
+    <h2 class="title topictitle2" id="ariaid-title3">External Tables</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+
+        The syntax <code class="ph codeph">CREATE EXTERNAL TABLE</code> sets up an Impala table that points at existing data
+        files, potentially in HDFS locations outside the normal Impala data directories.. This operation saves the
+        expense of importing the data into a new table when you already have the data files in a known location in
+        HDFS, in the desired file format.
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            You can use Impala to query the data in this table.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            You can create data in external tables by issuing <code class="ph codeph">INSERT</code> or <code class="ph codeph">LOAD DATA</code>
+            statements.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            If you add or replace data using HDFS operations, issue the <code class="ph codeph">REFRESH</code> command in
+            <span class="keyword cmdname">impala-shell</span> so that Impala recognizes the changes in data files, block locations,
+            and so on.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            When you issue a <code class="ph codeph">DROP TABLE</code> statement in Impala, that removes the connection that
+            Impala has with the associated data files, but does not physically remove the underlying data. You can
+            continue to use the data files with other Hadoop components and HDFS operations.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+        To see whether a table is internal or external, and its associated HDFS location, issue the statement
+        <code class="ph codeph">DESCRIBE FORMATTED <var class="keyword varname">table_name</var></code>. The <code class="ph codeph">Table Type</code> field
+        displays <code class="ph codeph">MANAGED_TABLE</code> for internal tables and <code class="ph codeph">EXTERNAL_TABLE</code> for
+        external tables. The <code class="ph codeph">Location</code> field displays the path of the table directory as an HDFS
+        URI.
+      </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            When you issue an <code class="ph codeph">ALTER TABLE</code> statement to rename an external table, all data files
+            are left in their original locations.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            You can point multiple external tables at the same HDFS directory by using the same
+            <code class="ph codeph">LOCATION</code> attribute for each one. The tables could have different column definitions,
+            as long as the number and types of columns are compatible with the schema evolution considerations for
+            the underlying file type. For example, for text data files, one table might define a certain column as
+            a <code class="ph codeph">STRING</code> while another defines the same column as a <code class="ph codeph">BIGINT</code>.
+          </p>
+        </li>
+      </ul>
+
+      <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+      <div class="p">
+        You can switch a table from internal to external, or from external to internal, by using the <code class="ph codeph">ALTER
+        TABLE</code> statement:
+<pre class="pre codeblock"><code>
+-- Switch a table from internal to external.
+ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXTERNAL'='TRUE');
+
+-- Switch a table from external to internal.
+ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXTERNAL'='FALSE');
+</code></pre>
+      </div>
+
+      <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+      <p class="p">
+        <a class="xref" href="impala_tables.html#internal_tables">Internal Tables</a>, <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a>,
+        <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a>, <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a>,
+        <a class="xref" href="impala_describe.html#describe">DESCRIBE Statement</a>
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="tables__table_file_formats">
+    <h2 class="title topictitle2" id="ariaid-title4">File Formats</h2>
+
+    <div class="body conbody">
+      <p class="p">
+        Each table has an associated file format, which determines how Impala interprets the
+        associated data files. See <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a> for details.
+      </p>
+      <p class="p">
+        You set the file format during the <code class="ph codeph">CREATE TABLE</code> statement,
+        or change it later using the <code class="ph codeph">ALTER TABLE</code> statement.
+        Partitioned tables can have a different file format for individual partitions,
+        allowing you to change the file format used in your ETL process for new data
+        without going back and reconverting all the existing data in the same table.
+      </p>
+      <p class="p">
+        Any <code class="ph codeph">INSERT</code> statements produce new data files with the current file format of the table.
+        For existing data files, changing the file format of the table does not automatically do any data conversion.
+        You must use <code class="ph codeph">TRUNCATE TABLE</code> or <code class="ph codeph">INSERT OVERWRITE</code> to remove any previous data
+        files that use the old file format.
+        Then you use the <code class="ph codeph">LOAD DATA</code> statement, <code class="ph codeph">INSERT ... SELECT</code>, or other mechanism
+        to put data files of the correct format into the table.
+      </p>
+      <p class="p">
+        The default file format, text, is the most flexible and easy to produce when you are just getting started with
+        Impala. The Parquet file format offers the highest query performance and uses compression to reduce storage
+        requirements; therefore, where practical, use Parquet for Impala tables with substantial amounts of data.
+        <span class="ph">Also, the complex types (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, and <code class="ph codeph">MAP</code>)
+        available in <span class="keyword">Impala 2.3</span> and higher are currently only supported with the Parquet file type.</span>
+        Based on your existing ETL workflow, you might use other file formats such as Avro, possibly doing a final
+        conversion step to Parquet to take advantage of its performance for analytic queries.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="tables__kudu_tables">
+    <h2 class="title topictitle2" id="ariaid-title5">Kudu Tables</h2>
+
+
+    <div class="body conbody">
+      <p class="p">
+        Tables stored in Apache Kudu are treated specially, because Kudu manages its data independently of HDFS files.
+        Some information about the table is stored in the metastore database for use by Impala. Other table metadata is
+        managed internally by Kudu.
+      </p>
+
+      <p class="p">
+        When you create a Kudu table through Impala, it is assigned an internal Kudu table name of the form
+        <code class="ph codeph">impala::<var class="keyword varname">db_name</var>.<var class="keyword varname">table_name</var></code>. You can see the Kudu-assigned name
+        in the output of <code class="ph codeph">DESCRIBE FORMATTED</code>, in the <code class="ph codeph">kudu.table_name</code> field of the table properties.
+        The Kudu-assigned name remains the same even if you use <code class="ph codeph">ALTER TABLE</code> to rename the Impala table
+        or move it to a different Impala database. If you issue the statement
+        <code class="ph codeph">ALTER TABLE <var class="keyword varname">impala_name</var> SET TBLPROPERTIES('kudu.table_name' = '<var class="keyword varname">different_kudu_table_name</var>')</code>,
+        the effect is different depending on whether the Impala table was created with a regular <code class="ph codeph">CREATE TABLE</code>
+        statement (that is, if it is an internal or managed table), or if it was created with a
+        <code class="ph codeph">CREATE EXTERNAL TABLE</code> statement (and therefore is an external table). Changing the <code class="ph codeph">kudu.table_name</code>
+        property of an internal table physically renames the underlying Kudu table to match the new name.
+        Changing the <code class="ph codeph">kudu.table_name</code> property of an external table switches which underlying Kudu table
+        the Impala table refers to; the underlying Kudu table must already exist.
+      </p>
+
+      <p class="p">
+        The following example shows what happens with both internal and external Kudu tables as the <code class="ph codeph">kudu.table_name</code>
+        property is changed. In practice, external tables are typically used to access underlying Kudu tables that were created
+        outside of Impala, that is, through the Kudu API.
+      </p>
+
+<pre class="pre codeblock"><code>
+-- This is an internal table that we will create and then rename.
+create table old_name (id bigint primary key, s string)
+  partition by hash(id) partitions 2 stored as kudu;
+
+-- Initially, the name OLD_NAME is the same on the Impala and Kudu sides.
+describe formatted old_name;
+...
+| Location:          | hdfs://host.example.com:8020/path/user.db/old_name
+| Table Type:        | MANAGED_TABLE         | NULL
+| Table Parameters:  | NULL                  | NULL
+|                    | DO_NOT_UPDATE_STATS   | true
+|                    | kudu.master_addresses | vd0342.example.com
+|                    | kudu.table_name       | impala::user.old_name
+
+-- ALTER TABLE RENAME TO changes the Impala name but not the underlying Kudu name.
+alter table old_name rename to new_name;
+
+describe formatted new_name;
+| Location:          | hdfs://host.example.com:8020/path/user.db/new_name
+| Table Type:        | MANAGED_TABLE         | NULL
+| Table Parameters:  | NULL                  | NULL
+|                    | DO_NOT_UPDATE_STATS   | true
+|                    | kudu.master_addresses | vd0342.example.com
+|                    | kudu.table_name       | impala::user.old_name
+
+-- Setting TBLPROPERTIES changes the underlying Kudu name.
+alter table new_name
+  set tblproperties('kudu.table_name' = 'impala::user.new_name');
+
+describe formatted new_name;
+| Location:          | hdfs://host.example.com:8020/path/user.db/new_name
+| Table Type:        | MANAGED_TABLE         | NULL
+| Table Parameters:  | NULL                  | NULL
+|                    | DO_NOT_UPDATE_STATS   | true
+|                    | kudu.master_addresses | vd0342.example.com
+|                    | kudu.table_name       | impala::user.new_name
+
+-- Put some data in the table to demonstrate how external tables can map to
+-- different underlying Kudu tables.
+insert into new_name values (0, 'zero'), (1, 'one'), (2, 'two');
+
+-- This external table points to the same underlying Kudu table, NEW_NAME,
+-- as we created above. No need to declare columns or other table aspects.
+create external table kudu_table_alias stored as kudu
+  tblproperties('kudu.table_name' = 'impala::user.new_name');
+
+-- The external table can fetch data from the NEW_NAME table that already
+-- existed and already had data.
+select * from kudu_table_alias limit 100;
++----+------+
+| id | s    |
++----+------+
+| 1  | one  |
+| 0  | zero |
+| 2  | two  |
++----+------+
+
+-- We cannot re-point the external table at a different underlying Kudu table
+-- unless that other underlying Kudu table already exists.
+alter table kudu_table_alias
+  set tblproperties('kudu.table_name' = 'impala::user.yet_another_name');
+ERROR:
+TableLoadingException: Error opening Kudu table 'impala::user.yet_another_name',
+  Kudu error: The table does not exist: table_name: "impala::user.yet_another_name"
+
+-- Once the underlying Kudu table exists, we can re-point the external table to it.
+create table yet_another_name (id bigint primary key, x int, y int, s string)
+  partition by hash(id) partitions 2 stored as kudu;
+
+alter table kudu_table_alias
+  set tblproperties('kudu.table_name' = 'impala::user.yet_another_name');
+
+-- Now no data is returned because this other table is empty.
+select * from kudu_table_alias limit 100;
+
+-- The Impala table automatically recognizes the table schema of the new table,
+-- for example the extra X and Y columns not present in the original table.
+describe kudu_table_alias;
++------+--------+---------+-------------+----------+...
+| name | type   | comment | primary_key | nullable |...
++------+--------+---------+-------------+----------+...
+| id   | bigint |         | true        | false    |...
+| x    | int    |         | false       | true     |...
+| y    | int    |         | false       | true     |...
+| s    | string |         | false       | true     |...
++------+--------+---------+-------------+----------+...
+</code></pre>
+
+      <p class="p">
+        The <code class="ph codeph">SHOW TABLE STATS</code> output for a Kudu table shows Kudu-specific details about the layout of the table.
+        Instead of information about the number and sizes of files, the information is divided by the Kudu tablets.
+        For each tablet, the output includes the fields
+        <code class="ph codeph"># Rows</code> (although this number is not currently computed), <code class="ph codeph">Start Key</code>, <code class="ph codeph">Stop Key</code>, <code class="ph codeph">Leader Replica</code>, and <code class="ph codeph"># Replicas</code>.
+        The output of <code class="ph codeph">SHOW COLUMN STATS</code>, illustrating the distribution of values within each column, is the same for Kudu tables
+        as for HDFS-backed tables.
+      </p>
+
+      <div class="p">
+        The distinction between internal and external tables has some special
+        details for Kudu tables. Tables created entirely through Impala are
+        internal tables. The table name as represented within Kudu includes
+        notation such as an <code class="ph codeph">impala::</code> prefix and the Impala
+        database name. External Kudu tables are those created by a non-Impala
+        mechanism, such as a user application calling the Kudu APIs. For
+        these tables, the <code class="ph codeph">CREATE EXTERNAL TABLE</code> syntax lets
+        you establish a mapping from Impala to the existing Kudu table:
+<pre class="pre codeblock"><code>
+CREATE EXTERNAL TABLE impala_name STORED AS KUDU
+  TBLPROPERTIES('kudu.table_name' = 'original_kudu_name');
+</code></pre>
+        External Kudu tables differ in one important way from other external
+        tables: adding or dropping a column or range partition changes the
+        data in the underlying Kudu table, in contrast to an HDFS-backed
+        external table where existing data files are left untouched.
+      </div>
+    </div>
+  </article>
+
+</article></main></body></html>

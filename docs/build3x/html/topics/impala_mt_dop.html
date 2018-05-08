@@ -1,0 +1,190 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="mt_dop"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>MT_DOP Query Option</title></head><body id="mt_dop"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">MT_DOP Query Option</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      Sets the degree of intra-node parallelism used for certain operations that
+      can benefit from multithreaded execution. You can specify values
+      higher than zero to find the ideal balance of response time,
+      memory usage, and CPU usage during statement processing.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+      <p class="p">
+        The Impala execution engine is being revamped incrementally to add
+        additional parallelism within a single host for certain statements and
+        kinds of operations. The setting <code class="ph codeph">MT_DOP=0</code> uses the
+        <span class="q">"old"</span> code path with limited intra-node parallelism.
+      </p>
+
+      <p class="p">
+        Currently, the operations affected by the <code class="ph codeph">MT_DOP</code>
+        query option are:
+      </p>
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">COMPUTE [INCREMENTAL] STATS</code>. Impala automatically sets
+            <code class="ph codeph">MT_DOP=4</code> for <code class="ph codeph">COMPUTE STATS</code> and
+            <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> statements on Parquet tables.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            Queries with execution plans containing only scan and aggregation operators,
+            or local joins that do not need data exchanges (such as for nested types).
+            Other queries produce an error if <code class="ph codeph">MT_DOP</code> is set to a non-zero
+            value. Therefore, this query option is typically only set for the duration of
+            specific long-running, CPU-intensive queries.
+          </p>
+        </li>
+      </ul>
+
+    </div>
+
+    <p class="p">
+        <strong class="ph b">Type:</strong> integer
+      </p>
+    <p class="p">
+        <strong class="ph b">Default:</strong> <code class="ph codeph">0</code>
+      </p>
+    <p class="p">
+      Because <code class="ph codeph">COMPUTE STATS</code> and <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
+      statements for Parquet tables benefit substantially from extra intra-node
+      parallelism, Impala automatically sets <code class="ph codeph">MT_DOP=4</code> when computing stats
+      for Parquet tables.
+    </p>
+    <p class="p">
+      <strong class="ph b">Range:</strong> 0 to 64
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+      <p class="p">
+        Any timing figures in the following examples are on a small, lightly loaded development cluster.
+        Your mileage may vary. Speedups depend on many factors, including the number of rows, columns, and
+        partitions within each table.
+      </p>
+    </div>
+
+    <p class="p">
+      The following example shows how to run a <code class="ph codeph">COMPUTE STATS</code>
+      statement against a Parquet table with or without an explicit <code class="ph codeph">MT_DOP</code>
+      setting:
+    </p>
+
+<pre class="pre codeblock"><code>
+-- Explicitly setting MT_DOP to 0 selects the old code path.
+set mt_dop = 0;
+MT_DOP set to 0
+
+-- The analysis for the billion rows is distributed among hosts,
+-- but uses only a single core on each host.
+compute stats billion_rows_parquet;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 2 column(s). |
++-----------------------------------------+
+
+drop stats billion_rows_parquet;
+
+-- Using 4 logical processors per host is faster.
+set mt_dop = 4;
+MT_DOP set to 4
+
+compute stats billion_rows_parquet;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 2 column(s). |
++-----------------------------------------+
+
+drop stats billion_rows_parquet;
+
+-- Unsetting the option reverts back to its default.
+-- Which for COMPUTE STATS and a Parquet table is 4,
+-- so again it uses the fast path.
+unset MT_DOP;
+Unsetting option MT_DOP
+
+compute stats billion_rows_parquet;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 2 column(s). |
++-----------------------------------------+
+
+</code></pre>
+
+    <p class="p">
+      The following example shows the effects of setting <code class="ph codeph">MT_DOP</code>
+      for a query involving only scan and aggregation operations for a Parquet table:
+    </p>
+
+<pre class="pre codeblock"><code>
+set mt_dop = 0;
+MT_DOP set to 0
+
+-- COUNT(DISTINCT) for a unique column is CPU-intensive.
+select count(distinct id) from billion_rows_parquet;
++--------------------+
+| count(distinct id) |
++--------------------+
+| 1000000000         |
++--------------------+
+Fetched 1 row(s) in 67.20s
+
+set mt_dop = 16;
+MT_DOP set to 16
+
+-- Introducing more intra-node parallelism for the aggregation
+-- speeds things up, and potentially reduces memory overhead by
+-- reducing the number of scanner threads.
+select count(distinct id) from billion_rows_parquet;
++--------------------+
+| count(distinct id) |
++--------------------+
+| 1000000000         |
++--------------------+
+Fetched 1 row(s) in 17.19s
+
+</code></pre>
+
+    <p class="p">
+      The following example shows how queries that are not compatible with non-zero
+      <code class="ph codeph">MT_DOP</code> settings produce an error when <code class="ph codeph">MT_DOP</code>
+      is set:
+    </p>
+
+<pre class="pre codeblock"><code>
+set mt_dop=1;
+MT_DOP set to 1
+
+select * from a1 inner join a2
+  on a1.id = a2.id limit 4;
+ERROR: NotImplementedException: MT_DOP not supported for plans with
+  base table joins or table sinks.
+
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+    <p class="p">
+      <a class="xref" href="impala_compute_stats.html">COMPUTE STATS Statement</a>,
+      <a class="xref" href="impala_aggregate_functions.html">Impala Aggregate Functions</a>
+    </p>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

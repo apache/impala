@@ -1,0 +1,177 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="delete"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DELETE Statement (Impala 2.8 or higher only)</title></head><body id="delete"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">DELETE Statement (<span class="keyword">Impala 2.8</span> or higher only)</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      Deletes an arbitrary number of rows from a Kudu table.
+      This statement only works for Impala tables that use the Kudu storage engine.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>
+DELETE [FROM] [<var class="keyword varname">database_name</var>.]<var class="keyword varname">table_name</var> [ WHERE <var class="keyword varname">where_conditions</var> ]
+
+DELETE <var class="keyword varname">table_ref</var> FROM [<var class="keyword varname">joined_table_refs</var>] [ WHERE <var class="keyword varname">where_conditions</var> ]
+</code></pre>
+
+    <p class="p">
+      The first form evaluates rows from one table against an optional
+      <code class="ph codeph">WHERE</code> clause, and deletes all the rows that
+      match the <code class="ph codeph">WHERE</code> conditions, or all rows if
+      <code class="ph codeph">WHERE</code> is omitted.
+    </p>
+
+    <p class="p">
+      The second form evaluates one or more join clauses, and deletes
+      all matching rows from one of the tables. The join clauses can
+      include non-Kudu tables, but the table from which the rows
+      are deleted must be a Kudu table. The <code class="ph codeph">FROM</code>
+      keyword is required in this case, to separate the name of
+      the table whose rows are being deleted from the table names
+      of the join clauses.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      The conditions in the <code class="ph codeph">WHERE</code> clause are the same ones allowed
+      for the <code class="ph codeph">SELECT</code> statement. See <a class="xref" href="impala_select.html#select">SELECT Statement</a>
+      for details.
+    </p>
+
+    <p class="p">
+      The conditions in the <code class="ph codeph">WHERE</code> clause can refer to
+      any combination of primary key columns or other columns. Referring to
+      primary key columns in the <code class="ph codeph">WHERE</code> clause is more efficient
+      than referring to non-primary key columns.
+    </p>
+
+    <p class="p">
+      If the <code class="ph codeph">WHERE</code> clause is omitted, all rows are removed from the table.
+    </p>
+
+    <p class="p">
+      Because Kudu currently does not enforce strong consistency during concurrent DML operations,
+      be aware that the results after this statement finishes might be different than you
+      intuitively expect:
+    </p>
+    <ul class="ul">
+      <li class="li">
+        <p class="p">
+          If some rows cannot be deleted because their
+          some primary key columns are not found, due to their being deleted
+          by a concurrent <code class="ph codeph">DELETE</code> operation,
+          the statement succeeds but returns a warning.
+        </p>
+      </li>
+      <li class="li">
+        <p class="p">
+          A <code class="ph codeph">DELETE</code> statement might also overlap with
+          <code class="ph codeph">INSERT</code>, <code class="ph codeph">UPDATE</code>,
+          or <code class="ph codeph">UPSERT</code> statements running concurrently on the same table.
+          After the statement finishes, there might be more or fewer rows than expected in the table
+          because it is undefined whether the <code class="ph codeph">DELETE</code> applies to rows that are
+          inserted or updated while the <code class="ph codeph">DELETE</code> is in progress.
+        </p>
+      </li>
+    </ul>
+
+    <p class="p">
+      The number of affected rows is reported in an <span class="keyword cmdname">impala-shell</span> message
+      and in the query profile.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Statement type:</strong> DML
+      </p>
+
+    <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+        After adding or replacing data in a table used in performance-critical queries, issue a <code class="ph codeph">COMPUTE
+        STATS</code> statement to make sure all statistics are up-to-date. Consider updating statistics for a
+        table after any <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, or <code class="ph codeph">CREATE TABLE AS
+        SELECT</code> statement in Impala, or after loading data through Hive and doing a <code class="ph codeph">REFRESH
+        <var class="keyword varname">table_name</var></code> in Impala. This technique is especially important for tables that
+        are very large, used in join queries, or both.
+      </div>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      The following examples show how to delete rows from a specified
+      table, either all rows or rows that match a <code class="ph codeph">WHERE</code>
+      clause:
+    </p>
+
+<pre class="pre codeblock"><code>
+-- Deletes all rows. The FROM keyword is optional.
+DELETE FROM kudu_table;
+DELETE kudu_table;
+
+-- Deletes 0, 1, or more rows.
+-- (If c1 is a single-column primary key, the statement could only
+-- delete 0 or 1 rows.)
+DELETE FROM kudu_table WHERE c1 = 100;
+
+-- Deletes all rows that match all the WHERE conditions.
+DELETE FROM kudu_table WHERE
+  (c1 &gt; c2 OR c3 IN ('hello','world')) AND c4 IS NOT NULL;
+DELETE FROM t1 WHERE
+  (c1 IN (1,2,3) AND c2 &gt; c3) OR c4 IS NOT NULL;
+DELETE FROM time_series WHERE
+  year = 2016 AND month IN (11,12) AND day &gt; 15;
+
+-- WHERE condition with a subquery.
+DELETE FROM t1 WHERE
+  c5 IN (SELECT DISTINCT other_col FROM other_table);
+
+-- Does not delete any rows, because the WHERE condition is always false.
+DELETE FROM kudu_table WHERE 1 = 0;
+</code></pre>
+
+    <p class="p">
+      The following examples show how to delete rows that are part
+      of the result set from a join:
+    </p>
+
+<pre class="pre codeblock"><code>
+-- Remove _all_ rows from t1 that have a matching X value in t2.
+DELETE t1 FROM t1 JOIN t2 ON t1.x = t2.x;
+
+-- Remove _some_ rows from t1 that have a matching X value in t2.
+DELETE t1 FROM t1 JOIN t2 ON t1.x = t2.x
+  WHERE t1.y = FALSE and t2.z &gt; 100;
+
+-- Delete from a Kudu table based on a join with a non-Kudu table.
+DELETE t1 FROM kudu_table t1 JOIN non_kudu_table t2 ON t1.x = t2.x;
+
+-- The tables can be joined in any order as long as the Kudu table
+-- is specified as the deletion target.
+DELETE t2 FROM non_kudu_table t1 JOIN kudu_table t2 ON t1.x = t2.x;
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_kudu.html#impala_kudu">Using Impala to Query Kudu Tables</a>, <a class="xref" href="impala_insert.html#insert">INSERT Statement</a>,
+      <a class="xref" href="impala_update.html#update">UPDATE Statement (Impala 2.8 or higher only)</a>, <a class="xref" href="impala_upsert.html#upsert">UPSERT Statement (Impala 2.8 or higher only)</a>
+    </p>
+
+  </div>
+
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

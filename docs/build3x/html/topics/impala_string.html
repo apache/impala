@@ -1,0 +1,197 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="string"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>STRING Data Type</title></head><body id="string"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">STRING Data Type</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      A data type used in <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER TABLE</code> statements.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+    <p class="p">
+      In the column definition of a <code class="ph codeph">CREATE TABLE</code> statement:
+    </p>
+
+<pre class="pre codeblock"><code><var class="keyword varname">column_name</var> STRING</code></pre>
+
+    <p class="p">
+      <strong class="ph b">Length:</strong> Maximum of 32,767 bytes. Do not use any length constraint when declaring
+      <code class="ph codeph">STRING</code> columns, as you might be familiar with from <code class="ph codeph">VARCHAR</code>,
+      <code class="ph codeph">CHAR</code>, or similar column types from relational database systems. <span class="ph">If you do
+      need to manipulate string values with precise or maximum lengths, in Impala 2.0 and higher you can declare
+      columns as <code class="ph codeph">VARCHAR(<var class="keyword varname">max_length</var>)</code> or
+      <code class="ph codeph">CHAR(<var class="keyword varname">length</var>)</code>, but for best performance use <code class="ph codeph">STRING</code>
+      where practical.</span>
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Character sets:</strong> For full support in all Impala subsystems, restrict string values to the ASCII
+      character set. Although some UTF-8 character data can be stored in Impala and retrieved through queries, UTF-8 strings
+      containing non-ASCII characters are not guaranteed to work properly in combination with many SQL aspects,
+      including but not limited to:
+    </p>
+    <ul class="ul">
+      <li class="li">
+        String manipulation functions.
+      </li>
+      <li class="li">
+        Comparison operators.
+      </li>
+      <li class="li">
+        The <code class="ph codeph">ORDER BY</code> clause.
+      </li>
+      <li class="li">
+        Values in partition key columns.
+      </li>
+    </ul>
+
+    <p class="p">
+      For any national language aspects such as
+      collation order or interpreting extended ASCII variants such as ISO-8859-1 or ISO-8859-2 encodings, Impala
+      does not include such metadata with the table definition. If you need to sort, manipulate, or display data
+      depending on those national language characteristics of string data, use logic on the application side.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Conversions:</strong>
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        <p class="p">
+          Impala does not automatically convert <code class="ph codeph">STRING</code> to any numeric type. Impala does
+          automatically convert <code class="ph codeph">STRING</code> to <code class="ph codeph">TIMESTAMP</code> if the value matches one of
+          the accepted <code class="ph codeph">TIMESTAMP</code> formats; see <a class="xref" href="impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for
+          details.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+          You can use <code class="ph codeph">CAST()</code> to convert <code class="ph codeph">STRING</code> values to
+          <code class="ph codeph">TINYINT</code>, <code class="ph codeph">SMALLINT</code>, <code class="ph codeph">INT</code>, <code class="ph codeph">BIGINT</code>,
+          <code class="ph codeph">FLOAT</code>, <code class="ph codeph">DOUBLE</code>, or <code class="ph codeph">TIMESTAMP</code>.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+          You cannot directly cast a <code class="ph codeph">STRING</code> value to <code class="ph codeph">BOOLEAN</code>. You can use a
+          <code class="ph codeph">CASE</code> expression to evaluate string values such as <code class="ph codeph">'T'</code>,
+          <code class="ph codeph">'true'</code>, and so on and return Boolean <code class="ph codeph">true</code> and <code class="ph codeph">false</code>
+          values as appropriate.
+        </p>
+      </li>
+
+      <li class="li">
+        <p class="p">
+          You can cast a <code class="ph codeph">BOOLEAN</code> value to <code class="ph codeph">STRING</code>, returning <code class="ph codeph">'1'</code>
+          for <code class="ph codeph">true</code> values and <code class="ph codeph">'0'</code> for <code class="ph codeph">false</code> values.
+        </p>
+      </li>
+    </ul>
+
+    <p class="p">
+        <strong class="ph b">Partitioning:</strong>
+      </p>
+
+    <p class="p">
+      Although it might be convenient to use <code class="ph codeph">STRING</code> columns for partition keys, even when those
+      columns contain numbers, for performance and scalability it is much better to use numeric columns as
+      partition keys whenever practical. Although the underlying HDFS directory name might be the same in either
+      case, the in-memory storage for the partition key columns is more compact, and computations are faster, if
+      partition key columns such as <code class="ph codeph">YEAR</code>, <code class="ph codeph">MONTH</code>, <code class="ph codeph">DAY</code> and so on
+      are declared as <code class="ph codeph">INT</code>, <code class="ph codeph">SMALLINT</code>, and so on.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Zero-length strings:</strong> For purposes of clauses such as <code class="ph codeph">DISTINCT</code> and <code class="ph codeph">GROUP
+        BY</code>, Impala considers zero-length strings (<code class="ph codeph">""</code>), <code class="ph codeph">NULL</code>, and space
+        to all be different values.
+      </p>
+
+
+
+
+
+    <p class="p">
+        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text tables than in tables
+        using Parquet or other binary formats.
+      </p>
+
+    <p class="p"><strong class="ph b">Avro considerations:</strong></p>
+    <p class="p">
+        The Avro specification allows string values up to 2**64 bytes in length.
+        Impala queries for Avro tables use 32-bit integers to hold string lengths.
+        In <span class="keyword">Impala 2.5</span> and higher, Impala truncates <code class="ph codeph">CHAR</code>
+        and <code class="ph codeph">VARCHAR</code> values in Avro tables to (2**31)-1 bytes.
+        If a query encounters a <code class="ph codeph">STRING</code> value longer than (2**31)-1
+        bytes in an Avro table, the query fails. In earlier releases,
+        encountering such long values in an Avro table could cause a crash.
+      </p>
+
+
+
+
+
+
+
+    <p class="p">
+        <strong class="ph b">Column statistics considerations:</strong> Because the values of this type have variable size, none of the
+        column statistics fields are filled in until you run the <code class="ph codeph">COMPUTE STATS</code> statement.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      The following examples demonstrate double-quoted and single-quoted string literals, and required escaping for
+      quotation marks within string literals:
+    </p>
+
+<pre class="pre codeblock"><code>SELECT 'I am a single-quoted string';
+SELECT "I am a double-quoted string";
+SELECT 'I\'m a single-quoted string with an apostrophe';
+SELECT "I\'m a double-quoted string with an apostrophe";
+SELECT 'I am a "short" single-quoted string containing quotes';
+SELECT "I am a \"short\" double-quoted string containing quotes";
+</code></pre>
+
+    <p class="p">
+      The following examples demonstrate calls to string manipulation functions to concatenate strings, convert
+      numbers to strings, or pull out substrings:
+    </p>
+
+<pre class="pre codeblock"><code>SELECT CONCAT("Once upon a time, there were ", CAST(3 AS STRING), ' little pigs.');
+SELECT SUBSTR("hello world",7,5);
+</code></pre>
+
+    <p class="p">
+      The following examples show how to perform operations on <code class="ph codeph">STRING</code> columns within a table:
+    </p>
+
+<pre class="pre codeblock"><code>CREATE TABLE t1 (s1 STRING, s2 STRING);
+INSERT INTO t1 VALUES ("hello", 'world'), (CAST(7 AS STRING), "wonders");
+SELECT s1, s2, length(s1) FROM t1 WHERE s2 LIKE 'w%';
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      <a class="xref" href="impala_literals.html#string_literals">String Literals</a>, <a class="xref" href="impala_char.html#char">CHAR Data Type (Impala 2.0 or higher only)</a>,
+      <a class="xref" href="impala_varchar.html#varchar">VARCHAR Data Type (Impala 2.0 or higher only)</a>, <a class="xref" href="impala_string_functions.html#string_functions">Impala String Functions</a>,
+      <a class="xref" href="impala_datetime_functions.html#datetime_functions">Impala Date and Time Functions</a>
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div></div></nav></article></main></body></html>

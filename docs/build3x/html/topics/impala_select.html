@@ -1,0 +1,236 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_joins.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_order_by.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_group_by.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_having.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_limit.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_offset.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_union.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_subqueries.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_tablesample.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_with.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_distinct.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="select"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>SELECT Statement</title></head><body id="select"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">SELECT Statement</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      The <code class="ph codeph">SELECT</code> statement performs queries, retrieving data from one or more tables and producing
+      result sets consisting of rows and columns.
+    </p>
+
+    <p class="p">
+      The Impala <code class="ph codeph"><a class="xref" href="impala_insert.html#insert">INSERT</a></code> statement also typically ends
+      with a <code class="ph codeph">SELECT</code> statement, to define data to copy from one table to another.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>[WITH <em class="ph i">name</em> AS (<em class="ph i">select_expression</em>) [, ...] ]
+SELECT
+  [ALL | DISTINCT]
+  [STRAIGHT_JOIN]
+  <em class="ph i">expression</em> [, <em class="ph i">expression</em> ...]
+FROM <em class="ph i">table_reference</em> [, <em class="ph i">table_reference</em> ...]
+[[FULL | [LEFT | RIGHT] INNER | [LEFT | RIGHT] OUTER | [LEFT | RIGHT] SEMI | [LEFT | RIGHT] ANTI | CROSS]
+  JOIN <em class="ph i">table_reference</em>
+  [ON <em class="ph i">join_equality_clauses</em> | USING (<var class="keyword varname">col1</var>[, <var class="keyword varname">col2</var> ...]] ...
+WHERE <em class="ph i">conditions</em>
+GROUP BY { <em class="ph i">column</em> | <em class="ph i">expression</em> [, ...] }
+HAVING <code class="ph codeph">conditions</code>
+ORDER BY { <em class="ph i">column</em> | <em class="ph i">expression</em> [ASC | DESC] [NULLS FIRST | NULLS LAST] [, ...] }
+LIMIT <em class="ph i">expression</em> [OFFSET <em class="ph i">expression</em>]
+[UNION [ALL] <em class="ph i">select_statement</em>] ...]
+
+table_reference := { <var class="keyword varname">table_name</var> | (<var class="keyword varname">subquery</var>) }
+  <span class="ph">[ TABLESAMPLE SYSTEM(<var class="keyword varname">percentage</var>) [REPEATABLE(<var class="keyword varname">seed</var>)] ]</span>
+</code></pre>
+
+    <p class="p">
+      Impala <code class="ph codeph">SELECT</code> queries support:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        SQL scalar data types: <code class="ph codeph"><a class="xref" href="impala_boolean.html#boolean">BOOLEAN</a></code>,
+        <code class="ph codeph"><a class="xref" href="impala_tinyint.html#tinyint">TINYINT</a></code>,
+        <code class="ph codeph"><a class="xref" href="impala_smallint.html#smallint">SMALLINT</a></code>,
+        <code class="ph codeph"><a class="xref" href="impala_int.html#int">INT</a></code>,
+        <code class="ph codeph"><a class="xref" href="impala_bigint.html#bigint">BIGINT</a></code>,
+        <code class="ph codeph"><a class="xref" href="impala_decimal.html#decimal">DECIMAL</a></code>
+        <code class="ph codeph"><a class="xref" href="impala_float.html#float">FLOAT</a></code>,
+        <code class="ph codeph"><a class="xref" href="impala_double.html#double">DOUBLE</a></code>,
+        <code class="ph codeph"><a class="xref" href="impala_timestamp.html#timestamp">TIMESTAMP</a></code>,
+        <code class="ph codeph"><a class="xref" href="impala_string.html#string">STRING</a></code>,
+        <code class="ph codeph"><a class="xref" href="impala_varchar.html#varchar">VARCHAR</a></code>,
+        <code class="ph codeph"><a class="xref" href="impala_char.html#char">CHAR</a></code>.
+      </li>
+
+
+      <li class="li">
+        The complex data types <code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, and <code class="ph codeph">MAP</code>,
+        are available in <span class="keyword">Impala 2.3</span> and higher.
+        Queries involving these types typically involve special qualified names
+        using dot notation for referring to the complex column fields,
+        and join clauses for bringing the complex columns into the result set.
+        See <a class="xref" href="impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details.
+      </li>
+
+      <li class="li">
+        An optional <a class="xref" href="impala_with.html#with"><code class="ph codeph">WITH</code> clause</a> before the
+        <code class="ph codeph">SELECT</code> keyword, to define a subquery whose name or column names can be referenced from
+        later in the main query. This clause lets you abstract repeated clauses, such as aggregation functions,
+        that are referenced multiple times in the same query.
+      </li>
+
+      <li class="li">
+        By default, one <code class="ph codeph">DISTINCT</code> clause per query. See <a class="xref" href="impala_distinct.html#distinct">DISTINCT Operator</a>
+        for details. See <a class="xref" href="impala_appx_count_distinct.html#appx_count_distinct">APPX_COUNT_DISTINCT Query Option (Impala 2.0 or higher only)</a> for a query option to
+        allow multiple <code class="ph codeph">COUNT(DISTINCT)</code> impressions in the same query.
+      </li>
+
+      <li class="li">
+        Subqueries in a <code class="ph codeph">FROM</code> clause. In <span class="keyword">Impala 2.0</span> and higher,
+        subqueries can also go in the <code class="ph codeph">WHERE</code> clause, for example with the
+        <code class="ph codeph">IN()</code>, <code class="ph codeph">EXISTS</code>, and <code class="ph codeph">NOT EXISTS</code> operators.
+      </li>
+
+      <li class="li">
+        <code class="ph codeph">WHERE</code>, <code class="ph codeph">GROUP BY</code>, <code class="ph codeph">HAVING</code> clauses.
+      </li>
+
+      <li class="li">
+        <code class="ph codeph"><a class="xref" href="impala_order_by.html#order_by">ORDER BY</a></code>. Prior to Impala 1.4.0, Impala
+        required that queries using an <code class="ph codeph">ORDER BY</code> clause also include a
+        <code class="ph codeph"><a class="xref" href="impala_limit.html#limit">LIMIT</a></code> clause. In Impala 1.4.0 and higher, this
+        restriction is lifted; sort operations that would exceed the Impala memory limit automatically use a
+        temporary disk work area to perform the sort.
+      </li>
+
+      <li class="li">
+        <p class="p">
+        Impala supports a wide variety of <code class="ph codeph">JOIN</code> clauses. Left, right, semi, full, and outer joins
+        are supported in all Impala versions. The <code class="ph codeph">CROSS JOIN</code> operator is available in Impala 1.2.2
+        and higher. During performance tuning, you can override the reordering of join clauses that Impala does
+        internally by including the keyword <code class="ph codeph">STRAIGHT_JOIN</code> immediately after the
+        <code class="ph codeph">SELECT</code> and any <code class="ph codeph">DISTINCT</code> or <code class="ph codeph">ALL</code> keywords.
+      </p>
+        <p class="p">
+          See <a class="xref" href="impala_joins.html#joins">Joins in Impala SELECT Statements</a> for details and examples of join queries.
+        </p>
+      </li>
+
+      <li class="li">
+        <code class="ph codeph">UNION ALL</code>.
+      </li>
+
+      <li class="li">
+        <code class="ph codeph">LIMIT</code>.
+      </li>
+
+      <li class="li">
+        External tables.
+      </li>
+
+      <li class="li">
+        Relational operators such as greater than, less than, or equal to.
+      </li>
+
+      <li class="li">
+        Arithmetic operators such as addition or subtraction.
+      </li>
+
+      <li class="li">
+        Logical/Boolean operators <code class="ph codeph">AND</code>, <code class="ph codeph">OR</code>, and <code class="ph codeph">NOT</code>. Impala does
+        not support the corresponding symbols <code class="ph codeph">&amp;&amp;</code>, <code class="ph codeph">||</code>, and
+        <code class="ph codeph">!</code>.
+      </li>
+
+      <li class="li">
+        Common SQL built-in functions such as <code class="ph codeph">COUNT</code>, <code class="ph codeph">SUM</code>, <code class="ph codeph">CAST</code>,
+        <code class="ph codeph">LIKE</code>, <code class="ph codeph">IN</code>, <code class="ph codeph">BETWEEN</code>, and <code class="ph codeph">COALESCE</code>. Impala
+        specifically supports built-ins described in <a class="xref" href="impala_functions.html#builtins">Impala Built-In Functions</a>.
+      </li>
+
+      <li class="li">
+        In <span class="keyword">Impala 2.9</span> and higher, an optional <code class="ph codeph">TABLESAMPLE</code>
+        clause immediately after a table reference, to specify that the query only processes a
+        specified percentage of the table data. See <a class="xref" href="impala_tablesample.html">TABLESAMPLE Clause</a> for details.
+      </li>
+    </ul>
+
+    <p class="p">
+        Impala queries ignore files with extensions commonly used for temporary work files by Hadoop tools. Any
+        files with extensions <code class="ph codeph">.tmp</code> or <code class="ph codeph">.copying</code> are not considered part of the
+        Impala table. The suffix matching is case-insensitive, so for example Impala ignores both
+        <code class="ph codeph">.copying</code> and <code class="ph codeph">.COPYING</code> suffixes.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Security considerations:</strong>
+      </p>
+    <p class="p">
+        If these statements in your environment contain sensitive literal values such as credit card numbers or tax
+        identifiers, Impala can redact this sensitive information when displaying the statements in log files and
+        other administrative contexts. See <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Amazon S3 considerations:</strong>
+      </p>
+    <p class="p">
+        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files stored in Amazon S3.
+        For Impala tables that use the file formats Parquet, RCFile, SequenceFile,
+        Avro, and uncompressed text, the setting <code class="ph codeph">fs.s3a.block.size</code>
+        in the <span class="ph filepath">core-site.xml</span> configuration file determines
+        how Impala divides the I/O work of reading the data files. This configuration
+        setting is specified in bytes. By default, this
+        value is 33554432 (32 MB), meaning that Impala parallelizes S3 read operations on the files
+        as if they were made up of 32 MB blocks. For example, if your S3 queries primarily access
+        Parquet files written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code>
+        to 134217728 (128 MB) to match the row group size of those files. If most S3 queries involve
+        Parquet files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code>
+        to 268435456 (256 MB) to match the row group size produced by Impala.
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Cancellation:</strong> Can be cancelled. To cancel this statement, use Ctrl-C from the
+        <span class="keyword cmdname">impala-shell</span> interpreter, the <span class="ph uicontrol">Cancel</span> button from the
+        <span class="ph uicontrol">Watch</span> page in Hue, or <span class="ph uicontrol">Cancel</span> from the list of
+        in-flight queries (for a particular node) on the <span class="ph uicontrol">Queries</span> tab in the Impala web UI
+        (port 25000).
+      </p>
+
+    <p class="p">
+        <strong class="ph b">HDFS permissions:</strong>
+      </p>
+    <p class="p">
+      The user ID that the <span class="keyword cmdname">impalad</span> daemon runs under,
+      typically the <code class="ph codeph">impala</code> user, must have read
+      permissions for the files in all applicable directories in all source tables,
+      and read and execute permissions for the relevant data directories.
+      (A <code class="ph codeph">SELECT</code> operation could read files from multiple different HDFS directories
+      if the source table is partitioned.)
+      If a query attempts to read a data file and is unable to because of an HDFS permission error,
+      the query halts and does not return any further results.
+    </p>
+
+    <p class="p toc"></p>
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      The <code class="ph codeph">SELECT</code> syntax is so extensive that it forms its own category of statements: queries. The
+      other major classifications of SQL statements are data definition language (see
+      <a class="xref" href="impala_ddl.html#ddl">DDL Statements</a>) and data manipulation language (see <a class="xref" href="impala_dml.html#dml">DML Statements</a>).
+    </p>
+
+    <p class="p">
+      Because the focus of Impala is on fast queries with interactive response times over huge data sets, query
+      performance and scalability are important considerations. See
+      <a class="xref" href="impala_performance.html#performance">Tuning Impala for Performance</a> and <a class="xref" href="impala_scalability.html#scalability">Scalability Considerations for Impala</a> for
+      details.
+    </p>
+  </div>
+
+
+<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_joins.html">Joins in Impala SELECT Statements</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_order_by.html">ORDER BY Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_group_by.html">GROUP BY Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_having.html">HAVING Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_limit.html">LIMIT Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_offset.html">OFFSET Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_union.html">UNION Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_subqueries.html">Subqueries in Impala SELECT Statements</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_tablesample.html">TABLESAMPLE Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_with.html">WITH Clause</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_distinct.html">DISTINCT Operator</a></strong><br></li></ul><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

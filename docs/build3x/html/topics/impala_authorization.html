@@ -1,0 +1,1176 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="authorization"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Enabling Sentry Authorization for Impala</title></head><body id="authorization"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Enabling Sentry Authorization for Impala</h1>
+
+
+  <div class="body conbody" id="authorization__sentry">
+
+    <p class="p">
+      Authorization determines which users are allowed to access which resources, and what operations they are
+      allowed to perform. In Impala 1.1 and higher, you use Apache Sentry for
+      authorization. Sentry adds a fine-grained authorization framework for Hadoop. By default (when authorization
+      is not enabled), Impala does all read and write operations with the privileges of the <code class="ph codeph">impala</code>
+      user, which is suitable for a development/test environment but not for a secure production environment. When
+      authorization is enabled, Impala uses the OS user ID of the user who runs <span class="keyword cmdname">impala-shell</span> or
+      other client program, and associates various privileges with each user.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+      Sentry is typically used in conjunction with Kerberos authentication, which defines which hosts are allowed
+      to connect to each server. Using the combination of Sentry and Kerberos prevents malicious users from being
+      able to connect by creating a named account on an untrusted machine. See
+      <a class="xref" href="impala_kerberos.html#kerberos">Enabling Kerberos Authentication for Impala</a> for details about Kerberos authentication.
+    </div>
+
+    <p class="p toc inpage">
+      See the following sections for details about using the Impala authorization features:
+    </p>
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_security.html">Impala Security</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="authorization__sentry_priv_model">
+
+    <h2 class="title topictitle2" id="ariaid-title2">The Sentry Privilege Model</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Privileges can be granted on different objects in the schema. Any privilege that can be granted is
+        associated with a level in the object hierarchy. If a privilege is granted on a container object in the
+        hierarchy, the child object automatically inherits it. This is the same privilege model as Hive and other
+        database systems such as MySQL.
+      </p>
+
+      <p class="p">
+        The object hierarchy for Impala covers Server, URI, Database, Table, and Column. (The Table privileges apply to views as well;
+        anywhere you specify a table name, you can specify a view name instead.)
+        Column-level authorization is available in <span class="keyword">Impala 2.3</span> and higher.
+        Previously, you constructed views to query specific columns and assigned privilege based on
+        the views rather than the base tables. Now, you can use Impala's <a class="xref" href="impala_grant.html">GRANT Statement (Impala 2.0 or higher only)</a> and
+        <a class="xref" href="impala_revoke.html">REVOKE Statement (Impala 2.0 or higher only)</a> statements to assign and revoke privileges from specific columns
+        in a table.
+      </p>
+
+      <p class="p">
+        A restricted set of privileges determines what you can do with each object:
+      </p>
+
+      <dl class="dl">
+
+
+          <dt class="dt dlterm" id="sentry_priv_model__select_priv">
+            SELECT privilege
+          </dt>
+
+          <dd class="dd">
+            Lets you read data from a table or view, for example with the <code class="ph codeph">SELECT</code> statement, the
+            <code class="ph codeph">INSERT...SELECT</code> syntax, or <code class="ph codeph">CREATE TABLE...LIKE</code>. Also required to
+            issue the <code class="ph codeph">DESCRIBE</code> statement or the <code class="ph codeph">EXPLAIN</code> statement for a query
+            against a particular table. Only objects for which a user has this privilege are shown in the output
+            for <code class="ph codeph">SHOW DATABASES</code> and <code class="ph codeph">SHOW TABLES</code> statements. The
+            <code class="ph codeph">REFRESH</code> statement and <code class="ph codeph">INVALIDATE METADATA</code> statements only access
+            metadata for tables for which the user has this privilege.
+          </dd>
+
+
+
+
+
+          <dt class="dt dlterm" id="sentry_priv_model__insert_priv">
+            INSERT privilege
+          </dt>
+
+          <dd class="dd">
+            Lets you write data to a table. Applies to the <code class="ph codeph">INSERT</code> and <code class="ph codeph">LOAD DATA</code>
+            statements.
+          </dd>
+
+
+
+
+
+          <dt class="dt dlterm" id="sentry_priv_model__all_priv">
+            ALL privilege
+          </dt>
+
+          <dd class="dd">
+            Lets you create or modify the object. Required to run DDL statements such as <code class="ph codeph">CREATE
+            TABLE</code>, <code class="ph codeph">ALTER TABLE</code>, or <code class="ph codeph">DROP TABLE</code> for a table,
+            <code class="ph codeph">CREATE DATABASE</code> or <code class="ph codeph">DROP DATABASE</code> for a database, or <code class="ph codeph">CREATE
+            VIEW</code>, <code class="ph codeph">ALTER VIEW</code>, or <code class="ph codeph">DROP VIEW</code> for a view. Also required for
+            the URI of the <span class="q">"location"</span> parameter for the <code class="ph codeph">CREATE EXTERNAL TABLE</code> and
+            <code class="ph codeph">LOAD DATA</code> statements.
+
+          </dd>
+
+
+      </dl>
+
+      <p class="p">
+        Privileges can be specified for a table or view before that object actually exists. If you do not have
+        sufficient privilege to perform an operation, the error message does not disclose if the object exists or
+        not.
+      </p>
+
+      <p class="p">
+        Originally, privileges were encoded in a policy file, stored in HDFS. This mode of operation is still an
+        option, but the emphasis of privilege management is moving towards being SQL-based. Although currently
+        Impala does not have <code class="ph codeph">GRANT</code> or <code class="ph codeph">REVOKE</code> statements, Impala can make use of
+        privileges assigned through <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements done through
+        Hive. The mode of operation with <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements instead of
+        the policy file requires that a special Sentry service be enabled; this service stores, retrieves, and
+        manipulates privilege information stored inside the metastore database.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="authorization__secure_startup">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Starting the impalad Daemon with Sentry Authorization Enabled</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        To run the <span class="keyword cmdname">impalad</span> daemon with authorization enabled, you add one or more options to the
+        <code class="ph codeph">IMPALA_SERVER_ARGS</code> declaration in the <span class="ph filepath">/etc/default/impala</span>
+        configuration file:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          The <code class="ph codeph">-server_name</code> option turns on Sentry authorization for Impala. The authorization
+          rules refer to a symbolic server name, and you specify the name to use as the argument to the
+          <code class="ph codeph">-server_name</code> option.
+        </li>
+
+        <li class="li">
+          If you specify just <code class="ph codeph">-server_name</code>, Impala uses the Sentry service for authorization,
+          relying on the results of <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements issued through
+          Hive. (This mode of operation is available in Impala 1.4.0 and higher.) Prior to Impala 1.4.0, or if you
+          want to continue storing privilege rules in the policy file, also specify the
+          <code class="ph codeph">-authorization_policy_file</code> option as in the following item.
+        </li>
+
+        <li class="li">
+          Specifying the <code class="ph codeph">-authorization_policy_file</code> option in addition to
+          <code class="ph codeph">-server_name</code> makes Impala read privilege information from a policy file, rather than
+          from the metastore database. The argument to the <code class="ph codeph">-authorization_policy_file</code> option
+          specifies the HDFS path to the policy file that defines the privileges on different schema objects.
+        </li>
+      </ul>
+
+      <p class="p">
+        For example, you might adapt your <span class="ph filepath">/etc/default/impala</span> configuration to contain lines
+        like the following. To use the Sentry service rather than the policy file:
+      </p>
+
+<pre class="pre codeblock"><code>IMPALA_SERVER_ARGS=" \
+-server_name=server1 \
+...
+</code></pre>
+
+      <p class="p">
+        Or to use the policy file, as in releases prior to Impala 1.4:
+      </p>
+
+<pre class="pre codeblock"><code>IMPALA_SERVER_ARGS=" \
+-authorization_policy_file=/user/hive/warehouse/auth-policy.ini \
+-server_name=server1 \
+...
+</code></pre>
+
+      <p class="p">
+        The preceding examples set up a symbolic name of <code class="ph codeph">server1</code> to refer to the current instance
+        of Impala. This symbolic name is used in the following ways:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            Specify the <code class="ph codeph">server1</code> value for the <code class="ph codeph">sentry.hive.server</code> property in the
+            <span class="ph filepath">sentry-site.xml</span> configuration file for Hive, as well as in the
+            <code class="ph codeph">-server_name</code> option for <span class="keyword cmdname">impalad</span>.
+          </p>
+          <p class="p">
+            If the <span class="keyword cmdname">impalad</span> daemon is not already running, start it as described in
+            <a class="xref" href="impala_processes.html#processes">Starting Impala</a>. If it is already running, restart it with the command
+            <code class="ph codeph">sudo /etc/init.d/impala-server restart</code>. Run the appropriate commands on all the nodes
+            where <span class="keyword cmdname">impalad</span> normally runs.
+          </p>
+        </li>
+
+        <li class="li">
+          <p class="p">
+            If you use the mode of operation using the policy file, the rules in the <code class="ph codeph">[roles]</code>
+            section of the policy file refer to this same <code class="ph codeph">server1</code> name. For example, the following
+            rule sets up a role <code class="ph codeph">report_generator</code> that lets users with that role query any table in
+            a database named <code class="ph codeph">reporting_db</code> on a node where the <span class="keyword cmdname">impalad</span> daemon
+            was started up with the <code class="ph codeph">-server_name=server1</code> option:
+          </p>
+<pre class="pre codeblock"><code>[roles]
+report_generator = server=server1-&gt;db=reporting_db-&gt;table=*-&gt;action=SELECT
+</code></pre>
+        </li>
+      </ul>
+
+      <p class="p">
+        When <span class="keyword cmdname">impalad</span> is started with one or both of the <code class="ph codeph">-server_name=server1</code>
+        and <code class="ph codeph">-authorization_policy_file</code> options, Impala authorization is enabled. If Impala detects
+        any errors or inconsistencies in the authorization settings or the policy file, the daemon refuses to
+        start.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="authorization__sentry_service">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Using Impala with the Sentry Service (<span class="keyword">Impala 1.4</span> or higher only)</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        When you use the Sentry service rather than the policy file, you set up privileges through
+        <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statement in either Impala or Hive, then both components
+        use those same privileges automatically. (Impala added the <code class="ph codeph">GRANT</code> and
+        <code class="ph codeph">REVOKE</code> statements in <span class="keyword">Impala 2.0</span>.)
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="authorization__security_policy_file">
+
+    <h2 class="title topictitle2" id="ariaid-title5">Using Impala with the Sentry Policy File</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        The policy file is a file that you put in a designated location in HDFS, and is read during the startup of
+        the <span class="keyword cmdname">impalad</span> daemon when you specify both the <code class="ph codeph">-server_name</code> and
+        <code class="ph codeph">-authorization_policy_file</code> startup options. It controls which objects (databases, tables,
+        and HDFS directory paths) can be accessed by the user who connects to <span class="keyword cmdname">impalad</span>, and what
+        operations that user can perform on the objects.
+      </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+        <p class="p">
+          The Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service (Impala 1.4 or higher only)</a>, stores
+          authorization metadata in a relational database. This means you can manage user privileges for Impala tables
+          using traditional <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> SQL statements, rather than the
+          policy file approach described here.If you are still using policy files, migrate to the
+          database-backed service whenever practical.
+        </p>
+      </div>
+
+      <p class="p">
+        The location of the policy file is listed in the <span class="ph filepath">auth-site.xml</span> configuration file. To
+        minimize overhead, the security information from this file is cached by each <span class="keyword cmdname">impalad</span>
+        daemon and refreshed automatically, with a default interval of 5 minutes. After making a substantial change
+        to security policies, restart all Impala daemons to pick up the changes immediately.
+      </p>
+
+      <p class="p toc inpage"></p>
+    </div>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title6" id="security_policy_file__security_policy_file_details">
+
+      <h3 class="title topictitle3" id="ariaid-title6">Policy File Location and Format</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          The policy file uses the familiar <code class="ph codeph">.ini</code> format, divided into the major sections
+          <code class="ph codeph">[groups]</code> and <code class="ph codeph">[roles]</code>. There is also an optional
+          <code class="ph codeph">[databases]</code> section, which allows you to specify a specific policy file for a particular
+          database, as explained in <a class="xref" href="#security_multiple_policy_files">Using Multiple Policy Files for Different Databases</a>. Another optional section,
+          <code class="ph codeph">[users]</code>, allows you to override the OS-level mapping of users to groups; that is an
+          advanced technique primarily for testing and debugging, and is beyond the scope of this document.
+        </p>
+
+        <p class="p">
+          In the <code class="ph codeph">[groups]</code> section, you define various categories of users and select which roles
+          are associated with each category. The group and usernames correspond to Linux groups and users on the
+          server where the <span class="keyword cmdname">impalad</span> daemon runs.
+        </p>
+
+        <p class="p">
+          The group and usernames in the <code class="ph codeph">[groups]</code> section correspond to Linux groups and users on
+          the server where the <span class="keyword cmdname">impalad</span> daemon runs. When you access Impala through the
+          <span class="keyword cmdname">impalad</span> interpreter, for purposes of authorization, the user is the logged-in Linux
+          user and the groups are the Linux groups that user is a member of. When you access Impala through the
+          ODBC or JDBC interfaces, the user and password specified through the connection string are used as login
+          credentials for the Linux server, and authorization is based on that username and the associated Linux
+          group membership.
+        </p>
+
+        <div class="p">
+          In the <code class="ph codeph">[roles]</code> section, you a set of roles. For each role, you specify precisely the set
+          of privileges is available. That is, which objects users with that role can access, and what operations
+          they can perform on those objects. This is the lowest-level category of security information; the other
+          sections in the policy file map the privileges to higher-level divisions of groups and users. In the
+          <code class="ph codeph">[groups]</code> section, you specify which roles are associated with which groups. The group
+          and usernames correspond to Linux groups and users on the server where the <span class="keyword cmdname">impalad</span>
+          daemon runs. The privileges are specified using patterns like:
+<pre class="pre codeblock"><code>server=<var class="keyword varname">server_name</var>-&gt;db=<var class="keyword varname">database_name</var>-&gt;table=<var class="keyword varname">table_name</var>-&gt;action=SELECT
+server=<var class="keyword varname">server_name</var>-&gt;db=<var class="keyword varname">database_name</var>-&gt;table=<var class="keyword varname">table_name</var>-&gt;action=CREATE
+server=<var class="keyword varname">server_name</var>-&gt;db=<var class="keyword varname">database_name</var>-&gt;table=<var class="keyword varname">table_name</var>-&gt;action=ALL
+</code></pre>
+          For the <var class="keyword varname">server_name</var> value, substitute the same symbolic name you specify with the
+          <span class="keyword cmdname">impalad</span> <code class="ph codeph">-server_name</code> option. You can use <code class="ph codeph">*</code> wildcard
+          characters at each level of the privilege specification to allow access to all such objects. For example:
+<pre class="pre codeblock"><code>server=impala-host.example.com-&gt;db=default-&gt;table=t1-&gt;action=SELECT
+server=impala-host.example.com-&gt;db=*-&gt;table=*-&gt;action=CREATE
+server=impala-host.example.com-&gt;db=*-&gt;table=audit_log-&gt;action=SELECT
+server=impala-host.example.com-&gt;db=default-&gt;table=t1-&gt;action=*
+</code></pre>
+        </div>
+
+        <p class="p">
+          When authorization is enabled, Impala uses the policy file as a <em class="ph i">whitelist</em>, representing every
+          privilege available to any user on any object. That is, only operations specified for the appropriate
+          combination of object, role, group, and user are allowed; all other operations are not allowed. If a
+          group or role is defined multiple times in the policy file, the last definition takes precedence.
+        </p>
+
+        <p class="p">
+          To understand the notion of whitelisting, set up a minimal policy file that does not provide any
+          privileges for any object. When you connect to an Impala node where this policy file is in effect, you
+          get no results for <code class="ph codeph">SHOW DATABASES</code>, and an error when you issue any <code class="ph codeph">SHOW
+          TABLES</code>, <code class="ph codeph">USE <var class="keyword varname">database_name</var></code>, <code class="ph codeph">DESCRIBE
+          <var class="keyword varname">table_name</var></code>, <code class="ph codeph">SELECT</code>, and or other statements that expect to
+          access databases or tables, even if the corresponding databases and tables exist.
+        </p>
+
+        <p class="p">
+          The contents of the policy file are cached, to avoid a performance penalty for each query. The policy
+          file is re-checked by each <span class="keyword cmdname">impalad</span> node every 5 minutes. When you make a
+          non-time-sensitive change such as adding new privileges or new users, you can let the change take effect
+          automatically a few minutes later. If you remove or reduce privileges, and want the change to take effect
+          immediately, restart the <span class="keyword cmdname">impalad</span> daemon on all nodes, again specifying the
+          <code class="ph codeph">-server_name</code> and <code class="ph codeph">-authorization_policy_file</code> options so that the rules
+          from the updated policy file are applied.
+        </p>
+      </div>
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title7" id="security_policy_file__security_examples">
+
+      <h3 class="title topictitle3" id="ariaid-title7">Examples of Policy File Rules for Security Scenarios</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          The following examples show rules that might go in the policy file to deal with various
+          authorization-related scenarios. For illustration purposes, this section shows several very small policy
+          files with only a few rules each. In your environment, typically you would define many roles to cover all
+          the scenarios involving your own databases, tables, and applications, and a smaller number of groups,
+          whose members are given the privileges from one or more roles.
+        </p>
+
+        <div class="example" id="security_examples__sec_ex_unprivileged"><h4 class="title sectiontitle">A User with No Privileges</h4>
+
+
+
+          <p class="p">
+            If a user has no privileges at all, that user cannot access any schema objects in the system. The error
+            messages do not disclose the names or existence of objects that the user is not authorized to read.
+          </p>
+
+          <p class="p">
+
+            This is the experience you want a user to have if they somehow log into a system where they are not an
+            authorized Impala user. In a real deployment with a filled-in policy file, a user might have no
+            privileges because they are not a member of any of the relevant groups mentioned in the policy file.
+          </p>
+
+
+
+        </div>
+
+        <div class="example" id="security_examples__sec_ex_superuser"><h4 class="title sectiontitle">Examples of Privileges for Administrative Users</h4>
+
+
+
+          <p class="p">
+            When an administrative user has broad access to tables or databases, the associated rules in the
+            <code class="ph codeph">[roles]</code> section typically use wildcards and/or inheritance. For example, in the
+            following sample policy file, <code class="ph codeph">db=*</code> refers to all databases and
+            <code class="ph codeph">db=*-&gt;table=*</code> refers to all tables in all databases.
+          </p>
+
+          <p class="p">
+            Omitting the rightmost portion of a rule means that the privileges apply to all the objects that could
+            be specified there. For example, in the following sample policy file, the
+            <code class="ph codeph">all_databases</code> role has all privileges for all tables in all databases, while the
+            <code class="ph codeph">one_database</code> role has all privileges for all tables in one specific database. The
+            <code class="ph codeph">all_databases</code> role does not grant privileges on URIs, so a group with that role could
+            not issue a <code class="ph codeph">CREATE TABLE</code> statement with a <code class="ph codeph">LOCATION</code> clause. The
+            <code class="ph codeph">entire_server</code> role has all privileges on both databases and URIs within the server.
+          </p>
+
+<pre class="pre codeblock"><code>[groups]
+supergroup = all_databases
+
+[roles]
+read_all_tables = server=server1-&gt;db=*-&gt;table=*-&gt;action=SELECT
+all_tables = server=server1-&gt;db=*-&gt;table=*
+all_databases = server=server1-&gt;db=*
+one_database = server=server1-&gt;db=test_db
+entire_server = server=server1
+</code></pre>
+
+        </div>
+
+        <div class="example" id="security_examples__sec_ex_detailed"><h4 class="title sectiontitle">A User with Privileges for Specific Databases and Tables</h4>
+
+
+
+          <p class="p">
+            If a user has privileges for specific tables in specific databases, the user can access those things
+            but nothing else. They can see the tables and their parent databases in the output of <code class="ph codeph">SHOW
+            TABLES</code> and <code class="ph codeph">SHOW DATABASES</code>, <code class="ph codeph">USE</code> the appropriate databases,
+            and perform the relevant actions (<code class="ph codeph">SELECT</code> and/or <code class="ph codeph">INSERT</code>) based on the
+            table privileges. To actually create a table requires the <code class="ph codeph">ALL</code> privilege at the
+            database level, so you might define separate roles for the user that sets up a schema and other users
+            or applications that perform day-to-day operations on the tables.
+          </p>
+
+          <p class="p">
+            The following sample policy file shows some of the syntax that is appropriate as the policy file grows,
+            such as the <code class="ph codeph">#</code> comment syntax, <code class="ph codeph">\</code> continuation syntax, and comma
+            separation for roles assigned to groups or privileges assigned to roles.
+          </p>
+
+<pre class="pre codeblock"><code>[groups]
+employee = training_sysadmin, instructor
+visitor = student
+
+[roles]
+training_sysadmin = server=server1-&gt;db=training, \
+server=server1-&gt;db=instructor_private, \
+server=server1-&gt;db=lesson_development
+instructor = server=server1-&gt;db=training-&gt;table=*-&gt;action=*, \
+server=server1-&gt;db=instructor_private-&gt;table=*-&gt;action=*, \
+server=server1-&gt;db=lesson_development-&gt;table=lesson*
+# This particular course is all about queries, so the students can SELECT but not INSERT or CREATE/DROP.
+student = server=server1-&gt;db=training-&gt;table=lesson_*-&gt;action=SELECT
+</code></pre>
+
+        </div>
+
+
+
+        <div class="example" id="security_examples__sec_ex_external_files"><h4 class="title sectiontitle">Privileges for Working with External Data Files</h4>
+
+
+
+          <p class="p">
+            When data is being inserted through the <code class="ph codeph">LOAD DATA</code> statement, or is referenced from an
+            HDFS location outside the normal Impala database directories, the user also needs appropriate
+            permissions on the URIs corresponding to those HDFS locations.
+          </p>
+
+          <p class="p">
+            In this sample policy file:
+          </p>
+
+          <ul class="ul">
+            <li class="li">
+              The <code class="ph codeph">external_table</code> role lets us insert into and query the Impala table,
+              <code class="ph codeph">external_table.sample</code>.
+            </li>
+
+            <li class="li">
+              The <code class="ph codeph">staging_dir</code> role lets us specify the HDFS path
+              <span class="ph filepath">/user/username/external_data</span> with the <code class="ph codeph">LOAD DATA</code> statement.
+              Remember, when Impala queries or loads data files, it operates on all the files in that directory,
+              not just a single file, so any Impala <code class="ph codeph">LOCATION</code> parameters refer to a directory
+              rather than an individual file.
+            </li>
+
+            <li class="li">
+              We included the IP address and port of the Hadoop name node in the HDFS URI of the
+              <code class="ph codeph">staging_dir</code> rule. We found those details in
+              <span class="ph filepath">/etc/hadoop/conf/core-site.xml</span>, under the <code class="ph codeph">fs.default.name</code>
+              element. That is what we use in any roles that specify URIs (that is, the locations of directories in
+              HDFS).
+            </li>
+
+            <li class="li">
+              We start this example after the table <code class="ph codeph">external_table.sample</code> is already created. In
+              the policy file for the example, we have already taken away the <code class="ph codeph">external_table_admin</code>
+              role from the <code class="ph codeph">username</code> group, and replaced it with the lesser-privileged
+              <code class="ph codeph">external_table</code> role.
+            </li>
+
+            <li class="li">
+              We assign privileges to a subdirectory underneath <span class="ph filepath">/user/username</span> in HDFS,
+              because such privileges also apply to any subdirectories underneath. If we had assigned privileges to
+              the parent directory <span class="ph filepath">/user/username</span>, it would be too likely to mess up other
+              files by specifying a wrong location by mistake.
+            </li>
+
+            <li class="li">
+              The <code class="ph codeph">username</code> under the <code class="ph codeph">[groups]</code> section refers to the
+              <code class="ph codeph">username</code> group. (In this example, there is a <code class="ph codeph">username</code> user
+              that is a member of a <code class="ph codeph">username</code> group.)
+            </li>
+          </ul>
+
+          <p class="p">
+            Policy file:
+          </p>
+
+<pre class="pre codeblock"><code>[groups]
+username = external_table, staging_dir
+
+[roles]
+external_table_admin = server=server1-&gt;db=external_table
+external_table = server=server1-&gt;db=external_table-&gt;table=sample-&gt;action=*
+staging_dir = server=server1-&gt;uri=hdfs://127.0.0.1:8020/user/username/external_data-&gt;action=*
+</code></pre>
+
+          <p class="p">
+            <span class="keyword cmdname">impala-shell</span> session:
+          </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; use external_table;
+Query: use external_table
+[localhost:21000] &gt; show tables;
+Query: show tables
+Query finished, fetching results ...
++--------+
+| name   |
++--------+
+| sample |
++--------+
+Returned 1 row(s) in 0.02s
+
+[localhost:21000] &gt; select * from sample;
+Query: select * from sample
+Query finished, fetching results ...
++-----+
+| x   |
++-----+
+| 1   |
+| 5   |
+| 150 |
++-----+
+Returned 3 row(s) in 1.04s
+
+[localhost:21000] &gt; load data inpath '/user/username/external_data' into table sample;
+Query: load data inpath '/user/username/external_data' into table sample
+Query finished, fetching results ...
++----------------------------------------------------------+
+| summary                                                  |
++----------------------------------------------------------+
+| Loaded 1 file(s). Total files in destination location: 2 |
++----------------------------------------------------------+
+Returned 1 row(s) in 0.26s
+[localhost:21000] &gt; select * from sample;
+Query: select * from sample
+Query finished, fetching results ...
++-------+
+| x     |
++-------+
+| 2     |
+| 4     |
+| 6     |
+| 8     |
+| 64738 |
+| 49152 |
+| 1     |
+| 5     |
+| 150   |
++-------+
+Returned 9 row(s) in 0.22s
+
+[localhost:21000] &gt; load data inpath '/user/username/unauthorized_data' into table sample;
+Query: load data inpath '/user/username/unauthorized_data' into table sample
+ERROR: AuthorizationException: User 'username' does not have privileges to access: hdfs://127.0.0.1:8020/user/username/unauthorized_data
+</code></pre>
+
+        </div>
+
+
+
+        <div class="example" id="security_examples__sec_sysadmin"><h4 class="title sectiontitle">Separating Administrator Responsibility from Read and Write Privileges</h4>
+
+
+
+          <p class="p">
+            Remember that to create a database requires full privilege on that database, while day-to-day
+            operations on tables within that database can be performed with lower levels of privilege on specific
+            table. Thus, you might set up separate roles for each database or application: an administrative one
+            that could create or drop the database, and a user-level one that can access only the relevant tables.
+          </p>
+
+          <p class="p">
+            For example, this policy file divides responsibilities between users in 3 different groups:
+          </p>
+
+          <ul class="ul">
+            <li class="li">
+              Members of the <code class="ph codeph">supergroup</code> group have the <code class="ph codeph">training_sysadmin</code> role and
+              so can set up a database named <code class="ph codeph">training</code>.
+            </li>
+
+            <li class="li"> Members of the <code class="ph codeph">employee</code> group have the
+                <code class="ph codeph">instructor</code> role and so can create, insert into,
+              and query any tables in the <code class="ph codeph">training</code> database,
+              but cannot create or drop the database itself. </li>
+
+            <li class="li">
+              Members of the <code class="ph codeph">visitor</code> group have the <code class="ph codeph">student</code> role and so can query
+              those tables in the <code class="ph codeph">training</code> database.
+            </li>
+          </ul>
+
+<pre class="pre codeblock"><code>[groups]
+supergroup = training_sysadmin
+employee = instructor
+visitor = student
+
+[roles]
+training_sysadmin = server=server1-&gt;db=training
+instructor = server=server1-&gt;db=training-&gt;table=*-&gt;action=*
+student = server=server1-&gt;db=training-&gt;table=*-&gt;action=SELECT
+</code></pre>
+
+        </div>
+      </div>
+    </article>
+
+    <article class="topic concept nested2" aria-labelledby="ariaid-title8" id="security_policy_file__security_multiple_policy_files">
+
+      <h3 class="title topictitle3" id="ariaid-title8">Using Multiple Policy Files for Different Databases</h3>
+
+      <div class="body conbody">
+
+        <p class="p">
+          For an Impala cluster with many databases being accessed by many users and applications, it might be
+          cumbersome to update the security policy file for each privilege change or each new database, table, or
+          view. You can allow security to be managed separately for individual databases, by setting up a separate
+          policy file for each database:
+        </p>
+
+        <ul class="ul">
+          <li class="li">
+            Add the optional <code class="ph codeph">[databases]</code> section to the main policy file.
+          </li>
+
+          <li class="li">
+            Add entries in the <code class="ph codeph">[databases]</code> section for each database that has its own policy file.
+          </li>
+
+          <li class="li">
+            For each listed database, specify the HDFS path of the appropriate policy file.
+          </li>
+        </ul>
+
+        <p class="p">
+          For example:
+        </p>
+
+<pre class="pre codeblock"><code>[databases]
+# Defines the location of the per-DB policy files for the 'customers' and 'sales' databases.
+customers = hdfs://ha-nn-uri/etc/access/customers.ini
+sales = hdfs://ha-nn-uri/etc/access/sales.ini
+</code></pre>
+
+        <p class="p">
+          To enable URIs in per-DB policy files, the Java configuration option <code class="ph codeph">sentry.allow.uri.db.policyfile</code>
+          must be set to <code class="ph codeph">true</code>. For example:
+        </p>
+
+<pre class="pre codeblock"><code>JAVA_TOOL_OPTIONS="-Dsentry.allow.uri.db.policyfile=true"
+</code></pre>
+
+        <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+          Enabling URIs in per-DB policy files introduces a security risk by allowing the owner of the db-level
+          policy file to grant himself/herself load privileges to anything the <code class="ph codeph">impala</code> user has
+          read permissions for in HDFS (including data in other databases controlled by different db-level policy
+          files).
+        </div>
+      </div>
+    </article>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="authorization__security_schema">
+
+    <h2 class="title topictitle2" id="ariaid-title9">Setting Up Schema Objects for a Secure Impala Deployment</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Remember that in your role definitions, you specify privileges at the level of individual databases and
+        tables, or all databases or all tables within a database. To simplify the structure of these rules, plan
+        ahead of time how to name your schema objects so that data with different authorization requirements is
+        divided into separate databases.
+      </p>
+
+      <p class="p">
+        If you are adding security on top of an existing Impala deployment, remember that you can rename tables or
+        even move them between databases using the <code class="ph codeph">ALTER TABLE</code> statement. In Impala, creating new
+        databases is a relatively inexpensive operation, basically just creating a new directory in HDFS.
+      </p>
+
+      <p class="p">
+        You can also plan the security scheme and set up the policy file before the actual schema objects named in
+        the policy file exist. Because the authorization capability is based on whitelisting, a user can only
+        create a new database or table if the required privilege is already in the policy file: either by listing
+        the exact name of the object being created, or a <code class="ph codeph">*</code> wildcard to match all the applicable
+        objects within the appropriate container.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title10" id="authorization__security_privileges">
+
+    <h2 class="title topictitle2" id="ariaid-title10">Privilege Model and Object Hierarchy</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Privileges can be granted on different objects in the schema. Any privilege that can be granted is
+        associated with a level in the object hierarchy. If a privilege is granted on a container object in the
+        hierarchy, the child object automatically inherits it. This is the same privilege model as Hive and other
+        database systems such as MySQL.
+      </p>
+
+      <p class="p">
+        The kinds of objects in the schema hierarchy are:
+      </p>
+
+<pre class="pre codeblock"><code>Server
+URI
+Database
+  Table
+</code></pre>
+
+      <p class="p">
+        The server name is specified by the <code class="ph codeph">-server_name</code> option when <span class="keyword cmdname">impalad</span>
+        starts. Specify the same name for all <span class="keyword cmdname">impalad</span> nodes in the cluster.
+      </p>
+
+      <p class="p">
+        URIs represent the HDFS paths you specify as part of statements such as <code class="ph codeph">CREATE EXTERNAL
+        TABLE</code> and <code class="ph codeph">LOAD DATA</code>. Typically, you specify what look like UNIX paths, but these
+        locations can also be prefixed with <code class="ph codeph">hdfs://</code> to make clear that they are really URIs. To
+        set privileges for a URI, specify the name of a directory, and the privilege applies to all the files in
+        that directory and any directories underneath it.
+      </p>
+
+      <p class="p">
+        In <span class="keyword">Impala 2.3</span> and higher, you can specify privileges for individual columns.
+        Formerly, to specify read privileges at this level, you created a view that queried specific columns
+        and/or partitions from a base table, and gave <code class="ph codeph">SELECT</code> privilege on the view but not
+        the underlying table. Now, you can use Impala's <a class="xref" href="impala_grant.html">GRANT Statement (Impala 2.0 or higher only)</a> and
+        <a class="xref" href="impala_revoke.html">REVOKE Statement (Impala 2.0 or higher only)</a> statements to assign and revoke privileges from specific columns
+        in a table.
+      </p>
+
+      <div class="p">
+        URIs must start with either <code class="ph codeph">hdfs://</code> or <code class="ph codeph">file://</code>. If a URI starts with
+        anything else, it will cause an exception and the policy file will be invalid. When defining URIs for HDFS,
+        you must also specify the NameNode. For example:
+<pre class="pre codeblock"><code>data_read = server=server1-&gt;uri=file:///path/to/dir, \
+server=server1-&gt;uri=hdfs://namenode:port/path/to/dir
+</code></pre>
+        <div class="note warning note_warning"><span class="note__title warningtitle">Warning:</span>
+          <p class="p">
+            Because the NameNode host and port must be specified, enable High Availability (HA) to ensure
+            that the URI will remain constant even if the NameNode changes.
+          </p>
+<pre class="pre codeblock"><code>data_read = server=server1-&gt;uri=file:///path/to/dir,\ server=server1-&gt;uri=hdfs://ha-nn-uri/path/to/dir
+</code></pre>
+        </div>
+      </div>
+
+
+
+
+
+      <table class="table"><caption><span class="table--title-label">Table 1. </span><span class="title">Valid privilege types and objects they apply to</span></caption><colgroup><col style="width:33.33333333333333%"><col style="width:66.66666666666666%"></colgroup><thead class="thead">
+            <tr class="row">
+              <th class="entry nocellnorowborder" id="security_privileges__entry__1"><strong class="ph b">Privilege</strong></th>
+              <th class="entry nocellnorowborder" id="security_privileges__entry__2"><strong class="ph b">Object</strong></th>
+            </tr>
+          </thead><tbody class="tbody">
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__1 ">INSERT</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__2 ">DB, TABLE</td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__1 ">SELECT</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__2 ">DB, TABLE, COLUMN</td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__1 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__2 ">SERVER, TABLE, DB, URI</td>
+            </tr>
+          </tbody></table>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+        <p class="p">
+          Although this document refers to the <code class="ph codeph">ALL</code> privilege, currently if you use the policy file
+          mode, you do not use the actual keyword <code class="ph codeph">ALL</code> in the policy file. When you code role
+          entries in the policy file:
+        </p>
+        <ul class="ul">
+          <li class="li">
+            To specify the <code class="ph codeph">ALL</code> privilege for a server, use a role like
+            <code class="ph codeph">server=<var class="keyword varname">server_name</var></code>.
+          </li>
+
+          <li class="li">
+            To specify the <code class="ph codeph">ALL</code> privilege for a database, use a role like
+            <code class="ph codeph">server=<var class="keyword varname">server_name</var>-&gt;db=<var class="keyword varname">database_name</var></code>.
+          </li>
+
+          <li class="li">
+            To specify the <code class="ph codeph">ALL</code> privilege for a table, use a role like
+            <code class="ph codeph">server=<var class="keyword varname">server_name</var>-&gt;db=<var class="keyword varname">database_name</var>-&gt;table=<var class="keyword varname">table_name</var>-&gt;action=*</code>.
+          </li>
+        </ul>
+      </div>
+      <table class="table"><caption></caption><colgroup><col style="width:29.241071428571423%"><col style="width:26.116071428571423%"><col style="width:22.32142857142857%"><col style="width:22.32142857142857%"></colgroup><thead class="thead">
+            <tr class="row">
+              <th class="entry nocellnorowborder" id="security_privileges__entry__9">
+                Operation
+              </th>
+              <th class="entry nocellnorowborder" id="security_privileges__entry__10">
+                Scope
+              </th>
+              <th class="entry nocellnorowborder" id="security_privileges__entry__11">
+                Privileges
+              </th>
+              <th class="entry nocellnorowborder" id="security_privileges__entry__12">
+                URI
+              </th>
+            </tr>
+          </thead><tbody class="tbody">
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">EXPLAIN</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE; COLUMN</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">SELECT</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">LOAD DATA</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">INSERT</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 ">URI</td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">CREATE DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">SERVER</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">DROP DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">CREATE TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">DROP TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">DESCRIBE TABLE<p class="p">-Output shows <em class="ph i">all</em> columns if the
+                  user has table level-privileges or <code class="ph codeph">SELECT</code>
+                  privilege on at least one table column</p></td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">SELECT/INSERT</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. ADD COLUMNS</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. REPLACE COLUMNS</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. CHANGE column</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. RENAME</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. SET TBLPROPERTIES</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. SET FILEFORMAT</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. SET LOCATION</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 ">URI</td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. ADD PARTITION</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. ADD PARTITION location</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 ">URI</td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. DROP PARTITION</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. PARTITION SET FILEFORMAT</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. SET SERDEPROPERTIES</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">CREATE VIEW<p class="p">-This operation is allowed if you have
+                  column-level <code class="ph codeph">SELECT</code> access to the columns
+                  being used.</p></td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">DATABASE; SELECT on TABLE; </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">DROP VIEW</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">VIEW/TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row" id="security_privileges__alter_view_privs">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">
+                ALTER VIEW
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">
+                You need <code class="ph codeph">ALL</code> privilege on the named view <span class="ph">and the parent
+                database</span>, plus <code class="ph codeph">SELECT</code> privilege for any tables or views referenced by the
+                view query. Once the view is created or altered by a high-privileged system administrator, it can
+                be queried by a lower-privileged user who does not have full query privileges for the base tables.
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">
+                ALL, SELECT
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">ALTER TABLE .. SET LOCATION</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL on DATABASE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 ">URI</td>
+            </tr>
+            <tr class="row" id="security_privileges__create_external_table_privs">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">
+                CREATE EXTERNAL TABLE
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">
+                Database (ALL), URI (SELECT)
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">
+                ALL, SELECT
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">SELECT<p class="p">-You can grant the SELECT privilege on a view to
+                  give users access to specific columns of a table they do not
+                  otherwise have access to.</p><p class="p">-See
+                  <span class="xref">the documentation for Apache Sentry</span>
+                  for details on allowed column-level
+                operations.</p></td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">VIEW/TABLE; COLUMN</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">SELECT</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">USE &lt;dbName&gt;</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">Any</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 "></td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">CREATE FUNCTION</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">SERVER</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">DROP FUNCTION</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">SERVER</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">REFRESH &lt;table name&gt; or REFRESH &lt;table name&gt; PARTITION (&lt;partition_spec&gt;)</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">SELECT/INSERT</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">INVALIDATE METADATA</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">SERVER</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">INVALIDATE METADATA &lt;table name&gt;</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">SELECT/INSERT</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">COMPUTE STATS</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">TABLE</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">ALL</td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row" id="security_privileges__show_table_stats_privs">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">
+                SHOW TABLE STATS, SHOW PARTITIONS
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">
+                TABLE
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">
+                SELECT/INSERT
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" id="security_privileges__show_column_stats_privs" headers="security_privileges__entry__9 ">
+                SHOW COLUMN STATS
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">
+                TABLE
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">
+                SELECT/INSERT
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row">
+              <td class="entry nocellnorowborder" id="security_privileges__show_functions_privs" headers="security_privileges__entry__9 ">
+                SHOW FUNCTIONS
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 ">
+                DATABASE
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">
+                SELECT
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row" id="security_privileges__show_tables_privs">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">
+                SHOW TABLES
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 "></td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">
+                No special privileges needed to issue the statement, but only shows objects you are authorized for
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+            <tr class="row" id="security_privileges__show_databases_privs">
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__9 ">
+                SHOW DATABASES, SHOW SCHEMAS
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__10 "></td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__11 ">
+                No special privileges needed to issue the statement, but only shows objects you are authorized for
+              </td>
+              <td class="entry nocellnorowborder" headers="security_privileges__entry__12 "></td>
+            </tr>
+          </tbody></table>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="authorization__sentry_debug">
+
+    <h2 class="title topictitle2" id="ariaid-title11"><span class="ph">Debugging Failed Sentry Authorization Requests</span></h2>
+
+    <div class="body conbody">
+
+      <div class="p">
+      Sentry logs all facts that lead up to authorization decisions at the debug level. If you do not understand
+      why Sentry is denying access, the best way to debug is to temporarily turn on debug logging:
+      <ul class="ul">
+        <li class="li">
+          Add <code class="ph codeph">log4j.logger.org.apache.sentry=DEBUG</code> to the <span class="ph filepath">log4j.properties</span>
+          file on each host in the cluster, in the appropriate configuration directory for each service.
+        </li>
+      </ul>
+      Specifically, look for exceptions and messages such as:
+<pre class="pre codeblock"><code>FilePermission server..., RequestPermission server...., result [true|false]</code></pre>
+      which indicate each evaluation Sentry makes. The <code class="ph codeph">FilePermission</code> is from the policy file,
+      while <code class="ph codeph">RequestPermission</code> is the privilege required for the query. A
+      <code class="ph codeph">RequestPermission</code> will iterate over all appropriate <code class="ph codeph">FilePermission</code>
+      settings until a match is found. If no matching privilege is found, Sentry returns <code class="ph codeph">false</code>
+      indicating <span class="q">"Access Denied"</span> .
+
+    </div>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title12" id="authorization__sec_ex_default">
+
+    <h2 class="title topictitle2" id="ariaid-title12">The DEFAULT Database in a Secure Deployment</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Because of the extra emphasis on granular access controls in a secure deployment, you should move any
+        important or sensitive information out of the <code class="ph codeph">DEFAULT</code> database into a named database whose
+        privileges are specified in the policy file. Sometimes you might need to give privileges on the
+        <code class="ph codeph">DEFAULT</code> database for administrative reasons; for example, as a place you can reliably
+        specify with a <code class="ph codeph">USE</code> statement when preparing to drop a database.
+      </p>
+
+
+    </div>
+  </article>
+</article></main></body></html>

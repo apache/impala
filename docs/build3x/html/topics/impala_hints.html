@@ -1,0 +1,488 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="hints"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Optimizer Hints</title></head><body id="hints"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Optimizer Hints</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+       The Impala SQL supports
+      query hints, for fine-tuning the inner workings of queries. Specify hints
+      as a temporary workaround for expensive queries, where missing statistics
+      or other factors cause inefficient performance. </p>
+
+    <p class="p"> Hints are most often used for the resource-intensive Impala queries,
+      such as: </p>
+
+    <ul class="ul">
+      <li class="li">
+        Join queries involving large tables, where intermediate result sets are transmitted across the network to
+        evaluate the join conditions.
+      </li>
+
+      <li class="li">
+        Inserting into partitioned Parquet tables, where many memory buffers could be allocated on each host to
+        hold intermediate results for each partition.
+      </li>
+    </ul>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+    <p class="p"> In <span class="keyword">Impala 2.0</span> and higher, you can
+      specify the hints inside comments that use either the <code class="ph codeph">/*
+        */</code> or <code class="ph codeph">--</code> notation. Specify a
+        <code class="ph codeph">+</code> symbol immediately before the hint name. Recently
+      added hints are only available using the <code class="ph codeph">/* */</code> and
+        <code class="ph codeph">--</code> notation. For clarity, the <code class="ph codeph">/* */</code>
+      and <code class="ph codeph">--</code> styles are used in the syntax and examples
+      throughout this section. With the <code class="ph codeph">/* */</code> or
+        <code class="ph codeph">--</code> notation for hints, specify a <code class="ph codeph">+</code>
+      symbol immediately before the first hint name. Multiple hints can be
+      specified separated by commas, for example <code class="ph codeph">/* +clustered,shuffle
+        */</code>
+    </p>
+
+<pre class="pre codeblock"><code>SELECT STRAIGHT_JOIN <var class="keyword varname">select_list</var> FROM
+<var class="keyword varname">join_left_hand_table</var>
+  JOIN /* +BROADCAST|SHUFFLE */
+<var class="keyword varname">join_right_hand_table</var>
+<var class="keyword varname">remainder_of_query</var>;
+
+SELECT <var class="keyword varname">select_list</var> FROM
+<var class="keyword varname">join_left_hand_table</var>
+  JOIN -- +BROADCAST|SHUFFLE
+<var class="keyword varname">join_right_hand_table</var>
+<var class="keyword varname">remainder_of_query</var>;
+
+INSERT <var class="keyword varname">insert_clauses</var>
+  /* +SHUFFLE|NOSHUFFLE */
+  SELECT <var class="keyword varname">remainder_of_query</var>;
+
+INSERT <var class="keyword varname">insert_clauses</var>
+  -- +SHUFFLE|NOSHUFFLE
+  SELECT <var class="keyword varname">remainder_of_query</var>;
+
+<span class="ph">
+INSERT /* +SHUFFLE|NOSHUFFLE */
+  <var class="keyword varname">insert_clauses</var>
+  SELECT <var class="keyword varname">remainder_of_query</var>;</span>
+
+<span class="ph">
+INSERT -- +SHUFFLE|NOSHUFFLE
+  <var class="keyword varname">insert_clauses</var>
+  SELECT <var class="keyword varname">remainder_of_query</var>;</span>
+
+<span class="ph">
+UPSERT /* +SHUFFLE|NOSHUFFLE */
+  <var class="keyword varname">upsert_clauses</var>
+  SELECT <var class="keyword varname">remainder_of_query</var>;</span>
+
+<span class="ph">
+UPSERT -- +SHUFFLE|NOSHUFFLE
+  <var class="keyword varname">upsert_clauses</var>
+  SELECT <var class="keyword varname">remainder_of_query</var>;</span>
+
+<span class="ph">SELECT <var class="keyword varname">select_list</var> FROM
+<var class="keyword varname">table_ref</var>
+  /* +{SCHEDULE_CACHE_LOCAL | SCHEDULE_DISK_LOCAL | SCHEDULE_REMOTE}
+    [,RANDOM_REPLICA] */
+<var class="keyword varname">remainder_of_query</var>;</span>
+
+<span class="ph">INSERT <var class="keyword varname">insert_clauses</var>
+  -- +CLUSTERED
+  SELECT <var class="keyword varname">remainder_of_query</var>;
+
+INSERT <var class="keyword varname">insert_clauses</var>
+  /* +CLUSTERED */
+  SELECT <var class="keyword varname">remainder_of_query</var>;</span>
+
+<span class="ph">INSERT -- +CLUSTERED
+  <var class="keyword varname">insert_clauses</var>
+  SELECT <var class="keyword varname">remainder_of_query</var>;
+
+INSERT /* +CLUSTERED */
+  <var class="keyword varname">insert_clauses</var>
+  SELECT <var class="keyword varname">remainder_of_query</var>;
+
+UPSERT -- +CLUSTERED
+  <var class="keyword varname">upsert_clauses</var>
+  SELECT <var class="keyword varname">remainder_of_query</var>;
+
+UPSERT /* +CLUSTERED */
+  <var class="keyword varname">upsert_clauses</var>
+  SELECT <var class="keyword varname">remainder_of_query</var>;</span>
+
+CREATE /* +SHUFFLE|NOSHUFFLE */
+  <var class="keyword varname">table_clauses</var>
+  AS SELECT <var class="keyword varname">remainder_of_query</var>;
+
+CREATE -- +SHUFFLE|NOSHUFFLE
+  <var class="keyword varname">table_clauses</var>
+  AS SELECT <var class="keyword varname">remainder_of_query</var>;
+
+CREATE /* +CLUSTER|NOCLUSTER */
+  <var class="keyword varname">table_clauses</var>
+  AS SELECT <var class="keyword varname">remainder_of_query</var>;
+
+CREATE -- +CLUSTER|NOCLUSTER
+  <var class="keyword varname">table_clauses</var>
+  AS SELECT <var class="keyword varname">remainder_of_query</var>;
+</code></pre>
+    <p class="p">The square bracket style hints are supported for backward compatibility,
+      but the syntax is deprecated and will be removed in a future release. For
+      that reason, any newly added hints are not available with the square
+      bracket syntax.</p>
+    <pre class="pre codeblock"><code>SELECT STRAIGHT_JOIN <var class="keyword varname">select_list</var> FROM
+<var class="keyword varname">join_left_hand_table</var>
+  JOIN [{ /* +BROADCAST */ | /* +SHUFFLE */ }]
+<var class="keyword varname">join_right_hand_table</var>
+<var class="keyword varname">remainder_of_query</var>;
+
+INSERT <var class="keyword varname">insert_clauses</var>
+  [{ /* +SHUFFLE */ | /* +NOSHUFFLE */ }]
+  [<span class="ph">/* +CLUSTERED */</span>]
+  SELECT <var class="keyword varname">remainder_of_query</var>;
+
+<span class="ph">
+UPSERT [{ /* +SHUFFLE */ | /* +NOSHUFFLE */ }]
+  [<span class="ph">/* +CLUSTERED */</span>]
+  <var class="keyword varname">upsert_clauses</var>
+  SELECT <var class="keyword varname">remainder_of_query</var>;</span>
+</code></pre>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      With both forms of hint syntax, include the <code class="ph codeph">STRAIGHT_JOIN</code>
+      keyword immediately after the <code class="ph codeph">SELECT</code> and any
+      <code class="ph codeph">DISTINCT</code> or <code class="ph codeph">ALL</code> keywords to prevent Impala from
+      reordering the tables in a way that makes the join-related hints ineffective.
+    </p>
+
+    <p class="p">
+        The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in the query
+        block containing the hint. It does not affect the join order of nested queries, such as views,
+        inline views, or <code class="ph codeph">WHERE</code>-clause subqueries. To use this hint for performance
+        tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
+      </p>
+
+    <p class="p">
+      To reduce the need to use hints, run the <code class="ph codeph">COMPUTE STATS</code> statement against all tables involved
+      in joins, or used as the source tables for <code class="ph codeph">INSERT ... SELECT</code> operations where the
+      destination is a partitioned Parquet table. Do this operation after loading data or making substantial
+      changes to the data within each table. Having up-to-date statistics helps Impala choose more efficient query
+      plans without the need for hinting. See <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a> for details and
+      examples.
+    </p>
+
+    <p class="p">
+      To see which join strategy is used for a particular query, examine the <code class="ph codeph">EXPLAIN</code> output for
+      that query. See <a class="xref" href="impala_explain_plan.html#perf_explain">Using the EXPLAIN Plan for Performance Tuning</a> for details and examples.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Hints for join queries:</strong>
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">/* +BROADCAST */</code> and <code class="ph codeph">/* +SHUFFLE */</code> hints control the execution strategy for join
+      queries. Specify one of the following constructs immediately after the <code class="ph codeph">JOIN</code> keyword in a
+      query:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        <code class="ph codeph">/* +SHUFFLE */</code> - Makes that join operation use the <span class="q">"partitioned"</span> technique, which divides
+        up corresponding rows from both tables using a hashing algorithm, sending subsets of the rows to other
+        nodes for processing. (The keyword <code class="ph codeph">SHUFFLE</code> is used to indicate a <span class="q">"partitioned join"</span>,
+        because that type of join is not related to <span class="q">"partitioned tables"</span>.) Since the alternative
+        <span class="q">"broadcast"</span> join mechanism is the default when table and index statistics are unavailable, you might
+        use this hint for queries where broadcast joins are unsuitable; typically, partitioned joins are more
+        efficient for joins between large tables of similar size.
+      </li>
+
+      <li class="li">
+        <code class="ph codeph">/* +BROADCAST */</code> - Makes that join operation use the <span class="q">"broadcast"</span> technique that sends the
+        entire contents of the right-hand table to all nodes involved in processing the join. This is the default
+        mode of operation when table and index statistics are unavailable, so you would typically only need it if
+        stale metadata caused Impala to mistakenly choose a partitioned join operation. Typically, broadcast joins
+        are more efficient in cases where one table is much smaller than the other. (Put the smaller table on the
+        right side of the <code class="ph codeph">JOIN</code> operator.)
+      </li>
+    </ul>
+
+    <p class="p">
+      <strong class="ph b">Hints for INSERT ... SELECT and CREATE TABLE AS SELECT (CTAS):</strong>
+    </p>
+    <p class="p" id="hints__insert_hints">
+      When inserting into partitioned tables, such as using the Parquet file
+      format, you can include a hint in the <code class="ph codeph">INSERT</code> or <code class="ph codeph">CREATE TABLE AS SELECT(CTAS)</code>
+      statements to fine-tune the overall performance of the operation and its
+      resource usage.</p>
+    <p class="p">
+      You would only use hints if an <code class="ph codeph">INSERT</code> or
+        <code class="ph codeph">CTAS</code> into a partitioned table was failing due to
+      capacity limits, or if such an operation was succeeding but with
+      less-than-optimal performance.
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        <code class="ph codeph">/* +SHUFFLE */</code> and <code class="ph codeph">/* +NOSHUFFLE */</code> Hints
+        <ul class="ul">
+          <li class="li">
+            <code class="ph codeph">/* +SHUFFLE */</code> adds an exchange node, before
+            writing the data, which re-partitions the result of the
+              <code class="ph codeph">SELECT</code> based on the partitioning columns of the
+            target table. With this hint, only one node writes to a partition at
+            a time, minimizing the global number of simultaneous writes and the
+            number of memory buffers holding data for individual partitions.
+            This also reduces fragmentation, resulting in fewer files. Thus it
+            reduces overall resource usage of the <code class="ph codeph">INSERT</code> or
+              <code class="ph codeph">CTAS</code> operation and allows some operations to
+            succeed that otherwise would fail. It does involve some data
+            transfer between the nodes so that the data files for a particular
+            partition are all written on the same node.
+
+            <p class="p">
+              Use <code class="ph codeph">/* +SHUFFLE */</code> in cases where an <code class="ph codeph">INSERT</code>
+              or <code class="ph codeph">CTAS</code> statement fails or runs inefficiently due
+              to all nodes attempting to write data for all partitions.
+            </p>
+
+            <p class="p"> If the table is unpartitioned or every partitioning expression
+              is constant, then <code class="ph codeph">/* +SHUFFLE */</code> will cause every
+              write to happen on the coordinator node.
+            </p>
+          </li>
+
+          <li class="li">
+            <code class="ph codeph">/* +NOSHUFFLE */</code> does not add exchange node before
+            inserting to partitioned tables and disables re-partitioning. So the
+            selected execution plan might be faster overall, but might also
+            produce a larger number of small data files or exceed capacity
+            limits, causing the <code class="ph codeph">INSERT</code> or <code class="ph codeph">CTAS</code>
+            operation to fail.
+
+            <p class="p"> Impala automatically uses the <code class="ph codeph">/*
+                +SHUFFLE */</code> method if any partition key column in the
+              source table, mentioned in the <code class="ph codeph">SELECT</code> clause,
+              does not have column statistics. In this case, use the <code class="ph codeph">/*
+                +NOSHUFFLE */</code> hint if you want to override this default
+              behavior.
+            </p>
+          </li>
+
+          <li class="li">
+            If column statistics are available for all partition key columns
+            in the source table mentioned in the <code class="ph codeph">INSERT ...
+              SELECT</code> or <code class="ph codeph">CTAS</code> query, Impala chooses
+            whether to use the <code class="ph codeph">/* +SHUFFLE */</code> or <code class="ph codeph">/*
+              +NOSHUFFLE */</code> technique based on the estimated number of
+            distinct values in those columns and the number of nodes involved in
+            the operation. In this case, you might need the <code class="ph codeph">/* +SHUFFLE
+              */</code> or the <code class="ph codeph">/* +NOSHUFFLE */</code> hint to
+            override the execution plan selected by Impala.
+          </li>
+        </ul>
+      </li>
+
+      <li class="li">
+        <code class="ph codeph">/* +CLUSTERED */</code> and <code class="ph codeph">/* +NOCLUSTERED
+          */</code> Hints
+        <ul class="ul">
+          <li class="li">
+            <code class="ph codeph">/* +CLUSTERED */</code> sorts data by the partition
+            columns before inserting to ensure that only one partition is
+            written at a time per node. Use this hint to reduce the number of
+            files kept open and the number of buffers kept in memory
+            simultaneously. This technique is primarily useful for inserts into
+            Parquet tables, where the large block size requires substantial
+            memory to buffer data for multiple output files at once. This hint
+            is available in <span class="keyword">Impala 2.8</span> or higher.
+
+            <p class="p">
+              Starting in <span class="keyword">Impala 3.0</span>, <code class="ph codeph">/*
+                +CLUSTERED */</code> is the default behavior for HDFS tables.
+            </p>
+          </li>
+
+          <li class="li">
+            <code class="ph codeph">/* +NOCLUSTERED */</code> does not sort by primary key
+            before insert. This hint is available in <span class="keyword">Impala 2.8</span> or higher.
+
+            <p class="p">
+              Use this hint when inserting to Kudu tables.
+            </p>
+
+            <p class="p">
+              In the versions lower than <span class="keyword">Impala 3.0</span>,
+                <code class="ph codeph">/* +NOCLUSTERED */</code> is the default in HDFS
+              tables.
+            </p>
+          </li>
+        </ul>
+      </li>
+    </ul>
+
+    <p class="p">
+      Starting from <span class="keyword">Impala 2.9</span>, <code class="ph codeph">INSERT</code>
+      or <code class="ph codeph">UPSERT</code> operations into Kudu tables automatically have
+      an exchange and sort node added to the plan that partitions and sorts the
+      rows according to the partitioning/primary key scheme of the target table
+      (unless the number of rows to be inserted is small enough to trigger
+      single node execution). Use the<code class="ph codeph"> /* +NOCLUSTERED */</code> and
+        <code class="ph codeph">/* +NOSHUFFLE */</code> hints together to disable partitioning
+      and sorting before the rows are sent to Kudu.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Hints for scheduling of HDFS blocks:</strong>
+    </p>
+
+    <p class="p">
+      The hints <code class="ph codeph">/* +SCHEDULE_CACHE_LOCAL */</code>,
+      <code class="ph codeph">/* +SCHEDULE_DISK_LOCAL */</code>, and
+      <code class="ph codeph">/* +SCHEDULE_REMOTE */</code> have the same effect
+      as specifying the <code class="ph codeph">REPLICA_PREFERENCE</code> query
+      option with the respective option settings of <code class="ph codeph">CACHE_LOCAL</code>,
+      <code class="ph codeph">DISK_LOCAL</code>, or <code class="ph codeph">REMOTE</code>.
+      The hint <code class="ph codeph">/* +RANDOM_REPLICA */</code> is the same as
+      enabling the <code class="ph codeph">SCHEDULE_RANDOM_REPLICA</code> query option.
+    </p>
+
+    <p class="p">
+      You can use these hints in combination by separating them with commas,
+      for example, <code class="ph codeph">/* +SCHEDULE_CACHE_LOCAL,RANDOM_REPLICA */</code>.
+      See <a class="xref" href="impala_replica_preference.html">REPLICA_PREFERENCE Query Option (Impala 2.7 or higher only)</a> and
+      <a class="xref" href="impala_schedule_random_replica.html">SCHEDULE_RANDOM_REPLICA Query Option (Impala 2.5 or higher only)</a> for information about how
+      these settings influence the way Impala processes HDFS data blocks.
+    </p>
+
+    <p class="p">
+      Specifying the replica preference as a query hint always overrides the
+      query option setting. Specifying either the <code class="ph codeph">SCHEDULE_RANDOM_REPLICA</code>
+      query option or the corresponding <code class="ph codeph">RANDOM_REPLICA</code> query hint
+      enables the random tie-breaking behavior when processing data blocks
+      during the query.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Suggestions versus directives:</strong>
+    </p>
+
+    <p class="p">
+      In early Impala releases, hints were always obeyed and so acted more like directives. Once Impala gained join
+      order optimizations, sometimes join queries were automatically reordered in a way that made a hint
+      irrelevant. Therefore, the hints act more like suggestions in Impala 1.2.2 and higher.
+    </p>
+
+    <p class="p">
+      To force Impala to follow the hinted execution mechanism for a join query, include the
+      <code class="ph codeph">STRAIGHT_JOIN</code> keyword in the <code class="ph codeph">SELECT</code> statement. See
+      <a class="xref" href="impala_perf_joins.html#straight_join">Overriding Join Reordering with STRAIGHT_JOIN</a> for details. When you use this technique, Impala does not
+      reorder the joined tables at all, so you must be careful to arrange the join order to put the largest table
+      (or subquery result set) first, then the smallest, second smallest, third smallest, and so on. This ordering lets Impala do the
+      most I/O-intensive parts of the query using local reads on the DataNodes, and then reduce the size of the
+      intermediate result set as much as possible as each subsequent table or subquery result set is joined.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Restrictions:</strong>
+      </p>
+
+    <p class="p">
+      Queries that include subqueries in the <code class="ph codeph">WHERE</code> clause can be rewritten internally as join
+      queries. Currently, you cannot apply hints to the joins produced by these types of queries.
+    </p>
+
+    <p class="p">
+      Because hints can prevent queries from taking advantage of new metadata or improvements in query planning,
+      use them only when required to work around performance issues, and be prepared to remove them when they are
+      no longer required, such as after a new Impala release or bug fix.
+    </p>
+
+    <p class="p">
+      In particular, the <code class="ph codeph">/* +BROADCAST */</code> and <code class="ph codeph">/* +SHUFFLE */</code> hints are expected to be
+      needed much less frequently in Impala 1.2.2 and higher, because the join order optimization feature in
+      combination with the <code class="ph codeph">COMPUTE STATS</code> statement now automatically choose join order and join
+      mechanism without the need to rewrite the query and add hints. See
+      <a class="xref" href="impala_perf_joins.html#perf_joins">Performance Considerations for Join Queries</a> for details.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Compatibility:</strong>
+      </p>
+
+    <p class="p">
+      The hints embedded within <code class="ph codeph">--</code> comments are compatible with Hive queries. The hints embedded
+      within <code class="ph codeph">/* */</code> comments or <code class="ph codeph">[ ]</code> square brackets are not recognized by or not
+      compatible with Hive. For example, Hive raises an error for Impala hints within <code class="ph codeph">/* */</code>
+      comments because it does not recognize the Impala hint names.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Considerations for views:</strong>
+      </p>
+
+    <p class="p">
+      If you use a hint in the query that defines a view, the hint is preserved when you query the view. Impala
+      internally rewrites all hints in views to use the <code class="ph codeph">--</code> comment notation, so that Hive can
+      query such views without errors due to unrecognized hint names.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      For example, this query joins a large customer table with a small lookup table of less than 100 rows. The
+      right-hand table can be broadcast efficiently to all nodes involved in the join. Thus, you would use the
+      <code class="ph codeph">/* +broadcast */</code> hint to force a broadcast join strategy:
+    </p>
+
+<pre class="pre codeblock"><code>select straight_join customer.address, state_lookup.state_name
+  from customer join <strong class="ph b">/* +broadcast */</strong> state_lookup
+  on customer.state_id = state_lookup.state_id;</code></pre>
+
+    <p class="p">
+      This query joins two large tables of unpredictable size. You might benchmark the query with both kinds of
+      hints and find that it is more efficient to transmit portions of each table to other nodes for processing.
+      Thus, you would use the <code class="ph codeph">/* +shuffle */</code> hint to force a partitioned join strategy:
+    </p>
+
+<pre class="pre codeblock"><code>select straight_join weather.wind_velocity, geospatial.altitude
+  from weather join <strong class="ph b">/* +shuffle */</strong> geospatial
+  on weather.lat = geospatial.lat and weather.long = geospatial.long;</code></pre>
+
+    <p class="p">
+      For joins involving three or more tables, the hint applies to the tables on either side of that specific
+      <code class="ph codeph">JOIN</code> keyword. The <code class="ph codeph">STRAIGHT_JOIN</code> keyword ensures that joins are processed
+      in a predictable order from left to right. For example, this query joins
+      <code class="ph codeph">t1</code> and <code class="ph codeph">t2</code> using a partitioned join, then joins that result set to
+      <code class="ph codeph">t3</code> using a broadcast join:
+    </p>
+
+<pre class="pre codeblock"><code>select straight_join t1.name, t2.id, t3.price
+  from t1 join <strong class="ph b">/* +shuffle */</strong> t2 join <strong class="ph b">/* +broadcast */</strong> t3
+  on t1.id = t2.id and t2.id = t3.id;</code></pre>
+
+
+
+    <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+    <p class="p">
+      For more background information about join queries, see <a class="xref" href="impala_joins.html#joins">Joins in Impala SELECT Statements</a>. For
+      performance considerations, see <a class="xref" href="impala_perf_joins.html#perf_joins">Performance Considerations for Join Queries</a>.
+    </p>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div></div></nav></article></main></body></html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="seqfile"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Using the SequenceFile File Format with Impala Tables</title></head><body id="seqfile"><main role="main"><article role="article" aria-labelledby="seqfile__sequencefile">
+
+  <h1 class="title topictitle1" id="seqfile__sequencefile">Using the SequenceFile File Format with Impala Tables</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      Impala supports using SequenceFile data files.
+    </p>
+
+    <table class="table"><caption><span class="table--title-label">Table 1. </span><span class="title">SequenceFile Format Support in Impala</span></caption><colgroup><col style="width:10%"><col style="width:10%"><col style="width:20%"><col style="width:30%"><col style="width:30%"></colgroup><thead class="thead">
+          <tr class="row">
+            <th class="entry nocellnorowborder" id="seqfile__entry__1">
+              File Type
+            </th>
+            <th class="entry nocellnorowborder" id="seqfile__entry__2">
+              Format
+            </th>
+            <th class="entry nocellnorowborder" id="seqfile__entry__3">
+              Compression Codecs
+            </th>
+            <th class="entry nocellnorowborder" id="seqfile__entry__4">
+              Impala Can CREATE?
+            </th>
+            <th class="entry nocellnorowborder" id="seqfile__entry__5">
+              Impala Can INSERT?
+            </th>
+          </tr>
+        </thead><tbody class="tbody">
+          <tr class="row">
+            <td class="entry nocellnorowborder" headers="seqfile__entry__1 ">
+              <a class="xref" href="impala_seqfile.html#seqfile">SequenceFile</a>
+            </td>
+            <td class="entry nocellnorowborder" headers="seqfile__entry__2 ">
+              Structured
+            </td>
+            <td class="entry nocellnorowborder" headers="seqfile__entry__3 ">
+              Snappy, gzip, deflate, bzip2
+            </td>
+            <td class="entry nocellnorowborder" headers="seqfile__entry__4 ">Yes.</td>
+            <td class="entry nocellnorowborder" headers="seqfile__entry__5 ">
+              No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the right format, or use
+              <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> in Impala.
+            </td>
+
+          </tr>
+        </tbody></table>
+
+    <p class="p toc inpage"></p>
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_file_formats.html">How Impala Works with Hadoop File Formats</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="seqfile__seqfile_create">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Creating SequenceFile Tables and Loading Data</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        If you do not have an existing data file to use, begin by creating one in the appropriate format.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">To create a SequenceFile table:</strong>
+      </p>
+
+      <p class="p">
+        In the <code class="ph codeph">impala-shell</code> interpreter, issue a command similar to:
+      </p>
+
+<pre class="pre codeblock"><code>create table sequencefile_table (<var class="keyword varname">column_specs</var>) stored as sequencefile;</code></pre>
+
+      <p class="p">
+        Because Impala can query some kinds of tables that it cannot currently write to, after creating tables of
+        certain file formats, you might use the Hive shell to load the data. See
+        <a class="xref" href="impala_file_formats.html#file_formats">How Impala Works with Hadoop File Formats</a> for details. After loading data into a table through
+        Hive or other mechanism outside of Impala, issue a <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code>
+        statement the next time you connect to the Impala node, before querying the table, to make Impala recognize
+        the new data.
+      </p>
+
+      <p class="p">
+        For example, here is how you might create some SequenceFile tables in Impala (by specifying the columns
+        explicitly, or cloning the structure of another table), load data through Hive, and query them through
+        Impala:
+      </p>
+
+<pre class="pre codeblock"><code>$ impala-shell -i localhost
+[localhost:21000] &gt; create table seqfile_table (x int) stored as sequencefile;
+[localhost:21000] &gt; create table seqfile_clone like some_other_table stored as sequencefile;
+[localhost:21000] &gt; quit;
+
+$ hive
+hive&gt; insert into table seqfile_table select x from some_other_table;
+3 Rows loaded to seqfile_table
+Time taken: 19.047 seconds
+hive&gt; quit;
+
+$ impala-shell -i localhost
+[localhost:21000] &gt; select * from seqfile_table;
+Returned 0 row(s) in 0.23s
+[localhost:21000] &gt; -- Make Impala recognize the data loaded through Hive;
+[localhost:21000] &gt; refresh seqfile_table;
+[localhost:21000] &gt; select * from seqfile_table;
++---+
+| x |
++---+
+| 1 |
+| 2 |
+| 3 |
++---+
+Returned 3 row(s) in 0.23s</code></pre>
+
+      <p class="p">
+        <strong class="ph b">Complex type considerations:</strong>
+        Although you can create tables in this file format using
+        the complex types (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>,
+        and <code class="ph codeph">MAP</code>) available in <span class="keyword">Impala 2.3</span> and higher,
+        currently, Impala can query these types only in Parquet tables.
+        <span class="ph">
+        The one exception to the preceding rule is <code class="ph codeph">COUNT(*)</code> queries on RCFile tables that include complex types.
+        Such queries are allowed in <span class="keyword">Impala 2.6</span> and higher.
+        </span>
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="seqfile__seqfile_compression">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Enabling Compression for SequenceFile Tables</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+
+        You may want to enable compression on existing tables. Enabling compression provides performance gains in
+        most cases and is supported for SequenceFile tables. For example, to enable Snappy compression, you would
+        specify the following additional settings when loading data through the Hive shell:
+      </p>
+
+<pre class="pre codeblock"><code>hive&gt; SET hive.exec.compress.output=true;
+hive&gt; SET mapred.max.split.size=256000000;
+hive&gt; SET mapred.output.compression.type=BLOCK;
+hive&gt; SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+hive&gt; insert overwrite table <var class="keyword varname">new_table</var> select * from <var class="keyword varname">old_table</var>;</code></pre>
+
+      <p class="p">
+        If you are converting partitioned tables, you must complete additional steps. In such a case, specify
+        additional settings similar to the following:
+      </p>
+
+<pre class="pre codeblock"><code>hive&gt; create table <var class="keyword varname">new_table</var> (<var class="keyword varname">your_cols</var>) partitioned by (<var class="keyword varname">partition_cols</var>) stored as <var class="keyword varname">new_format</var>;
+hive&gt; SET hive.exec.dynamic.partition.mode=nonstrict;
+hive&gt; SET hive.exec.dynamic.partition=true;
+hive&gt; insert overwrite table <var class="keyword varname">new_table</var> partition(<var class="keyword varname">comma_separated_partition_cols</var>) select * from <var class="keyword varname">old_table</var>;</code></pre>
+
+      <p class="p">
+        Remember that Hive does not require that you specify a source format for it. Consider the case of
+        converting a table with two partition columns called <code class="ph codeph">year</code> and <code class="ph codeph">month</code> to a
+        Snappy compressed SequenceFile. Combining the components outlined previously to complete this table
+        conversion, you would specify settings similar to the following:
+      </p>
+
+<pre class="pre codeblock"><code>hive&gt; create table TBL_SEQ (int_col int, string_col string) STORED AS SEQUENCEFILE;
+hive&gt; SET hive.exec.compress.output=true;
+hive&gt; SET mapred.max.split.size=256000000;
+hive&gt; SET mapred.output.compression.type=BLOCK;
+hive&gt; SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+hive&gt; SET hive.exec.dynamic.partition.mode=nonstrict;
+hive&gt; SET hive.exec.dynamic.partition=true;
+hive&gt; INSERT OVERWRITE TABLE tbl_seq SELECT * FROM tbl;</code></pre>
+
+      <p class="p">
+        To complete a similar process for a table that includes partitions, you would specify settings similar to
+        the following:
+      </p>
+
+<pre class="pre codeblock"><code>hive&gt; CREATE TABLE tbl_seq (int_col INT, string_col STRING) PARTITIONED BY (year INT) STORED AS SEQUENCEFILE;
+hive&gt; SET hive.exec.compress.output=true;
+hive&gt; SET mapred.max.split.size=256000000;
+hive&gt; SET mapred.output.compression.type=BLOCK;
+hive&gt; SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+hive&gt; SET hive.exec.dynamic.partition.mode=nonstrict;
+hive&gt; SET hive.exec.dynamic.partition=true;
+hive&gt; INSERT OVERWRITE TABLE tbl_seq PARTITION(year) SELECT * FROM tbl;</code></pre>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+        <p class="p">
+          The compression type is specified in the following command:
+        </p>
+<pre class="pre codeblock"><code>SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;</code></pre>
+        <p class="p">
+          You could elect to specify alternative codecs such as <code class="ph codeph">GzipCodec</code> here.
+        </p>
+      </div>
+    </div>
+  </article>
+
+
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="seqfile__seqfile_performance">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Query Performance for Impala SequenceFile Tables</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        In general, expect query performance with SequenceFile tables to be
+        faster than with tables using text data, but slower than with
+        Parquet tables. See <a class="xref" href="impala_parquet.html#parquet">Using the Parquet File Format with Impala Tables</a>
+        for information about using the Parquet file format for
+        high-performance analytic queries.
+      </p>
+
+      <p class="p">
+        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files stored in Amazon S3.
+        For Impala tables that use the file formats Parquet, RCFile, SequenceFile,
+        Avro, and uncompressed text, the setting <code class="ph codeph">fs.s3a.block.size</code>
+        in the <span class="ph filepath">core-site.xml</span> configuration file determines
+        how Impala divides the I/O work of reading the data files. This configuration
+        setting is specified in bytes. By default, this
+        value is 33554432 (32 MB), meaning that Impala parallelizes S3 read operations on the files
+        as if they were made up of 32 MB blocks. For example, if your S3 queries primarily access
+        Parquet files written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code>
+        to 134217728 (128 MB) to match the row group size of those files. If most S3 queries involve
+        Parquet files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code>
+        to 268435456 (256 MB) to match the row group size produced by Impala.
+      </p>
+
+    </div>
+  </article>
+
+</article></main></body></html>

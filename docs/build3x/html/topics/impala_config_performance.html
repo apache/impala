@@ -1,0 +1,149 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_config.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="config_performance"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Post-Installation Configuration for Impala</title></head><body id="config_performance"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Post-Installation Configuration for Impala</h1>
+
+
+  <div class="body conbody">
+
+    <p class="p" id="config_performance__p_24">
+      This section describes the mandatory and recommended configuration settings for Impala. If Impala is
+      installed using cluster management software, some of these configurations might be completed automatically; you must still
+      configure short-circuit reads manually. If you want to customize your environment, consider making the changes described in this topic.
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        You must enable short-circuit reads, whether or not Impala was installed with cluster
+        management software. This setting goes in the Impala configuration settings, not the Hadoop-wide settings.
+      </li>
+
+      <li class="li">
+        You must enable block location tracking, and you can optionally enable native checksumming for optimal performance.
+      </li>
+    </ul>
+
+    <section class="section" id="config_performance__section_fhq_wyv_ls"><h2 class="title sectiontitle">Mandatory: Short-Circuit Reads</h2>
+
+      <p class="p"> Enabling short-circuit reads allows Impala to read local data directly
+        from the file system. This removes the need to communicate through the
+        DataNodes, improving performance. This setting also minimizes the number
+        of additional copies of data. Short-circuit reads requires
+          <code class="ph codeph">libhadoop.so</code>
+        (the Hadoop Native Library) to be accessible to both the server and the
+        client. <code class="ph codeph">libhadoop.so</code> is not available if you have
+        installed from a tarball. You must install from an
+        <code class="ph codeph">.rpm</code>, <code class="ph codeph">.deb</code>, or parcel to use
+        short-circuit local reads.
+      </p>
+      <p class="p">
+        <strong class="ph b">To configure DataNodes for short-circuit reads:</strong>
+      </p>
+      <ol class="ol" id="config_performance__ol_qlq_wyv_ls">
+        <li class="li" id="config_performance__copy_config_files"> Copy the client
+            <code class="ph codeph">core-site.xml</code> and <code class="ph codeph">hdfs-site.xml</code>
+          configuration files from the Hadoop configuration directory to the
+          Impala configuration directory. The default Impala configuration
+          location is <code class="ph codeph">/etc/impala/conf</code>. </li>
+        <li class="li">
+
+
+
+          On all Impala nodes, configure the following properties in
+
+          Impala's copy of <code class="ph codeph">hdfs-site.xml</code> as shown: <pre class="pre codeblock"><code>&lt;property&gt;
+    &lt;name&gt;dfs.client.read.shortcircuit&lt;/name&gt;
+    &lt;value&gt;true&lt;/value&gt;
+&lt;/property&gt;
+
+&lt;property&gt;
+    &lt;name&gt;dfs.domain.socket.path&lt;/name&gt;
+    &lt;value&gt;/var/run/hdfs-sockets/dn&lt;/value&gt;
+&lt;/property&gt;
+
+&lt;property&gt;
+    &lt;name&gt;dfs.client.file-block-storage-locations.timeout.millis&lt;/name&gt;
+    &lt;value&gt;10000&lt;/value&gt;
+&lt;/property&gt;</code></pre>
+
+
+        </li>
+        <li class="li">
+          <p class="p"> If <code class="ph codeph">/var/run/hadoop-hdfs/</code> is group-writable, make
+            sure its group is <code class="ph codeph">root</code>. </p>
+          <div class="note note note_note"><span class="note__title notetitle">Note:</span>  If you are also going to enable block location tracking, you
+            can skip copying configuration files and restarting DataNodes and go
+            straight to <a class="xref" href="#config_performance__block_location_tracking">Optional: Block Location Tracking</a>.
+            Configuring short-circuit reads and block location tracking require
+            the same process of copying files and restarting services, so you
+            can complete that process once when you have completed all
+            configuration changes. Whether you copy files and restart services
+            now or during configuring block location tracking, short-circuit
+            reads are not enabled until you complete those final steps. </div>
+        </li>
+        <li class="li" id="config_performance__restart_all_datanodes"> After applying these changes, restart
+          all DataNodes. </li>
+      </ol>
+    </section>
+
+    <section class="section" id="config_performance__block_location_tracking"><h2 class="title sectiontitle">Mandatory: Block Location Tracking</h2>
+
+
+
+      <p class="p">
+        Enabling block location metadata allows Impala to know which disk data blocks are located on, allowing
+        better utilization of the underlying disks. Impala will not start unless this setting is enabled.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">To enable block location tracking:</strong>
+      </p>
+
+      <ol class="ol">
+        <li class="li">
+          For each DataNode, adding the following to the&nbsp;<code class="ph codeph">hdfs-site.xml</code> file:
+<pre class="pre codeblock"><code>&lt;property&gt;
+  &lt;name&gt;dfs.datanode.hdfs-blocks-metadata.enabled&lt;/name&gt;
+  &lt;value&gt;true&lt;/value&gt;
+&lt;/property&gt; </code></pre>
+        </li>
+
+        <li class="li"> Copy the client
+            <code class="ph codeph">core-site.xml</code> and <code class="ph codeph">hdfs-site.xml</code>
+          configuration files from the Hadoop configuration directory to the
+          Impala configuration directory. The default Impala configuration
+          location is <code class="ph codeph">/etc/impala/conf</code>. </li>
+
+        <li class="li"> After applying these changes, restart
+          all DataNodes. </li>
+      </ol>
+    </section>
+
+    <section class="section" id="config_performance__native_checksumming"><h2 class="title sectiontitle">Optional: Native Checksumming</h2>
+
+
+
+      <p class="p">
+        Enabling native checksumming causes Impala to use an optimized native library for computing checksums, if
+        that library is available.
+      </p>
+
+      <p class="p" id="config_performance__p_29">
+        <strong class="ph b">To enable native checksumming:</strong>
+      </p>
+
+      <p class="p">
+        If you installed <span class="keyword"></span> from packages, the native checksumming library is installed and setup correctly. In
+        such a case, no additional steps are required. Conversely, if you installed by other means, such as with
+        tarballs, native checksumming may not be available due to missing shared objects. Finding the message
+        "<code class="ph codeph">Unable to load native-hadoop library for your platform... using builtin-java classes where
+        applicable</code>" in the Impala logs indicates native checksumming may be unavailable. To enable native
+        checksumming, you must build and install <code class="ph codeph">libhadoop.so</code> (the
+
+
+        Hadoop Native Library).
+      </p>
+    </section>
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_config.html">Managing Impala</a></div></div></nav></article></main></body></html>

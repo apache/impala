@@ -1,0 +1,322 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="shell_running_commands"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Running Commands and SQL Statements in impala-shell</title></head><body id="shell_running_commands"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Running Commands and SQL Statements in impala-shell</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      For information on available commands, see
+      <a class="xref" href="impala_shell_commands.html#shell_commands">impala-shell Command Reference</a>. You can see the full set of available
+      commands by pressing TAB twice, for example:
+    </p>
+
+<pre class="pre codeblock"><code>[impalad-host:21000] &gt;
+connect   describe  explain   help      history   insert    quit      refresh   select    set       shell     show      use       version
+[impalad-host:21000] &gt;</code></pre>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+      Commands must be terminated by a semi-colon. A command can span multiple lines.
+    </div>
+
+    <p class="p">
+      For example:
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; select *
+                  &gt; from t1
+                  &gt; limit 5;
++---------+-----------+
+| s1      | s2        |
++---------+-----------+
+| hello   | world     |
+| goodbye | cleveland |
++---------+-----------+
+</code></pre>
+
+    <p class="p">
+      A comment is considered part of the statement it precedes, so when you enter a <code class="ph codeph">--</code> or
+      <code class="ph codeph">/* */</code> comment, you get a continuation prompt until you finish entering a statement ending
+      with a semicolon:
+    </p>
+
+<pre class="pre codeblock"><code>[localhost:21000] &gt; -- This is a test comment
+                  &gt; show tables like 't*';
++--------+
+| name   |
++--------+
+| t1     |
+| t2     |
+| tab1   |
+| tab2   |
+| tab3   |
+| text_t |
++--------+
+</code></pre>
+
+    <p class="p">
+      Use the up-arrow and down-arrow keys to cycle through and edit previous commands.
+      <span class="keyword cmdname">impala-shell</span> uses the <code class="ph codeph">readline</code> library and so supports a standard set of
+      keyboard shortcuts for editing and cursor movement, such as <code class="ph codeph">Ctrl-A</code> for beginning of line and
+      <code class="ph codeph">Ctrl-E</code> for end of line.
+    </p>
+
+    <p class="p">
+      In <span class="keyword">Impala 2.5</span> and higher, you can define substitution variables to be used within SQL statements
+      processed by <span class="keyword cmdname">impala-shell</span>. On the command line, you specify the option
+      <code class="ph codeph">--var=<var class="keyword varname">variable_name</var>=<var class="keyword varname">value</var></code>.
+      Within an interactive session or a script file processed by the <code class="ph codeph">-f</code> option, you specify
+      a <code class="ph codeph">SET</code> command using the notation <code class="ph codeph">SET VAR:<var class="keyword varname">variable_name</var>=<var class="keyword varname">value</var></code>.
+      Within a SQL statement, you substitute the value by using the notation <code class="ph codeph">${var:<var class="keyword varname">variable_name</var>}</code>.
+    </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+      Because this feature is part of <span class="keyword cmdname">impala-shell</span> rather than the <span class="keyword cmdname">impalad</span>
+      backend, make sure the client system you are connecting from has the most recent <span class="keyword cmdname">impala-shell</span>.
+      You can use this feature with a new <span class="keyword cmdname">impala-shell</span> connecting to an older <span class="keyword cmdname">impalad</span>,
+      but not the reverse.
+    </div>
+
+    <p class="p">
+      For example, here are some <span class="keyword cmdname">impala-shell</span> commands that define substitution variables and then
+      use them in SQL statements executed through the <code class="ph codeph">-q</code> and <code class="ph codeph">-f</code> options.
+      Notice how the <code class="ph codeph">-q</code> argument strings are single-quoted to prevent shell expansion of the
+      <code class="ph codeph">${var:value}</code> notation, and any string literals within the queries are enclosed by double quotation marks.
+    </p>
+
+<pre class="pre codeblock"><code>
+$ impala-shell --var=tname=table1 --var=colname=x --var=coltype=string -q 'create table ${var:tname} (${var:colname} ${var:coltype}) stored as parquet'
+Starting Impala Shell without Kerberos authentication
+Connected to <var class="keyword varname">hostname</var>
+Server version: <var class="keyword varname">impalad_version</var>
+Query: create table table1 (x string) stored as parquet
+
+$ NEW_STRING="hello world"
+$ impala-shell --var=tname=table1 --var=insert_val="$NEW_STRING" -q 'insert into ${var:tname} values ("${var:insert_val}")'
+Starting Impala Shell without Kerberos authentication
+Connected to <var class="keyword varname">hostname</var>
+Server version: <var class="keyword varname">impalad_version</var>
+Query: insert into table1 values ("hello world")
+Inserted 1 row(s) in 1.40s
+
+$ for VAL in foo bar bletch
+do
+  impala-shell --var=tname=table1 --var=insert_val="$VAL" -q 'insert into ${var:tname} values ("${var:insert_val}")'
+done
+...
+Query: insert into table1 values ("foo")
+Inserted 1 row(s) in 0.22s
+Query: insert into table1 values ("bar")
+Inserted 1 row(s) in 0.11s
+Query: insert into table1 values ("bletch")
+Inserted 1 row(s) in 0.21s
+
+$ echo "Search for what substring?" ; read answer
+Search for what substring?
+b
+$ impala-shell --var=tname=table1 -q 'select x from ${var:tname} where x like "%${var:answer}%"'
+Starting Impala Shell without Kerberos authentication
+Connected to <var class="keyword varname">hostname</var>
+Server version: <var class="keyword varname">impalad_version</var>
+Query: select x from table1 where x like "%b%"
++--------+
+| x      |
++--------+
+| bletch |
+| bar    |
++--------+
+Fetched 2 row(s) in 0.83s
+</code></pre>
+
+    <p class="p">
+      Here is a substitution variable passed in by the <code class="ph codeph">--var</code> option,
+      and then referenced by statements issued interactively. Then the variable is
+      cleared with the <code class="ph codeph">UNSET</code> command, and defined again with the
+      <code class="ph codeph">SET</code> command.
+    </p>
+
+<pre class="pre codeblock"><code>
+$ impala-shell --quiet --var=tname=table1
+Starting Impala Shell without Kerberos authentication
+***********************************************************************************
+<var class="keyword varname">banner_message</var>
+***********************************************************************************
+[<var class="keyword varname">hostname</var>:21000] &gt; select count(*) from ${var:tname};
++----------+
+| count(*) |
++----------+
+| 4        |
++----------+
+[<var class="keyword varname">hostname</var>:21000] &gt; unset var:tname;
+Unsetting variable TNAME
+[<var class="keyword varname">hostname</var>:21000] &gt; select count(*) from ${var:tname};
+Error: Unknown variable TNAME
+[<var class="keyword varname">hostname</var>:21000] &gt; set var:tname=table1;
+[<var class="keyword varname">hostname</var>:21000] &gt; select count(*) from ${var:tname};
++----------+
+| count(*) |
++----------+
+| 4        |
++----------+
+</code></pre>
+
+    <p class="p">
+      The following example shows how the <code class="ph codeph">SOURCE</code> command can execute
+      a series of statements from a file:
+    </p>
+
+<pre class="pre codeblock"><code>
+$ cat commands.sql
+show databases;
+show tables in default;
+show functions in _impala_builtins like '*minute*';
+
+$ impala-shell -i localhost
+...
+[localhost:21000] &gt; source commands.sql;
+Query: show databases
++------------------+----------------------------------------------+
+| name             | comment                                      |
++------------------+----------------------------------------------+
+| _impala_builtins | System database for Impala builtin functions |
+| default          | Default Hive database                        |
++------------------+----------------------------------------------+
+Fetched 2 row(s) in 0.06s
+Query: show tables in default
++-----------+
+| name      |
++-----------+
+| customers |
+| sample_07 |
+| sample_08 |
+| web_logs  |
++-----------+
+Fetched 4 row(s) in 0.02s
+Query: show functions in _impala_builtins like '*minute*'
++-------------+--------------------------------+-------------+---------------+
+| return type | signature                      | binary type | is persistent |
++-------------+--------------------------------+-------------+---------------+
+| INT         | minute(TIMESTAMP)              | BUILTIN     | true          |
+| TIMESTAMP   | minutes_add(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | minutes_add(TIMESTAMP, INT)    | BUILTIN     | true          |
+| TIMESTAMP   | minutes_sub(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | minutes_sub(TIMESTAMP, INT)    | BUILTIN     | true          |
++-------------+--------------------------------+-------------+---------------+
+Fetched 5 row(s) in 0.03s
+</code></pre>
+
+    <p class="p">
+      The following example shows how a file that is run by the <code class="ph codeph">SOURCE</code> command,
+      or through the <code class="ph codeph">-q</code> or <code class="ph codeph">-f</code> options of <span class="keyword cmdname">impala-shell</span>,
+      can contain additional <code class="ph codeph">SOURCE</code> commands.
+      The first file, <span class="ph filepath">nested1.sql</span>, runs an <span class="keyword cmdname">impala-shell</span> command
+      and then also runs the commands from <span class="ph filepath">nested2.sql</span>.
+      This ability for scripts to call each other is often useful for code that sets up schemas for applications
+      or test environments.
+    </p>
+
+<pre class="pre codeblock"><code>
+$ cat nested1.sql
+show functions in _impala_builtins like '*minute*';
+source nested2.sql
+$ cat nested2.sql
+show functions in _impala_builtins like '*hour*'
+
+$ impala-shell -i localhost -f nested1.sql
+Starting Impala Shell without Kerberos authentication
+Connected to localhost:21000
+...
+Query: show functions in _impala_builtins like '*minute*'
++-------------+--------------------------------+-------------+---------------+
+| return type | signature                      | binary type | is persistent |
++-------------+--------------------------------+-------------+---------------+
+| INT         | minute(TIMESTAMP)              | BUILTIN     | true          |
+| TIMESTAMP   | minutes_add(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | minutes_add(TIMESTAMP, INT)    | BUILTIN     | true          |
+| TIMESTAMP   | minutes_sub(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | minutes_sub(TIMESTAMP, INT)    | BUILTIN     | true          |
++-------------+--------------------------------+-------------+---------------+
+Fetched 5 row(s) in 0.01s
+Query: show functions in _impala_builtins like '*hour*'
++-------------+------------------------------+-------------+---------------+
+| return type | signature                    | binary type | is persistent |
++-------------+------------------------------+-------------+---------------+
+| INT         | hour(TIMESTAMP)              | BUILTIN     | true          |
+| TIMESTAMP   | hours_add(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | hours_add(TIMESTAMP, INT)    | BUILTIN     | true          |
+| TIMESTAMP   | hours_sub(TIMESTAMP, BIGINT) | BUILTIN     | true          |
+| TIMESTAMP   | hours_sub(TIMESTAMP, INT)    | BUILTIN     | true          |
++-------------+------------------------------+-------------+---------------+
+Fetched 5 row(s) in 0.01s
+</code></pre>
+
+  </div>
+
+  <nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_impala_shell.html">Using the Impala Shell (impala-shell Command)</a></div></div></nav><article class="topic concept nested1" aria-labelledby="ariaid-title2" id="shell_running_commands__rerun">
+    <h2 class="title topictitle2" id="ariaid-title2">Rerunning impala-shell Commands</h2>
+    <div class="body conbody">
+
+      <p class="p">
+        In <span class="keyword">Impala 2.10</span> and higher, you can use the
+        <code class="ph codeph">rerun</code> command, or its abbreviation <code class="ph codeph">@</code>,
+        to re-execute commands from the history list. The argument can be
+        a positive integer (reflecting the number shown in <code class="ph codeph">history</code>
+        output) or a negative integer (reflecting the N'th last command in the
+        <code class="ph codeph">history</code> output. For example:
+      </p>
+
+<pre class="pre codeblock"><code>
+[localhost:21000] &gt; select * from p1 order by t limit 5;
+...
+[localhost:21000] &gt; show table stats p1;
++-----------+--------+--------+------------------------------------------------------------+
+| #Rows     | #Files | Size   | Location                                                   |
++-----------+--------+--------+------------------------------------------------------------+
+| 134217728 | 50     | 4.66MB | hdfs://test.example.com:8020/user/hive/warehouse/jdr.db/p1 |
++-----------+--------+--------+------------------------------------------------------------+
+[localhost:21000] &gt; compute stats p1;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 3 column(s). |
++-----------------------------------------+
+[localhost:21000] &gt; history;
+[1]: use jdr;
+[2]: history;
+[3]: show tables;
+[4]: select * from p1 order by t limit 5;
+[5]: show table stats p1;
+[6]: compute stats p1;
+[7]: history;
+[localhost:21000] &gt; @-2; &lt;- Rerun the 2nd last command in the history list
+Rerunning compute stats p1;
++-----------------------------------------+
+| summary                                 |
++-----------------------------------------+
+| Updated 1 partition(s) and 3 column(s). |
++-----------------------------------------+
+[localhost:21000] &gt; history; &lt;- History list is not updated by rerunning commands
+                                or by repeating the last command, in this case 'history'.
+[1]: use jdr;
+[2]: history;
+[3]: show tables;
+[4]: select * from p1 order by t limit 5;
+[5]: show table stats p1;
+[6]: compute stats p1;
+[7]: history;
+[localhost:21000] &gt; @4; &lt;- Rerun command #4 in the history list using short form '@'.
+Rerunning select * from p1 order by t limit 5;
+...
+[localhost:21000] &gt; rerun 4; &lt;- Rerun command #4 using long form 'rerun'.
+Rerunning select * from p1 order by t limit 5;
+...
+
+</code></pre>
+
+    </div>
+  </article>
+
+</article></main></body></html>

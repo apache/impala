@@ -1,0 +1,99 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security_guidelines.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security_files.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security_install.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security_metastore.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_security_webui.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_ssl.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_authorization.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_authentication.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_auditing.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_lineage.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="security"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Security</title></head><body id="security"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1"><span class="ph">Impala Security</span></h1>
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      Impala includes a fine-grained authorization framework for Hadoop, based on Apache Sentry.
+      Sentry authorization was added in Impala 1.1.0. Together with the Kerberos
+      authentication framework, Sentry takes Hadoop security to a new level needed for the requirements of
+      highly regulated industries such as healthcare, financial services, and government. Impala also includes
+      an auditing capability which was added in Impala 1.1.1; Impala generates the audit data which can be
+      consumed, filtered, and visualized by cluster-management components focused on governance.
+    </p>
+
+    <p class="p">
+      The Impala security features have several objectives. At the most basic level, security prevents
+      accidents or mistakes that could disrupt application processing, delete or corrupt data, or reveal data to
+      unauthorized users. More advanced security features and practices can harden the system against malicious
+      users trying to gain unauthorized access or perform other disallowed operations. The auditing feature
+      provides a way to confirm that no unauthorized access occurred, and detect whether any such attempts were
+      made. This is a critical set of features for production deployments in large organizations that handle
+      important or sensitive data. It sets the stage for multi-tenancy, where multiple applications run
+      concurrently and are prevented from interfering with each other.
+    </p>
+
+    <p class="p">
+      The material in this section presumes that you are already familiar with administering secure Linux systems.
+      That is, you should know the general security practices for Linux and Hadoop, and their associated commands
+      and configuration files. For example, you should know how to create Linux users and groups, manage Linux
+      group membership, set Linux and HDFS file permissions and ownership, and designate the default permissions
+      and ownership for new files. You should be familiar with the configuration of the nodes in your Hadoop
+      cluster, and know how to apply configuration changes or run a set of commands across all the nodes.
+    </p>
+
+    <p class="p">
+      The security features are divided into these broad categories:
+    </p>
+
+    <dl class="dl">
+
+
+        <dt class="dt dlterm">
+          authorization
+        </dt>
+
+        <dd class="dd">
+          Which users are allowed to access which resources, and what operations are they allowed to perform?
+          Impala relies on the open source Sentry project for authorization. By default (when authorization is not
+          enabled), Impala does all read and write operations with the privileges of the <code class="ph codeph">impala</code>
+          user, which is suitable for a development/test environment but not for a secure production environment.
+          When authorization is enabled, Impala uses the OS user ID of the user who runs
+          <span class="keyword cmdname">impala-shell</span> or other client program, and associates various privileges with each
+          user. See <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for details about setting up and managing
+          authorization.
+        </dd>
+
+
+
+
+
+        <dt class="dt dlterm">
+          authentication
+        </dt>
+
+        <dd class="dd">
+          How does Impala verify the identity of the user to confirm that they really are allowed to exercise the
+          privileges assigned to that user? Impala relies on the Kerberos subsystem for authentication. See
+          <a class="xref" href="impala_kerberos.html#kerberos">Enabling Kerberos Authentication for Impala</a> for details about setting up and managing authentication.
+        </dd>
+
+
+
+
+
+        <dt class="dt dlterm">
+          auditing
+        </dt>
+
+        <dd class="dd">
+          What operations were attempted, and did they succeed or not? This feature provides a way to look back and
+          diagnose whether attempts were made to perform unauthorized operations. You use this information to track
+          down suspicious activity, and to see where changes are needed in authorization policies. The audit data
+          produced by this feature can be collected and presented in a user-friendly form by cluster-management
+          software. See <a class="xref" href="impala_auditing.html#auditing">Auditing Impala Operations</a> for details about setting up and managing
+          auditing.
+        </dd>
+
+
+    </dl>
+
+    <p class="p toc"></p>
+
+
+  </div>
+<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_security_guidelines.html">Security Guidelines for Impala</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_security_files.html">Securing Impala Data and Log Files</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_security_install.html">Installation Considerations for Impala Security</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_security_metastore.html">Securing the Hive Metastore Database</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_security_webui.html">Securing the Impala Web User Interface</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_ssl.html">Configuring TLS/SSL for Impala</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_authorization.html">Enabling Sentry Authorization for Impala</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_authentication.html">Impala Authentication</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_auditing.html">Auditing Impala Operations</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_lineage.html">Viewing Lineage Information for Impala Data</a></strong><br></li></ul></nav></article></main></body></html>

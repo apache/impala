@@ -1,0 +1,188 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="optimize_partition_key_scans"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>OPTIMIZE_PARTITION_KEY_SCANS Query Option (Impala 2.5 or higher only)</title></head><body id="optimize_partition_key_scans"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">OPTIMIZE_PARTITION_KEY_SCANS Query Option (<span class="keyword">Impala 2.5</span> or higher only)</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      Enables a fast code path for queries that apply simple aggregate functions to partition key
+      columns: <code class="ph codeph">MIN(<var class="keyword varname">key_column</var>)</code>, <code class="ph codeph">MAX(<var class="keyword varname">key_column</var>)</code>,
+      or <code class="ph codeph">COUNT(DISTINCT <var class="keyword varname">key_column</var>)</code>.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and <code class="ph codeph">false</code>;
+        any other value interpreted as <code class="ph codeph">false</code>
+      </p>
+    <p class="p">
+        <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code> statement)
+      </p>
+
+    <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+        In <span class="keyword">Impala 2.5.0</span>, only the value 1 enables the option, and the value
+        <code class="ph codeph">true</code> is not recognized. This limitation is
+        tracked by the issue
+        <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-3334" target="_blank">IMPALA-3334</a>,
+        which shows the releases where the problem is fixed.
+      </div>
+
+    <p class="p">
+        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.5.0</span>
+      </p>
+
+    <p class="p">
+        <strong class="ph b">Usage notes:</strong>
+      </p>
+
+    <p class="p">
+      This optimization speeds up common <span class="q">"introspection"</span> operations when using queries
+      to calculate the cardinality and range for partition key columns.
+    </p>
+
+    <p class="p">
+      This optimization does not apply if the queries contain any <code class="ph codeph">WHERE</code>,
+      <code class="ph codeph">GROUP BY</code>, or <code class="ph codeph">HAVING</code> clause. The relevant queries
+      should only compute the minimum, maximum, or number of distinct values for the
+      partition key columns across the whole table.
+    </p>
+
+    <p class="p">
+      This optimization is enabled by a query option because it skips some consistency checks
+      and therefore can return slightly different partition values if partitions are in the
+      process of being added, dropped, or loaded outside of Impala. Queries might exhibit different
+      behavior depending on the setting of this option in the following cases:
+    </p>
+
+    <ul class="ul">
+      <li class="li">
+        <p class="p">
+          If files are removed from a partition using HDFS or other non-Impala operations,
+          there is a period until the next <code class="ph codeph">REFRESH</code> of the table where regular
+          queries fail at run time because they detect the missing files. With this optimization
+          enabled, queries that evaluate only the partition key column values (not the contents of
+          the partition itself) succeed, and treat the partition as if it still exists.
+        </p>
+      </li>
+      <li class="li">
+        <p class="p">
+          If a partition contains any data files, but the data files do not contain any rows,
+          a regular query considers that the partition does not exist. With this optimization
+          enabled, the partition is treated as if it exists.
+        </p>
+        <p class="p">
+          If the partition includes no files at all, this optimization does not change the query
+          behavior: the partition is considered to not exist whether or not this optimization is enabled.
+        </p>
+      </li>
+    </ul>
+
+    <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+    <p class="p">
+      The following example shows initial schema setup and the default behavior of queries that
+      return just the partition key column for a table:
+    </p>
+
+<pre class="pre codeblock"><code>
+-- Make a partitioned table with 3 partitions.
+create table t1 (s string) partitioned by (year int);
+insert into t1 partition (year=2015) values ('last year');
+insert into t1 partition (year=2016) values ('this year');
+insert into t1 partition (year=2017) values ('next year');
+
+-- Regardless of the option setting, this query must read the
+-- data files to know how many rows to return for each year value.
+explain select year from t1;
++-----------------------------------------------------+
+| Explain String                                      |
++-----------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=0B VCores=0 |
+|                                                     |
+| F00:PLAN FRAGMENT [UNPARTITIONED]                   |
+|   00:SCAN HDFS [key_cols.t1]                        |
+|      partitions=3/3 files=4 size=40B                |
+|      table stats: 3 rows total                      |
+|      column stats: all                              |
+|      hosts=3 per-host-mem=unavailable               |
+|      tuple-ids=0 row-size=4B cardinality=3          |
++-----------------------------------------------------+
+
+-- The aggregation operation means the query does not need to read
+-- the data within each partition: the result set contains exactly 1 row
+-- per partition, derived from the partition key column value.
+-- By default, Impala still includes a 'scan' operation in the query.
+explain select distinct year from t1;
++------------------------------------------------------------------------------------+
+| Explain String                                                                     |
++------------------------------------------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=0B VCores=0                                |
+|                                                                                    |
+| 01:AGGREGATE [FINALIZE]                                                            |
+| |  group by: year                                                                  |
+| |                                                                                  |
+| 00:SCAN HDFS [key_cols.t1]                                                         |
+|    partitions=0/0 files=0 size=0B                                                  |
++------------------------------------------------------------------------------------+
+</code></pre>
+
+    <p class="p">
+      The following examples show how the plan is made more efficient when the
+      <code class="ph codeph">OPTIMIZE_PARTITION_KEY_SCANS</code> option is enabled:
+    </p>
+
+<pre class="pre codeblock"><code>
+set optimize_partition_key_scans=1;
+OPTIMIZE_PARTITION_KEY_SCANS set to 1
+
+-- The aggregation operation is turned into a UNION internally,
+-- with constant values known in advance based on the metadata
+-- for the partitioned table.
+explain select distinct year from t1;
++-----------------------------------------------------+
+| Explain String                                      |
++-----------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=0B VCores=0 |
+|                                                     |
+| F00:PLAN FRAGMENT [UNPARTITIONED]                   |
+|   01:AGGREGATE [FINALIZE]                           |
+|   |  group by: year                                 |
+|   |  hosts=1 per-host-mem=unavailable               |
+|   |  tuple-ids=1 row-size=4B cardinality=3          |
+|   |                                                 |
+|   00:UNION                                          |
+|      constant-operands=3                            |
+|      hosts=1 per-host-mem=unavailable               |
+|      tuple-ids=0 row-size=4B cardinality=3          |
++-----------------------------------------------------+
+
+-- The same optimization applies to other aggregation queries
+-- that only return values based on partition key columns:
+-- MIN, MAX, COUNT(DISTINCT), and so on.
+explain select min(year) from t1;
++-----------------------------------------------------+
+| Explain String                                      |
++-----------------------------------------------------+
+| Estimated Per-Host Requirements: Memory=0B VCores=0 |
+|                                                     |
+| F00:PLAN FRAGMENT [UNPARTITIONED]                   |
+|   01:AGGREGATE [FINALIZE]                           |
+|   |  output: min(year)                              |
+|   |  hosts=1 per-host-mem=unavailable               |
+|   |  tuple-ids=1 row-size=4B cardinality=1          |
+|   |                                                 |
+|   00:UNION                                          |
+|      constant-operands=3                            |
+|      hosts=1 per-host-mem=unavailable               |
+|      tuple-ids=0 row-size=4B cardinality=3          |
++-----------------------------------------------------+
+</code></pre>
+
+  </div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div></div></nav></article></main></body></html>

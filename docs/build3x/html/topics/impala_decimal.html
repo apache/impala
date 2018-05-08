@@ -1,0 +1,907 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="decimal"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>DECIMAL Data Type (Impala 3.0 or higher only)</title></head><body id="decimal"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">DECIMAL Data Type (<span class="keyword">Impala 3.0</span> or higher only)</h1>
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">DECIMAL</code> data type is a numeric data type with fixed scale and
+      precision.
+    </p>
+
+    <p class="p">
+      The data type is useful for storing and doing operations on precise decimal values.
+    </p>
+
+    <p class="p">
+        <strong class="ph b">Syntax:</strong>
+      </p>
+
+<pre class="pre codeblock"><code>DECIMAL[(<var class="keyword varname">precision</var>[, <var class="keyword varname">scale</var>])]</code></pre>
+
+    <p class="p">
+      <strong class="ph b">Precision:</strong>
+    </p>
+
+    <p class="p">
+      <var class="keyword varname">precision</var> represents the total number of digits that can be represented
+      regardless of the location of the decimal point.
+    </p>
+
+    <p class="p">
+      This value must be between 1 and 38, specified as an integer literal.
+    </p>
+
+    <p class="p">
+      The default precision is 9.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Scale:</strong>
+    </p>
+
+    <p class="p">
+      <var class="keyword varname">scale</var> represents the number of fractional digits.
+    </p>
+
+    <p class="p">
+      This value must be less than or equal to the precision, specified as an integer literal.
+    </p>
+
+    <p class="p">
+      The default scale is 0.
+    </p>
+
+    <p class="p">
+      When the precision and the scale are omitted, a <code class="ph codeph">DECIMAL</code> is treated as
+      <code class="ph codeph">DECIMAL(9, 0)</code>.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Range:</strong>
+    </p>
+
+    <p class="p">
+      The range of <code class="ph codeph">DECIMAL</code> type is -10^38 +1 through 10^38 –1.
+    </p>
+
+    <p class="p">
+      The largest value is represented by <code class="ph codeph">DECIMAL(38, 0)</code>.
+    </p>
+
+    <p class="p">
+      The most precise fractional value (between 0 and 1, or 0 and -1) is represented by
+      <code class="ph codeph">DECIMAL(38, 38)</code>, with 38 digits to the right of the decimal point. The
+      value closest to 0 would be .0000...1 (37 zeros and the final 1). The value closest to 1
+      would be .999... (9 repeated 38 times).
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Memory and disk storage:</strong>
+    </p>
+
+    <p class="p">
+      Only the precision determines the storage size for <code class="ph codeph">DECIMAL</code> values, and
+      the scale setting has no effect on the storage size. The following table describes the
+      in-memory storage once the values are loaded into memory.
+    </p>
+
+    <div class="p">
+      <table class="simpletable frame-all" id="decimal__simpletable_tty_3y2_mdb"><col style="width:50%"><col style="width:50%"><thead><tr class="sthead">
+
+          <th class="stentry" id="decimal__simpletable_tty_3y2_mdb__stentry__1">Precision</th>
+
+          <th class="stentry" id="decimal__simpletable_tty_3y2_mdb__stentry__2">In-memory Storage</th>
+
+        </tr></thead><tbody><tr class="strow">
+
+          <td class="stentry" headers="decimal__simpletable_tty_3y2_mdb__stentry__1">1 - 9</td>
+
+          <td class="stentry" headers="decimal__simpletable_tty_3y2_mdb__stentry__2">4 bytes</td>
+
+        </tr><tr class="strow">
+
+          <td class="stentry" headers="decimal__simpletable_tty_3y2_mdb__stentry__1">10 - 18</td>
+
+          <td class="stentry" headers="decimal__simpletable_tty_3y2_mdb__stentry__2">8 bytes</td>
+
+        </tr><tr class="strow">
+
+          <td class="stentry" headers="decimal__simpletable_tty_3y2_mdb__stentry__1">19 - 38</td>
+
+          <td class="stentry" headers="decimal__simpletable_tty_3y2_mdb__stentry__2">16 bytes</td>
+
+        </tr></tbody></table>
+    </div>
+
+    <p class="p">
+      The on-disk representation varies depending on the file format of the table.
+    </p>
+
+    <p class="p">
+      Text, RCFile, and SequenceFile tables use ASCII-based formats as below:
+    </p>
+
+    <div class="p">
+      <ul class="ul">
+        <li class="li">
+          Leading zeros are not stored.
+        </li>
+
+        <li class="li">
+          Trailing zeros are stored.
+        </li>
+
+        <li class="li">
+          <p class="p">
+            Each <code class="ph codeph">DECIMAL</code> value takes up as many bytes as the precision of the
+            value, plus:
+          </p>
+          <ul class="ul">
+            <li class="li">
+              One extra byte if the decimal point is present.
+            </li>
+
+            <li class="li">
+              One extra byte for negative values.
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+      Parquet and Avro tables use binary formats and offer more compact storage for
+      <code class="ph codeph">DECIMAL</code> values. In these tables, Impala stores each value in fewer bytes
+      where possible depending on the precision specified for the <code class="ph codeph">DECIMAL</code>
+      column. To conserve space in large tables, use the smallest-precision
+      <code class="ph codeph">DECIMAL</code> type.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Precision and scale in arithmetic operations:</strong>
+    </p>
+
+    <p class="p">
+      For all arithmetic operations, the resulting precision is at most 38.
+    </p>
+
+    <p class="p">
+      If the resulting precision would be greater than 38, Impala truncates the result from the
+      back, but keeps at least 6 fractional digits in scale and rounds.
+    </p>
+
+    <p class="p">
+      For example, <code class="ph codeph">DECIMAL(38, 20) * DECIMAL(38, 20)</code> returns
+      <code class="ph codeph">DECIMAL(38, 6)</code>. According to the table below, the resulting precision and
+      scale would be <code class="ph codeph">(77, 40)</code>, but they are higher than the maximum precision
+      and scale for <code class="ph codeph">DECIMAL</code>. So, Impala sets the precision to the maximum
+      allowed 38, and truncates the scale to 6.
+    </p>
+
+    <div class="p">
+      When you use <code class="ph codeph">DECIMAL</code> values in arithmetic operations, the precision and
+      scale of the result value are determined as follows. For better readability, the following
+      terms are used in the table below:
+      <ul class="ul">
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            P1, P2: Input precisions
+          </p>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            S1, S2: Input scales
+          </p>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            L1, L2: Leading digits in input <code class="ph codeph">DECIMAL</code>s, i.e., L1 = P1 - S1 and L2
+            = P2 - S2
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <div class="p">
+      <table class="table frame-all" id="decimal__table_inl_sz2_mdb"><caption></caption><colgroup><col><col><col></colgroup><tbody class="tbody">
+            <tr class="row">
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                <strong class="ph b">Operation</strong>
+              </td>
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                <strong class="ph b">Resulting Precision</strong>
+              </td>
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                <strong class="ph b">Resulting Scale</strong>
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                Addition and Subtraction
+              </td>
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                <p class="p">
+                  max (L1, L2) + max (S1, S2) + 1
+                </p>
+
+
+
+                <p class="p">
+                  1 is for carry-over.
+                </p>
+              </td>
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                max (S1, S2)
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                Multiplication
+              </td>
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                P1 + P2 + 1
+              </td>
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                S1 + S2
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                Division
+              </td>
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                L1 + S2 + max (S1 + P2 + 1, 6)
+              </td>
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                max (S1 + P2 + 1, 6)
+              </td>
+            </tr>
+            <tr class="row">
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                Modulo
+              </td>
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                min (L1, L2) + max (S1, S2)
+              </td>
+              <td class="entry cellrowborder align-left colsep-1 rowsep-1">
+                max (S1, S2)
+              </td>
+            </tr>
+          </tbody></table>
+    </div>
+
+    <p class="p">
+      <strong class="ph b">Precision and scale in functions:</strong>
+    </p>
+
+    <div class="p">
+      When you use <code class="ph codeph">DECIMAL</code> values in built-in functions, the precision and
+      scale of the result value are determined as follows:
+      <ul class="ul">
+        <li dir="ltr" class="li">
+          The result of the <code class="ph codeph">SUM</code> aggregate function on a
+          <code class="ph codeph">DECIMAL</code> value is:
+          <ul class="ul">
+            <li class="li">
+              <p dir="ltr" class="p">
+                Precision: 38
+              </p>
+            </li>
+
+            <li class="li">
+              <p dir="ltr" class="p">
+                Scale: The same scale as the input column
+              </p>
+            </li>
+          </ul>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            The result of <code class="ph codeph">AVG</code> aggregate function on a <code class="ph codeph">DECIMAL</code>
+            value is:
+          </p>
+          <ul class="ul">
+            <li class="li">
+              <p dir="ltr" class="p">
+                Precision: 38
+              </p>
+            </li>
+
+            <li class="li">
+              <p dir="ltr" class="p">
+                Scale: max(Scale of input column, 6)
+              </p>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+      <strong class="ph b">Implicit conversions in DECIMAL assignments:</strong>
+    </p>
+
+    <p class="p">
+      Impala enforces strict conversion rules in decimal assignments like in
+      <code class="ph codeph">INSERT</code> and <code class="ph codeph">UNION</code> statements, or in functions like
+      <code class="ph codeph">COALESCE</code>.
+    </p>
+
+    <p class="p">
+      If there is not enough precision and scale in the destination, Impala fails with an error.
+    </p>
+
+    <div class="p">
+      Impala performs implicit conversions between <code class="ph codeph">DECIMAL</code> and other numeric
+      types as below:
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">DECIMAL</code> is implicitly converted to <code class="ph codeph">DOUBLE</code> or
+          <code class="ph codeph">FLOAT</code> when necessary even with a loss of precision. It can be
+          necessary, for example when inserting a <code class="ph codeph">DECIMAL</code> value into a
+          <code class="ph codeph">DOUBLE</code> column. For example:
+<pre class="pre codeblock"><code>CREATE TABLE flt(c FLOAT);
+INSERT INTO flt SELECT CAST(1e37 AS DECIMAL(38, 0));
+SELECT CAST(c AS DECIMAL(38, 0)) FROM flt;
+
+Result: 9999999933815812510711506376257961984</code></pre>
+          <p dir="ltr" class="p">
+            The result has a loss of information due to implicit casting. This is why we
+            discourage using the <code class="ph codeph">DOUBLE</code> and <code class="ph codeph">FLOAT</code> types in
+            general.
+          </p>
+        </li>
+
+        <li class="li">
+          <code class="ph codeph">DOUBLE</code> and <code class="ph codeph">FLOAT</code> cannot be implicitly converted to
+          <code class="ph codeph">DECIMAL</code>. An error is returned.
+        </li>
+
+        <li class="li">
+          <code class="ph codeph">DECIMAL</code> is implicitly converted to <code class="ph codeph">DECIMAL</code> if all
+          digits fit in the resulting <code class="ph codeph">DECIMAL</code>.
+          <div class="p">
+            For example, the following query returns an error because the resulting type that
+            guarantees that all digits fit cannot be determined .
+<pre class="pre codeblock"><code>SELECT GREATEST (CAST(1 AS DECIMAL(38, 0)), CAST(2 AS DECIMAL(38, 37)));</code></pre>
+          </div>
+        </li>
+
+        <li class="li">
+          Integer values can be implicitly converted to <code class="ph codeph">DECIMAL</code> when there is
+          enough room in the <code class="ph codeph">DECIMAL</code> to guarantee that all digits fit. The
+          integer types require the following numbers of digits to the left of the decimal point
+          when converted to <code class="ph codeph">DECIMAL</code>:
+          <ul class="ul">
+            <li class="li">
+              <p dir="ltr" class="p">
+                <code class="ph codeph">BIGINT</code>: 19 digits
+              </p>
+            </li>
+
+            <li class="li">
+              <p dir="ltr" class="p">
+                <code class="ph codeph">INT</code>: 10 digits
+              </p>
+            </li>
+
+            <li class="li">
+              <p dir="ltr" class="p">
+                <code class="ph codeph">SMALLINT</code>: 5 digits
+              </p>
+            </li>
+
+            <li class="li">
+              <p dir="ltr" class="p">
+                <code class="ph codeph">TINYINT</code>: 3 digits
+              </p>
+            </li>
+          </ul>
+          <p class="p">
+            For example:
+          </p>
+
+          <div class="p">
+<pre class="pre codeblock"><code>CREATE TABLE decimals_10_8 (x DECIMAL(10, 8));
+INSERT INTO decimals_10_8 VALUES (CAST(1 AS TINYINT));</code></pre>
+          </div>
+
+          <p class="p">
+            The above <code class="ph codeph">INSERT</code> statement fails because <code class="ph codeph">TINYINT</code>
+            requires room for 3 digits to the left of the decimal point in the
+            <code class="ph codeph">DECIMAL</code>.
+          </p>
+
+          <div class="p">
+<pre class="pre codeblock"><code>CREATE TABLE decimals_11_8(x DECIMAL(11, 8));
+INSERT INTO decimals_11_8 VALUES (CAST(1 AS TINYINT));</code></pre>
+          </div>
+
+          <p class="p">
+            The above <code class="ph codeph">INSERT</code> statement succeeds because there is enough room
+            for 3 digits to the left of the decimal point that <code class="ph codeph">TINYINT</code>
+            requires.
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <div class="p">
+      In <code class="ph codeph">UNION</code>, the resulting precision and scales are determined as follows.
+      <ul class="ul">
+        <li class="li">
+          Precision: max (L1, L2) + max (S1, S2)
+          <p class="p">
+            If the resulting type does not fit in the <code class="ph codeph">DECIMAL</code> type, an error is
+            returned. See the first example below.
+          </p>
+        </li>
+
+        <li class="li">
+          Scale: max (S1, S2)
+        </li>
+      </ul>
+    </div>
+
+    <div class="p">
+      Examples for <code class="ph codeph">UNION</code>:
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">DECIMAL(20, 0) UNION DECIMAL(20, 20)</code> would require a
+          <code class="ph codeph">DECIMAL(40, 20)</code> to fit all the digits. Since this is larger than the
+          max precision for <code class="ph codeph">DECIMAL</code>, Impala returns an error. One way to fix
+          the error is to cast both operands to the desired type, for example
+          <code class="ph codeph">DECIMAL(38, 18)</code>.
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            <code class="ph codeph">DECIMAL(20, 2) UNION DECIMAL(8, 6)</code> returns <code class="ph codeph">DECIMAL(24,
+            6)</code>.
+          </p>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            <code class="ph codeph">INT UNION DECIMAL(9, 4)</code> returns <code class="ph codeph">DECIMAL(14, 4)</code>.
+          </p>
+
+          <p class="p">
+            <code class="ph codeph">INT</code> has the precision 10 and the scale 0, so it is treated as
+            <code class="ph codeph">DECIMAL(10, 0) UNION DECIMAL(9. 4)</code>.
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+      <strong class="ph b">Casting between DECIMAL and other data types:</strong>
+    </p>
+
+    <div class="p">
+      To avoid potential conversion errors, use <code class="ph codeph">CAST</code> to explicitly convert
+      between <code class="ph codeph">DECIMAL</code> and other types in decimal assignments like in
+      <code class="ph codeph">INSERT</code> and <code class="ph codeph">UNION</code> statements, or in functions like
+      <code class="ph codeph">COALESCE</code>:
+      <ul class="ul">
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            You can cast the following types to <code class="ph codeph">DECIMAL</code>:
+            <code class="ph codeph">FLOAT</code>, <code class="ph codeph">TINYINT</code>, <code class="ph codeph">SMALLINT</code>,
+            <code class="ph codeph">INT</code>, <code class="ph codeph">BIGINT</code>, <code class="ph codeph">STRING</code>
+          </p>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            You can cast <code class="ph codeph">DECIMAL</code> to the following types:
+            <code class="ph codeph">FLOAT</code>, <code class="ph codeph">TINYINT</code>, <code class="ph codeph">SMALLINT</code>,
+            <code class="ph codeph">INT</code>, <code class="ph codeph">BIGINT</code>, <code class="ph codeph">STRING</code>,
+            <code class="ph codeph">BOOLEAN</code>, <code class="ph codeph">TIMESTAMP</code>
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <div class="p">
+      Impala performs <code class="ph codeph">CAST</code> between <code class="ph codeph">DECIMAL</code> and other numeric
+      types as below:
+      <ul class="ul">
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            Precision: If you cast a value with bigger precision than the precision of the
+            destination type, Impala returns an error. For example, <code class="ph codeph">CAST(123456 AS
+            DECIMAL(3,0))</code> returns an error because all digits do not fit into
+            <code class="ph codeph">DECIMAL(3, 0)</code>
+          </p>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            Scale: If you cast a value with more fractional digits than the scale of the
+            destination type, the fractional digits are rounded. For example, <code class="ph codeph">CAST(1.239
+            AS DECIMAL(3, 2))</code> returns <code class="ph codeph">1.24</code>.
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+      <strong class="ph b">Casting STRING to DECIMAL:</strong>
+    </p>
+
+    <div class="p">
+      You can cast <code class="ph codeph">STRING</code> of numeric characters in columns, literals, or
+      expressions to <code class="ph codeph">DECIMAL</code> as long as number fits within the specified target
+      <code class="ph codeph">DECIMAL</code> type without overflow.
+      <ul class="ul">
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            If scale in <code class="ph codeph">STRING</code> &gt; scale in <code class="ph codeph">DECIMAL</code>, the
+            fractional digits are rounded to the <code class="ph codeph">DECIMAL</code> scale.
+          </p>
+
+          <p dir="ltr" class="p">
+            For example, <code class="ph codeph">CAST('98.678912' AS DECIMAL(15, 1))</code> returns
+            <code class="ph codeph">98.7</code>.
+          </p>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            If # leading digits in <code class="ph codeph">STRING</code> &gt; # leading digits in
+            <code class="ph codeph">DECIMAL</code>, an error is returned.
+          </p>
+
+          <p dir="ltr" class="p">
+            For example, <code class="ph codeph">CAST('123.45' AS DECIMAL(2, 2))</code> returns an error.
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+      Exponential notation is supported when casting from <code class="ph codeph">STRING</code>.
+    </p>
+
+    <p class="p">
+      For example, <code class="ph codeph">CAST('1.0e6' AS DECIMAL(32, 0))</code> returns
+      <code class="ph codeph">1000000</code>.
+    </p>
+
+    <p class="p">
+      Casting any non-numeric value, such as <code class="ph codeph">'ABC'</code> to the
+      <code class="ph codeph">DECIMAL</code> type returns an error.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Casting DECIMAL to TIMESTAMP:</strong>
+    </p>
+
+    <p class="p">
+      Casting a <code class="ph codeph">DECIMAL</code> value N to <code class="ph codeph">TIMESTAMP</code> produces a value
+      that is N seconds past the start of the epoch date (January 1, 1970).
+    </p>
+
+    <p class="p">
+      <strong class="ph b">DECIMAL vs FLOAT consideration:</strong>
+    </p>
+
+    <p class="p">
+      The <code class="ph codeph">FLOAT</code> and <code class="ph codeph">DOUBLE</code> types can cause problems or
+      unexpected behavior due to inability to precisely represent certain fractional values, for
+      example dollar and cents values for currency. You might find output values slightly
+      different than you inserted, equality tests that do not match precisely, or unexpected
+      values for <code class="ph codeph">GROUP BY</code> columns. The <code class="ph codeph">DECIMAL</code> type can help
+      reduce unexpected behavior and rounding errors, but at the expense of some performance
+      overhead for assignments and comparisons.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Literals and expressions:</strong>
+    </p>
+
+    <div class="p">
+      <ul class="ul">
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            Numeric literals without a decimal point
+          </p>
+          <ul class="ul">
+            <li class="li">
+              The literals are treated as the smallest integer that would fit the literal. For
+              example, <code class="ph codeph">111</code> is a <code class="ph codeph">TINYINT</code>, and
+              <code class="ph codeph">1111</code> is a <code class="ph codeph">SMALLINT</code>.
+            </li>
+
+            <li class="li">
+              Large literals that do not fit into any integer type are treated as
+              <code class="ph codeph">DECIMAL</code>.
+            </li>
+
+            <li class="li">
+              The literals too large to fit into a <code class="ph codeph">DECIMAL(38, 0)</code> are treated
+              as <code class="ph codeph">DOUBLE</code>.
+            </li>
+          </ul>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            Numeric literals with a decimal point
+          </p>
+          <ul class="ul">
+            <li class="li">
+              The literal with less than 38 digits are treated as <code class="ph codeph">DECIMAL</code>.
+            </li>
+
+            <li class="li">
+              The literals with 38 or more digits are treated as a <code class="ph codeph">DOUBLE</code>.
+            </li>
+          </ul>
+        </li>
+
+        <li class="li">
+          Exponential notation is supported in <code class="ph codeph">DECIMAL</code> literals.
+        </li>
+
+        <li dir="ltr" class="li">
+          <p class="p">
+            To represent a very large or precise <code class="ph codeph">DECIMAL</code> value as a literal,
+            for example one that contains more digits than can be represented by a
+            <code class="ph codeph">BIGINT</code> literal, use a quoted string or a floating-point value for
+            the number and <code class="ph codeph">CAST</code> the string to the desired
+            <code class="ph codeph">DECIMAL</code> type.
+          </p>
+
+          <p class="p">
+            For example: <code class="ph codeph">CAST('999999999999999999999999999999' AS DECIMAL(38,
+            5)))</code>
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+        <strong class="ph b">File format considerations:</strong>
+      </p>
+
+    <div class="p" dir="ltr">
+      The <code class="ph codeph">DECIMAL</code> data type can be stored in any of the file formats supported
+      by Impala.
+      <ul class="ul">
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            Impala can query Avro, RCFile, or SequenceFile tables that contain
+            <code class="ph codeph">DECIMAL</code> columns, created by other Hadoop components.
+          </p>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            Impala can query and insert into Kudu tables that contain <code class="ph codeph">DECIMAL</code>
+            columns.
+          </p>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            The <code class="ph codeph">DECIMAL</code> data type is fully compatible with HBase tables.
+          </p>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            The <code class="ph codeph">DECIMAL</code> data type is fully compatible with Parquet tables.
+          </p>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            Values of the <code class="ph codeph">DECIMAL</code> data type are potentially larger in text
+            tables than in tables using Parquet or other binary formats.
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+      <strong class="ph b">UDF consideration:</strong>
+    </p>
+
+    <p class="p">
+      When writing a C++ UDF, use the <code class="ph codeph">DecimalVal</code> data type defined in
+      <span class="ph filepath">/usr/include/impala_udf/udf.h</span>.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Changing precision and scale:</strong>
+    </p>
+
+    <div class="p">
+      You can issue an <code class="ph codeph">ALTER TABLE ... REPLACE COLUMNS</code> statement to change the
+      precision and scale of an existing <code class="ph codeph">DECIMAL</code> column.
+      <ul class="ul">
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            For text-based formats (text, RCFile, and SequenceFile tables)
+          </p>
+          <ul class="ul">
+            <li class="li">
+              <p dir="ltr" class="p">
+                If the values in the column fit within the new precision and scale, they are
+                returned correctly by a query.
+              </p>
+            </li>
+
+            <li class="li">
+              <div class="p" dir="ltr">
+                If any values that do not fit within the new precision and scale:
+                <ul class="ul">
+                  <li class="li">
+                    Impala returns an error if the query option <code class="ph codeph">ABORT_ON_ERROR</code>
+                    is set to <code class="ph codeph">true</code>.
+                  </li>
+
+                  <li class="li">
+                    Impala returns a <code class="ph codeph">NULL</code> and warning that conversion failed if
+                    the query option <code class="ph codeph">ABORT_ON_ERROR</code> is set to
+                    <code class="ph codeph">false</code>.
+                  </li>
+                </ul>
+              </div>
+            </li>
+
+            <li class="li">
+              <p class="p">
+                Leading zeros do not count against the precision value, but trailing zeros after
+                the decimal point do.
+              </p>
+            </li>
+          </ul>
+        </li>
+
+        <li dir="ltr" class="li">
+          <p dir="ltr" class="p">
+            For binary formats (Parquet and Avro tables)
+          </p>
+          <ul class="ul">
+            <li class="li">
+              <p dir="ltr" class="p">
+                Although an <code class="ph codeph">ALTER TABLE ... REPLACE COLUMNS</code> statement that
+                changes the precision or scale of a <code class="ph codeph">DECIMAL</code> column succeeds,
+                any subsequent attempt to query the changed column results in a fatal error.
+                This is because the metadata about the columns is stored in the data files
+                themselves, and <code class="ph codeph">ALTER TABLE</code> does not actually make any updates
+                to the data files. The other unaltered columns can still be queried
+                successfully.
+              </p>
+            </li>
+
+            <li class="li">
+              <p dir="ltr" class="p">
+                If the metadata in the data files disagrees with the metadata in the metastore
+                database, Impala cancels the query.
+              </p>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+
+    <p class="p">
+        <strong class="ph b">Partitioning:</strong>
+      </p>
+
+    <p class="p">
+      Using a <code class="ph codeph">DECIMAL</code> column as a partition key provides you a better match
+      between the partition key values and the HDFS directory names than using a
+      <code class="ph codeph">DOUBLE</code> or <code class="ph codeph">FLOAT</code> partitioning column.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Column statistics considerations:</strong>
+    </p>
+
+    <p class="p">
+      Because the <code class="ph codeph">DECIMAL</code> type has a fixed size, the maximum and average size
+      fields are always filled in for column statistics, even before you run the <code class="ph codeph">COMPUTE
+      STATS</code> statement.
+    </p>
+
+    <p class="p">
+      <strong class="ph b">Compatibility with older version of DECIMAL:</strong>
+    </p>
+
+    <p class="p">
+      This version of <code class="ph codeph">DECIMAL</code> type is the default in
+      <span class="keyword">Impala 3.0</span> and higher. The key differences between this
+      version of <code class="ph codeph">DECIMAL</code> and the previous <code class="ph codeph">DECIMAL</code> V1 in Impala
+      2.x include the following.
+    </p>
+
+    <div class="p">
+      <table class="simpletable frame-all" id="decimal__simpletable_bwl_khm_rdb"><col style="width:33.33333333333333%"><col style="width:33.33333333333333%"><col style="width:33.33333333333333%"><thead><tr class="sthead">
+
+          <th class="stentry" id="decimal__simpletable_bwl_khm_rdb__stentry__1"></th>
+
+          <th class="stentry" id="decimal__simpletable_bwl_khm_rdb__stentry__2">DECIMAL in <span class="keyword">Impala 3.0</span> or
+            higher</th>
+
+          <th class="stentry" id="decimal__simpletable_bwl_khm_rdb__stentry__3">DECIMAL in <span class="keyword">Impala 2.12</span> or lower
+          </th>
+
+        </tr></thead><tbody><tr class="strow">
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__1">Overall behavior</td>
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__2">Returns either the result or an error.</td>
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__3">Returns either the result or <code class="ph codeph">NULL</code> with a
+            warning.</td>
+
+        </tr><tr class="strow">
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__1">Overflow behavior</td>
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__2">Aborts with an error.</td>
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__3">Issues a warning and returns <code class="ph codeph">NULL</code>.</td>
+
+        </tr><tr class="strow">
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__1">Truncation / rounding behavior in arithmetic</td>
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__2">Truncates and rounds digits from the back.</td>
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__3">Truncates digits from the front.</td>
+
+        </tr><tr class="strow">
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__1">String cast</td>
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__2">Truncates from the back and rounds.</td>
+
+          <td class="stentry" headers="decimal__simpletable_bwl_khm_rdb__stentry__3">Truncates from the back.</td>
+
+        </tr></tbody></table>
+    </div>
+
+    <div class="p">
+      If you need to continue using the first version of the <code class="ph codeph">DECIMAL</code> type for
+      the backward compatibility of your queries, set the <code class="ph codeph">DECIMAL_V2</code> query
+      option to <code class="ph codeph">FALSE</code>:
+<pre class="pre codeblock"><code>SET DECIMAL_V2=FALSE;</code></pre>
+    </div>
+
+    <p class="p">
+      <strong class="ph b">Compatibility with other databases:</strong>
+    </p>
+
+    <p dir="ltr" class="p">
+      Use the <code class="ph codeph">DECIMAL</code> data type in Impala for applications where you used the
+      <code class="ph codeph">NUMBER</code> data type in Oracle.
+    </p>
+
+    <p dir="ltr" class="p">
+      The Impala <code class="ph codeph">DECIMAL</code> type does not support the Oracle idioms of
+      <code class="ph codeph">*</code> for scale.
+    </p>
+
+    <p dir="ltr" class="p">
+      The Impala <code class="ph codeph">DECIMAL</code> type does not support negative values for precision.
+    </p>
+
+  </div>
+
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_datatypes.html">Data Types</a></div></div></nav></article></main></body></html>

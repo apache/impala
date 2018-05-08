@@ -1,0 +1,920 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="scalability"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Scalability Considerations for Impala</title></head><body id="scalability"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Scalability Considerations for Impala</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      This section explains how the size of your cluster and the volume of data influences SQL performance and
+      schema design for Impala tables. Typically, adding more cluster capacity reduces problems due to memory
+      limits or disk throughput. On the other hand, larger clusters are more likely to have other kinds of
+      scalability issues, such as a single slow node that causes performance problems for queries.
+    </p>
+
+    <p class="p toc inpage"></p>
+
+    <p class="p">
+        A good source of tips related to scalability and performance tuning is the
+        <a class="xref" href="http://www.slideshare.net/cloudera/the-impala-cookbook-42530186" target="_blank">Impala Cookbook</a>
+        presentation. These slides are updated periodically as new features come out and new benchmarks are performed.
+      </p>
+
+  </div>
+
+
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title2" id="scalability__scalability_catalog">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Impact of Many Tables or Partitions on Impala Catalog Performance and Memory Usage</h2>
+
+    <div class="body conbody">
+
+
+
+      <p class="p">
+        Because Hadoop I/O is optimized for reading and writing large files, Impala is optimized for tables
+        containing relatively few, large data files. Schemas containing thousands of tables, or tables containing
+        thousands of partitions, can encounter performance issues during startup or during DDL operations such as
+        <code class="ph codeph">ALTER TABLE</code> statements.
+      </p>
+
+      <div class="note important note_important"><span class="note__title importanttitle">Important:</span>
+      <p class="p">
+        Because of a change in the default heap size for the <span class="keyword cmdname">catalogd</span> daemon in
+        <span class="keyword">Impala 2.5</span> and higher, the following procedure to increase the <span class="keyword cmdname">catalogd</span>
+        memory limit might be required following an upgrade to <span class="keyword">Impala 2.5</span> even if not
+        needed previously.
+      </p>
+      </div>
+
+      <div class="p">
+        For schemas with large numbers of tables, partitions, and data files, the <span class="keyword cmdname">catalogd</span>
+        daemon might encounter an out-of-memory error. To increase the memory limit for the
+        <span class="keyword cmdname">catalogd</span> daemon:
+
+        <ol class="ol">
+          <li class="li">
+            <p class="p">
+              Check current memory usage for the <span class="keyword cmdname">catalogd</span> daemon by running the
+              following commands on the host where that daemon runs on your cluster:
+            </p>
+  <pre class="pre codeblock"><code>
+  jcmd <var class="keyword varname">catalogd_pid</var> VM.flags
+  jmap -heap <var class="keyword varname">catalogd_pid</var>
+  </code></pre>
+          </li>
+          <li class="li">
+            <p class="p">
+              Decide on a large enough value for the <span class="keyword cmdname">catalogd</span> heap.
+              You express it as an environment variable value as follows:
+            </p>
+  <pre class="pre codeblock"><code>
+  JAVA_TOOL_OPTIONS="-Xmx8g"
+  </code></pre>
+          </li>
+          <li class="li">
+            <p class="p">
+              On systems not using cluster management software, put this environment variable setting into the
+              startup script for the <span class="keyword cmdname">catalogd</span> daemon, then restart the <span class="keyword cmdname">catalogd</span>
+              daemon.
+            </p>
+          </li>
+          <li class="li">
+            <p class="p">
+              Use the same <span class="keyword cmdname">jcmd</span> and <span class="keyword cmdname">jmap</span> commands as earlier to
+              verify that the new settings are in effect.
+            </p>
+          </li>
+        </ol>
+      </div>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title3" id="scalability__statestore_scalability">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Scalability Considerations for the Impala Statestore</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Before <span class="keyword">Impala 2.1</span>, the statestore sent only one kind of message to its subscribers. This message contained all
+        updates for any topics that a subscriber had subscribed to. It also served to let subscribers know that the
+        statestore had not failed, and conversely the statestore used the success of sending a heartbeat to a
+        subscriber to decide whether or not the subscriber had failed.
+      </p>
+
+      <p class="p">
+        Combining topic updates and failure detection in a single message led to bottlenecks in clusters with large
+        numbers of tables, partitions, and HDFS data blocks. When the statestore was overloaded with metadata
+        updates to transmit, heartbeat messages were sent less frequently, sometimes causing subscribers to time
+        out their connection with the statestore. Increasing the subscriber timeout and decreasing the frequency of
+        statestore heartbeats worked around the problem, but reduced responsiveness when the statestore failed or
+        restarted.
+      </p>
+
+      <p class="p">
+        As of <span class="keyword">Impala 2.1</span>, the statestore now sends topic updates and heartbeats in separate messages. This allows the
+        statestore to send and receive a steady stream of lightweight heartbeats, and removes the requirement to
+        send topic updates according to a fixed schedule, reducing statestore network overhead.
+      </p>
+
+      <p class="p">
+        The statestore now has the following relevant configuration flags for the <span class="keyword cmdname">statestored</span>
+        daemon:
+      </p>
+
+      <dl class="dl">
+
+
+          <dt class="dt dlterm" id="statestore_scalability__statestore_num_update_threads">
+            <code class="ph codeph">-statestore_num_update_threads</code>
+          </dt>
+
+          <dd class="dd">
+            The number of threads inside the statestore dedicated to sending topic updates. You should not
+            typically need to change this value.
+            <p class="p">
+              <strong class="ph b">Default:</strong> 10
+            </p>
+          </dd>
+
+
+
+
+
+          <dt class="dt dlterm" id="statestore_scalability__statestore_update_frequency_ms">
+            <code class="ph codeph">-statestore_update_frequency_ms</code>
+          </dt>
+
+          <dd class="dd">
+            The frequency, in milliseconds, with which the statestore tries to send topic updates to each
+            subscriber. This is a best-effort value; if the statestore is unable to meet this frequency, it sends
+            topic updates as fast as it can. You should not typically need to change this value.
+            <p class="p">
+              <strong class="ph b">Default:</strong> 2000
+            </p>
+          </dd>
+
+
+
+
+
+          <dt class="dt dlterm" id="statestore_scalability__statestore_num_heartbeat_threads">
+            <code class="ph codeph">-statestore_num_heartbeat_threads</code>
+          </dt>
+
+          <dd class="dd">
+            The number of threads inside the statestore dedicated to sending heartbeats. You should not typically
+            need to change this value.
+            <p class="p">
+              <strong class="ph b">Default:</strong> 10
+            </p>
+          </dd>
+
+
+
+
+
+          <dt class="dt dlterm" id="statestore_scalability__statestore_heartbeat_frequency_ms">
+            <code class="ph codeph">-statestore_heartbeat_frequency_ms</code>
+          </dt>
+
+          <dd class="dd">
+            The frequency, in milliseconds, with which the statestore tries to send heartbeats to each subscriber.
+            This value should be good for large catalogs and clusters up to approximately 150 nodes. Beyond that,
+            you might need to increase this value to make the interval longer between heartbeat messages.
+            <p class="p">
+              <strong class="ph b">Default:</strong> 1000 (one heartbeat message every second)
+            </p>
+          </dd>
+
+
+      </dl>
+
+      <p class="p">
+        If it takes a very long time for a cluster to start up, and <span class="keyword cmdname">impala-shell</span> consistently
+        displays <code class="ph codeph">This Impala daemon is not ready to accept user requests</code>, the statestore might be
+        taking too long to send the entire catalog topic to the cluster. In this case, consider adding
+        <code class="ph codeph">--load_catalog_in_background=false</code> to your catalog service configuration. This setting
+        stops the statestore from loading the entire catalog into memory at cluster startup. Instead, metadata for
+        each table is loaded when the table is accessed for the first time.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title4" id="scalability__scalability_coordinator">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Controlling which Hosts are Coordinators and Executors</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        By default, each host in the cluster that runs the <span class="keyword cmdname">impalad</span>
+        daemon can act as the coordinator for an Impala query, execute the fragments
+        of the execution plan for the query, or both. During highly concurrent
+        workloads for large-scale queries, especially on large clusters, the dual
+        roles can cause scalability issues:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            The extra work required for a host to act as the coordinator could interfere
+            with its capacity to perform other work for the earlier phases of the query.
+            For example, the coordinator can experience significant network and CPU overhead
+            during queries containing a large number of query fragments. Each coordinator
+            caches metadata for all table partitions and data files, which can be substantial
+            and contend with memory needed to process joins, aggregations, and other operations
+            performed by query executors.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            Having a large number of hosts act as coordinators can cause unnecessary network
+            overhead, or even timeout errors, as each of those hosts communicates with the
+            <span class="keyword cmdname">statestored</span> daemon for metadata updates.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            The <span class="q">"soft limits"</span> imposed by the admission control feature are more likely
+            to be exceeded when there are a large number of heavily loaded hosts acting as
+            coordinators.
+          </p>
+        </li>
+      </ul>
+
+      <p class="p">
+        If such scalability bottlenecks occur, you can explicitly specify that certain
+        hosts act as query coordinators, but not executors for query fragments.
+        These hosts do not participate in I/O-intensive operations such as scans,
+        and CPU-intensive operations such as aggregations.
+      </p>
+
+      <p class="p">
+        Then, you specify that the
+        other hosts act as executors but not coordinators. These hosts do not communicate
+        with the <span class="keyword cmdname">statestored</span> daemon or process the final result sets
+        from queries. You cannot connect to these hosts through clients such as
+        <span class="keyword cmdname">impala-shell</span> or business intelligence tools.
+      </p>
+
+      <p class="p">
+        This feature is available in <span class="keyword">Impala 2.9</span> and higher.
+      </p>
+
+      <p class="p">
+        To use this feature, you specify one of the following startup flags for the
+        <span class="keyword cmdname">impalad</span> daemon on each host:
+      </p>
+
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">is_executor=false</code> for each host that
+            does not act as an executor for Impala queries.
+            These hosts act exclusively as query coordinators.
+            This setting typically applies to a relatively small number of
+            hosts, because the most common topology is to have nearly all
+            DataNodes doing work for query execution.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">is_coordinator=false</code> for each host that
+            does not act as a coordinator for Impala queries.
+            These hosts act exclusively as executors.
+            The number of hosts with this setting typically increases
+            as the cluster grows larger and handles more table partitions,
+            data files, and concurrent queries. As the overhead for query
+            coordination increases, it becomes more important to centralize
+            that work on dedicated hosts.
+          </p>
+        </li>
+      </ul>
+
+      <p class="p">
+        By default, both of these settings are enabled for each <code class="ph codeph">impalad</code>
+        instance, allowing all such hosts to act as both executors and coordinators.
+      </p>
+
+      <p class="p">
+        For example, on a 100-node cluster, you might specify <code class="ph codeph">is_executor=false</code>
+        for 10 hosts, to dedicate those hosts as query coordinators. Then specify
+        <code class="ph codeph">is_coordinator=false</code> for the remaining 90 hosts. All explicit or
+        load-balanced connections must go to the 10 hosts acting as coordinators. These hosts
+        perform the network communication to keep metadata up-to-date and route query results
+        to the appropriate clients. The remaining 90 hosts perform the intensive I/O, CPU, and
+        memory operations that make up the bulk of the work for each query. If a bottleneck or
+        other performance issue arises on a specific host, you can narrow down the cause more
+        easily because each host is dedicated to specific operations within the overall
+        Impala workload.
+      </p>
+
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title5" id="scalability__scalability_buffer_pool">
+    <h2 class="title topictitle2" id="ariaid-title5">Effect of Buffer Pool on Memory Usage (<span class="keyword">Impala 2.10</span> and higher)</h2>
+    <div class="body conbody">
+      <p class="p">
+        The buffer pool feature, available in <span class="keyword">Impala 2.10</span> and higher, changes the
+        way Impala allocates memory during a query. Most of the memory needed is reserved at the
+        beginning of the query, avoiding cases where a query might run for a long time before failing
+        with an out-of-memory error. The actual memory estimates and memory buffers are typically
+        smaller than before, so that more queries can run concurrently or process larger volumes
+        of data than previously.
+      </p>
+      <p class="p">
+        The buffer pool feature includes some query options that you can fine-tune:
+        <a class="xref" href="impala_buffer_pool_limit.html">BUFFER_POOL_LIMIT Query Option</a>,
+        <a class="xref" href="impala_default_spillable_buffer_size.html">DEFAULT_SPILLABLE_BUFFER_SIZE Query Option</a>,
+        <a class="xref" href="impala_max_row_size.html">MAX_ROW_SIZE Query Option</a>, and
+        <a class="xref" href="impala_min_spillable_buffer_size.html">MIN_SPILLABLE_BUFFER_SIZE Query Option</a>.
+      </p>
+      <p class="p">
+        Most of the effects of the buffer pool are transparent to you as an Impala user.
+        Memory use during spilling is now steadier and more predictable, instead of
+        increasing rapidly as more data is spilled to disk. The main change from a user
+        perspective is the need to increase the <code class="ph codeph">MAX_ROW_SIZE</code> query option
+        setting when querying tables with columns containing long strings, many columns,
+        or other combinations of factors that produce very large rows. If Impala encounters
+        rows that are too large to process with the default query option settings, the query
+        fails with an error message suggesting to increase the <code class="ph codeph">MAX_ROW_SIZE</code>
+        setting.
+      </p>
+    </div>
+  </article>
+
+
+
+
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title6" id="scalability__spill_to_disk">
+
+    <h2 class="title topictitle2" id="ariaid-title6">SQL Operations that Spill to Disk</h2>
+
+    <div class="body conbody">
+
+      <p class="p">
+        Certain memory-intensive operations write temporary data to disk (known as <dfn class="term">spilling</dfn> to disk)
+        when Impala is close to exceeding its memory limit on a particular host.
+      </p>
+
+      <p class="p">
+        The result is a query that completes successfully, rather than failing with an out-of-memory error. The
+        tradeoff is decreased performance due to the extra disk I/O to write the temporary data and read it back
+        in. The slowdown could be potentially be significant. Thus, while this feature improves reliability,
+        you should optimize your queries, system parameters, and hardware configuration to make this spilling a rare occurrence.
+      </p>
+
+      <div class="note note note_note"><span class="note__title notetitle">Note:</span>
+        <p class="p">
+          In <span class="keyword">Impala 2.10</span> and higher, also see <a class="xref" href="impala_scalability.html">Scalability Considerations for Impala</a> for
+          changes to Impala memory allocation that might change the details of which queries spill to disk,
+          and how much memory and disk space is involved in the spilling operation.
+        </p>
+      </div>
+
+      <p class="p">
+        <strong class="ph b">What kinds of queries might spill to disk:</strong>
+      </p>
+
+      <p class="p">
+        Several SQL clauses and constructs require memory allocations that could activat the spilling mechanism:
+      </p>
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            when a query uses a <code class="ph codeph">GROUP BY</code> clause for columns
+            with millions or billions of distinct values, Impala keeps a
+            similar number of temporary results in memory, to accumulate the
+            aggregate results for each value in the group.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            When large tables are joined together, Impala keeps the values of
+            the join columns from one table in memory, to compare them to
+            incoming values from the other table.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            When a large result set is sorted by the <code class="ph codeph">ORDER BY</code>
+            clause, each node sorts its portion of the result set in memory.
+          </p>
+        </li>
+        <li class="li">
+          <p class="p">
+            The <code class="ph codeph">DISTINCT</code> and <code class="ph codeph">UNION</code> operators
+            build in-memory data structures to represent all values found so
+            far, to eliminate duplicates as the query progresses.
+          </p>
+        </li>
+
+      </ul>
+
+      <p class="p">
+        When the spill-to-disk feature is activated for a join node within a query, Impala does not
+        produce any runtime filters for that join operation on that host. Other join nodes within
+        the query are not affected.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">How Impala handles scratch disk space for spilling:</strong>
+      </p>
+
+      <p class="p">
+        By default, intermediate files used during large sort, join, aggregation, or analytic function operations
+        are stored in the directory <span class="ph filepath">/tmp/impala-scratch</span> . These files are removed when the
+        operation finishes. (Multiple concurrent queries can perform operations that use the <span class="q">"spill to disk"</span>
+        technique, without any name conflicts for these temporary files.) You can specify a different location by
+        starting the <span class="keyword cmdname">impalad</span> daemon with the
+        <code class="ph codeph">--scratch_dirs="<var class="keyword varname">path_to_directory</var>"</code> configuration option.
+        You can specify a single directory, or a comma-separated list of directories. The scratch directories must
+        be on the local filesystem, not in HDFS. You might specify different directory paths for different hosts,
+        depending on the capacity and speed
+        of the available storage devices. In <span class="keyword">Impala 2.3</span> or higher, Impala successfully starts (with a warning
+        Impala successfully starts (with a warning written to the log) if it cannot create or read and write files
+        in one of the scratch directories. If there is less than 1 GB free on the filesystem where that directory resides,
+        Impala still runs, but writes a warning message to its log.  If Impala encounters an error reading or writing
+        files in a scratch directory during a query, Impala logs the error and the query fails.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Memory usage for SQL operators:</strong>
+      </p>
+
+      <p class="p">
+        In <span class="keyword">Impala 2.10</span> and higher, the way SQL operators such as <code class="ph codeph">GROUP BY</code>,
+        <code class="ph codeph">DISTINCT</code>, and joins, transition between using additional memory or activating the
+        spill-to-disk feature is changed. The memory required to spill to disk is reserved up front, and you can
+        examine it in the <code class="ph codeph">EXPLAIN</code> plan when the <code class="ph codeph">EXPLAIN_LEVEL</code> query option is
+        set to 2 or higher.
+      </p>
+
+     <p class="p">
+       The infrastructure of the spilling feature affects the way the affected SQL operators, such as
+       <code class="ph codeph">GROUP BY</code>, <code class="ph codeph">DISTINCT</code>, and joins, use memory.
+       On each host that participates in the query, each such operator in a query requires memory
+       to store rows of data and other data structures. Impala reserves a certain amount of memory
+       up front for each operator that supports spill-to-disk that is sufficient to execute the
+       operator. If an operator accumulates more data than can fit in the reserved memory, it
+       can either reserve more memory to continue processing data in memory or start spilling
+       data to temporary scratch files on disk. Thus, operators with spill-to-disk support
+       can adapt to different memory constraints by using however much memory is available
+       to speed up execution, yet tolerate low memory conditions by spilling data to disk.
+     </p>
+
+     <p class="p">
+       The amount data depends on the portion of the data being handled by that host, and thus
+       the operator may end up consuming different amounts of memory on different hosts.
+     </p>
+
+
+
+      <p class="p">
+        <strong class="ph b">Added in:</strong> This feature was added to the <code class="ph codeph">ORDER BY</code> clause in Impala 1.4.
+        This feature was extended to cover join queries, aggregation functions, and analytic
+        functions in Impala 2.0. The size of the memory work area required by
+        each operator that spills was reduced from 512 megabytes to 256 megabytes in Impala 2.2.
+        <span class="ph">The spilling mechanism was reworked to take advantage of the
+        Impala buffer pool feature and be more predictable and stable in <span class="keyword">Impala 2.10</span>.</span>
+      </p>
+
+      <p class="p">
+        <strong class="ph b">Avoiding queries that spill to disk:</strong>
+      </p>
+
+      <p class="p">
+        Because the extra I/O can impose significant performance overhead on these types of queries, try to avoid
+        this situation by using the following steps:
+      </p>
+
+      <ol class="ol">
+        <li class="li">
+          Detect how often queries spill to disk, and how much temporary data is written. Refer to the following
+          sources:
+          <ul class="ul">
+            <li class="li">
+              The output of the <code class="ph codeph">PROFILE</code> command in the <span class="keyword cmdname">impala-shell</span>
+              interpreter. This data shows the memory usage for each host and in total across the cluster. The
+              <code class="ph codeph">WriteIoBytes</code> counter reports how much data was written to disk for each operator
+              during the query. (In <span class="keyword">Impala 2.9</span>, the counter was named
+              <code class="ph codeph">ScratchBytesWritten</code>; in <span class="keyword">Impala 2.8</span> and earlier, it was named
+              <code class="ph codeph">BytesWritten</code>.)
+            </li>
+
+            <li class="li">
+              The <span class="ph uicontrol">Queries</span> tab in the Impala debug web user interface. Select the query to
+              examine and click the corresponding <span class="ph uicontrol">Profile</span> link. This data breaks down the
+              memory usage for a single host within the cluster, the host whose web interface you are connected to.
+            </li>
+          </ul>
+        </li>
+
+        <li class="li">
+          Use one or more techniques to reduce the possibility of the queries spilling to disk:
+          <ul class="ul">
+            <li class="li">
+              Increase the Impala memory limit if practical, for example, if you can increase the available memory
+              by more than the amount of temporary data written to disk on a particular node. Remember that in
+              Impala 2.0 and later, you can issue <code class="ph codeph">SET MEM_LIMIT</code> as a SQL statement, which lets you
+              fine-tune the memory usage for queries from JDBC and ODBC applications.
+            </li>
+
+            <li class="li">
+              Increase the number of nodes in the cluster, to increase the aggregate memory available to Impala and
+              reduce the amount of memory required on each node.
+            </li>
+
+            <li class="li">
+              Increase the overall memory capacity of each DataNode at the hardware level.
+            </li>
+
+            <li class="li">
+              On a cluster with resources shared between Impala and other Hadoop components, use resource
+              management features to allocate more memory for Impala. See
+              <a class="xref" href="impala_resource_management.html#resource_management">Resource Management for Impala</a> for details.
+            </li>
+
+            <li class="li">
+              If the memory pressure is due to running many concurrent queries rather than a few memory-intensive
+              ones, consider using the Impala admission control feature to lower the limit on the number of
+              concurrent queries. By spacing out the most resource-intensive queries, you can avoid spikes in
+              memory usage and improve overall response times. See
+              <a class="xref" href="impala_admission.html#admission_control">Admission Control and Query Queuing</a> for details.
+            </li>
+
+            <li class="li">
+              Tune the queries with the highest memory requirements, using one or more of the following techniques:
+              <ul class="ul">
+                <li class="li">
+                  Run the <code class="ph codeph">COMPUTE STATS</code> statement for all tables involved in large-scale joins and
+                  aggregation queries.
+                </li>
+
+                <li class="li">
+                  Minimize your use of <code class="ph codeph">STRING</code> columns in join columns. Prefer numeric values
+                  instead.
+                </li>
+
+                <li class="li">
+                  Examine the <code class="ph codeph">EXPLAIN</code> plan to understand the execution strategy being used for the
+                  most resource-intensive queries. See <a class="xref" href="impala_explain_plan.html#perf_explain">Using the EXPLAIN Plan for Performance Tuning</a> for
+                  details.
+                </li>
+
+                <li class="li">
+                  If Impala still chooses a suboptimal execution strategy even with statistics available, or if it
+                  is impractical to keep the statistics up to date for huge or rapidly changing tables, add hints
+                  to the most resource-intensive queries to select the right execution strategy. See
+                  <a class="xref" href="impala_hints.html#hints">Optimizer Hints</a> for details.
+                </li>
+              </ul>
+            </li>
+
+            <li class="li">
+              If your queries experience substantial performance overhead due to spilling, enable the
+              <code class="ph codeph">DISABLE_UNSAFE_SPILLS</code> query option. This option prevents queries whose memory usage
+              is likely to be exorbitant from spilling to disk. See
+              <a class="xref" href="impala_disable_unsafe_spills.html#disable_unsafe_spills">DISABLE_UNSAFE_SPILLS Query Option (Impala 2.0 or higher only)</a> for details. As you tune
+              problematic queries using the preceding steps, fewer and fewer will be cancelled by this option
+              setting.
+            </li>
+          </ul>
+        </li>
+      </ol>
+
+      <p class="p">
+        <strong class="ph b">Testing performance implications of spilling to disk:</strong>
+      </p>
+
+      <p class="p">
+        To artificially provoke spilling, to test this feature and understand the performance implications, use a
+        test environment with a memory limit of at least 2 GB. Issue the <code class="ph codeph">SET</code> command with no
+        arguments to check the current setting for the <code class="ph codeph">MEM_LIMIT</code> query option. Set the query
+        option <code class="ph codeph">DISABLE_UNSAFE_SPILLS=true</code>. This option limits the spill-to-disk feature to prevent
+        runaway disk usage from queries that are known in advance to be suboptimal. Within
+        <span class="keyword cmdname">impala-shell</span>, run a query that you expect to be memory-intensive, based on the criteria
+        explained earlier. A self-join of a large table is a good candidate:
+      </p>
+
+<pre class="pre codeblock"><code>select count(*) from big_table a join big_table b using (column_with_many_values);
+</code></pre>
+
+      <p class="p">
+        Issue the <code class="ph codeph">PROFILE</code> command to get a detailed breakdown of the memory usage on each node
+        during the query.
+
+      </p>
+
+
+
+      <p class="p">
+        Set the <code class="ph codeph">MEM_LIMIT</code> query option to a value that is smaller than the peak memory usage
+        reported in the profile output. Now try the memory-intensive query again.
+      </p>
+
+      <p class="p">
+        Check if the query fails with a message like the following:
+      </p>
+
+<pre class="pre codeblock"><code>WARNINGS: Spilling has been disabled for plans that do not have stats and are not hinted
+to prevent potentially bad plans from using too many cluster resources. Compute stats on
+these tables, hint the plan or disable this behavior via query options to enable spilling.
+</code></pre>
+
+      <p class="p">
+        If so, the query could have consumed substantial temporary disk space, slowing down so much that it would
+        not complete in any reasonable time. Rather than rely on the spill-to-disk feature in this case, issue the
+        <code class="ph codeph">COMPUTE STATS</code> statement for the table or tables in your sample query. Then run the query
+        again, check the peak memory usage again in the <code class="ph codeph">PROFILE</code> output, and adjust the memory
+        limit again if necessary to be lower than the peak memory usage.
+      </p>
+
+      <p class="p">
+        At this point, you have a query that is memory-intensive, but Impala can optimize it efficiently so that
+        the memory usage is not exorbitant. You have set an artificial constraint through the
+        <code class="ph codeph">MEM_LIMIT</code> option so that the query would normally fail with an out-of-memory error. But
+        the automatic spill-to-disk feature means that the query should actually succeed, at the expense of some
+        extra disk I/O to read and write temporary work data.
+      </p>
+
+      <p class="p">
+        Try the query again, and confirm that it succeeds. Examine the <code class="ph codeph">PROFILE</code> output again. This
+        time, look for lines of this form:
+      </p>
+
+<pre class="pre codeblock"><code>- SpilledPartitions: <var class="keyword varname">N</var>
+</code></pre>
+
+      <p class="p">
+        If you see any such lines with <var class="keyword varname">N</var> greater than 0, that indicates the query would have
+        failed in Impala releases prior to 2.0, but now it succeeded because of the spill-to-disk feature. Examine
+        the total time taken by the <code class="ph codeph">AGGREGATION_NODE</code> or other query fragments containing non-zero
+        <code class="ph codeph">SpilledPartitions</code> values. Compare the times to similar fragments that did not spill, for
+        example in the <code class="ph codeph">PROFILE</code> output when the same query is run with a higher memory limit. This
+        gives you an idea of the performance penalty of the spill operation for a particular query with a
+        particular memory limit. If you make the memory limit just a little lower than the peak memory usage, the
+        query only needs to write a small amount of temporary data to disk. The lower you set the memory limit, the
+        more temporary data is written and the slower the query becomes.
+      </p>
+
+      <p class="p">
+        Now repeat this procedure for actual queries used in your environment. Use the
+        <code class="ph codeph">DISABLE_UNSAFE_SPILLS</code> setting to identify cases where queries used more memory than
+        necessary due to lack of statistics on the relevant tables and columns, and issue <code class="ph codeph">COMPUTE
+        STATS</code> where necessary.
+      </p>
+
+      <p class="p">
+        <strong class="ph b">When to use DISABLE_UNSAFE_SPILLS:</strong>
+      </p>
+
+      <p class="p">
+        You might wonder, why not leave <code class="ph codeph">DISABLE_UNSAFE_SPILLS</code> turned on all the time. Whether and
+        how frequently to use this option depends on your system environment and workload.
+      </p>
+
+      <p class="p">
+        <code class="ph codeph">DISABLE_UNSAFE_SPILLS</code> is suitable for an environment with ad hoc queries whose performance
+        characteristics and memory usage are not known in advance. It prevents <span class="q">"worst-case scenario"</span> queries
+        that use large amounts of memory unnecessarily. Thus, you might turn this option on within a session while
+        developing new SQL code, even though it is turned off for existing applications.
+      </p>
+
+      <p class="p">
+        Organizations where table and column statistics are generally up-to-date might leave this option turned on
+        all the time, again to avoid worst-case scenarios for untested queries or if a problem in the ETL pipeline
+        results in a table with no statistics. Turning on <code class="ph codeph">DISABLE_UNSAFE_SPILLS</code> lets you <span class="q">"fail
+        fast"</span> in this case and immediately gather statistics or tune the problematic queries.
+      </p>
+
+      <p class="p">
+        Some organizations might leave this option turned off. For example, you might have tables large enough that
+        the <code class="ph codeph">COMPUTE STATS</code> takes substantial time to run, making it impractical to re-run after
+        loading new data. If you have examined the <code class="ph codeph">EXPLAIN</code> plans of your queries and know that
+        they are operating efficiently, you might leave <code class="ph codeph">DISABLE_UNSAFE_SPILLS</code> turned off. In that
+        case, you know that any queries that spill will not go overboard with their memory consumption.
+      </p>
+
+    </div>
+  </article>
+
+<article class="topic concept nested1" aria-labelledby="ariaid-title7" id="scalability__complex_query">
+<h2 class="title topictitle2" id="ariaid-title7">Limits on Query Size and Complexity</h2>
+<div class="body conbody">
+<p class="p">
+There are hardcoded limits on the maximum size and complexity of queries.
+Currently, the maximum number of expressions in a query is 2000.
+You might exceed the limits with large or deeply nested queries
+produced by business intelligence tools or other query generators.
+</p>
+<p class="p">
+If you have the ability to customize such queries or the query generation
+logic that produces them, replace sequences of repetitive expressions
+with single operators such as <code class="ph codeph">IN</code> or <code class="ph codeph">BETWEEN</code>
+that can represent multiple values or ranges.
+For example, instead of a large number of <code class="ph codeph">OR</code> clauses:
+</p>
+<pre class="pre codeblock"><code>WHERE val = 1 OR val = 2 OR val = 6 OR val = 100 ...
+</code></pre>
+<p class="p">
+use a single <code class="ph codeph">IN</code> clause:
+</p>
+<pre class="pre codeblock"><code>WHERE val IN (1,2,6,100,...)</code></pre>
+</div>
+</article>
+
+<article class="topic concept nested1" aria-labelledby="ariaid-title8" id="scalability__scalability_io">
+<h2 class="title topictitle2" id="ariaid-title8">Scalability Considerations for Impala I/O</h2>
+<div class="body conbody">
+<p class="p">
+Impala parallelizes its I/O operations aggressively,
+therefore the more disks you can attach to each host, the better.
+Impala retrieves data from disk so quickly using
+bulk read operations on large blocks, that most queries
+are CPU-bound rather than I/O-bound.
+</p>
+<p class="p">
+Because the kind of sequential scanning typically done by
+Impala queries does not benefit much from the random-access
+capabilities of SSDs, spinning disks typically provide
+the most cost-effective kind of storage for Impala data,
+with little or no performance penalty as compared to SSDs.
+</p>
+<p class="p">
+Resource management features such as YARN, Llama, and admission control
+typically constrain the amount of memory, CPU, or overall number of
+queries in a high-concurrency environment.
+Currently, there is no throttling mechanism for Impala I/O.
+</p>
+</div>
+</article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title9" id="scalability__big_tables">
+    <h2 class="title topictitle2" id="ariaid-title9">Scalability Considerations for Table Layout</h2>
+    <div class="body conbody">
+      <p class="p">
+        Due to the overhead of retrieving and updating table metadata
+        in the metastore database, try to limit the number of columns
+        in a table to a maximum of approximately 2000.
+        Although Impala can handle wider tables than this, the metastore overhead
+        can become significant, leading to query performance that is slower
+        than expected based on the actual data volume.
+      </p>
+      <p class="p">
+        To minimize overhead related to the metastore database and Impala query planning,
+        try to limit the number of partitions for any partitioned table to a few tens of thousands.
+      </p>
+      <p class="p">
+        If the volume of data within a table makes it impractical to run exploratory
+        queries, consider using the <code class="ph codeph">TABLESAMPLE</code> clause to limit query processing
+        to only a percentage of data within the table. This technique reduces the overhead
+        for query startup, I/O to read the data, and the amount of network, CPU, and memory
+        needed to process intermediate results during the query. See <a class="xref" href="impala_tablesample.html">TABLESAMPLE Clause</a>
+        for details.
+      </p>
+    </div>
+  </article>
+
+<article class="topic concept nested1" aria-labelledby="ariaid-title10" id="scalability__kerberos_overhead_cluster_size">
+<h2 class="title topictitle2" id="ariaid-title10">Kerberos-Related Network Overhead for Large Clusters</h2>
+<div class="body conbody">
+<p class="p">
+When Impala starts up, or after each <code class="ph codeph">kinit</code> refresh, Impala sends a number of
+simultaneous requests to the KDC. For a cluster with 100 hosts, the KDC might be able to process
+all the requests within roughly 5 seconds. For a cluster with 1000 hosts, the time to process
+the requests would be roughly 500 seconds. Impala also makes a number of DNS requests at the same
+time as these Kerberos-related requests.
+</p>
+<p class="p">
+While these authentication requests are being processed, any submitted Impala queries will fail.
+During this period, the KDC and DNS may be slow to respond to requests from components other than Impala,
+so other secure services might be affected temporarily.
+</p>
+  <p class="p">
+    In <span class="keyword">Impala 2.12</span> or earlier, to reduce the
+    frequency of the <code class="ph codeph">kinit</code> renewal that initiates a new set
+    of authentication requests, increase the <code class="ph codeph">kerberos_reinit_interval</code>
+    configuration setting for the <code class="ph codeph">impalad</code> daemons. Currently,
+    the default is 60 minutes. Consider using a higher value such as 360 (6 hours).
+      </p>
+  <p class="p">
+    The <code class="ph codeph">kerberos_reinit_interval</code> configuration setting is removed
+    in <span class="keyword">Impala 3.0</span>, and the above step is no longer needed.
+  </p>
+
+</div>
+</article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title11" id="scalability__scalability_hotspots">
+    <h2 class="title topictitle2" id="ariaid-title11">Avoiding CPU Hotspots for HDFS Cached Data</h2>
+    <div class="body conbody">
+      <p class="p">
+        You can use the HDFS caching feature, described in <a class="xref" href="impala_perf_hdfs_caching.html#hdfs_caching">Using HDFS Caching with Impala (Impala 2.1 or higher only)</a>,
+        with Impala to reduce I/O and memory-to-memory copying for frequently accessed tables or partitions.
+      </p>
+      <p class="p">
+        In the early days of this feature, you might have found that enabling HDFS caching
+        resulted in little or no performance improvement, because it could result in
+        <span class="q">"hotspots"</span>: instead of the I/O to read the table data being parallelized across
+        the cluster, the I/O was reduced but the CPU load to process the data blocks
+        might be concentrated on a single host.
+      </p>
+      <p class="p">
+        To avoid hotspots, include the <code class="ph codeph">WITH REPLICATION</code> clause with the
+        <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statements for tables that use HDFS caching.
+        This clause allows more than one host to cache the relevant data blocks, so the CPU load
+        can be shared, reducing the load on any one host.
+        See <a class="xref" href="impala_create_table.html#create_table">CREATE TABLE Statement</a> and <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a>
+        for details.
+      </p>
+      <p class="p">
+        Hotspots with high CPU load for HDFS cached data could still arise in some cases, due to
+        the way that Impala schedules the work of processing data blocks on different hosts.
+        In <span class="keyword">Impala 2.5</span> and higher, scheduling improvements mean that the work for
+        HDFS cached data is divided better among all the hosts that have cached replicas
+        for a particular data block. When more than one host has a cached replica for a data block,
+        Impala assigns the work of processing that block to whichever host has done the least work
+        (in terms of number of bytes read) for the current query. If hotspots persist even with this
+        load-based scheduling algorithm, you can enable the query option <code class="ph codeph">SCHEDULE_RANDOM_REPLICA=TRUE</code>
+        to further distribute the CPU load. This setting causes Impala to randomly pick a host to process a cached
+        data block if the scheduling algorithm encounters a tie when deciding which host has done the
+        least work.
+      </p>
+    </div>
+  </article>
+
+  <article class="topic concept nested1" aria-labelledby="ariaid-title12" id="scalability__scalability_file_handle_cache">
+    <h2 class="title topictitle2" id="ariaid-title12">Scalability Considerations for NameNode Traffic with File Handle Caching</h2>
+    <div class="body conbody">
+      <p class="p">
+        One scalability aspect that affects heavily loaded clusters is the load on the HDFS
+        NameNode, from looking up the details as each HDFS file is opened. Impala queries
+        often access many different HDFS files, for example if a query does a full table scan
+        on a table with thousands of partitions, each partition containing multiple data files.
+        Accessing each column of a Parquet file also involves a separate <span class="q">"open"</span> call,
+        further increasing the load on the NameNode. High NameNode overhead can add startup time
+        (that is, increase latency) to Impala queries, and reduce overall throughput for non-Impala
+        workloads that also require accessing HDFS files.
+      </p>
+      <p class="p"> In <span class="keyword">Impala 2.10</span> and higher, you can reduce
+        NameNode overhead by enabling a caching feature for HDFS file handles.
+        Data files that are accessed by different queries, or even multiple
+        times within the same query, can be accessed without a new <span class="q">"open"</span>
+        call and without fetching the file details again from the NameNode. </p>
+      <p class="p">
+        Because this feature only involves HDFS data files, it does not apply to non-HDFS tables,
+        such as Kudu or HBase tables, or tables that store their data on cloud services such as
+        S3 or ADLS. Any read operations that perform remote reads also skip the cached file handles.
+      </p>
+      <p class="p"> The feature is enabled by default with 20,000 file handles to be
+        cached. To change the value, set the configuration option
+          <code class="ph codeph">max_cached_file_handles</code> to a non-zero value for each
+          <span class="keyword cmdname">impalad</span> daemon. From the initial default value of
+        20000, adjust upward if NameNode request load is still significant, or
+        downward if it is more important to reduce the extra memory usage on
+        each host. Each cache entry consumes 6 KB, meaning that caching 20,000
+        file handles requires up to 120 MB on each Impala executor. The exact
+        memory usage varies depending on how many file handles have actually
+        been cached; memory is freed as file handles are evicted from the cache. </p>
+      <p class="p">
+        If a manual HDFS operation moves a file to the HDFS Trashcan while the file handle is cached,
+        Impala still accesses the contents of that file. This is a change from prior behavior. Previously,
+        accessing a file that was in the trashcan would cause an error. This behavior only applies to
+        non-Impala methods of removing HDFS files, not the Impala mechanisms such as <code class="ph codeph">TRUNCATE TABLE</code>
+        or <code class="ph codeph">DROP TABLE</code>.
+      </p>
+      <p class="p">
+        If files are removed, replaced, or appended by HDFS operations outside of Impala, the way to bring the
+        file information up to date is to run the <code class="ph codeph">REFRESH</code> statement on the table.
+      </p>
+      <p class="p">
+        File handle cache entries are evicted as the cache fills up, or based on a timeout period
+        when they have not been accessed for some time.
+      </p>
+      <p class="p">
+        To evaluate the effectiveness of file handle caching for a particular workload, issue the
+        <code class="ph codeph">PROFILE</code> statement in <span class="keyword cmdname">impala-shell</span> or examine query
+        profiles in the Impala web UI. Look for the ratio of <code class="ph codeph">CachedFileHandlesHitCount</code>
+        (ideally, should be high) to <code class="ph codeph">CachedFileHandlesMissCount</code> (ideally, should be low).
+        Before starting any evaluation, run some representative queries to <span class="q">"warm up"</span> the cache,
+        because the first time each data file is accessed is always recorded as a cache miss.
+        To see metrics about file handle caching for each <span class="keyword cmdname">impalad</span> instance,
+        examine the <span class="ph uicontrol">/metrics</span> page in the Impala web UI, in particular the fields
+        <span class="ph uicontrol">impala-server.io.mgr.cached-file-handles-miss-count</span>,
+        <span class="ph uicontrol">impala-server.io.mgr.cached-file-handles-hit-count</span>, and
+        <span class="ph uicontrol">impala-server.io.mgr.num-cached-file-handles</span>.
+      </p>
+    </div>
+  </article>
+
+</article></main></body></html>

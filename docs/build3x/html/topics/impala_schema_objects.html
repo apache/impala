@@ -1,0 +1,48 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><meta name="copyright" content="(C) Copyright 2018"><meta name="DC.rights.owner" content="(C) Copyright 2018"><meta name="DC.Type" content="concept"><meta name="DC.Relation" scheme="URI" content="../topics/impala_langref.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_aliases.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_databases.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_functions_overview.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_identifiers.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_tables.html"><meta name="DC.Relation" scheme="URI" content="../topics/impala_views.html"><meta name="prodname" content="Impala"><meta name="prodname" content="Impala"><meta name="version" content="Impala 3.0.x"><meta name="version" content="Impala 3.0.x"><meta name="DC.Format" content="XHTML"><meta name="DC.Identifier" content="schema_objects"><link rel="stylesheet" type="text/css" href="../commonltr.css"><title>Impala Schema Objects and Object Names</title></head><body id="schema_objects"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Schema Objects and Object Names</h1>
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+
+      With Impala, you work with schema objects that are familiar to database users: primarily databases, tables, views,
+      and functions. The SQL syntax to work with these objects is explained in
+      <a class="xref" href="impala_langref_sql.html#langref_sql">Impala SQL Statements</a>. This section explains the conceptual knowledge you need to
+      work with these objects and the various ways to specify their names.
+    </p>
+
+    <p class="p">
+      Within a table, partitions can also be considered a kind of object. Partitioning is an important subject for
+      Impala, with its own documentation section covering use cases and performance considerations. See
+      <a class="xref" href="impala_partitioning.html#partitioning">Partitioning for Impala Tables</a> for details.
+    </p>
+
+    <p class="p">
+      Impala does not have a counterpart of the <span class="q">"tablespace"</span> notion from some database systems. By default,
+      all the data files for a database, table, or partition are located within nested folders within the HDFS file
+      system. You can also specify a particular HDFS location for a given Impala table or partition. The raw data
+      for these objects is represented as a collection of data files, providing the flexibility to load data by
+      simply moving files into the expected HDFS location.
+    </p>
+
+    <p class="p">
+      Information about the schema objects is held in the
+      <a class="xref" href="impala_hadoop.html#intro_metastore">metastore</a> database. This database is shared between
+      Impala and Hive, allowing each to create, drop, and query each other's databases, tables, and so on. When
+      Impala makes a change to schema objects through a <code class="ph codeph">CREATE</code>, <code class="ph codeph">ALTER</code>,
+      <code class="ph codeph">DROP</code>, <code class="ph codeph">INSERT</code>, or <code class="ph codeph">LOAD DATA</code> statement, it broadcasts those
+      changes to all nodes in the cluster through the <a class="xref" href="impala_components.html#intro_catalogd">catalog
+      service</a>. When you make such changes through Hive or directly through manipulating HDFS files, you use
+      the <a class="xref" href="impala_refresh.html#refresh">REFRESH</a> or
+      <a class="xref" href="impala_invalidate_metadata.html#invalidate_metadata">INVALIDATE METADATA</a> statements on the
+      Impala side to recognize the newly loaded data, new tables, and so on.
+    </p>
+
+    <p class="p toc"></p>
+  </div>
+<nav role="navigation" class="related-links"><ul class="ullinks"><li class="link ulchildlink"><strong><a href="../topics/impala_aliases.html">Overview of Impala Aliases</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_databases.html">Overview of Impala Databases</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_functions_overview.html">Overview of Impala Functions</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_identifiers.html">Overview of Impala Identifiers</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_tables.html">Overview of Impala Tables</a></strong><br></li><li class="link ulchildlink"><strong><a href="../topics/impala_views.html">Overview of Impala Views</a></strong><br></li></ul><div class="familylinks"><div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref.html">Impala SQL Language Reference</a></div></div></nav></article></main></body></html>
