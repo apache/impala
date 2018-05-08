@@ -37,9 +37,9 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="hidden">MEM_LIMIT query option</indexterm>
-      When resource management is not enabled, defines the maximum amount of memory a query can allocate on each node.
-      Therefore, the total memory that can be used by a query is the <codeph>MEM_LIMIT</codeph> times the number of nodes.
+      The MEM_LIMIT query option defines the maximum amount of memory a query
+      can allocate on each node. The total memory that can be used by a query is
+      the <codeph>MEM_LIMIT</codeph> times the number of nodes.
     </p>
 
     <p rev="">
@@ -58,21 +58,6 @@ under the License.
       <cmdname>impalad</cmdname> limit, Impala cancels the query automatically.
       Memory limits are checked periodically during query processing, so the actual memory in use
       might briefly exceed the limit without the query being cancelled.
-    </p>
-
-    <p>
-      When resource management is enabled, the mechanism for this option changes. If set, it overrides the
-      automatic memory estimate from Impala. Impala requests this amount of memory from YARN on each node, and the
-      query does not proceed until that much memory is available. The actual memory used by the query could be
-      lower, since some queries use much less memory than others. With resource management, the
-      <codeph>MEM_LIMIT</codeph> setting acts both as a hard limit on the amount of memory a query can use on any
-      node (enforced by YARN) and a guarantee that that much memory will be available on each node while the query
-      is being executed. When resource management is enabled but no <codeph>MEM_LIMIT</codeph> setting is
-      specified, Impala estimates the amount of memory needed on each node for each query, requests that much
-      memory from YARN before starting the query, and then internally sets the <codeph>MEM_LIMIT</codeph> on each
-      node to the requested amount of memory during the query. Thus, if the query takes more memory than was
-      originally estimated, Impala detects that the <codeph>MEM_LIMIT</codeph> is exceeded and cancels the query
-      itself.
     </p>
 
     <p>
