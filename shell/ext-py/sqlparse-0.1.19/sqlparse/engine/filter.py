@@ -40,7 +40,7 @@ class StatementFilter:
 
         unified = value.upper()
 
-        if unified == 'DECLARE' and self._is_create:
+        if unified == 'DECLARE' and self._is_create and self._begin_depth == 0:
             self._in_declare = True
             return 1
 
@@ -50,6 +50,9 @@ class StatementFilter:
                 # FIXME(andi): This makes no sense.
                 return 1
             return 0
+
+        if unified in ('END IF', 'END FOR'):
+            return -1
 
         if unified == 'END':
             # Should this respect a preceeding BEGIN?

@@ -589,7 +589,7 @@ shell/ext-py/prettytable-0.7.1: 3-clause BSD
 
 --------------------------------------------------------------------------------
 
-shell/ext-py/sqlparse-0.1.14 (most parts): 3-clause BSD
+shell/ext-py/sqlparse-0.1.19 (most parts): 3-clause BSD
 
   Copyright (c) 2009, Andi Albrecht <albrecht.andi@gmail.com>
 
@@ -641,7 +641,7 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 
-shell/ext-py/sqlparse-0.1.14/sqlparse/pipeline.py:
+shell/ext-py/sqlparse-0.1.19/sqlparse/pipeline.py:
 
 Copyright (C) 2011 Jesus Leganes "piranna", piranna@gmail.com
 

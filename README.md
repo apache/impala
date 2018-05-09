@@ -72,7 +72,7 @@ can do so through the environment variables and scripts listed below.
 | JAVA_VERSION | "java-7-oracle-amd64" | Can override to set a local Java version. |
 | JAVA | "${JAVA_HOME}/bin/java" | Java binary location. |
 | CLASSPATH | | See bin/set-classpath.sh for details. |
-| PYTHONPATH |  Will be changed to include: "${IMPALA_HOME}/shell/gen-py" "${IMPALA_HOME}/testdata" "${THRIFT_HOME}/python/lib/python2.7/site-packages" "${HIVE_HOME}/lib/py" "${IMPALA_HOME}/shell/ext-py/prettytable-0.7.1/dist/prettytable-0.7.1" "${IMPALA_HOME}/shell/ext-py/sasl-0.1.1/dist/sasl-0.1.1-py2.7-linux-x "${IMPALA_HOME}/shell/ext-py/sqlparse-0.1.14/dist/sqlparse-0.1.14-py2 |
+| PYTHONPATH |  Will be changed to include: "${IMPALA_HOME}/shell/gen-py" "${IMPALA_HOME}/testdata" "${THRIFT_HOME}/python/lib/python2.7/site-packages" "${HIVE_HOME}/lib/py" "${IMPALA_HOME}/shell/ext-py/prettytable-0.7.1/dist/prettytable-0.7.1" "${IMPALA_HOME}/shell/ext-py/sasl-0.1.1/dist/sasl-0.1.1-py2.7-linux-x "${IMPALA_HOME}/shell/ext-py/sqlparse-0.1.19/dist/sqlparse-0.1.19-py2 |
 
 ##### Source Directories for Impala
 

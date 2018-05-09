@@ -110,6 +110,13 @@ class SQLParseTest(TestCaseBase):
         self.assertEqual(t[-1].get_real_name(), '[foo bar]')
         self.assertEqual(t[-1].get_parent_name(), 'a')
 
+    def test_square_brackets_notation_isnt_too_greedy(self):  # see issue153
+        t = sqlparse.parse('[foo], [bar]')[0].tokens
+        self.assert_(isinstance(t[0], sqlparse.sql.IdentifierList))
+        self.assertEqual(len(t[0].tokens), 4)
+        self.assertEqual(t[0].tokens[0].get_real_name(), '[foo]')
+        self.assertEqual(t[0].tokens[-1].get_real_name(), '[bar]')
+
     def test_keyword_like_identifier(self):  # see issue47
         t = sqlparse.parse('foo.key')[0].tokens
         self.assertEqual(len(t), 1)
@@ -138,6 +145,15 @@ def test_quoted_identifier():
     assert t[2].get_real_name() == 'y'
 
 
+@pytest.mark.parametrize('name', [
+    'foo',
+    '_foo',
+])
+def test_valid_identifier_names(name):  # issue175
+    t = sqlparse.parse(name)[0].tokens
+    assert isinstance(t[0], sqlparse.sql.Identifier)
+
+
 def test_psql_quotation_marks():  # issue83
     # regression: make sure plain $$ work
     t = sqlparse.split("""
@@ -157,6 +173,14 @@ def test_psql_quotation_marks():  # issue83
           ....
     $PROC_2$ LANGUAGE plpgsql;""")
     assert len(t) == 2
+
+
+def test_double_precision_is_builtin():
+    sql = 'DOUBLE PRECISION'
+    t = sqlparse.parse(sql)[0].tokens
+    assert (len(t) == 1
+            and t[0].ttype == sqlparse.tokens.Name.Builtin
+            and t[0].value == 'DOUBLE PRECISION')
 
 
 @pytest.mark.parametrize('ph', ['?', ':1', ':foo', '%s', '%(foo)s'])
@@ -189,3 +213,93 @@ def test_single_quotes_with_linebreaks():  # issue118
     p = sqlparse.parse("'f\nf'")[0].tokens
     assert len(p) == 1
     assert p[0].ttype is T.String.Single
+
+
+def test_sqlite_identifiers():
+    # Make sure we still parse sqlite style escapes
+    p = sqlparse.parse('[col1],[col2]')[0].tokens
+    assert (len(p) == 1
+            and isinstance(p[0], sqlparse.sql.IdentifierList)
+            and [id.get_name() for id in p[0].get_identifiers()]
+                    == ['[col1]', '[col2]'])
+
+    p = sqlparse.parse('[col1]+[col2]')[0]
+    types = [tok.ttype for tok in p.flatten()]
+    assert types == [T.Name, T.Operator, T.Name]
+
+
+def test_simple_1d_array_index():
+    p = sqlparse.parse('col[1]')[0].tokens
+    assert len(p) == 1
+    assert p[0].get_name() == 'col'
+    indices = list(p[0].get_array_indices())
+    assert (len(indices) == 1  # 1-dimensional index
+            and len(indices[0]) == 1  # index is single token
+            and indices[0][0].value == '1')
+
+
+def test_2d_array_index():
+    p = sqlparse.parse('col[x][(y+1)*2]')[0].tokens
+    assert len(p) == 1
+    assert p[0].get_name() == 'col'
+    assert len(list(p[0].get_array_indices())) == 2  # 2-dimensional index
+
+
+def test_array_index_function_result():
+    p = sqlparse.parse('somefunc()[1]')[0].tokens
+    assert len(p) == 1
+    assert len(list(p[0].get_array_indices())) == 1
+
+
+def test_schema_qualified_array_index():
+    p = sqlparse.parse('schem.col[1]')[0].tokens
+    assert len(p) == 1
+    assert p[0].get_parent_name() == 'schem'
+    assert p[0].get_name() == 'col'
+    assert list(p[0].get_array_indices())[0][0].value == '1'
+
+
+def test_aliased_array_index():
+    p = sqlparse.parse('col[1] x')[0].tokens
+    assert len(p) == 1
+    assert p[0].get_alias() == 'x'
+    assert p[0].get_real_name() == 'col'
+    assert list(p[0].get_array_indices())[0][0].value == '1'
+
+
+def test_array_literal():
+    # See issue #176
+    p = sqlparse.parse('ARRAY[%s, %s]')[0]
+    assert len(p.tokens) == 2
+    assert len(list(p.flatten())) == 7
+
+
+def test_typed_array_definition():
+    # array indices aren't grouped with builtins, but make sure we can extract
+    # indentifer names
+    p = sqlparse.parse('x int, y int[], z int')[0]
+    names = [x.get_name() for x in p.get_sublists()
+             if isinstance(x, sqlparse.sql.Identifier)]
+    assert names == ['x', 'y', 'z']
+
+
+@pytest.mark.parametrize('sql', [
+    'select 1 -- foo',
+    'select 1 # foo'  # see issue178
+])
+def test_single_line_comments(sql):
+    p = sqlparse.parse(sql)[0]
+    assert len(p.tokens) == 5
+    assert p.tokens[-1].ttype == T.Comment.Single
+
+
+@pytest.mark.parametrize('sql', [
+    'foo',
+    '@foo',
+    '#foo',  # see issue192
+    '##foo'
+])
+def test_names_and_special_names(sql):
+    p = sqlparse.parse(sql)[0]
+    assert len(p.tokens) == 1
+    assert isinstance(p.tokens[0], sqlparse.sql.Identifier)
