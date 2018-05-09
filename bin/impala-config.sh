@@ -148,8 +148,6 @@ export IMPALA_TPC_H_VERSION=2.17.0
 unset IMPALA_TPC_H_URL
 export IMPALA_THRIFT_VERSION=0.9.3-p4
 unset IMPALA_THRIFT_URL
-export IMPALA_THRIFT_JAVA_VERSION=0.9.3
-unset IMPALA_THRIFT_JAVA_URL
 export IMPALA_ZLIB_VERSION=1.2.8
 unset IMPALA_ZLIB_URL
 
@@ -160,10 +158,6 @@ if [[ $OSTYPE == "darwin"* ]]; then
   unset IMPALA_GPERFTOOLS_URL
   IMPALA_OPENSSL_VERSION=1.0.1p
   unset IMPALA_OPENSSL_URL
-  IMPALA_THRIFT_VERSION=0.9.2
-  unset IMPALA_THRIFT_URL
-  IMPALA_THRIFT_JAVA_VERSION=0.9.2
-  unset IMPALA_THRIFT_JAVA_URL
 fi
 
 # Kudu version in the toolchain; provides libkudu_client.so and minicluster binaries.
