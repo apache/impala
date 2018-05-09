@@ -211,8 +211,8 @@ data_type:
 
     <p rev="kudu IMPALA-3719">
       <b>kudu_partition_clause:</b>
-<codeblock rev="kudu">
-kudu_partition_clause ::= [<varname>hash_clause</varname>] [, <varname>range_clause</varname> [ , <varname>range_clause</varname> ] ]
+      <codeblock rev="kudu">
+kudu_partition_clause ::= [ <varname>hash_clause</varname> [, ...]] [, <varname>range_clause</varname> ]
 
 hash_clause ::=
   HASH [ (<varname>pk_col</varname> [, ...]) ]
