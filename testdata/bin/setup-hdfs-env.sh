@@ -76,5 +76,5 @@ fi
 if [[ -n "${HDFS_ERASURECODE_POLICY:-}" ]]; then
   hdfs ec -enablePolicy -policy "${HDFS_ERASURECODE_POLICY}"
   hdfs ec -setPolicy -policy "${HDFS_ERASURECODE_POLICY}" \
-    -path "${HDFS_ERASURECODE_PATH:=/}"
+    -path "${HDFS_ERASURECODE_PATH:=/test-warehouse}"
 fi

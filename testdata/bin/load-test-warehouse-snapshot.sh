@@ -72,6 +72,11 @@ if [[ "$REPLY" =~ ^[Yy]$ ]]; then
     fi
     echo "Creating ${TEST_WAREHOUSE_DIR} directory"
     hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
+    if [[ -n "${HDFS_ERASURECODE_POLICY:-}" ]]; then
+      hdfs ec -enablePolicy -policy "${HDFS_ERASURECODE_POLICY}"
+      hdfs ec -setPolicy -policy "${HDFS_ERASURECODE_POLICY}" \
+        -path "${HDFS_ERASURECODE_PATH:=/test-warehouse}"
+    fi
 
     # TODO: commented out because of regressions in local end-to-end testing. See
     # IMPALA-4345

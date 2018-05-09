@@ -114,11 +114,21 @@
     <value>true</value>
   </property>
 
+  <!-- The default behavior of the namenode is to exclude datanodes with the number of
+    connections 2x higher than the average among all the datanodes from being considered
+    for replication/EC. In the minicluster we have to use every datanode for every block
+    so this should be disabled. -->
+  <property>
+    <name>dfs.namenode.redundancy.considerLoad</name>
+    <value>false</value>
+  </property>
+
   <!-- Location of the KMS key provider -->
   <property>
     <name>dfs.encryption.key.provider.uri</name>
     <value>kms://http@127.0.0.1:9600/kms</value>
   </property>
+
 
   <!-- BEGIN Kerberos settings -->
   <!-- We use the MiniKdc; it generates a keytab and krb5.conf; we point

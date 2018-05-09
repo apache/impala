@@ -96,14 +96,6 @@ do
   shift;
 done
 
-# The hdfs environment script sets up kms (encryption) and cache pools (hdfs caching).
-# On a non-hdfs filesystem, we don't test encryption or hdfs caching, so this setup is not
-# needed.
-if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
-  run-step "Setting up HDFS environment" setup-hdfs-env.log \
-      ${IMPALA_HOME}/testdata/bin/setup-hdfs-env.sh
-fi
-
 if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
   if [[ -z "$REMOTE_LOAD" ]]; then
     run-step "Loading Hive Builtins" load-hive-builtins.log \
@@ -291,6 +283,14 @@ function copy-and-load-dependent-tables {
     /tmp/alltypes_rc /tmp/alltypes_seq
   hadoop fs -mkdir -p /tmp/alltypes_seq/year=2009 \
     /tmp/alltypes_rc/year=2009
+
+  # The file written by hive to /test-warehouse will be strangely replicated rather than
+  # erasure coded if EC is not set in /tmp
+  if [[ -n "${HDFS_ERASURECODE_POLICY:-}" ]]; then
+    hdfs ec -setPolicy -policy "${HDFS_ERASURECODE_POLICY}" -path "/tmp/alltypes_rc"
+    hdfs ec -setPolicy -policy "${HDFS_ERASURECODE_POLICY}" -path "/tmp/alltypes_seq"
+  fi
+
   hadoop fs -cp /test-warehouse/alltypes_seq/year=2009/month=2/ /tmp/alltypes_seq/year=2009
   hadoop fs -cp /test-warehouse/alltypes_rc/year=2009/month=3/ /tmp/alltypes_rc/year=2009
 
@@ -468,7 +468,16 @@ function copy-and-load-ext-data-source {
     ${IMPALA_HOME}/testdata/bin/create-data-source-table.sql
 }
 
-function wait-hdfs-replication {
+function check-hdfs-health {
+  if [[ -n "${HDFS_ERASURECODE_POLICY:-}" ]]; then
+    if ! grep "Replicated Blocks:[[:space:]]*#[[:space:]]*Total size:[[:space:]]*0 B"\
+        <<< $(hdfs fsck /test-warehouse | tr '\n' '#'); then
+        echo "There are some replicated files despite that erasure coding is on"
+        echo "Failing the data loading job"
+        exit 1
+    fi
+    return
+  fi
   MAX_FSCK=30
   SLEEP_SEC=120
   LAST_NUMBER_UNDER_REPLICATED=-1
@@ -516,6 +525,14 @@ if [[ -z "$REMOTE_LOAD" ]]; then
   run-step "Starting Impala cluster" start-impala-cluster.log \
     ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_DATA_LOADING_LOGS_DIR} \
     ${START_CLUSTER_ARGS}
+fi
+
+# The hdfs environment script sets up kms (encryption) and cache pools (hdfs caching).
+# On a non-hdfs filesystem, we don't test encryption or hdfs caching, so this setup is not
+# needed.
+if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
+  run-step "Setting up HDFS environment" setup-hdfs-env.log \
+      ${IMPALA_HOME}/testdata/bin/setup-hdfs-env.sh
 fi
 
 if [ $SKIP_METADATA_LOAD -eq 0 ]; then
@@ -580,7 +597,7 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   run-step "Creating internal HBase table" create-internal-hbase-table.log \
       create-internal-hbase-table
 
-  run-step "Waiting for HDFS replication" wait-hdfs-replication.log wait-hdfs-replication
+  run-step "Checking HDFS health" check-hdfs-health.log check-hdfs-health
 fi
 
 # TODO: Investigate why all stats are not preserved. Theoretically, we only need to

@@ -452,7 +452,7 @@ elif [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
       return 1
     fi
     export HDFS_ERASURECODE_POLICY="RS-3-2-1024k"
-    export HDFS_ERASURECODE_PATH="/"
+    export HDFS_ERASURECODE_PATH="/test-warehouse"
   fi
 else
   echo "Unsupported filesystem '$TARGET_FILESYSTEM'"
