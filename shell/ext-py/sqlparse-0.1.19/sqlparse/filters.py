@@ -271,7 +271,11 @@ class StripWhitespaceFilter:
         [self.process(stack, sgroup, depth + 1)
          for sgroup in stmt.get_sublists()]
         self._stripws(stmt)
-        if depth == 0 and stmt.tokens[-1].is_whitespace():
+        if (
+            depth == 0
+            and stmt.tokens
+            and stmt.tokens[-1].is_whitespace()
+        ):
             stmt.tokens.pop(-1)
 
 
@@ -316,7 +320,7 @@ class ReindentFilter:
     def _split_kwds(self, tlist):
         split_words = ('FROM', 'STRAIGHT_JOIN$', 'JOIN$', 'AND', 'OR',
                        'GROUP', 'ORDER', 'UNION', 'VALUES',
-                       'SET', 'BETWEEN', 'EXCEPT')
+                       'SET', 'BETWEEN', 'EXCEPT', 'HAVING')
 
         def _next_token(i):
             t = tlist.token_next_match(i, T.Keyword, split_words,
@@ -329,20 +333,21 @@ class ReindentFilter:
 
         idx = 0
         token = _next_token(idx)
+        added = set()
         while token:
             prev = tlist.token_prev(tlist.token_index(token), False)
             offset = 1
-            if prev and prev.is_whitespace():
+            if prev and prev.is_whitespace() and prev not in added:
                 tlist.tokens.pop(tlist.token_index(prev))
                 offset += 1
-            if (prev
-                and isinstance(prev, sql.Comment)
-                and (unicode(prev).endswith('\n')
-                     or unicode(prev).endswith('\r'))):
+            uprev = unicode(prev)
+            if (prev and (uprev.endswith('\n') or uprev.endswith('\r'))):
                 nl = tlist.token_next(token)
             else:
                 nl = self.nl()
+                added.add(nl)
                 tlist.insert_before(token, nl)
+                offset += 1
             token = _next_token(tlist.token_index(nl) + offset)
 
     def _split_statements(self, tlist):
@@ -366,6 +371,16 @@ class ReindentFilter:
 
     def _process_where(self, tlist):
         token = tlist.token_next_match(0, T.Keyword, 'WHERE')
+        try:
+            tlist.insert_before(token, self.nl())
+        except ValueError:  # issue121, errors in statement
+            pass
+        self.indent += 1
+        self._process_default(tlist)
+        self.indent -= 1
+
+    def _process_having(self, tlist):
+        token = tlist.token_next_match(0, T.Keyword, 'HAVING')
         try:
             tlist.insert_before(token, self.nl())
         except ValueError:  # issue121, errors in statement
@@ -402,9 +417,6 @@ class ReindentFilter:
             self.offset += num_offset
             for token in identifiers[1:]:
                 tlist.insert_before(token, self.nl())
-            for token in tlist.tokens:
-                if isinstance(token, sql.Comment):
-                    tlist.insert_after(token, self.nl())
             self.offset -= num_offset
         self._process_default(tlist)
 

@@ -164,10 +164,10 @@ class Lexer(object):
 
     tokens = {
         'root': [
-            (r'--.*?(\r\n|\r|\n)', tokens.Comment.Single),
+            (r'(--|# ).*?(\r\n|\r|\n)', tokens.Comment.Single),
             # $ matches *before* newline, therefore we have two patterns
             # to match Comment.Single
-            (r'--.*?$', tokens.Comment.Single),
+            (r'(--|# ).*?$', tokens.Comment.Single),
             (r'(\r\n|\r|\n)', tokens.Newline),
             (r'\s+', tokens.Whitespace),
             (r'/\*', tokens.Comment.Multiline, 'multiline-comments'),
@@ -185,7 +185,10 @@ class Lexer(object):
             # FIXME(andi): VALUES shouldn't be listed here
             # see https://github.com/andialbrecht/sqlparse/pull/64
             (r'VALUES', tokens.Keyword),
-            (r'@[^\W\d_]\w+', tokens.Name),
+            (r'(@|##|#)[^\W\d_]\w+', tokens.Name),
+            # IN is special, it may be followed by a parenthesis, but
+            # is never a functino, see issue183
+            (r'in\b(?=[ (])?', tokens.Keyword),
             (r'[^\W\d_]\w*(?=[.(])', tokens.Name),  # see issue39
             (r'[-]?0x[0-9a-fA-F]+', tokens.Number.Hexadecimal),
             (r'[-]?[0-9]*(\.[0-9]+)?[eE][-]?[0-9]+', tokens.Number.Float),
@@ -194,13 +197,17 @@ class Lexer(object):
             (r"'(''|\\\\|\\'|[^'])*'", tokens.String.Single),
             # not a real string literal in ANSI SQL:
             (r'(""|".*?[^\\]")', tokens.String.Symbol),
-            (r'(\[.*[^\]]\])', tokens.Name),
+            # sqlite names can be escaped with [square brackets]. left bracket
+            # cannot be preceded by word character or a right bracket --
+            # otherwise it's probably an array index
+            (r'(?<![\w\])])(\[[^\]]+\])', tokens.Name),
             (r'((LEFT\s+|RIGHT\s+|FULL\s+)?(INNER\s+|OUTER\s+|STRAIGHT\s+)?|(CROSS\s+|NATURAL\s+)?)?JOIN\b', tokens.Keyword),
             (r'END(\s+IF|\s+LOOP)?\b', tokens.Keyword),
             (r'NOT NULL\b', tokens.Keyword),
             (r'CREATE(\s+OR\s+REPLACE)?\b', tokens.Keyword.DDL),
+            (r'DOUBLE\s+PRECISION\b', tokens.Name.Builtin),
             (r'(?<=\.)[^\W\d_]\w*', tokens.Name),
-            (r'[^\W\d_]\w*', is_keyword),
+            (r'[^\W\d]\w*', is_keyword),
             (r'[;:()\[\],\.]', tokens.Punctuation),
             (r'[<>=~!]+', tokens.Operator.Comparison),
             (r'[+/@#%^&|`?^-]+', tokens.Operator),
@@ -290,7 +297,6 @@ class Lexer(object):
             for rexmatch, action, new_state in statetokens:
                 m = rexmatch(text, pos)
                 if m:
-                    # print rex.pattern
                     value = m.group()
                     if value in known_names:
                         yield pos, known_names[value], value
@@ -312,7 +318,13 @@ class Lexer(object):
                                     statestack.pop()
                                 elif state == '#push':
                                     statestack.append(statestack[-1])
-                                else:
+                                elif (
+                                    # Ugly hack - multiline-comments
+                                    # are not stackable
+                                    state != 'multiline-comments'
+                                    or not statestack
+                                    or statestack[-1] != 'multiline-comments'
+                                ):
                                     statestack.append(state)
                         elif isinstance(new_state, int):
                             # pop

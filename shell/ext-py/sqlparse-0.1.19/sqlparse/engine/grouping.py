@@ -51,19 +51,21 @@ def _group_left_right(tlist, ttype, value, cls,
                                            ttype, value)
 
 
+def _find_matching(idx, tlist, start_ttype, start_value, end_ttype, end_value):
+    depth = 1
+    for tok in tlist.tokens[idx:]:
+        if tok.match(start_ttype, start_value):
+            depth += 1
+        elif tok.match(end_ttype, end_value):
+            depth -= 1
+            if depth == 1:
+                return tok
+    return None
+
+
 def _group_matching(tlist, start_ttype, start_value, end_ttype, end_value,
                     cls, include_semicolon=False, recurse=False):
-    def _find_matching(i, tl, stt, sva, ett, eva):
-        depth = 1
-        for n in xrange(i, len(tl.tokens)):
-            t = tl.tokens[n]
-            if t.match(stt, sva):
-                depth += 1
-            elif t.match(ett, eva):
-                depth -= 1
-                if depth == 1:
-                    return t
-        return None
+
     [_group_matching(sgroup, start_ttype, start_value, end_ttype, end_value,
                      cls, include_semicolon) for sgroup in tlist.get_sublists()
      if recurse]
@@ -155,15 +157,19 @@ def group_identifier(tlist):
         # TODO: Usage of Wildcard token is ambivalent here.
         x = itertools.cycle((
             lambda y: (y.match(T.Punctuation, '.')
-                       or y.ttype is T.Operator
-                       or y.ttype is T.Wildcard),
+                       or y.ttype in (T.Operator,
+                                      T.Wildcard,
+                                      T.Name)
+                       or isinstance(y, sql.SquareBrackets)),
             lambda y: (y.ttype in (T.String.Symbol,
                                    T.Name,
                                    T.Wildcard,
                                    T.Literal.String.Single,
                                    T.Literal.Number.Integer,
                                    T.Literal.Number.Float)
-                       or isinstance(y, (sql.Parenthesis, sql.Function)))))
+                       or isinstance(y, (sql.Parenthesis,
+                                         sql.SquareBrackets,
+                                         sql.Function)))))
         for t in tl.tokens[i:]:
             # Don't take whitespaces into account.
             if t.ttype is T.Whitespace:
@@ -172,7 +178,9 @@ def group_identifier(tlist):
             if next(x)(t):
                 yield t
             else:
-                raise StopIteration
+                if isinstance(t, sql.Comment) and t.is_multiline():
+                    yield t
+                return
 
     def _next_token(tl, i):
         # chooses the next token. if two tokens are found then the
@@ -180,10 +188,13 @@ def group_identifier(tlist):
         t1 = tl.token_next_by_type(
             i, (T.String.Symbol, T.Name, T.Literal.Number.Integer,
                 T.Literal.Number.Float))
-        t2 = tl.token_next_by_instance(i, (sql.Function, sql.Parenthesis))
+
+        i1 = tl.token_index(t1, start=i) if t1 else None
+        t2_end = None if i1 is None else i1 + 1
+        t2 = tl.token_next_by_instance(i, (sql.Function, sql.Parenthesis), end=t2_end)
+
         if t1 and t2:
-            i1 = tl.token_index(t1)
-            i2 = tl.token_index(t2)
+            i2 = tl.token_index(t2, start=i)
             if i1 > i2:
                 return t2
             else:
@@ -203,7 +214,7 @@ def group_identifier(tlist):
     while token:
         identifier_tokens = [token] + list(
             _consume_cycle(tlist,
-                           tlist.token_index(token) + 1))
+                           tlist.token_index(token, start=idx) + 1))
         # remove trailing whitespace
         if identifier_tokens and identifier_tokens[-1].ttype is T.Whitespace:
             identifier_tokens = identifier_tokens[:-1]
@@ -212,7 +223,7 @@ def group_identifier(tlist):
                      or identifier_tokens[0].ttype in (T.Literal.Number.Integer,
                                                        T.Literal.Number.Float))):
             group = tlist.group_tokens(sql.Identifier, identifier_tokens)
-            idx = tlist.token_index(group) + 1
+            idx = tlist.token_index(group, start=idx) + 1
         else:
             idx += 1
         token = _next_token(tlist, idx)
@@ -221,7 +232,6 @@ def group_identifier(tlist):
 def group_identifier_list(tlist):
     [group_identifier_list(sgroup) for sgroup in tlist.get_sublists()
      if not isinstance(sgroup, sql.IdentifierList)]
-    idx = 0
     # Allowed list items
     fend1_funcs = [lambda t: isinstance(t, (sql.Identifier, sql.Function,
                                             sql.Case)),
@@ -238,11 +248,13 @@ def group_identifier_list(tlist):
                    lambda t: isinstance(t, sql.Comment),
                    lambda t: t.ttype == T.Comment.Multiline,
                    ]
-    tcomma = tlist.token_next_match(idx, T.Punctuation, ',')
+    tcomma = tlist.token_next_match(0, T.Punctuation, ',')
     start = None
     while tcomma is not None:
-        before = tlist.token_prev(tcomma)
-        after = tlist.token_next(tcomma)
+        # Go back one idx to make sure to find the correct tcomma
+        idx = tlist.token_index(tcomma)
+        before = tlist.token_prev(idx)
+        after = tlist.token_next(idx)
         # Check if the tokens around tcomma belong to a list
         bpassed = apassed = False
         for func in fend1_funcs:
@@ -253,12 +265,13 @@ def group_identifier_list(tlist):
         if not bpassed or not apassed:
             # Something's wrong here, skip ahead to next ","
             start = None
-            tcomma = tlist.token_next_match(tlist.token_index(tcomma) + 1,
+            tcomma = tlist.token_next_match(idx + 1,
                                             T.Punctuation, ',')
         else:
             if start is None:
                 start = before
-            next_ = tlist.token_next(after)
+            after_idx = tlist.token_index(after, start=idx)
+            next_ = tlist.token_next(after_idx)
             if next_ is None or not next_.match(T.Punctuation, ','):
                 # Reached the end of the list
                 tokens = tlist.tokens_between(start, after)
@@ -270,9 +283,48 @@ def group_identifier_list(tlist):
                 tcomma = next_
 
 
-def group_parenthesis(tlist):
-    _group_matching(tlist, T.Punctuation, '(', T.Punctuation, ')',
-                    sql.Parenthesis)
+def group_brackets(tlist):
+    """Group parentheses () or square brackets []
+
+        This is just like _group_matching, but complicated by the fact that
+        round brackets can contain square bracket groups and vice versa
+    """
+
+    if isinstance(tlist, (sql.Parenthesis, sql.SquareBrackets)):
+        idx = 1
+    else:
+        idx = 0
+
+    # Find the first opening bracket
+    token = tlist.token_next_match(idx, T.Punctuation, ['(', '['])
+
+    while token:
+        start_val = token.value  # either '(' or '['
+        if start_val == '(':
+            end_val = ')'
+            group_class = sql.Parenthesis
+        else:
+            end_val = ']'
+            group_class = sql.SquareBrackets
+
+        tidx = tlist.token_index(token)
+
+        # Find the corresponding closing bracket
+        end = _find_matching(tidx, tlist, T.Punctuation, start_val,
+                             T.Punctuation, end_val)
+
+        if end is None:
+            idx = tidx + 1
+        else:
+            group = tlist.group_tokens(group_class,
+                                       tlist.tokens_between(token, end))
+
+            # Check for nested bracket groups within this group
+            group_brackets(group)
+            idx = tlist.token_index(group) + 1
+
+        # Find the next opening bracket
+        token = tlist.token_next_match(idx, T.Punctuation, ['(', '['])
 
 
 def group_comments(tlist):
@@ -301,7 +353,7 @@ def group_where(tlist):
      if not isinstance(sgroup, sql.Where)]
     idx = 0
     token = tlist.token_next_match(idx, T.Keyword, 'WHERE')
-    stopwords = ('ORDER', 'GROUP', 'LIMIT', 'UNION', 'EXCEPT')
+    stopwords = ('ORDER', 'GROUP', 'LIMIT', 'UNION', 'EXCEPT', 'HAVING')
     while token:
         tidx = tlist.token_index(token)
         end = tlist.token_next_match(tidx + 1, T.Keyword, stopwords)
@@ -368,10 +420,27 @@ def group_order(tlist):
         token = tlist.token_next_by_type(idx, T.Keyword.Order)
 
 
+def align_comments(tlist):
+    [align_comments(sgroup) for sgroup in tlist.get_sublists()]
+    idx = 0
+    token = tlist.token_next_by_instance(idx, sql.Comment)
+    while token:
+        before = tlist.token_prev(tlist.token_index(token))
+        if isinstance(before, sql.TokenList):
+            grp = tlist.tokens_between(before, token)[1:]
+            before.tokens.extend(grp)
+            for t in grp:
+                tlist.tokens.remove(t)
+            idx = tlist.token_index(before) + 1
+        else:
+            idx = tlist.token_index(token) + 1
+        token = tlist.token_next_by_instance(idx, sql.Comment)
+
+
 def group(tlist):
     for func in [
             group_comments,
-            group_parenthesis,
+            group_brackets,
             group_functions,
             group_where,
             group_case,
@@ -382,9 +451,11 @@ def group(tlist):
             group_aliased,
             group_assignment,
             group_comparison,
+            align_comments,
             group_identifier_list,
             group_if,
             group_for,
             group_foreach,
-            group_begin]:
+            group_begin,
+            ]:
         func(tlist)
