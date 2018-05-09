@@ -355,11 +355,13 @@ Memory Usage: Additional Notes
       </p>
 
       <p>
-        Then, you specify that the
-        other hosts act as executors but not coordinators. These hosts do not communicate
-        with the <cmdname>statestored</cmdname> daemon or process the final result sets
-        from queries. You cannot connect to these hosts through clients such as
-        <cmdname>impala-shell</cmdname> or business intelligence tools.
+        Then, you specify that the other hosts act as executors but not
+        coordinators. These hosts do communicate with the
+          <cmdname>statestored</cmdname> daemon or process the final result sets
+        from queries, but the executor hosts do not get the metadata topic from
+          <cmdname>statestored</cmdname>. You cannot connect to these hosts
+        through clients such as <cmdname>impala-shell</cmdname> or business
+        intelligence tools.
       </p>
 
       <p>
