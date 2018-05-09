@@ -206,6 +206,16 @@ Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
 
 void RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
     int64_t failed_allocation_size, const ErrorMsg* msg) {
+  // Constructing the MemLimitExceeded and logging it is not cheap, so
+  // avoid the cost if the query has already hit an error.
+  // This is particularly important on the UDF codepath, because the UDF codepath
+  // cannot abort the fragment immediately. It relies on callers checking status
+  // periodically. This means that this function could be called a large number of times
+  // (e.g. once per row) before the fragment aborts. See IMPALA-6997.
+  {
+    lock_guard<SpinLock> l(query_status_lock_);
+    if (!query_status_.ok()) return;
+  }
   Status status = tracker->MemLimitExceeded(this, msg == nullptr ? "" : msg->msg(),
       failed_allocation_size);
   {
