@@ -136,6 +136,15 @@ class SQLSplitTest(TestCaseBase):
         stmts = list(sqlparse.parsestream(stream))
         self.assertEqual(type(stmts[0].tokens[0].value), unicode)
 
+    def test_split_quotes_with_new_line(self):
+        stmts = sqlparse.split('select "foo\nbar"')
+        assert len(stmts) == 1
+        assert stmts[0] == 'select "foo\nbar"'
+
+        stmts = sqlparse.split("select 'foo\n\bar'")
+        assert len(stmts) == 1
+        assert stmts[0] == "select 'foo\n\bar'"
+
 
 def test_split_simple():
     stmts = sqlparse.split('select * from foo; select * from bar;')

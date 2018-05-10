@@ -196,7 +196,8 @@ class Lexer(object):
             (r'[-]?[0-9]+', tokens.Number.Integer),
             (r"'(''|\\\\|\\'|[^'])*'", tokens.String.Single),
             # not a real string literal in ANSI SQL:
-            (r'(""|".*?[^\\]")', tokens.String.Symbol),
+            # A patch based on: https://github.com/andialbrecht/sqlparse/pull/396
+            (r'"(""|\\\\|\\"|[^"])*"', tokens.String.Symbol),
             # sqlite names can be escaped with [square brackets]. left bracket
             # cannot be preceded by word character or a right bracket --
             # otherwise it's probably an array index
