@@ -21,7 +21,7 @@ import pytest
 
 from testdata.common import widetable
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfLocal
+from tests.common.skip import SkipIfLocal, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -115,6 +115,15 @@ class TestInsertQueries(ImpalaTestSuite):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
           vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert', vector,
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+
+  @pytest.mark.execute_serially
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_insert_mem_limit(self, vector):
+    if (vector.get_value('table_format').file_format == 'parquet'):
+      vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
+          vector.get_value('compression_codec')
+    self.run_test_case('QueryTest/insert-mem-limit', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
   @pytest.mark.execute_serially

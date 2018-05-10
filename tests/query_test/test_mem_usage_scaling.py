@@ -21,7 +21,7 @@ from copy import copy
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfLocal
+from tests.common.skip import SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
@@ -32,7 +32,7 @@ MEM_LIMIT_TOO_LOW_FOR_RESERVATION = ("minimum memory reservation is greater than
   "available to the query for buffer reservations")
 MEM_LIMIT_ERROR_MSGS = [MEM_LIMIT_EXCEEDED_MSG, MEM_LIMIT_TOO_LOW_FOR_RESERVATION]
 
-@SkipIfLocal.mem_usage_different
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestQueryMemLimitScaling(ImpalaTestSuite):
   """Test class to do functional validation of per query memory limits. """
   QUERY = ["select * from lineitem where l_orderkey = -1",
@@ -120,7 +120,7 @@ class TestLowMemoryLimits(ImpalaTestSuite):
       assert found_expected_error, str(e)
 
 
-@SkipIfLocal.mem_usage_different
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestTpchMemLimitError(TestLowMemoryLimits):
   # The mem limits that will be used.
   MEM_IN_MB = [20, 50, 80, 130, 160, 200, 400]
@@ -226,7 +226,7 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
       verifier = MetricVerifier(impalad.service)
       verifier.wait_for_metric("impala-server.num-fragments-in-flight", 0)
 
-@SkipIfLocal.mem_usage_different
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestTpchPrimitivesMemLimitError(TestLowMemoryLimits):
   """
   Memory usage tests using targeted-perf queries to exercise specific operators.
@@ -272,7 +272,7 @@ class TestTpchPrimitivesMemLimitError(TestLowMemoryLimits):
     self.run_primitive_query(vector, 'primitive_orderby_all')
 
 
-@SkipIfLocal.mem_usage_different
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestTpcdsMemLimitError(TestLowMemoryLimits):
   # The mem limits that will be used.
   MEM_IN_MB = [20, 100, 116, 150]

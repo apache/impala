@@ -18,6 +18,7 @@
 import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
     create_parquet_dimension)
 
@@ -69,10 +70,12 @@ class TestSpillingDebugActionDimensions(ImpalaTestSuite):
     """Test spilling null-aware anti-joins"""
     self.run_test_case('QueryTest/spilling-naaj', vector)
 
-  def test_spilling_sorts_exhaustive(self, vector):
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_spilling_regression_exhaustive(self, vector):
+    """Regression tests for spilling. mem_limits tuned for 3-node minicluster."""
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip("only run large sorts on exhaustive")
-    self.run_test_case('QueryTest/spilling-sorts-exhaustive', vector)
+    self.run_test_case('QueryTest/spilling-regression-exhaustive', vector)
 
 
 @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,
