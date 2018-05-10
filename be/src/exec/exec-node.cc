@@ -29,6 +29,7 @@
 #include "common/status.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exec/aggregation-node.h"
 #include "exec/analytic-eval-node.h"
 #include "exec/cardinality-check-node.h"
 #include "exec/data-source-scan-node.h"
@@ -42,11 +43,11 @@
 #include "exec/kudu-util.h"
 #include "exec/nested-loop-join-node.h"
 #include "exec/partial-sort-node.h"
-#include "exec/partitioned-aggregation-node.h"
 #include "exec/partitioned-hash-join-node.h"
 #include "exec/select-node.h"
 #include "exec/singular-row-src-node.h"
 #include "exec/sort-node.h"
+#include "exec/streaming-aggregation-node.h"
 #include "exec/subplan-node.h"
 #include "exec/topn-node.h"
 #include "exec/union-node.h"
@@ -306,7 +307,11 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       }
       break;
     case TPlanNodeType::AGGREGATION_NODE:
-      *node = pool->Add(new PartitionedAggregationNode(pool, tnode, descs));
+      if (tnode.agg_node.use_streaming_preaggregation) {
+        *node = pool->Add(new StreamingAggregationNode(pool, tnode, descs));
+      } else {
+        *node = pool->Add(new AggregationNode(pool, tnode, descs));
+      }
       break;
     case TPlanNodeType::HASH_JOIN_NODE:
       *node = pool->Add(new PartitionedHashJoinNode(pool, tnode, descs));

@@ -15,28 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exec/partitioned-aggregation-node.h"
+#include "exec/grouping-aggregator.h"
 
 #include "exec/hash-table.inline.h"
 #include "exprs/agg-fn-evaluator.h"
-#include "exprs/scalar-expr.h"
-#include "exprs/scalar-expr-evaluator.h"
-#include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 
 using namespace impala;
 
-Status PartitionedAggregationNode::ProcessBatchNoGrouping(RowBatch* batch) {
-  Tuple* output_tuple = singleton_output_tuple_;
-  FOREACH_ROW(batch, 0, batch_iter) {
-    UpdateTuple(agg_fn_evals_.data(), output_tuple, batch_iter.Get());
-  }
-  return Status::OK();
-}
-
-template<bool AGGREGATED_ROWS>
-Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch,
+template <bool AGGREGATED_ROWS>
+Status GroupingAggregator::AddBatchImpl(RowBatch* batch,
     TPrefetchMode::type prefetch_mode, HashTableCtx* __restrict__ ht_ctx) {
   DCHECK(!hash_partitions_.empty());
   DCHECK(!is_streaming_preagg_);
@@ -64,10 +53,9 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch,
   return Status::OK();
 }
 
-template<bool AGGREGATED_ROWS>
-void IR_ALWAYS_INLINE PartitionedAggregationNode::EvalAndHashPrefetchGroup(
-    RowBatch* batch, int start_row_idx, TPrefetchMode::type prefetch_mode,
-    HashTableCtx* ht_ctx) {
+template <bool AGGREGATED_ROWS>
+void IR_ALWAYS_INLINE GroupingAggregator::EvalAndHashPrefetchGroup(RowBatch* batch,
+    int start_row_idx, TPrefetchMode::type prefetch_mode, HashTableCtx* ht_ctx) {
   HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
   const int cache_size = expr_vals_cache->capacity();
 
@@ -87,7 +75,7 @@ void IR_ALWAYS_INLINE PartitionedAggregationNode::EvalAndHashPrefetchGroup(
     if (is_null) {
       expr_vals_cache->SetRowNull();
     } else if (prefetch_mode != TPrefetchMode::NONE) {
-      if (LIKELY(hash_tbl != NULL)) hash_tbl->PrefetchBucket<false>(hash);
+      if (LIKELY(hash_tbl != nullptr)) hash_tbl->PrefetchBucket<false>(hash);
     }
     expr_vals_cache->NextRow();
   }
@@ -95,9 +83,9 @@ void IR_ALWAYS_INLINE PartitionedAggregationNode::EvalAndHashPrefetchGroup(
   expr_vals_cache->ResetForRead();
 }
 
-template<bool AGGREGATED_ROWS>
-Status PartitionedAggregationNode::ProcessRow(TupleRow* __restrict__ row,
-    HashTableCtx* __restrict__ ht_ctx) {
+template <bool AGGREGATED_ROWS>
+Status GroupingAggregator::ProcessRow(
+    TupleRow* __restrict__ row, HashTableCtx* __restrict__ ht_ctx) {
   HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
   // Hoist lookups out of non-null branch to speed up non-null case.
   const uint32_t hash = expr_vals_cache->CurExprValuesHash();
@@ -110,8 +98,8 @@ Status PartitionedAggregationNode::ProcessRow(TupleRow* __restrict__ row,
   HashTable* hash_tbl = GetHashTable(partition_idx);
   Partition* dst_partition = hash_partitions_[partition_idx];
   DCHECK(dst_partition != nullptr);
-  DCHECK_EQ(dst_partition->is_spilled(), hash_tbl == NULL);
-  if (hash_tbl == NULL) {
+  DCHECK_EQ(dst_partition->is_spilled(), hash_tbl == nullptr);
+  if (hash_tbl == nullptr) {
     // This partition is already spilled, just append the row.
     return AppendSpilledRow<AGGREGATED_ROWS>(dst_partition, row);
   }
@@ -138,22 +126,22 @@ Status PartitionedAggregationNode::ProcessRow(TupleRow* __restrict__ row,
   return AddIntermediateTuple<AGGREGATED_ROWS>(dst_partition, row, hash, it);
 }
 
-template<bool AGGREGATED_ROWS>
-Status PartitionedAggregationNode::AddIntermediateTuple(Partition* __restrict__ partition,
+template <bool AGGREGATED_ROWS>
+Status GroupingAggregator::AddIntermediateTuple(Partition* __restrict__ partition,
     TupleRow* __restrict__ row, uint32_t hash, HashTable::Iterator insert_it) {
   while (true) {
     DCHECK(partition->aggregated_row_stream->is_pinned());
     Tuple* intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_evals,
-        partition->aggregated_row_stream.get(), &process_batch_status_);
+        partition->aggregated_row_stream.get(), &add_batch_status_);
 
-    if (LIKELY(intermediate_tuple != NULL)) {
-      UpdateTuple(partition->agg_fn_evals.data(), intermediate_tuple,
-          row, AGGREGATED_ROWS);
+    if (LIKELY(intermediate_tuple != nullptr)) {
+      UpdateTuple(
+          partition->agg_fn_evals.data(), intermediate_tuple, row, AGGREGATED_ROWS);
       // After copying and initializing the tuple, insert it into the hash table.
       insert_it.SetTuple(intermediate_tuple, hash);
       return Status::OK();
-    } else if (!process_batch_status_.ok()) {
-      return std::move(process_batch_status_);
+    } else if (!add_batch_status_.ok()) {
+      return std::move(add_batch_status_);
     }
 
     // We did not have enough memory to add intermediate_tuple to the stream.
@@ -164,7 +152,7 @@ Status PartitionedAggregationNode::AddIntermediateTuple(Partition* __restrict__ 
   }
 }
 
-Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
+Status GroupingAggregator::AddBatchStreamingImpl(bool needs_serialize,
     TPrefetchMode::type prefetch_mode, RowBatch* in_batch, RowBatch* out_batch,
     HashTableCtx* __restrict__ ht_ctx, int remaining_capacity[PARTITION_FANOUT]) {
   DCHECK(is_streaming_preagg_);
@@ -183,24 +171,24 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
       TupleRow* in_row = in_batch_iter.Get();
       const uint32_t hash = expr_vals_cache->CurExprValuesHash();
       const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
-      if (!expr_vals_cache->IsRowNull() &&
-          !TryAddToHashTable(ht_ctx, hash_partitions_[partition_idx],
-            GetHashTable(partition_idx), in_row, hash, &remaining_capacity[partition_idx],
-            &process_batch_status_)) {
-        RETURN_IF_ERROR(std::move(process_batch_status_));
+      if (!expr_vals_cache->IsRowNull()
+          && !TryAddToHashTable(ht_ctx, hash_partitions_[partition_idx],
+                 GetHashTable(partition_idx), in_row, hash,
+                 &remaining_capacity[partition_idx], &add_batch_status_)) {
+        RETURN_IF_ERROR(std::move(add_batch_status_));
         // Tuple is not going into hash table, add it to the output batch.
-        Tuple* intermediate_tuple = ConstructIntermediateTuple(agg_fn_evals_,
-            out_batch->tuple_data_pool(), &process_batch_status_);
-        if (UNLIKELY(intermediate_tuple == NULL)) {
-          DCHECK(!process_batch_status_.ok());
-          return std::move(process_batch_status_);
+        Tuple* intermediate_tuple = ConstructIntermediateTuple(
+            agg_fn_evals_, out_batch->tuple_data_pool(), &add_batch_status_);
+        if (UNLIKELY(intermediate_tuple == nullptr)) {
+          DCHECK(!add_batch_status_.ok());
+          return std::move(add_batch_status_);
         }
         UpdateTuple(agg_fn_evals_.data(), intermediate_tuple, in_row);
         out_batch_iterator.Get()->SetTuple(0, intermediate_tuple);
         out_batch_iterator.Next();
         out_batch->CommitLastRow();
       }
-      DCHECK(process_batch_status_.ok());
+      DCHECK(add_batch_status_.ok());
       expr_vals_cache->NextRow();
     }
     DCHECK(expr_vals_cache->AtEnd());
@@ -214,11 +202,11 @@ Status PartitionedAggregationNode::ProcessBatchStreaming(bool needs_serialize,
   return Status::OK();
 }
 
-bool PartitionedAggregationNode::TryAddToHashTable(
-    HashTableCtx* __restrict__ ht_ctx, Partition* __restrict__ partition,
-    HashTable* __restrict__ hash_tbl, TupleRow* __restrict__ in_row,
-    uint32_t hash, int* __restrict__ remaining_capacity, Status* status) {
-  DCHECK(remaining_capacity != NULL);
+bool GroupingAggregator::TryAddToHashTable(HashTableCtx* __restrict__ ht_ctx,
+    Partition* __restrict__ partition, HashTable* __restrict__ hash_tbl,
+    TupleRow* __restrict__ in_row, uint32_t hash, int* __restrict__ remaining_capacity,
+    Status* status) {
+  DCHECK(remaining_capacity != nullptr);
   DCHECK_EQ(hash_tbl, partition->hash_tbl.get());
   DCHECK_GE(*remaining_capacity, 0);
   bool found;
@@ -230,9 +218,9 @@ bool PartitionedAggregationNode::TryAddToHashTable(
   } else if (*remaining_capacity == 0) {
     return false;
   } else {
-    intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_evals,
-        partition->aggregated_row_stream.get(), status);
-    if (LIKELY(intermediate_tuple != NULL)) {
+    intermediate_tuple = ConstructIntermediateTuple(
+        partition->agg_fn_evals, partition->aggregated_row_stream.get(), status);
+    if (LIKELY(intermediate_tuple != nullptr)) {
       it.SetTuple(intermediate_tuple, hash);
       --(*remaining_capacity);
     } else {
@@ -247,7 +235,7 @@ bool PartitionedAggregationNode::TryAddToHashTable(
 }
 
 // Instantiate required templates.
-template Status PartitionedAggregationNode::ProcessBatch<false>(RowBatch*,
-    TPrefetchMode::type, HashTableCtx*);
-template Status PartitionedAggregationNode::ProcessBatch<true>(RowBatch*,
-    TPrefetchMode::type, HashTableCtx*);
+template Status GroupingAggregator::AddBatchImpl<false>(
+    RowBatch*, TPrefetchMode::type, HashTableCtx*);
+template Status GroupingAggregator::AddBatchImpl<true>(
+    RowBatch*, TPrefetchMode::type, HashTableCtx*);
