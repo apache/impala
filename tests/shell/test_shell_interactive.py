@@ -502,6 +502,20 @@ class TestImpalaShellInteractive(object):
     assert '| id   |' in result.stdout
 
   @pytest.mark.execute_serially
+  def test_fix_infinite_loop(self):
+    # IMPALA-6337: Fix infinite loop.
+    result = run_impala_shell_interactive("select 1 + 1; \"\n;\";")
+    assert '| 2     |' in result.stdout
+    result = run_impala_shell_interactive("select '1234'\";\n;\n\";")
+    assert '| 1234 |' in result.stdout
+    result = run_impala_shell_interactive("select 1 + 1; \"\n;\"\n;")
+    assert '| 2     |' in result.stdout
+    result = run_impala_shell_interactive("select '1\\'23\\'4'\";\n;\n\";")
+    assert '| 1\'23\'4 |' in result.stdout
+    result = run_impala_shell_interactive("select '1\"23\"4'\";\n;\n\";")
+    assert '| 1"23"4 |' in result.stdout
+
+  @pytest.mark.execute_serially
   def test_shell_prompt(self):
     proc = pexpect.spawn(SHELL_CMD)
     proc.expect(":21000] default>")
