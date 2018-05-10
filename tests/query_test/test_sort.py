@@ -18,7 +18,7 @@
 from copy import copy, deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfLocal
+from tests.common.skip import SkipIfNotHdfsMinicluster
 
 def transpose_results(result, map_fn=lambda x: x):
   """Given a query result (list of strings, each string represents a row), return a list
@@ -168,7 +168,7 @@ class TestQueryFullSort(ImpalaTestSuite):
       query, exec_option, table_format=table_format).data)
     assert(result[0] == sorted(result[0]))
 
-  @SkipIfLocal.mem_usage_different
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_sort_reservation_usage(self, vector):
     """Tests for sorter reservation usage."""
     new_vector = deepcopy(vector)

@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 # Test sort with small char column materialized by exprs.
-# Set low memory limit to force spilling.
+# Set low mem_limit to force spilling. mem_limit is tuned for a 3-node HDFS minicluster.
 # IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
 set buffer_pool_limit=28m;
 set mem_limit=200m;
@@ -40,6 +40,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test sort with small input char column materialized before sort.
+# mem_limit is tuned for a 3-node HDFS minicluster.
 set mem_limit=200m;
 set buffer_pool_limit=28m;
 set disable_outermost_topn=1;
@@ -78,7 +79,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test sort with large input char column materialized before sort.
-# Set low memory limit to force spilling.
+# Set low mem_limit to force spilling. mem_limit is tuned for a 3-node HDFS minicluster.
 set mem_limit=200m;
 set buffer_pool_limit=28m;
 set disable_outermost_topn=1;
@@ -117,7 +118,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test sort with varchar column materialized by exprs.
-# Set low memory limit to force spilling.
+# Set low mem_limit to force spilling. mem_limit is tuned for a 3-node HDFS minicluster.
 set buffer_pool_limit=28m;
 # IMPALA-3332: comparator makes local allocations that cause runaway memory consumption.
 set mem_limit=200m;
@@ -156,7 +157,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test sort with input varchar column materialized before sort.
-# Set low memory limit to force spilling.
+# Set low mem_limit to force spilling. mem_limit is tuned for a 3-node HDFS minicluster.
 set mem_limit=200m;
 set buffer_pool_limit=28m;
 set disable_outermost_topn=1;
@@ -195,6 +196,7 @@ row_regex: .*TotalMergesPerformed: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test that we can spill with a buffer size larger than the default I/O size (8mb).
+# buffer_pool_limit is tuned for a 3-node HDFS minicluster.
 set default_spillable_buffer_size=16m;
 set buffer_pool_limit=96m;
 select l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
@@ -221,4 +223,46 @@ BIGINT,BIGINT,BIGINT,INT,STRING
 6000000,96127,6128,2,'ooze furiously about the pe'
 ---- RUNTIME_PROFILE
 row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Regression test for IMPALA-2612. The following query will cause CastToChar
+# to be invoked when building the hash tables in partitioned aggregation
+# nodes. CastToChar will do "local" memory allocation. Without the fix of
+# IMPALA-2612, the peak memory consumption will be higher.
+# mem_limit is tuned to reproduce the issue on a 3-node HDFS minicluster.
+set mem_limit=800m;
+set num_scanner_threads=1;
+select count(distinct concat(cast(l_comment as char(120)), cast(l_comment as char(120)),
+                             cast(l_comment as char(120)), cast(l_comment as char(120)),
+                             cast(l_comment as char(120)), cast(l_comment as char(120))))
+from lineitem
+---- RESULTS
+4502054
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+# Verify that the agg spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# IMPALA-3304: test that avg() can spill with a query mem limit.
+# This test only covers that use FIXED_UDA_INTERMEDIATE, not functions that allocate
+# strings for intermediate values. mem_limit is tuned to reproduce the issue on a 3-node
+# HDFS minicluster.
+set mem_limit=100m;
+select l_orderkey, avg(l_tax), avg(l_quantity), avg(l_discount), avg(l_extendedprice)
+from tpch_parquet.lineitem
+group by 1
+order by avg(l_extendedprice) desc, avg(l_discount)
+limit 5
+---- TYPES
+BIGINT,DECIMAL,DECIMAL,DECIMAL,DECIMAL
+---- RESULTS
+3811460,0.050000,50.000000,0.050000,104899.500000
+1744195,0.040000,50.000000,0.090000,104649.500000
+5151266,0.070000,50.000000,0.000000,104449.500000
+4571042,0.030000,50.000000,0.090000,104399.500000
+1198304,0.010000,50.000000,0.020000,104299.500000
+---- RUNTIME_PROFILE
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====

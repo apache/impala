@@ -145,25 +145,6 @@ BIGINT, BIGINT, STRING
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
-# Regression test for IMPALA-2612. The following query will cause CastToChar
-# to be invoked when building the hash tables in partitioned aggregation
-# nodes. CastToChar will do "local" memory allocation. Without the fix of
-# IMPALA-2612, the peak memory consumption will be higher.
-set mem_limit=800m;
-set num_scanner_threads=1;
-select count(distinct concat(cast(l_comment as char(120)), cast(l_comment as char(120)),
-                             cast(l_comment as char(120)), cast(l_comment as char(120)),
-                             cast(l_comment as char(120)), cast(l_comment as char(120))))
-from lineitem
----- RESULTS
-4502054
----- TYPES
-BIGINT
----- RUNTIME_PROFILE
-# Verify that the agg spilled.
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-====
----- QUERY
 # Test aggregation with minimum required reservation to exercise IMPALA-2708.
 # Merge aggregation requires 17 buffers and preaggregation requires 16 buffers
 # plus 1mb of hash tables. The buffer size is 256k for this test. The scan needs 24MB.
@@ -175,27 +156,6 @@ from (select distinct * from orders) t
 BIGINT
 ---- RESULTS
 1500000
----- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-====
----- QUERY
-# IMPALA-3304: test that avg() can spill with a query mem limit.
-# This test only covers that use FIXED_UDA_INTERMEDIATE, not functions that allocate
-# strings for intermediate values.
-set mem_limit=100m;
-select l_orderkey, avg(l_tax), avg(l_quantity), avg(l_discount), avg(l_extendedprice)
-from tpch_parquet.lineitem
-group by 1
-order by avg(l_extendedprice) desc, avg(l_discount)
-limit 5
----- TYPES
-BIGINT,DECIMAL,DECIMAL,DECIMAL,DECIMAL
----- RESULTS
-3811460,0.050000,50.000000,0.050000,104899.500000
-1744195,0.040000,50.000000,0.090000,104649.500000
-5151266,0.070000,50.000000,0.000000,104449.500000
-4571042,0.030000,50.000000,0.090000,104399.500000
-1198304,0.010000,50.000000,0.020000,104299.500000
 ---- RUNTIME_PROFILE
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====

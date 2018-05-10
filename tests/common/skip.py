@@ -127,8 +127,6 @@ class SkipIfLocal:
       reason="HBase not started when using local file system")
   hdfs_client = pytest.mark.skipif(IS_LOCAL,
       reason="HDFS not started when using local file system")
-  mem_usage_different = pytest.mark.skipif(IS_LOCAL,
-      reason="Memory limit too low when running single node")
   qualified_path = pytest.mark.skipif(IS_LOCAL,
       reason="Tests rely on HDFS qualified paths")
   root_path = pytest.mark.skipif(IS_LOCAL,
@@ -138,6 +136,9 @@ class SkipIfNotHdfsMinicluster:
   # These ones are skipped when not running against a local HDFS mini-cluster.
   plans = pytest.mark.skipif(not IS_HDFS or pytest.config.option.testing_remote_cluster,
       reason="Test assumes plans from local HDFS mini-cluster")
+  tuned_for_minicluster = pytest.mark.skipif(
+      not IS_HDFS or pytest.config.option.testing_remote_cluster,
+      reason="Test is tuned for 3-node HDFS minicluster")
 
 class SkipIfBuildType:
   not_dev_build = pytest.mark.skipif(not IMPALAD_BUILD.is_dev(),

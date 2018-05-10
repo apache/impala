@@ -1,0 +1,16 @@
+====
+---- QUERY
+# Check that hdfs writers respects mem_limit. mem_limit is tuned for a 3-node HDFS
+# minicluster.
+set mem_limit=64m;
+insert into table alltypesinsert
+partition (year, month) /* +noclustered */
+select at1.id, at1.bool_col, at1.tinyint_col, at1.smallint_col, at1.int_col, at1.bigint_col,
+  at1.float_col, at1.double_col, at1.date_string_col, at1.string_col, at1.timestamp_col,
+  at1.year, at2.id as month
+from  functional.alltypes at1, functional.alltypes at2;
+---- SETUP
+DROP PARTITIONS alltypesinsert
+---- CATCH
+Memory limit exceeded
+====

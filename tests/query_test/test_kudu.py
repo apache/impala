@@ -39,6 +39,7 @@ from pytz import utc
 
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
+from tests.common.skip import SkipIfNotHdfsMinicluster
 from tests.verifiers.metric_verifier import MetricVerifier
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
@@ -82,6 +83,10 @@ class TestKuduOperations(KuduTestSuite):
 
   def test_kudu_insert(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_insert', vector, use_db=unique_database)
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_kudu_insert_mem_limit(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_insert_mem_limit', vector, use_db=unique_database)
 
   def test_kudu_update(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_update', vector, use_db=unique_database)
@@ -1028,6 +1033,7 @@ class TestImpalaKuduIntegration(KuduTestSuite):
     cursor.execute("SHOW TABLES IN %s" % unique_database)
     assert (impala_tbl_name,) not in cursor.fetchall()
 
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestKuduMemLimits(KuduTestSuite):
 
   QUERIES = ["select * from tpch_kudu.lineitem where l_orderkey = -1",
