@@ -211,6 +211,7 @@ class ExecNode {
   MemTracker* expr_mem_tracker() { return expr_mem_tracker_.get(); }
   MemPool* expr_perm_pool() { return expr_perm_pool_.get(); }
   MemPool* expr_results_pool() { return expr_results_pool_.get(); }
+  const TBackendResourceProfile& resource_profile() { return resource_profile_; }
   bool is_closed() const { return is_closed_; }
 
   /// Return true if codegen was disabled by the planner for this ExecNode. Does not
@@ -219,6 +220,10 @@ class ExecNode {
 
   /// Extract node id from p->name().
   static int GetNodeIdFromProfile(RuntimeProfile* p);
+
+  /// Returns true if this node is inside the right-hand side plan tree of a SubplanNode.
+  /// Valid to call in or after Prepare().
+  bool IsInSubplan() const { return containing_subplan_ != NULL; }
 
   /// Names of counters shared by all exec nodes
   static const std::string ROW_THROUGHPUT_COUNTER;
@@ -321,10 +326,6 @@ class ExecNode {
   /// Pointer to the containing SubplanNode or NULL if not inside a subplan.
   /// Set by SubplanNode::Init(). Not owned.
   SubplanNode* containing_subplan_;
-
-  /// Returns true if this node is inside the right-hand side plan tree of a SubplanNode.
-  /// Valid to call in or after Prepare().
-  bool IsInSubplan() const { return containing_subplan_ != NULL; }
 
   /// If true, codegen should be disabled for this exec node.
   const bool disable_codegen_;

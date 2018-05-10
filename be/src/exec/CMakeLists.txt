@@ -25,6 +25,8 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 
 add_library(Exec
+  aggregation-node.cc
+  aggregator.cc
   analytic-eval-node.cc
   base-sequence-scanner.cc
   blocking-join-node.cc
@@ -38,6 +40,9 @@ add_library(Exec
   exchange-node.cc
   external-data-source-executor.cc
   filter-context.cc
+  grouping-aggregator.cc
+  grouping-aggregator-ir.cc
+  grouping-aggregator-partition.cc
   hash-table.cc
   hbase-table-sink.cc
   hbase-table-writer.cc
@@ -66,12 +71,12 @@ add_library(Exec
   incr-stats-util.cc
   nested-loop-join-builder.cc
   nested-loop-join-node.cc
+  non-grouping-aggregator.cc
+  non-grouping-aggregator-ir.cc
   parquet-column-readers.cc
   parquet-column-stats.cc
   parquet-metadata-utils.cc
   partial-sort-node.cc
-  partitioned-aggregation-node.cc
-  partitioned-aggregation-node-ir.cc
   partitioned-hash-join-builder.cc
   partitioned-hash-join-builder-ir.cc
   partitioned-hash-join-node.cc
@@ -91,6 +96,7 @@ add_library(Exec
   select-node-ir.cc
   singular-row-src-node.cc
   sort-node.cc
+  streaming-aggregation-node.cc
   subplan-node.cc
   text-converter.cc
   topn-node.cc
