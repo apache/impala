@@ -960,6 +960,9 @@ class Query(object):
          self.solo_runtime_profile_without_spilling),
     ]
     for filename, profile in profiles_to_write:
+      if profile is None:
+        LOG.debug("No profile recorded for {0}".format(filename))
+        continue
       with open(os.path.join(directory, filename), "w") as fh:
         fh.write(profile)
 
