@@ -18,6 +18,7 @@
 #include <random>
 
 #include <gtest/gtest.h>
+#include <openssl/err.h>
 #include <openssl/rand.h>
 
 #include "common/init.h"
@@ -32,7 +33,9 @@ namespace impala {
 class OpenSSLUtilTest : public ::testing::Test {
  protected:
   virtual void SetUp() { SeedOpenSSLRNG(); }
-  virtual void TearDown() {}
+  virtual void TearDown() {
+    EXPECT_EQ(ERR_peek_error(), 0) << "Did not clear OpenSSL error queue";
+  }
 
   /// Fill buffer 'data' with 'len' bytes of random binary data from 'rng_'.
   /// 'len' must be a multiple of 8 bytes'.
