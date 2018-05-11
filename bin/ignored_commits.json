@@ -24,7 +24,9 @@
       { "hash": "8a609b3513c4a181cd06bb82e2aeb97908590184",
         "comment": "Not applicable to 2.x: Revert commit above" },
       { "hash": "167ed627febe5a10d8a4a7474a34efde1ac6f1c2",
-        "comment": "Not applicable to 2.x: decimal_v2" }
+        "comment": "Not applicable to 2.x: decimal_v2" },
+      { "hash": "8668d18ebb0e137993a12d5303411b6c06e91c59",
+        "comment": "Not applicable to 2.x: 3.x version update" }
     ]
   }
 ]
