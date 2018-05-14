@@ -656,7 +656,7 @@ void Coordinator::CancelBackends() {
 }
 
 Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& params) {
-  VLOG_FILE << "UpdateBackendExecStatus() query_id=" << query_id()
+  VLOG_FILE << "UpdateBackendExecStatus() query_id=" << PrintId(query_id())
             << " backend_idx=" << params.coord_state_idx;
   if (params.coord_state_idx >= backend_states_.size()) {
     return Status(TErrorCode::INTERNAL_ERROR,
