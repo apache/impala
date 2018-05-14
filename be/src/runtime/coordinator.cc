@@ -586,7 +586,7 @@ void Coordinator::WaitForBackends() {
 }
 
 Status Coordinator::Wait() {
-  lock_guard<mutex> l(wait_lock_);
+  lock_guard<SpinLock> l(wait_lock_);
   SCOPED_TIMER(query_profile_->total_time_counter());
   if (has_called_wait_) return Status::OK();
   has_called_wait_ = true;
