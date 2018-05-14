@@ -21,7 +21,6 @@
 #include <string>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <rapidjson/document.h>
 
@@ -33,6 +32,7 @@
 #include "util/condition-variable.h"
 #include "util/progress-updater.h"
 #include "util/runtime-profile-counters.h"
+#include "util/spinlock.h"
 
 namespace impala {
 
@@ -205,7 +205,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   PlanRootSink* coord_sink_ = nullptr;
 
   /// ensures single-threaded execution of Wait(). See lock ordering class comment.
-  boost::mutex wait_lock_;
+  SpinLock wait_lock_;
 
   bool has_called_wait_ = false;  // if true, Wait() was called; protected by wait_lock_
 
