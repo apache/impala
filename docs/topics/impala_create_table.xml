@@ -565,6 +565,11 @@ CREATE TABLE ctas_t1
       <xref href="impala_kudu.xml#kudu_primary_key_attribute"/>.
     </p>
 
+    <p>
+      For more on creating a Kudu table with a specific replication factor, see
+        <xref href="impala_kudu.xml#kudu_replication_factor"/>.
+    </p>
+
     <p rev="IMPALA-3719">
       For more on the <codeph>NULL</codeph> and <codeph>NOT NULL</codeph> attributes, see
       <xref href="impala_kudu.xml#kudu_not_null_attribute"/>.
