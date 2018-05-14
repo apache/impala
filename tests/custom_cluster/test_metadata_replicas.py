@@ -20,8 +20,17 @@ import re
 from time import sleep
 from tests.common.environ import specific_build_type_timeout
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import (
+    SkipIfS3,
+    SkipIfADLS,
+    SkipIfIsilon,
+    SkipIfLocal)
 from tests.util.hive_utils import HiveDbWrapper
 
+@SkipIfS3.hive
+@SkipIfADLS.hive
+@SkipIfIsilon.hive
+@SkipIfLocal.hive
 class TestMetadataReplicas(CustomClusterTestSuite):
   """ Validates metadata content across catalogd and impalad coordinators."""
 
