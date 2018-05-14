@@ -308,6 +308,16 @@ class CatalogdService(BaseImpalaService):
     super(CatalogdService, self).__init__(hostname, webserver_port)
     self.service_port = service_port
 
-  def get_catalog_version(self):
-    """ Gets catalogd's latest catalog version. """
-    return self.get_debug_webpage_json('catalog')["version"]
+  def get_catalog_version(self, timeout=10, interval=1):
+    """ Gets catalogd's latest catalog version. Retry for 'timeout'
+        seconds, sleeping 'interval' seconds between tries. If the
+        version cannot be obtained, this method fails."""
+    start_time = time()
+    while (time() - start_time < timeout):
+      try:
+        info = self.get_debug_webpage_json('catalog')
+        if "version" in info: return info['version']
+      except Exception:
+        LOG.info('Catalogd version not yet available.')
+      sleep(interval)
+    assert False, 'Catalog version not ready in expected time.'
