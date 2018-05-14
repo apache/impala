@@ -144,23 +144,41 @@ under the License.
 
           <li>
             <p>
-              Data is physically divided based on units of storage called <term>tablets</term>. Tablets are
-              stored by <term>tablet servers</term>. Each tablet server can store multiple tablets,
-              and each tablet is replicated across multiple tablet servers, managed automatically by Kudu.
-              Where practical, colocate the tablet servers on the same hosts as the DataNodes, although that is not required.
+              Data is physically divided based on units of storage called
+                <term>tablets</term>. Tablets are stored by <term>tablet
+                servers</term>. Each tablet server can store multiple tablets,
+              and each tablet is replicated across multiple tablet servers,
+              managed automatically by Kudu. Where practical, co-locate the
+              tablet servers on the same hosts as the DataNodes, although that
+              is not required.
             </p>
           </li>
         </ul>
-
-        <p>
-          One consideration for the cluster topology is that the number of replicas for a Kudu table
-          must be odd.
-        </p>
 
       </conbody>
 
     </concept>
 
+  </concept>
+
+  <concept id="kudu_replication_factor">
+    <title>Kudu Replication Factor</title>
+    <conbody>
+      <p>
+        By default, Kudu tables created through Impala use a tablet
+        replication factor of 3. To change the replication factor for a Kudu
+        table, specify the replication factor using <codeph>TBLPROPERTIES
+          ('kudu.num_tablet_replicas' = '<i>n</i>')</codeph> in the <keyword
+          keyref="create_table"/> statement.
+      </p>
+
+      <p>
+        The number of replicas for a Kudu table must be odd.
+      </p>
+
+      <p> Altering the <codeph>kudu.num_tablet_replicas</codeph> property after
+        table creation currently has no effect. </p>
+    </conbody>
   </concept>
 
   <concept id="kudu_ddl">
