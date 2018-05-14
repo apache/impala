@@ -30,6 +30,7 @@ IS_ISILON = FILESYSTEM == "isilon"
 IS_LOCAL = FILESYSTEM == "local"
 IS_HDFS = FILESYSTEM == "hdfs"
 IS_ADLS = FILESYSTEM == "adls"
+IS_EC = os.getenv("ERASURE_CODING") == "true"
 # This condition satisfies both the states where one can assume a default fs
 #   - The environment variable is set to an empty string.
 #   - Tne environment variables is unset ( None )

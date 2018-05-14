@@ -18,7 +18,7 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfLocal
+from tests.common.skip import SkipIfLocal, SkipIfEC
 from tests.util.filesystem_utils import (
     IS_ISILON,
     IS_S3,
@@ -26,6 +26,7 @@ from tests.util.filesystem_utils import (
 from time import sleep
 
 @SkipIfLocal.hdfs_fd_caching
+@SkipIfEC.remote_read
 class TestHdfsFdCaching(CustomClusterTestSuite):
   """Tests that if HDFS file handle caching is enabled, file handles are actually cached
   and the associated metrics return valid results. In addition, tests that the upper bound

@@ -27,8 +27,10 @@ from tests.common.skip import (
     SkipIfIsilon,
     SkipIfS3,
     SkipIfADLS,
+    SkipIfEC,
     SkipIfLocal,
-    SkipIfNotHdfsMinicluster)
+    SkipIfNotHdfsMinicluster
+    )
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
 
@@ -86,6 +88,7 @@ class TestNestedTypes(ImpalaTestSuite):
     a 3-node HDFS minicluster."""
     self.run_test_case('QueryTest/nested-types-tpch-mem-limit', vector)
 
+  @SkipIfEC.fix_later
   def test_parquet_stats(self, vector):
     """Queries that test evaluation of Parquet row group statistics."""
     self.run_test_case('QueryTest/nested-types-parquet-stats', vector)

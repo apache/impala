@@ -20,12 +20,13 @@
 import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfLocal, SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfLocal, SkipIfNotHdfsMinicluster, SkipIfEC
 from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the different explain levels [0-3] on a few queries.
 # TODO: Clean up this test to use an explain level test dimension and appropriate
 # result sub-sections for the expected explain plans.
+@SkipIfEC.fix_later
 class TestExplain(ImpalaTestSuite):
   # Value for the num_scanner_threads query option to ensure that the memory estimates of
   # scan nodes are consistent even when run on machines with different numbers of cores.

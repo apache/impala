@@ -22,6 +22,7 @@ import pytest
 import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfEC
 from tests.common.test_dimensions import create_uncompressed_text_dimension, extend_exec_option_dimension
 from tests.common.test_vector import ImpalaTestVector
 
@@ -166,12 +167,14 @@ class TestQueriesTextTables(ImpalaTestSuite):
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/distinct-estimate', vector)
 
+  @SkipIfEC.oom
   def test_random(self, vector):
     # These results will vary slightly depending on how the values get split up
     # so only run with 1 node and on text.
     vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/random', vector)
 
+  @SkipIfEC.oom
   def test_values(self, vector):
     self.run_test_case('QueryTest/values', vector)
 
@@ -188,6 +191,7 @@ class TestQueriesParquetTables(ImpalaTestSuite):
   def get_workload(cls):
     return 'functional-query'
 
+  @SkipIfEC.oom
   @pytest.mark.execute_serially
   def test_very_large_strings(self, vector):
     """Regression test for IMPALA-1619. Doesn't need to be run on all file formats.
@@ -219,6 +223,7 @@ class TestHdfsQueries(ImpalaTestSuite):
   def get_workload(cls):
     return 'functional-query'
 
+  @SkipIfEC.oom
   def test_hdfs_scan_node(self, vector):
     self.run_test_case('QueryTest/hdfs-scan-node', vector)
 

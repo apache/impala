@@ -35,6 +35,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
     SkipIfS3,
     SkipIfADLS,
+    SkipIfEC,
     SkipIfIsilon,
     SkipIfLocal)
 from tests.common.test_dimensions import (
@@ -485,6 +486,7 @@ class TestParquet(ImpalaTestSuite):
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
+  @SkipIfEC.fix_later
   def test_misaligned_parquet_row_groups(self, vector):
     """IMPALA-3989: Test that no warnings are issued when misaligned row groups are
     encountered. Make sure that 'NumScannersWithNoReads' counters are set to the number of
@@ -555,6 +557,7 @@ class TestParquet(ImpalaTestSuite):
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
+  @SkipIfEC.fix_later
   def test_multiple_blocks_one_row_group(self, vector):
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock_one_row_group has
     # 3 blocks but only one row group across these blocks. We test to see that only one
@@ -954,6 +957,7 @@ class TestOrc(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
+  @SkipIfEC.fix_later
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
   def test_misaligned_orc_stripes(self, vector, unique_database):

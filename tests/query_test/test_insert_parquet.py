@@ -29,7 +29,7 @@ from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder
 from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIfIsilon, SkipIfLocal, SkipIfS3, SkipIfADLS
+from tests.common.skip import SkipIfEC, SkipIfIsilon, SkipIfLocal, SkipIfS3, SkipIfADLS
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path
@@ -101,6 +101,7 @@ class TestInsertParquetQueries(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').compression_codec == 'none')
 
+  @SkipIfEC.oom
   @SkipIfLocal.multiple_impalad
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_insert_parquet(self, vector, unique_database):

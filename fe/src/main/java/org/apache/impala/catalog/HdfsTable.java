@@ -434,14 +434,14 @@ public class HdfsTable extends Table {
         continue;
       }
       FileDescriptor fd;
-      // Block locations are manually synthesized if the underlying fs does not support
-      // the block location API.
       if (synthesizeFileMd) {
+        // Block locations are manually synthesized if the underlying fs does not support
+        // the block location API.
         fd = FileDescriptor.createWithSynthesizedBlockMd(fileStatus,
             partitions.get(0).getFileFormat(), hostIndex_);
       } else {
-        fd = FileDescriptor.create(fileStatus,
-            fileStatus.getBlockLocations(), fs, hostIndex_, numUnknownDiskIds);
+        fd = FileDescriptor.create(fileStatus, fileStatus.getBlockLocations(), fs,
+            hostIndex_, fileStatus.isErasureCoded(), numUnknownDiskIds);
       }
       newFileDescs.add(fd);
       ++loadStats.loadedFiles;
@@ -508,13 +508,13 @@ public class HdfsTable extends Table {
       FileDescriptor fd = fileDescsByName.get(fileName);
       if (isPartitionMarkedCached || hasFileChanged(fd, fileStatus)) {
         if (synthesizeFileMd) {
-          fd = FileDescriptor.createWithSynthesizedBlockMd(fileStatus,
-              fileFormat, hostIndex_);
+          fd = FileDescriptor.createWithSynthesizedBlockMd(fileStatus, fileFormat,
+              hostIndex_);
         } else {
           BlockLocation[] locations =
-            fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
-          fd = FileDescriptor.create(fileStatus, locations, fs, hostIndex_,
-              numUnknownDiskIds);
+              fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+            fd = FileDescriptor.create(fileStatus, locations, fs, hostIndex_,
+                fileStatus.isErasureCoded(), numUnknownDiskIds);
         }
         ++loadStats.loadedFiles;
       } else {

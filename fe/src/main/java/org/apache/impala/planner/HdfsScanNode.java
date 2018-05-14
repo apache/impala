@@ -801,7 +801,8 @@ public class HdfsScanNode extends ScanNode {
             // Translate from network address to the global (to this request) host index.
             Integer globalHostIdx = analyzer.getHostIndex().getIndex(networkAddress);
             location.setHost_idx(globalHostIdx);
-            if (checkMissingDiskIds && FileBlock.getDiskId(block, i) == -1) {
+            if (checkMissingDiskIds && !fileDesc.getIsEc() &&
+                FileBlock.getDiskId(block, i) == -1) {
               ++numScanRangesNoDiskIds_;
               partitionMissingDiskIds = true;
               fileDescMissingDiskIds = true;

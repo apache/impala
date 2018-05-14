@@ -26,11 +26,12 @@ from functools import partial
 
 from tests.common.environ import IMPALAD_BUILD
 from tests.util.filesystem_utils import (
+    IS_ADLS,
+    IS_EC,
+    IS_HDFS,
     IS_ISILON,
     IS_LOCAL,
-    IS_HDFS,
     IS_S3,
-    IS_ADLS,
     SECONDARY_FILESYSTEM)
 
 
@@ -143,3 +144,9 @@ class SkipIfNotHdfsMinicluster:
 class SkipIfBuildType:
   not_dev_build = pytest.mark.skipif(not IMPALAD_BUILD.is_dev(),
       reason="Tests depends on debug build startup option.")
+
+class SkipIfEC:
+  remote_read = pytest.mark.skipif(IS_EC, reason="EC files are read remotely and "
+      "features relying on local read do not work.")
+  oom = pytest.mark.skipif(IS_EC, reason="Probably broken by HDFS-13540.")
+  fix_later = pytest.mark.skipif(IS_EC, reason="It should work but doesn't.")

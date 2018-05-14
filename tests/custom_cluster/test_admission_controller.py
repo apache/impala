@@ -32,7 +32,8 @@ from tests.common.environ import specific_build_type_timeout, IMPALAD_BUILD
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (
     SkipIfS3,
-    SkipIfADLS)
+    SkipIfADLS,
+    SkipIfEC)
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -384,6 +385,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
   @SkipIfS3.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
+  @SkipIfEC.fix_later
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=1,

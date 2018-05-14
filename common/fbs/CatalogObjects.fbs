@@ -73,4 +73,7 @@ table FbFileDesc {
 
   // List of FbFileBlocks that make up this file.
   file_blocks: [FbFileBlock] (id: 4);
+
+  // Whether this file is erasure-coded
+  is_ec: bool = false (id: 5);
 }

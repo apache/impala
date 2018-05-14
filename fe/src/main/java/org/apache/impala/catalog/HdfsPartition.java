@@ -102,22 +102,29 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
      * Creates the file descriptor of a file represented by 'fileStatus' with blocks
      * stored in 'blockLocations'. 'fileSystem' is the filesystem where the
      * file resides and 'hostIndex' stores the network addresses of the hosts that store
-     * blocks of the parent HdfsTable. Populates 'numUnknownDiskIds' with the number of
-     * unknown disk ids.
+     * blocks of the parent HdfsTable. 'isEc' indicates whether the file is erasure-coded.
+     * Populates 'numUnknownDiskIds' with the number of unknown disk ids.
      */
     public static FileDescriptor create(FileStatus fileStatus,
         BlockLocation[] blockLocations, FileSystem fileSystem,
-        ListMap<TNetworkAddress> hostIndex, Reference<Long> numUnknownDiskIds)
-        throws IOException {
+        ListMap<TNetworkAddress> hostIndex, boolean isEc,
+        Reference<Long> numUnknownDiskIds) throws IOException {
       Preconditions.checkState(FileSystemUtil.supportsStorageIds(fileSystem));
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
       int[] fbFileBlockOffsets = new int[blockLocations.length];
       int blockIdx = 0;
       for (BlockLocation loc: blockLocations) {
-        fbFileBlockOffsets[blockIdx++] = FileBlock.createFbFileBlock(fbb, loc, hostIndex,
-            numUnknownDiskIds);
+        if (isEc) {
+          fbFileBlockOffsets[blockIdx++] = FileBlock.createFbFileBlock(fbb,
+              loc.getOffset(), loc.getLength(),
+              (short) hostIndex.getIndex(REMOTE_NETWORK_ADDRESS));
+        } else {
+          fbFileBlockOffsets[blockIdx++] =
+              FileBlock.createFbFileBlock(fbb, loc, hostIndex, numUnknownDiskIds);
+        }
       }
-      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, fbFileBlockOffsets));
+      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, fbFileBlockOffsets,
+          isEc));
     }
 
     /**
@@ -132,7 +139,8 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
       int[] fbFileBlockOffets =
           synthesizeFbBlockMd(fbb, fileStatus, fileFormat, hostIndex);
-      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, fbFileBlockOffets));
+      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, fbFileBlockOffets,
+          false));
     }
 
     /**
@@ -142,13 +150,14 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
      * buffer.
      */
     private static FbFileDesc createFbFileDesc(FlatBufferBuilder fbb,
-        FileStatus fileStatus, int[] fbFileBlockOffets) {
+        FileStatus fileStatus, int[] fbFileBlockOffets, boolean isEc) {
       int fileNameOffset = fbb.createString(fileStatus.getPath().getName());
       int blockVectorOffset = FbFileDesc.createFileBlocksVector(fbb, fbFileBlockOffets);
       FbFileDesc.startFbFileDesc(fbb);
       FbFileDesc.addFileName(fbb, fileNameOffset);
       FbFileDesc.addLength(fbb, fileStatus.getLen());
       FbFileDesc.addLastModificationTime(fbb, fileStatus.getModificationTime());
+      FbFileDesc.addIsEc(fbb, isEc);
       HdfsCompression comp = HdfsCompression.fromFileName(fileStatus.getPath().getName());
       FbFileDesc.addCompression(fbb, comp.toFb());
       FbFileDesc.addFileBlocks(fbb, blockVectorOffset);
@@ -209,6 +218,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
 
     public long getModificationTime() { return fbFileDescriptor_.lastModificationTime(); }
     public int getNumFileBlocks() { return fbFileDescriptor_.fileBlocksLength(); }
+    public boolean getIsEc() {return fbFileDescriptor_.isEc(); }
 
     public FbFileBlock getFbFileBlock(int idx) {
       return fbFileDescriptor_.fileBlocks(idx);

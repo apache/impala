@@ -25,7 +25,7 @@ from subprocess import check_call
 from tests.common.environ import specific_build_type_timeout
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
-from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal, SkipIfEC
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.shell_util import exec_process
@@ -35,6 +35,7 @@ from tests.util.shell_util import exec_process
 @SkipIfADLS.caching
 @SkipIfIsilon.caching
 @SkipIfLocal.caching
+@SkipIfEC.fix_later
 class TestHdfsCaching(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
