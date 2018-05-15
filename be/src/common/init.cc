@@ -280,3 +280,29 @@ Status impala::StartMemoryMaintenanceThread() {
   return Thread::Create("common", "memory-maintenance-thread",
       &MemoryMaintenanceThread, &memory_maintenance_thread);
 }
+
+#if defined(ADDRESS_SANITIZER)
+// Default ASAN_OPTIONS. Override by setting environment variable $ASAN_OPTIONS.
+extern "C" const char *__asan_default_options() {
+  // IMPALA-2746: backend tests don't pass with leak sanitizer enabled.
+  return "handle_segv=0 detect_leaks=0 allocator_may_return_null=1";
+}
+#endif
+
+#if defined(THREAD_SANITIZER)
+// Default TSAN_OPTIONS. Override by setting environment variable $TSAN_OPTIONS.
+extern "C" const char *__tsan_default_options() {
+  // Note that backend test should re-configure to halt_on_error=1
+  return "halt_on_error=0 history_size=7";
+}
+#endif
+
+// Default UBSAN_OPTIONS. Override by setting environment variable $UBSAN_OPTIONS.
+#if defined(UNDEFINED_SANITIZER)
+extern "C" const char *__ubsan_default_options() {
+  static const string default_options = Substitute(
+      "print_stacktrace=1 suppressions=$0/bin/ubsan-suppressions.txt",
+      getenv("IMPALA_HOME") == nullptr ? "." : getenv("IMPALA_HOME"));
+  return default_options.c_str();
+}
+#endif
