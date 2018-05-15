@@ -33,23 +33,8 @@ class CountingBarrier {
   }
 
   /// Sends one notification, decrementing the number of pending notifications by one.
-  /// Returns the remaining pending notifications.
-  int32_t Notify() {
-    int32_t result = count_.Add(-1);
-    if (result == 0) promise_.Set(true);
-    return result;
-  }
-
-  /// Sets the number of pending notifications to 0 and unblocks Wait().
-  void NotifyRemaining() {
-    while (true) {
-      int32_t value = count_.Load();
-      if (value <= 0) return;  // count_ can legitimately drop below 0
-      if (count_.CompareAndSwap(value, 0)) {
-        promise_.Set(true);
-        return;
-      }
-    }
+  void Notify() {
+    if (count_.Add(-1) == 0) promise_.Set(true);
   }
 
   /// Blocks until all notifications are received.
@@ -58,8 +43,6 @@ class CountingBarrier {
   /// Blocks until all notifications are received, or until 'timeout_ms' passes, in which
   /// case '*timed_out' will be true.
   void Wait(int64_t timeout_ms, bool* timed_out) { promise_.Get(timeout_ms, timed_out); }
-
-  int32_t pending() const { return count_.Load(); }
 
  private:
   /// Used to signal waiters when all notifications are received.
