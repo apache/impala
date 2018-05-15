@@ -20,8 +20,7 @@
 
 #include <memory>
 
-#include "exec/exec-node.h"
-#include "exec/grouping-aggregator.h"
+#include "exec/aggregation-node-base.h"
 
 namespace impala {
 
@@ -44,14 +43,11 @@ class RuntimeState;
 /// the final aggregation.
 ///
 /// This node only supports grouping aggregations.
-class StreamingAggregationNode : public ExecNode {
+class StreamingAggregationNode : public AggregationNodeBase {
  public:
   StreamingAggregationNode(
       ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
-  virtual Status Prepare(RuntimeState* state) override;
-  virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
   virtual Status Reset(RuntimeState* state) override;
@@ -63,14 +59,21 @@ class StreamingAggregationNode : public ExecNode {
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
-  /// Row batch used as argument to GetNext() for the child node preaggregations. Store
-  /// in node to avoid reallocating for every GetNext() call when streaming.
+  /// Row batch retrieved from the child and passed to Aggregators in GetNext(). Stored
+  /// here as we may need it in multiple GetNext() calls if we're streaming rows through.
   std::unique_ptr<RowBatch> child_batch_;
 
-  /// True if no more rows to process from child.
-  bool child_eos_;
+  /// If true, there are no more rows in 'child_batch_' that need to be passed to any
+  /// Aggregator, and the next call to GetNext() will retrieve another batch, unless
+  /// 'child_eos_' is true.
+  bool child_batch_processed_ = true;
 
-  std::unique_ptr<GroupingAggregator> aggregator_;
+  /// True if no more rows to process from child.
+  bool child_eos_ = false;
+
+  /// If 'replicate_input_' is true, the index in 'aggs_' of the next Aggregator to pass
+  /// 'child_batch_' into.
+  int32_t replicate_agg_idx_ = 0;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////

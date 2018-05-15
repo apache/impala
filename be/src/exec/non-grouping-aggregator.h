@@ -33,7 +33,7 @@ class LlvmCodeGen;
 class ObjectPool;
 class RowBatch;
 class RuntimeState;
-class TPlanNode;
+class TAggregator;
 class Tuple;
 
 /// Aggregator for doing non-grouping aggregations. Input is passed to the aggregator
@@ -41,8 +41,8 @@ class Tuple;
 /// not support streaming preaggregation.
 class NonGroupingAggregator : public Aggregator {
  public:
-  NonGroupingAggregator(ExecNode* exec_node, ObjectPool* pool, const TPlanNode& tnode,
-      const DescriptorTbl& descs);
+  NonGroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
+      const TAggregator& taggregator, const DescriptorTbl& descs, int agg_idx);
 
   virtual Status Prepare(RuntimeState* state) override;
   virtual void Codegen(RuntimeState* state) override;
@@ -52,9 +52,15 @@ class NonGroupingAggregator : public Aggregator {
   virtual void Close(RuntimeState* state) override;
 
   virtual Status AddBatch(RuntimeState* state, RowBatch* batch) override;
+
+  /// NonGroupingAggregators behave the same in streaming and non-streaming contexts, so
+  /// this just calls AddBatch.
+  virtual Status AddBatchStreaming(RuntimeState* state, RowBatch* out_batch,
+      RowBatch* child_batch, bool* eos) override;
+
   virtual Status InputDone() override { return Status::OK(); }
 
-  virtual int num_grouping_exprs() override { return 0; }
+  virtual int GetNumGroupingExprs() override { return 0; }
 
   /// NonGroupingAggregator doesn't create a buffer pool client so it doesn't need the
   /// debug options.
@@ -72,7 +78,7 @@ class NonGroupingAggregator : public Aggregator {
 
   typedef Status (*AddBatchImplFn)(NonGroupingAggregator*, RowBatch*);
   /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
-  AddBatchImplFn add_batch_impl_fn_;
+  AddBatchImplFn add_batch_impl_fn_ = nullptr;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
@@ -80,8 +86,8 @@ class NonGroupingAggregator : public Aggregator {
   /// Result of aggregation w/o GROUP BY.
   /// Note: can be NULL even if there is no grouping if the result tuple is 0 width
   /// e.g. select 1 from table group by col.
-  Tuple* singleton_output_tuple_;
-  bool singleton_output_tuple_returned_;
+  Tuple* singleton_output_tuple_ = nullptr;
+  bool singleton_output_tuple_returned_ = true;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////

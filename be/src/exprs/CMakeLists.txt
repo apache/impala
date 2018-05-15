@@ -63,6 +63,7 @@ add_library(Exprs
   udf-builtins-ir.cc
   utility-functions.cc
   utility-functions-ir.cc
+  valid-tuple-id.cc
 )
 add_dependencies(Exprs gen-deps gen_ir_descriptions)
 

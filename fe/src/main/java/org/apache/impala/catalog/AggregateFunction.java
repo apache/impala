@@ -20,6 +20,8 @@ package org.apache.impala.catalog;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.HdfsUri;
 import org.apache.impala.thrift.TAggregateFunction;
@@ -27,6 +29,7 @@ import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolType;
+import org.apache.kudu.shaded.com.google.common.collect.Lists;
 
 import com.google.common.base.Preconditions;
 
@@ -196,6 +199,25 @@ public class AggregateFunction extends Function {
   public void setMergeFnSymbol(String fn) { mergeFnSymbol_ = fn; }
   public void setFinalizeFnSymbol(String fn) { finalizeFnSymbol_ = fn; }
   public void setIntermediateType(Type t) { intermediateType_ = t; }
+
+  /**
+   * Simplifies and returns the children of the given distinct aggregate expression such
+   * that they are suitable for comparing/grouping using equals():
+   * - removes top-level implicit casts
+   * - removes the trailing constant separator for group_concat
+   * TODO: Deal with constant exprs more generally, instead of special-casing
+   * group_concat().
+   */
+  public static List<Expr> getCanonicalDistinctAggChildren(FunctionCallExpr aggFn) {
+    Preconditions.checkState(aggFn.isDistinct());
+    List<Expr> result = Lists.newArrayList();
+    if (aggFn.getFnName().getFunction().equalsIgnoreCase("group_concat")) {
+      result.add(aggFn.getChild(0).ignoreImplicitCast());
+    } else {
+      for (Expr c : aggFn.getChildren()) result.add(c.ignoreImplicitCast());
+    }
+    return result;
+  }
 
   @Override
   protected TSymbolLookupParams getLookupParams() {

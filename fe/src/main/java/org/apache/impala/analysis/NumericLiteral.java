@@ -110,6 +110,10 @@ public class NumericLiteral extends LiteralExpr {
     explicitlyCast_ = other.explicitlyCast_;
   }
 
+  public static NumericLiteral create(int value) {
+    return new NumericLiteral(new BigDecimal(value));
+  }
+
   /**
    * Returns true if 'v' can be represented by a NumericLiteral, false otherwise.
    * Special float values like NaN, infinity, and negative zero cannot be represented

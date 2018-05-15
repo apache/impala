@@ -36,6 +36,7 @@
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "util/runtime-profile-counters.h"
+#include "util/string-parser.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -85,40 +86,24 @@ static const int STREAMING_HT_MIN_REDUCTION_SIZE =
     sizeof(STREAMING_HT_MIN_REDUCTION) / sizeof(STREAMING_HT_MIN_REDUCTION[0]);
 
 GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-    const TPlanNode& tnode, const DescriptorTbl& descs)
-  : Aggregator(exec_node, pool, tnode, descs, "GroupingAggregator"),
+    const TAggregator& taggregator, const DescriptorTbl& descs,
+    int64_t estimated_input_cardinality, int agg_idx)
+  : Aggregator(exec_node, pool, taggregator, descs,
+        Substitute("GroupingAggregator $0", agg_idx), agg_idx),
     intermediate_row_desc_(intermediate_tuple_desc_, false),
-    is_streaming_preagg_(tnode.agg_node.use_streaming_preaggregation),
-    needs_serialize_(false),
-    output_partition_(nullptr),
-    resource_profile_(exec_node->resource_profile()),
-    num_input_rows_(0),
+    is_streaming_preagg_(taggregator.use_streaming_preaggregation),
+    resource_profile_(taggregator.resource_profile),
     is_in_subplan_(exec_node->IsInSubplan()),
     limit_(exec_node->limit()),
-    add_batch_impl_fn_(nullptr),
-    add_batch_streaming_impl_fn_(nullptr),
-    ht_resize_timer_(nullptr),
-    get_results_timer_(nullptr),
-    num_hash_buckets_(nullptr),
-    partitions_created_(nullptr),
-    max_partition_level_(nullptr),
-    num_row_repartitioned_(nullptr),
-    num_repartitions_(nullptr),
-    num_spilled_partitions_(nullptr),
-    largest_partition_percent_(nullptr),
-    streaming_timer_(nullptr),
-    num_passthrough_rows_(nullptr),
-    preagg_estimated_reduction_(nullptr),
-    preagg_streaming_ht_min_reduction_(nullptr),
-    estimated_input_cardinality_(tnode.agg_node.estimated_input_cardinality),
-    partition_eos_(false),
+    estimated_input_cardinality_(estimated_input_cardinality),
     partition_pool_(new ObjectPool()) {
   DCHECK_EQ(PARTITION_FANOUT, 1 << NUM_PARTITIONING_BITS);
 }
 
-Status GroupingAggregator::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status GroupingAggregator::Init(const TAggregator& taggregator, RuntimeState* state,
+    const std::vector<TExpr>& conjuncts) {
   RETURN_IF_ERROR(ScalarExpr::Create(
-      tnode.agg_node.grouping_exprs, input_row_desc_, state, &grouping_exprs_));
+      taggregator.grouping_exprs, input_row_desc_, state, &grouping_exprs_));
 
   // Construct build exprs from intermediate_row_desc_
   for (int i = 0; i < grouping_exprs_.size(); ++i) {
@@ -133,7 +118,7 @@ Status GroupingAggregator::Init(const TPlanNode& tnode, RuntimeState* state) {
     if (build_expr->type().IsVarLenStringType()) string_grouping_exprs_.push_back(i);
   }
 
-  RETURN_IF_ERROR(Aggregator::Init(tnode, state));
+  RETURN_IF_ERROR(Aggregator::Init(taggregator, state, conjuncts));
   for (int i = 0; i < agg_fns_.size(); ++i) {
     needs_serialize_ |= agg_fns_[i]->SupportsSerialize();
   }
@@ -283,7 +268,7 @@ Status GroupingAggregator::GetRowsFromPartition(
     Tuple* output_tuple = GetOutputTuple(output_partition_->agg_fn_evals,
         intermediate_tuple, row_batch->tuple_data_pool());
     output_iterator_.Next();
-    row->SetTuple(0, output_tuple);
+    row->SetTuple(agg_idx_, output_tuple);
     DCHECK_EQ(conjunct_evals_.size(), conjuncts_.size());
     if (ExecNode::EvalConjuncts(conjunct_evals_.data(), conjuncts_.size(), row)) {
       row_batch->CommitLastRow();
@@ -382,6 +367,7 @@ void GroupingAggregator::CleanupHashTbl(
 Status GroupingAggregator::Reset(RuntimeState* state) {
   DCHECK(!is_streaming_preagg_) << "Cannot reset preaggregation";
   partition_eos_ = false;
+  streaming_idx_ = 0;
   // Reset the HT and the partitions for this grouping agg.
   ht_ctx_->set_level(0);
   ClosePartitions();
@@ -399,7 +385,6 @@ void GroupingAggregator::Close(RuntimeState* state) {
   }
   ScalarExpr::Close(grouping_exprs_);
   ScalarExpr::Close(build_exprs_);
-
   reservation_manager_.Close(state);
   if (reservation_tracker_ != nullptr) reservation_tracker_->Close();
   // Must be called after tuple_pool_ is freed, so that mem_tracker_ can be closed.
@@ -422,7 +407,8 @@ Status GroupingAggregator::AddBatch(RuntimeState* state, RowBatch* batch) {
 }
 
 Status GroupingAggregator::AddBatchStreaming(
-    RuntimeState* state, RowBatch* out_batch, RowBatch* child_batch) {
+    RuntimeState* state, RowBatch* out_batch, RowBatch* child_batch, bool* eos) {
+  RETURN_IF_ERROR(QueryMaintenance(state));
   SCOPED_TIMER(streaming_timer_);
   RETURN_IF_ERROR(QueryMaintenance(state));
   num_input_rows_ += child_batch->num_rows();
@@ -457,12 +443,13 @@ Status GroupingAggregator::AddBatchStreaming(
 
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
   if (add_batch_streaming_impl_fn_ != nullptr) {
-    RETURN_IF_ERROR(add_batch_streaming_impl_fn_(this, needs_serialize_, prefetch_mode,
-        child_batch, out_batch, ht_ctx_.get(), remaining_capacity));
+    RETURN_IF_ERROR(add_batch_streaming_impl_fn_(this, agg_idx_, needs_serialize_,
+        prefetch_mode, child_batch, out_batch, ht_ctx_.get(), remaining_capacity));
   } else {
-    RETURN_IF_ERROR(AddBatchStreamingImpl(needs_serialize_, prefetch_mode, child_batch,
-        out_batch, ht_ctx_.get(), remaining_capacity));
+    RETURN_IF_ERROR(AddBatchStreamingImpl(agg_idx_, needs_serialize_, prefetch_mode,
+        child_batch, out_batch, ht_ctx_.get(), remaining_capacity));
   }
+  *eos = (streaming_idx_ == 0);
 
   num_rows_returned_ += out_batch->num_rows();
   COUNTER_SET(num_passthrough_rows_, num_rows_returned_);
@@ -1040,12 +1027,16 @@ Status GroupingAggregator::CodegenAddBatchStreamingImpl(
   llvm::Function* add_batch_streaming_impl_fn = codegen->GetFunction(ir_fn, true);
   DCHECK(add_batch_streaming_impl_fn != nullptr);
 
+  // Make agg_idx arg constant.
+  llvm::Value* agg_idx_arg = codegen->GetArgument(add_batch_streaming_impl_fn, 2);
+  agg_idx_arg->replaceAllUsesWith(codegen->GetI32Constant(agg_idx_));
+
   // Make needs_serialize arg constant so dead code can be optimised out.
-  llvm::Value* needs_serialize_arg = codegen->GetArgument(add_batch_streaming_impl_fn, 2);
+  llvm::Value* needs_serialize_arg = codegen->GetArgument(add_batch_streaming_impl_fn, 3);
   needs_serialize_arg->replaceAllUsesWith(codegen->GetBoolConstant(needs_serialize_));
 
   // Replace prefetch_mode with constant so branches can be optimised out.
-  llvm::Value* prefetch_mode_arg = codegen->GetArgument(add_batch_streaming_impl_fn, 3);
+  llvm::Value* prefetch_mode_arg = codegen->GetArgument(add_batch_streaming_impl_fn, 4);
   prefetch_mode_arg->replaceAllUsesWith(codegen->GetI32Constant(prefetch_mode));
 
   llvm::Function* update_tuple_fn;

@@ -1,0 +1,1280 @@
+# Multiple distinct without grouping.
+select count(distinct tinyint_col), sum(distinct int_col), count(distinct smallint_col)
+from functional.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 6, count(smallint_col))
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: sum(int_col)
+|  Class 2
+|    output: count(smallint_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 6, count(smallint_col))
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|  Class 1
+|    output: sum:merge(int_col)
+|  Class 2
+|    output: count:merge(smallint_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: sum(int_col)
+|  Class 2
+|    output: count(smallint_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(int_col) WHEN 5 THEN murmur_hash(smallint_col) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct without grouping. First needs intermediate tuple.
+select avg(distinct tinyint_col), sum(distinct int_col), count(distinct smallint_col)
+from functional.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, sum(int_col)), aggif(valid_tid() = 7, count(smallint_col))
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg(tinyint_col)
+|  Class 1
+|    output: sum(int_col)
+|  Class 2
+|    output: count(smallint_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, sum(int_col)), aggif(valid_tid() = 7, count(smallint_col))
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(tinyint_col)
+|  Class 1
+|    output: sum:merge(int_col)
+|  Class 2
+|    output: count:merge(smallint_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: avg(tinyint_col)
+|  Class 1
+|    output: sum(int_col)
+|  Class 2
+|    output: count(smallint_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(int_col) WHEN 6 THEN murmur_hash(smallint_col) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct without grouping. Last needs intermediate tuple.
+select count(distinct tinyint_col), sum(distinct int_col), avg(distinct smallint_col)
+from functional.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 7, avg(smallint_col))
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: sum(int_col)
+|  Class 2
+|    output: avg(smallint_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 7, avg(smallint_col))
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|  Class 1
+|    output: sum:merge(int_col)
+|  Class 2
+|    output: avg:merge(smallint_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: sum(int_col)
+|  Class 2
+|    output: avg(smallint_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(int_col) WHEN 5 THEN murmur_hash(smallint_col) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct without grouping. All need intermediate tuples
+select avg(distinct tinyint_col), avg(distinct int_col), avg(distinct smallint_col)
+from functional.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(int_col)), aggif(valid_tid() = 9, avg(smallint_col))
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg(tinyint_col)
+|  Class 1
+|    output: avg(int_col)
+|  Class 2
+|    output: avg(smallint_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(int_col)), aggif(valid_tid() = 9, avg(smallint_col))
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(tinyint_col)
+|  Class 1
+|    output: avg:merge(int_col)
+|  Class 2
+|    output: avg:merge(smallint_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: avg(tinyint_col)
+|  Class 1
+|    output: avg(int_col)
+|  Class 2
+|    output: avg(smallint_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(int_col) WHEN 7 THEN murmur_hash(smallint_col) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct with grouping.
+select bigint_col, count(distinct tinyint_col), sum(distinct int_col),
+       count(distinct smallint_col)
+from functional.alltypes group by bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 6, count(smallint_col))
+|  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 6 THEN bigint_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: sum(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count(smallint_col)
+|    group by: bigint_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 6, count(smallint_col))
+|  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 6 THEN bigint_col END
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: sum:merge(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count:merge(smallint_col)
+|    group by: bigint_col
+|
+06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 6 THEN murmur_hash(bigint_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: sum(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count(smallint_col)
+|    group by: bigint_col
+|
+05:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 3 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(int_col) WHEN 5 THEN murmur_hash(smallint_col) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct with grouping. First needs intermediate tuple.
+select bigint_col, avg(distinct tinyint_col), sum(distinct int_col),
+       count(distinct smallint_col)
+from functional.alltypes group by bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, sum(int_col)), aggif(valid_tid() = 7, count(smallint_col))
+|  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 5 THEN bigint_col WHEN 7 THEN bigint_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: sum(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count(smallint_col)
+|    group by: bigint_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, sum(int_col)), aggif(valid_tid() = 7, count(smallint_col))
+|  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 5 THEN bigint_col WHEN 7 THEN bigint_col END
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: sum:merge(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count:merge(smallint_col)
+|    group by: bigint_col
+|
+06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) WHEN 7 THEN murmur_hash(bigint_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: avg(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: sum(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count(smallint_col)
+|    group by: bigint_col
+|
+05:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 6 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(int_col) WHEN 6 THEN murmur_hash(smallint_col) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct with grouping. Last needs intermediate tuple.
+select bigint_col, count(distinct tinyint_col), sum(distinct int_col),
+       avg(distinct smallint_col)
+from functional.alltypes group by bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 7, avg(smallint_col))
+|  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 7 THEN bigint_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: sum(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg(smallint_col)
+|    group by: bigint_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, sum(int_col)), aggif(valid_tid() = 7, avg(smallint_col))
+|  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 7 THEN bigint_col END
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: sum:merge(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg:merge(smallint_col)
+|    group by: bigint_col
+|
+06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 6 THEN murmur_hash(bigint_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: sum(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg(smallint_col)
+|    group by: bigint_col
+|
+05:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 3 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(int_col) WHEN 5 THEN murmur_hash(smallint_col) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct with grouping. All need intermediate tuples
+select bigint_col, avg(distinct tinyint_col), avg(distinct int_col),
+       avg(distinct smallint_col)
+from functional.alltypes group by bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(int_col)), aggif(valid_tid() = 9, avg(smallint_col))
+|  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 6 THEN bigint_col WHEN 9 THEN bigint_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: avg(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg(smallint_col)
+|    group by: bigint_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(int_col)), aggif(valid_tid() = 9, avg(smallint_col))
+|  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 6 THEN bigint_col WHEN 9 THEN bigint_col END
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: avg:merge(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg:merge(smallint_col)
+|    group by: bigint_col
+|
+06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) WHEN 8 THEN murmur_hash(bigint_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: avg(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: avg(int_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg(smallint_col)
+|    group by: bigint_col
+|
+05:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 7 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(int_col) WHEN 7 THEN murmur_hash(smallint_col) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, int_col
+|  Class 2
+|    group by: bigint_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct and non-distinct without grouping.
+select count(distinct tinyint_col), count(distinct smallint_col), count(int_col)
+from functional.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, count(int_col))
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: count(smallint_col)
+|  Class 2
+|    output: count:merge(int_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: count(int_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, count(int_col))
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|  Class 1
+|    output: count:merge(smallint_col)
+|  Class 2
+|    output: count:merge(int_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: count(smallint_col)
+|  Class 2
+|    output: count:merge(int_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: count:merge(int_col)
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: count(int_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct and non-distinct without grouping. First distinct needs
+# intermediate agg tuple.
+select avg(distinct tinyint_col), count(distinct smallint_col), count(int_col)
+from functional.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, count(smallint_col)), aggif(valid_tid() = 6, count(int_col))
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg(tinyint_col)
+|  Class 1
+|    output: count(smallint_col)
+|  Class 2
+|    output: count:merge(int_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: count(int_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, count(smallint_col)), aggif(valid_tid() = 6, count(int_col))
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(tinyint_col)
+|  Class 1
+|    output: count:merge(smallint_col)
+|  Class 2
+|    output: count:merge(int_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: avg(tinyint_col)
+|  Class 1
+|    output: count(smallint_col)
+|  Class 2
+|    output: count:merge(int_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: count:merge(int_col)
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(smallint_col) WHEN 6 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: count(int_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct and non-distinct without grouping. Non-distinct needs
+# intermediate agg tuple.
+select count(distinct tinyint_col), count(distinct smallint_col), avg(int_col)
+from functional.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 6, avg(int_col))
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: count(smallint_col)
+|  Class 2
+|    output: avg:merge(int_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: avg(int_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 6, avg(int_col))
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|  Class 1
+|    output: count:merge(smallint_col)
+|  Class 2
+|    output: avg:merge(int_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: count(smallint_col)
+|  Class 2
+|    output: avg:merge(int_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: avg:merge(int_col)
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: avg(int_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct and non-distinct without grouping. All need intermediate agg tuples.
+select avg(distinct tinyint_col), avg(distinct smallint_col), avg(int_col)
+from functional.alltypes
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(smallint_col)), aggif(valid_tid() = 8, avg(int_col))
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg(tinyint_col)
+|  Class 1
+|    output: avg(smallint_col)
+|  Class 2
+|    output: avg:merge(int_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: avg(int_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(smallint_col)), aggif(valid_tid() = 8, avg(int_col))
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(tinyint_col)
+|  Class 1
+|    output: avg:merge(smallint_col)
+|  Class 2
+|    output: avg:merge(int_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: avg(tinyint_col)
+|  Class 1
+|    output: avg(smallint_col)
+|  Class 2
+|    output: avg:merge(int_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: avg:merge(int_col)
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(smallint_col) WHEN 7 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: avg(int_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct and non-distinct with grouping.
+select bigint_col, count(distinct tinyint_col), count(distinct smallint_col),
+       count(int_col)
+from functional.alltypes group by bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, count(int_col))
+|  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 5 THEN bigint_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count:merge(int_col)
+|    group by: bigint_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: count(int_col)
+|    group by: bigint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, count(int_col))
+|  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 5 THEN bigint_col END
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count:merge(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count:merge(int_col)
+|    group by: bigint_col
+|
+06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count:merge(int_col)
+|    group by: bigint_col
+|
+05:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: count:merge(int_col)
+|    group by: bigint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 3 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: count(int_col)
+|    group by: bigint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct and non-distinct without grouping. First distinct needs
+# intermediate agg tuple.
+select bigint_col, avg(distinct tinyint_col), count(distinct smallint_col),
+       count(int_col)
+from functional.alltypes group by bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, count(smallint_col)), aggif(valid_tid() = 6, count(int_col))
+|  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 5 THEN bigint_col WHEN 6 THEN bigint_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count:merge(int_col)
+|    group by: bigint_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: count(int_col)
+|    group by: bigint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 5, count(smallint_col)), aggif(valid_tid() = 6, count(int_col))
+|  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 5 THEN bigint_col WHEN 6 THEN bigint_col END
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count:merge(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count:merge(int_col)
+|    group by: bigint_col
+|
+06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) WHEN 6 THEN murmur_hash(bigint_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: avg(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: count:merge(int_col)
+|    group by: bigint_col
+|
+05:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: count:merge(int_col)
+|    group by: bigint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 6 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(smallint_col) WHEN 6 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: count(int_col)
+|    group by: bigint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct and non-distinct without grouping. Non-distinct needs
+# intermediate agg tuple.
+select bigint_col, count(distinct tinyint_col), count(distinct smallint_col),
+       avg(int_col)
+from functional.alltypes group by bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 6, avg(int_col))
+|  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 6 THEN bigint_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg:merge(int_col)
+|    group by: bigint_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: avg(int_col)
+|    group by: bigint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 6, avg(int_col))
+|  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 6 THEN bigint_col END
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count:merge(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg:merge(int_col)
+|    group by: bigint_col
+|
+06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg:merge(int_col)
+|    group by: bigint_col
+|
+05:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: avg:merge(int_col)
+|    group by: bigint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 3 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: avg(int_col)
+|    group by: bigint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Multiple distinct and non-distinct without grouping. All need intermediate agg tuples.
+select bigint_col, avg(distinct tinyint_col), avg(distinct smallint_col),
+       avg(int_col)
+from functional.alltypes group by bigint_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(smallint_col)), aggif(valid_tid() = 8, avg(int_col))
+|  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 6 THEN bigint_col WHEN 8 THEN bigint_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: avg(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg:merge(int_col)
+|    group by: bigint_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: avg(int_col)
+|    group by: bigint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, avg(tinyint_col)), aggif(valid_tid() = 6, avg(smallint_col)), aggif(valid_tid() = 8, avg(int_col))
+|  group by: CASE valid_tid() WHEN 3 THEN bigint_col WHEN 6 THEN bigint_col WHEN 8 THEN bigint_col END
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: avg:merge(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg:merge(int_col)
+|    group by: bigint_col
+|
+06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) WHEN 7 THEN murmur_hash(bigint_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: avg(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: avg(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: avg:merge(int_col)
+|    group by: bigint_col
+|
+05:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: avg:merge(int_col)
+|    group by: bigint_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 7 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 4 THEN murmur_hash(smallint_col) WHEN 7 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: avg(int_col)
+|    group by: bigint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====

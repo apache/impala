@@ -36,11 +36,9 @@
 namespace impala {
 
 NonGroupingAggregator::NonGroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-    const TPlanNode& tnode, const DescriptorTbl& descs)
-  : Aggregator(exec_node, pool, tnode, descs, "NonGroupingAggregator"),
-    add_batch_impl_fn_(nullptr),
-    singleton_output_tuple_(nullptr),
-    singleton_output_tuple_returned_(true) {}
+    const TAggregator& taggregator, const DescriptorTbl& descs, int agg_idx)
+  : Aggregator(exec_node, pool, taggregator, descs,
+        Substitute("NonGroupingAggregator $0", agg_idx), agg_idx) {}
 
 Status NonGroupingAggregator::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(Aggregator::Prepare(state));
@@ -84,6 +82,7 @@ Status NonGroupingAggregator::GetNext(
 void NonGroupingAggregator::GetSingletonOutput(RowBatch* row_batch) {
   int row_idx = row_batch->AddRow();
   TupleRow* row = row_batch->GetRow(row_idx);
+  row_batch->ClearRow(row);
   // The output row batch may reference memory allocated by Serialize() or Finalize(),
   // allocating that memory directly from the row batch's pool means we can safely return
   // the batch.
@@ -91,7 +90,7 @@ void NonGroupingAggregator::GetSingletonOutput(RowBatch* row_batch) {
       ScopedResultsPool::Create(agg_fn_evals_, row_batch->tuple_data_pool());
   Tuple* output_tuple = GetOutputTuple(
       agg_fn_evals_, singleton_output_tuple_, row_batch->tuple_data_pool());
-  row->SetTuple(0, output_tuple);
+  row->SetTuple(agg_idx_, output_tuple);
   if (ExecNode::EvalConjuncts(conjunct_evals_.data(), conjunct_evals_.size(), row)) {
     row_batch->CommitLastRow();
     ++num_rows_returned_;
@@ -126,6 +125,12 @@ Status NonGroupingAggregator::AddBatch(RuntimeState* state, RowBatch* batch) {
   }
 
   return Status::OK();
+}
+
+Status NonGroupingAggregator::AddBatchStreaming(
+    RuntimeState* state, RowBatch* out_batch, RowBatch* child_batch, bool* eos) {
+  *eos = true;
+  return AddBatch(state, child_batch);
 }
 
 Tuple* NonGroupingAggregator::ConstructSingletonOutputTuple(

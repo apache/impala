@@ -39,12 +39,12 @@ public abstract class AggregateInfoBase {
 
   // For aggregations: All unique grouping expressions from a select block.
   // For analytics: Empty.
-  protected ArrayList<Expr> groupingExprs_;
+  protected List<Expr> groupingExprs_;
 
   // For aggregations: All unique aggregate expressions from a select block.
   // For analytics: The results of AnalyticExpr.getFnCall() for the unique
   // AnalyticExprs of a select block.
-  protected ArrayList<FunctionCallExpr> aggregateExprs_;
+  protected List<FunctionCallExpr> aggregateExprs_;
 
   // The tuple into which the intermediate output of an aggregation is materialized.
   // Contains groupingExprs.size() + aggregateExprs.size() slots, the first of which
@@ -66,10 +66,9 @@ public abstract class AggregateInfoBase {
   // For analytics: indices into the analytic exprs and their corresponding aggregate
   // exprs that need to be materialized.
   // Populated in materializeRequiredSlots() which must be implemented by subclasses.
-  protected ArrayList<Integer> materializedSlots_ = Lists.newArrayList();
+  protected List<Integer> materializedSlots_ = Lists.newArrayList();
 
-  protected AggregateInfoBase(ArrayList<Expr> groupingExprs,
-      ArrayList<FunctionCallExpr> aggExprs)  {
+  protected AggregateInfoBase(List<Expr> groupingExprs, List<FunctionCallExpr> aggExprs) {
     Preconditions.checkState(groupingExprs != null || aggExprs != null);
     groupingExprs_ =
         groupingExprs != null ? Expr.cloneList(groupingExprs) : new ArrayList<Expr>();
@@ -184,8 +183,8 @@ public abstract class AggregateInfoBase {
   public abstract void materializeRequiredSlots(Analyzer analyzer,
       ExprSubstitutionMap smap);
 
-  public ArrayList<Expr> getGroupingExprs() { return groupingExprs_; }
-  public ArrayList<FunctionCallExpr> getAggregateExprs() { return aggregateExprs_; }
+  public List<Expr> getGroupingExprs() { return groupingExprs_; }
+  public List<FunctionCallExpr> getAggregateExprs() { return aggregateExprs_; }
   public TupleDescriptor getOutputTupleDesc() { return outputTupleDesc_; }
   public TupleDescriptor getIntermediateTupleDesc() { return intermediateTupleDesc_; }
   public TupleId getIntermediateTupleId() { return intermediateTupleDesc_.getId(); }
@@ -195,6 +194,7 @@ public abstract class AggregateInfoBase {
     Preconditions.checkNotNull(outputTupleDesc_);
     return intermediateTupleDesc_ != outputTupleDesc_;
   }
+  public List<Integer> getMaterializedSlots() { return materializedSlots_; }
 
   /**
    * Returns true if evaluating the given aggregate exprs requires an intermediate tuple,

@@ -143,9 +143,9 @@ public class UnionStmt extends QueryStmt {
   // of the DISTINCT operands)
   protected final List<UnionOperand> allOperands_ = Lists.newArrayList();
 
-  protected AggregateInfo distinctAggInfo_;  // only set if we have DISTINCT ops
+  protected MultiAggregateInfo distinctAggInfo_; // only set if we have DISTINCT ops
 
- // Single tuple materialized by the union. Set in analyze().
+  // Single tuple materialized by the union. Set in analyze().
   protected TupleId tupleId_;
 
   // set prior to unnesting
@@ -199,7 +199,7 @@ public class UnionStmt extends QueryStmt {
   public boolean hasDistinctOps() { return !distinctOperands_.isEmpty(); }
   public List<UnionOperand> getAllOperands() { return allOperands_; }
   public boolean hasAllOps() { return !allOperands_.isEmpty(); }
-  public AggregateInfo getDistinctAggInfo() { return distinctAggInfo_; }
+  public MultiAggregateInfo getDistinctAggInfo() { return distinctAggInfo_; }
   public boolean hasAnalyticExprs() { return hasAnalyticExprs_; }
   public TupleId getTupleId() { return tupleId_; }
 
@@ -257,9 +257,8 @@ public class UnionStmt extends QueryStmt {
       // Aggregate produces exactly the same tuple as the original union stmt.
       ArrayList<Expr> groupingExprs = Expr.cloneList(resultExprs_);
       try {
-        distinctAggInfo_ =
-            AggregateInfo.create(groupingExprs, null,
-              analyzer.getDescTbl().getTupleDesc(tupleId_), analyzer);
+        distinctAggInfo_ = MultiAggregateInfo.createDistinct(
+            groupingExprs, analyzer.getTupleDesc(tupleId_), analyzer);
       } catch (AnalysisException e) {
         // Should never happen.
         throw new IllegalStateException(
@@ -316,11 +315,9 @@ public class UnionStmt extends QueryStmt {
       for (UnionOperand op: operands_) {
         exprs.add(op.getQueryStmt().getBaseTblResultExprs().get(i));
       }
-      if (distinctAggInfo_ != null) {
-        // also mark the corresponding slot in the distinct agg tuple as being
-        // materialized
-        distinctAggInfo_.getOutputTupleDesc().getSlots().get(i).setIsMaterialized(true);
-      }
+    }
+    if (distinctAggInfo_ != null) {
+      distinctAggInfo_.materializeRequiredSlots(analyzer, null);
     }
     materializeSlots(analyzer, exprs);
 

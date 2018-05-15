@@ -1,0 +1,972 @@
+# A subset of aggregation classes are materialized. No group by.
+select a, c, e1, e2, e3 from
+  (select count(distinct tinyint_col) a, avg(distinct smallint_col) b,
+          count(distinct int_col) c, avg(distinct bigint_col) d,
+          min(float_col) e1, max(float_col) e2, sum(double_col) e3
+   from functional.alltypes) v
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 7, count(int_col)), aggif(valid_tid() = 11, min(float_col)), aggif(valid_tid() = 11, max(float_col)), aggif(valid_tid() = 11, sum(double_col))
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: count(int_col)
+|  Class 2
+|    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    output: min(float_col), max(float_col), sum(double_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 7, count(int_col)), aggif(valid_tid() = 11, min(float_col)), aggif(valid_tid() = 11, max(float_col)), aggif(valid_tid() = 11, sum(double_col))
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|  Class 1
+|    output: count:merge(int_col)
+|  Class 2
+|    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: count(int_col)
+|  Class 2
+|    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 6 THEN murmur_hash(int_col) WHEN 11 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    output: min(float_col), max(float_col), sum(double_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# A subset of aggregation classes are materialized. A subset of aggregation functions
+# of the surviving classes are materialized. No group by.
+select a1, c2, e2 from
+  (select count(distinct tinyint_col) a1, avg(distinct tinyint_col) a2,
+          count(distinct smallint_col) b1, avg(distinct smallint_col) b2,
+          count(distinct int_col) c1, avg(distinct int_col) c2,
+          count(distinct bigint_col) d1, avg(distinct bigint_col) d2,
+          min(float_col) e1, max(float_col) e2, sum(double_col) e3
+   from functional.alltypes) v
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, count(tinyint_col)), aggif(valid_tid() = 9, avg(int_col)), aggif(valid_tid() = 13, max(float_col))
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: avg(int_col)
+|  Class 2
+|    output: max:merge(float_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    output: max(float_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, count(tinyint_col)), aggif(valid_tid() = 9, avg(int_col)), aggif(valid_tid() = 13, max(float_col))
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|  Class 1
+|    output: avg:merge(int_col)
+|  Class 2
+|    output: max:merge(float_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: avg(int_col)
+|  Class 2
+|    output: max:merge(float_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    output: max:merge(float_col)
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 7 THEN murmur_hash(int_col) WHEN 13 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: int_col
+|  Class 2
+|    output: max(float_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# A subset of aggregation classes are materialized. With group by.
+select a, c, e1, e2, e3, gby2 from
+  (select count(distinct tinyint_col) a, avg(distinct smallint_col) b,
+          count(distinct int_col) c, avg(distinct bigint_col) d,
+          min(float_col) e1, max(float_col) e2, sum(double_col) e3,
+          string_col gby1, date_string_col gby2
+   from functional.alltypes
+   group by gby1, gby2) v
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 7, count(int_col)), aggif(valid_tid() = 11, min(float_col)), aggif(valid_tid() = 11, max(float_col)), aggif(valid_tid() = 11, sum(double_col))
+|  group by: CASE valid_tid() WHEN 2 THEN string_col WHEN 7 THEN string_col WHEN 11 THEN string_col END, CASE valid_tid() WHEN 2 THEN date_string_col WHEN 7 THEN date_string_col WHEN 11 THEN date_string_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: string_col, date_string_col
+|  Class 1
+|    output: count(int_col)
+|    group by: string_col, date_string_col
+|  Class 2
+|    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
+|    group by: string_col, date_string_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: string_col, date_string_col, tinyint_col
+|  Class 1
+|    group by: string_col, date_string_col, int_col
+|  Class 2
+|    output: min(float_col), max(float_col), sum(double_col)
+|    group by: string_col, date_string_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 7, count(int_col)), aggif(valid_tid() = 11, min(float_col)), aggif(valid_tid() = 11, max(float_col)), aggif(valid_tid() = 11, sum(double_col))
+|  group by: CASE valid_tid() WHEN 2 THEN string_col WHEN 7 THEN string_col WHEN 11 THEN string_col END, CASE valid_tid() WHEN 2 THEN date_string_col WHEN 7 THEN date_string_col WHEN 11 THEN date_string_col END
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|    group by: string_col, date_string_col
+|  Class 1
+|    output: count:merge(int_col)
+|    group by: string_col, date_string_col
+|  Class 2
+|    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
+|    group by: string_col, date_string_col
+|
+06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(string_col) WHEN 7 THEN murmur_hash(string_col) WHEN 11 THEN murmur_hash(string_col) END,CASE valid_tid() WHEN 2 THEN murmur_hash(date_string_col) WHEN 7 THEN murmur_hash(date_string_col) WHEN 11 THEN murmur_hash(date_string_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: string_col, date_string_col
+|  Class 1
+|    output: count(int_col)
+|    group by: string_col, date_string_col
+|  Class 2
+|    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
+|    group by: string_col, date_string_col
+|
+05:AGGREGATE
+|  Class 0
+|    group by: string_col, date_string_col, tinyint_col
+|  Class 1
+|    group by: string_col, date_string_col, int_col
+|  Class 2
+|    output: min:merge(float_col), max:merge(float_col), sum:merge(double_col)
+|    group by: string_col, date_string_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(string_col) WHEN 6 THEN murmur_hash(string_col) WHEN 11 THEN murmur_hash(string_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(date_string_col) WHEN 6 THEN murmur_hash(date_string_col) WHEN 11 THEN murmur_hash(date_string_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 6 THEN murmur_hash(int_col) WHEN 11 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: string_col, date_string_col, tinyint_col
+|  Class 1
+|    group by: string_col, date_string_col, int_col
+|  Class 2
+|    output: min(float_col), max(float_col), sum(double_col)
+|    group by: string_col, date_string_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# A subset of aggregation classes are materialized. A subset of aggregation functions
+# of the surviving classes are materialized. With group by.
+select a1, c2, e2, gby1 from
+  (select count(distinct tinyint_col) a1, avg(distinct tinyint_col) a2,
+          count(distinct smallint_col) b1, avg(distinct smallint_col) b2,
+          count(distinct int_col) c1, avg(distinct int_col) c2,
+          count(distinct bigint_col) d1, avg(distinct bigint_col) d2,
+          min(float_col) e1, max(float_col) e2, sum(double_col) e3,
+          string_col gby1, date_string_col gby2
+   from functional.alltypes
+   group by gby1, gby2) v
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, count(tinyint_col)), aggif(valid_tid() = 9, avg(int_col)), aggif(valid_tid() = 13, max(float_col))
+|  group by: CASE valid_tid() WHEN 3 THEN string_col WHEN 9 THEN string_col WHEN 13 THEN string_col END, CASE valid_tid() WHEN 3 THEN date_string_col WHEN 9 THEN date_string_col WHEN 13 THEN date_string_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: string_col, date_string_col
+|  Class 1
+|    output: avg(int_col)
+|    group by: string_col, date_string_col
+|  Class 2
+|    output: max:merge(float_col)
+|    group by: string_col, date_string_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: string_col, date_string_col, tinyint_col
+|  Class 1
+|    group by: string_col, date_string_col, int_col
+|  Class 2
+|    output: max(float_col)
+|    group by: string_col, date_string_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 3, count(tinyint_col)), aggif(valid_tid() = 9, avg(int_col)), aggif(valid_tid() = 13, max(float_col))
+|  group by: CASE valid_tid() WHEN 3 THEN string_col WHEN 9 THEN string_col WHEN 13 THEN string_col END, CASE valid_tid() WHEN 3 THEN date_string_col WHEN 9 THEN date_string_col WHEN 13 THEN date_string_col END
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|    group by: string_col, date_string_col
+|  Class 1
+|    output: avg:merge(int_col)
+|    group by: string_col, date_string_col
+|  Class 2
+|    output: max:merge(float_col)
+|    group by: string_col, date_string_col
+|
+06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(string_col) WHEN 8 THEN murmur_hash(string_col) WHEN 13 THEN murmur_hash(string_col) END,CASE valid_tid() WHEN 2 THEN murmur_hash(date_string_col) WHEN 8 THEN murmur_hash(date_string_col) WHEN 13 THEN murmur_hash(date_string_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: string_col, date_string_col
+|  Class 1
+|    output: avg(int_col)
+|    group by: string_col, date_string_col
+|  Class 2
+|    output: max:merge(float_col)
+|    group by: string_col, date_string_col
+|
+05:AGGREGATE
+|  Class 0
+|    group by: string_col, date_string_col, tinyint_col
+|  Class 1
+|    group by: string_col, date_string_col, int_col
+|  Class 2
+|    output: max:merge(float_col)
+|    group by: string_col, date_string_col
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(string_col) WHEN 7 THEN murmur_hash(string_col) WHEN 13 THEN murmur_hash(string_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(date_string_col) WHEN 7 THEN murmur_hash(date_string_col) WHEN 13 THEN murmur_hash(date_string_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 7 THEN murmur_hash(int_col) WHEN 13 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: string_col, date_string_col, tinyint_col
+|  Class 1
+|    group by: string_col, date_string_col, int_col
+|  Class 2
+|    output: max(float_col)
+|    group by: string_col, date_string_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Simplifies to a single aggrgeation class. Only first distinct agg is materialized.
+select a from
+  (select count(distinct tinyint_col) a, count(distinct smallint_col) b
+   from functional.alltypes) v
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(tinyint_col)
+|
+01:AGGREGATE
+|  group by: tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(tinyint_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(tinyint_col)
+|
+05:AGGREGATE
+|  group by: tinyint_col
+|
+04:EXCHANGE [HASH(tinyint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Simplifies to a single aggrgeation class. Only second distinct agg is materialized.
+select b from
+  (select count(distinct tinyint_col) a, count(distinct smallint_col) b
+   from functional.alltypes) v
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(smallint_col)
+|
+01:AGGREGATE
+|  group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(smallint_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(smallint_col)
+|
+05:AGGREGATE
+|  group by: smallint_col
+|
+04:EXCHANGE [HASH(smallint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Some aggs only referenced in HAVING clause.
+select count(distinct tinyint_col), min(timestamp_col) from functional.alltypes
+having count(distinct smallint_col) < 10 and max(date_string_col) = 'test'
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, min(timestamp_col)), aggif(valid_tid() = 5, max(date_string_col))
+|  having: aggif(valid_tid() = 4, count(smallint_col)) < 10, aggif(valid_tid() = 5, max(date_string_col)) = 'test'
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: count(smallint_col)
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(date_string_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: min(timestamp_col), max(date_string_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, min(timestamp_col)), aggif(valid_tid() = 5, max(date_string_col))
+|  having: aggif(valid_tid() = 4, count(smallint_col)) < 10, aggif(valid_tid() = 5, max(date_string_col)) = 'test'
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|  Class 1
+|    output: count:merge(smallint_col)
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(date_string_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: count(smallint_col)
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(date_string_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(date_string_col)
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: min(timestamp_col), max(date_string_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Some aggs only referenced in ORDER BY clause.
+select count(distinct tinyint_col), min(timestamp_col) from functional.alltypes
+group by bigint_col
+order by count(distinct smallint_col), max(date_string_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+04:SORT
+|  order by: aggif(valid_tid() = 4, count(smallint_col)) ASC, aggif(valid_tid() = 5, max(date_string_col)) ASC
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, min(timestamp_col)), aggif(valid_tid() = 5, max(date_string_col))
+|  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 5 THEN bigint_col END
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(date_string_col)
+|    group by: bigint_col
+|
+01:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: min(timestamp_col), max(date_string_col)
+|    group by: bigint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: aggif(valid_tid() = 4, count(smallint_col)) ASC, aggif(valid_tid() = 5, max(date_string_col)) ASC
+|
+04:SORT
+|  order by: aggif(valid_tid() = 4, count(smallint_col)) ASC, aggif(valid_tid() = 5, max(date_string_col)) ASC
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, min(timestamp_col)), aggif(valid_tid() = 5, max(date_string_col))
+|  group by: CASE valid_tid() WHEN 2 THEN bigint_col WHEN 4 THEN bigint_col WHEN 5 THEN bigint_col END
+|
+08:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count:merge(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(date_string_col)
+|    group by: bigint_col
+|
+07:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(bigint_col) WHEN 4 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END)]
+|
+02:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: bigint_col
+|  Class 1
+|    output: count(smallint_col)
+|    group by: bigint_col
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(date_string_col)
+|    group by: bigint_col
+|
+06:AGGREGATE
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(date_string_col)
+|    group by: bigint_col
+|
+05:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(bigint_col) WHEN 3 THEN murmur_hash(bigint_col) WHEN 5 THEN murmur_hash(bigint_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: bigint_col, tinyint_col
+|  Class 1
+|    group by: bigint_col, smallint_col
+|  Class 2
+|    output: min(timestamp_col), max(date_string_col)
+|    group by: bigint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Mixed distinct and non-distinct aggs. No materialized aggregations. No group by.
+select 1 from
+  (select min(string_col) a, count(distinct tinyint_col) b,
+          max(string_col) c, count(distinct smallint_col) d
+   from functional.alltypes) v
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Mixed distinct and non-distinct aggs. No materialized aggregations. With group by.
+select v.gby1 from
+  (select min(string_col) a, count(distinct tinyint_col) b,
+          max(string_col) c, count(distinct smallint_col) d,
+          string_col gby1, date_string_col gby2
+   from functional.alltypes
+   group by gby1, gby2) v
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  group by: string_col, date_string_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Only distinct aggs. No materialized aggregations. No group by.
+select 1 from
+  (select count(distinct tinyint_col) a, count(distinct smallint_col) b
+   from functional.alltypes) v
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|
+01:AGGREGATE
+|  group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Only distinct aggs. No materialized aggregations. With group by.
+select v.gby2 from
+  (select count(distinct tinyint_col) a, count(distinct smallint_col) b,
+          string_col gby1, date_string_col gby2
+   from functional.alltypes
+   group by gby1, gby2) v
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  group by: string_col, date_string_col
+|
+01:AGGREGATE
+|  group by: string_col, date_string_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Simplifies to a single aggregation class. Only first distinct agg is materialized.
+# No group by.
+select b from
+  (select min(string_col) a, count(distinct tinyint_col) b,
+          max(string_col) c, count(distinct smallint_col) d
+   from functional.alltypes
+   having count(distinct tinyint_col) < 9) v
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(tinyint_col)
+|  having: count(tinyint_col) < 9
+|
+01:AGGREGATE
+|  group by: tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(tinyint_col)
+|  having: count(tinyint_col) < 9
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(tinyint_col)
+|
+05:AGGREGATE
+|  group by: tinyint_col
+|
+04:EXCHANGE [HASH(tinyint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Simplifies to a single aggregation class. Only second distinct agg is materialized.
+# No group by.
+select d from
+  (select min(string_col) a, count(distinct tinyint_col) b,
+          max(string_col) c, count(distinct smallint_col) d
+   from functional.alltypes
+   having count(distinct smallint_col) < 9) v
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(smallint_col)
+|  having: count(smallint_col) < 9
+|
+01:AGGREGATE
+|  group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(smallint_col)
+|  having: count(smallint_col) < 9
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(smallint_col)
+|
+05:AGGREGATE
+|  group by: smallint_col
+|
+04:EXCHANGE [HASH(smallint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Simplifies to a single aggregation class. Only non-distinct aggs remain.
+# No group by.
+select a, c from
+  (select min(string_col) a, count(distinct tinyint_col) b,
+          max(string_col) c, count(distinct smallint_col) d
+   from functional.alltypes
+   having min(string_col) < '9') v
+where c > '0' and c < a
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: min(string_col), max(string_col)
+|  having: max(string_col) > '0', min(string_col) < '9', max(string_col) < min(string_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:AGGREGATE [FINALIZE]
+|  output: min:merge(string_col), max:merge(string_col)
+|  having: max(string_col) > '0', min(string_col) < '9', max(string_col) < min(string_col)
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: min(string_col), max(string_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Simplifies to a single aggregation class with distinct and non-distinct aggs.
+# No group by.
+select a, b, c from
+  (select min(string_col) a, count(distinct tinyint_col) b,
+          max(string_col) c, count(distinct smallint_col) d
+   from functional.alltypes
+   having min(string_col) < '9' and count(distinct tinyint_col) = 10) v
+where c > '0' and c < a
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(tinyint_col), min:merge(string_col), max:merge(string_col)
+|  having: count(tinyint_col) = 10, max(string_col) > '0', min(string_col) < '9', max(string_col) < min(string_col)
+|
+01:AGGREGATE
+|  output: min(string_col), max(string_col)
+|  group by: tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(tinyint_col), min:merge(string_col), max:merge(string_col)
+|  having: count(tinyint_col) = 10, max(string_col) > '0', min(string_col) < '9', max(string_col) < min(string_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(tinyint_col), min:merge(string_col), max:merge(string_col)
+|
+05:AGGREGATE
+|  output: min:merge(string_col), max:merge(string_col)
+|  group by: tinyint_col
+|
+04:EXCHANGE [HASH(tinyint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: min(string_col), max(string_col)
+|  group by: tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Simplifies to a single aggregation class with one distinct agg.
+# With group by.
+select b, gby1 from
+  (select min(string_col) a, count(distinct tinyint_col) b,
+          max(string_col) c, count(distinct smallint_col) d,
+          date_string_col gby1, timestamp_col gby2
+   from functional.alltypes
+   group by gby1, gby2
+   having count(distinct tinyint_col) < 10) v
+where gby1 = 'test1'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(tinyint_col)
+|  group by: date_string_col, timestamp_col
+|  having: count(tinyint_col) < 10
+|
+01:AGGREGATE
+|  group by: date_string_col, timestamp_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.date_string_col = 'test1'
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(tinyint_col)
+|  group by: date_string_col, timestamp_col
+|  having: count(tinyint_col) < 10
+|
+06:EXCHANGE [HASH(date_string_col,timestamp_col)]
+|
+02:AGGREGATE [STREAMING]
+|  output: count(tinyint_col)
+|  group by: date_string_col, timestamp_col
+|
+05:AGGREGATE
+|  group by: date_string_col, timestamp_col, tinyint_col
+|
+04:EXCHANGE [HASH(date_string_col,timestamp_col,tinyint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  group by: date_string_col, timestamp_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.date_string_col = 'test1'
+====
+# Simplifies to a single aggregation class with two non-distinct aggs.
+# With group by.
+select a, c, gby1, gby2 from
+  (select min(string_col) a, count(distinct tinyint_col) b,
+          max(string_col) c, count(distinct smallint_col) d,
+          date_string_col gby1, timestamp_col gby2
+   from functional.alltypes
+   group by gby1, gby2
+   having count(distinct tinyint_col) < 10) v
+where gby1 = 'test1' and gby1 < gby2
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(tinyint_col), min:merge(string_col), max:merge(string_col)
+|  group by: date_string_col, timestamp_col
+|  having: count(tinyint_col) < 10, date_string_col < timestamp_col
+|
+01:AGGREGATE
+|  output: min(string_col), max(string_col)
+|  group by: date_string_col, timestamp_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.timestamp_col > NULL, functional.alltypes.date_string_col = 'test1'
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(tinyint_col), min:merge(string_col), max:merge(string_col)
+|  group by: date_string_col, timestamp_col
+|  having: count(tinyint_col) < 10, date_string_col < timestamp_col
+|
+06:EXCHANGE [HASH(date_string_col,timestamp_col)]
+|
+02:AGGREGATE [STREAMING]
+|  output: count(tinyint_col), min:merge(string_col), max:merge(string_col)
+|  group by: date_string_col, timestamp_col
+|
+05:AGGREGATE
+|  output: min:merge(string_col), max:merge(string_col)
+|  group by: date_string_col, timestamp_col, tinyint_col
+|
+04:EXCHANGE [HASH(date_string_col,timestamp_col,tinyint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: min(string_col), max(string_col)
+|  group by: date_string_col, timestamp_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.timestamp_col > NULL, functional.alltypes.date_string_col = 'test1'
+====
+# Simplifies to a single aggregation class with one distinct and one non-distinct agg.
+# With group by.
+select c, d, gby1, gby2 from
+  (select min(string_col) a, count(distinct tinyint_col) b,
+          max(string_col) c, count(distinct smallint_col) d,
+          date_string_col gby1, timestamp_col gby2
+   from functional.alltypes
+   group by gby1, gby2
+   having count(distinct smallint_col) < 20) v
+where gby1 = 'test1' and gby1 < gby2
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(smallint_col), max:merge(string_col)
+|  group by: date_string_col, timestamp_col
+|  having: count(smallint_col) < 20, date_string_col < timestamp_col
+|
+01:AGGREGATE
+|  output: max(string_col)
+|  group by: date_string_col, timestamp_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.timestamp_col > NULL, functional.alltypes.date_string_col = 'test1'
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(smallint_col), max:merge(string_col)
+|  group by: date_string_col, timestamp_col
+|  having: count(smallint_col) < 20, date_string_col < timestamp_col
+|
+06:EXCHANGE [HASH(date_string_col,timestamp_col)]
+|
+02:AGGREGATE [STREAMING]
+|  output: count(smallint_col), max:merge(string_col)
+|  group by: date_string_col, timestamp_col
+|
+05:AGGREGATE
+|  output: max:merge(string_col)
+|  group by: date_string_col, timestamp_col, smallint_col
+|
+04:EXCHANGE [HASH(date_string_col,timestamp_col,smallint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: max(string_col)
+|  group by: date_string_col, timestamp_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.timestamp_col > NULL, functional.alltypes.date_string_col = 'test1'
+====

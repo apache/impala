@@ -75,6 +75,31 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testMultipleDistinct() {
+    // TODO: Multiple distinct with count(distinct a,b,c) variants.
+    // TODO: Multiple distinct in subplan.
+    // TODO: Multiple distinct in subqueries.
+    // TODO: Multiple distinct lineage tests.
+    // TODO: Multiple distinct and SHUFFLE_DISTINCT_EXPRS tests
+    runPlannerTestFile("multiple-distinct");
+  }
+
+  @Test
+  public void testMultipleDistinctMaterialization() {
+    runPlannerTestFile("multiple-distinct-materialization");
+  }
+
+  @Test
+  public void testMultipleDistinctPredicates() {
+    runPlannerTestFile("multiple-distinct-predicates");
+  }
+
+  @Test
+  public void testMultipleDistinctLimit() {
+    runPlannerTestFile("multiple-distinct-limit");
+  }
+
+  @Test
   public void testShuffleByDistinctExprs() {
     runPlannerTestFile("shuffle-by-distinct-exprs");
   }

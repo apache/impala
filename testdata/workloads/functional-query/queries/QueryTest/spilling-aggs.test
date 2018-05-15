@@ -159,3 +159,63 @@ BIGINT
 ---- RUNTIME_PROFILE
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
+---- QUERY
+# Multiple distinct
+set buffer_pool_limit=30M;
+select count(distinct l_orderkey), count(distinct l_partkey) from lineitem
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+1500000,200000
+---- RUNTIME_PROFILE
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Multiple distinct with string col and group by
+set buffer_pool_limit=50m;
+select l_linenumber, count(distinct l_orderkey), count(distinct l_comment) from lineitem
+group by 1 order by 1 limit 5
+---- TYPES
+INT,BIGINT,BIGINT
+---- RESULTS
+1,1500000,1273334
+2,1285828,1102714
+3,1071394,929553
+4,857015,753374
+5,643287,574337
+---- RUNTIME_PROFILE
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Multiple distinct and non-distinct, with an intermediate tuple (avg)
+set buffer_pool_limit=40m;
+select avg(distinct l_orderkey), count(distinct l_partkey), sum(l_tax), count(l_suppkey)
+from tpch_parquet.lineitem
+---- TYPES
+DOUBLE,BIGINT,DECIMAL,BIGINT
+---- RESULTS
+2999991.5,200000,240129.67,6001215
+---- RUNTIME_PROFILE
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Multiple distinct and non-distinct, with a group by
+set buffer_pool_limit=55m;
+select l_linenumber, avg(distinct l_orderkey), count(distinct l_partkey), sum(l_tax), count(l_suppkey)
+from tpch_parquet.lineitem
+group by 1 order by 1 limit 5
+---- TYPES
+INT,DOUBLE,BIGINT,DECIMAL,BIGINT
+---- RESULTS
+1,2999991.5,199893,60025.25,1500000
+2,3000615.766574534,199674,51457.37,1285828
+3,3000079.631604246,199036,42879.38,1071394
+4,3000330.547357981,197222,34279.36,857015
+5,2999188.900650876,191905,25745.25,643287
+---- RUNTIME_PROFILE
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====

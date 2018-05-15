@@ -19,11 +19,10 @@
 
 #include <sstream>
 
-#include "exec/grouping-aggregator.h"
-#include "exec/non-grouping-aggregator.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/tuple-row.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 
@@ -35,38 +34,10 @@ namespace impala {
 
 AggregationNode::AggregationNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs) {}
-
-Status AggregationNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  // The conjuncts will be evaluated in the Aggregator, so don't pass them to the
-  // ExecNode. TODO: remove this once we assign conjuncts directly to Aggregators.
-  TPlanNode tnode_no_conjuncts(tnode);
-  tnode_no_conjuncts.__set_conjuncts(std::vector<TExpr>());
-  RETURN_IF_ERROR(ExecNode::Init(tnode_no_conjuncts, state));
-  if (tnode.agg_node.grouping_exprs.empty()) {
-    aggregator_.reset(new NonGroupingAggregator(this, pool_, tnode, state->desc_tbl()));
-  } else {
-    aggregator_.reset(new GroupingAggregator(this, pool_, tnode, state->desc_tbl()));
+  : AggregationNodeBase(pool, tnode, descs) {
+  for (int i = 0; i < tnode.agg_node.aggregators.size(); ++i) {
+    DCHECK(!tnode.agg_node.aggregators[i].use_streaming_preaggregation);
   }
-  RETURN_IF_ERROR(aggregator_->Init(tnode, state));
-  runtime_profile_->AddChild(aggregator_->runtime_profile());
-  return Status::OK();
-}
-
-Status AggregationNode::Prepare(RuntimeState* state) {
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
-  RETURN_IF_ERROR(ExecNode::Prepare(state));
-  aggregator_->SetDebugOptions(debug_options_);
-  RETURN_IF_ERROR(aggregator_->Prepare(state));
-  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
-  return Status::OK();
-}
-
-void AggregationNode::Codegen(RuntimeState* state) {
-  DCHECK(state->ShouldCodegen());
-  ExecNode::Codegen(state);
-  if (IsNodeCodegenDisabled()) return;
-  aggregator_->Codegen(state);
 }
 
 Status AggregationNode::Open(RuntimeState* state) {
@@ -74,17 +45,53 @@ Status AggregationNode::Open(RuntimeState* state) {
   // Open the child before consuming resources in this node.
   RETURN_IF_ERROR(child(0)->Open(state));
   RETURN_IF_ERROR(ExecNode::Open(state));
+  for (auto& agg : aggs_) RETURN_IF_ERROR(agg->Open(state));
+  RowBatch child_batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
 
-  RETURN_IF_ERROR(aggregator_->Open(state));
+  int num_aggs = aggs_.size();
+  // Create mini batches.
+  vector<unique_ptr<RowBatch>> mini_batches;
+  if (!replicate_input_ && num_aggs > 1) {
+    for (int i = 0; i < num_aggs; ++i) {
+      mini_batches.push_back(make_unique<RowBatch>(
+          child(0)->row_desc(), state->batch_size(), mem_tracker()));
+    }
+  }
 
-  RowBatch batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
   // Read all the rows from the child and process them.
   bool eos = false;
   do {
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
-    RETURN_IF_ERROR(aggregator_->AddBatch(state, &batch));
-    batch.Reset();
+    RETURN_IF_ERROR(children_[0]->GetNext(state, &child_batch, &eos));
+
+    if (num_aggs == 1) {
+      RETURN_IF_ERROR(aggs_[0]->AddBatch(state, &child_batch));
+      child_batch.Reset();
+      continue;
+    }
+
+    if (replicate_input_) {
+      for (auto& agg : aggs_) RETURN_IF_ERROR(agg->AddBatch(state, &child_batch));
+      child_batch.Reset();
+      continue;
+    }
+
+    // Separate input batch into mini batches destined for the different aggs.
+    int num_tuples = child(0)->row_desc()->tuple_descriptors().size();
+    DCHECK_EQ(num_aggs, num_tuples);
+    int num_rows = child_batch.num_rows();
+    if (num_rows > 0) {
+      RETURN_IF_ERROR(SplitMiniBatches(&child_batch, &mini_batches));
+
+      for (int i = 0; i < num_tuples; ++i) {
+        RowBatch* mini_batch = mini_batches[i].get();
+        if (mini_batch->num_rows() > 0) {
+          RETURN_IF_ERROR(aggs_[i]->AddBatch(state, mini_batch));
+          mini_batch->Reset();
+        }
+      }
+    }
+    child_batch.Reset();
   } while (!eos);
 
   // The child can be closed at this point in most cases because we have consumed all of
@@ -93,7 +100,7 @@ Status AggregationNode::Open(RuntimeState* state) {
   // child again,
   if (!IsInSubplan()) child(0)->Close(state);
 
-  RETURN_IF_ERROR(aggregator_->InputDone());
+  for (auto& agg : aggs_) RETURN_IF_ERROR(agg->InputDone());
   return Status::OK();
 }
 
@@ -102,20 +109,23 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
 
-  if (ReachedLimit()) {
+  if (curr_output_agg_idx_ >= aggs_.size() || ReachedLimit()) {
     *eos = true;
     return Status::OK();
   }
 
-  RETURN_IF_ERROR(aggregator_->GetNext(state, row_batch, eos));
+  // With multiple Aggregators, each will only set a single tuple per row. We rely on the
+  // other tuples to be null to detect which Aggregator set which row.
+  if (aggs_.size() > 1) row_batch->ClearTuplePointers();
+
+  bool pagg_eos = false;
+  RETURN_IF_ERROR(aggs_[curr_output_agg_idx_]->GetNext(state, row_batch, &pagg_eos));
+  if (pagg_eos) ++curr_output_agg_idx_;
+
+  *eos = ReachedLimit() || (pagg_eos && curr_output_agg_idx_ >= aggs_.size());
   num_rows_returned_ += row_batch->num_rows();
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK();
-}
-
-Status AggregationNode::Reset(RuntimeState* state) {
-  RETURN_IF_ERROR(aggregator_->Reset(state));
-  return ExecNode::Reset(state);
 }
 
 void AggregationNode::Close(RuntimeState* state) {
@@ -123,14 +133,14 @@ void AggregationNode::Close(RuntimeState* state) {
   // All expr mem allocations should happen in the Aggregator.
   DCHECK(expr_results_pool() == nullptr
       || expr_results_pool()->total_allocated_bytes() == 0);
-  aggregator_->Close(state);
+  for (auto& agg : aggs_) agg->Close(state);
   ExecNode::Close(state);
 }
 
 void AggregationNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "AggregationNode("
-       << "aggregator=" << aggregator_->DebugString();
+  *out << "AggregationNode(";
+  for (auto& agg : aggs_) agg->DebugString(indentation_level, out);
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }

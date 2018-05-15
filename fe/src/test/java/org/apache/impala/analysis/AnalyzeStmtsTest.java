@@ -24,8 +24,8 @@ import static org.junit.Assert.fail;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Set;
 
-import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
@@ -41,6 +41,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 public class AnalyzeStmtsTest extends AnalyzerTest {
 
@@ -2114,9 +2115,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select distinct id from functional.testtbl having max(id) > 0",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
     AnalyzesOk("select count(distinct id, zip) from functional.testtbl");
-    AnalysisError("select count(distinct id, zip), count(distinct zip) " +
-        "from functional.testtbl",
-        "all DISTINCT aggregate functions need to have the same set of parameters");
     AnalyzesOk("select tinyint_col, count(distinct int_col, bigint_col) "
         + "from functional.alltypesagg group by 1");
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
@@ -2127,13 +2125,47 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select sum(distinct t1.bigint_col), avg(distinct t1.bigint_col) " +
         "from functional.alltypes t1 group by t1.int_col, t1.int_col");
 
-    AnalysisError("select tinyint_col, count(distinct int_col),"
-        + "sum(distinct bigint_col) from functional.alltypesagg group by 1",
-        "all DISTINCT aggregate functions need to have the same set of parameters");
     // min and max are ignored in terms of DISTINCT
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
         + "min(distinct smallint_col), max(distinct string_col) "
         + "from functional.alltypesagg group by 1");
+
+    // Test multiple distinct aggregations.
+    Table alltypesTbl = catalog_.getOrLoadTable("functional", "alltypes");
+    List<String> distinctFns = Lists.newArrayList();
+    for (Column col : alltypesTbl.getColumns()) {
+      distinctFns.add(String.format("count(distinct %s)", col.getName()));
+    }
+    // Test a single query with a count(distinct) on all columns of alltypesTbl.
+    AnalyzesOk(String.format(
+        "select %s from functional.alltypes", Joiner.on(",").join(distinctFns)));
+
+    // Test various mixes of distinct and non-distinct, including multiple distinct.
+    Set<String> testAggExprs = Sets.newHashSet(
+        "count(tinyint_col)",
+        "count(string_col)",
+        "avg(float_col)",
+        "max(string_col)",
+        "count(distinct tinyint_col)",
+        "count(distinct tinyint_col, smallint_col, int_col)",
+        "avg(distinct double_col)",
+        "count(distinct string_col)",
+        "sum(distinct smallint_col)"
+        );
+    List<String> testGroupByExprs = Lists.newArrayList(
+        "int_col", "bigint_col", "string_col",
+        "string_col, date_string_col",
+        "id, double_col, date_string_col"
+        );
+    for (Set<String> aggExprs : Sets.powerSet(testAggExprs)) {
+      if (aggExprs.isEmpty()) continue;
+      String selectList = Joiner.on(",").join(aggExprs);
+      AnalyzesOk(String.format("select %s from functional.alltypes", selectList));
+      for (String groupByExprs : testGroupByExprs) {
+        AnalyzesOk(String.format(
+            "select %s from functional.alltypes group by %s", selectList, groupByExprs));
+      }
+    }
 
     // IMPALA-6114: Test that numeric literals having the same value, but different types are
     // considered distinct.
@@ -2155,7 +2187,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         String stmtSql = String.format("select %s from %s", aggFnCall, tblName);
         SelectStmt stmt = (SelectStmt) AnalyzesOk(stmtSql);
         // Verify that the resolved function signature matches as expected.
-        Type[] args = stmt.getAggInfo().getAggregateExprs().get(0).getFn().getArgs();
+        AggregateInfo aggInfo = stmt.getMultiAggInfo().getAggClass(0);
+        Type[] args = aggInfo.getAggregateExprs().get(0).getFn().getArgs();
         assertEquals(args.length, 2);
         assertTrue(col.getType().matchesType(args[0]) ||
             col.getType().isStringType() && args[0].equals(Type.STRING));
@@ -2256,6 +2289,23 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
         + "sum(distinct int_col) from " +
         "(select * from functional.alltypesagg) x group by 1");
+    AnalyzesOk("select * from " +
+        "(select count(distinct id, zip), count(distinct zip) " +
+        "from functional.testtbl) x");
+    AnalyzesOk("select * from " + "(select tinyint_col, count(distinct int_col)," +
+        "sum(distinct bigint_col) from functional.alltypesagg group by 1) x");
+    AnalyzesOk("select count(distinct id, zip) " +
+        "from (select * from functional.testtbl) x");
+    AnalyzesOk("select tinyint_col, count(distinct int_col, bigint_col) " +
+        "from (select * from functional.alltypesagg) x group by 1");
+    AnalyzesOk("select tinyint_col, count(distinct int_col)," +
+        "sum(distinct int_col) from " +
+        "(select * from functional.alltypesagg) x group by 1");
+    AnalyzesOk("select count(distinct id, zip), count(distinct zip) " +
+        " from (select * from functional.testtbl) x");
+    AnalyzesOk("select tinyint_col, count(distinct int_col)," +
+        "sum(distinct bigint_col) from " +
+        "(select * from functional.alltypesagg) x group by 1");
 
     // Error case when distinct is inside an inline view
     AnalysisError("select * from " +
@@ -2267,13 +2317,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select * from " +
         "(select distinct id, zip, count(*) from functional.testtbl group by 1, 2) x",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
-    AnalysisError("select * from " +
-        "(select count(distinct id, zip), count(distinct zip) " +
-        "from functional.testtbl) x",
-        "all DISTINCT aggregate functions need to have the same set of parameters");
-    AnalysisError("select * from " + "(select tinyint_col, count(distinct int_col),"
-        + "sum(distinct bigint_col) from functional.alltypesagg group by 1) x",
-        "all DISTINCT aggregate functions need to have the same set of parameters");
 
     // Error case when inline view is in the from clause
     AnalysisError("select distinct count(*) from (select * from functional.testtbl) x",
@@ -2284,20 +2327,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select distinct id, zip, count(*) from " +
         "(select * from functional.testtbl) x group by 1, 2",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
-    AnalyzesOk("select count(distinct id, zip) " +
-        "from (select * from functional.testtbl) x");
-    AnalysisError("select count(distinct id, zip), count(distinct zip) " +
-        " from (select * from functional.testtbl) x",
-        "all DISTINCT aggregate functions need to have the same set of parameters");
-    AnalyzesOk("select tinyint_col, count(distinct int_col, bigint_col) "
-        + "from (select * from functional.alltypesagg) x group by 1");
-    AnalyzesOk("select tinyint_col, count(distinct int_col),"
-        + "sum(distinct int_col) from " +
-        "(select * from functional.alltypesagg) x group by 1");
-    AnalysisError("select tinyint_col, count(distinct int_col),"
-        + "sum(distinct bigint_col) from " +
-        "(select * from functional.alltypesagg) x group by 1",
-        "all DISTINCT aggregate functions need to have the same set of parameters");
   }
 
   @Test

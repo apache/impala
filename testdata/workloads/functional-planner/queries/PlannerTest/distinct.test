@@ -579,3 +579,48 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
+# Query block with a single distinct and multiple non-distinct aggs simplifies to a
+# non-grouping aggregation plan.
+select a, c from
+  (select min(string_col) a, count(distinct smallint_col) b,
+          max(string_col) c
+   from functional.alltypes
+   having min(string_col) < '9' and min(string_col) < max(string_col)) v
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: min:merge(string_col), max:merge(string_col)
+|  having: min(string_col) < '9', min(string_col) < max(string_col)
+|
+01:AGGREGATE
+|  output: min(string_col), max(string_col)
+|  group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:AGGREGATE [FINALIZE]
+|  output: min:merge(string_col), max:merge(string_col)
+|  having: min(string_col) < '9', min(string_col) < max(string_col)
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: min:merge(string_col), max:merge(string_col)
+|
+04:AGGREGATE
+|  output: min:merge(string_col), max:merge(string_col)
+|  group by: smallint_col
+|
+03:EXCHANGE [HASH(smallint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: min(string_col), max(string_col)
+|  group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====

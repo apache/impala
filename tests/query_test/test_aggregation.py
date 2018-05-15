@@ -359,9 +359,13 @@ class TestDistinctAggregation(ImpalaTestSuite):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail("HBase returns columns in alphabetical order for select distinct *, "
                    "making the result verication to fail.")
-    if vector.get_value('table_format').file_format == 'kudu':
-      pytest.xfail("IMPALA-4042: count(distinct NULL) fails on a view, needed for kudu")
     self.run_test_case('QueryTest/distinct', vector)
+
+  def test_multiple_distinct(self, vector):
+    if vector.get_value('table_format').file_format == 'hbase':
+      pytest.xfail("HBase returns columns in alphabetical order for select distinct *, "
+                   "making the result verication to fail.")
+    self.run_test_case('QueryTest/multiple-distinct-aggs', vector)
 
 
 class TestWideAggregationQueries(ImpalaTestSuite):

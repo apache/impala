@@ -36,6 +36,7 @@ class AggFnEvaluator;
 class LlvmCodeGen;
 class RowBatch;
 class RuntimeState;
+class TAggregator;
 class Tuple;
 
 /// Aggregator for doing grouping aggregations. Input is passed to the aggregator through
@@ -113,10 +114,12 @@ class Tuple;
 /// TODO: support an Init() method with an initial value in the UDAF interface.
 class GroupingAggregator : public Aggregator {
  public:
-  GroupingAggregator(ExecNode* exec_node, ObjectPool* pool, const TPlanNode& tnode,
-      const DescriptorTbl& descs);
+  GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
+      const TAggregator& taggregator, const DescriptorTbl& descs,
+      int64_t estimated_input_cardinality, int agg_idx);
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status Init(const TAggregator& taggregator, RuntimeState* state,
+      const std::vector<TExpr>& conjuncts) override;
   virtual Status Prepare(RuntimeState* state) override;
   virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
@@ -125,15 +128,11 @@ class GroupingAggregator : public Aggregator {
   virtual void Close(RuntimeState* state) override;
 
   virtual Status AddBatch(RuntimeState* state, RowBatch* batch) override;
-  /// Used to insert input rows if this is a streaming pre-agg. Tries to aggregate all of
-  /// the rows of 'child_batch', but if there isn't enough memory available rows will be
-  /// streamed through and returned in 'out_batch'. AddBatch() and AddBatchStreaming()
-  /// should not be called on the same GroupingAggregator.
-  Status AddBatchStreaming(
-      RuntimeState* state, RowBatch* out_batch, RowBatch* child_batch);
-  virtual Status InputDone() override WARN_UNUSED_RESULT;
+  virtual Status AddBatchStreaming(RuntimeState* state, RowBatch* out_batch,
+      RowBatch* child_batch, bool* eos) override;
+  virtual Status InputDone() override;
 
-  virtual int num_grouping_exprs() override { return grouping_exprs_.size(); }
+  virtual int GetNumGroupingExprs() override { return grouping_exprs_.size(); }
 
   virtual void SetDebugOptions(const TDebugOptions& debug_options) override;
 
@@ -184,7 +183,7 @@ class GroupingAggregator : public Aggregator {
   const bool is_streaming_preagg_;
 
   /// True if any of the evaluators require the serialize step.
-  bool needs_serialize_;
+  bool needs_serialize_ = false;
 
   /// Exprs used to evaluate input rows
   std::vector<ScalarExpr*> grouping_exprs_;
@@ -211,7 +210,7 @@ class GroupingAggregator : public Aggregator {
   /// The current partition and iterator to the next row in its hash table that we need
   /// to return in GetNext(). If 'output_iterator_' is not AtEnd() then
   /// 'output_partition_' is not nullptr.
-  Partition* output_partition_;
+  Partition* output_partition_ = nullptr;
   HashTable::Iterator output_iterator_;
 
   /// Resource information sent from the frontend.
@@ -222,7 +221,7 @@ class GroupingAggregator : public Aggregator {
   BufferPool::ClientHandle* buffer_pool_client();
 
   /// The number of rows that have been passed to AddBatch() or AddBatchStreaming().
-  int64_t num_input_rows_;
+  int64_t num_input_rows_ = 0;
 
   /// True if this aggregator is being executed in a subplan.
   const bool is_in_subplan_;
@@ -233,52 +232,52 @@ class GroupingAggregator : public Aggregator {
   typedef Status (*AddBatchImplFn)(
       GroupingAggregator*, RowBatch*, TPrefetchMode::type, HashTableCtx*);
   /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
-  AddBatchImplFn add_batch_impl_fn_;
+  AddBatchImplFn add_batch_impl_fn_ = nullptr;
 
-  typedef Status (*AddBatchStreamingImplFn)(GroupingAggregator*, bool,
+  typedef Status (*AddBatchStreamingImplFn)(GroupingAggregator*, int, bool,
       TPrefetchMode::type, RowBatch*, RowBatch*, HashTableCtx*, int[PARTITION_FANOUT]);
   /// Jitted AddBatchStreamingImpl function pointer.  Null if codegen is disabled.
-  AddBatchStreamingImplFn add_batch_streaming_impl_fn_;
+  AddBatchStreamingImplFn add_batch_streaming_impl_fn_ = nullptr;
 
   /// Total time spent resizing hash tables.
-  RuntimeProfile::Counter* ht_resize_timer_;
+  RuntimeProfile::Counter* ht_resize_timer_ = nullptr;
 
   /// Time spent returning the aggregated rows
-  RuntimeProfile::Counter* get_results_timer_;
+  RuntimeProfile::Counter* get_results_timer_ = nullptr;
 
   /// Total number of hash buckets across all partitions.
-  RuntimeProfile::Counter* num_hash_buckets_;
+  RuntimeProfile::Counter* num_hash_buckets_ = nullptr;
 
   /// Total number of partitions created.
-  RuntimeProfile::Counter* partitions_created_;
+  RuntimeProfile::Counter* partitions_created_ = nullptr;
 
   /// Level of max partition (i.e. number of repartitioning steps).
-  RuntimeProfile::HighWaterMarkCounter* max_partition_level_;
+  RuntimeProfile::HighWaterMarkCounter* max_partition_level_ = nullptr;
 
   /// Number of rows that have been repartitioned.
-  RuntimeProfile::Counter* num_row_repartitioned_;
+  RuntimeProfile::Counter* num_row_repartitioned_ = nullptr;
 
   /// Number of partitions that have been repartitioned.
-  RuntimeProfile::Counter* num_repartitions_;
+  RuntimeProfile::Counter* num_repartitions_ = nullptr;
 
   /// Number of partitions that have been spilled.
-  RuntimeProfile::Counter* num_spilled_partitions_;
+  RuntimeProfile::Counter* num_spilled_partitions_ = nullptr;
 
   /// The largest fraction after repartitioning. This is expected to be
   /// 1 / PARTITION_FANOUT. A value much larger indicates skew.
-  RuntimeProfile::HighWaterMarkCounter* largest_partition_percent_;
+  RuntimeProfile::HighWaterMarkCounter* largest_partition_percent_ = nullptr;
 
   /// Time spent in streaming preagg algorithm.
-  RuntimeProfile::Counter* streaming_timer_;
+  RuntimeProfile::Counter* streaming_timer_ = nullptr;
 
   /// The number of rows passed through without aggregation.
-  RuntimeProfile::Counter* num_passthrough_rows_;
+  RuntimeProfile::Counter* num_passthrough_rows_ = nullptr;
 
   /// The estimated reduction of the preaggregation.
-  RuntimeProfile::Counter* preagg_estimated_reduction_;
+  RuntimeProfile::Counter* preagg_estimated_reduction_ = nullptr;
 
   /// Expose the minimum reduction factor to continue growing the hash tables.
-  RuntimeProfile::Counter* preagg_streaming_ht_min_reduction_;
+  RuntimeProfile::Counter* preagg_streaming_ht_min_reduction_ = nullptr;
 
   /// The estimated number of input rows from the planner.
   int64_t estimated_input_cardinality_;
@@ -289,7 +288,14 @@ class GroupingAggregator : public Aggregator {
   /// BEGIN: Members that must be Reset()
 
   /// If true, no more rows to output from partitions.
-  bool partition_eos_;
+  bool partition_eos_ = false;
+
+  /// When streaming rows through unaggregated, if the out batch reaches capacity before
+  /// the input batch is fully processed, 'streaming_idx_' indicates the position within
+  /// the input batch to resume at in the next call to AddBatchStreaming(). This is used
+  /// in the case where there are multiple aggregators, as the out batch passed to
+  /// AddBatchStreaming() may already have rows passed through by another aggregator.
+  int32_t streaming_idx_ = 0;
 
   /// Used for hash-related functionality, such as evaluating rows and calculating hashes.
   /// It also owns the evaluators for the grouping and build expressions used during hash
@@ -503,8 +509,8 @@ class GroupingAggregator : public Aggregator {
   /// into the hash table or added to 'out_batch' in the intermediate tuple format.
   /// 'in_batch' is processed entirely, and 'out_batch' must have enough capacity to
   /// store all of the rows in 'in_batch'.
-  /// 'needs_serialize' is an argument so that codegen can replace it with a constant,
-  ///     rather than using the member variable 'needs_serialize_'.
+  /// 'agg_idx' and 'needs_serialize' are arguments so that codegen can replace them with
+  ///     constants, rather than using the member variables of the same names.
   /// 'prefetch_mode' specifies the prefetching mode in use. If it's not PREFETCH_NONE,
   ///     hash table buckets will be prefetched based on the hash values computed. Note
   ///     that 'prefetch_mode' will be substituted with constants during codegen time.
@@ -512,9 +518,9 @@ class GroupingAggregator : public Aggregator {
   ///     additional rows that can be added to the hash table per partition. It is updated
   ///     by AddBatchStreamingImpl() when it inserts new rows.
   /// 'ht_ctx' is passed in as a way to avoid aliasing of 'this' confusing the optimiser.
-  Status AddBatchStreamingImpl(bool needs_serialize, TPrefetchMode::type prefetch_mode,
-      RowBatch* in_batch, RowBatch* out_batch, HashTableCtx* ht_ctx,
-      int remaining_capacity[PARTITION_FANOUT]) WARN_UNUSED_RESULT;
+  Status AddBatchStreamingImpl(int agg_idx, bool needs_serialize,
+      TPrefetchMode::type prefetch_mode, RowBatch* in_batch, RowBatch* out_batch,
+      HashTableCtx* ht_ctx, int remaining_capacity[PARTITION_FANOUT]) WARN_UNUSED_RESULT;
 
   /// Tries to add intermediate to the hash table 'hash_tbl' of 'partition' for streaming
   /// aggregation. The input row must have been evaluated with 'ht_ctx', with 'hash' set

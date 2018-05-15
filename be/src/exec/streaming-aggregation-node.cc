@@ -22,6 +22,7 @@
 #include "gutil/strings/substitute.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/tuple-row.h"
 #include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/PlanNodes_types.h"
@@ -32,35 +33,12 @@ namespace impala {
 
 StreamingAggregationNode::StreamingAggregationNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs), child_eos_(false) {
+  : AggregationNodeBase(pool, tnode, descs) {
   DCHECK(tnode.conjuncts.empty()) << "Preaggs have no conjuncts";
-  DCHECK(!tnode.agg_node.grouping_exprs.empty()) << "Streaming preaggs do grouping";
   DCHECK(limit_ == -1) << "Preaggs have no limits";
-}
-
-Status StreamingAggregationNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-  aggregator_.reset(new GroupingAggregator(this, pool_, tnode, state->desc_tbl()));
-  RETURN_IF_ERROR(aggregator_->Init(tnode, state));
-  runtime_profile_->AddChild(aggregator_->runtime_profile());
-  return Status::OK();
-}
-
-Status StreamingAggregationNode::Prepare(RuntimeState* state) {
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
-  RETURN_IF_ERROR(ExecNode::Prepare(state));
-  aggregator_->SetDebugOptions(debug_options_);
-  RETURN_IF_ERROR(aggregator_->Prepare(state));
-  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
-  return Status::OK();
-}
-
-void StreamingAggregationNode::Codegen(RuntimeState* state) {
-  DCHECK(state->ShouldCodegen());
-  ExecNode::Codegen(state);
-  if (IsNodeCodegenDisabled()) return;
-
-  aggregator_->Codegen(state);
+  for (int i = 0; i < tnode.agg_node.aggregators.size(); ++i) {
+    DCHECK(tnode.agg_node.aggregators[i].use_streaming_preaggregation);
+  }
 }
 
 Status StreamingAggregationNode::Open(RuntimeState* state) {
@@ -69,7 +47,7 @@ Status StreamingAggregationNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Open(state));
   RETURN_IF_ERROR(ExecNode::Open(state));
 
-  RETURN_IF_ERROR(aggregator_->Open(state));
+  for (auto& agg : aggs_) RETURN_IF_ERROR(agg->Open(state));
 
   // Streaming preaggregations do all processing in GetNext().
   return Status::OK();
@@ -86,15 +64,22 @@ Status StreamingAggregationNode::GetNext(
     return Status::OK();
   }
 
-  bool aggregator_eos = false;
-  if (!child_eos_) {
+  // With multiple Aggregators, each will only set a single tuple per row. We rely on the
+  // other tuples to be null to detect which Aggregator set which row.
+  if (aggs_.size() > 1) row_batch->ClearTuplePointers();
+
+  if (!child_eos_ || !child_batch_processed_) {
     // For streaming preaggregations, we process rows from the child as we go.
     RETURN_IF_ERROR(GetRowsStreaming(state, row_batch));
+    *eos = false;
   } else {
-    RETURN_IF_ERROR(aggregator_->GetNext(state, row_batch, &aggregator_eos));
+    bool aggregator_eos = false;
+    RETURN_IF_ERROR(
+        aggs_[curr_output_agg_idx_]->GetNext(state, row_batch, &aggregator_eos));
+    if (aggregator_eos) ++curr_output_agg_idx_;
+    *eos = curr_output_agg_idx_ >= aggs_.size();
   }
 
-  *eos = aggregator_eos && child_eos_;
   num_rows_returned_ += row_batch->num_rows();
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK();
@@ -102,27 +87,94 @@ Status StreamingAggregationNode::GetNext(
 
 Status StreamingAggregationNode::GetRowsStreaming(
     RuntimeState* state, RowBatch* out_batch) {
-  DCHECK(!child_eos_);
-
   if (child_batch_ == nullptr) {
     child_batch_.reset(
         new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
+  }
+
+  int num_aggs = aggs_.size();
+  // Create mini batches.
+  vector<unique_ptr<RowBatch>> mini_batches;
+  if (!replicate_input_ && num_aggs > 1) {
+    for (int i = 0; i < num_aggs; ++i) {
+      mini_batches.push_back(make_unique<RowBatch>(
+          child(0)->row_desc(), state->batch_size(), mem_tracker()));
+    }
   }
 
   do {
     DCHECK_EQ(out_batch->num_rows(), 0);
     RETURN_IF_CANCELLED(state);
 
-    RETURN_IF_ERROR(child(0)->GetNext(state, child_batch_.get(), &child_eos_));
+    if (child_batch_processed_) {
+      DCHECK_EQ(child_batch_->num_rows(), 0);
+      RETURN_IF_ERROR(child(0)->GetNext(state, child_batch_.get(), &child_eos_));
+      child_batch_processed_ = false;
+    }
 
-    RETURN_IF_ERROR(aggregator_->AddBatchStreaming(state, out_batch, child_batch_.get()));
-    child_batch_->Reset(); // All rows from child_batch_ were processed.
+    if (num_aggs == 1) {
+      RETURN_IF_ERROR(aggs_[0]->AddBatchStreaming(
+          state, out_batch, child_batch_.get(), &child_batch_processed_));
+      // We're not guaranteed to be able to stream the entirety of 'child_batch_' into
+      // 'out_batch' as AddBatchStreaming() will attach all var-len data to 'out_batch'
+      // and 'child_batch_' may have been referencing data that wasn't attached to it.
+      if (child_batch_processed_) {
+        child_batch_->Reset();
+      }
+      continue;
+    }
+
+    if (replicate_input_) {
+      bool eos = false;
+      while (replicate_agg_idx_ < num_aggs) {
+        RETURN_IF_ERROR(aggs_[replicate_agg_idx_]->AddBatchStreaming(
+            state, out_batch, child_batch_.get(), &eos));
+        if (eos) ++replicate_agg_idx_;
+        if (out_batch->AtCapacity()) break;
+        // If out_batch isn't full, we must have processed the entire input.
+        DCHECK(eos);
+      }
+      if (replicate_agg_idx_ == num_aggs) {
+        replicate_agg_idx_ = 0;
+        child_batch_processed_ = true;
+        child_batch_->Reset();
+      }
+      continue;
+    }
+
+    // Separate input batch into mini batches destined for the different aggs.
+    int num_tuples = child(0)->row_desc()->tuple_descriptors().size();
+    DCHECK_EQ(num_aggs, num_tuples);
+    int num_rows = child_batch_->num_rows();
+    DCHECK_LE(num_rows, out_batch->capacity());
+    if (num_rows > 0) {
+      RETURN_IF_ERROR(SplitMiniBatches(child_batch_.get(), &mini_batches));
+
+      for (int i = 0; i < num_tuples; ++i) {
+        RowBatch* mini_batch = mini_batches[i].get();
+        if (mini_batch->num_rows() > 0) {
+          bool eos;
+          RETURN_IF_ERROR(
+              aggs_[i]->AddBatchStreaming(state, out_batch, mini_batch, &eos));
+          // child_batch_'s size is <= out_batch's capacity, so even under high memory
+          // pressure where all rows are streamed though, we will be able to process
+          // the entire input. Note that unlike the single agg case above, this works
+          // because any node that hits this path must have been preceded by an
+          // aggregation node in 'replicate_input_' mode, and so all memory pointed to by
+          // 'child_batch_' will be attached to 'child_batch_'.
+          DCHECK(eos);
+          mini_batch->Reset();
+        }
+      }
+    }
+    child_batch_processed_ = true;
+    child_batch_->Reset();
   } while (out_batch->num_rows() == 0 && !child_eos_);
 
   if (child_eos_) {
     child(0)->Close(state);
     child_batch_.reset();
-    RETURN_IF_ERROR(aggregator_->InputDone());
+    for (auto& agg : aggs_) RETURN_IF_ERROR(agg->InputDone());
   }
 
   return Status::OK();
@@ -138,7 +190,7 @@ void StreamingAggregationNode::Close(RuntimeState* state) {
   // All expr mem allocations should happen in the Aggregator.
   DCHECK(expr_results_pool() == nullptr
       || expr_results_pool()->total_allocated_bytes() == 0);
-  aggregator_->Close(state);
+  for (auto& agg : aggs_) agg->Close(state);
   child_batch_.reset();
   ExecNode::Close(state);
 }
@@ -146,8 +198,8 @@ void StreamingAggregationNode::Close(RuntimeState* state) {
 void StreamingAggregationNode::DebugString(
     int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "StreamingAggregationNode("
-       << "aggregator=" << aggregator_->DebugString();
+  *out << "StreamingAggregationNode(";
+  for (auto& agg : aggs_) agg->DebugString(indentation_level, out);
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }

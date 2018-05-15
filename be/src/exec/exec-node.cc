@@ -274,7 +274,7 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       }
       break;
     case TPlanNodeType::AGGREGATION_NODE:
-      if (tnode.agg_node.use_streaming_preaggregation) {
+      if (tnode.agg_node.aggregators[0].use_streaming_preaggregation) {
         *node = pool->Add(new StreamingAggregationNode(pool, tnode, descs));
       } else {
         *node = pool->Add(new AggregationNode(pool, tnode, descs));

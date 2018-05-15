@@ -242,6 +242,10 @@ class RowBatch {
       return Get();
     }
 
+    /// Returns the index in the RowBatch of the current row. This does an integer
+    /// division and so should not be used in hot inner loops.
+    int RowNum() { return (row_ - parent_->tuple_ptrs_) / num_tuples_per_row_; }
+
     /// Returns true if the iterator is beyond the last row for read iterators.
     /// Useful for read iterators to determine the limit. Write iterators should use
     /// RowBatch::AtCapacity() instead.
@@ -332,6 +336,10 @@ class RowBatch {
     memmove(tuple_ptrs_ + num_tuples_per_row_ * dest,
         tuple_ptrs_ + num_tuples_per_row_ * src,
         num_rows * num_tuples_per_row_ * sizeof(Tuple*));
+  }
+
+  void ClearTuplePointers() {
+    memset(tuple_ptrs_, 0, capacity_ * num_tuples_per_row_ * sizeof(Tuple*));
   }
 
   void ClearRow(TupleRow* row) {

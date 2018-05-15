@@ -152,18 +152,18 @@ Status GroupingAggregator::AddIntermediateTuple(Partition* __restrict__ partitio
   }
 }
 
-Status GroupingAggregator::AddBatchStreamingImpl(bool needs_serialize,
+Status GroupingAggregator::AddBatchStreamingImpl(int agg_idx, bool needs_serialize,
     TPrefetchMode::type prefetch_mode, RowBatch* in_batch, RowBatch* out_batch,
     HashTableCtx* __restrict__ ht_ctx, int remaining_capacity[PARTITION_FANOUT]) {
   DCHECK(is_streaming_preagg_);
-  DCHECK_EQ(out_batch->num_rows(), 0);
-  DCHECK_LE(in_batch->num_rows(), out_batch->capacity());
+  DCHECK(!out_batch->AtCapacity());
 
   RowBatch::Iterator out_batch_iterator(out_batch, out_batch->num_rows());
   HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
   const int num_rows = in_batch->num_rows();
   const int cache_size = expr_vals_cache->capacity();
-  for (int group_start = 0; group_start < num_rows; group_start += cache_size) {
+  for (int group_start = streaming_idx_; group_start < num_rows;
+       group_start += cache_size) {
     EvalAndHashPrefetchGroup<false>(in_batch, group_start, prefetch_mode, ht_ctx);
 
     FOREACH_ROW_LIMIT(in_batch, group_start, cache_size, in_batch_iter) {
@@ -184,15 +184,21 @@ Status GroupingAggregator::AddBatchStreamingImpl(bool needs_serialize,
           return std::move(add_batch_status_);
         }
         UpdateTuple(agg_fn_evals_.data(), intermediate_tuple, in_row);
-        out_batch_iterator.Get()->SetTuple(0, intermediate_tuple);
+        out_batch_iterator.Get()->SetTuple(agg_idx, intermediate_tuple);
         out_batch_iterator.Next();
         out_batch->CommitLastRow();
+        if (out_batch->AtCapacity() && in_batch_iter.RowNum() + 1 < num_rows) {
+          streaming_idx_ = in_batch_iter.RowNum() + 1;
+          goto ret;
+        }
       }
       DCHECK(add_batch_status_.ok());
       expr_vals_cache->NextRow();
     }
     DCHECK(expr_vals_cache->AtEnd());
   }
+  streaming_idx_ = 0;
+ret:
   if (needs_serialize) {
     FOREACH_ROW(out_batch, 0, out_batch_iter) {
       AggFnEvaluator::Serialize(agg_fn_evals_, out_batch_iter.Get()->GetTuple(0));

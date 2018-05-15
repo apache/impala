@@ -48,7 +48,7 @@ class RuntimeState;
 class ScalarExpr;
 class ScalarExprEvaluator;
 class SlotDescriptor;
-class TPlanNode;
+class TAggregator;
 class Tuple;
 class TupleDescriptor;
 class TupleRow;
@@ -60,13 +60,15 @@ class TupleRow;
 /// be called and the results can be fetched with GetNext().
 class Aggregator {
  public:
-  Aggregator(ExecNode* exec_node, ObjectPool* pool, const TPlanNode& tnode,
-      const DescriptorTbl& descs, const std::string& name);
+  /// 'agg_idx' is the index of 'taggregator' in the parent TAggregationNode.
+  Aggregator(ExecNode* exec_node, ObjectPool* pool, const TAggregator& taggregator,
+      const DescriptorTbl& descs, const std::string& name, int agg_idx);
   virtual ~Aggregator();
 
   /// Aggregators follow the same lifecycle as ExecNodes, except that after Open() and
   /// before GetNext() rows should be added with AddBatch(), followed by InputDone()[
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) WARN_UNUSED_RESULT;
+  virtual Status Init(const TAggregator& taggregator, RuntimeState* state,
+      const std::vector<TExpr>& conjuncts) WARN_UNUSED_RESULT;
   virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
   virtual void Codegen(RuntimeState* state) = 0;
   virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
@@ -77,10 +79,21 @@ class Aggregator {
 
   /// Adds all of the rows in 'batch' to the aggregation.
   virtual Status AddBatch(RuntimeState* state, RowBatch* batch) = 0;
-  /// Indicates that all batches have been added. Must be called before GetNext().
-  virtual Status InputDone() = 0;
 
-  virtual int num_grouping_exprs() = 0;
+  /// Used to insert input rows if this is a streaming pre-agg. Tries to aggregate all of
+  /// the rows of 'child_batch', but if there isn't enough memory available rows will be
+  /// streamed through and returned in 'out_batch'. If 'eos' is true, 'child_batch' was
+  /// fully processed, otherwise 'out_batch' was filled up and AddBatchStreaming() should
+  /// be called again with the same 'child_batch' and a new 'out_batch'.
+  /// AddBatch() and AddBatchStreaming() should not be called on the same Aggregator.
+  virtual Status AddBatchStreaming(RuntimeState* state, RowBatch* out_batch,
+      RowBatch* child_batch, bool* eos) WARN_UNUSED_RESULT = 0;
+
+  /// Indicates that all batches have been added. Must be called before GetNext().
+  virtual Status InputDone() WARN_UNUSED_RESULT = 0;
+
+  virtual int GetNumGroupingExprs() = 0;
+
   RuntimeProfile* runtime_profile() { return runtime_profile_; }
 
   virtual void SetDebugOptions(const TDebugOptions& debug_options) = 0;
@@ -92,8 +105,13 @@ class Aggregator {
 
  protected:
   /// The id of the ExecNode this Aggregator corresponds to.
-  int id_;
+  const int id_;
   ExecNode* exec_node_;
+
+  /// The index of this Aggregator within the AggregationNode. When returning output, this
+  /// Aggregator should only write tuples at 'agg_idx_' within the row.
+  const int agg_idx_;
+
   ObjectPool* pool_;
 
   /// Account for peak memory used by this aggregator.
@@ -154,11 +172,11 @@ class Aggregator {
   /// Runtime profile for this aggregator. Owned by 'pool_'.
   RuntimeProfile* const runtime_profile_;
 
-  int64_t num_rows_returned_;
-  RuntimeProfile::Counter* rows_returned_counter_;
+  int64_t num_rows_returned_ = 0;
+  RuntimeProfile::Counter* rows_returned_counter_ = nullptr;
 
   /// Time spent processing the child rows
-  RuntimeProfile::Counter* build_timer_;
+  RuntimeProfile::Counter* build_timer_ = nullptr;
 
   /// Initializes the aggregate function slots of an intermediate tuple.
   /// Any var-len data is allocated from the FunctionContexts.

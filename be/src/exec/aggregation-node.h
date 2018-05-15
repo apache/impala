@@ -20,8 +20,7 @@
 
 #include <memory>
 
-#include "exec/aggregator.h"
-#include "exec/exec-node.h"
+#include "exec/aggregation-node-base.h"
 
 namespace impala {
 
@@ -31,29 +30,15 @@ class RuntimeState;
 /// Node for doing partitioned hash aggregation.
 /// This node consumes the input from child(0) during Open() and then passes it to the
 /// Aggregator, which does the actual work of aggregating.
-class AggregationNode : public ExecNode {
+class AggregationNode : public AggregationNodeBase {
  public:
   AggregationNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
-  virtual Status Prepare(RuntimeState* state) override;
-  virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
-  virtual Status Reset(RuntimeState* state) override;
   virtual void Close(RuntimeState* state) override;
 
   virtual void DebugString(int indentation_level, std::stringstream* out) const override;
-
- private:
-  /////////////////////////////////////////
-  /// BEGIN: Members that must be Reset()
-
-  /// Performs the actual work of aggregating input rows.
-  std::unique_ptr<Aggregator> aggregator_;
-
-  /// END: Members that must be Reset()
-  /////////////////////////////////////////
 };
 } // namespace impala
 

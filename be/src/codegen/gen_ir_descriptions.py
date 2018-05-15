@@ -52,7 +52,7 @@ ir_functions = [
   ["NON_GROUPING_AGG_ADD_BATCH_IMPL",
    "_ZN6impala21NonGroupingAggregator12AddBatchImplEPNS_8RowBatchE"],
   ["GROUPING_AGG_ADD_BATCH_STREAMING_IMPL",
-   "_ZN6impala18GroupingAggregator21AddBatchStreamingImplEbNS_13TPrefetchMode4typeEPNS_8RowBatchES4_PNS_12HashTableCtxEPi"],
+   "_ZN6impala18GroupingAggregator21AddBatchStreamingImplEibNS_13TPrefetchMode4typeEPNS_8RowBatchES4_PNS_12HashTableCtxEPi"],
   ["AVG_UPDATE_BIGINT",
    "_ZN6impala18AggregateFunctions9AvgUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE"],
   ["AVG_UPDATE_DOUBLE",

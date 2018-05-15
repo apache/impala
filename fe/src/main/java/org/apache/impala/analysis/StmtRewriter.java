@@ -142,9 +142,9 @@ public class StmtRewriter {
       BoolLiteral boolLiteral = null;
       if (subqueryStmt.getAnalyzer().hasEmptyResultSet()) {
         boolLiteral = new BoolLiteral(predicate.isNotExists());
-      } else if (subqueryStmt.hasAggInfo() &&
-          subqueryStmt.getAggInfo().hasAggregateExprs() &&
-          !subqueryStmt.hasAnalyticInfo() && subqueryStmt.getHavingPred() == null) {
+      } else if (subqueryStmt.hasMultiAggInfo()
+          && subqueryStmt.getMultiAggInfo().hasAggregateExprs()
+          && !subqueryStmt.hasAnalyticInfo() && subqueryStmt.getHavingPred() == null) {
         boolLiteral = new BoolLiteral(!predicate.isNotExists());
       }
       return boolLiteral;
@@ -329,8 +329,10 @@ public class StmtRewriter {
 
       // Update the subquery's select list and/or its GROUP BY clause by adding
       // exprs from the extracted correlated predicates.
-      boolean updateGroupBy = isScalarSubquery || (expr instanceof ExistsPredicate &&
-          !subqueryStmt.getSelectList().isDistinct() && subqueryStmt.hasAggInfo());
+      boolean updateGroupBy = isScalarSubquery
+          || (expr instanceof ExistsPredicate
+                 && !subqueryStmt.getSelectList().isDistinct()
+                 && subqueryStmt.hasMultiAggInfo());
       List<Expr> lhsExprs = Lists.newArrayList();
       List<Expr> rhsExprs = Lists.newArrayList();
       for (Expr conjunct : onClauseConjuncts) {
@@ -639,10 +641,10 @@ public class StmtRewriter {
       SelectStmt stmt = (SelectStmt) expr.getSubquery().getStatement();
       Preconditions.checkNotNull(stmt);
       // Grouping and/or aggregation is not allowed on correlated scalar and IN subqueries
-      if ((expr instanceof BinaryPredicate &&
-          (stmt.hasGroupByClause() || stmt.hasAnalyticInfo())) ||
-          (expr instanceof InPredicate &&
-              (stmt.hasAggInfo() || stmt.hasAnalyticInfo()))) {
+      if ((expr instanceof BinaryPredicate
+              && (stmt.hasGroupByClause() || stmt.hasAnalyticInfo()))
+          || (expr instanceof InPredicate
+                 && (stmt.hasMultiAggInfo() || stmt.hasAnalyticInfo()))) {
         throw new AnalysisException(
             "Unsupported correlated subquery with grouping " + "and/or aggregation: " +
                 stmt.toSql());
@@ -656,8 +658,10 @@ public class StmtRewriter {
       // The following correlated subqueries with a limit clause are supported:
       // 1. EXISTS subqueries
       // 2. Scalar subqueries with aggregation
-      if (stmt.hasLimit() && (!(expr instanceof BinaryPredicate) || !stmt.hasAggInfo() ||
-          stmt.selectList_.isDistinct()) && !(expr instanceof ExistsPredicate)) {
+      if (stmt.hasLimit()
+          && (!(expr instanceof BinaryPredicate) || !stmt.hasMultiAggInfo()
+                 || stmt.selectList_.isDistinct())
+          && !(expr instanceof ExistsPredicate)) {
         throw new AnalysisException(
             "Unsupported correlated subquery with a " + "LIMIT clause: " + stmt.toSql());
       }
@@ -684,10 +688,11 @@ public class StmtRewriter {
       // A HAVING clause is only allowed on correlated EXISTS subqueries with
       // correlated binary predicates of the form Slot = Slot (see IMPALA-2734)
       // TODO Handle binary predicates with IS NOT DISTINCT op
-      if (expr instanceof ExistsPredicate && stmt.hasHavingClause() &&
-          !correlatedPredicates.isEmpty() && (!stmt.hasAggInfo() || !Iterables
-          .all(correlatedPredicates,
-              Predicates.or(Expr.IS_EQ_BINARY_PREDICATE, isSingleSlotRef)))) {
+      if (expr instanceof ExistsPredicate && stmt.hasHavingClause()
+          && !correlatedPredicates.isEmpty()
+          && (!stmt.hasMultiAggInfo()
+                 || !Iterables.all(correlatedPredicates,
+                        Predicates.or(Expr.IS_EQ_BINARY_PREDICATE, isSingleSlotRef)))) {
         throw new AnalysisException(
             "Unsupported correlated EXISTS subquery with a " + "HAVING clause: " +
                 stmt.toSql());

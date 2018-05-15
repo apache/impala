@@ -221,6 +221,16 @@ class AggregateFunctions {
   static void SampledNdvMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static BigIntVal SampledNdvFinalize(FunctionContext*, const StringVal& src);
 
+  /// The AGGIF(predicate, expr) function returns 'expr' if 'predicate' is true.
+  /// It is expected that 'predicate' only returns true for a single row per group.
+  /// The predicate must not evaluate to NULL.
+  template <typename T>
+  static void AggIfUpdate(FunctionContext*, const BooleanVal& cond, const T& src, T* dst);
+  template <typename T>
+  static void AggIfMerge(FunctionContext*, const T& src, T* dst);
+  template <typename T>
+  static T AggIfFinalize(FunctionContext*, const T& src);
+
   /// Knuth's variance algorithm, more numerically stable than canonical stddev
   /// algorithms; reference implementation:
   /// http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm

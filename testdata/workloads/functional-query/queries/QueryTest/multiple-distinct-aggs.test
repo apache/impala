@@ -1,0 +1,424 @@
+====
+---- QUERY
+# Distinct and non-distinct without grouping.
+select count(distinct tinyint_col), count(smallint_col) from alltypes
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+10,7300
+====
+---- QUERY
+# Distinct and non-distinct without grouping. Distinct needs intermediate agg tuple.
+select avg(distinct tinyint_col), count(smallint_col) from alltypes
+---- TYPES
+DOUBLE,BIGINT
+---- RESULTS
+4.5,7300
+====
+---- QUERY
+# Distinct and non-distinct without grouping. Non-distinct needs intermediate agg tuple.
+select count(distinct tinyint_col), avg(smallint_col) from alltypes
+---- TYPES
+BIGINT,DOUBLE
+---- RESULTS
+10,4.5
+====
+---- QUERY
+# Distinct and non-distinct without grouping. Both need intermediate agg tuples.
+select avg(distinct tinyint_col), avg(smallint_col) from alltypes
+---- TYPES
+DOUBLE,DOUBLE
+---- RESULTS
+4.5,4.5
+====
+---- QUERY
+# Distinct and non-distinct with grouping.
+select bigint_col, count(distinct tinyint_col), count(smallint_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,BIGINT,BIGINT
+---- RESULTS
+0,1,730
+10,1,730
+20,1,730
+30,1,730
+40,1,730
+50,1,730
+60,1,730
+70,1,730
+80,1,730
+90,1,730
+====
+---- QUERY
+# Distinct and non-distinct with grouping. Distinct needs intermediate agg tuple.
+select bigint_col, avg(distinct tinyint_col), count(smallint_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,DOUBLE,BIGINT
+---- RESULTS
+0,0,730
+10,1,730
+20,2,730
+30,3,730
+40,4,730
+50,5,730
+60,6,730
+70,7,730
+80,8,730
+90,9,730
+====
+---- QUERY
+# Distinct and non-distinct with grouping. Non-distinct needs intermediate agg tuple.
+select bigint_col, count(distinct tinyint_col), avg(smallint_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,BIGINT,DOUBLE
+---- RESULTS
+0,1,0
+10,1,1
+20,1,2
+30,1,3
+40,1,4
+50,1,5
+60,1,6
+70,1,7
+80,1,8
+90,1,9
+====
+---- QUERY
+# Distinct and non-distinct with grouping. Both need intermediate agg tuples.
+select bigint_col, avg(distinct tinyint_col), avg(smallint_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,DOUBLE,DOUBLE
+---- RESULTS
+0,0,0
+10,1,1
+20,2,2
+30,3,3
+40,4,4
+50,5,5
+60,6,6
+70,7,7
+80,8,8
+90,9,9
+====
+---- QUERY
+# Multiple distinct without grouping.
+select count(distinct tinyint_col), sum(distinct int_col), count(distinct smallint_col)
+from alltypes
+---- TYPES
+BIGINT,BIGINT,BIGINT
+---- RESULTS
+10,45,10
+====
+---- QUERY
+# Multiple distinct without grouping. First needs intermediate tuple.
+select avg(distinct tinyint_col), sum(distinct int_col), count(distinct smallint_col)
+from alltypes
+---- TYPES
+DOUBLE,BIGINT,BIGINT
+---- RESULTS
+4.5,45,10
+====
+---- QUERY
+# Multiple distinct without grouping. Last needs intermediate tuple.
+select count(distinct tinyint_col), sum(distinct int_col), avg(distinct smallint_col)
+from alltypes
+---- TYPES
+BIGINT,BIGINT,DOUBLE
+---- RESULTS
+10,45,4.5
+====
+---- QUERY
+# Multiple distinct without grouping. All need intermediate tuples
+select avg(distinct tinyint_col), avg(distinct int_col), avg(distinct smallint_col)
+from alltypes
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE
+---- RESULTS
+4.5,4.5,4.5
+====
+---- QUERY
+# Multiple distinct with grouping.
+select bigint_col, count(distinct tinyint_col), sum(distinct int_col),
+       count(distinct smallint_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+0,1,0,1
+10,1,1,1
+20,1,2,1
+30,1,3,1
+40,1,4,1
+50,1,5,1
+60,1,6,1
+70,1,7,1
+80,1,8,1
+90,1,9,1
+====
+---- QUERY
+# Multiple distinct with grouping. First needs intermediate tuple.
+select bigint_col, avg(distinct tinyint_col), sum(distinct int_col),
+       count(distinct smallint_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,DOUBLE,BIGINT,BIGINT
+---- RESULTS
+0,0,0,1
+10,1,1,1
+20,2,2,1
+30,3,3,1
+40,4,4,1
+50,5,5,1
+60,6,6,1
+70,7,7,1
+80,8,8,1
+90,9,9,1
+====
+---- QUERY
+# Multiple distinct with grouping. Last needs intermediate tuple.
+select bigint_col, count(distinct tinyint_col), sum(distinct int_col),
+       avg(distinct smallint_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,BIGINT,BIGINT,DOUBLE
+---- RESULTS
+0,1,0,0
+10,1,1,1
+20,1,2,2
+30,1,3,3
+40,1,4,4
+50,1,5,5
+60,1,6,6
+70,1,7,7
+80,1,8,8
+90,1,9,9
+====
+---- QUERY
+# Multiple distinct with grouping. All need intermediate tuples
+select bigint_col, avg(distinct tinyint_col), avg(distinct int_col),
+       avg(distinct smallint_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,DOUBLE,DOUBLE,DOUBLE
+---- RESULTS
+0,0,0,0
+10,1,1,1
+20,2,2,2
+30,3,3,3
+40,4,4,4
+50,5,5,5
+60,6,6,6
+70,7,7,7
+80,8,8,8
+90,9,9,9
+====
+---- QUERY
+# Multiple distinct and non-distinct without grouping.
+select count(distinct tinyint_col), count(distinct smallint_col), count(int_col)
+from alltypes
+---- TYPES
+BIGINT,BIGINT,BIGINT
+---- RESULTS
+10,10,7300
+====
+---- QUERY
+# Multiple distinct and non-distinct without grouping. First distinct needs
+# intermediate agg tuple.
+select avg(distinct tinyint_col), count(distinct smallint_col), count(int_col)
+from alltypes
+---- TYPES
+DOUBLE,BIGINT,BIGINT
+---- RESULTS
+4.5,10,7300
+====
+---- QUERY
+# Multiple distinct and non-distinct without grouping. Non-distinct needs
+# intermediate agg tuple.
+select count(distinct tinyint_col), count(distinct smallint_col), avg(int_col)
+from alltypes
+---- TYPES
+BIGINT,BIGINT,DOUBLE
+---- RESULTS
+10,10,4.5
+====
+---- QUERY
+# Multiple distinct and non-distinct without grouping. All need intermediate agg tuples.
+select avg(distinct tinyint_col), avg(distinct smallint_col), avg(int_col)
+from alltypes
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE
+---- RESULTS
+4.5,4.5,4.5
+====
+---- QUERY
+# Multiple distinct and non-distinct with grouping.
+select bigint_col, count(distinct tinyint_col), count(distinct smallint_col),
+       count(int_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+0,1,1,730
+10,1,1,730
+20,1,1,730
+30,1,1,730
+40,1,1,730
+50,1,1,730
+60,1,1,730
+70,1,1,730
+80,1,1,730
+90,1,1,730
+====
+---- QUERY
+# Multiple distinct and non-distinct without grouping. First distinct needs
+# intermediate agg tuple.
+select bigint_col, avg(distinct tinyint_col), count(distinct smallint_col),
+       count(int_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,DOUBLE,BIGINT,BIGINT
+---- RESULTS
+0,0,1,730
+10,1,1,730
+20,2,1,730
+30,3,1,730
+40,4,1,730
+50,5,1,730
+60,6,1,730
+70,7,1,730
+80,8,1,730
+90,9,1,730
+====
+---- QUERY
+# Multiple distinct and non-distinct without grouping. Non-distinct needs
+# intermediate agg tuple.
+select bigint_col, count(distinct tinyint_col), count(distinct smallint_col),
+       avg(int_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,BIGINT,BIGINT,DOUBLE
+---- RESULTS
+0,1,1,0
+10,1,1,1
+20,1,1,2
+30,1,1,3
+40,1,1,4
+50,1,1,5
+60,1,1,6
+70,1,1,7
+80,1,1,8
+90,1,1,9
+====
+---- QUERY
+# Multiple distinct and non-distinct without grouping. All need intermediate agg tuples.
+select bigint_col, avg(distinct tinyint_col), avg(distinct smallint_col),
+       avg(int_col)
+from alltypes group by bigint_col
+---- TYPES
+BIGINT,DOUBLE,DOUBLE,DOUBLE
+---- RESULTS
+0,0,0,0
+10,1,1,1
+20,2,2,2
+30,3,3,3
+40,4,4,4
+50,5,5,5
+60,6,6,6
+70,7,7,7
+80,8,8,8
+90,9,9,9
+====
+---- QUERY
+# Multiple distinct with constant and null
+select count(distinct 0), count(distinct null) from alltypes
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+1,0
+====
+---- QUERY
+# Multiple distinct with agg that returns a string (group_concat)
+select id, count(distinct id), group_concat(distinct string_col)
+from alltypestiny group by id
+---- TYPES
+INT,BIGINT,STRING
+---- RESULTS
+4,1,'0'
+2,1,'0'
+6,1,'0'
+0,1,'0'
+7,1,'1'
+1,1,'1'
+5,1,'1'
+3,1,'1'
+====
+---- QUERY
+# Multiple distinct over more complex espressions
+select count(distinct id % 2),
+  count(distinct concat(string_col, 'a')) > 0,
+  sum(distinct tinyint_col * 0),
+  abs(count(distinct id) * 100)
+from alltypestiny;
+---- TYPES
+BIGINT,BOOLEAN,BIGINT,BIGINT
+---- RESULTS
+2,True,0,800
+====
+---- QUERY
+# Multiple distinct inside a subplan
+select id, v.cnt, v.sm
+from functional_parquet.complextypestbl a cross join
+  (select count(distinct item) cnt, sum(distinct item) sm from a.int_array) v;
+---- TYPES
+BIGINT,BIGINT,BIGINT
+---- RESULTS
+1,3,6
+2,3,6
+3,0,NULL
+4,0,NULL
+5,0,NULL
+6,0,NULL
+7,0,NULL
+8,1,-1
+====
+---- QUERY
+# Multiple distinct with a subquery
+select sum(distinct v.cnt), count(distinct v.sm)
+from (select id, count(distinct int_col) cnt, sum(distinct tinyint_col) sm
+  from alltypestiny group by id) v;
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+1,2
+====
+---- QUERY
+# Multiple distinct with NULLs (from the left outer join)
+select count(distinct a.id), count(distinct b.id), avg(distinct b.tinyint_col)
+from alltypessmall a left outer join alltypestiny b on a.id = b.id
+where a.id < 12 and a.id > 5;
+---- TYPES
+BIGINT,BIGINT,DOUBLE
+---- RESULTS
+6,2,0.5
+====
+---- QUERY
+# Multiple distinct with a larger number of classes
+select
+  count(distinct id),
+  count(distinct tinyint_col),
+  count(distinct smallint_col),
+  count(distinct int_col),
+  count(distinct bigint_col),
+  count(distinct double_col),
+  count(distinct float_col),
+  count(distinct string_col),
+  count(distinct timestamp_col)
+from alltypestiny;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+8,2,2,2,2,2,2,2,8
+====

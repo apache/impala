@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.impala.catalog.Function;
@@ -27,7 +26,6 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
-import org.apache.impala.thrift.TExpr;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -55,47 +53,6 @@ public class AnalyzerTest extends FrontendTestBase {
         "cast('2012-12-21 00:00:00.000' as timestamp)");
     typeToLiteralValue_.put(Type.STRING, "'Hello, World!'");
     typeToLiteralValue_.put(Type.NULL, "NULL");
-  }
-
-  /**
-   * Check whether SelectStmt components can be converted to thrift.
-   */
-  protected void checkSelectToThrift(SelectStmt node) {
-    // convert select list exprs and where clause to thrift
-    List<Expr> selectListExprs = node.getResultExprs();
-    List<TExpr> thriftExprs = Expr.treesToThrift(selectListExprs);
-    LOG.info("select list:\n");
-    for (TExpr expr: thriftExprs) {
-      LOG.info(expr.toString() + "\n");
-    }
-    for (Expr expr: selectListExprs) {
-      checkBinaryExprs(expr);
-    }
-    if (node.getWhereClause() != null) {
-      TExpr thriftWhere = node.getWhereClause().treeToThrift();
-      LOG.info("WHERE pred: " + thriftWhere.toString() + "\n");
-      checkBinaryExprs(node.getWhereClause());
-    }
-    AggregateInfo aggInfo = node.getAggInfo();
-    if (aggInfo != null) {
-      if (aggInfo.getGroupingExprs() != null) {
-        LOG.info("grouping exprs:\n");
-        for (Expr expr: aggInfo.getGroupingExprs()) {
-          LOG.info(expr.treeToThrift().toString() + "\n");
-          checkBinaryExprs(expr);
-        }
-      }
-      LOG.info("aggregate exprs:\n");
-      for (Expr expr: aggInfo.getAggregateExprs()) {
-        LOG.info(expr.treeToThrift().toString() + "\n");
-        checkBinaryExprs(expr);
-      }
-      if (node.getHavingPred() != null) {
-        TExpr thriftHaving = node.getHavingPred().treeToThrift();
-        LOG.info("HAVING pred: " + thriftHaving.toString() + "\n");
-        checkBinaryExprs(node.getHavingPred());
-      }
-    }
   }
 
   /**
@@ -131,23 +88,6 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalysisError(uqQuery, createAnalysisCtx(tbl.getDb()), expectedError);
     String fqQuery = query.replace("$TBL", tbl.toString());
     AnalysisError(fqQuery, expectedError);
-  }
-
-  /**
-   * Makes sure that operands to binary exprs having same type.
-   */
-  private void checkBinaryExprs(Expr expr) {
-    if (expr instanceof BinaryPredicate
-        || (expr instanceof ArithmeticExpr
-        && ((ArithmeticExpr) expr).getOp() != ArithmeticExpr.Operator.BITNOT)) {
-      Assert.assertEquals(expr.getChildren().size(), 2);
-      // The types must be equal or one of them is NULL_TYPE.
-      Assert.assertTrue(expr.getChild(0).getType() == expr.getChild(1).getType()
-          || expr.getChild(0).getType().isNull() || expr.getChild(1).getType().isNull());
-    }
-    for (Expr child: expr.getChildren()) {
-      checkBinaryExprs(child);
-    }
   }
 
   @Test

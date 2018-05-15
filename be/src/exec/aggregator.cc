@@ -43,41 +43,41 @@ namespace impala {
 
 const char* Aggregator::LLVM_CLASS_NAME = "class.impala::Aggregator";
 
-Aggregator::Aggregator(ExecNode* exec_node, ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs, const std::string& name)
+Aggregator::Aggregator(ExecNode* exec_node, ObjectPool* pool,
+    const TAggregator& taggregator, const DescriptorTbl& descs, const std::string& name,
+    int agg_idx)
   : id_(exec_node->id()),
     exec_node_(exec_node),
+    agg_idx_(agg_idx),
     pool_(pool),
-    intermediate_tuple_id_(tnode.agg_node.intermediate_tuple_id),
+    intermediate_tuple_id_(taggregator.intermediate_tuple_id),
     intermediate_tuple_desc_(descs.GetTupleDescriptor(intermediate_tuple_id_)),
-    output_tuple_id_(tnode.agg_node.output_tuple_id),
+    output_tuple_id_(taggregator.output_tuple_id),
     output_tuple_desc_(descs.GetTupleDescriptor(output_tuple_id_)),
     row_desc_(*exec_node->row_desc()),
     input_row_desc_(*exec_node->child(0)->row_desc()),
-    needs_finalize_(tnode.agg_node.need_finalize),
-    runtime_profile_(RuntimeProfile::Create(pool_, name)),
-    num_rows_returned_(0),
-    rows_returned_counter_(nullptr),
-    build_timer_(nullptr) {}
+    needs_finalize_(taggregator.need_finalize),
+    runtime_profile_(RuntimeProfile::Create(pool_, name)) {}
 
 Aggregator::~Aggregator() {}
 
-Status Aggregator::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status Aggregator::Init(const TAggregator& taggregator, RuntimeState* state,
+    const std::vector<TExpr>& conjuncts) {
   DCHECK(intermediate_tuple_desc_ != nullptr);
   DCHECK(output_tuple_desc_ != nullptr);
   DCHECK_EQ(intermediate_tuple_desc_->slots().size(), output_tuple_desc_->slots().size());
 
-  int j = num_grouping_exprs();
-  for (int i = 0; i < tnode.agg_node.aggregate_functions.size(); ++i, ++j) {
+  int j = GetNumGroupingExprs();
+  for (int i = 0; i < taggregator.aggregate_functions.size(); ++i, ++j) {
     SlotDescriptor* intermediate_slot_desc = intermediate_tuple_desc_->slots()[j];
     SlotDescriptor* output_slot_desc = output_tuple_desc_->slots()[j];
     AggFn* agg_fn;
-    RETURN_IF_ERROR(AggFn::Create(tnode.agg_node.aggregate_functions[i], input_row_desc_,
+    RETURN_IF_ERROR(AggFn::Create(taggregator.aggregate_functions[i], input_row_desc_,
         *intermediate_slot_desc, *output_slot_desc, state, &agg_fn));
     agg_fns_.push_back(agg_fn);
   }
 
-  RETURN_IF_ERROR(ScalarExpr::Create(tnode.conjuncts, row_desc_, state, &conjuncts_));
+  RETURN_IF_ERROR(ScalarExpr::Create(conjuncts, row_desc_, state, &conjuncts_));
   return Status::OK();
 }
 
@@ -123,7 +123,7 @@ void Aggregator::Close(RuntimeState* state) {
 void Aggregator::InitAggSlots(
     const vector<AggFnEvaluator*>& agg_fn_evals, Tuple* intermediate_tuple) {
   vector<SlotDescriptor*>::const_iterator slot_desc =
-      intermediate_tuple_desc_->slots().begin() + num_grouping_exprs();
+      intermediate_tuple_desc_->slots().begin() + GetNumGroupingExprs();
   for (int i = 0; i < agg_fn_evals.size(); ++i, ++slot_desc) {
     // To minimize branching on the UpdateTuple path, initialize the result value so that
     // the Add() UDA function can ignore the NULL bit of its destination value. E.g. for
@@ -184,7 +184,7 @@ Tuple* Aggregator::GetOutputTuple(
   // Copy grouping values from tuple to dst.
   // TODO: Codegen this.
   if (dst != tuple) {
-    int num_grouping_slots = num_grouping_exprs();
+    int num_grouping_slots = GetNumGroupingExprs();
     for (int i = 0; i < num_grouping_slots; ++i) {
       SlotDescriptor* src_slot_desc = intermediate_tuple_desc_->slots()[i];
       SlotDescriptor* dst_slot_desc = output_tuple_desc_->slots()[i];
@@ -568,7 +568,7 @@ Status Aggregator::CodegenUpdateTuple(LlvmCodeGen* codegen, llvm::Function** fn)
 
   // Loop over each expr and generate the IR for that slot.  If the expr is not
   // count(*), generate a helper IR function to update the slot and call that.
-  int j = num_grouping_exprs();
+  int j = GetNumGroupingExprs();
   for (int i = 0; i < agg_fns_.size(); ++i, ++j) {
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[j];
     AggFn* agg_fn = agg_fns_[i];

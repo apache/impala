@@ -20,19 +20,17 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
-import static org.apache.impala.analysis.JoinOperator.*;
+import org.apache.impala.analysis.MultiAggregateInfo.AggPhase;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
-import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.util.KuduUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -789,21 +787,21 @@ public class DistributedPlanner {
    * Returns a fragment that materializes the aggregation result of 'node'.
    * If the child fragment is partitioned, the result fragment will be partitioned on
    * the grouping exprs of 'node'.
-   * If 'node' is phase 1 of a 2-phase DISTINCT aggregation, this will simply
-   * add 'node' to the child fragment and return the child fragment; the new
-   * fragment will be created by the subsequent call of createAggregationFragment()
-   * for the phase 2 AggregationNode.
+   * If 'node' is phase 1 of a 2-phase DISTINCT aggregation or the 'transpose' phase of a
+   * multiple-distinct aggregation, this will simply add 'node' to the child fragment and
+   * return the child fragment; the new fragment will be created by the call of
+   * createAggregationFragment() for the phase 2 AggregationNode.
    */
   private PlanFragment createAggregationFragment(AggregationNode node,
       PlanFragment childFragment, ArrayList<PlanFragment> fragments)
       throws ImpalaException {
-    if (!childFragment.isPartitioned()) {
+    if (!childFragment.isPartitioned() || node.getAggPhase() == AggPhase.TRANSPOSE) {
       // nothing to distribute; do full aggregation directly within childFragment
       childFragment.addPlanRoot(node);
       return childFragment;
     }
 
-    if (node.getAggInfo().isDistinctAgg()) {
+    if (node.isDistinctAgg()) {
       // 'node' is phase 1 of a DISTINCT aggregation; the actual agg fragment
       // will get created in the next createAggregationFragment() call
       // for the parent AggregationNode
@@ -813,7 +811,7 @@ public class DistributedPlanner {
 
     // Check if 'node' is phase 2 of a DISTINCT aggregation.
     boolean isDistinct = node.getChild(0) instanceof AggregationNode
-          && ((AggregationNode)(node.getChild(0))).getAggInfo().isDistinctAgg();
+        && ((AggregationNode) (node.getChild(0))).isDistinctAgg();
     if (isDistinct) {
       return createPhase2DistinctAggregationFragment(node, childFragment, fragments);
     } else {
@@ -827,18 +825,15 @@ public class DistributedPlanner {
    * aggregation.
    */
   private PlanFragment createMergeAggregationFragment(
-      AggregationNode node, PlanFragment childFragment)
-      throws ImpalaException {
+      AggregationNode node, PlanFragment childFragment) throws ImpalaException {
     Preconditions.checkArgument(childFragment.isPartitioned());
-    ArrayList<Expr> groupingExprs = node.getAggInfo().getGroupingExprs();
-    boolean hasGrouping = !groupingExprs.isEmpty();
-
+    List<Expr> partitionExprs = node.getMergePartitionExprs(ctx_.getRootAnalyzer());
+    boolean hasGrouping = !partitionExprs.isEmpty();
     DataPartition parentPartition = null;
     if (hasGrouping) {
-      List<Expr> partitionExprs = node.getAggInfo().getPartitionExprs();
-      if (partitionExprs == null) partitionExprs = groupingExprs;
-      boolean childHasCompatPartition = ctx_.getRootAnalyzer().setsHaveValueTransfer(
-          partitionExprs, childFragment.getDataPartition().getPartitionExprs(), true);
+      boolean childHasCompatPartition = node.isSingleClassAgg()
+          && ctx_.getRootAnalyzer().setsHaveValueTransfer(partitionExprs,
+                 childFragment.getDataPartition().getPartitionExprs(), true);
       if (childHasCompatPartition) {
         // The data is already partitioned on the required expressions. We can do the
         // aggregation in the child fragment without an extra merge step.
@@ -848,13 +843,8 @@ public class DistributedPlanner {
         childFragment.addPlanRoot(node);
         return childFragment;
       }
-      // the parent fragment is partitioned on the grouping exprs;
-      // substitute grouping exprs to reference the *output* of the agg, not the input
-      partitionExprs = Expr.substituteList(partitionExprs,
-          node.getAggInfo().getIntermediateSmap(), ctx_.getRootAnalyzer(), false);
       parentPartition = DataPartition.hashPartitioned(partitionExprs);
     } else {
-      // the parent fragment is unpartitioned
       parentPartition = DataPartition.UNPARTITIONED;
     }
 
@@ -874,7 +864,7 @@ public class DistributedPlanner {
     // place a merge aggregation step in a new fragment
     PlanFragment mergeFragment = createParentFragment(childFragment, parentPartition);
     AggregationNode mergeAggNode = new AggregationNode(ctx_.getNextNodeId(),
-        mergeFragment.getPlanRoot(), node.getAggInfo().getMergeAggInfo());
+        mergeFragment.getPlanRoot(), node.getMultiAggInfo(), AggPhase.FIRST_MERGE);
     mergeAggNode.init(ctx_.getRootAnalyzer());
     mergeAggNode.setLimit(limit);
     // Merge of non-grouping agg only processes one tuple per Impala daemon - codegen
@@ -904,65 +894,44 @@ public class DistributedPlanner {
   private PlanFragment createPhase2DistinctAggregationFragment(
       AggregationNode phase2AggNode, PlanFragment childFragment,
       ArrayList<PlanFragment> fragments) throws ImpalaException {
-    // When a query has both grouping and distinct exprs, impala can optionally include
-    // the distinct exprs in the hash exchange of the first aggregation phase to spread
-    // the data among more nodes. However, this plan requires another hash exchange on the
-    // grouping exprs in the second phase which is not required when omitting the distinct
-    // exprs in the first phase. Shuffling by both is better if the grouping exprs have
-    // low NDVs.
-    boolean shuffleDistinctExprs = ctx_.getQueryOptions().shuffle_distinct_exprs ||
-        phase2AggNode.getAggInfo().getGroupingExprs().isEmpty();
     // The phase-1 aggregation node is already in the child fragment.
     Preconditions.checkState(phase2AggNode.getChild(0) == childFragment.getPlanRoot());
+    // When a query has both grouping and distinct exprs, Impala can optionally include
+    // the distinct exprs in the hash exchange of the first aggregation phase to spread
+    // the data among more nodes. However, this plan requires another hash exchange on
+    // the grouping exprs in the second phase which is not required when omitting the
+    // distinct exprs in the first phase. Shuffling by both is better if the grouping
+    // exprs have low NDVs.
+    boolean shuffleDistinctExprs = ctx_.getQueryOptions().shuffle_distinct_exprs;
+    boolean hasGrouping = phase2AggNode.hasGrouping();
 
-    AggregateInfo phase1AggInfo = ((AggregationNode) phase2AggNode.getChild(0))
-        .getAggInfo();
-    ArrayList<Expr> partitionExprs;
+    AggregationNode phase1AggNode = ((AggregationNode) phase2AggNode.getChild(0));
     // With grouping, the output partition exprs of the child are the (input) grouping
     // exprs of the parent. The grouping exprs reference the output tuple of phase-1
     // but the partitioning happens on the intermediate tuple of the phase-1.
-    if (shuffleDistinctExprs) {
-      // We need to do
-      // - child fragment:
-      //   * phase-1 aggregation
-      // - first merge fragment, hash-partitioned on grouping and distinct exprs:
-      //   * merge agg of phase-1
-      //   * phase-2 agg
-      // - second merge fragment, partitioned on grouping exprs or unpartitioned
-      //   without grouping exprs
-      //   * merge agg of phase-2
-      partitionExprs = Expr.substituteList(
-          phase1AggInfo.getGroupingExprs(), phase1AggInfo.getIntermediateSmap(),
-          ctx_.getRootAnalyzer(), false);
-    } else {
-      // We need to do
-      // - child fragment:
-      //   * phase-1 aggregation
-      // - merge fragment, hash-partitioned on grouping exprs:
-      //   * merge agg of phase-1
-      //   * phase-2 agg
-      partitionExprs = Expr.substituteList(phase2AggNode.getAggInfo().getGroupingExprs(),
-          phase1AggInfo.getOutputToIntermediateSmap(), ctx_.getRootAnalyzer(), false);
-    }
+    List<Expr> phase1PartitionExprs =
+        phase1AggNode.getMergePartitionExprs(ctx_.getRootAnalyzer());
+
     PlanFragment firstMergeFragment;
-    boolean childHasCompatPartition = ctx_.getRootAnalyzer().setsHaveValueTransfer(
-        partitionExprs, childFragment.getDataPartition().getPartitionExprs(), true);
+    boolean childHasCompatPartition = phase1AggNode.isSingleClassAgg()
+        && ctx_.getRootAnalyzer().setsHaveValueTransfer(phase1PartitionExprs,
+               childFragment.getDataPartition().getPartitionExprs(), true);
     if (childHasCompatPartition) {
       // The data is already partitioned on the required expressions, we can skip the
       // phase-1 merge step.
       childFragment.addPlanRoot(phase2AggNode);
       firstMergeFragment = childFragment;
     } else {
-      DataPartition mergePartition = DataPartition.hashPartitioned(partitionExprs);
-      // Convert the existing node to a preaggregation.
-      AggregationNode preaggNode = (AggregationNode)phase2AggNode.getChild(0);
-      preaggNode.setIsPreagg(ctx_);
+      phase1AggNode.setIntermediateTuple();
+      phase1AggNode.setIsPreagg(ctx_);
+
+      DataPartition phase1MergePartition =
+          DataPartition.hashPartitioned(phase1PartitionExprs);
 
       // place phase-1 merge aggregation step in a new fragment
-      firstMergeFragment = createParentFragment(childFragment, mergePartition);
-      AggregateInfo phase1MergeAggInfo = phase1AggInfo.getMergeAggInfo();
-      AggregationNode phase1MergeAggNode =
-          new AggregationNode(ctx_.getNextNodeId(), preaggNode, phase1MergeAggInfo);
+      firstMergeFragment = createParentFragment(childFragment, phase1MergePartition);
+      AggregationNode phase1MergeAggNode = new AggregationNode(ctx_.getNextNodeId(),
+          phase1AggNode, phase1AggNode.getMultiAggInfo(), AggPhase.FIRST_MERGE);
       phase1MergeAggNode.init(ctx_.getRootAnalyzer());
       phase1MergeAggNode.unsetNeedsFinalize();
       phase1MergeAggNode.setIntermediateTuple();
@@ -972,27 +941,30 @@ public class DistributedPlanner {
       // if there is a limit, it had already been placed with the phase-2 aggregation
       // step (which is where it should be)
       firstMergeFragment.addPlanRoot(phase2AggNode);
-      if (shuffleDistinctExprs) fragments.add(firstMergeFragment);
+      if (shuffleDistinctExprs || !hasGrouping) fragments.add(firstMergeFragment);
     }
-    if (!shuffleDistinctExprs) return firstMergeFragment;
+    if (!shuffleDistinctExprs && hasGrouping) return firstMergeFragment;
+
     phase2AggNode.unsetNeedsFinalize();
     phase2AggNode.setIntermediateTuple();
     // Limit should be applied at the final merge aggregation node
     long limit = phase2AggNode.getLimit();
     phase2AggNode.unsetLimit();
 
-    DataPartition mergePartition;
-    if (phase2AggNode.getAggInfo().getGroupingExprs().isEmpty()) {
-      mergePartition = DataPartition.UNPARTITIONED;
+    DataPartition phase2MergePartition;
+    List<Expr> phase2PartitionExprs =
+        phase2AggNode.getMergePartitionExprs(ctx_.getRootAnalyzer());
+    if (phase2PartitionExprs.isEmpty()) {
+      phase2MergePartition = DataPartition.UNPARTITIONED;
     } else {
       phase2AggNode.setIsPreagg(ctx_);
-      mergePartition = DataPartition.hashPartitioned(
-          phase2AggNode.getAggInfo().getMergeAggInfo().getGroupingExprs());
+      phase2MergePartition = DataPartition.hashPartitioned(phase2PartitionExprs);
     }
     PlanFragment secondMergeFragment =
-        createParentFragment(firstMergeFragment, mergePartition);
+        createParentFragment(firstMergeFragment, phase2MergePartition);
+
     AggregationNode phase2MergeAggNode = new AggregationNode(ctx_.getNextNodeId(),
-        phase2AggNode, phase2AggNode.getAggInfo().getMergeAggInfo());
+        phase2AggNode, phase2AggNode.getMultiAggInfo(), AggPhase.SECOND_MERGE);
     phase2MergeAggNode.init(ctx_.getRootAnalyzer());
     phase2MergeAggNode.setLimit(limit);
     // Transfer having predicates to final merge agg node

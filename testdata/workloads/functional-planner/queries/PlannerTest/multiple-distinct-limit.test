@@ -1,0 +1,181 @@
+# Test correct placement of limit.
+select count(distinct tinyint_col) a, min(timestamp_col) b,
+       count(distinct smallint_col) c, max(timestamp_col) d
+from functional.alltypes
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, min(timestamp_col)), aggif(valid_tid() = 5, max(timestamp_col))
+|  limit: 10
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: count(smallint_col)
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(timestamp_col)
+|
+01:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: min(timestamp_col), max(timestamp_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, min(timestamp_col)), aggif(valid_tid() = 5, max(timestamp_col))
+|  limit: 10
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(tinyint_col)
+|  Class 1
+|    output: count:merge(smallint_col)
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(timestamp_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  Class 0
+|    output: count(tinyint_col)
+|  Class 1
+|    output: count(smallint_col)
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(timestamp_col)
+|
+05:AGGREGATE
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: min:merge(timestamp_col), max:merge(timestamp_col)
+|
+04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    group by: tinyint_col
+|  Class 1
+|    group by: smallint_col
+|  Class 2
+|    output: min(timestamp_col), max(timestamp_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Test correct placement of limit. Simplifies to a single class with one distinct agg.
+select b from (
+  select count(distinct tinyint_col) a, min(timestamp_col) b,
+         count(distinct smallint_col) c, max(timestamp_col) d
+  from functional.alltypes limit 20) v
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: min(timestamp_col)
+|  limit: 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:AGGREGATE [FINALIZE]
+|  output: min:merge(timestamp_col)
+|  limit: 10
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: min(timestamp_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Test correct placement of limit. Simplifies to a single class with a non-distinct agg.
+select d from (
+  select count(distinct tinyint_col) a, min(timestamp_col) b,
+         count(distinct smallint_col) c, max(timestamp_col) d
+  from functional.alltypes limit 20) v
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: max(timestamp_col)
+|  limit: 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:AGGREGATE [FINALIZE]
+|  output: max:merge(timestamp_col)
+|  limit: 10
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: max(timestamp_col)
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Test correct placement of limit. Simplifies to a single class with distinct
+# and non-distinct aggss.
+select d, c, d from (
+  select count(distinct tinyint_col) a, min(timestamp_col) b,
+         count(distinct smallint_col) c, max(timestamp_col) d
+  from functional.alltypes limit 20) v
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(smallint_col), max:merge(timestamp_col)
+|  limit: 10
+|
+01:AGGREGATE
+|  output: max(timestamp_col)
+|  group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(smallint_col), max:merge(timestamp_col)
+|  limit: 10
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(smallint_col), max:merge(timestamp_col)
+|
+05:AGGREGATE
+|  output: max:merge(timestamp_col)
+|  group by: smallint_col
+|
+04:EXCHANGE [HASH(smallint_col)]
+|
+01:AGGREGATE [STREAMING]
+|  output: max(timestamp_col)
+|  group by: smallint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====

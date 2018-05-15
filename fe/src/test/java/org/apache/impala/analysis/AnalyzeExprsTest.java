@@ -18,6 +18,8 @@
 package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -30,7 +32,6 @@ import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Catalog;
-import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
@@ -2204,13 +2205,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     TupleDescriptor tblRefDesc = stmt.fromClause_.get(0).getDesc();
     tblRefDesc.materializeSlots();
     tblRefDesc.computeMemLayout();
-    if (stmt.hasAggInfo()) {
-      TupleDescriptor intDesc = stmt.getAggInfo().intermediateTupleDesc_;
+    if (stmt.hasMultiAggInfo()) {
+      Preconditions.checkState(stmt.getMultiAggInfo().getAggClasses().size() == 1);
+      AggregateInfo aggInfo = stmt.getMultiAggInfo().getAggClass(0);
+      TupleDescriptor intDesc = aggInfo.intermediateTupleDesc_;
       intDesc.materializeSlots();
       intDesc.computeMemLayout();
-      checkSerializedMTime(stmt.getAggInfo().getAggregateExprs().get(0), expectMTime);
+      checkSerializedMTime(aggInfo.getAggregateExprs().get(0), expectMTime);
       checkSerializedMTime(
-          stmt.getAggInfo().getMergeAggInfo().getAggregateExprs().get(0), expectMTime);
+          aggInfo.getMergeAggInfo().getAggregateExprs().get(0), expectMTime);
     } else {
       checkSerializedMTime(stmt.getSelectList().getItems().get(0).getExpr(), expectMTime);
     }
@@ -2727,7 +2730,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestAppxCountDistinctOption() throws AnalysisException, CatalogException {
+  public void TestAppxCountDistinctOption() throws AnalysisException {
     TQueryOptions queryOptions = new TQueryOptions();
     queryOptions.setAppx_count_distinct(true);
 
@@ -2736,20 +2739,24 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Accumulates count(distinct) for all columns of both alltypesTbl and decimalTbl.
     List<String> allCountDistinctFns = Lists.newArrayList();
 
-    Table alltypesTbl = catalog_.getTable("functional", "alltypes");
+    Table alltypesTbl = catalog_.getOrLoadTable("functional", "alltypes");
     for (Column col: alltypesTbl.getColumns()) {
       String colName = col.getName();
       // Test a single count(distinct) with some other aggs.
-      AnalyzesOk(String.format(
-          "select count(distinct %s), sum(distinct smallint_col), " +
+      String countDistinctFn = String.format("count(distinct %s)", colName);
+      SelectStmt stmt = (SelectStmt) AnalyzesOk(String.format(
+          "select %s, sum(distinct smallint_col), " +
           "avg(float_col), min(%s) " +
           "from functional.alltypes",
-          colName, colName), createAnalysisCtx(queryOptions));
-      countDistinctFns.add(String.format("count(distinct %s)", colName));
+          countDistinctFn, colName), createAnalysisCtx(queryOptions));
+      validateSingleColAppxCountDistinctRewrite(stmt, colName);
+      countDistinctFns.add(countDistinctFn);
     }
     // Test a single query with a count(distinct) on all columns of alltypesTbl.
-    AnalyzesOk(String.format("select %s from functional.alltypes",
+    SelectStmt alltypesStmt = (SelectStmt) AnalyzesOk(String.format(
+        "select %s from functional.alltypes",
         Joiner.on(",").join(countDistinctFns)), createAnalysisCtx(queryOptions));
+    assertAllNdvAggExprs(alltypesStmt, alltypesTbl.getColumns().size());
 
     allCountDistinctFns.addAll(countDistinctFns);
     countDistinctFns.clear();
@@ -2757,38 +2764,85 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     for (Column col: decimalTbl.getColumns()) {
       String colName = col.getName();
       // Test a single count(distinct) with some other aggs.
-      AnalyzesOk(String.format(
+      SelectStmt stmt = (SelectStmt) AnalyzesOk(String.format(
           "select count(distinct %s), sum(distinct d1), " +
           "avg(d2), min(%s) " +
           "from functional.decimal_tbl",
           colName, colName), createAnalysisCtx(queryOptions));
       countDistinctFns.add(String.format("count(distinct %s)", colName));
+      validateSingleColAppxCountDistinctRewrite(stmt, colName);
     }
     // Test a single query with a count(distinct) on all columns of decimalTbl.
-    AnalyzesOk(String.format("select %s from functional.decimal_tbl",
+    SelectStmt decimalTblStmt = (SelectStmt) AnalyzesOk(String.format(
+        "select %s from functional.decimal_tbl",
         Joiner.on(",").join(countDistinctFns)), createAnalysisCtx(queryOptions));
+    assertAllNdvAggExprs(decimalTblStmt, decimalTbl.getColumns().size());
 
     allCountDistinctFns.addAll(countDistinctFns);
 
     // Test a single query with a count(distinct) on all columns of both
     // alltypes/decimalTbl.
-    AnalyzesOk(String.format(
+    SelectStmt comboStmt = (SelectStmt) AnalyzesOk(String.format(
         "select %s from functional.alltypes cross join functional.decimal_tbl",
-        Joiner.on(",").join(countDistinctFns)), createAnalysisCtx(queryOptions));
+        Joiner.on(",").join(allCountDistinctFns)), createAnalysisCtx(queryOptions));
+    assertAllNdvAggExprs(comboStmt, alltypesTbl.getColumns().size() +
+        decimalTbl.getColumns().size());
 
     // The rewrite does not work for multiple count() arguments.
-    AnalysisError("select count(distinct int_col, bigint_col), " +
-        "count(distinct string_col, float_col) from functional.alltypes",
-        createAnalysisCtx(queryOptions),
-        "all DISTINCT aggregate functions need to have the same set of parameters as " +
-        "count(DISTINCT int_col, bigint_col); deviating function: " +
-        "count(DISTINCT string_col, float_col)");
+    SelectStmt noRewriteStmt = (SelectStmt) AnalyzesOk(
+        "select count(distinct int_col, bigint_col), " +
+        "count(distinct string_col, float_col) from functional.alltypes");
+    assertNoNdvAggExprs(noRewriteStmt, 2);
+
     // The rewrite only applies to the count() function.
-    AnalysisError(
+    noRewriteStmt = (SelectStmt) AnalyzesOk(
         "select avg(distinct int_col), sum(distinct float_col) from functional.alltypes",
-        createAnalysisCtx(queryOptions),
-        "all DISTINCT aggregate functions need to have the same set of parameters as " +
-        "avg(DISTINCT int_col); deviating function: sum(DISTINCT");
+        createAnalysisCtx(queryOptions));
+    assertNoNdvAggExprs(noRewriteStmt, 2);
+  }
+
+  // Checks that 'stmt' has two aggregate exprs - DISTINCT 'sum' and non-DISTINCT 'ndv'.
+  private void validateSingleColAppxCountDistinctRewrite(
+      SelectStmt stmt, String rewrittenColName) {
+    MultiAggregateInfo multiAggInfo = stmt.getMultiAggInfo();
+    List<FunctionCallExpr> aggExprs = multiAggInfo.getAggExprs();
+    assertEquals(4, aggExprs.size());
+    int numDistinctExprs = 0;
+    int numNdvExprs = 0;
+    for (FunctionCallExpr aggExpr : aggExprs) {
+      if (aggExpr.isDistinct()) {
+        assertEquals("sum", aggExpr.getFnName().toString());
+        ++numDistinctExprs;
+      }
+      if (aggExpr.getFnName().toString().equals("ndv")) {
+        assertEquals(rewrittenColName, aggExpr.getChild(0).toSql());
+        ++numNdvExprs;
+      }
+    }
+    assertEquals(1, numDistinctExprs);
+    assertEquals(1, numNdvExprs);
+  }
+
+  // Checks that all aggregate exprs in 'stmt' are non-DISTINCT 'ndv'.
+  private void assertAllNdvAggExprs(SelectStmt stmt, int expectedNumAggExprs) {
+    MultiAggregateInfo multiAggInfo = stmt.getMultiAggInfo();
+    List<FunctionCallExpr> aggExprs = multiAggInfo.getAggExprs();
+    assertEquals(expectedNumAggExprs, aggExprs.size());
+    for (FunctionCallExpr aggExpr : aggExprs) {
+      assertFalse(aggExpr.isDistinct());
+      assertEquals("ndv", aggExpr.getFnName().toString());
+    }
+  }
+
+  // Checks that all aggregate exprs in 'stmt' are DISTINCT and not 'ndv'.
+  private void assertNoNdvAggExprs(SelectStmt stmt, int expectedNumAggExprs) {
+    MultiAggregateInfo multiAggInfo = stmt.getMultiAggInfo();
+    List<FunctionCallExpr> aggExprs = multiAggInfo.getAggExprs();
+    assertEquals(expectedNumAggExprs, aggExprs.size());
+    for (FunctionCallExpr aggExpr : aggExprs) {
+      assertTrue(aggExpr.isDistinct());
+      assertNotEquals("ndv", aggExpr.getFnName().toString());
+    }
   }
 
   @Test

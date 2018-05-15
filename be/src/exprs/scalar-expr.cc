@@ -44,6 +44,7 @@
 #include "exprs/tuple-is-null-predicate.h"
 #include "exprs/udf-builtins.h"
 #include "exprs/utility-functions.h"
+#include "exprs/valid-tuple-id.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
@@ -185,6 +186,9 @@ Status ScalarExpr::CreateNode(
       return Status::OK();
     case TExprNodeType::KUDU_PARTITION_EXPR:
       *expr = pool->Add(new KuduPartitionExpr(texpr_node));
+      return Status::OK();
+    case TExprNodeType::VALID_TUPLE_ID_EXPR:
+      *expr = pool->Add(new ValidTupleIdExpr(texpr_node));
       return Status::OK();
     default:
       *expr = nullptr;

@@ -39,6 +39,8 @@ import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InlineViewRef;
 import org.apache.impala.analysis.JoinOperator;
+import org.apache.impala.analysis.MultiAggregateInfo;
+import org.apache.impala.analysis.MultiAggregateInfo.AggPhase;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SelectStmt;
@@ -261,13 +263,17 @@ public class SingleNodePlanner {
         AnalyticInfo analyticInfo = selectStmt.getAnalyticInfo();
         AnalyticPlanner analyticPlanner =
             new AnalyticPlanner(analyticInfo, analyzer, ctx_);
+        MultiAggregateInfo multiAggInfo = selectStmt.getMultiAggInfo();
+        List<Expr> groupingExprs = multiAggInfo != null ?
+            multiAggInfo.getGroupingExprs() :
+            Collections.<Expr>emptyList();
         List<Expr> inputPartitionExprs = Lists.newArrayList();
-        AggregateInfo aggInfo = selectStmt.getAggInfo();
-        root = analyticPlanner.createSingleNodePlan(root,
-            aggInfo != null ? aggInfo.getGroupingExprs() : null, inputPartitionExprs);
-        if (aggInfo != null && !inputPartitionExprs.isEmpty()) {
+        root = analyticPlanner.createSingleNodePlan(
+            root, groupingExprs, inputPartitionExprs);
+        if (multiAggInfo != null && !inputPartitionExprs.isEmpty()
+            && multiAggInfo.getMaterializedAggClasses().size() == 1) {
           // analytic computation will benefit from a partition on inputPartitionExprs
-          aggInfo.setPartitionExprs(inputPartitionExprs);
+          multiAggInfo.getMaterializedAggClass(0).setPartitionExprs(inputPartitionExprs);
         }
       }
     } else {
@@ -610,13 +616,20 @@ public class SingleNodePlanner {
     List<SubplanRef> subplanRefs = Lists.newArrayList();
     computeParentAndSubplanRefs(
         selectStmt.getTableRefs(), analyzer.isStraightJoin(), parentRefs, subplanRefs);
-    AggregateInfo aggInfo = selectStmt.getAggInfo();
-    PlanNode root = createTableRefsPlan(parentRefs, subplanRefs, aggInfo, analyzer);
-    // add aggregation, if any
-    if (aggInfo != null) {
-      if (root instanceof HdfsScanNode) {
-        aggInfo.substitute(((HdfsScanNode) root).getOptimizedAggSmap(), analyzer);
-        aggInfo.getMergeAggInfo().substitute(((HdfsScanNode) root).getOptimizedAggSmap(), analyzer);
+    MultiAggregateInfo multiAggInfo = selectStmt.getMultiAggInfo();
+    // Only optimize scan/agg plan if there is a single aggregation class.
+    AggregateInfo scanAggInfo = null;
+    if (multiAggInfo != null && multiAggInfo.getMaterializedAggClasses().size() == 1) {
+      scanAggInfo = multiAggInfo.getMaterializedAggClass(0);
+    }
+    PlanNode root = createTableRefsPlan(parentRefs, subplanRefs, scanAggInfo, analyzer);
+    // Add aggregation, if any.
+    if (multiAggInfo != null) {
+      // Apply substitution for optimized scan/agg plan,
+      if (scanAggInfo != null && root instanceof HdfsScanNode) {
+        scanAggInfo.substitute(((HdfsScanNode) root).getOptimizedAggSmap(), analyzer);
+        scanAggInfo.getMergeAggInfo().substitute(
+            ((HdfsScanNode) root).getOptimizedAggSmap(), analyzer);
       }
       root = createAggregationPlan(selectStmt, analyzer, root);
     }
@@ -886,28 +899,56 @@ public class SingleNodePlanner {
    * Returns a new AggregationNode that materializes the aggregation of the given stmt.
    * Assigns conjuncts from the Having clause to the returned node.
    */
-  private PlanNode createAggregationPlan(SelectStmt selectStmt, Analyzer analyzer,
-      PlanNode root) throws ImpalaException {
-    Preconditions.checkState(selectStmt.getAggInfo() != null);
-    // add aggregation, if required
-    AggregateInfo aggInfo = selectStmt.getAggInfo();
-    root = new AggregationNode(ctx_.getNextNodeId(), root, aggInfo);
-    root.init(analyzer);
-    Preconditions.checkState(root.hasValidStats());
-    // if we're computing DISTINCT agg fns, the analyzer already created the
-    // 2nd phase agginfo
-    if (aggInfo.isDistinctAgg()) {
-      ((AggregationNode)root).unsetNeedsFinalize();
-      // The output of the 1st phase agg is the 1st phase intermediate.
-      ((AggregationNode)root).setIntermediateTuple();
-      root = new AggregationNode(ctx_.getNextNodeId(), root,
-          aggInfo.getSecondPhaseDistinctAggInfo());
-      root.init(analyzer);
-      Preconditions.checkState(root.hasValidStats());
+  private AggregationNode createAggregationPlan(
+      SelectStmt selectStmt, Analyzer analyzer, PlanNode root) throws ImpalaException {
+    MultiAggregateInfo multiAggInfo =
+        Preconditions.checkNotNull(selectStmt.getMultiAggInfo());
+    AggregationNode result = createAggregationPlan(root, multiAggInfo, analyzer);
+    ExprSubstitutionMap simplifiedAggSmap = multiAggInfo.getSimplifiedAggSmap();
+    if (simplifiedAggSmap == null) return result;
+
+    // Fix up aggregations that simplified to a single class after
+    // materializeRequiredSlots().
+
+    // Collect conjuncts and then re-assign them to the top-most aggregation node
+    // of the simplified plan.
+    AggregationNode dummyAgg = new AggregationNode(
+        ctx_.getNextNodeId(), result, multiAggInfo, AggPhase.TRANSPOSE);
+    dummyAgg.init(analyzer);
+    List<Expr> conjuncts =
+        Expr.substituteList(dummyAgg.getConjuncts(), simplifiedAggSmap, analyzer, true);
+    // Validate conjuncts after substitution.
+    for (Expr c : conjuncts) {
+      Preconditions.checkState(c.isBound(result.getTupleIds().get(0)));
     }
-    // add Having clause
-    root.assignConjuncts(analyzer);
-    return root;
+    result.getConjuncts().addAll(conjuncts);
+
+    // Apply simplification substitution in ancestors.
+    result.setOutputSmap(
+        ExprSubstitutionMap.compose(result.getOutputSmap(), simplifiedAggSmap, analyzer));
+    return result;
+  }
+
+  private AggregationNode createAggregationPlan(PlanNode root,
+      MultiAggregateInfo multiAggInfo, Analyzer analyzer) throws InternalException {
+    Preconditions.checkNotNull(multiAggInfo);
+    AggregationNode firstPhaseAgg =
+        new AggregationNode(ctx_.getNextNodeId(), root, multiAggInfo, AggPhase.FIRST);
+    firstPhaseAgg.init(analyzer);
+    if (!multiAggInfo.hasSecondPhase()) return firstPhaseAgg;
+
+    firstPhaseAgg.unsetNeedsFinalize();
+    firstPhaseAgg.setIntermediateTuple();
+
+    AggregationNode secondPhaseAgg = new AggregationNode(
+        ctx_.getNextNodeId(), firstPhaseAgg, multiAggInfo, AggPhase.SECOND);
+    secondPhaseAgg.init(analyzer);
+    if (!multiAggInfo.hasTransposePhase()) return secondPhaseAgg;
+
+    AggregationNode transposePhaseAgg = new AggregationNode(
+        ctx_.getNextNodeId(), secondPhaseAgg, multiAggInfo, AggPhase.TRANSPOSE);
+    transposePhaseAgg.init(analyzer);
+    return transposePhaseAgg;
   }
 
  /**
@@ -1621,7 +1662,7 @@ public class SingleNodePlanner {
       result = createUnionPlan(
           analyzer, unionStmt, unionStmt.getDistinctOperands(), null);
       result = new AggregationNode(
-          ctx_.getNextNodeId(), result, unionStmt.getDistinctAggInfo());
+          ctx_.getNextNodeId(), result, unionStmt.getDistinctAggInfo(), AggPhase.FIRST);
       result.init(analyzer);
     }
     // create ALL tree

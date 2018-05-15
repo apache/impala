@@ -41,7 +41,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Representation of a single select block, including GROUP BY, ORDER BY and HAVING
@@ -64,7 +63,7 @@ public class SelectStmt extends QueryStmt {
   private Expr havingPred_;
 
   // set if we have any kind of aggregation operation, include SELECT DISTINCT
-  private AggregateInfo aggInfo_;
+  private MultiAggregateInfo multiAggInfo_;
 
   // set if we have AnalyticExprs in the select list/order by clause
   private AnalyticInfo analyticInfo_;
@@ -97,7 +96,7 @@ public class SelectStmt extends QueryStmt {
     havingClause_ = havingPredicate;
     colLabels_ = Lists.newArrayList();
     havingPred_ = null;
-    aggInfo_ = null;
+    multiAggInfo_ = null;
     sortInfo_ = null;
   }
 
@@ -119,8 +118,8 @@ public class SelectStmt extends QueryStmt {
   public boolean hasGroupByClause() { return groupingExprs_ != null; }
   public Expr getWhereClause() { return whereClause_; }
   public void setWhereClause(Expr whereClause) { whereClause_ = whereClause; }
-  public AggregateInfo getAggInfo() { return aggInfo_; }
-  public boolean hasAggInfo() { return aggInfo_ != null; }
+  public MultiAggregateInfo getMultiAggInfo() { return multiAggInfo_; }
+  public boolean hasMultiAggInfo() { return multiAggInfo_ != null; }
   public AnalyticInfo getAnalyticInfo() { return analyticInfo_; }
   public boolean hasAnalyticInfo() { return analyticInfo_ != null; }
   public boolean hasHavingClause() { return havingClause_ != null; }
@@ -275,22 +274,18 @@ public class SelectStmt extends QueryStmt {
 
     // If this block's select-project-join portion returns an empty result set and the
     // block has no aggregation, then mark this block as returning an empty result set.
-    if (analyzer.hasEmptySpjResultSet() && aggInfo_ == null) {
+    if (analyzer.hasEmptySpjResultSet() && multiAggInfo_ == null) {
       analyzer.setHasEmptyResultSet();
     }
 
     ColumnLineageGraph graph = analyzer.getColumnLineageGraph();
-    if (aggInfo_ != null && !aggInfo_.getAggregateExprs().isEmpty()) {
-      graph.addDependencyPredicates(aggInfo_.getGroupingExprs());
+    if (multiAggInfo_ != null && multiAggInfo_.hasAggregateExprs()) {
+      graph.addDependencyPredicates(multiAggInfo_.getGroupingExprs());
     }
     if (sortInfo_ != null && hasLimit()) {
       // When there is a LIMIT clause in conjunction with an ORDER BY, the ordering exprs
       // must be added in the column lineage graph.
       graph.addDependencyPredicates(sortInfo_.getSortExprs());
-    }
-
-    if (aggInfo_ != null) {
-      if (LOG.isTraceEnabled()) LOG.trace("post-analysis " + aggInfo_.debugString());
     }
   }
 
@@ -384,27 +379,12 @@ public class SelectStmt extends QueryStmt {
       analyticInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
 
-    if (aggInfo_ != null) {
-      // mark all agg exprs needed for HAVING pred and binding predicates as materialized
-      // before calling AggregateInfo.materializeRequiredSlots(), otherwise they won't
-      // show up in AggregateInfo.getMaterializedAggregateExprs()
-      ArrayList<Expr> havingConjuncts = Lists.newArrayList();
-      if (havingPred_ != null) havingConjuncts.add(havingPred_);
-      // Ignore predicates bound to a group-by slot because those
-      // are already evaluated below this agg node (e.g., in a scan).
-      Set<SlotId> groupBySlots = Sets.newHashSet();
-      for (int i = 0; i < aggInfo_.getGroupingExprs().size(); ++i) {
-        groupBySlots.add(aggInfo_.getOutputTupleDesc().getSlots().get(i).getId());
-      }
-      // Binding predicates are assigned to the final output tuple of the aggregation,
-      // which is the tuple of the 2nd phase agg for distinct aggs.
-      ArrayList<Expr> bindingPredicates =
-          analyzer.getBoundPredicates(aggInfo_.getResultTupleId(), groupBySlots, false);
-      havingConjuncts.addAll(bindingPredicates);
-      havingConjuncts.addAll(
-          analyzer.getUnassignedConjuncts(aggInfo_.getResultTupleId().asList(), false));
-      materializeSlots(analyzer, havingConjuncts);
-      aggInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
+    if (multiAggInfo_ != null) {
+      // Mark all agg slots required for conjunct evaluation as materialized before
+      // calling MultiAggregateInfo.materializeRequiredSlots().
+      List<Expr> conjuncts = multiAggInfo_.collectConjuncts(analyzer, false);
+      materializeSlots(analyzer, conjuncts);
+      multiAggInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
   }
 
@@ -631,7 +611,6 @@ public class SelectStmt extends QueryStmt {
       // make a deep copy here, we don't want to modify the original
       // exprs during analysis (in case we need to print them later)
       groupingExprsCopy = Expr.cloneList(groupingExprs_);
-
       substituteOrdinalsAndAliases(groupingExprsCopy, "GROUP BY", analyzer);
 
       for (int i = 0; i < groupingExprsCopy.size(); ++i) {
@@ -653,7 +632,7 @@ public class SelectStmt extends QueryStmt {
 
     // Collect the aggregate expressions from the SELECT, HAVING and ORDER BY clauses
     // of this statement.
-    ArrayList<FunctionCallExpr> aggExprs = Lists.newArrayList();
+    List<FunctionCallExpr> aggExprs = Lists.newArrayList();
     TreeNode.collect(resultExprs_, Expr.isAggregatePredicate(), aggExprs);
     if (havingPred_ != null) {
       havingPred_.collect(Expr.isAggregatePredicate(), aggExprs);
@@ -705,16 +684,24 @@ public class SelectStmt extends QueryStmt {
         Expr.substituteList(aggExprs, countAllMap, analyzer, false);
     aggExprs.clear();
     TreeNode.collect(substitutedAggs, Expr.isAggregatePredicate(), aggExprs);
-    createAggInfo(groupingExprsCopy, aggExprs, analyzer);
 
-    // combine avg smap with the one that produces the final agg output
-    AggregateInfo finalAggInfo =
-        aggInfo_.getSecondPhaseDistinctAggInfo() != null
-          ? aggInfo_.getSecondPhaseDistinctAggInfo()
-          : aggInfo_;
+    List<Expr> groupingExprs = groupingExprsCopy;
+    if (selectList_.isDistinct()) {
+      // Create multiAggInfo for SELECT DISTINCT:
+      // - all select list items turn into grouping exprs
+      // - there are no aggregate exprs
+      Preconditions.checkState(groupingExprsCopy.isEmpty());
+      Preconditions.checkState(aggExprs.isEmpty());
+      groupingExprs = Expr.cloneList(resultExprs_);
+    }
+    Expr.removeDuplicates(aggExprs);
+    Expr.removeDuplicates(groupingExprs);
+    multiAggInfo_ = new MultiAggregateInfo(groupingExprs, aggExprs);
+    multiAggInfo_.analyze(analyzer);
 
+    ExprSubstitutionMap finalOutputSmap = multiAggInfo_.getOutputSmap();
     ExprSubstitutionMap combinedSmap =
-        ExprSubstitutionMap.compose(countAllMap, finalAggInfo.getOutputSmap(), analyzer);
+        ExprSubstitutionMap.compose(countAllMap, finalOutputSmap, analyzer);
 
     // change select list, having and ordering exprs to point to agg output. We need
     // to reanalyze the exprs at this point.
@@ -748,7 +735,7 @@ public class SelectStmt extends QueryStmt {
 
     // check that all post-agg exprs point to agg output
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
-      if (!resultExprs_.get(i).isBound(finalAggInfo.getOutputTupleId())) {
+      if (!resultExprs_.get(i).isBound(multiAggInfo_.getResultTupleId())) {
         SelectListItem selectListItem = selectList_.getItems().get(i);
         throw new AnalysisException(
             "select list expression not produced by aggregation output "
@@ -758,8 +745,7 @@ public class SelectStmt extends QueryStmt {
     }
     if (orderByElements_ != null) {
       for (int i = 0; i < orderByElements_.size(); ++i) {
-        if (!sortInfo_.getSortExprs().get(i).isBound(
-            finalAggInfo.getOutputTupleId())) {
+        if (!sortInfo_.getSortExprs().get(i).isBound(multiAggInfo_.getResultTupleId())) {
           throw new AnalysisException(
               "ORDER BY expression not produced by aggregation output "
               + "(missing from GROUP BY clause?): "
@@ -768,7 +754,7 @@ public class SelectStmt extends QueryStmt {
       }
     }
     if (havingPred_ != null) {
-      if (!havingPred_.isBound(finalAggInfo.getOutputTupleId())) {
+      if (!havingPred_.isBound(multiAggInfo_.getResultTupleId())) {
         throw new AnalysisException(
             "HAVING clause not produced by aggregation output "
             + "(missing from GROUP BY clause?): "
@@ -824,26 +810,6 @@ public class SelectStmt extends QueryStmt {
     }
 
     return scalarCountAllMap;
-  }
-
-  /**
-   * Create aggInfo for the given grouping and agg exprs.
-   */
-  private void createAggInfo(ArrayList<Expr> groupingExprs,
-      ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer)
-          throws AnalysisException {
-    if (selectList_.isDistinct()) {
-       // Create aggInfo for SELECT DISTINCT ... stmt:
-       // - all select list items turn into grouping exprs
-       // - there are no aggregate exprs
-      Preconditions.checkState(groupingExprs.isEmpty());
-      Preconditions.checkState(aggExprs.isEmpty());
-      ArrayList<Expr> distinctGroupingExprs = Expr.cloneList(resultExprs_);
-      aggInfo_ =
-          AggregateInfo.create(distinctGroupingExprs, null, null, analyzer);
-    } else {
-      aggInfo_ = AggregateInfo.create(groupingExprs, aggExprs, null, analyzer);
-    }
   }
 
   /**
@@ -915,8 +881,7 @@ public class SelectStmt extends QueryStmt {
     Expr rewrittenExpr = rewriter.rewrite(expr, analyzer_);
     if (rewrittenExpr.isLiteral() && rewrittenExpr.getType().isIntegerType()) {
       return expr;
-    }
-    else {
+    } else {
       return rewrittenExpr;
     }
   }
@@ -1018,9 +983,9 @@ public class SelectStmt extends QueryStmt {
   public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
     if (evaluateOrderBy_) {
       tupleIdList.add(sortInfo_.getSortTupleDescriptor().getId());
-    } else if (aggInfo_ != null) {
+    } else if (multiAggInfo_ != null) {
       // Return the tuple id produced in the final aggregation step.
-      tupleIdList.add(aggInfo_.getResultTupleId());
+      tupleIdList.add(multiAggInfo_.getResultTupleId());
     } else {
       for (TableRef tblRef: fromClause_) {
         // Don't include materialized tuple ids from semi-joined table
@@ -1050,7 +1015,7 @@ public class SelectStmt extends QueryStmt {
         (other.groupingExprs_ != null) ? Expr.cloneList(other.groupingExprs_) : null;
     havingClause_ = (other.havingClause_ != null) ? other.havingClause_.clone() : null;
     colLabels_ = Lists.newArrayList(other.colLabels_);
-    aggInfo_ = (other.aggInfo_ != null) ? other.aggInfo_.clone() : null;
+    multiAggInfo_ = (other.multiAggInfo_ != null) ? other.multiAggInfo_.clone() : null;
     analyticInfo_ = (other.analyticInfo_ != null) ? other.analyticInfo_.clone() : null;
     sqlString_ = (other.sqlString_ != null) ? new String(other.sqlString_) : null;
     baseTblSmap_ = other.baseTblSmap_.clone();
@@ -1104,7 +1069,7 @@ public class SelectStmt extends QueryStmt {
     if (groupingExprs_ != null) Expr.resetList(groupingExprs_);
     if (havingClause_ != null) havingClause_.reset();
     havingPred_ = null;
-    aggInfo_ = null;
+    multiAggInfo_ = null;
     analyticInfo_ = null;
     baseTblSmap_.clear();
   }
@@ -1130,7 +1095,9 @@ public class SelectStmt extends QueryStmt {
     // No from clause (base tables or inline views)
     if (fromClause_.isEmpty()) return true;
     // Aggregation with no group by and no DISTINCT
-    if (hasAggInfo() && !hasGroupByClause() && !selectList_.isDistinct()) return true;
+    if (hasMultiAggInfo() && !hasGroupByClause() && !selectList_.isDistinct()) {
+      return true;
+    }
     // Select from an inline view that returns at most one row.
     List<TableRef> tableRefs = fromClause_.getTableRefs();
     if (tableRefs.size() == 1 && tableRefs.get(0) instanceof InlineViewRef) {

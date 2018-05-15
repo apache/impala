@@ -1690,6 +1690,43 @@ BigIntVal AggregateFunctions::SampledNdvFinalize(FunctionContext* ctx,
   return round(scaled_extrap_ndv * ndv_scale);
 }
 
+template <typename T>
+void AggregateFunctions::AggIfUpdate(
+    FunctionContext* ctx, const BooleanVal& cond, const T& src, T* dst) {
+  DCHECK(!cond.is_null);
+  if (cond.val) *dst = src;
+}
+
+template <>
+void AggregateFunctions::AggIfUpdate(
+    FunctionContext* ctx, const BooleanVal& cond, const StringVal& src, StringVal* dst) {
+  DCHECK(!cond.is_null);
+  if (cond.val) CopyStringVal(ctx, src, dst);
+}
+
+template <typename T>
+void AggregateFunctions::AggIfMerge(FunctionContext*, const T& src, T* dst) {
+  *dst = src;
+}
+
+template <>
+void AggregateFunctions::AggIfMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  CopyStringVal(ctx, src, dst);
+}
+
+template <typename T>
+T AggregateFunctions::AggIfFinalize(FunctionContext*, const T& src) {
+  return src;
+}
+
+template <>
+StringVal AggregateFunctions::AggIfFinalize(FunctionContext* ctx, const StringVal& src) {
+  StringVal result = StringValGetValue(ctx, src);
+  if (!src.is_null) ctx->Free(src.ptr);
+  return result;
+}
+
 // An implementation of a simple single pass variance algorithm. A standard UDA must
 // be single pass (i.e. does not scan the table more than once), so the most canonical
 // two pass approach is not practical.
@@ -2350,6 +2387,62 @@ template void AggregateFunctions::SampledNdvUpdate(
     FunctionContext*, const TimestampVal&, const DoubleVal&, StringVal*);
 template void AggregateFunctions::SampledNdvUpdate(
     FunctionContext*, const DecimalVal&, const DoubleVal&, StringVal*);
+
+template void AggregateFunctions::AggIfUpdate(
+    FunctionContext*, const BooleanVal& cond, const BooleanVal& src, BooleanVal* dst);
+template void AggregateFunctions::AggIfUpdate(
+    FunctionContext*, const BooleanVal& cond, const TinyIntVal& src, TinyIntVal* dst);
+template void AggregateFunctions::AggIfUpdate(
+    FunctionContext*, const BooleanVal& cond, const SmallIntVal& src, SmallIntVal* dst);
+template void AggregateFunctions::AggIfUpdate(
+    FunctionContext*, const BooleanVal& cond, const IntVal& src, IntVal* dst);
+template void AggregateFunctions::AggIfUpdate(
+    FunctionContext*, const BooleanVal& cond, const BigIntVal& src, BigIntVal* dst);
+template void AggregateFunctions::AggIfUpdate(
+    FunctionContext*, const BooleanVal& cond, const FloatVal& src, FloatVal* dst);
+template void AggregateFunctions::AggIfUpdate(
+    FunctionContext*, const BooleanVal& cond, const DoubleVal& src, DoubleVal* dst);
+template void AggregateFunctions::AggIfUpdate(
+    FunctionContext*, const BooleanVal& cond, const TimestampVal& src, TimestampVal* dst);
+template void AggregateFunctions::AggIfUpdate(
+    FunctionContext*, const BooleanVal& cond, const DecimalVal& src, DecimalVal* dst);
+
+template void AggregateFunctions::AggIfMerge(
+    FunctionContext*, const BooleanVal& src, BooleanVal* dst);
+template void AggregateFunctions::AggIfMerge(
+    FunctionContext*, const TinyIntVal& src, TinyIntVal* dst);
+template void AggregateFunctions::AggIfMerge(
+    FunctionContext*, const SmallIntVal& src, SmallIntVal* dst);
+template void AggregateFunctions::AggIfMerge(
+    FunctionContext*, const IntVal& src, IntVal* dst);
+template void AggregateFunctions::AggIfMerge(
+    FunctionContext*, const BigIntVal& src, BigIntVal* dst);
+template void AggregateFunctions::AggIfMerge(
+    FunctionContext*, const FloatVal& src, FloatVal* dst);
+template void AggregateFunctions::AggIfMerge(
+    FunctionContext*, const DoubleVal& src, DoubleVal* dst);
+template void AggregateFunctions::AggIfMerge(
+    FunctionContext*, const TimestampVal& src, TimestampVal* dst);
+template void AggregateFunctions::AggIfMerge(
+    FunctionContext*, const DecimalVal& src, DecimalVal* dst);
+
+template BooleanVal AggregateFunctions::AggIfFinalize(
+    FunctionContext*, const BooleanVal& src);
+template TinyIntVal AggregateFunctions::AggIfFinalize(
+    FunctionContext*, const TinyIntVal& src);
+template SmallIntVal AggregateFunctions::AggIfFinalize(
+    FunctionContext*, const SmallIntVal& src);
+template IntVal AggregateFunctions::AggIfFinalize(FunctionContext*, const IntVal& src);
+template BigIntVal AggregateFunctions::AggIfFinalize(
+    FunctionContext*, const BigIntVal& src);
+template FloatVal AggregateFunctions::AggIfFinalize(
+    FunctionContext*, const FloatVal& src);
+template DoubleVal AggregateFunctions::AggIfFinalize(
+    FunctionContext*, const DoubleVal& src);
+template TimestampVal AggregateFunctions::AggIfFinalize(
+    FunctionContext*, const TimestampVal& src);
+template DecimalVal AggregateFunctions::AggIfFinalize(
+    FunctionContext*, const DecimalVal& src);
 
 template void AggregateFunctions::KnuthVarUpdate(
     FunctionContext*, const TinyIntVal&, StringVal*);

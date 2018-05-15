@@ -1351,6 +1351,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return Objects.toStringHelper(this.getClass())
         .add("id", id_)
         .add("type", type_)
+        .add("toSql", toSql())
         .add("sel", selectivity_)
         .add("evalCost", evalCost_)
         .add("#distinct", numDistinctValues_)
