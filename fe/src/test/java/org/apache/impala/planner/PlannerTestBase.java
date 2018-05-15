@@ -45,6 +45,7 @@ import org.apache.impala.testutil.TestFileParser;
 import org.apache.impala.testutil.TestFileParser.Section;
 import org.apache.impala.testutil.TestFileParser.TestCase;
 import org.apache.impala.testutil.TestUtils;
+import org.apache.impala.testutil.TestUtils.ResultFilter;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.TDescriptorTable;
 import org.apache.impala.thrift.TExecRequest;
@@ -396,8 +397,8 @@ public class PlannerTestBase extends FrontendTestBase {
    * of 'testCase'.
    */
   private void runTestCase(TestCase testCase, StringBuilder errorLog,
-      StringBuilder actualOutput, String dbName, boolean ignoreExplainHeader)
-      throws CatalogException {
+      StringBuilder actualOutput, String dbName,
+      Set<PlannerTestOption> testOptions) throws CatalogException {
     String query = testCase.getQuery();
     LOG.info("running query " + query);
     if (query.isEmpty()) {
@@ -411,16 +412,16 @@ public class PlannerTestBase extends FrontendTestBase {
     queryCtx.client_request.query_options = testCase.getOptions();
     // Test single node plan, scan range locations, and column lineage.
     TExecRequest singleNodeExecRequest = testPlan(testCase, Section.PLAN, queryCtx.deepCopy(),
-        ignoreExplainHeader, errorLog, actualOutput);
+        testOptions, errorLog, actualOutput);
     validateTableIds(singleNodeExecRequest);
     checkScanRangeLocations(testCase, singleNodeExecRequest, errorLog, actualOutput);
     checkColumnLineage(testCase, singleNodeExecRequest, errorLog, actualOutput);
     checkLimitCardinality(query, singleNodeExecRequest, errorLog);
     // Test distributed plan.
-    testPlan(testCase, Section.DISTRIBUTEDPLAN, queryCtx.deepCopy(), ignoreExplainHeader,
+    testPlan(testCase, Section.DISTRIBUTEDPLAN, queryCtx.deepCopy(), testOptions,
         errorLog, actualOutput);
     // test parallel plans
-    testPlan(testCase, Section.PARALLELPLANS, queryCtx.deepCopy(), ignoreExplainHeader,
+    testPlan(testCase, Section.PARALLELPLANS, queryCtx.deepCopy(), testOptions,
         errorLog, actualOutput);
   }
 
@@ -476,11 +477,10 @@ public class PlannerTestBase extends FrontendTestBase {
    * Returns the produced exec request or null if there was an error generating
    * the plan.
    *
-   * If ignoreExplainHeader is true, the explain header with warnings and resource
-   * estimates is stripped out.
+   * testOptions control exactly how the plan is generated and compared.
    */
   private TExecRequest testPlan(TestCase testCase, Section section,
-      TQueryCtx queryCtx, boolean ignoreExplainHeader,
+      TQueryCtx queryCtx, Set<PlannerTestOption> testOptions,
       StringBuilder errorLog, StringBuilder actualOutput) {
     String query = testCase.getQuery();
     queryCtx.client_request.setStmt(query);
@@ -516,7 +516,9 @@ public class PlannerTestBase extends FrontendTestBase {
     if (execRequest == null) return null;
 
     String explainStr = explainBuilder.toString();
-    if (ignoreExplainHeader) explainStr = removeExplainHeader(explainStr);
+    if (!testOptions.contains(PlannerTestOption.INCLUDE_EXPLAIN_HEADER)) {
+      explainStr = removeExplainHeader(explainStr);
+    }
     actualOutput.append(explainStr);
     LOG.info(section.toString() + ":" + explainStr);
     if (expectedErrorMsg != null) {
@@ -524,8 +526,13 @@ public class PlannerTestBase extends FrontendTestBase {
           "\nExpected failure, but query produced %s.\nQuery:\n%s\n\n%s:\n%s",
           section, query, section, explainStr));
     } else {
+      List<ResultFilter> resultFilters =
+          Lists.<ResultFilter>newArrayList(TestUtils.FILE_SIZE_FILTER);
+      if (!testOptions.contains(PlannerTestOption.VALIDATE_RESOURCES)) {
+        resultFilters.addAll(TestUtils.RESOURCE_FILTERS);
+      }
       String planDiff = TestUtils.compareOutput(
-          Lists.newArrayList(explainStr.split("\n")), expectedPlan, true, true);
+          Lists.newArrayList(explainStr.split("\n")), expectedPlan, true, resultFilters);
       if (!planDiff.isEmpty()) {
         errorLog.append(String.format(
             "\nSection %s of query:\n%s\n\n%s", section, query, planDiff));
@@ -587,7 +594,8 @@ public class PlannerTestBase extends FrontendTestBase {
     if (expectedLocations.size() > 0 && locationsStr != null) {
       // Locations' order does not matter.
       String result = TestUtils.compareOutput(
-          Lists.newArrayList(locationsStr.split("\n")), expectedLocations, false, false);
+          Lists.newArrayList(locationsStr.split("\n")), expectedLocations, false,
+          Collections.<TestUtils.ResultFilter>emptyList());
       if (!result.isEmpty()) {
         errorLog.append("section " + Section.SCANRANGELOCATIONS + " of query:\n"
             + query + "\n" + result);
@@ -749,22 +757,45 @@ public class PlannerTestBase extends FrontendTestBase {
     return explain;
   }
 
+  /**
+   * Assorted binary options that alter the behaviour of planner tests, generally
+   * enabling additional more-detailed checks.
+   */
+  protected static enum PlannerTestOption {
+    // Generate extended explain plans (default is STANDARD).
+    EXTENDED_EXPLAIN,
+    // Include the header of the explain plan (default is to strip the explain header).
+    INCLUDE_EXPLAIN_HEADER,
+    // Validate the values of resource requirements (default is to ignore differences
+    // in resource values).
+    VALIDATE_RESOURCES,
+  }
+
   protected void runPlannerTestFile(String testFile, TQueryOptions options) {
-    runPlannerTestFile(testFile, options, true);
+    runPlannerTestFile(testFile, "default", options,
+        Collections.<PlannerTestOption>emptySet());
   }
 
   protected void runPlannerTestFile(String testFile, TQueryOptions options,
-      boolean ignoreExplainHeader) {
-    runPlannerTestFile(testFile, "default", options, ignoreExplainHeader);
+      Set<PlannerTestOption> testOptions) {
+    runPlannerTestFile(testFile, "default", options, testOptions);
+  }
+
+  protected void runPlannerTestFile(
+      String testFile, Set<PlannerTestOption> testOptions) {
+    runPlannerTestFile(testFile, "default", defaultQueryOptions(), testOptions);
   }
 
   private void runPlannerTestFile(String testFile, String dbName, TQueryOptions options,
-      boolean ignoreExplainHeader) {
+        Set<PlannerTestOption> testOptions) {
     String fileName = testDir_.resolve(testFile + ".test").toString();
     if (options == null) {
       options = defaultQueryOptions();
     } else {
       options = mergeQueryOptions(defaultQueryOptions(), options);
+    }
+    if (testOptions.contains(PlannerTestOption.EXTENDED_EXPLAIN)) {
+      options.setExplain_level(TExplainLevel.EXTENDED);
     }
     TestFileParser queryFileParser = new TestFileParser(fileName, options);
     StringBuilder actualOutput = new StringBuilder();
@@ -782,7 +813,7 @@ public class PlannerTestBase extends FrontendTestBase {
         actualOutput.append("\n");
       }
       try {
-        runTestCase(testCase, errorLog, actualOutput, dbName, ignoreExplainHeader);
+        runTestCase(testCase, errorLog, actualOutput, dbName, testOptions);
       } catch (CatalogException e) {
         errorLog.append(String.format("Failed to plan query\n%s\n%s",
             testCase.getQuery(), e.getMessage()));
@@ -808,10 +839,12 @@ public class PlannerTestBase extends FrontendTestBase {
   }
 
   protected void runPlannerTestFile(String testFile) {
-    runPlannerTestFile(testFile, "default", null, true);
+    runPlannerTestFile(testFile, "default", defaultQueryOptions(),
+        Collections.<PlannerTestOption>emptySet());
   }
 
   protected void runPlannerTestFile(String testFile, String dbName) {
-    runPlannerTestFile(testFile, dbName, null, true);
+    runPlannerTestFile(testFile, dbName, defaultQueryOptions(),
+        Collections.<PlannerTestOption>emptySet());
   }
 }
