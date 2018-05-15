@@ -929,7 +929,7 @@ WHERE int_col =
 ORDER BY id
 ---- RESULTS
 ---- CATCH
-Query aborted:Subquery must not return more than one row:
+Subquery must not return more than one row:
 ====
 ---- QUERY
 # Uncorrelated subquery in arithmetic expr that returns multiple rows
@@ -940,7 +940,7 @@ WHERE int_col =
 ORDER BY id
 ---- RESULTS
 ---- CATCH
-Query aborted:Subquery must not return more than one row:
+Subquery must not return more than one row:
 ====
 ---- QUERY
 # Uncorrelated subquery in binary predicate that returns scalar value at runtime
@@ -1000,7 +1000,7 @@ SELECT a FROM (values(1 a),(2),(3)) v
 WHERE a = (SELECT x FROM (values(1 x),(2),(3)) v)
 ---- RESULTS
 ---- CATCH
-Query aborted:Subquery must not return more than one row:
+Subquery must not return more than one row:
 ====
 ---- QUERY
 # Subquery that returns more than one row
@@ -1009,7 +1009,7 @@ SELECT id FROM functional.alltypes
 WHERE id = (SELECT bigint_col FROM functional.alltypes_view)
 ---- RESULTS
 ---- CATCH
-Query aborted:Subquery must not return more than one row: SELECT bigint_col FROM functional.alltypes_view
+Subquery must not return more than one row: SELECT bigint_col FROM functional.alltypes_view
 ====
 ---- QUERY
 # Runtime scalar subquery with offset.
