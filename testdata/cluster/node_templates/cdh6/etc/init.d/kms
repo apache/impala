@@ -27,6 +27,12 @@ export KMS_HTTP_PORT=$KMS_WEBUI_PORT
 # Path to the file where the catalina server writes the PID
 export CATALINA_PID=$PID_DIR/kms
 
+# Versions of OpenJDK starting at 8u171 will fail unless
+# this Java property is set. See https://issues.apache.org/jira/browse/HDFS-13494
+# Note that this omits some of the JDK defaults, because KMS only
+# uses this one.
+export HADOOP_OPTS="${HADOOP_OPTS:-} -Djceks.key.serialFilter=org.apache.hadoop.crypto.key.JavaKeyStoreProvider*"
+
 function start {
 
   if [[ -e "$CATALINA_PID" ]]; then
