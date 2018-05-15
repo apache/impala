@@ -20,9 +20,11 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.TimeZone;
@@ -56,7 +58,12 @@ public class TestUtils {
   // than a literal
   private final static String REGEX_AGAINST_ACTUAL = "regex:";
 
-  interface ResultFilter {
+  // Regexes that match various elements in plan.
+  private final static String NUMBER_REGEX = "\\d+(\\.\\d+)?";
+  private final static String BYTE_SUFFIX_REGEX = "[KMGT]?B";
+  private final static String BYTE_VALUE_REGEX = NUMBER_REGEX + BYTE_SUFFIX_REGEX;
+
+  public interface ResultFilter {
     public boolean matches(String input);
     public String transform(String input);
   }
@@ -82,41 +89,54 @@ public class TestUtils {
     }
   }
 
-  static PathFilter[] pathFilterList_ = {
-    new PathFilter("hdfs:"),
-    new PathFilter("file: ")
-  };
 
+  /**
+   * Filter to ignore the value from elements in the format key=value.
+   */
+  public static class IgnoreValueFilter implements ResultFilter {
+    // Literal string containing the key name.
+    private final String keyPrefix;
+    private final String valueRegex;
+
+    /**
+     * Create a filter that ignores the value from key value pairs where the key is
+     * the literal 'key' value and the value matches 'valueRegex'.
+     */
+    public IgnoreValueFilter(String key, String valueRegex) {
+      // Include leading space to avoid matching partial keys, e.g. if key is "bar" we
+      // don't want to match "foobar=".
+      this.keyPrefix = " " + key + "=";
+      this.valueRegex = valueRegex;
+    }
+
+    public boolean matches(String input) { return input.contains(keyPrefix); }
+
+    public String transform(String input) {
+      return input.replaceAll(keyPrefix + valueRegex, keyPrefix);
+    }
+  }
   // File size could vary from run to run. For example, the parquet file header size
   // or column metadata size could change if the Impala version changes. That doesn't
   // mean anything is wrong with the plan, so we want to filter the file size out.
-  static class FileSizeFilter implements ResultFilter {
-    private final static String BYTE_FILTER = "[KMGT]?B";
-    private final static String NUMBER_FILTER = "\\d+(\\.\\d+)?";
-    private final static String FILTER_KEY = " size=";
-
-    public boolean matches(String input) { return input.contains(FILTER_KEY); }
-
-    public String transform(String input) {
-      return input.replaceAll(FILTER_KEY + NUMBER_FILTER + BYTE_FILTER, FILTER_KEY);
-    }
-  }
-
-  static FileSizeFilter fileSizeFilter_ = new FileSizeFilter();
+  public static final IgnoreValueFilter FILE_SIZE_FILTER =
+      new IgnoreValueFilter("size", BYTE_VALUE_REGEX);
 
   // Ignore the exact estimated row count, which depends on the file sizes.
-  static class ScanRangeRowCountFilter implements ResultFilter {
-    private final static String NUMBER_FILTER = "\\d+(\\.\\d+)?";
-    private final static String FILTER_KEY = " max-scan-range-rows=";
+  static IgnoreValueFilter SCAN_RANGE_ROW_COUNT_FILTER =
+      new IgnoreValueFilter("max-scan-range-rows", NUMBER_REGEX);
 
-    public boolean matches(String input) { return input.contains(FILTER_KEY); }
+  // Filters that are always applied
+  private static final List<ResultFilter> DEFAULT_FILTERS = Arrays.<ResultFilter>asList(
+    SCAN_RANGE_ROW_COUNT_FILTER, new PathFilter("hdfs:"), new PathFilter("file: "));
 
-    public String transform(String input) {
-      return input.replaceAll(FILTER_KEY + NUMBER_FILTER, FILTER_KEY);
-    }
-  }
-
-  static ScanRangeRowCountFilter scanRangeRowCountFilter_ = new ScanRangeRowCountFilter();
+  // Filters that ignore the values of resource requirements that appear in
+  // "EXTENDED" and above explain plans.
+  public static final List<ResultFilter> RESOURCE_FILTERS = Arrays.<ResultFilter>asList(
+      new IgnoreValueFilter("mem-estimate", BYTE_VALUE_REGEX),
+      new IgnoreValueFilter("mem-reservation", BYTE_VALUE_REGEX),
+      new IgnoreValueFilter("thread-reservation", NUMBER_REGEX),
+      new IgnoreValueFilter("Memory", BYTE_VALUE_REGEX),
+      new IgnoreValueFilter("Threads", NUMBER_REGEX));
 
   /**
    * Do a line-by-line comparison of actual and expected output.
@@ -126,12 +146,14 @@ public class TestUtils {
    * the expected line (ignoring the expectedFilePrefix prefix).
    * If orderMatters is false, we consider actual to match expected if they
    * both contains the same output lines regardless of order.
+   * lineFilters is a list of filters that are applied to corresponding lines in the
+   * actual and expected output if the filter matches the expected output.
    *
    * @return an error message if actual does not match expected, "" otherwise.
    */
   public static String compareOutput(
       ArrayList<String> actual, ArrayList<String> expected, boolean orderMatters,
-      boolean filterFileSize) {
+      List<ResultFilter> lineFilters) {
     if (!orderMatters) {
       Collections.sort(actual);
       Collections.sort(expected);
@@ -141,25 +163,17 @@ public class TestUtils {
     for (int i = 0; i < maxLen; ++i) {
       String expectedStr = expected.get(i).trim();
       String actualStr = actual.get(i);
-      // Filter out contents that change run to run but don't affect compare result.
+      // Apply all default and caller-supplied filters to the expected and actual output.
       boolean containsPrefix = false;
-      for (PathFilter filter: pathFilterList_) {
-        if (filter.matches(expectedStr)) {
-          containsPrefix = true;
-          expectedStr = filter.transform(expectedStr);
-          actualStr = filter.transform(actualStr);
-          break;
+      for (List<ResultFilter> filters:
+          Arrays.<List<ResultFilter>>asList(DEFAULT_FILTERS, lineFilters)) {
+        for (ResultFilter filter: filters) {
+          if (filter.matches(expectedStr)) {
+            containsPrefix = true;
+            expectedStr = filter.transform(expectedStr);
+            actualStr = filter.transform(actualStr);
+          }
         }
-      }
-      if (filterFileSize && fileSizeFilter_.matches(expectedStr)) {
-        containsPrefix = true;
-        expectedStr = fileSizeFilter_.transform(expectedStr);
-        actualStr = fileSizeFilter_.transform(actualStr);
-      }
-      if (scanRangeRowCountFilter_.matches(expectedStr)) {
-        containsPrefix = true;
-        expectedStr = scanRangeRowCountFilter_.transform(expectedStr);
-        actualStr = scanRangeRowCountFilter_.transform(actualStr);
       }
 
       boolean ignoreAfter = false;
