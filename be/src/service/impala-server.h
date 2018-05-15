@@ -111,6 +111,11 @@ class ClientRequestState;
 /// 6. ClientRequestState::expiration_data_lock_
 /// 7. Coordinator::exec_summary_lock
 ///
+/// Coordinator::lock_ should not be acquired at the same time as the
+/// ImpalaServer/SessionState/ClientRequestState locks. Aside from
+/// Coordinator::exec_summary_lock_ the Coordinator's lock ordering is independent of
+/// the above lock ordering.
+///
 /// The following locks are not held in conjunction with other locks:
 /// * query_log_lock_
 /// * session_timeout_lock_
