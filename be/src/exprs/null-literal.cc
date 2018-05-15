@@ -108,6 +108,10 @@ Status NullLiteral::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** 
     return Status::OK();
   }
 
+  if (type_.type == TYPE_CHAR) {
+    return Status::Expected("Codegen not supported for CHAR");
+  }
+
   DCHECK_EQ(GetNumChildren(), 0);
   llvm::Value* args[2];
   *fn = CreateIrFunctionPrototype("NullLiteral", codegen, &args);
