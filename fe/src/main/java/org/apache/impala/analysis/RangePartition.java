@@ -37,13 +37,15 @@ import com.google.common.collect.Lists;
  * The following cases are supported:
  * - Bounded on both ends:
  *   PARTITION l_val <[=] VALUES <[=] u_val
+ *   PARTITION (l_val1, ..., l_valn) <[=] VALUES <[=] (u_val1, ..., u_valn)
  * - Unbounded lower:
  *   PARTITION VALUES <[=] u_val
+ *   PARTITION VALUES <[=] (u_val, ..., u_valn)
  * - Unbounded upper:
  *   PARTITION l_val <[=] VALUES
+ *   PARTITION (l_val1, ..., l_valn) <[=] VALUES
  * - Single value (no range):
  *   PARTITION VALUE = val
- * - Multi-value:
  *   PARTITION VALUE = (val1, val2, ..., valn)
  *
  * Internally, all these cases are represented using the quadruplet:
@@ -78,25 +80,26 @@ public class RangePartition implements ParseNode {
   }
 
   /**
-   * Constructs a range partition. The range is specified in the CREATE TABLE statement
-   * using the 'PARTITION <expr> OP VALUES OP <expr>' clause. 'lower' corresponds to
-   * the '<expr> OP' pair which defines an optional lower bound. 'upper' corresponds to
-   * the 'OP <expr>' pair which defines an optional upper bound. Since only '<' and
-   * '<=' operators are allowed, operators are represented with boolean values that
-   * indicate inclusive or exclusive bounds.
+   * Constructs a range partition. The range is specified in the CREATE/ALTER TABLE
+   * statement using the 'PARTITION <expr> OP VALUES OP <expr>' clause or using the
+   * 'PARTITION (<expr>,....,<expr>) OP VALUES OP (<expr>,...,<expr>)' clause. 'lower'
+   * corresponds to the '<expr> OP' or '(<expr>,...,<expr>) OP' pair which defines an
+   * optional lower bound, and similarly 'upper' corresponds to the optional upper bound.
+   * Since only '<' and '<=' operators are allowed, operators are represented with boolean
+   * values that indicate inclusive or exclusive bounds.
    */
-  public static RangePartition createFromRange(Pair<Expr, Boolean> lower,
-      Pair<Expr, Boolean> upper) {
+  public static RangePartition createFromRange(Pair<List<Expr>, Boolean> lower,
+      Pair<List<Expr>, Boolean> upper) {
     List<Expr> lowerBoundExprs = Lists.newArrayListWithCapacity(1);
     boolean lowerBoundInclusive = false;
     List<Expr> upperBoundExprs = Lists.newArrayListWithCapacity(1);
     boolean upperBoundInclusive = false;
     if (lower != null) {
-      lowerBoundExprs.add(lower.first);
+      lowerBoundExprs = lower.first;
       lowerBoundInclusive = lower.second;
     }
     if (upper != null) {
-      upperBoundExprs.add(upper.first);
+      upperBoundExprs = upper.first;
       upperBoundInclusive = upper.second;
     }
     return new RangePartition(lowerBoundExprs, lowerBoundInclusive, upperBoundExprs,
@@ -105,7 +108,7 @@ public class RangePartition implements ParseNode {
 
   /**
    * Constructs a range partition from a set of values. The values are specified in the
-   * CREATE TABLE statement using the 'PARTITION VALUE = <expr>' or the
+   * CREATE/ALTER TABLE statement using the 'PARTITION VALUE = <expr>' or the
    * 'PARTITION VALUE = (<expr>,...,<expr>)' clause. For both cases, the generated
    * range partition has the same lower and upper bounds.
    */
@@ -219,23 +222,21 @@ public class RangePartition implements ParseNode {
     if (isSingletonRange_) {
       output.append("VALUE = ");
       if (lowerBound_.size() > 1) output.append("(");
-      List<String> literals = Lists.newArrayList();
-      for (Expr literal: lowerBound_) literals.add(literal.toSql());
-      output.append(Joiner.on(",").join(literals));
+      output.append(Expr.toSql(lowerBound_));
       if (lowerBound_.size() > 1) output.append(")");
     } else {
       if (!lowerBound_.isEmpty()) {
-        Preconditions.checkState(lowerBound_.size() == 1);
-        output.append(lowerBound_.get(0).toSql() + " " +
-            (lowerBoundInclusive_ ? "<=" : "<"));
-        output.append(" ");
+        if (lowerBound_.size() > 1) output.append("(");
+        output.append(Expr.toSql(lowerBound_));
+        if (lowerBound_.size() > 1) output.append(")");
+        output.append(lowerBoundInclusive_ ? " <= " : " < ");
       }
       output.append("VALUES");
       if (!upperBound_.isEmpty()) {
-        Preconditions.checkState(upperBound_.size() == 1);
-        output.append(" ");
-        output.append((upperBoundInclusive_ ? "<=" : "<") + " " +
-            upperBound_.get(0).toSql() );
+        output.append(upperBoundInclusive_ ? " <= " : " < ");
+        if (upperBound_.size() > 1) output.append("(");
+        output.append(Expr.toSql(upperBound_));
+        if (upperBound_.size() > 1) output.append(")");
       }
     }
     return output.toString();

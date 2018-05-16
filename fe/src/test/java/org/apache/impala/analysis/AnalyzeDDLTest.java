@@ -2212,12 +2212,28 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "partition 10 <= values", kw));
       AnalyzesOk(String.format("alter table functional_kudu.testtbl %s range " +
           "partition 1+1 <= values <= factorial(3)", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition (0, '0') < values", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition values <= (1, '1')", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition (0, '0') <= values < (1, '1')", kw));
+      AnalyzesOk(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition value = (-1, 'a')", kw));
       AnalysisError(String.format("alter table functional.alltypes %s range " +
           "partition 10 < values < 20", kw), "Table functional.alltypes does not " +
           "support range partitions: RANGE PARTITION 10 < VALUES < 20");
       AnalysisError(String.format("alter table functional_kudu.testtbl %s range " +
           "partition values < isnull(null, null)", kw), "Range partition values " +
           "cannot be NULL. Range partition: 'PARTITION VALUES < isnull(NULL, NULL)'");
+      AnalysisError(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition (0) < values", kw),
+          "Number of specified range partition values is different than the number of " +
+          "partitioning columns: (1 vs 2). Range partition: 'PARTITION (0) < VALUES'");
+      AnalysisError(String.format("alter table functional_kudu.jointbl %s range " +
+          "partition values < (0, 0)", kw),
+          "Range partition value 0 (type: TINYINT) is not type compatible with " +
+          "partitioning column 'test_name' (type: STRING).");
     }
 
     // ALTER TABLE ADD COLUMNS
@@ -2406,7 +2422,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "partition by range(a) (partition value = (1, 2), " +
         "partition value = 3, partition value = 4) stored as kudu",
         "Number of specified range partition values is different than the number of " +
-        "partitioning columns: (2 vs 1). Range partition: 'PARTITION VALUE = (1,2)'");
+        "partitioning columns: (2 vs 1). Range partition: 'PARTITION VALUE = (1, 2)'");
     // Key ranges must match the column types.
     AnalysisError("create table tab (a int, b int, c int, d int, primary key(a, b, c)) " +
         "partition by hash (a, b, c) partitions 8, range (a) " +
@@ -2493,6 +2509,18 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table tab (x int primary key) " +
         "partitioned by (y int) stored as kudu", "PARTITIONED BY cannot be used " +
         "in Kudu tables.");
+    // Multi-column range partitions
+    AnalyzesOk("create table tab (a bigint, b tinyint, c double, primary key(a, b)) " +
+        "partition by range(a, b) (partition (0, 0) < values <= (1, 1)) stored as kudu");
+    AnalysisError("create table tab (a bigint, b tinyint, c double, primary key(a, b)) " +
+        "partition by range(a, b) (partition values <= (1, 'b')) stored as kudu",
+        "Range partition value 'b' (type: STRING) is not type compatible with " +
+        "partitioning column 'b' (type: TINYINT)");
+    AnalysisError("create table tab (a bigint, b tinyint, c double, primary key(a, b)) " +
+        "partition by range(a, b) (partition 0 < values <= 1) stored as kudu",
+        "Number of specified range partition values is different than the number of " +
+        "partitioning columns: (1 vs 2). Range partition: 'PARTITION 0 < VALUES <= 1'");
+
 
     // Test unsupported Kudu types
     List<String> unsupportedTypes = Lists.newArrayList("VARCHAR(20)", "CHAR(20)",

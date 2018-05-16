@@ -432,7 +432,7 @@ nonterminal StructField struct_field_def;
 nonterminal KuduPartitionParam hash_partition_param;
 nonterminal List<RangePartition> range_params_list;
 nonterminal RangePartition range_param;
-nonterminal Pair<Expr, Boolean> opt_lower_range_val,
+nonterminal Pair<List<Expr>, Boolean> opt_lower_range_val,
    opt_upper_range_val;
 nonterminal ArrayList<KuduPartitionParam> hash_partition_param_list;
 nonterminal ArrayList<KuduPartitionParam> partition_param_list;
@@ -1401,18 +1401,26 @@ range_param ::=
 
 opt_lower_range_val ::=
   expr:l LESSTHAN
-  {: RESULT = new Pair<Expr, Boolean>(l, false); :}
+  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), false); :}
   | expr:l LESSTHAN EQUAL
-  {: RESULT = new Pair<Expr, Boolean>(l, true); :}
+  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), true); :}
+  | LPAREN expr_list:l RPAREN LESSTHAN
+  {: RESULT = new Pair<List<Expr>, Boolean>(l, false); :}
+  | LPAREN expr_list:l RPAREN LESSTHAN EQUAL
+  {: RESULT = new Pair<List<Expr>, Boolean>(l, true); :}
   | /* empty */
   {: RESULT = null; :}
   ;
 
 opt_upper_range_val ::=
   LESSTHAN expr:l
-  {: RESULT = new Pair<Expr, Boolean>(l, false); :}
+  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), false); :}
   | LESSTHAN EQUAL expr:l
-  {: RESULT = new Pair<Expr, Boolean>(l, true); :}
+  {: RESULT = new Pair<List<Expr>, Boolean>(Lists.newArrayList(l), true); :}
+  | LESSTHAN LPAREN expr_list:l RPAREN
+  {: RESULT = new Pair<List<Expr>, Boolean>(l, false); :}
+  | LESSTHAN EQUAL LPAREN expr_list:l RPAREN
+  {: RESULT = new Pair<List<Expr>, Boolean>(l, true); :}
   | /* empty */
   {: RESULT = null; :}
   ;

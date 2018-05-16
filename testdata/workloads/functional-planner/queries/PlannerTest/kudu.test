@@ -525,12 +525,12 @@ INSERT INTO KUDU [functional_kudu.alltypes]
 ====
 # Partition exprs are constant but primary key exprs aren't, so sort but don't partition.
 insert into functional_kudu.jointbl (test_id, test_name, test_zip, alltypes_id)
-select 1, string_col, int_col, id from functional.alltypes
+select 1, '1', int_col, id from functional.alltypes
 ---- DISTRIBUTEDPLAN
 INSERT INTO KUDU [functional_kudu.jointbl]
 |
 01:PARTIAL SORT
-|  order by: string_col ASC NULLS LAST, int_col ASC NULLS LAST, id ASC NULLS LAST
+|  order by: int_col ASC NULLS LAST, id ASC NULLS LAST
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB

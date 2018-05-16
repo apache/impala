@@ -568,3 +568,45 @@ ID,NAME,NEW_COL1,NEW_COL2,LAST_NAME,NEW_COL4
 ---- TYPES
 INT,STRING,INT,BIGINT,STRING,INT
 ====
+---- QUERY
+# Check that range partitions defined on multiple columns work
+create table multi_range_partition_cols (a string, b int, c tinyint, primary key(a, b, c))
+partition by range(a, b)
+(partition values < ('a', 0), partition ('a', 0) <= values < ('b', 1))
+stored as kudu
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+show range partitions multi_range_partition_cols;
+---- RESULTS
+'VALUES < ("a", 0)'
+'("a", 0) <= VALUES < ("b", 1)'
+====
+---- QUERY
+alter table multi_range_partition_cols add range partition ('b', 1) <= values < ('c', 2)
+====
+---- QUERY
+show range partitions multi_range_partition_cols;
+---- RESULTS
+'VALUES < ("a", 0)'
+'("a", 0) <= VALUES < ("b", 1)'
+'("b", 1) <= VALUES < ("c", 2)'
+====
+---- QUERY
+alter table multi_range_partition_cols add range partition value = ('c', 2)
+====
+---- QUERY
+show range partitions multi_range_partition_cols;
+---- RESULTS
+'VALUES < ("a", 0)'
+'("a", 0) <= VALUES < ("b", 1)'
+'("b", 1) <= VALUES < ("c", 2)'
+'VALUE = ("c", 2)'
+====
+---- QUERY
+# Try to insert a partition that overlaps with an existing partition
+alter table multi_range_partition_cols add range partition ('b', 2) <= values < ('c', 1)
+---- CATCH
+NonRecoverableException: New range partition conflicts with existing range partition: ("b", 2) <= VALUES < ("c", 1)
+====
