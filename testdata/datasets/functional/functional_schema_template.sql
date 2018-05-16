@@ -822,8 +822,11 @@ create table {db_name}{db_suffix}.{table_name} (
   alltypes_id int,
   primary key (test_id, test_name, test_zip, alltypes_id)
 )
-partition by range(test_id) (partition values <= 1003, partition 1003 < values <= 1007,
-partition 1007 < values) stored as kudu;
+partition by range(test_id, test_name)
+  (partition values <= (1003, 'Name3'),
+   partition (1003, 'Name3') < values <= (1007, 'Name7'),
+   partition (1007, 'Name7') < values)
+stored as kudu;
 ====
 ---- DATASET
 functional
