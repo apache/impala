@@ -79,4 +79,6 @@ struct TBackendGflags {
   26: required string authorized_proxy_group_config
 
   27: required bool use_local_catalog
+
+  28: required bool disable_catalog_data_ops_debug_only
 }

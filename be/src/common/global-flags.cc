@@ -199,6 +199,11 @@ DEFINE_string(reserved_words_version, "3.0.0", "Reserved words compatibility ver
     " version from which the reserved word list is taken. The value must be one of "
     "[\"2.11.0\", \"3.0.0\"].");
 
+DEFINE_bool_hidden(disable_catalog_data_ops_debug_only, false,
+    "Disable catalog operations that require access to file-system data blocks. "
+    "Examples are when catalog reads data blocks to load avro schemas and copy jars."
+    "Use only for testing/debugging, not in deployed clusters.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

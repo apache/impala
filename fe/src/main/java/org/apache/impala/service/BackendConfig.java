@@ -87,6 +87,10 @@ public class BackendConfig {
     return !Strings.isNullOrEmpty(backendCfg_.authorized_proxy_group_config);
   }
 
+  public boolean disableCatalogDataOpsDebugOnly() {
+    return backendCfg_.disable_catalog_data_ops_debug_only;
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

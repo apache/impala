@@ -37,6 +37,7 @@ import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.service.BackendConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 /**
@@ -83,7 +84,7 @@ public abstract class AvroSchemaUtils {
       if (url.toLowerCase().startsWith("http://")) {
         urlStream = new URL(url).openStream();
         schema = IOUtils.toString(urlStream);
-      } else {
+      } else if (!BackendConfig.INSTANCE.disableCatalogDataOpsDebugOnly()) {
         Path path = new Path(url);
         FileSystem fs = null;
         fs = path.getFileSystem(FileSystemUtil.getConfiguration());
@@ -92,6 +93,9 @@ public abstract class AvroSchemaUtils {
               "Invalid avro.schema.url: %s. Path does not exist.", url));
         }
         schema = FileSystemUtil.readFile(path);
+      } else {
+        LOG.info(String.format(
+            "Avro schema, %s, not loaded from fs: catalog data ops disabled.", url));
       }
     } catch (AnalysisException e) {
       throw e;

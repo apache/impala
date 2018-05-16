@@ -53,6 +53,7 @@ DECLARE_string(reserved_words_version);
 DECLARE_string(sentry_config);
 DECLARE_double(max_filter_error_rate);
 DECLARE_int64(min_buffer_size);
+DECLARE_bool(disable_catalog_data_ops_debug_only);
 
 namespace impala {
 
@@ -95,6 +96,8 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_max_filter_error_rate(FLAGS_max_filter_error_rate);
   cfg.__set_min_buffer_size(FLAGS_min_buffer_size);
   cfg.__set_authorized_proxy_group_config(FLAGS_authorized_proxy_group_config);
+  cfg.__set_disable_catalog_data_ops_debug_only(
+      FLAGS_disable_catalog_data_ops_debug_only);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }
