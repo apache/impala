@@ -591,7 +591,11 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
 
   # HBase splitting is only relevant for FE tests
   if [[ -z "$REMOTE_LOAD" ]]; then
-    run-step "Splitting HBase" create-hbase.log ${IMPALA_HOME}/testdata/bin/split-hbase.sh
+    IGNORE_MSG="Ignoring this HBase splitting failure to allow dataload to complete and
+        tests to run. This failure will cause some frontend tests to fail, and it may
+        impact some HBase tests. Other tests are unaffected."
+    run-step "Splitting HBase" create-hbase.log ${IMPALA_HOME}/testdata/bin/split-hbase.sh \
+        || echo ${IGNORE_MSG}
   fi
 
   run-step "Creating internal HBase table" create-internal-hbase-table.log \
