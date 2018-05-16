@@ -18,6 +18,23 @@
 # under the License.
 #
 
+# We do not use Impala's python environment here, nor do we depend on
+# non-standard python libraries to avoid needing extra build steps before
+# triggering this.
+import argparse
+import datetime
+import itertools
+import logging
+import multiprocessing
+import multiprocessing.pool
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+
 CLI_HELP = """\
 Runs tests inside of docker containers, parallelizing different types of
 tests. This script first creates a docker container, checks out this repo
@@ -100,22 +117,6 @@ as part of the build, in logs/docker/*/timeline.html.
 #     or move to different suite.
 #   - Run BE tests earlier (during data load)
 
-# We do not use Impala's python environment here, nor do we depend on
-# non-standard python libraries to avoid needing extra build steps before
-# triggering this.
-import argparse
-import datetime
-import logging
-import multiprocessing
-import multiprocessing.pool
-import os
-import re
-import subprocess
-import sys
-import tempfile
-import threading
-import time
-
 if __name__ == '__main__' and __package__ is None:
   sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
   import monitor
@@ -181,6 +182,10 @@ def main():
                       default=os.path.expanduser("~/.ccache"))
   parser.add_argument('--tail', action="store_true",
       help="Run tail on all container log files.")
+  parser.add_argument('--env', metavar='K=V', default=[], action='append',
+      help="""Passes given environment variables (expressed as KEY=VALUE)
+           through containers.
+           """)
   parser.add_argument('--test', action="store_true")
   args = parser.parse_args()
 
@@ -197,7 +202,8 @@ def main():
       parallel_test_concurrency=args.parallel_test_concurrency,
       suite_concurrency=args.suite_concurrency,
       impalad_mem_limit_bytes=args.impalad_mem_limit_bytes,
-      tail=args.tail)
+      tail=args.tail,
+      env=args.env)
 
   fh = logging.FileHandler(os.path.join(_make_dir_if_not_exist(t.log_dir), "log.txt"))
   fh.setFormatter(logging.Formatter(LOG_FORMAT))
@@ -430,7 +436,7 @@ class TestWithDocker(object):
   def __init__(self, build_image, suite_names, name, cleanup_containers,
                cleanup_image, ccache_dir, test_mode,
                suite_concurrency, parallel_test_concurrency,
-               impalad_mem_limit_bytes, tail):
+               impalad_mem_limit_bytes, tail, env):
     self.build_image = build_image
     self.name = name
     self.containers = []
@@ -466,6 +472,7 @@ class TestWithDocker(object):
     self.parallel_test_concurrency = parallel_test_concurrency
     self.impalad_mem_limit_bytes = impalad_mem_limit_bytes
     self.tail = tail
+    self.env = env
 
     # Map suites back into objects; we ignore case for this mapping.
     suites = []
@@ -545,6 +552,7 @@ class TestWithDocker(object):
           "-v", _make_dir_if_not_exist(self.log_dir,
                                        logdir) + ":/logs",
           "-v", base + ":/mnt/base:ro"]
+          + list(itertools.chain(*[["-e", env] for env in self.env]))
           + extras
           + [image]
           + entrypoint).strip()
