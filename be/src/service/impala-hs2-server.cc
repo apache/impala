@@ -266,6 +266,7 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
 // HiveServer2 API
 void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     const TOpenSessionReq& request) {
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   // Generate session ID and the secret
   TUniqueId session_id;
@@ -384,6 +385,7 @@ void ImpalaServer::CloseSession(TCloseSessionResp& return_val,
 void ImpalaServer::GetInfo(TGetInfoResp& return_val,
     const TGetInfoReq& request) {
   VLOG_QUERY << "GetInfo(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TUniqueId session_id;
   TUniqueId secret;
@@ -412,6 +414,7 @@ void ImpalaServer::GetInfo(TGetInfoResp& return_val,
 void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
     const TExecuteStatementReq& request) {
   VLOG_QUERY << "ExecuteStatement(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
   // We ignore the runAsync flag here: Impala's queries will always run asynchronously,
   // and will block on fetch. To the client, this looks like Hive's synchronous mode; the
   // difference is that rows are not available when ExecuteStatement() returns.
@@ -490,6 +493,7 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
 void ImpalaServer::GetTypeInfo(TGetTypeInfoResp& return_val,
     const TGetTypeInfoReq& request) {
   VLOG_QUERY << "GetTypeInfo(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
   req.__set_opcode(TMetadataOpcode::GET_TYPE_INFO);
@@ -508,6 +512,7 @@ void ImpalaServer::GetTypeInfo(TGetTypeInfoResp& return_val,
 void ImpalaServer::GetCatalogs(TGetCatalogsResp& return_val,
     const TGetCatalogsReq& request) {
   VLOG_QUERY << "GetCatalogs(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
   req.__set_opcode(TMetadataOpcode::GET_CATALOGS);
@@ -526,6 +531,7 @@ void ImpalaServer::GetCatalogs(TGetCatalogsResp& return_val,
 void ImpalaServer::GetSchemas(TGetSchemasResp& return_val,
     const TGetSchemasReq& request) {
   VLOG_QUERY << "GetSchemas(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
   req.__set_opcode(TMetadataOpcode::GET_SCHEMAS);
@@ -544,6 +550,7 @@ void ImpalaServer::GetSchemas(TGetSchemasResp& return_val,
 void ImpalaServer::GetTables(TGetTablesResp& return_val,
     const TGetTablesReq& request) {
   VLOG_QUERY << "GetTables(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
   req.__set_opcode(TMetadataOpcode::GET_TABLES);
@@ -562,6 +569,7 @@ void ImpalaServer::GetTables(TGetTablesResp& return_val,
 void ImpalaServer::GetTableTypes(TGetTableTypesResp& return_val,
     const TGetTableTypesReq& request) {
   VLOG_QUERY << "GetTableTypes(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
   req.__set_opcode(TMetadataOpcode::GET_TABLE_TYPES);
@@ -581,6 +589,7 @@ void ImpalaServer::GetTableTypes(TGetTableTypesResp& return_val,
 void ImpalaServer::GetColumns(TGetColumnsResp& return_val,
     const TGetColumnsReq& request) {
   VLOG_QUERY << "GetColumns(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
   req.__set_opcode(TMetadataOpcode::GET_COLUMNS);
@@ -599,6 +608,7 @@ void ImpalaServer::GetColumns(TGetColumnsResp& return_val,
 void ImpalaServer::GetFunctions(TGetFunctionsResp& return_val,
     const TGetFunctionsReq& request) {
   VLOG_QUERY << "GetFunctions(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
   req.__set_opcode(TMetadataOpcode::GET_FUNCTIONS);

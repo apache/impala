@@ -98,6 +98,7 @@ import org.apache.impala.planner.HdfsScanNode;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
+import org.apache.impala.thrift.TAdminRequest;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TCatalogOpRequest;
 import org.apache.impala.thrift.TCatalogOpType;
@@ -132,6 +133,7 @@ import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowStatsOp;
+import org.apache.impala.thrift.TShutdownParams;
 import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
@@ -1084,6 +1086,12 @@ public class Frontend {
           new TColumn("value", Type.STRING.toThrift()),
           new TColumn("level", Type.STRING.toThrift()))));
       result.setSet_query_option_request(analysisResult.getSetStmt().toThrift());
+      return result;
+    } else if (analysisResult.isAdminFnStmt()) {
+      result.stmt_type = TStmtType.ADMIN_FN;
+      result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
+          new TColumn("summary", Type.STRING.toThrift()))));
+      result.setAdmin_request(analysisResult.getAdminFnStmt().toThrift());
       return result;
     }
     // If unset, set MT_DOP to 0 to simplify the rest of the code.

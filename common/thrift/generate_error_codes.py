@@ -363,6 +363,7 @@ error_codes = (
   ("SCRATCH_READ_VERIFY_FAILED", 118, "Error reading $0 bytes from scratch file '$1' "
    "on backend $2 at offset $3: verification of read data failed."),
 
+  ("SERVER_SHUTTING_DOWN", 119, "Server is being shut down: $0."),
 )
 
 import sys
