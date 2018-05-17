@@ -41,6 +41,7 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.datagenerator.HBaseTestDataRegionAssignment;
 import org.apache.impala.testutil.TestFileParser;
 import org.apache.impala.testutil.TestFileParser.Section;
 import org.apache.impala.testutil.TestFileParser.TestCase;
@@ -114,6 +115,12 @@ public class PlannerTestBase extends FrontendTestBase {
     String logDir = System.getenv("IMPALA_FE_TEST_LOGS_DIR");
     if (logDir == null) logDir = "/tmp";
     outDir_ = Paths.get(logDir, "PlannerTest");
+
+    // Rebalance the HBase tables
+    HBaseTestDataRegionAssignment assignment = new HBaseTestDataRegionAssignment();
+    assignment.performAssignment("functional_hbase.alltypessmall");
+    assignment.performAssignment("functional_hbase.alltypesagg");
+    assignment.close();
   }
 
   @Before

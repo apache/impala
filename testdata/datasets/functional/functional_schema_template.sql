@@ -140,6 +140,8 @@ string_col string
 timestamp_col timestamp
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
+---- HBASE_REGION_SPLITS
+'1','3','5','7','9'
 ---- ALTER
 ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=1);
 ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2009, month=2);
@@ -515,6 +517,8 @@ string_col string
 timestamp_col timestamp
 ---- ROW_FORMAT
 delimited fields terminated by ','  escaped by '\\'
+---- HBASE_REGION_SPLITS
+'1','3','5','7','9'
 ---- ALTER
 ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=1);
 ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(year=2010, month=1, day=2);

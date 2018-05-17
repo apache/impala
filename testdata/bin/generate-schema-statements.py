@@ -347,8 +347,8 @@ def build_hbase_create_stmt_in_hive(columns, partition_columns, table_name):
   # PARTITIONED BY is not supported and does not make sense for HBase.
   if partition_columns:
     columns.extend(partition_columns.split('\n'))
-  # stringid is a special case. It still points to functional_hbase.alltypesagg
-  if 'stringid' not in table_name:
+  # stringids is a special case. It still points to functional_hbase.alltypesagg
+  if 'stringids' not in table_name:
     tbl_properties = ('TBLPROPERTIES("hbase.table.name" = '
                       '"{db_name}{db_suffix}.{table_name}")')
   else:
@@ -475,15 +475,19 @@ def build_load_statement(load_template, db_name, db_suffix, table_name):
                                          impala_home = base_load_dir)
   return load_template
 
-def build_hbase_create_stmt(db_name, table_name, column_families):
+def build_hbase_create_stmt(db_name, table_name, column_families, region_splits):
   hbase_table_name = "{db_name}_hbase.{table_name}".format(db_name=db_name,
                                                            table_name=table_name)
-  create_stmt = list()
-  create_stmt.append("disable '%s'" % hbase_table_name)
-  create_stmt.append("drop '%s'" % hbase_table_name)
+  create_stmts = list()
+  create_stmts.append("disable '%s'" % hbase_table_name)
+  create_stmts.append("drop '%s'" % hbase_table_name)
   column_families = ','.join(["'{0}'".format(cf) for cf in column_families.splitlines()])
-  create_stmt.append("create '%s', %s" % (hbase_table_name, column_families))
-  return create_stmt
+  create_statement = "create '%s', %s" % (hbase_table_name, column_families)
+  if (region_splits):
+    create_statement += ", {SPLITS => [" + region_splits.strip() + "]}"
+
+  create_stmts.append(create_statement)
+  return create_stmts
 
 # Does a hdfs directory listing and returns array with all the subdir names.
 def get_hdfs_subdirs_with_data(path):
@@ -691,8 +695,9 @@ def generate_statements(output_name, test_vectors, sections,
       if file_format == 'hbase':
         # If the HBASE_COLUMN_FAMILIES section does not exist, default to 'd'
         column_families = section.get('HBASE_COLUMN_FAMILIES', 'd')
+        region_splits = section.get('HBASE_REGION_SPLITS', None)
         hbase_output.create.extend(build_hbase_create_stmt(db_name, table_name,
-            column_families))
+            column_families, region_splits))
         hbase_post_load.load.append("flush '%s_hbase.%s'\n" % (db_name, table_name))
 
       # Need to make sure that tables created and/or data loaded in Hive is seen
@@ -779,7 +784,7 @@ def parse_schema_template_file(file_name):
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU',
                          'DEPENDENT_LOAD', 'DEPENDENT_LOAD_KUDU', 'DEPENDENT_LOAD_HIVE',
                          'LOAD', 'LOAD_LOCAL', 'ALTER', 'HBASE_COLUMN_FAMILIES',
-                         'TABLE_PROPERTIES']
+                         'TABLE_PROPERTIES', 'HBASE_REGION_SPLITS']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":
