@@ -140,14 +140,6 @@ LOG_DIR="${IMPALA_EE_TEST_LOGS_DIR}"
 # Enable core dumps
 ulimit -c unlimited || true
 
-if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
-  # To properly test HBase integeration, HBase regions are split and assigned by this
-  # script. Restarting HBase will change the region server assignment. Run split-hbase.sh
-  # before running any test.
-  run-step "Split and assign HBase regions" split-hbase.log \
-      "${IMPALA_HOME}/testdata/bin/split-hbase.sh"
-fi
-
 for i in $(seq 1 $NUM_TEST_ITERATIONS)
 do
   TEST_RET_CODE=0
