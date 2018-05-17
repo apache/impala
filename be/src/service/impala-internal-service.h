@@ -41,6 +41,8 @@ class ImpalaInternalService : public ImpalaInternalServiceIf {
       const TUpdateFilterParams& params);
   virtual void PublishFilter(TPublishFilterResult& return_val,
       const TPublishFilterParams& params);
+  virtual void RemoteShutdown(TRemoteShutdownResult& return_val,
+      const TRemoteShutdownParams& params);
 
  private:
   ImpalaServer* impala_server_;

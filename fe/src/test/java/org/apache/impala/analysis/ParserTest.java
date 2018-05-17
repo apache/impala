@@ -3838,4 +3838,39 @@ public class ParserTest extends FrontendTestBase {
       ParserError(String.format("ALTER %s SET OWNER", type));
     }
   }
+
+  public void TestAdminFns() {
+    // Any combination of whitespace is ok.
+    ParsesOk(":foobar()");
+    ParsesOk(": foobar()");
+    ParsesOk(":\tfoobar()");
+    ParsesOk("   :\tfoobar()");
+    ParsesOk("\n:foobar()");
+    ParsesOk("\n:foobar(123)");
+    ParsesOk("\n:foobar(123, 456)");
+    ParsesOk("\n:foobar('foo', 'bar')");
+    ParsesOk("\n:foobar('foo', 'bar', 1, -1, 1234, 99, false)");
+
+    // Any identifier is supported.
+    ParsesOk(": 1a()");
+
+    // Must be prefixed with colon.
+    ParserError("foobar()");
+    ParserError("  foobar()");
+
+    // Non-identifiers not supported.
+    ParserError(": 1()");
+    ParserError(": 'string'()");
+    ParserError(": a.b()");
+
+    // Must be single function with parens. Cannot have multiple statements.
+    ParserError(": shutdown");
+    ParserError(": shutdown foo");
+    ParserError(": shutdown() other()");
+    ParserError(": shutdown(); other()");
+    ParserError(": shutdown(), other()");
+    ParserError(": shutdown() :other()");
+    ParserError(": shutdown() :other()");
+    ParserError(": shutdown('hostA'); :shutdown('hostB');");
+  }
 }

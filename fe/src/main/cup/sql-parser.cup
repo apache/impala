@@ -537,6 +537,9 @@ nonterminal ShowFunctionsStmt show_functions_stmt;
 nonterminal DropFunctionStmt drop_function_stmt;
 nonterminal TFunctionCategory opt_function_category;
 
+// Admin statements.
+nonterminal AdminFnStmt admin_fn_stmt;
+
 precedence left KW_OR;
 precedence left KW_AND;
 precedence right KW_NOT, NOT;
@@ -671,6 +674,8 @@ stmt ::=
   {: RESULT = revoke_privilege; :}
   | comment_on_stmt:comment_on
   {: RESULT = comment_on; :}
+  | admin_fn_stmt:shutdown
+  {: RESULT = shutdown; :}
   | stmt:s SEMICOLON
   {: RESULT = s; :}
   ;
@@ -2511,6 +2516,14 @@ set_stmt ::=
   {: RESULT = new SetStmt(null, null, true); :}
   | KW_SET
   {: RESULT = new SetStmt(null, null, false); :}
+  ;
+
+// Top-level function call, e.g. ": shutdown()", used for admin commands, etc.
+admin_fn_stmt ::=
+    COLON ident_or_default:fn_name LPAREN RPAREN
+  {: RESULT = new AdminFnStmt(fn_name, Collections.<Expr>emptyList()); :}
+  | COLON ident_or_default:fn_name LPAREN expr_list:params RPAREN
+  {: RESULT = new AdminFnStmt(fn_name, params); :}
   ;
 
 select_list ::=

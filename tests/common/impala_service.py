@@ -172,12 +172,16 @@ class ImpaladService(BaseImpalaService):
     self.be_port = be_port
     self.hs2_port = hs2_port
 
-  def get_num_known_live_backends(self, timeout=30, interval=1):
+  def get_num_known_live_backends(self, timeout=30, interval=1,
+      include_shutting_down=True):
     LOG.info("Getting num_known_live_backends from %s:%s" %
         (self.hostname, self.webserver_port))
     result = json.loads(self.read_debug_webpage('backends?json', timeout, interval))
-    num = len(result['backends'])
-    return None if num is None else int(num)
+    count = 0
+    for backend in result['backends']:
+      if include_shutting_down or not backend['is_quiescing']:
+        count += 1
+    return count
 
   def get_query_locations(self):
     # Returns a dictionary of the format <host_address, num_of_queries_running_there>
@@ -207,12 +211,14 @@ class ImpaladService(BaseImpalaService):
         (num_in_flight_queries, expected_val))
     return False
 
-  def wait_for_num_known_live_backends(self, expected_value, timeout=30, interval=1):
+  def wait_for_num_known_live_backends(self, expected_value, timeout=30, interval=1,
+      include_shutting_down=True):
     start_time = time()
     while (time() - start_time < timeout):
       value = None
       try:
-        value = self.get_num_known_live_backends(timeout=timeout, interval=interval)
+        value = self.get_num_known_live_backends(timeout=timeout, interval=interval,
+            include_shutting_down=include_shutting_down)
       except Exception, e:
         LOG.error(e)
       if value == expected_value:
@@ -250,7 +256,9 @@ class ImpaladService(BaseImpalaService):
       if query_state == target_state:
         return
       sleep(interval)
-    assert target_state == query_state, 'Did not reach query state in time'
+    assert target_state == query_state, \
+        'Did not reach query state in time target={0} actual={1}'.format(
+            target_state, query_state)
     return
 
   def wait_for_query_status(self, client, query_id, expected_content,

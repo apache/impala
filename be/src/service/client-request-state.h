@@ -406,8 +406,6 @@ class ClientRequestState {
   bool user_has_profile_access_ = true;
 
   TResultSetMetadata result_metadata_; // metadata for select query
-  RowBatch* current_batch_ = nullptr; // the current row batch; only applicable if coord is set
-  int current_batch_row_ = 0 ; // number of rows fetched within the current batch
   int num_rows_fetched_ = 0; // number of rows fetched by client for the entire query
 
   /// True if a fetch was attempted by a client, regardless of whether a result set
@@ -456,8 +454,8 @@ class ClientRequestState {
   /// queries (e.g., compute stats) or dml (e.g., create table as select)
   Status ExecDdlRequest() WARN_UNUSED_RESULT;
 
-  /// Executes a LOAD DATA
-  Status ExecLoadDataRequest() WARN_UNUSED_RESULT;
+  /// Executes a shut down request.
+  Status ExecShutdownRequest() WARN_UNUSED_RESULT;
 
   /// Core logic of Wait(). Does not update operation_state_/query_status_.
   Status WaitInternal() WARN_UNUSED_RESULT;

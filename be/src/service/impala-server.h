@@ -97,6 +97,40 @@ class QuerySchedule;
 /// Internally, the Membership callback thread also participates in startup:
 ///    - If services_started_, then register to the statestore as an executor.
 ///
+/// Shutdown
+/// --------
+/// Impala Server shutdown can be initiated by a remote shutdown command from another
+/// Impala daemon or by a local shutdown command from a user session. The shutdown
+/// sequence aims to quiesce the Impalad (i.e. drain it of any running finstances or
+/// client requests) then exit the process cleanly. The shutdown sequence is as follows:
+///
+/// 1. StartShutdown() is called to initiate the process.
+/// 2. The startup grace period starts, during which:
+///   - no new client requests are accepted. Clients can still interact with registered
+///     requests and sessions as normal.
+///   - the Impala daemon is marked in the statestore as quiescing, so coordinators
+///     will not schedule new fragments on it (once the statestore update propagates).
+///   - the Impala daemon continues to start executing any new fragments sent to it by
+///     coordinators. This is required because the query may have been submitted before
+///     the coordinator learned that the executor was quiescing. Delays occur for several
+///     reasons:
+///     -> Latency of membership propagation through the statestore
+///     -> Latency of query startup work including scheduling, admission control and
+///        fragment startup.
+///     -> Queuing delay in the admission controller (which may be unbounded).
+/// 3. The startup grace period elapses.
+/// 4. The background shutdown thread periodically checks to see if the Impala daemon is
+///    quiesced (i.e. no client requests are registered and no fragment instances are
+///    executing). If it is quiesced then it cleanly shuts down by exiting the process.
+/// 5. The shutdown deadline elapses. The Impala daemon exits regardless of whether
+///    it was successfully quiesced or not.
+///
+/// If shutdown is initiated again during this process, it does not cancel the existing
+/// shutdown but can decrease the deadline, e.g. if an administrator starts shutdown
+/// with a deadline of 1 hour, but then wants to shut down the cluster sooner, they can
+/// run the shutdown function again to set a shorter deadline. The deadline can't be
+/// increased after shutdown is started.
+///
 /// Locking
 /// -------
 /// This class is partially thread-safe. To ensure freedom from deadlock, if multiple
@@ -118,10 +152,6 @@ class QuerySchedule;
 /// * catalog_version_lock_
 /// * connection_to_sessions_map_lock_
 ///
-/// TODO: The state of a running query is currently not cleaned up if the
-/// query doesn't experience any errors at runtime and close() doesn't get called.
-/// The solution is to have a separate thread that cleans up orphaned
-/// query execution states after a timeout period.
 /// TODO: The same doesn't apply to the execution state of an individual plan
 /// fragment: the originating coordinator might die, but we can get notified of
 /// that via the statestore. This still needs to be implemented.
@@ -145,11 +175,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Start() by calling GetThriftBackendPort(), GetBeeswaxPort() or GetHS2Port().
   Status Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t hs2_port);
 
-  /// Blocks until the server shuts down (by calling Shutdown()).
+  /// Blocks until the server shuts down.
   void Join();
-
-  /// Triggers service shutdown, by unblocking Join().
-  void Shutdown() { shutdown_promise_.Set(true); }
 
   /// ImpalaService rpcs: Beeswax API (implemented in impala-beeswax-server.cc)
   virtual void query(beeswax::QueryHandle& query_handle, const beeswax::Query& query);
@@ -371,6 +398,28 @@ class ImpalaServer : public ImpalaServiceIf,
 
   typedef boost::unordered_map<std::string, TBackendDescriptor> BackendDescriptorMap;
   const BackendDescriptorMap& GetKnownBackends();
+
+  /// Start the shutdown process. Return an error if it could not be started. Otherwise,
+  /// if it was successfully started by this or a previous call, return OK along with
+  /// information about the pending shutdown in 'shutdown_status'. 'relative_deadline_s'
+  /// is the deadline value in seconds to use, or -1 if we should use the default
+  /// deadline. See Shutdown class comment for explanation of the shutdown sequence.
+  Status StartShutdown(int64_t relative_deadline_s, TShutdownStatus* shutdown_status);
+
+  /// Returns true if a shut down is in progress.
+  bool IsShuttingDown() const { return shutting_down_.Load() != 0; }
+
+  /// Returns an informational error about why a new operation could not be started
+  /// if the server is shutting down. Must be called before starting execution of a
+  /// new operation (e.g. a query).
+  Status CheckNotShuttingDown() const;
+
+  /// Return information about the status of a shutdown. Only valid to call if a shutdown
+  /// is in progress (i.e. IsShuttingDown() is true).
+  TShutdownStatus GetShutdownStatus() const;
+
+  /// Convert the shutdown status to a human-readable string.
+  static std::string ShutdownStatusToString(const TShutdownStatus& shutdown_status);
 
   // Mapping between query option names and levels
   QueryOptionLevels query_option_levels_;
@@ -852,6 +901,9 @@ class ImpalaServer : public ImpalaServiceIf,
       const std::string& authorized_proxy_config_delimiter,
       AuthorizedProxyMap* authorized_proxy_map);
 
+  /// Background thread that does the shutdown.
+  [[noreturn]] void ShutdownThread();
+
   /// Guards query_log_ and query_log_index_
   boost::mutex query_log_lock_;
 
@@ -1143,11 +1195,15 @@ class ImpalaServer : public ImpalaServiceIf,
   /// set after all services required for the server have been started.
   std::atomic_bool services_started_;
 
-  /// Set to true when this ImpalaServer should shut down.
-  Promise<bool> shutdown_promise_;
+  /// Whether the Impala server shutdown process started. If 0, shutdown was not started.
+  /// Otherwise, this is the MonotonicMillis() value when the shut down was started.
+  AtomicInt64 shutting_down_{0};
+
+  /// The MonotonicMillis() value after we should shut down regardless of registered
+  /// client requests and running finstances. Set before 'shutting_down_' and updated
+  /// atomically if a new shutdown command with a shorter deadline comes in.
+  AtomicInt64 shutdown_deadline_{0};
 };
-
-
 }
 
 #endif

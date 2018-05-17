@@ -28,7 +28,8 @@ from time import sleep, time
 
 def needs_session(protocol_version=
                   TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6,
-                  conf_overlay=None):
+                  conf_overlay=None,
+                  close_session=True):
   def session_decorator(fn):
     """Decorator that establishes a session and sets self.session_handle. When the test is
     finished, the session is closed.
@@ -47,9 +48,10 @@ def needs_session(protocol_version=
       try:
         fn(self)
       finally:
-        close_session_req = TCLIService.TCloseSessionReq()
-        close_session_req.sessionHandle = resp.sessionHandle
-        HS2TestSuite.check_response(self.hs2_client.CloseSession(close_session_req))
+        if close_session:
+          close_session_req = TCLIService.TCloseSessionReq()
+          close_session_req.sessionHandle = resp.sessionHandle
+          HS2TestSuite.check_response(self.hs2_client.CloseSession(close_session_req))
         self.session_handle = None
     return add_session
 
@@ -62,13 +64,10 @@ def operation_id_to_query_id(operation_id):
   return "%s:%s" % (lo, hi)
 
 class HS2TestSuite(ImpalaTestSuite):
-  TEST_DB = 'hs2_db'
-
   HS2_V6_COLUMN_TYPES = ['boolVal', 'stringVal', 'byteVal', 'i16Val', 'i32Val', 'i64Val',
                          'doubleVal', 'binaryVal']
 
   def setup(self):
-    self.cleanup_db(self.TEST_DB)
     host, port = IMPALAD_HS2_HOST_PORT.split(":")
     self.socket = TSocket(host, port)
     self.transport = TBufferedTransport(self.socket)
@@ -77,7 +76,6 @@ class HS2TestSuite(ImpalaTestSuite):
     self.hs2_client = ImpalaHiveServer2Service.Client(self.protocol)
 
   def teardown(self):
-    self.cleanup_db(self.TEST_DB)
     if self.socket:
       self.socket.close()
 

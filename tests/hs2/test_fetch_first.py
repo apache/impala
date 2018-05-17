@@ -26,6 +26,7 @@ from TCLIService import TCLIService
 from tests.common.impala_cluster import ImpalaCluster
 
 class TestFetchFirst(HS2TestSuite):
+  TEST_DB = 'fetch_first_db'
   IMPALA_RESULT_CACHING_OPT = "impala.resultset.cache.size";
 
   def __test_invalid_result_caching(self, sql_stmt):
@@ -379,6 +380,7 @@ class TestFetchFirst(HS2TestSuite):
     fragment, so the query mem tracker is initialized differently.
     (IMPALA-963)
     """
+    self.cleanup_db(self.TEST_DB)
     self.client.set_configuration({'sync_ddl': 1})
     self.client.execute("create database %s" % self.TEST_DB)
     self.client.execute("create table %s.orderclone like tpch.orders" % self.TEST_DB)

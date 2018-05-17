@@ -513,6 +513,31 @@ struct TSetQueryOptionRequest {
   3: optional bool is_set_all
 }
 
+struct TShutdownParams {
+  // Set if a backend was specified as an argument to the shutdown function. If not set,
+  // the current impala daemon will be shut down. If the port was specified, it is set
+  // in 'backend'. If it was not specified, it is 0 and the port configured for this
+  // Impala daemon is assumed.
+  1: optional Types.TNetworkAddress backend
+
+  // Deadline in seconds for shutting down.
+  2: optional i64 deadline_s
+}
+
+// The type of administrative function to be executed.
+enum TAdminRequestType {
+  SHUTDOWN
+}
+
+// Parameters for administrative function statement. This is essentially a tagged union
+// that contains parameters for the type of administrative statement to be executed.
+struct TAdminRequest {
+  1: required TAdminRequestType type
+
+  // The below member corresponding to 'type' should be set.
+  2: optional TShutdownParams shutdown_params
+}
+
 // HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)
 enum TMetadataOpcode {
   GET_TYPE_INFO,
@@ -605,6 +630,9 @@ struct TExecRequest {
 
   // Profile information from the planning process.
   13: optional RuntimeProfile.TRuntimeProfileNode profile
+
+  // Set iff stmt_type is ADMIN_FN.
+  14: optional TAdminRequest admin_request
 }
 
 // Parameters to FeSupport.cacheJar().

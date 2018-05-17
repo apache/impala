@@ -210,6 +210,19 @@ DEFINE_bool(is_coordinator, true, "If true, this Impala daemon can accept and co
 DEFINE_bool(is_executor, true, "If true, this Impala daemon will execute query "
     "fragments.");
 
+// TODO: can we automatically choose a startup grace period based on the max admission
+// control queue timeout + some margin for error?
+DEFINE_int64(shutdown_grace_period_s, 120, "Shutdown startup grace period in seconds. "
+    "When the shutdown process is started for this daemon, it will wait for at least the "
+    "startup grace period before shutting down. This gives time for updated cluster "
+    "membership information to propagate to all coordinators and for fragment instances "
+    "that were scheduled based on old cluster membership to start executing (and "
+    "therefore be reflected in the metrics used to detect quiescence).");
+
+DEFINE_int64(shutdown_deadline_s, 60 * 60, "Default time limit in seconds for the shut "
+    "down process. If this duration elapses after the shut down process is started, "
+    "the daemon shuts down regardless of any running queries.");
+
 #ifndef NDEBUG
   DEFINE_int64(stress_metadata_loading_pause_injection_ms, 0, "Simulates metadata loading"
       "for a given query by injecting a sleep equivalent to this configuration in "
@@ -637,6 +650,7 @@ void ImpalaServer::LogQueryEvents(const ClientRequestState& request_state) {
     case TStmtType::EXPLAIN:
     case TStmtType::LOAD:
     case TStmtType::SET:
+    case TStmtType::ADMIN_FN:
     default:
       break;
   }
@@ -1663,8 +1677,13 @@ void ImpalaServer::MembershipCallback(
         VLOG(2) << "Error deserializing topic item with key: " << item.key;
         continue;
       }
-      // This is a new item - add it to the map of known backends.
-      known_backends_.insert(make_pair(item.key, backend_descriptor));
+      // This is a new or modified item - add it to the map of known backends.
+      auto it = known_backends_.find(item.key);
+      if (it != known_backends_.end()) {
+        it->second = backend_descriptor;
+      } else {
+        known_backends_.emplace_hint(it, item.key, backend_descriptor);
+      }
     }
 
     // Register the local backend in the statestore and update the list of known backends.
@@ -1754,7 +1773,14 @@ void ImpalaServer::MembershipCallback(
 void ImpalaServer::AddLocalBackendToStatestore(
     vector<TTopicDelta>* subscriber_topic_updates) {
   const string& local_backend_id = exec_env_->subscriber()->id();
-  if (known_backends_.find(local_backend_id) != known_backends_.end()) return;
+  bool is_quiescing = shutting_down_.Load() != 0;
+  auto it = known_backends_.find(local_backend_id);
+  // 'is_quiescing' can change during the lifetime of the Impalad - make sure that the
+  // membership reflects the current value.
+  if (it != known_backends_.end()
+      && is_quiescing == it->second.is_quiescing) {
+    return;
+  }
 
   TBackendDescriptor local_backend_descriptor;
   local_backend_descriptor.__set_is_coordinator(FLAGS_is_coordinator);
@@ -1763,6 +1789,7 @@ void ImpalaServer::AddLocalBackendToStatestore(
   local_backend_descriptor.ip_address = exec_env_->ip_address();
   local_backend_descriptor.__set_proc_mem_limit(
       exec_env_->process_mem_tracker()->limit());
+  local_backend_descriptor.__set_is_quiescing(is_quiescing);
   const TNetworkAddress& krpc_address = exec_env_->krpc_address();
   DCHECK(IsResolvedAddress(krpc_address));
   local_backend_descriptor.__set_krpc_address(krpc_address);
@@ -1779,6 +1806,8 @@ void ImpalaServer::AddLocalBackendToStatestore(
     LOG(WARNING) << "Failed to serialize Impala backend descriptor for statestore topic:"
                  << " " << status.GetDetail();
     subscriber_topic_updates->pop_back();
+  } else if (it != known_backends_.end()) {
+    it->second.is_quiescing = is_quiescing;
   } else {
     known_backends_.insert(make_pair(item.key, local_backend_descriptor));
   }
@@ -2273,6 +2302,8 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
 }
 
 void ImpalaServer::Join() {
+  // The server shuts down by exiting the process, so just block here until the process
+  // exits.
   thrift_be_server_->Join();
   thrift_be_server_.reset();
 
@@ -2282,7 +2313,6 @@ void ImpalaServer::Join() {
     beeswax_server_.reset();
     hs2_server_.reset();
   }
-  shutdown_promise_.Get();
 }
 
 shared_ptr<ClientRequestState> ImpalaServer::GetClientRequestState(
@@ -2310,5 +2340,95 @@ void ImpalaServer::UpdateFilter(TUpdateFilterResult& result,
     return;
   }
   client_request_state->UpdateFilter(params);
+}
+
+Status ImpalaServer::CheckNotShuttingDown() const {
+  if (!IsShuttingDown()) return Status::OK();
+  return Status::Expected(ErrorMsg(
+      TErrorCode::SERVER_SHUTTING_DOWN, ShutdownStatusToString(GetShutdownStatus())));
+}
+
+TShutdownStatus ImpalaServer::GetShutdownStatus() const {
+  TShutdownStatus result;
+  int64_t shutdown_time = shutting_down_.Load();
+  DCHECK_GT(shutdown_time, 0);
+  int64_t shutdown_deadline = shutdown_deadline_.Load();
+  DCHECK_GT(shutdown_time, 0);
+  int64_t now = MonotonicMillis();
+  int64_t elapsed_ms = now - shutdown_time;
+  result.grace_remaining_ms =
+      max<int64_t>(0, FLAGS_shutdown_grace_period_s * 1000 - elapsed_ms);
+  result.deadline_remaining_ms =
+      max<int64_t>(0, shutdown_deadline - now);
+  result.finstances_executing =
+      ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->GetValue();
+  result.client_requests_registered = ImpaladMetrics::NUM_QUERIES_REGISTERED->GetValue();
+  return result;
+}
+
+string ImpalaServer::ShutdownStatusToString(const TShutdownStatus& shutdown_status) {
+  return Substitute("startup grace period left: $0, deadline left: $1, "
+      "fragment instances: $2, queries registered: $3",
+      PrettyPrinter::Print(shutdown_status.grace_remaining_ms, TUnit::TIME_MS),
+      PrettyPrinter::Print(shutdown_status.deadline_remaining_ms, TUnit::TIME_MS),
+      shutdown_status.finstances_executing, shutdown_status.client_requests_registered);
+}
+
+Status ImpalaServer::StartShutdown(
+    int64_t relative_deadline_s, TShutdownStatus* shutdown_status) {
+  DCHECK_GE(relative_deadline_s, -1);
+  if (relative_deadline_s == -1) relative_deadline_s = FLAGS_shutdown_deadline_s;
+  int64_t now = MonotonicMillis();
+  int64_t new_deadline = now + relative_deadline_s * 1000L;
+
+  bool set_deadline = false;
+  bool set_grace = false;
+  int64_t curr_deadline = shutdown_deadline_.Load();
+  while (curr_deadline == 0 || curr_deadline > new_deadline) {
+    // Set the deadline - it was either unset or later than the new one.
+    if (shutdown_deadline_.CompareAndSwap(curr_deadline, new_deadline)) {
+      set_deadline = true;
+      break;
+    }
+    curr_deadline = shutdown_deadline_.Load();
+  }
+
+  while (shutting_down_.Load() == 0) {
+    if (!shutting_down_.CompareAndSwap(0, now)) continue;
+    unique_ptr<Thread> t;
+    Status status =
+        Thread::Create("shutdown", "shutdown", [this] { ShutdownThread(); }, &t, false);
+    if (!status.ok()) {
+      LOG(ERROR) << "Failed to create shutdown thread: " << status.GetDetail();
+      return status;
+    }
+    set_grace = true;
+    break;
+  }
+  *shutdown_status = GetShutdownStatus();
+  // Show the full grace/limit times to avoid showing confusing intermediate values
+  // to the person running the statement.
+  if (set_grace) {
+    shutdown_status->grace_remaining_ms = FLAGS_shutdown_grace_period_s * 1000L;
+  }
+  if (set_deadline) shutdown_status->deadline_remaining_ms = relative_deadline_s * 1000L;
+  return Status::OK();
+}
+
+[[noreturn]] void ImpalaServer::ShutdownThread() {
+  while (true) {
+    SleepForMs(1000);
+    TShutdownStatus shutdown_status = GetShutdownStatus();
+    LOG(INFO) << "Shutdown status: " << ShutdownStatusToString(shutdown_status);
+    if (shutdown_status.grace_remaining_ms <= 0
+        && shutdown_status.finstances_executing == 0
+        && shutdown_status.client_requests_registered == 0) {
+      break;
+    } else if (shutdown_status.deadline_remaining_ms <= 0) {
+      break;
+    }
+  }
+  LOG(INFO) << "Shutdown complete, going down.";
+  exit(0);
 }
 }

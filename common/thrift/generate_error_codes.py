@@ -364,6 +364,8 @@ error_codes = (
    "on backend $2 at offset $3: verification of read data failed."),
 
   ("CANCELLED_INTERNALLY", 119, "Cancelled in $0"),
+
+  ("SERVER_SHUTTING_DOWN", 120, "Server is being shut down: $0."),
 )
 
 import sys

@@ -104,6 +104,14 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
     ImpalaInternalServiceClient::recv_PublishFilter(_return);
   }
 
+  void RemoteShutdown(TRemoteShutdownResult& _return, const TRemoteShutdownParams& params,
+      bool* send_done) {
+    DCHECK(!*send_done);
+    ImpalaInternalServiceClient::send_RemoteShutdown(params);
+    *send_done = true;
+    ImpalaInternalServiceClient::recv_RemoteShutdown(_return);
+  }
+
 #pragma clang diagnostic pop
 
  private:

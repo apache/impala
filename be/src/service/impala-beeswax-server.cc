@@ -52,6 +52,8 @@ namespace impala {
 
 void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   VLOG_QUERY << "query(): query=" << query.query;
+  RAISE_IF_ERROR(CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
+
   ScopedSessionState session_handle(this);
   shared_ptr<SessionState> session;
   RAISE_IF_ERROR(
@@ -87,6 +89,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
 void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     const LogContextId& client_ctx) {
   VLOG_QUERY << "executeAndWait(): query=" << query.query;
+  RAISE_IF_ERROR(CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
   ScopedSessionState session_handle(this);
   shared_ptr<SessionState> session;
   RAISE_IF_ERROR(
@@ -140,6 +143,7 @@ void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& que
   // Translate Beeswax Query to Impala's QueryRequest and then set the explain plan bool
   // before shipping to FE
   VLOG_QUERY << "explain(): query=" << query.query;
+  RAISE_IF_ERROR(CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
   ScopedSessionState session_handle(this);
   RAISE_IF_ERROR(session_handle.WithSession(ThriftServer::GetThreadConnectionId()),
       SQLSTATE_GENERAL_ERROR);

@@ -190,7 +190,14 @@ void Scheduler::UpdateMembership(
            << TNetworkAddressToString(local_backend_descriptor_.address) << ")";
       continue;
     }
-    if (be_desc.is_executor) {
+    if (be_desc.is_quiescing) {
+      // Make sure backends that are shutting down are not scheduled on.
+      auto it = current_executors_.find(item.key);
+      if (it != current_executors_.end()) {
+        new_executors_config->RemoveBackend(it->second);
+        current_executors_.erase(it);
+      }
+    } else if (be_desc.is_executor) {
       new_executors_config->AddBackend(be_desc);
       current_executors_.insert(make_pair(item.key, be_desc));
     }

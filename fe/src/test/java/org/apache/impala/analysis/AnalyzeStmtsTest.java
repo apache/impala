@@ -3861,4 +3861,54 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     fnName.analyze(dummyAnalyzer, false);
     assertFalse(fnName.isBuiltin());
   }
+
+  @Test
+  public void TestAdminFns() throws ImpalaException {
+    AnalyzesOk(": shutdown()");
+    AnalyzesOk(":sHuTdoWn()");
+    AnalyzesOk(":   SHUTDOWN()");
+    AnalyzesOk(": sHuTdoWn('hostname')");
+    AnalyzesOk(": sHuTdoWn(\"hostname\")");
+    AnalyzesOk(": sHuTdoWn(\"hostname:1234\")");
+    AnalyzesOk(": shutdown(10)");
+    AnalyzesOk(": shutdown('hostname', 10)");
+    AnalyzesOk(": shutdown('hostname:11', 10)");
+    AnalyzesOk(": shutdown('hostname:11', 10 * 60)");
+    AnalyzesOk(": shutdown(10 * 60)");
+    AnalyzesOk(": shutdown(0)");
+
+    // Unknown admin functions.
+    AnalysisError(": foobar()", "Unknown admin function: foobar");
+    AnalysisError(": 1a()", "Unknown admin function: 1a");
+    AnalysisError(": foobar(1,2,3)", "Unknown admin function: foobar");
+
+    // Invalid number of shutdown params.
+    AnalysisError(": shutdown('a', 'b', 'c', 'd')",
+        "Shutdown takes 0, 1 or 2 arguments: :shutdown('a', 'b', 'c', 'd')");
+    AnalysisError(": shutdown(1, 2, 3)",
+        "Shutdown takes 0, 1 or 2 arguments: :shutdown(1, 2, 3)");
+
+    // Invalid type of shutdown params.
+    AnalysisError(": shutdown(a)",
+        "Could not resolve column/field reference: 'a'");
+    AnalysisError(": shutdown(1, 2)",
+        "Invalid backend, must be a string literal: 1");
+    AnalysisError(": shutdown(concat('host:', '1234'), 2)",
+        "Invalid backend, must be a string literal: concat('host:', '1234')");
+    AnalysisError(": shutdown('backend:1234', '...')",
+        "deadline expression must be an integer type but is 'STRING': '...'");
+    AnalysisError(": shutdown(true)",
+        "deadline expression must be an integer type but is 'BOOLEAN': TRUE");
+
+    // Invalid host/port.
+    AnalysisError(": shutdown('foo:bar')",
+        "Invalid port number in backend address: foo:bar");
+    AnalysisError(": shutdown('foo:bar:1234')",
+        "Invalid backend address: foo:bar:1234");
+
+    // Invalid deadline value.
+    AnalysisError(": shutdown(-1)", "deadline must be a non-negative integer: -1 = -1");
+    AnalysisError(": shutdown(1.234)",
+        "deadline expression must be an integer type but is 'DECIMAL(4,3)': 1.234");
+  }
 }
