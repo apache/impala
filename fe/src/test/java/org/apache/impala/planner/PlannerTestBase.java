@@ -288,10 +288,7 @@ public class PlannerTestBase extends FrontendTestBase {
           }
           if (locations.scan_range.isSetHbase_key_range()) {
             THBaseKeyRange keyRange = locations.scan_range.getHbase_key_range();
-            Integer hostIdx = locations.locations.get(0).host_idx;
-            TNetworkAddress networkAddress = execRequest.getHost_list().get(hostIdx);
             result.append("HBASE KEYRANGE ");
-            result.append("port=" + networkAddress.port + " ");
             if (keyRange.isSetStartKey()) {
               result.append(HBaseScanNode.printKey(keyRange.getStartKey().getBytes()));
             } else {
