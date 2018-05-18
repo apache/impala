@@ -270,14 +270,11 @@ show table stats census;
         location, dropping the table, and so on.
       </p>
 
-      <p>
-        When data is requested to be pinned in memory, that process happens in the background without blocking
-        access to the data while the caching is in progress. Loading the data from disk could take some time.
-        Impala reads each HDFS data block from memory if it has been pinned already, or from disk if it has not
-        been pinned yet. When files are added to a table or partition whose contents are cached, Impala
-        automatically detects those changes and performs a <codeph>REFRESH</codeph> automatically once the relevant
-        data is cached.
-      </p>
+      <p> When data is requested to be pinned in memory, that process happens in
+        the background without blocking access to the data while the caching is
+        in progress. Loading the data from disk could take some time. Impala
+        reads each HDFS data block from memory if it has been pinned already, or
+        from disk if it has not been pinned yet.</p>
 
       <p>
         The amount of data that you can pin on each node through the HDFS caching mechanism is subject to a quota
