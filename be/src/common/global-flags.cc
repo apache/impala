@@ -159,6 +159,13 @@ DEFINE_int32(kudu_operation_timeout_ms, 3 * 60 * 1000, "Timeout (milliseconds) s
     "all Kudu operations. This must be a positive value, and there is no way to disable "
     "timeouts.");
 
+// Timeout (ms) for Kudu rpcs set in the BE on the KuduClient.
+DEFINE_int32(kudu_client_rpc_timeout_ms, 0, "(Advanced) Timeout (milliseconds) set for "
+    "individual Kudu client rpcs. An operation may consist of several rpcs, so this is "
+    "expected to be less than kudu_operation_timeout_ms. This must be a positive value "
+    "or it will be ignored and Kudu's default of 10s will be used. There is no way to "
+    "disable timeouts.");
+
 DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
     "incremental stats the catalog is allowed to serialize per table. "
     "This limit is set as a safety check, to prevent the JVM from "

@@ -27,6 +27,7 @@ from getpass import getuser
 from time import sleep, time
 from optparse import OptionParser, SUPPRESS_HELP
 from testdata.common import cgroups
+from tests.common.environ import specific_build_type_timeout
 
 KUDU_MASTER_HOSTS = os.getenv('KUDU_MASTER_HOSTS', '127.0.0.1')
 DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get('IMPALA_MAX_LOG_FILES', 10)
@@ -110,6 +111,8 @@ CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 # Kills have a timeout to prevent automated scripts from hanging indefinitely.
 # It is set to a high value to avoid failing if processes are slow to shut down.
 KILL_TIMEOUT_IN_SECONDS = 240
+# For build types like ASAN, modify the default Kudu rpc timeout.
+KUDU_RPC_TIMEOUT = specific_build_type_timeout(0, slow_build_timeout=60000)
 
 def find_user_processes(binaries):
   """Returns an iterator over all processes owned by the current user with a matching
@@ -268,6 +271,9 @@ def start_impalad_instances(cluster_size, num_coordinators, use_exclusive_coordi
     if options.kudu_master_hosts:
       # Must be prepended, otherwise the java options interfere.
       args = "-kudu_master_hosts %s %s" % (options.kudu_master_hosts, args)
+
+    if "kudu_client_rpc_timeout" not in args:
+      args = "-kudu_client_rpc_timeout_ms %s %s" % (KUDU_RPC_TIMEOUT, args)
 
     if i >= num_coordinators:
       args = "-is_coordinator=false %s" % (args)
