@@ -15,6 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-add_custom_target(yarn-extras ALL DEPENDS impala-parent
+# The dependency on ext-data-source here is fictional, but Maven does not like
+# concurrent invocations. These lead to opaque, non-deterministic errors due to
+# races in how Maven handles its ~/.m2/repository doc.
+add_custom_target(yarn-extras ALL DEPENDS impala-parent ext-data-source
   COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B install -DskipTests
 )
