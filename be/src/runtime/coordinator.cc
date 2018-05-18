@@ -148,14 +148,8 @@ Status Coordinator::Exec() {
       DCHECK(!prepare_status.ok());
       return UpdateExecState(prepare_status, nullptr, FLAGS_hostname);
     }
-
-    // When GetFInstanceState() returns the coordinator instance, the Prepare phase
-    // is done and the FragmentInstanceState's root sink will be set up. At that point,
-    // the coordinator must be sure to call root_sink()->CloseConsumer(); the
-    // fragment instance's executor will not complete until that point.
-    // TODO: what does this mean?
-    // TODO: Consider moving this to Wait().
-    // TODO: clarify need for synchronization on this event
+    // When GetFInstanceState() returns the coordinator instance, the Prepare phase is
+    // done and the FragmentInstanceState's root sink will be set up.
     DCHECK(coord_instance_->IsPrepared() && coord_instance_->WaitForPrepare().ok());
     coord_sink_ = coord_instance_->root_sink();
     DCHECK(coord_sink_ != nullptr);
@@ -527,7 +521,6 @@ void Coordinator::HandleExecStateTransition(
       exec_rpcs_complete_barrier_->pending() <= 0) << "exec rpcs not completed";
 
   query_events_->MarkEvent(exec_state_to_event.at(new_state));
-  if (coord_sink_ != nullptr) coord_sink_->CloseConsumer();
   // This thread won the race to transitioning into a terminal state - terminate
   // execution and release resources.
   ReleaseExecResources();

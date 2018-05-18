@@ -72,11 +72,10 @@ Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
   // written clients may not cope correctly with them. See IMPALA-4335.
   while (current_batch_row < batch->num_rows()) {
     unique_lock<mutex> l(lock_);
-    while (results_ == nullptr && !consumer_done_) sender_cv_.Wait(l);
-    if (consumer_done_ || batch == nullptr) {
-      eos_ = true;
-      return Status::OK();
-    }
+    // Wait until the consumer gives us a result set to fill in, or the fragment
+    // instance has been cancelled.
+    while (results_ == nullptr && !state->is_cancelled()) sender_cv_.Wait(l);
+    RETURN_IF_CANCELLED(state);
 
     // Otherwise the consumer is ready. Fill out the rows.
     DCHECK(results_ != nullptr);
@@ -107,29 +106,26 @@ Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
 
 Status PlanRootSink::FlushFinal(RuntimeState* state) {
   unique_lock<mutex> l(lock_);
-  sender_done_ = true;
-  eos_ = true;
+  sender_state_ = SenderState::EOS;
   consumer_cv_.NotifyAll();
   return Status::OK();
 }
 
 void PlanRootSink::Close(RuntimeState* state) {
   unique_lock<mutex> l(lock_);
-  // No guarantee that FlushFinal() has been called, so need to mark sender_done_ here as
-  // well.
-  // TODO: shouldn't this also set eos to true? do we need both eos and sender_done_?
-  sender_done_ = true;
+  // FlushFinal() won't have been called when the fragment instance encounters an error
+  // before sending all rows.
+  if (sender_state_ == SenderState::ROWS_PENDING) {
+    sender_state_ = SenderState::CLOSED_NOT_EOS;
+  }
   consumer_cv_.NotifyAll();
-  // Wait for consumer to be done, in case sender tries to tear-down this sink while the
-  // sender is still reading from it.
-  while (!consumer_done_) sender_cv_.Wait(l);
   DataSink::Close(state);
 }
 
-void PlanRootSink::CloseConsumer() {
-  unique_lock<mutex> l(lock_);
-  consumer_done_ = true;
+void PlanRootSink::Cancel(RuntimeState* state) {
+  DCHECK(state->is_cancelled());
   sender_cv_.NotifyAll();
+  consumer_cv_.NotifyAll();
 }
 
 Status PlanRootSink::GetNext(
@@ -140,9 +136,14 @@ Status PlanRootSink::GetNext(
   num_rows_requested_ = num_results;
   sender_cv_.NotifyAll();
 
-  while (!eos_ && results_ != nullptr && !sender_done_) consumer_cv_.Wait(l);
+  // Wait while the sender is still producing rows and hasn't filled in the current
+  // result set.
+  while (sender_state_ == SenderState::ROWS_PENDING && results_ != nullptr &&
+      !state->is_cancelled()) {
+    consumer_cv_.Wait(l);
+  }
 
-  *eos = eos_;
+  *eos = sender_state_ == SenderState::EOS;
   return state->GetQueryStatus();
 }
 
