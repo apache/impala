@@ -103,13 +103,9 @@ void FragmentInstanceState::Cancel() {
   // being cancelled.
   discard_result(WaitForPrepare());
 
-  // Ensure that the sink is closed from both sides. Although in ordinary executions we
-  // rely on the consumer to do this, in error cases the consumer may not be able to send
-  // CloseConsumer() (see IMPALA-4348 for an example).
-  if (root_sink_ != nullptr) root_sink_->CloseConsumer();
-
   DCHECK(runtime_state_ != nullptr);
   runtime_state_->set_is_cancelled();
+  if (root_sink_ != nullptr) root_sink_->Cancel(runtime_state_);
   runtime_state_->stream_mgr()->Cancel(runtime_state_->fragment_instance_id());
 }
 
