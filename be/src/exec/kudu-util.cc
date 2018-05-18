@@ -24,6 +24,7 @@
 #include <kudu/client/callbacks.h>
 #include <kudu/client/schema.h>
 #include <kudu/common/partial_row.h>
+#include <kudu/util/monotime.h>
 
 #include "common/logging.h"
 #include "common/names.h"
@@ -41,7 +42,7 @@ using kudu::client::KuduValue;
 using DataType = kudu::client::KuduColumnSchema::DataType;
 
 DECLARE_bool(disable_kudu);
-DECLARE_int32(kudu_operation_timeout_ms);
+DECLARE_int32(kudu_client_rpc_timeout_ms);
 
 namespace impala {
 
@@ -69,6 +70,10 @@ Status CreateKuduClient(const vector<string>& master_addrs,
     kudu::client::sp::shared_ptr<KuduClient>* client) {
   kudu::client::KuduClientBuilder b;
   for (const string& address: master_addrs) b.add_master_server_addr(address);
+  if (FLAGS_kudu_client_rpc_timeout_ms > 0) {
+    b.default_rpc_timeout(
+        kudu::MonoDelta::FromMilliseconds(FLAGS_kudu_client_rpc_timeout_ms));
+  }
   KUDU_RETURN_IF_ERROR(b.Build(client), "Unable to create Kudu client");
   return Status::OK();
 }
