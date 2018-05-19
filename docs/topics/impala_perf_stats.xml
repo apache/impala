@@ -702,6 +702,51 @@ show column stats year_month_day;
         </p>
 
       </conbody>
+      <concept id="inc_stats_size_limit_bytes">
+        <title>Maximum Serialized Stats Size</title>
+        <conbody>
+          <p>
+            When executing <codeph>COMPUTE INCREMENTAL STATS</codeph> on
+            very large tables, use the configuration setting
+              <codeph>inc_stats_size_limit_bytes</codeph> to prevent Impala from
+            running out of memory while updating table metadata. If this limit
+            is reached, Impala will stop loading the table and return an error.
+            The error serves as an indication that <codeph>COMPUTE INCREMENTAL
+              STATS</codeph> should not be used on the particular table.
+            Consider spitting the table and using regular <codeph>COMPUTE
+              STATS</codeph> ]if possible.
+          </p>
+
+          <p>
+            The <codeph>inc_stats_size_limit_bytes</codeph> limit is set as a
+            safety check, to prevent Impala from hitting the maximum limit for
+            the table metadata. Note that this limit is only one part of the
+            entire table's metadata all of which together must be below 2 GB.
+          </p>
+
+          <p>
+            The default value for <codeph>inc_stats_size_limit_bytes</codeph>
+            is 20971520, 200 MB.
+          </p>
+
+          <p>
+            To change the <codeph>inc_stats_size_limit_bytes</codeph> value,
+            restart <codeph>impalad</codeph> and <codeph>catalogd</codeph> with
+            the new value specified in bytes, for example, 1048576000 for 1 GB.
+            See <xref
+              href="../../../../cloudera-docs/docs/topics/impala_config_options.xml#config_options"
+            /> for the steps to change the option and restart Impala
+            daemons.
+          </p>
+
+          <note type="attention">
+            The <codeph>inc_stats_size_limit_bytes</codeph> setting should be
+            increased with care. A big value for the setting, such as 1 GB or
+            more, can result in a spike in heap usage as well as a crash of
+            Impala.
+          </note>
+        </conbody>
+      </concept>
 
     </concept>
 
