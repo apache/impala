@@ -50,6 +50,7 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TOwnerType;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TTablePropertyType;
@@ -244,6 +245,15 @@ parser code {:
 
     return result.toString();
   }
+
+  /**
+   * This methods checks if a given ident matches the given keyword.
+   */
+  public void checkIdentKeyword(String keyword, String ident) throws Exception {
+    if (!keyword.equals(ident.toUpperCase())) {
+      parseError("identifier", SqlParserSymbols.IDENT, keyword);
+    }
+  }
 :};
 
 // List of keywords. Please keep them sorted alphabetically.
@@ -406,6 +416,9 @@ nonterminal ArrayList<PartitionKeyValue> partition_key_value_list;
 nonterminal PartitionKeyValue partition_key_value;
 nonterminal PartitionKeyValue static_partition_key_value;
 nonterminal Qualifier union_op;
+
+// For ALTER DATABASE.
+nonterminal AlterDbStmt alter_db_stmt;
 
 nonterminal PartitionDef partition_def;
 nonterminal List<PartitionDef> partition_def_list;
@@ -595,6 +608,8 @@ stmt ::=
   {: RESULT = describe; :}
   | describe_table_stmt:describe
   {: RESULT = describe; :}
+  | alter_db_stmt:alter_db
+  {: RESULT = alter_db; :}
   | alter_tbl_stmt:alter_tbl
   {: RESULT = alter_tbl; :}
   | alter_view_stmt:alter_view
@@ -1015,6 +1030,25 @@ partition_def_list ::=
 comment_on_stmt ::=
   KW_COMMENT KW_ON KW_DATABASE ident_or_default:db_name KW_IS nullable_comment_val:comment
   {: RESULT = new CommentOnDbStmt(db_name, comment); :}
+  ;
+
+// Introducing OWNER and USER keywords has a potential to be a breaking change,
+// such that any names that use OWNER or USER will need to be escaped. By using IDENT
+// token we can make OWNER and USER to be keywords only in these statements.
+alter_db_stmt ::=
+  KW_ALTER KW_DATABASE ident_or_default:db KW_SET IDENT:owner_id IDENT:user_id
+  ident_or_default:user
+  {:
+    parser.checkIdentKeyword("OWNER", owner_id);
+    parser.checkIdentKeyword("USER", user_id);
+    RESULT = new AlterDbSetOwnerStmt(db, new Owner(TOwnerType.USER, user));
+  :}
+  | KW_ALTER KW_DATABASE ident_or_default:db KW_SET IDENT:owner_id KW_ROLE
+    ident_or_default:role
+  {:
+    parser.checkIdentKeyword("OWNER", owner_id);
+    RESULT = new AlterDbSetOwnerStmt(db, new Owner(TOwnerType.ROLE, role));
+  :}
   ;
 
 alter_tbl_stmt ::=

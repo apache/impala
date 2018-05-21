@@ -58,6 +58,10 @@ public class MetaStoreUtil {
   // The longest strings Hive accepts for [serde] property values.
   public static final int MAX_PROPERTY_VALUE_LENGTH = 4000;
 
+  // Maximum owner length. The owner can be user or role.
+  // https://github.com/apache/hive/blob/13fbae57321f3525cabb326df702430d61c242f9/standalone-metastore/src/main/resources/package.jdo#L63
+  public static final int MAX_OWNER_LENGTH = 128;
+
   // The default maximum number of partitions to fetch from the Hive metastore in one
   // RPC.
   private static final short DEFAULT_MAX_PARTITIONS_PER_RPC = 1000;

@@ -3939,4 +3939,25 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("comment on database doesntexist is 'comment'",
         "Database does not exist: doesntexist");
   }
+
+  @Test
+  public void TestAlterDatabaseSetOwner() {
+    String[] ownerTypes = new String[]{"user", "role"};
+    for (String ownerType : ownerTypes) {
+      AnalyzesOk(String.format("alter database functional set owner %s foo", ownerType));
+      AnalysisError(String.format("alter database doesntexist set owner %s foo",
+          ownerType), "Database does not exist: doesntexist");
+      AnalysisError(String.format("alter database functional set owner %s %s",
+          ownerType, buildLongOwnerName()), "Owner name exceeds maximum length of 128 " +
+          "characters. The given owner name has 133 characters.");
+    }
+  }
+
+  private static String buildLongOwnerName() {
+    StringBuilder comment = new StringBuilder();
+    for (int i = 0; i < MetaStoreUtil.MAX_OWNER_LENGTH + 5; i++) {
+      comment.append("a");
+    }
+    return comment.toString();
+  }
 }
