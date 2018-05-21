@@ -422,13 +422,6 @@ under the License.
           </ul>
         </li>
         <li>
-          <p rev="">
-            The <codeph>REFRESH</codeph> statement now updates information about HDFS block locations.
-            Therefore, you can perform a fast and efficient <codeph>REFRESH</codeph> after doing an HDFS
-            rebalancing operation instead of the more expensive <codeph>INVALIDATE METADATA</codeph> statement.
-          </p>
-        </li>
-        <li>
           <p rev="IMPALA-1654">
             [<xref keyref="IMPALA-1654">IMPALA-1654</xref>]
             Several kinds of DDL operations
