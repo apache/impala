@@ -3747,4 +3747,27 @@ public class ParserTest extends FrontendTestBase {
     ParserError("COMMENT ON DATABASE IS 'comment'");
     ParserError("COMMENT ON DATABASE db IS");
   }
+
+  @Test
+  public void TestAlterDatabaseSetOwner() {
+    for (String valid : new String[]{"foo", "user", "owner"}) {
+      ParsesOk(String.format("ALTER DATABASE %s SET OWNER USER %s", valid, valid));
+      ParsesOk(String.format("ALTER DATABASE %s SET OWNER ROLE %s", valid, valid));
+    }
+
+    for (String invalid : new String[]{"'foo'", "''", "NULL"}) {
+      ParserError(String.format("ALTER DATABASE %s SET OWNER ROLE %s", invalid, invalid));
+      ParserError(String.format("ALTER DATABASE %s SET OWNER USER %s", invalid, invalid));
+    }
+
+    ParserError("ALTER DATABASE db SET ABC USER foo");
+    ParserError("ALTER DATABASE db SET ABC ROLE foo");
+    ParserError("ALTER DATABASE db SET OWNER ABC foo");
+    ParserError("ALTER DATABASE db SET OWNER USER");
+    ParserError("ALTER DATABASE SET OWNER foo");
+    ParserError("ALTER DATABASE SET OWNER USER foo");
+    ParserError("ALTER DATABASE db SET OWNER ROLE");
+    ParserError("ALTER DATABASE SET OWNER ROLE foo");
+    ParserError("ALTER DATABASE SET OWNER");
+  }
 }

@@ -3017,6 +3017,22 @@ public class AuthorizationTest extends FrontendTestBase {
         "User '%s' does not have privileges to execute 'ALTER' on: doesntexist");
   }
 
+  @Test
+  public void TestAlterDatabaseSetOwner() throws ImpalaException {
+    // User has ALTER privilege on functional_text_lzo database.
+    AuthzOk("alter database functional_text_lzo set owner user foo_user");
+    AuthzOk("alter database functional_text_lzo set owner role foo_role");
+    // User does not have ALTER privilege on functional database.
+    AuthzError("alter database functional set owner user foo_user",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional");
+    AuthzError("alter database functional set owner role foo_role",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional");
+    AuthzError("alter database doesntexist set owner user foo_user",
+        "User '%s' does not have privileges to execute 'ALTER' on: doesntexist");
+    AuthzError("alter database doesntexist set owner role foo_role",
+        "User '%s' does not have privileges to execute 'ALTER' on: doesntexist");
+  }
+
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)
       throws ImpalaException {
     Frontend fe = new Frontend(authzConfig, ctx_.catalog);

@@ -52,7 +52,38 @@ enum TDdlType {
   GRANT_PRIVILEGE,
   REVOKE_PRIVILEGE,
   TRUNCATE_TABLE,
-  COMMENT_ON
+  COMMENT_ON,
+  ALTER_DATABASE
+}
+
+enum TOwnerType {
+  USER,
+  ROLE
+}
+
+// Types of ALTER DATABASE commands supported.
+enum TAlterDbType {
+  SET_OWNER
+}
+
+// Parameters for ALTER DATABASE SET OWNER commands.
+struct TAlterDbSetOwnerParams {
+  // The owner type.
+  1: required TOwnerType owner_type
+
+  // The owner name.
+  2: required string owner_name
+}
+
+struct TAlterDbParams {
+  // The type of ALTER DATABASE command.
+  1: required TAlterDbType alter_type
+
+  // Name of the database to alter.
+  2: required string db
+
+  // Parameters for ALTER DATABASE SET OWNER commands.
+  3: optional TAlterDbSetOwnerParams set_owner_params
 }
 
 // Types of ALTER TABLE commands supported.

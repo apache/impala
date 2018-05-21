@@ -73,17 +73,22 @@ class TestDdlBase(ImpalaTestSuite):
     """Extracts the serde properties mapping from the output of DESCRIBE FORMATTED"""
     return self._get_properties('Storage Desc Params:', table_name)
 
-  def _get_properties(self, section_name, table_name):
-    """Extracts the table properties mapping from the output of DESCRIBE FORMATTED"""
-    result = self.client.execute("describe formatted " + table_name)
+  def _get_db_owner_properties(self, db_name):
+    """Extracts the DB properties mapping from the output of DESCRIBE FORMATTED"""
+    return self._get_properties("Owner:", db_name, True)
+
+  def _get_properties(self, section_name, name, is_db=False):
+    """Extracts the db/table properties mapping from the output of DESCRIBE FORMATTED"""
+    result = self.client.execute("describe {0} formatted {1}".format(
+      "database" if is_db else "", name))
     match = False
-    properties = dict();
+    properties = dict()
     for row in result.data:
       if section_name in row:
         match = True
       elif match:
         row = row.split('\t')
-        if (row[1] == 'NULL'):
+        if row[1] == 'NULL':
           break
         properties[row[1].rstrip()] = row[2].rstrip()
     return properties
