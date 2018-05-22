@@ -22,6 +22,7 @@
 #include "exec/scanner-context.inline.h"
 #include "exprs/expr.h"
 #include "runtime/exec-env.h"
+#include "runtime/io/request-context.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/tuple-row.h"
 #include "util/decompress.h"
@@ -115,8 +116,8 @@ void HdfsOrcScanner::ScanRangeInputStream::read(void* buf, uint64_t length,
   {
     SCOPED_TIMER(scanner_->state_->total_storage_wait_timer());
     bool needs_buffers;
-    status = ExecEnv::GetInstance()->disk_io_mgr()->StartScanRange(
-          scanner_->scan_node_->reader_context(), range, &needs_buffers);
+    status =
+        scanner_->scan_node_->reader_context()->StartScanRange(range, &needs_buffers);
     DCHECK(!status.ok() || !needs_buffers) << "Already provided a buffer";
     if (status.ok()) status = range->GetNext(&io_buffer);
   }

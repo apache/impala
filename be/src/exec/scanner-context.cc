@@ -22,6 +22,7 @@
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/hdfs-scan-node.h"
 #include "runtime/io/disk-io-mgr.h"
+#include "runtime/io/request-context.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
@@ -155,8 +156,8 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
         scan_range_->fs(), filename(), read_past_buffer_size, offset, partition_id,
         scan_range_->disk_id(), false, BufferOpts::Uncached());
     bool needs_buffers;
-    RETURN_IF_ERROR(io_mgr->StartScanRange(
-        parent_->scan_node_->reader_context(), range, &needs_buffers));
+    RETURN_IF_ERROR(
+        parent_->scan_node_->reader_context()->StartScanRange(range, &needs_buffers));
     if (needs_buffers) {
       // Allocate fresh buffers. The buffers for 'scan_range_' should be released now
       // since we hit EOS.
@@ -166,8 +167,7 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
             reservation_, io_mgr->min_buffer_size()));
       }
       RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(
-          parent_->scan_node_->reader_context(), parent_->bp_client_, range,
-          reservation_));
+          parent_->bp_client_, range, reservation_));
     }
     RETURN_IF_ERROR(range->GetNext(&io_buffer_));
     DCHECK(io_buffer_->eosr());

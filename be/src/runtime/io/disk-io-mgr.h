@@ -63,18 +63,18 @@ class DiskQueue;
 /// to read based on disk activity and begins reading and queuing buffers for that range.
 ///
 /// For Writers:
-/// Data is written via AddWriteRange(). This is non-blocking and adds a WriteRange to a
-/// per-disk queue. After the write is complete, a callback in WriteRange is invoked.
-/// No memory is allocated within IoMgr for writes and no copies are made. It is the
-/// responsibility of the client to ensure that the data to be written is valid and that
-/// the file to be written to exists until the callback is invoked.
+/// Data is written via RequestContext::AddWriteRange(). This is non-blocking and adds
+/// a WriteRange to a per-disk queue. After the write is complete, a callback in
+/// WriteRange is invoked. No memory is allocated within IoMgr for writes and no copies
+/// are made. It is the responsibility of the client to ensure that the data to be
+/// written is valid. The file to be written is created if not already present.
 ///
 /// There are several key methods for scanning data with the IoMgr.
-///  1. StartScanRange(): adds range to the IoMgr to start immediately.
-///  2. AddScanRanges(): adds ranges to the IoMgr that the reader wants to scan, but does
-///     not start them until GetNextUnstartedRange() is called.
-///  3. GetNextUnstartedRange(): returns to the caller the next scan range it should
-///     process.
+///  1. RequestContext::StartScanRange(): adds range to the IoMgr to start immediately.
+///  2. RequestContext::AddScanRanges(): adds ranges to the IoMgr that the reader wants to
+///     scan, but does not start them until RequestContext::GetNextUnstartedRange() is called.
+///  3. RequestContext::GetNextUnstartedRange(): returns to the caller the next scan range
+///     it should process.
 ///  4. ScanRange::GetNext(): returns the next buffer for this range, blocking until
 ///     data is available.
 ///
@@ -102,14 +102,14 @@ class DiskQueue;
 /// ranges of different clients.
 ///
 /// IoMgr clients may want to work on multiple scan ranges at a time to maximize CPU and
-/// I/O utilization. Clients can call GetNextUnstartedRange() to start as many concurrent
-/// scan ranges as required, e.g. from each parallel scanner thread. Once a scan range has
-/// been returned via GetNextUnstartedRange(), the caller must allocate any memory needed
-/// for buffering reads, after which the IoMgr wil start to fill the buffers with data
-/// while the caller concurrently consumes and processes the data. For example, the logic
-/// in a scanner thread might look like:
+/// I/O utilization. Clients can call RequestContext::GetNextUnstartedRange() to start as
+/// many concurrent scan ranges as required, e.g. from each parallel scanner thread. Once
+/// a scan range has been returned via GetNextUnstartedRange(), the caller must allocate
+/// any memory needed for buffering reads, after which the IoMgr wil start to fill the
+/// buffers with data while the caller concurrently consumes and processes the data. For
+/// example, the logic in a scanner thread might look like:
 ///   while (more_ranges)
-///     range = GetNextUnstartedRange()
+///     range = context->GetNextUnstartedRange()
 ///     while (!range.eosr)
 ///       buffer = range.GetNext()
 ///
@@ -247,49 +247,9 @@ class DiskIoMgr : public CacheLineAligned {
   /// up.
   void UnregisterContext(RequestContext* context);
 
-  /// Adds the scan ranges to reader's queues, but does not start scheduling it. The range
-  /// can be scheduled by a thread calling GetNextUnstartedRange(). This call is
-  /// non-blocking. The caller must not deallocate the scan range pointers before
-  /// UnregisterContext(). 'ranges' must not be empty.
-  Status AddScanRanges(
-      RequestContext* reader, const std::vector<ScanRange*>& ranges) WARN_UNUSED_RESULT;
-
-  /// Adds the scan range to the queues, as with AddScanRanges(), but immediately
-  /// start scheduling the scan range. This can be used to do synchronous reads as well
-  /// as schedule dependent ranges, e.g. for columnar formats. This call is non-blocking.
-  /// The caller must not deallocate the scan range pointers before UnregisterContext().
-  ///
-  /// If this returns true in '*needs_buffers', the caller must then call
-  /// AllocateBuffersForRange() to add buffers for the data to be read into before the
-  /// range can be scheduled. Otherwise, the range is scheduled and the IoMgr will
-  /// asynchronously read the data for the range and the caller can call
-  /// ScanRange::GetNext() to read the data.
-  Status StartScanRange(
-      RequestContext* reader, ScanRange* range, bool* needs_buffers) WARN_UNUSED_RESULT;
-
-  /// Add a WriteRange for the writer. This is non-blocking and schedules the context
-  /// on the IoMgr disk queue. Does not create any files.
-  Status AddWriteRange(
-      RequestContext* writer, WriteRange* write_range) WARN_UNUSED_RESULT;
-
-  /// Tries to get an unstarted scan range that was added to 'reader' with
-  /// AddScanRanges(). On success, returns OK and returns the range in '*range'.
-  /// If 'reader' was cancelled, returns CANCELLED. If another error is encountered,
-  /// an error status is returned. Otherwise, if error or cancellation wasn't encountered
-  /// and there are no unstarted ranges for 'reader', returns OK and sets '*range' to
-  /// nullptr.
-  ///
-  /// If '*needs_buffers' is returned as true, the caller must call
-  /// AllocateBuffersForRange() to add buffers for the data to be read into before the
-  /// range can be scheduled. Otherwise, the range is scheduled and the IoMgr will
-  /// asynchronously read the data for the range and the caller can call
-  /// ScanRange::GetNext() to read the data.
-  Status GetNextUnstartedRange(RequestContext* reader, ScanRange** range,
-      bool* needs_buffers) WARN_UNUSED_RESULT;
-
   /// Allocates up to 'max_bytes' buffers to read the data from 'range' into and schedules
-  /// the range. Called after StartScanRange() or GetNextUnstartedRange() returns
-  /// *needs_buffers=true.
+  /// the range. Called after StartScanRange() or reader->GetNextUnstartedRange()
+  /// returns *needs_buffers=true.
   ///
   /// The buffer sizes are chosen based on range->len(). 'max_bytes' must be >=
   /// min_read_buffer_size() so that at least one buffer can be allocated. The caller
@@ -299,7 +259,7 @@ class DiskIoMgr : public CacheLineAligned {
   /// Setting 'max_bytes' to IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE * max_buffer_size()
   /// will typically maximize I/O throughput. See the "Buffer Management" section of
   /// the class comment for explanation.
-  Status AllocateBuffersForRange(RequestContext* reader,
+  Status AllocateBuffersForRange(
       BufferPool::ClientHandle* bp_client, ScanRange* range, int64_t max_bytes);
 
   /// Determine which disk queue this file should be assigned to.  Returns an index into
@@ -386,33 +346,29 @@ class DiskIoMgr : public CacheLineAligned {
   /// See "Buffer Management" in the class comment for explanation.
   static const int64_t IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE = 3;
 
- protected:
-  // Protected methods are used by other classes in io::.
-  friend class DiskQueue;
-  friend class ScanRange;
-  friend class RequestContext;
-
-  /// Write the specified range to disk and calls HandleWriteFinished() when done.
-  /// Responsible for opening and closing the file that is written.
-  void Write(RequestContext* writer_context, WriteRange* write_range);
-
-  DiskQueue* GetDiskQueue(int disk_id) {
-    DCHECK_GE(disk_id, 0);
-    DCHECK_LT(disk_id, disk_queues_.size());
-    return disk_queues_[disk_id];
-  }
-
-  RuntimeProfile::Counter* total_bytes_read_counter() {
-    return &total_bytes_read_counter_;
-  }
-  RuntimeProfile::Counter* read_timer() { return &read_timer_; }
-  struct hadoopRzOptions* cached_read_options() { return cached_read_options_; }
+  /// Validates that range is correctly initialized. Return an error status if there
+  /// is something invalid about the scan range.
+  Status ValidateScanRange(ScanRange* range) WARN_UNUSED_RESULT;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(DiskIoMgr);
   friend class DiskIoMgrTest_Buffers_Test;
   friend class DiskIoMgrTest_BufferSizeSelection_Test;
   friend class DiskIoMgrTest_VerifyNumThreadsParameter_Test;
+
+  /////////////////////////////////////////
+  /// BEGIN: private members that are accessed by other io:: classes
+  friend class DiskQueue;
+  friend class ScanRange;
+
+  /// Write the specified range to disk and calls writer_context->WriteDone() when done.
+  /// Responsible for opening and closing the file that is written.
+  void Write(RequestContext* writer_context, WriteRange* write_range);
+
+  struct hadoopRzOptions* cached_read_options() { return cached_read_options_; }
+
+  /// END: private members that are accessed by other io:: classes
+  /////////////////////////////////////////
 
   // Handles the low level I/O functionality.
   std::unique_ptr<LocalFileSystem> local_file_system_;
@@ -437,12 +393,6 @@ class DiskIoMgr : public CacheLineAligned {
   /// Options object for cached hdfs reads. Set on startup and never modified.
   struct hadoopRzOptions* cached_read_options_ = nullptr;
 
-  /// Total bytes read by the IoMgr.
-  RuntimeProfile::Counter total_bytes_read_counter_;
-
-  /// Total time spent in hdfs reading
-  RuntimeProfile::Counter read_timer_;
-
   /// Per disk queues. This is static and created once at Init() time.  One queue is
   /// allocated for each local disk on the system and for each remote filesystem type.
   /// It is indexed by disk id.
@@ -457,17 +407,6 @@ class DiskIoMgr : public CacheLineAligned {
   // limit of entries defined by FLAGS_max_cached_file_handles. Evicted cached file
   // handles are closed.
   FileHandleCache file_handle_cache_;
-
-  /// Invokes write_range->callback_  after the range has been written and
-  /// updates per-disk state and handle state. The status of the write OK/RUNTIME_ERROR
-  /// etc. is passed via write_status and to the callback.
-  /// The write_status does not affect the writer->status_. That is, an write error does
-  /// not cancel the writer context - that decision is left to the callback handler.
-  void HandleWriteFinished(
-      RequestContext* writer, WriteRange* write_range, const Status& write_status);
-
-  /// Validates that range is correctly initialized
-  Status ValidateScanRange(ScanRange* range) WARN_UNUSED_RESULT;
 
   /// Helper method to write a range using the specified FILE handle. Returns Status:OK
   /// if the write succeeded, or a RUNTIME_ERROR with an appropriate message otherwise.
