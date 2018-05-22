@@ -119,8 +119,9 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   class BoolColumnWriter;
   friend class BoolColumnWriter;
 
-  /// Minimum allowable block size in bytes. This is a function of the number of columns.
-  int64_t MinBlockSize() const;
+  /// Minimum allowable block size in bytes. This is a function of the number of columns
+  /// in the target file.
+  int64_t MinBlockSize(int64_t num_file_cols) const;
 
   /// Fills in the schema portion of the file metadata, converting the schema in
   /// table_desc_ into the format in the file metadata
