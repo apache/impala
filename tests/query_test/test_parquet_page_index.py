@@ -24,6 +24,7 @@ from subprocess import check_call
 from parquet.ttypes import BoundaryOrder, ColumnIndex, OffsetIndex, PageHeader, PageType
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfLocal
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.get_parquet_metadata import (
     decode_stats_value,
@@ -34,6 +35,7 @@ from tests.util.get_parquet_metadata import (
 PAGE_INDEX_MAX_STRING_LENGTH = 64
 
 
+@SkipIfLocal.parquet_file_size
 class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
   """Since PARQUET-922 page statistics can be written before the footer.
   The tests in this class checks if Impala writes the page indices correctly.
