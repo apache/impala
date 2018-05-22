@@ -18,31 +18,20 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.thrift.TCommentOnParams;
-import org.apache.impala.util.MetaStoreUtil;
 
 /**
- * A base class for COMMENT ON statement.
+ * Represents a COMMENT ON TABLE tbl IS 'comment' statement.
  */
-public abstract class CommentOnStmt extends StatementBase {
-  protected final String comment_;
-
-  public CommentOnStmt(String comment) {
-    comment_ = comment;
+public class CommentOnTableStmt extends CommentOnTableOrViewStmt {
+  public CommentOnTableStmt(TableName tableName, String comment) {
+    super(tableName, comment);
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (comment_ != null && comment_.length() > MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH) {
-      throw new AnalysisException(String.format("Comment exceeds maximum length of %d " +
-          "characters. The given comment has %d characters.",
-          MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH, comment_.length()));
+  protected void validateType(TableRef tableRef) throws AnalysisException {
+    if (tableRef instanceof InlineViewRef) {
+      throw new AnalysisException(String.format(
+          "COMMENT ON TABLE not allowed on a view: %s", tableName_));
     }
-  }
-
-  public TCommentOnParams toThrift() {
-    TCommentOnParams params = new TCommentOnParams();
-    params.setComment(comment_);
-    return params;
   }
 }

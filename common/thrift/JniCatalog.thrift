@@ -663,9 +663,16 @@ struct TGetCatalogUsageResponse{
 }
 
 struct TCommentOnParams {
-  // Name of comment to alter. When this field is not set, the comment will be removed.
+  // Contents of comment to alter. When this field is not set, the comment will be removed.
   1: optional string comment
+
+  //--------------------------------------
+  // Only one of these fields can be set.
+  //--------------------------------------
 
   // Name of database to alter.
   2: optional string db
+
+  // Name of table/view to alter.
+  3: optional CatalogObjects.TTableName table_name
 }

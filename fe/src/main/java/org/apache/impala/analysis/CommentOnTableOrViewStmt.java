@@ -22,28 +22,45 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCommentOnParams;
 
-/**
- * Represents a COMMENT ON DATABASE db IS 'comment' statement.
- */
-public class CommentOnDbStmt extends CommentOnStmt {
-  private final String dbName_;
+import java.util.List;
 
-  public CommentOnDbStmt(String dbName, String comment) {
+/**
+ * A base class for COMMENT ON TABLE/VIEW.
+ */
+public abstract class CommentOnTableOrViewStmt extends CommentOnStmt {
+  protected TableName tableName_;
+
+  public CommentOnTableOrViewStmt(TableName tableName, String comment) {
     super(comment);
-    Preconditions.checkNotNull(dbName);
-    dbName_ = dbName;
+    Preconditions.checkArgument(tableName != null && !tableName.isEmpty());
+    tableName_ = tableName;
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    tblRefs.add(new TableRef(tableName_.toPath(), null));
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    analyzer.getDb(dbName_, Privilege.ALTER);
+    tableName_ = analyzer.getFqTableName(tableName_);
+    TableRef tableRef = new TableRef(tableName_.toPath(), null, Privilege.ALTER);
+    tableRef = analyzer.resolveTableRef(tableRef);
+    Preconditions.checkNotNull(tableRef);
+    tableRef.analyze(analyzer);
+    validateType(tableRef);
   }
+
+  /**
+   * Validates the type of the given TableRef.
+   */
+  protected abstract void validateType(TableRef tableRef) throws AnalysisException;
 
   @Override
   public TCommentOnParams toThrift() {
     TCommentOnParams params = super.toThrift();
-    params.setDb(dbName_);
+    params.setTable_name(tableName_.toThrift());
     return params;
   }
 }

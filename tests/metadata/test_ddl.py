@@ -202,6 +202,10 @@ class TestDdlStatements(TestDdlBase):
     comment = self._get_db_comment(unique_database)
     assert 'comment' == comment
 
+    self.client.execute("comment on database {0} is '\\'comment\\''".format(unique_database))
+    comment = self._get_db_comment(unique_database)
+    assert "\\'comment\\'" == comment
+
     self.client.execute("comment on database {0} is ''".format(unique_database))
     comment = self._get_db_comment(unique_database)
     assert '' == comment
@@ -257,6 +261,52 @@ class TestDdlStatements(TestDdlBase):
     vector.get_value('exec_option')['abort_on_error'] = False
     self.run_test_case('QueryTest/kudu_create', vector, use_db=unique_database,
         multiple_impalad=self._use_multiple_impalad(vector))
+
+  def test_comment_on_table(self, vector, unique_database):
+    table = '{0}.comment_table'.format(unique_database)
+    self.client.execute("create table {0} (i int)".format(table))
+
+    comment = self._get_table_or_view_comment(table)
+    assert comment is None
+
+    self.client.execute("comment on table {0} is 'comment'".format(table))
+    comment = self._get_table_or_view_comment(table)
+    assert "comment" == comment
+
+    self.client.execute("comment on table {0} is '\\'comment\\''".format(table))
+    comment = self._get_table_or_view_comment(table)
+    assert "\\\\'comment\\\\'" == comment
+
+    self.client.execute("comment on table {0} is ''".format(table))
+    comment = self._get_table_or_view_comment(table)
+    assert "" == comment
+
+    self.client.execute("comment on table {0} is null".format(table))
+    comment = self._get_table_or_view_comment(table)
+    assert comment is None
+
+  def test_comment_on_view(self, vector, unique_database):
+    view = '{0}.comment_view'.format(unique_database)
+    self.client.execute("create view {0} as select 1".format(view))
+
+    comment = self._get_table_or_view_comment(view)
+    assert comment is None
+
+    self.client.execute("comment on view {0} is 'comment'".format(view))
+    comment = self._get_table_or_view_comment(view)
+    assert "comment" == comment
+
+    self.client.execute("comment on view {0} is '\\'comment\\''".format(view))
+    comment = self._get_table_or_view_comment(view)
+    assert "\\\\'comment\\\\'" == comment
+
+    self.client.execute("comment on view {0} is ''".format(view))
+    comment = self._get_table_or_view_comment(view)
+    assert "" == comment
+
+    self.client.execute("comment on view {0} is null".format(view))
+    comment = self._get_table_or_view_comment(view)
+    assert comment is None
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_sync_ddl_drop(self, vector, unique_database):
