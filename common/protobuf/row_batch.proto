@@ -16,6 +16,8 @@
 // under the License.
 //
 
+syntax="proto2";
+
 package impala;
 
 import "common.proto";

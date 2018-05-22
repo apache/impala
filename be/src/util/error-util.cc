@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "util/error-util.h"
+#include "util/error-util-internal.h"
 
 #include <errno.h>
 #include <string.h>
@@ -140,20 +140,20 @@ ErrorMsg ErrorMsg::Init(TErrorCode::type error, const ArgType& arg0,
 
 void PrintErrorMap(ostream* stream, const ErrorLogMap& errors) {
   for (const ErrorLogMap::value_type& v: errors) {
-    const TErrorLogEntry& log_entry = v.second;
+    const ErrorLogEntryPB& entry = v.second;
     if (v.first == TErrorCode::GENERAL) {
-      DCHECK_EQ(log_entry.count, 0);
-      for (const string& s: log_entry.messages) {
-        *stream << s << "\n";
+      DCHECK_EQ(entry.count(), 0);
+      for (auto& msg : entry.messages()) {
+        *stream << msg << "\n";
       }
-    } else if (!log_entry.messages.empty()) {
-      DCHECK_GT(log_entry.count, 0);
-      DCHECK_EQ(log_entry.messages.size(), 1);
-      *stream << log_entry.messages.front();
-      if (log_entry.count == 1) {
+    } else if (entry.messages_size() > 0) {
+      DCHECK_GT(entry.count(), 0);
+      DCHECK_EQ(entry.messages_size(), 1);
+      *stream << *(entry.messages().begin());
+      if (entry.count() == 1) {
         *stream << "\n";
       } else {
-        *stream << " (1 of " << log_entry.count << " similar)\n";
+        *stream << " (1 of " << entry.count() << " similar)\n";
       }
     }
   }
@@ -165,48 +165,56 @@ string PrintErrorMapToString(const ErrorLogMap& errors) {
   return stream.str();
 }
 
-void MergeErrorMaps(const ErrorLogMap& m1, ErrorLogMap* m2) {
-  for (const ErrorLogMap::value_type& v: m1) {
-    TErrorLogEntry& target = (*m2)[v.first];
-    const TErrorLogEntry& source = v.second;
-    // Append generic message, append specific codes or increment count if exists
-    if (v.first == TErrorCode::GENERAL) {
-      DCHECK_EQ(v.second.count, 0);
-      target.messages.insert(
-          target.messages.end(), source.messages.begin(), source.messages.end());
-    } else {
-      DCHECK_EQ(source.messages.empty(), source.count == 0);
-      if (target.messages.empty()) {
-        target.messages = source.messages;
-      }
-      target.count += source.count;
+void MergeErrorLogEntry(TErrorCode::type error_code, const ErrorLogEntryPB& entry,
+    ErrorLogMap* target_map) {
+  ErrorLogEntryPB* target = &(*target_map)[error_code];
+
+  // Append generic message, append specific codes or increment count if exists.
+  if (error_code == TErrorCode::GENERAL || target->messages_size() == 0) {
+    for (auto& msg : entry.messages()) {
+      target->add_messages(msg);
     }
+  }
+  if (error_code != TErrorCode::GENERAL) {
+    target->set_count(target->count() + entry.count());
+  }
+}
+
+void MergeErrorMaps(const ErrorLogMapPB& m1, ErrorLogMap* m2) {
+  for (const ErrorLogMapPB::value_type& v : m1) {
+    MergeErrorLogEntry(static_cast<TErrorCode::type>(v.first), v.second, m2);
+  }
+}
+
+void MergeErrorMaps(const ErrorLogMap& m1, ErrorLogMap* m2) {
+  for (const ErrorLogMap::value_type& v : m1) {
+    MergeErrorLogEntry(v.first, v.second, m2);
   }
 }
 
 void AppendError(ErrorLogMap* map, const ErrorMsg& e) {
-  TErrorLogEntry& target = (*map)[e.error()];
+  ErrorLogEntryPB* target = &(*map)[e.error()];
   if (e.error() == TErrorCode::GENERAL) {
-    target.messages.push_back(e.msg());
+    target->add_messages(e.msg());
   } else {
-    if (target.messages.empty()) {
-      target.messages.push_back(e.msg());
+    if (target->messages_size() == 0) {
+      target->add_messages(e.msg());
     }
-    ++target.count;
+    target->set_count(target->count() + 1);
   }
 }
 
 void ClearErrorMap(ErrorLogMap& errors) {
-  for (auto iter = errors.begin(); iter != errors.end(); ++iter) {
-    iter->second.messages.clear();
-    iter->second.count = 0;
+  for (auto& err : errors) {
+    err.second.mutable_messages()->Clear();
+    err.second.set_count(0);
   }
 }
 
 size_t ErrorCount(const ErrorLogMap& errors) {
   ErrorLogMap::const_iterator cit = errors.find(TErrorCode::GENERAL);
   if (cit == errors.end()) return errors.size();
-  return errors.size() + cit->second.messages.size() - 1;
+  return errors.size() + cit->second.messages_size() - 1;
 }
 
 string ErrorMsg::GetFullMessageDetails() const {

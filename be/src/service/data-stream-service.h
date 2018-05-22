@@ -21,7 +21,6 @@
 #include "gen-cpp/data_stream_service.service.h"
 
 #include "common/status.h"
-#include "runtime/mem-tracker.h"
 
 namespace kudu {
 namespace rpc {
@@ -31,7 +30,9 @@ class RpcContext;
 
 namespace impala {
 
-class RpcMgr;
+class DataStreamServiceProxy;
+class MemTracker;
+class MetricGroup;
 
 /// This is singleton class which provides data transmission services between fragment
 /// instances. The client for this service is implemented in KrpcDataStreamSender.
@@ -74,6 +75,11 @@ class DataStreamService : public DataStreamServiceIf {
       kudu::rpc::RpcContext* ctx);
 
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
+
+  /// Gets a DataStreamService proxy to a server with 'address' and 'hostname'.
+  /// The newly created proxy is returned in 'proxy'. Returns error status on failure.
+  static Status GetProxy(const TNetworkAddress& address, const std::string& hostname,
+      std::unique_ptr<DataStreamServiceProxy>* proxy);
 
  private:
   /// Tracks the memory usage of the payloads in the service queue.

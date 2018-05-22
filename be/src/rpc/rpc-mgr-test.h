@@ -22,11 +22,13 @@
 
 #include "common/init.h"
 #include "exec/kudu-util.h"
+#include "kudu/rpc/remote_user.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_header.pb.h"
 #include "kudu/rpc/rpc_sidecar.h"
 #include "kudu/util/status.h"
+#include "rpc/rpc-mgr.inline.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "testutil/gtest-util.h"
@@ -43,6 +45,7 @@
 #include "common/names.h"
 
 using kudu::rpc::GeneratedServiceIf;
+using kudu::rpc::RemoteUser;
 using kudu::rpc::RpcController;
 using kudu::rpc::RpcContext;
 using kudu::rpc::RpcSidecar;
@@ -174,10 +177,23 @@ class PingServiceImpl : public PingServiceIf {
       mem_tracker_(-1, "Ping Service"),
       cb_(cb) {}
 
+  Status GetProxy(const TNetworkAddress& address, const std::string& hostname,
+      std::unique_ptr<PingServiceProxy>* proxy) {
+    return rpc_mgr_->GetProxy(address, hostname, proxy);
+  }
+
   virtual bool Authorize(const google::protobuf::Message* req,
       google::protobuf::Message* resp, RpcContext* context) override {
     if (!IsKerberosEnabled()) {
-      return context->remote_user().username() == "impala";
+      const RemoteUser& remote_user = context->remote_user();
+      if (remote_user.username() != "impala") {
+        mem_tracker_.Release(context->GetTransferSize());
+        context->RespondFailure(kudu::Status::NotAuthorized(
+            Substitute("$0 is not allowed to access PingService",
+                remote_user.ToString())));
+        return false;
+      }
+      return true;
     } else {
       return rpc_mgr_->Authorize("PingService", context, mem_tracker());
     }
@@ -203,7 +219,13 @@ class ScanMemServiceImpl : public ScanMemServiceIf {
  public:
   ScanMemServiceImpl(RpcMgr* rpc_mgr)
     : ScanMemServiceIf(rpc_mgr->metric_entity(), rpc_mgr->result_tracker()),
+      rpc_mgr_(rpc_mgr),
       mem_tracker_(-1, "ScanMem Service") {
+  }
+
+  Status GetProxy(const TNetworkAddress& address, const std::string& hostname,
+      std::unique_ptr<ScanMemServiceProxy>* proxy) {
+    return rpc_mgr_->GetProxy(address, hostname, proxy);
   }
 
   // A no-op authorization function.
@@ -241,6 +263,7 @@ class ScanMemServiceImpl : public ScanMemServiceIf {
   MemTracker* mem_tracker() { return &mem_tracker_; }
 
  private:
+  RpcMgr* rpc_mgr_;
   MemTracker mem_tracker_;
 
 };
@@ -266,12 +289,12 @@ Status RpcMgrTest::RunMultipleServicesTest(
   RETURN_IF_ERROR(rpc_mgr->StartServices(krpc_address));
 
   unique_ptr<PingServiceProxy> ping_proxy;
-  RETURN_IF_ERROR(rpc_mgr->GetProxy<PingServiceProxy>(krpc_address, FLAGS_hostname,
-      &ping_proxy));
+  RETURN_IF_ERROR(static_cast<PingServiceImpl*>(ping_impl)->GetProxy(krpc_address,
+      FLAGS_hostname, &ping_proxy));
 
   unique_ptr<ScanMemServiceProxy> scan_mem_proxy;
-  RETURN_IF_ERROR(rpc_mgr->GetProxy<ScanMemServiceProxy>(krpc_address, FLAGS_hostname,
-      &scan_mem_proxy));
+  RETURN_IF_ERROR(static_cast<ScanMemServiceImpl*>(scan_mem_impl)->GetProxy(krpc_address,
+      FLAGS_hostname, &scan_mem_proxy));
 
   RpcController controller;
   srand(0);

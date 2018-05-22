@@ -385,49 +385,52 @@ struct TQueryCtx {
   // TODO: determine whether we can get this somehow via the Thrift rpc mechanism.
   6: optional Types.TNetworkAddress coord_address
 
+  // The initiating coordinator's address of its KRPC based ImpalaInternalService.
+  7: optional Types.TNetworkAddress coord_krpc_address
+
   // List of tables missing relevant table and/or column stats. Used for
   // populating query-profile fields consumed by CM as well as warning messages.
-  7: optional list<CatalogObjects.TTableName> tables_missing_stats
+  8: optional list<CatalogObjects.TTableName> tables_missing_stats
 
   // Internal flag to disable spilling. Used as a guard against potentially
   // disastrous query plans. The rationale is that cancelling queries, e.g.,
   // with a huge join build is preferable over spilling "forever".
-  8: optional bool disable_spilling
+  9: optional bool disable_spilling
 
   // Set if this is a child query (e.g. a child of a COMPUTE STATS request)
-  9: optional Types.TUniqueId parent_query_id
+  10: optional Types.TUniqueId parent_query_id
 
   // List of tables suspected to have corrupt stats
-  10: optional list<CatalogObjects.TTableName> tables_with_corrupt_stats
+  11: optional list<CatalogObjects.TTableName> tables_with_corrupt_stats
 
   // The snapshot timestamp as of which to execute the query
   // When the backing storage engine supports snapshot timestamps (such as Kudu) this
   // allows to select a snapshot timestamp on which to perform the scan, making sure that
   // results returned from multiple scan nodes are consistent.
   // This defaults to -1 when no timestamp is specified.
-  11: optional i64 snapshot_timestamp = -1;
+  12: optional i64 snapshot_timestamp = -1;
 
   // Optional for frontend tests.
-  12: optional Descriptors.TDescriptorTable desc_tbl
+  13: optional Descriptors.TDescriptorTable desc_tbl
 
   // Milliseconds since UNIX epoch at the start of query execution.
-  13: required i64 start_unix_millis
+  14: required i64 start_unix_millis
 
   // Hint to disable codegen. Set by planner for single-node optimization or by the
   // backend in NativeEvalExprsWithoutRow() in FESupport. This flag is only advisory to
   // avoid the overhead of codegen and can be ignored if codegen is needed functionally.
-  14: optional bool disable_codegen_hint = false;
+  15: optional bool disable_codegen_hint = false;
 
   // List of tables with scan ranges that map to blocks with missing disk IDs.
-  15: optional list<CatalogObjects.TTableName> tables_missing_diskids
+  16: optional list<CatalogObjects.TTableName> tables_missing_diskids
 
   // The resolved admission control pool to which this request will be submitted. May be
   // unset for statements that aren't subjected to admission control (e.g. USE, SET).
-  16: optional string request_pool
+  17: optional string request_pool
 
   // String containing a timestamp (in UTC) set as the query submission time. It
   // represents the same point in time as now_string
-  17: required string utc_timestamp_string
+  18: required string utc_timestamp_string
 
   // String containing name of the local timezone.
   // It is guaranteed to be a valid timezone on the coordinator (but not necessarily on
@@ -436,7 +439,7 @@ struct TQueryCtx {
   //   still has an effect if TimezoneDatabase::LocalZoneName() cannot find the
   //   system's local timezone and falls back to UTC. This logic will be removed in
   //   IMPALA-7359, which will make this member completely obsolete.
-  18: required string local_time_zone
+  19: required string local_time_zone
 }
 
 // Specification of one output destination of a plan fragment
@@ -556,158 +559,6 @@ struct TExecQueryFInstancesResult {
   // required in V1
   1: optional Status.TStatus status
 }
-
-
-// ReportExecStatus
-
-struct TParquetInsertStats {
-  // For each column, the on disk byte size
-  1: required map<string, i64> per_column_size
-}
-
-struct TKuduDmlStats {
-  // The number of reported per-row errors, i.e. this many rows were not modified.
-  // Note that this aggregate is less useful than a breakdown of the number of errors by
-  // error type, e.g. number of rows with duplicate key conflicts, number of rows
-  // violating nullability constraints, etc., but it isn't possible yet to differentiate
-  // all error types in the KuduTableSink yet.
-  1: optional i64 num_row_errors
-}
-
-// Per partition DML stats
-// TODO: this should include the table stats that we update the metastore with.
-// TODO: Refactor to reflect usage by other DML statements.
-struct TInsertStats {
-  1: required i64 bytes_written
-  2: optional TParquetInsertStats parquet_stats
-  3: optional TKuduDmlStats kudu_stats
-}
-
-const string ROOT_PARTITION_KEY = ''
-
-// Per-partition statistics and metadata resulting from DML statements.
-// TODO: Refactor to reflect usage by other DML statements.
-struct TInsertPartitionStatus {
-  // The id of the partition written to (may be -1 if the partition is created by this
-  // query). See THdfsTable.partitions.
-  1: optional i64 id
-
-  // The number of rows modified in this partition
-  2: optional i64 num_modified_rows
-
-  // Detailed statistics gathered by table writers for this partition
-  3: optional TInsertStats stats
-
-  // Fully qualified URI to the base directory for this partition.
-  4: required string partition_base_dir
-
-  // The latest observed Kudu timestamp reported by the local KuduSession.
-  // This value is an unsigned int64.
-  5: optional i64 kudu_latest_observed_ts
-}
-
-// The results of a DML statement, sent to the coordinator as part of
-// TReportExecStatusParams
-// TODO: Refactor to reflect usage by other DML statements.
-struct TInsertExecStatus {
-  // A map from temporary absolute file path to final absolute destination. The
-  // coordinator performs these updates after the query completes.
-  1: required map<string, string> files_to_move;
-
-  // Per-partition details, used in finalization and reporting.
-  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the
-  // root's key in an unpartitioned table being ROOT_PARTITION_KEY.
-  // The target table name is recorded in the corresponding TQueryExecRequest
-  2: optional map<string, TInsertPartitionStatus> per_partition_status
-}
-
-// Error message exchange format
-struct TErrorLogEntry {
-
-  // Number of error messages reported using the above identifier
-  1: i32 count = 0
-
-  // Sample messages from the above error code
-  2: list<string> messages
-}
-
-// Represents the states that a fragment instance goes through during its execution. The
-// current state gets sent back to the coordinator and will be presented to users through
-// the debug webpages.
-// The states are listed in order and one state will only strictly be reached after all
-// the previous states.
-enum TFInstanceExecState {
-  WAITING_FOR_EXEC,
-  WAITING_FOR_PREPARE,
-  WAITING_FOR_CODEGEN,
-  WAITING_FOR_OPEN,
-  WAITING_FOR_FIRST_BATCH,
-  FIRST_BATCH_PRODUCED,
-  PRODUCING_DATA,
-  LAST_BATCH_SENT,
-  FINISHED
-}
-
-struct TFragmentInstanceExecStatus {
-  // required in V1
-  1: optional Types.TUniqueId fragment_instance_id
-
-  // Status of fragment execution; any error status means it's done.
-  // required in V1
-  2: optional Status.TStatus status
-
-  // If true, fragment finished executing.
-  // required in V1
-  3: optional bool done
-
-  // cumulative profile
-  // required in V1
-  4: optional RuntimeProfile.TRuntimeProfileTree profile
-
-  // The current state of this fragment instance's execution.
-  // required in V1
-  5: optional TFInstanceExecState current_state
-}
-
-struct TReportExecStatusParams {
-  1: required ImpalaInternalServiceVersion protocol_version
-
-  // required in V1
-  2: optional Types.TUniqueId query_id
-
-  // same as TExecQueryFInstancesParams.coord_state_idx
-  // required in V1
-  3: optional i32 coord_state_idx
-
-  4: list<TFragmentInstanceExecStatus> instance_exec_status
-
-  // Cumulative structural changes made by the table sink of any instance
-  // included in instance_exec_status
-  // optional in V1
-  5: optional TInsertExecStatus insert_exec_status;
-
-  // New errors that have not been reported to the coordinator by any of the
-  // instances included in instance_exec_status
-  6: optional map<ErrorCodes.TErrorCode, TErrorLogEntry> error_log;
-
-  // Cumulative status for this backend. A backend can have an error from a specific
-  // fragment instance, or it can have a general error that is independent of any
-  // individual fragment. If reporting a single error, this status is always set to
-  // the error being reported. If reporting multiple errors, the status is set by the
-  // following rules:
-  // 1. A general error takes precedence over any fragment instance error.
-  // 2. Any fragment instance error takes precedence over any cancelled status.
-  // 3. If multiple fragments have errors, prefer the error that comes first in the
-  // 'instance_exec_status' list.
-  // This status is only OK if all fragment instances included are OK.
-  7: optional Status.TStatus status;
-}
-
-struct TReportExecStatusResult {
-  // required in V1
-  1: optional Status.TStatus status
-}
-
 
 // CancelQueryFInstances
 
@@ -907,10 +758,6 @@ service ImpalaInternalService {
   // backend.
   // Returns as soon as all incoming data streams have been set up.
   TExecQueryFInstancesResult ExecQueryFInstances(1:TExecQueryFInstancesParams params);
-
-  // Periodically called by backend to report status of fragment instance execution
-  // back to coord; also called when execution is finished, for whatever reason.
-  TReportExecStatusResult ReportExecStatus(1:TReportExecStatusParams params);
 
   // Called by coord to cancel execution of a single query's fragment instances, which
   // the coordinator initiated with a prior call to ExecQueryFInstances.

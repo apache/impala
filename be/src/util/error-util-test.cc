@@ -20,8 +20,10 @@
 #include "gen-cpp/Status_types.h"
 #include "gen-cpp/ErrorCodes_types.h"
 
-#include "error-util.h"
+#include "error-util-internal.h"
 #include "testutil/gtest-util.h"
+
+#include "common/names.h"
 
 namespace impala {
 
@@ -41,68 +43,68 @@ TEST(ErrorMsg, GenericFormatting) {
 
 TEST(ErrorMsg, MergeMap) {
   ErrorLogMap left, right;
-  left[TErrorCode::GENERAL].messages.push_back("1");
+  left[TErrorCode::GENERAL].add_messages("1");
 
-  right[TErrorCode::GENERAL].messages.push_back("2");
-  right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.push_back("p");
-  right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count = 3;
+  right[TErrorCode::GENERAL].add_messages("2");
+  right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].add_messages("p");
+  right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].set_count(3);
 
   MergeErrorMaps(right, &left);
   ASSERT_EQ(2, left.size());
-  ASSERT_EQ(2, left[TErrorCode::GENERAL].messages.size());
+  ASSERT_EQ(2, left[TErrorCode::GENERAL].messages_size());
 
   right = ErrorLogMap();
-  right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.push_back("p");
-  right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count = 3;
+  right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].add_messages("p");
+  right[TErrorCode::PARQUET_MULTIPLE_BLOCKS].set_count(3);
 
   MergeErrorMaps(right, &left);
   ASSERT_EQ(2, left.size());
-  ASSERT_EQ(2, left[TErrorCode::GENERAL].messages.size());
-  ASSERT_EQ(6, left[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
+  ASSERT_EQ(2, left[TErrorCode::GENERAL].messages_size());
+  ASSERT_EQ(6, left[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count());
 
   ErrorLogMap dummy, cleared;
-  dummy[TErrorCode::GENERAL].messages.push_back("2");
-  dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.push_back("p");
-  dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count = 3;
+  dummy[TErrorCode::GENERAL].add_messages("2");
+  dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].add_messages("p");
+  dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].set_count(3);
   ASSERT_EQ(2, dummy.size());
-  ASSERT_EQ(3, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
-  ASSERT_EQ(1, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.size());
-  ASSERT_EQ(1, dummy[TErrorCode::GENERAL].messages.size());
-  cleared[TErrorCode::GENERAL].messages.push_back("1");
-  cleared[TErrorCode::RPC_RECV_TIMEOUT].messages.push_back("p");
+  ASSERT_EQ(3, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count());
+  ASSERT_EQ(1, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages_size());
+  ASSERT_EQ(1, dummy[TErrorCode::GENERAL].messages_size());
+  cleared[TErrorCode::GENERAL].add_messages("1");
+  cleared[TErrorCode::RPC_RECV_TIMEOUT].add_messages("p");
   ClearErrorMap(cleared);
   ASSERT_EQ(2, cleared.size());
   ASSERT_EQ(1, cleared.count(TErrorCode::RPC_RECV_TIMEOUT));
 
   MergeErrorMaps(cleared, &dummy);
   ASSERT_EQ(3, dummy.size());
-  ASSERT_EQ(3, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
-  ASSERT_EQ(1, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.size());
+  ASSERT_EQ(3, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count());
+  ASSERT_EQ(1, dummy[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages_size());
   ASSERT_EQ(1, dummy.count(TErrorCode::RPC_RECV_TIMEOUT));
-  ASSERT_EQ(0, dummy[TErrorCode::RPC_RECV_TIMEOUT].count);
-  ASSERT_EQ(0, dummy[TErrorCode::RPC_RECV_TIMEOUT].messages.size());
-  ASSERT_EQ(0, dummy[TErrorCode::GENERAL].count);
-  ASSERT_EQ(1, dummy[TErrorCode::GENERAL].messages.size());
+  ASSERT_EQ(0, dummy[TErrorCode::RPC_RECV_TIMEOUT].count());
+  ASSERT_EQ(0, dummy[TErrorCode::RPC_RECV_TIMEOUT].messages_size());
+  ASSERT_EQ(0, dummy[TErrorCode::GENERAL].count());
+  ASSERT_EQ(1, dummy[TErrorCode::GENERAL].messages_size());
 
   MergeErrorMaps(dummy, &cleared);
   ASSERT_EQ(3, cleared.size());
-  ASSERT_EQ(3, cleared[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count);
-  ASSERT_EQ(1, cleared[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.size());
+  ASSERT_EQ(3, cleared[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count());
+  ASSERT_EQ(1, cleared[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages_size());
   ASSERT_EQ(1, cleared.count(TErrorCode::RPC_RECV_TIMEOUT));
-  ASSERT_EQ(0, cleared[TErrorCode::RPC_RECV_TIMEOUT].count);
-  ASSERT_EQ(0, cleared[TErrorCode::RPC_RECV_TIMEOUT].messages.size());
-  ASSERT_EQ(0, cleared[TErrorCode::GENERAL].count);
-  ASSERT_EQ(1, cleared[TErrorCode::GENERAL].messages.size());
+  ASSERT_EQ(0, cleared[TErrorCode::RPC_RECV_TIMEOUT].count());
+  ASSERT_EQ(0, cleared[TErrorCode::RPC_RECV_TIMEOUT].messages_size());
+  ASSERT_EQ(0, cleared[TErrorCode::GENERAL].count());
+  ASSERT_EQ(1, cleared[TErrorCode::GENERAL].messages_size());
 }
 
 TEST(ErrorMsg, CountErrors) {
   ErrorLogMap m;
   ASSERT_EQ(0, ErrorCount(m));
-  m[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.push_back("p");
-  m[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count = 999;
+  m[TErrorCode::PARQUET_MULTIPLE_BLOCKS].add_messages("p");
+  m[TErrorCode::PARQUET_MULTIPLE_BLOCKS].set_count(999);
   ASSERT_EQ(1, ErrorCount(m));
-  m[TErrorCode::GENERAL].messages.push_back("1");
-  m[TErrorCode::GENERAL].messages.push_back("2");
+  m[TErrorCode::GENERAL].add_messages("1");
+  m[TErrorCode::GENERAL].add_messages("2");
   ASSERT_EQ(3, ErrorCount(m));
   ClearErrorMap(m);
   ASSERT_EQ(1, ErrorCount(m));
@@ -124,11 +126,13 @@ TEST(ErrorMsg, AppendError) {
 
 TEST(ErrorMsg, PrintMap) {
   ErrorLogMap left;
-  left[TErrorCode::GENERAL].messages.push_back("1");
-  left[TErrorCode::GENERAL].messages.push_back("2");
-  left[TErrorCode::PARQUET_MULTIPLE_BLOCKS].messages.push_back("p");
-  left[TErrorCode::PARQUET_MULTIPLE_BLOCKS].count = 999;
-  ASSERT_EQ("1\n2\np (1 of 999 similar)\n", PrintErrorMapToString(left));
+  left[TErrorCode::GENERAL].add_messages("1");
+  left[TErrorCode::GENERAL].add_messages("2");
+  left[TErrorCode::GENERAL].add_messages("3");
+  left[TErrorCode::PARQUET_MULTIPLE_BLOCKS].add_messages("p");
+  left[TErrorCode::PARQUET_MULTIPLE_BLOCKS].set_count(999);
+  const string msg = PrintErrorMapToString(left);
+  ASSERT_EQ("1\n2\n3\np (1 of 999 similar)\n", msg);
   ClearErrorMap(left);
   ASSERT_EQ("", PrintErrorMapToString(left));
 }

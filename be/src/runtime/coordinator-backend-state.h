@@ -32,9 +32,12 @@
 
 #include "runtime/coordinator.h"
 #include "scheduling/query-schedule.h"
+#include "util/error-util-internal.h"
 #include "util/progress-updater.h"
 #include "util/stopwatch.h"
 #include "util/runtime-profile.h"
+#include "gen-cpp/control_service.pb.h"
+#include "gen-cpp/RuntimeProfile_types.h"
 #include "gen-cpp/Types_types.h"
 
 namespace impala {
@@ -43,9 +46,9 @@ class ProgressUpdater;
 class ObjectPool;
 class DebugOptions;
 class CountingBarrier;
+class ReportExecStatusRequestPB;
 class TUniqueId;
 class TQueryCtx;
-class TReportExecStatusParams;
 class ExecSummary;
 struct FInstanceExecParams;
 
@@ -81,8 +84,9 @@ class Coordinator::BackendState {
   /// becomes the first reported error status. Returns true iff this update changed
   /// IsDone() from false to true, either because it was the last fragment to complete or
   /// because it was the first error received.
-  bool ApplyExecStatusReport(const TReportExecStatusParams& backend_exec_status,
-      ExecSummary* exec_summary, ProgressUpdater* scan_range_progress);
+  bool ApplyExecStatusReport(const ReportExecStatusRequestPB& backend_exec_status,
+      const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary,
+      ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state);
 
   /// Update completion_times, rates, and avg_profile for all fragment_stats.
   void UpdateExecStats(const std::vector<FragmentStats*>& fragment_stats);
@@ -145,11 +149,12 @@ class Coordinator::BackendState {
     InstanceStats(const FInstanceExecParams& exec_params, FragmentStats* fragment_stats,
         ObjectPool* obj_pool);
 
-    /// Updates 'this' with exec_status, the fragment instances' TExecStats in
-    /// exec_summary, and 'progress_updater' with the number of newly completed scan
-    /// ranges. Also updates the instance's avg profile.
-    /// Caller must hold BackendState::lock_.
-    void Update(const TFragmentInstanceExecStatus& exec_status, ExecSummary* exec_summary,
+    /// Updates 'this' with exec_status and the fragment intance's thrift profile. Also
+    /// updates the fragment instance's TExecStats in exec_summary and 'progress_updater'
+    /// with the number of newly completed scan ranges. Also updates the instance's avg
+    /// profile. Caller must hold BackendState::lock_.
+    void Update(const FragmentInstanceExecStatusPB& exec_status,
+        const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary,
         ProgressUpdater* scan_range_progress);
 
     int per_fragment_instance_idx() const {
@@ -169,6 +174,9 @@ class Coordinator::BackendState {
 
     /// Set in Update(). Uses MonotonicMillis().
     int64_t last_report_time_ms_ = 0;
+
+    /// The sequence number of the last report.
+    int64_t last_report_seq_no_ = 0;
 
     /// owned by coordinator object pool provided in the c'tor, created in Update()
     RuntimeProfile* profile_ = nullptr;
@@ -198,7 +206,7 @@ class Coordinator::BackendState {
 
     /// The current state of this fragment instance's execution. This gets serialized in
     /// ToJson() and is displayed in the debug webpages.
-    TFInstanceExecState::type current_state_ = TFInstanceExecState::WAITING_FOR_EXEC;
+    FInstanceExecStatePB current_state_ = FInstanceExecStatePB::WAITING_FOR_EXEC;
 
     /// Extracts scan_ranges_complete_counters_ and  bytes_read_counters_ from profile_.
     void InitCounters();

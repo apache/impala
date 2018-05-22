@@ -143,9 +143,9 @@ class RpcMgr {
   bool Authorize(const string& service_name, kudu::rpc::RpcContext* context,
       MemTracker* mem_tracker) const;
 
-  /// Creates a new proxy for a remote service of type P at location 'address' with
-  /// hostname 'hostname' and places it in 'proxy'. 'P' must descend from
-  /// kudu::rpc::ServiceIf. Note that 'address' must be a resolved IP address.
+  /// Creates a new proxy of type P at location 'address' with hostname 'hostname' and
+  /// places it in 'proxy'. 'P' must descend from kudu::rpc::Proxy. Note that 'address'
+  /// must be a resolved IP address.
   template <typename P>
   Status GetProxy(const TNetworkAddress& address, const std::string& hostname,
       std::unique_ptr<P>* proxy) WARN_UNUSED_RESULT;

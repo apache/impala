@@ -108,8 +108,8 @@ TEST_F(RpcMgrKerberizedTest, AuthorizationFail) {
   // ScanMemService's authorization function always returns true so we should be able
   // to access with dummy credentials.
   unique_ptr<ScanMemServiceProxy> scan_proxy;
-  ASSERT_OK(rpc_mgr_.GetProxy<ScanMemServiceProxy>(
-      krpc_address_, FLAGS_hostname, &scan_proxy));
+  ASSERT_OK(static_cast<ScanMemServiceImpl*>(scan_mem_impl)->GetProxy(krpc_address_,
+      FLAGS_hostname, &scan_proxy));
   ScanMemRequestPB scan_request;
   ScanMemResponsePB scan_response;
   SetupScanMemRequest(&scan_request, &controller);
@@ -120,8 +120,8 @@ TEST_F(RpcMgrKerberizedTest, AuthorizationFail) {
 
   // Fail to access PingService as it's expecting FLAGS_be_principal as principal name.
   unique_ptr<PingServiceProxy> ping_proxy;
-  ASSERT_OK(rpc_mgr_.GetProxy<PingServiceProxy>(
-      krpc_address_, FLAGS_hostname, &ping_proxy));
+  ASSERT_OK(static_cast<PingServiceImpl*>(ping_impl)->GetProxy(krpc_address_,
+      FLAGS_hostname, &ping_proxy));
   PingRequestPB ping_request;
   PingResponsePB ping_response;
   controller.Reset();

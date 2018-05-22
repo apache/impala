@@ -112,7 +112,7 @@ jobject CatalogUpdateResultIterator::next(JNIEnv* env) {
     ++pos_;
     uint8_t* buf;
     uint32_t buf_size;
-    Status s = serializer_.Serialize(current_obj, &buf_size, &buf);
+    Status s = serializer_.SerializeToBuffer(current_obj, &buf_size, &buf);
     if (!s.ok()) {
       LOG(ERROR) << "Error serializing catalog object: " << s.GetDetail();
       continue;

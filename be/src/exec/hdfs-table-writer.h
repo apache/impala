@@ -23,7 +23,7 @@
 #include <hdfs.h>
 
 #include "common/status.h"
-#include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/control_service.pb.h"
 
 namespace impala {
 
@@ -88,7 +88,7 @@ class HdfsTableWriter {
   virtual void Close() = 0;
 
   /// Returns the stats for this writer.
-  TInsertStats& stats() { return stats_; }
+  const DmlStatsPB& stats() const { return stats_; }
 
   /// Default block size to use for this file format.  If the file format doesn't
   /// care, it should return 0 and the hdfs config default will be used.
@@ -133,8 +133,7 @@ class HdfsTableWriter {
   const std::vector<ScalarExprEvaluator*>& output_expr_evals_;
 
   /// Subclass should populate any file format specific stats.
-  TInsertStats stats_;
-
+  DmlStatsPB stats_;
 };
 }
 #endif

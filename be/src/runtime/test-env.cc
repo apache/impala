@@ -20,16 +20,21 @@
 #include <limits>
 #include <memory>
 
+#include "gutil/strings/substitute.h"
+#include "rpc/rpc-mgr.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/tmp-file-mgr.h"
 #include "runtime/query-state.h"
+#include "service/control-service.h"
 #include "util/disk-info.h"
 #include "util/impalad-metrics.h"
-#include "gutil/strings/substitute.h"
+
 #include "common/names.h"
 
 using boost::scoped_ptr;
 using std::numeric_limits;
+
+DECLARE_string(hostname);
 
 namespace impala {
 
@@ -50,7 +55,6 @@ Status TestEnv::Init() {
   // Populate the ExecEnv state that the backend tests need.
   exec_env_->mem_tracker_.reset(new MemTracker(-1, "Process"));
   RETURN_IF_ERROR(exec_env_->disk_io_mgr()->Init());
-  exec_env_->metrics_.reset(new MetricGroup("test-env-metrics"));
   exec_env_->tmp_file_mgr_.reset(new TmpFileMgr);
   if (have_tmp_file_mgr_args_) {
     RETURN_IF_ERROR(
@@ -60,6 +64,15 @@ Status TestEnv::Init() {
   }
   exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_,
       static_cast<int64_t>(0.1 * buffer_pool_capacity_));
+
+  // Initialize RpcMgr and control service.
+  IpAddr ip_address;
+  RETURN_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address));
+  exec_env_->krpc_address_.__set_hostname(ip_address);
+  RETURN_IF_ERROR(exec_env_->rpc_mgr_->Init());
+  exec_env_->control_svc_.reset(new ControlService(exec_env_->rpc_metrics_));
+  RETURN_IF_ERROR(exec_env_->control_svc_->Init());
+
   return Status::OK();
 }
 
@@ -113,6 +126,8 @@ Status TestEnv::CreateQueryState(
   query_ctx.query_id.hi = 0;
   query_ctx.query_id.lo = query_id;
   query_ctx.request_pool = "test-pool";
+  query_ctx.coord_address = exec_env_->configured_backend_address_;
+  query_ctx.coord_krpc_address = exec_env_->krpc_address_;
   TQueryOptions* query_options_to_use = &query_ctx.client_request.query_options;
   int64_t mem_limit =
       query_options_to_use->__isset.mem_limit && query_options_to_use->mem_limit > 0 ?
@@ -133,7 +148,8 @@ Status TestEnv::CreateQueryState(
       vector<TPlanFragmentInstanceCtx>({TPlanFragmentInstanceCtx()}));
   RETURN_IF_ERROR(qs->Init(rpc_params));
   FragmentInstanceState* fis = qs->obj_pool()->Add(
-      new FragmentInstanceState(qs, qs->rpc_params().fragment_ctxs[0], qs->rpc_params().fragment_instance_ctxs[0]));
+      new FragmentInstanceState(qs, qs->exec_rpc_params().fragment_ctxs[0],
+          qs->exec_rpc_params().fragment_instance_ctxs[0]));
   RuntimeState* rs = qs->obj_pool()->Add(
       new RuntimeState(qs, fis->fragment_ctx(), fis->instance_ctx(), exec_env_.get()));
   runtime_states_.push_back(rs);

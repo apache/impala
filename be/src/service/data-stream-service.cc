@@ -25,14 +25,17 @@
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/util/monotime.h"
 #include "rpc/rpc-mgr.h"
+#include "rpc/rpc-mgr.inline.h"
 #include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/exec-env.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "util/memory-metrics.h"
 #include "util/parse-util.h"
 #include "testutil/fault-injection-util.h"
 
 #include "gen-cpp/data_stream_service.pb.h"
+#include "gen-cpp/data_stream_service.proxy.h"
 
 #include "common/names.h"
 
@@ -40,12 +43,12 @@ using kudu::rpc::RpcContext;
 using kudu::MonoDelta;
 using kudu::MonoTime;
 
-static const string queue_limit_msg = "(Advanced) Limit on RPC payloads consumption for "
+static const string QUEUE_LIMIT_MSG = "(Advanced) Limit on RPC payloads consumption for "
     "DataStreamService. " + Substitute(MEM_UNITS_HELP_MSG, "the process memory limit");
-DEFINE_string(datastream_service_queue_mem_limit, "5%", queue_limit_msg.c_str());
+DEFINE_string(datastream_service_queue_mem_limit, "5%", QUEUE_LIMIT_MSG.c_str());
 DEFINE_int32(datastream_service_num_svc_threads, 0, "Number of threads for processing "
     "datastream services' RPCs. If left at default value 0, it will be set to number of "
-    "CPU cores");
+    "CPU cores.  Set it to a positive value to change from the default.");
 
 namespace impala {
 
@@ -53,9 +56,13 @@ DataStreamService::DataStreamService(MetricGroup* metric_group)
   : DataStreamServiceIf(ExecEnv::GetInstance()->rpc_mgr()->metric_entity(),
         ExecEnv::GetInstance()->rpc_mgr()->result_tracker()) {
   MemTracker* process_mem_tracker = ExecEnv::GetInstance()->process_mem_tracker();
-  bool is_percent;
+  bool is_percent; // not used
   int64_t bytes_limit = ParseUtil::ParseMemSpec(FLAGS_datastream_service_queue_mem_limit,
       &is_percent, process_mem_tracker->limit());
+  if (bytes_limit <= 0) {
+    CLEAN_EXIT_WITH_ERROR(Substitute("Invalid mem limit for data stream service queue: "
+        "'$0'.", FLAGS_datastream_service_queue_mem_limit));
+  }
   mem_tracker_.reset(new MemTracker(
       bytes_limit, "Data Stream Service Queue", process_mem_tracker));
   MemTrackerMetric::CreateMetrics(metric_group, mem_tracker_.get(), "DataStreamService");
@@ -69,6 +76,12 @@ Status DataStreamService::Init() {
   RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->RegisterService(num_svc_threads,
       std::numeric_limits<int32_t>::max(), this, mem_tracker()));
   return Status::OK();
+}
+
+Status DataStreamService::GetProxy(const TNetworkAddress& address, const string& hostname,
+    unique_ptr<DataStreamServiceProxy>* proxy) {
+  // Create a DataStreamService proxy to the destination.
+  return ExecEnv::GetInstance()->rpc_mgr()->GetProxy(address, hostname, proxy);
 }
 
 bool DataStreamService::Authorize(const google::protobuf::Message* req,

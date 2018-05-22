@@ -24,6 +24,7 @@
 #include <boost/uuid/uuid_generators.hpp>
 
 #include "gen-cpp/Types_types.h"  // for TUniqueId
+#include "gen-cpp/control_service.pb.h"
 #include "util/debug-util.h"
 
 namespace impala {
@@ -55,6 +56,12 @@ inline void UUIDToTUniqueId(const boost::uuids::uuid& uuid, TUniqueId* unique_id
   memcpy(&(unique_id->lo), &uuid.data[8], 8);
 }
 
+inline void TUniqueIdToUniqueIdPB(
+    const TUniqueId& t_unique_id, UniqueIdPB* unique_id_pb) {
+  unique_id_pb->set_lo(t_unique_id.lo);
+  unique_id_pb->set_hi(t_unique_id.hi);
+}
+
 /// Query id: uuid with bottom 4 bytes set to 0
 /// Fragment instance id: query id with instance index stored in the bottom 4 bytes
 
@@ -68,6 +75,14 @@ inline TUniqueId UuidToQueryId(const boost::uuids::uuid& uuid) {
   return result;
 }
 
+inline TUniqueId ProtoToQueryId(const UniqueIdPB& uid_pb) {
+  DCHECK(uid_pb.IsInitialized());
+  TUniqueId result;
+  result.hi = uid_pb.hi();
+  result.lo = uid_pb.lo();
+  return result;
+}
+
 inline TUniqueId GetQueryId(const TUniqueId& fragment_instance_id) {
   TUniqueId result = fragment_instance_id;
   result.lo &= ~FRAGMENT_IDX_MASK;  // zero out bottom 4 bytes
@@ -76,6 +91,10 @@ inline TUniqueId GetQueryId(const TUniqueId& fragment_instance_id) {
 
 inline int32_t GetInstanceIdx(const TUniqueId& fragment_instance_id) {
   return fragment_instance_id.lo & FRAGMENT_IDX_MASK;
+}
+
+inline int32_t GetInstanceIdx(const UniqueIdPB& fragment_instance_id) {
+  return fragment_instance_id.lo() & FRAGMENT_IDX_MASK;
 }
 
 inline bool IsValidFInstanceId(const TUniqueId& fragment_instance_id) {

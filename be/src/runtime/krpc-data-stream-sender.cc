@@ -35,7 +35,7 @@
 #include "kudu/rpc/rpc_sidecar.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/status.h"
-#include "rpc/rpc-mgr.inline.h"
+#include "rpc/rpc-mgr.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
@@ -43,6 +43,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
+#include "service/data-stream-service.h"
 #include "util/aligned-new.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
@@ -306,8 +307,7 @@ Status KrpcDataStreamSender::Channel::Init(RuntimeState* state) {
   batch_.reset(new RowBatch(row_desc_, capacity, parent_->mem_tracker()));
 
   // Create a DataStreamService proxy to the destination.
-  RpcMgr* rpc_mgr = ExecEnv::GetInstance()->rpc_mgr();
-  RETURN_IF_ERROR(rpc_mgr->GetProxy(address_, hostname_, &proxy_));
+  RETURN_IF_ERROR(DataStreamService::GetProxy(address_, hostname_, &proxy_));
   return Status::OK();
 }
 

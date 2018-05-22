@@ -45,6 +45,9 @@ using strings::Substitute;
 
 namespace impala {
 
+// Empty string
+const char* const DataSink::ROOT_PARTITION_KEY = "";
+
 DataSink::DataSink(const RowDescriptor* row_desc, const string& name, RuntimeState* state)
   : closed_(false), row_desc_(row_desc), name_(name) {
   profile_ = RuntimeProfile::Create(state->obj_pool(), name);

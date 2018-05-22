@@ -21,7 +21,13 @@
 #include <boost/thread/locks.hpp>
 
 #include "common/thread-debug-info.h"
+#include "exec/kudu-util.h"
 #include "exprs/expr.h"
+#include "kudu/rpc/rpc_controller.h"
+#include "kudu/rpc/rpc_sidecar.h"
+#include "kudu/util/monotime.h"
+#include "kudu/util/status.h"
+#include "rpc/rpc-mgr.h"
 #include "runtime/backend-client.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
@@ -33,15 +39,25 @@
 #include "runtime/query-exec-mgr.h"
 #include "runtime/runtime-state.h"
 #include "runtime/scanner-mem-limiter.h"
+#include "service/control-service.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/thread.h"
+
+#include "gen-cpp/control_service.pb.h"
+#include "gen-cpp/control_service.proxy.h"
+
+using kudu::MonoDelta;
+using kudu::rpc::RpcController;
+using kudu::rpc::RpcSidecar;
 
 #include "common/names.h"
 
 DEFINE_int32(report_status_retry_interval_ms, 100,
     "The interval in milliseconds to wait before retrying a failed status report RPC to "
     "the coordinator.");
+DECLARE_int32(backend_client_rpc_timeout_ms);
+DECLARE_int64(rpc_max_message_size);
 
 using namespace impala;
 
@@ -111,7 +127,7 @@ QueryState::~QueryState() {
   }
 }
 
-Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
+Status QueryState::Init(const TExecQueryFInstancesParams& exec_rpc_params) {
   // Decremented in QueryExecMgr::StartQueryHelper() on success or by the caller of
   // Init() on failure. We need to do this before any returns because Init() always
   // returns a resource refcount to its caller.
@@ -131,27 +147,31 @@ Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
 
   RETURN_IF_ERROR(InitBufferPoolState());
 
+  // Initialize the RPC proxy once and report any error.
+  RETURN_IF_ERROR(ControlService::GetProxy(query_ctx().coord_krpc_address,
+      query_ctx().coord_address.hostname, &proxy_));
+
   // don't copy query_ctx, it's large and we already did that in the c'tor
-  rpc_params_.__set_coord_state_idx(rpc_params.coord_state_idx);
+  exec_rpc_params_.__set_coord_state_idx(exec_rpc_params.coord_state_idx);
   TExecQueryFInstancesParams& non_const_params =
-      const_cast<TExecQueryFInstancesParams&>(rpc_params);
-  rpc_params_.fragment_ctxs.swap(non_const_params.fragment_ctxs);
-  rpc_params_.__isset.fragment_ctxs = true;
-  rpc_params_.fragment_instance_ctxs.swap(non_const_params.fragment_instance_ctxs);
-  rpc_params_.__isset.fragment_instance_ctxs = true;
+      const_cast<TExecQueryFInstancesParams&>(exec_rpc_params);
+  exec_rpc_params_.fragment_ctxs.swap(non_const_params.fragment_ctxs);
+  exec_rpc_params_.__isset.fragment_ctxs = true;
+  exec_rpc_params_.fragment_instance_ctxs.swap(non_const_params.fragment_instance_ctxs);
+  exec_rpc_params_.__isset.fragment_instance_ctxs = true;
 
   instances_prepared_barrier_.reset(
-      new CountingBarrier(rpc_params_.fragment_instance_ctxs.size()));
+      new CountingBarrier(exec_rpc_params_.fragment_instance_ctxs.size()));
   instances_finished_barrier_.reset(
-      new CountingBarrier(rpc_params_.fragment_instance_ctxs.size()));
+      new CountingBarrier(exec_rpc_params_.fragment_instance_ctxs.size()));
 
   // Claim the query-wide minimum reservation. Do this last so that we don't need
   // to handle releasing it if a later step fails.
   initial_reservations_ = obj_pool_.Add(new InitialReservations(&obj_pool_,
       buffer_reservation_, query_mem_tracker_,
-      rpc_params.initial_mem_reservation_total_claims));
+      exec_rpc_params.initial_mem_reservation_total_claims));
   RETURN_IF_ERROR(
-      initial_reservations_->Init(query_id(), rpc_params.min_mem_reservation_bytes));
+      initial_reservations_->Init(query_id(), exec_rpc_params.min_mem_reservation_bytes));
   scanner_mem_limiter_ = obj_pool_.Add(new ScannerMemLimiter);
   return Status::OK();
 }
@@ -241,6 +261,58 @@ void QueryState::ReportExecStatus(bool done, const Status& status,
   ReportExecStatusAux(done, status, fis, true);
 }
 
+void QueryState::ConstructReport(bool done, const Status& status,
+    FragmentInstanceState* fis, ReportExecStatusRequestPB* report,
+    ThriftSerializer* serializer, uint8_t** profile_buf, uint32_t* profile_len) {
+  report->Clear();
+  TUniqueIdToUniqueIdPB(query_id(), report->mutable_query_id());
+  DCHECK(exec_rpc_params().__isset.coord_state_idx);
+  report->set_coord_state_idx(exec_rpc_params().coord_state_idx);
+  status.ToProto(report->mutable_status());
+
+  if (fis != nullptr) {
+    // create status for 'fis'
+    FragmentInstanceExecStatusPB* instance_status = report->add_instance_exec_status();
+    instance_status->set_report_seq_no(fis->AdvanceReportSeqNo());
+    const TUniqueId& finstance_id = fis->instance_id();
+    TUniqueIdToUniqueIdPB(finstance_id, instance_status->mutable_fragment_instance_id());
+    status.ToProto(instance_status->mutable_status());
+    instance_status->set_done(done);
+    instance_status->set_current_state(fis->current_state());
+
+    // Only send updates to insert status if fragment is finished, the coordinator waits
+    // until query execution is done to use them anyhow.
+    RuntimeState* state = fis->runtime_state();
+    if (done) {
+      state->dml_exec_state()->ToProto(instance_status->mutable_dml_exec_status());
+    }
+
+    // Send new errors to coordinator
+    state->GetUnreportedErrors(instance_status->mutable_error_log());
+
+    // Debug action to simulate failure to serialize the profile.
+    if (!DebugAction(query_options(), "REPORT_EXEC_STATUS_PROFILE").ok()) {
+      DCHECK(profile_buf == nullptr);
+      return;
+    }
+
+    // Generate the runtime profile.
+    DCHECK(fis->profile() != nullptr);
+    TRuntimeProfileTree thrift_profile;
+    fis->profile()->ToThrift(&thrift_profile);
+    Status serialize_status =
+        serializer->SerializeToBuffer(&thrift_profile, profile_len, profile_buf);
+    if (UNLIKELY(!serialize_status.ok() ||
+            *profile_len > FLAGS_rpc_max_message_size)) {
+      profile_buf = nullptr;
+      LOG(ERROR) << Substitute("Failed to create $0profile for query fragment $1: "
+          "status=$2 len=$3", done ? "final " : "", PrintId(finstance_id),
+          serialize_status.ok() ? "OK" : serialize_status.GetDetail(), *profile_len);
+    }
+  }
+}
+
+// TODO: rethink whether 'done' can be inferred from 'status' or 'query_status_'.
 void QueryState::ReportExecStatusAux(bool done, const Status& status,
     FragmentInstanceState* fis, bool instances_started) {
   // if we're reporting an error, we're done
@@ -251,56 +323,62 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
   // This will send a report even if we are cancelled.  If the query completed correctly
   // but fragments still need to be cancelled (e.g. limit reached), the coordinator will
   // be waiting for a final report and profile.
-  TReportExecStatusParams params;
-  params.protocol_version = ImpalaInternalServiceVersion::V1;
-  params.__set_query_id(query_ctx().query_id);
-  DCHECK(rpc_params().__isset.coord_state_idx);
-  params.__set_coord_state_idx(rpc_params().coord_state_idx);
-  status.SetTStatus(&params);
+  ReportExecStatusRequestPB report;
 
-  if (fis != nullptr) {
-    // create status for 'fis'
-    params.instance_exec_status.emplace_back();
-    params.__isset.instance_exec_status = true;
-    TFragmentInstanceExecStatus& instance_status = params.instance_exec_status.back();
-    instance_status.__set_fragment_instance_id(fis->instance_id());
-    status.SetTStatus(&instance_status);
-    instance_status.__set_done(done);
-    instance_status.__set_current_state(fis->current_state());
+  // Serialize the runtime profile with Thrift to 'profile_buf'. Note that the
+  // serialization output is owned by 'serializer' so this must be alive until RPC
+  // is done.
+  ThriftSerializer serializer(true);
+  uint8_t* profile_buf = nullptr;
+  uint32_t profile_len = 0;
+  ConstructReport(done, status, fis, &report, &serializer, &profile_buf, &profile_len);
 
-    DCHECK(fis->profile() != nullptr);
-    fis->profile()->ToThrift(&instance_status.profile);
-    instance_status.__isset.profile = true;
-
-    // Only send updates to insert status if fragment is finished, the coordinator waits
-    // until query execution is done to use them anyhow.
-    RuntimeState* state = fis->runtime_state();
-    if (done && state->dml_exec_state()->ToThrift(&params.insert_exec_status)) {
-      params.__isset.insert_exec_status = true;
-    }
-    // Send new errors to coordinator
-    state->GetUnreportedErrors(&params.error_log);
-    params.__isset.error_log = (params.error_log.size() > 0);
-  }
-
-  Status rpc_status;
-  TReportExecStatusResult res;
-  DCHECK_EQ(res.status.status_code, TErrorCode::OK);
   // Try to send the RPC 3 times before failing. Sleep for 100ms between retries.
   // It's safe to retry the RPC as the coordinator handles duplicate RPC messages.
-  Status client_status;
+  Status rpc_status;
+  Status result_status;
   for (int i = 0; i < 3; ++i) {
-    ImpalaBackendConnection client(ExecEnv::GetInstance()->impalad_client_cache(),
-        query_ctx().coord_address, &client_status);
-    if (client_status.ok()) {
-      rpc_status = client.DoRpc(&ImpalaBackendClient::ReportExecStatus, params, &res);
-      if (rpc_status.ok()) break;
+    RpcController rpc_controller;
+
+    // The profile is a thrift structure serialized to a string and sent as a sidecar.
+    // We keep the runtime profile as Thrift object as Impala client still communicates
+    // with Impala server with Thrift RPC.
+    //
+    // Note that the sidecar is created with faststring so the ownership of the Thrift
+    // profile buffer is transferred to RPC layer and it is freed after the RPC payload
+    // is sent. If serialization of the profile to RPC sidecar fails, we will proceed
+    // without the profile so that the coordinator can still get the status instead of
+    // hitting IMPALA-2990.
+    if (profile_buf != nullptr) {
+      unique_ptr<kudu::faststring> sidecar_buf = make_unique<kudu::faststring>();
+      sidecar_buf->assign_copy(profile_buf, profile_len);
+      unique_ptr<RpcSidecar> sidecar = RpcSidecar::FromFaststring(move(sidecar_buf));
+
+      int sidecar_idx;
+      kudu::Status sidecar_status =
+          rpc_controller.AddOutboundSidecar(move(sidecar), &sidecar_idx);
+      if (LIKELY(sidecar_status.ok())) {
+        report.set_thrift_profiles_sidecar_idx(sidecar_idx);
+      } else {
+        LOG(DFATAL) <<
+            FromKuduStatus(sidecar_status, "Failed to add sidecar").GetDetail();
+      }
     }
+
+    rpc_controller.set_timeout(
+        MonoDelta::FromMilliseconds(FLAGS_backend_client_rpc_timeout_ms));
+    ReportExecStatusResponsePB resp;
+    rpc_status = FromKuduStatus(proxy_->ReportExecStatus(report, &resp, &rpc_controller),
+        "ReportExecStatus() RPC failed");
+    result_status = Status(resp.status());
+    if (rpc_status.ok()) break;
+    //TODO: Consider exponential backoff.
     if (i < 2) SleepForMs(FLAGS_report_status_retry_interval_ms);
+    LOG(WARNING) <<
+        Substitute("Retrying ReportExecStatus() RPC for query $0", PrintId(query_id()));
   }
-  Status result_status(res.status);
-  if ((!client_status.ok() || !rpc_status.ok() || !result_status.ok()) &&
-      instances_started) {
+
+  if ((!rpc_status.ok() || !result_status.ok()) && instances_started) {
     // TODO: should we try to keep rpc_status for the final report? (but the final
     // report, following this Cancel(), may not succeed anyway.)
     // TODO: not keeping an error status here means that all instances might
@@ -308,11 +386,7 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
     // TODO: Fix IMPALA-2990. Cancelling fragment instances without sending the
     // ReporExecStatus RPC may cause query to hang as the coordinator may not be aware
     // of the cancellation. Remove the log statements once IMPALA-2990 is fixed.
-    if (!client_status.ok()) {
-      LOG(ERROR) << "Cancelling fragment instances due to failure to obtain a connection "
-                 << "to the coordinator. (" << client_status.GetDetail()
-                 << "). Query " << PrintId(query_id()) << " may hang. See IMPALA-2990.";
-    } else if (!rpc_status.ok()) {
+    if (!rpc_status.ok()) {
       LOG(ERROR) << "Cancelling fragment instances due to failure to reach the "
                  << "coordinator. (" << rpc_status.GetDetail()
                  << "). Query " << PrintId(query_id()) << " may hang. See IMPALA-2990.";
@@ -343,7 +417,7 @@ Status QueryState::WaitForFinish() {
 
 void QueryState::StartFInstances() {
   VLOG(2) << "StartFInstances(): query_id=" << PrintId(query_id())
-          << " #instances=" << rpc_params_.fragment_instance_ctxs.size();
+          << " #instances=" << exec_rpc_params_.fragment_instance_ctxs.size();
   DCHECK_GT(refcnt_.Load(), 0);
   DCHECK_GT(backend_resource_refcnt_.Load(), 0) << "Should have been taken in Init()";
 
@@ -364,17 +438,18 @@ void QueryState::StartFInstances() {
           << "\n" << desc_tbl_->DebugString();
 
   Status thread_create_status;
-  DCHECK_GT(rpc_params_.fragment_ctxs.size(), 0);
-  TPlanFragmentCtx* fragment_ctx = &rpc_params_.fragment_ctxs[0];
+  DCHECK_GT(exec_rpc_params_.fragment_ctxs.size(), 0);
+  TPlanFragmentCtx* fragment_ctx = &exec_rpc_params_.fragment_ctxs[0];
   int fragment_ctx_idx = 0;
-  int num_unstarted_instances = rpc_params_.fragment_instance_ctxs.size();
+  int num_unstarted_instances = exec_rpc_params_.fragment_instance_ctxs.size();
   fragment_events_start_time_ = MonotonicStopWatch::Now();
-  for (const TPlanFragmentInstanceCtx& instance_ctx: rpc_params_.fragment_instance_ctxs) {
+  for (const TPlanFragmentInstanceCtx& instance_ctx :
+           exec_rpc_params_.fragment_instance_ctxs) {
     // determine corresponding TPlanFragmentCtx
     if (fragment_ctx->fragment.idx != instance_ctx.fragment_idx) {
       ++fragment_ctx_idx;
-      DCHECK_LT(fragment_ctx_idx, rpc_params_.fragment_ctxs.size());
-      fragment_ctx = &rpc_params_.fragment_ctxs[fragment_ctx_idx];
+      DCHECK_LT(fragment_ctx_idx, exec_rpc_params_.fragment_ctxs.size());
+      fragment_ctx = &exec_rpc_params_.fragment_ctxs[fragment_ctx_idx];
       // we expect fragment and instance contexts to follow the same order
       DCHECK_EQ(fragment_ctx->fragment.idx, instance_ctx.fragment_idx);
     }
@@ -472,7 +547,7 @@ void QueryState::ExecFInstance(FragmentInstanceState* fis) {
   VLOG_QUERY << "Executing instance. instance_id=" << PrintId(fis->instance_id())
       << " fragment_idx=" << fis->instance_ctx().fragment_idx
       << " per_fragment_instance_idx=" << fis->instance_ctx().per_fragment_instance_idx
-      << " coord_state_idx=" << rpc_params().coord_state_idx
+      << " coord_state_idx=" << exec_rpc_params().coord_state_idx
       << " #in-flight="
       << ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->GetValue();
   Status status = fis->Exec();

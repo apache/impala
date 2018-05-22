@@ -49,10 +49,10 @@ class ThriftSerializer {
 
   /// Serializes obj into result.  Result will contain a copy of the memory.
   template <class T>
-  Status Serialize(const T* obj, std::vector<uint8_t>* result) {
+  Status SerializeToVector(const T* obj, std::vector<uint8_t>* result) {
     uint32_t len;
     uint8_t* buffer;
-    RETURN_IF_ERROR(Serialize(obj, &len, &buffer));
+    RETURN_IF_ERROR(SerializeToBuffer(obj, &len, &buffer));
     result->assign(buffer, buffer + len);
     return Status::OK();
   }
@@ -61,7 +61,7 @@ class ThriftSerializer {
   /// memory returned is owned by this object and will be invalid when another object
   /// is serialized.
   template <class T>
-  Status Serialize(const T* obj, uint32_t* len, uint8_t** buffer) {
+  Status SerializeToBuffer(const T* obj, uint32_t* len, uint8_t** buffer) {
     try {
       mem_buffer_->resetBuffer();
       obj->write(protocol_.get());
@@ -75,7 +75,7 @@ class ThriftSerializer {
   }
 
   template <class T>
-  Status Serialize(const T* obj, std::string* result) {
+  Status SerializeToString(const T* obj, std::string* result) {
     try {
       mem_buffer_->resetBuffer();
       obj->write(protocol_.get());

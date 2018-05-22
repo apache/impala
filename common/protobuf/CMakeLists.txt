@@ -18,38 +18,38 @@
 
 cmake_minimum_required(VERSION 2.6)
 
+add_custom_target(proto-deps)
+
 set(PROTOBUF_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources/gen-cpp/)
 
-PROTOBUF_GENERATE_CPP(
-  COMMON_PROTO_SRCS COMMON_PROTO_HDRS COMMON_PROTO_TGTS
-  SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}
-  BINARY_ROOT ${PROTOBUF_OUTPUT_DIR}
-  PROTO_FILES common.proto)
-add_custom_target(common_proto DEPENDS ${COMMON_PROTO_TGTS})
-set(COMMON_PROTO_SRCS ${COMMON_PROTO_SRCS} PARENT_SCOPE)
+foreach(pb_src common row_batch)
+   string(TOUPPER ${pb_src} _PB_SRC_UPPER)
+   set(_PROTO_SRCS ${_PB_SRC_UPPER}_PROTO_SRCS)
+   set(_PROTO_HDRS ${_PB_SRC_UPPER}_PROTO_HDRS)
+   set(_PROTO_TGTS ${_PB_SRC_UPPER}_PROTO_TGTS)
+   set(_INPUT_SRC ${pb_src}.proto)
+   PROTOBUF_GENERATE_CPP(
+      ${_PROTO_SRCS} ${_PROTO_HDRS} ${_PROTO_TGTS}
+      SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}
+      BINARY_ROOT ${PROTOBUF_OUTPUT_DIR}
+      PROTO_FILES ${_INPUT_SRC})
+   add_custom_target(${pb_src}_proto DEPENDS ${${_PROTO_TGTS}})
+   add_dependencies(proto-deps ${pb_src}_proto)
+   set(${_PROTO_SRCS} ${${_PROTO_SRCS}} PARENT_SCOPE)
+endforeach()
 
-PROTOBUF_GENERATE_CPP(
-  ROW_BATCH_PROTO_SRCS ROW_BATCH_PROTO_HDRS ROW_BATCH_PROTO_TGTS
-  SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}
-  BINARY_ROOT ${PROTOBUF_OUTPUT_DIR}
-  PROTO_FILES row_batch.proto)
-add_custom_target(row_batch_proto DEPENDS ${ROW_BATCH_PROTO_TGTS})
-set(ROW_BATCH_PROTO_SRCS ${ROW_BATCH_PROTO_SRCS} PARENT_SCOPE)
-
-KRPC_GENERATE(DATA_STREAM_SVC_PROTO_SRCS DATA_STREAM_SVC_PROTO_HDRS
-  DATA_STREAM_SVC_PROTO_TGTS
-  SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}
-  BINARY_ROOT ${PROTOBUF_OUTPUT_DIR}
-  PROTO_FILES data_stream_service.proto)
-add_custom_target(data_stream_svc_proto DEPENDS ${DATA_STREAM_SVC_PROTO_TGTS})
-set(DATA_STREAM_SVC_PROTO_SRCS ${DATA_STREAM_SVC_PROTO_SRCS} PARENT_SCOPE)
-
-KRPC_GENERATE(RPC_TEST_PROTO_SRCS RPC_TEST_PROTO_HDRS
-  RPC_TEST_PROTO_TGTS
-  SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}
-  BINARY_ROOT ${PROTOBUF_OUTPUT_DIR}
-  PROTO_FILES rpc_test.proto)
-add_custom_target(rpc_test_proto_tgt DEPENDS ${RPC_TEST_PROTO_TGTS})
-set(RPC_TEST_PROTO_SRCS ${RPC_TEST_PROTO_SRCS} PARENT_SCOPE)
-
-add_custom_target(proto-deps DEPENDS token_proto rpc_header_proto common_proto row_batch_proto data_stream_svc_proto)
+foreach(pb_src data_stream_service control_service rpc_test)
+   string(TOUPPER ${pb_src} _PB_SRC_UPPER)
+   set(_PROTO_SRCS ${_PB_SRC_UPPER}_PROTO_SRCS)
+   set(_PROTO_HDRS ${_PB_SRC_UPPER}_PROTO_HDRS)
+   set(_PROTO_TGTS ${_PB_SRC_UPPER}_PROTO_TGTS)
+   set(_INPUT_SRC ${pb_src}.proto)
+   KRPC_GENERATE(
+      ${_PROTO_SRCS} ${_PROTO_HDRS} ${_PROTO_TGTS}
+      SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}
+      BINARY_ROOT ${PROTOBUF_OUTPUT_DIR}
+      PROTO_FILES ${_INPUT_SRC})
+   add_custom_target(${pb_src}_proto DEPENDS ${${_PROTO_TGTS}})
+   add_dependencies(proto-deps ${pb_src}_proto)
+   set(${_PROTO_SRCS} ${${_PROTO_SRCS}} PARENT_SCOPE)
+endforeach()

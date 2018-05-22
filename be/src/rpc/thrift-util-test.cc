@@ -41,20 +41,20 @@ TEST(ThriftUtil, SimpleSerializeDeserialize) {
     counter.__set_value(123);
 
     vector<uint8_t> msg;
-    EXPECT_OK(serializer.Serialize(&counter, &msg));
+    EXPECT_OK(serializer.SerializeToVector(&counter, &msg));
 
     uint8_t* buffer1 = NULL;
     uint8_t* buffer2 = NULL;
     uint32_t len1 = 0;
     uint32_t len2 = 0;
 
-    EXPECT_OK(serializer.Serialize(&counter, &len1, &buffer1));
+    EXPECT_OK(serializer.SerializeToBuffer(&counter, &len1, &buffer1));
 
     EXPECT_EQ(len1, msg.size());
     EXPECT_TRUE(memcmp(buffer1, msg.data(), len1) == 0);
 
     // Serialize again and ensure the memory buffer is the same and being reused.
-    EXPECT_OK(serializer.Serialize(&counter, &len2, &buffer2));
+    EXPECT_OK(serializer.SerializeToBuffer(&counter, &len2, &buffer2));
 
     EXPECT_EQ(len1, len2);
     EXPECT_TRUE(buffer1 == buffer2);
@@ -63,6 +63,17 @@ TEST(ThriftUtil, SimpleSerializeDeserialize) {
     EXPECT_OK(DeserializeThriftMsg(buffer1, &len1, compact, &deserialized_counter));
     EXPECT_EQ(len1, len2);
     EXPECT_TRUE(counter == deserialized_counter);
+
+    // Serialize to string
+    std::string str;
+    EXPECT_OK(serializer.SerializeToString(&counter, &str));
+    EXPECT_EQ(len2, str.length());
+
+    // Verifies that deserialization of 'str' works.
+    TCounter deserialized_counter_2;
+    EXPECT_OK(DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(str.data()), &len2,
+        compact, &deserialized_counter_2));
+    EXPECT_TRUE(counter == deserialized_counter_2);
   }
 }
 

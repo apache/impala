@@ -29,12 +29,12 @@
 
 namespace impala {
 
-class TInsertExecStatus;
+class DmlExecStatusPB;
+class DmlPartitionStatusPB;
+class DmlStatsPB;
 class TInsertResult;
-class TInsertStats;
 class TFinalizeParams;
 class TUpdateCatalogRequest;
-class TInsertPartitionStatus;
 class RuntimeProfile;
 class HdfsTableDescriptor;
 
@@ -57,7 +57,7 @@ class HdfsTableDescriptor;
 class DmlExecState {
  public:
   /// Merge values from 'dml_exec_status'.
-  void Update(const TInsertExecStatus& dml_exec_status);
+  void Update(const DmlExecStatusPB& dml_exec_status);
 
   /// Add a new partition with the given parameters. Ignores 'base_dir' if nullptr.
   /// It is an error to call this for an existing partition.
@@ -67,7 +67,7 @@ class DmlExecState {
   /// Ignores 'insert_stats' if nullptr.
   /// Requires that the partition already exist.
   void UpdatePartition(const std::string& partition_name,
-      int64_t num_modified_rows_delta, const TInsertStats* insert_stats);
+      int64_t num_modified_rows_delta, const DmlStatsPB* insert_stats);
 
   /// Used to initialize this state when execute Kudu DML. Must be called before
   /// SetKuduDmlStats().
@@ -102,22 +102,22 @@ class DmlExecState {
   Status FinalizeHdfsInsert(const TFinalizeParams& params, bool s3_skip_insert_staging,
       HdfsTableDescriptor* hdfs_table, RuntimeProfile* profile) WARN_UNUSED_RESULT;
 
-  // Serialize to thrift. Returns true if any fields of 'dml_status' were set.
-  bool ToThrift(TInsertExecStatus* dml_status);
+  /// Serialize to protobuf and stores the result in 'dml_status'.
+  void ToProto(DmlExecStatusPB* dml_status);
 
-  // Populates 'insert_result' with PartitionStatusMap data, for Impala's extension of
-  // Beeswax.
+  /// Populates 'insert_result' with PartitionStatusMap data, for Impala's extension of
+  /// Beeswax.
   void ToTInsertResult(TInsertResult* insert_result);
 
  private:
-  // protects all fields below
+  /// protects all fields below
   boost::mutex lock_;
 
   /// Counts how many rows an DML query has added to a particular partition (partitions
   /// are identified by their partition keys: k1=v1/k2=v2 etc. Unpartitioned tables
   /// have a single 'default' partition which is identified by ROOT_PARTITION_KEY.
   /// Uses ordered map so that iteration order is deterministic.
-  typedef std::map<std::string, TInsertPartitionStatus> PartitionStatusMap;
+  typedef std::map<std::string, DmlPartitionStatusPB> PartitionStatusMap;
   PartitionStatusMap per_partition_status_;
 
   /// Tracks files to move from a temporary (key) to a final destination (value) as
@@ -141,7 +141,7 @@ class DmlExecState {
       PermissionCache* permissions_cache);
 
   /// Merge 'src' into 'dst'. Not thread-safe.
-  void MergeDmlStats(const TInsertStats& src, TInsertStats* dst);
+  void MergeDmlStats(const DmlStatsPB& src, DmlStatsPB* dst);
 };
 
 }

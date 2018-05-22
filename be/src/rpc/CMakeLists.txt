@@ -47,17 +47,17 @@ target_link_libraries(thrift-server-test security-test-for-impala)
 ADD_BE_LSAN_TEST(authentication-test)
 
 ADD_BE_TEST(rpc-mgr-test) # TODO: this test leaks various KRPC things
-add_dependencies(rpc-mgr-test rpc_test_proto)
-target_link_libraries(rpc-mgr-test rpc_test_proto)
+add_dependencies(rpc-mgr-test rpc_test_proto_tgt)
+target_link_libraries(rpc-mgr-test rpc_test_proto_tgt)
 target_link_libraries(rpc-mgr-test security-test-for-impala)
 target_link_libraries(rpc-mgr-test ${KRB5_REALM_OVERRIDE})
 
 ADD_BE_TEST(rpc-mgr-kerberized-test) # TODO: this test leaks various KRPC things
-add_dependencies(rpc-mgr-kerberized-test rpc_test_proto)
-target_link_libraries(rpc-mgr-kerberized-test rpc_test_proto)
+add_dependencies(rpc-mgr-kerberized-test rpc_test_proto_tgt)
+target_link_libraries(rpc-mgr-kerberized-test rpc_test_proto_tgt)
 target_link_libraries(rpc-mgr-kerberized-test security-test-for-impala)
 target_link_libraries(rpc-mgr-kerberized-test ${KRB5_REALM_OVERRIDE})
 
-add_library(rpc_test_proto ${RPC_TEST_PROTO_SRCS})
-add_dependencies(rpc_test_proto rpc_test_proto_tgt krpc)
-target_link_libraries(rpc_test_proto krpc)
+add_library(rpc_test_proto_tgt ${RPC_TEST_PROTO_SRCS})
+add_dependencies(rpc_test_proto_tgt rpc_test_proto krpc)
+target_link_libraries(rpc_test_proto_tgt krpc)

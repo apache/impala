@@ -597,7 +597,7 @@ void SchedulerWrapper::AddHostToTopicDelta(const Host& host, TTopicDelta* delta)
   TTopicItem item;
   item.key = host.ip;
   ThriftSerializer serializer(false);
-  Status status = serializer.Serialize(&be_desc, &item.value);
+  Status status = serializer.SerializeToString(&be_desc, &item.value);
   DCHECK(status.ok());
 
   // Add to topic delta.

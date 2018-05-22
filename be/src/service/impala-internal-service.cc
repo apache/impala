@@ -79,14 +79,6 @@ void ImpalaInternalService::CancelQueryFInstances(
   qs->Cancel();
 }
 
-void ImpalaInternalService::ReportExecStatus(TReportExecStatusResult& return_val,
-    const TReportExecStatusParams& params) {
-  FAULT_INJECTION_RPC_DELAY(RPC_REPORTEXECSTATUS);
-  DCHECK(params.__isset.query_id);
-  DCHECK(params.__isset.coord_state_idx);
-  impala_server_->ReportExecStatus(return_val, params);
-}
-
 void ImpalaInternalService::UpdateFilter(TUpdateFilterResult& return_val,
     const TUpdateFilterParams& params) {
   FAULT_INJECTION_RPC_DELAY(RPC_UPDATEFILTER);

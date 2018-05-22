@@ -22,12 +22,15 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/service")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/service")
 
 # Mark the protobuf file as generated
-set_source_files_properties(${DATA_STREAM_SVC_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${CONTROL_SERVICE_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${DATA_STREAM_SERVICE_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 add_library(Service
   child-query.cc
   client-request-state.cc
-  ${DATA_STREAM_SVC_PROTO_SRCS}
+  ${CONTROL_SERVICE_PROTO_SRCS}
+  control-service.cc
+  ${DATA_STREAM_SERVICE_PROTO_SRCS}
   data-stream-service.cc
   frontend.cc
   fe-support.cc

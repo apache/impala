@@ -52,9 +52,6 @@ using namespace strings;
 
 namespace impala {
 
-const static string& ROOT_PARTITION_KEY =
-    g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
-
 HdfsTableSink::HdfsTableSink(const RowDescriptor* row_desc, const TDataSink& tsink,
     RuntimeState* state)
   : DataSink(row_desc, "HdfsTableSink", state),
@@ -611,8 +608,8 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
   return Status::OK();
 }
 
-Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
-                                            OutputPartition* partition) {
+Status HdfsTableSink::FinalizePartitionFile(
+    RuntimeState* state, OutputPartition* partition) {
   if (partition->tmp_hdfs_file == nullptr && !overwrite_) return Status::OK();
   SCOPED_TIMER(ADD_TIMER(profile(), "FinalizePartitionFileTimer"));
 

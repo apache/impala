@@ -660,23 +660,21 @@ void Coordinator::CancelBackends() {
       PrintId(query_id()), num_cancelled);
 }
 
-Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& params) {
+Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& request,
+    const TRuntimeProfileTree& thrift_profile) {
+  const int32_t coord_state_idx = request.coord_state_idx();
   VLOG_FILE << "UpdateBackendExecStatus() query_id=" << PrintId(query_id())
-            << " backend_idx=" << params.coord_state_idx;
-  if (params.coord_state_idx >= backend_states_.size()) {
+            << " backend_idx=" << coord_state_idx;
+
+  if (coord_state_idx >= backend_states_.size()) {
     return Status(TErrorCode::INTERNAL_ERROR,
         Substitute("Unknown backend index $0 (max known: $1)",
-            params.coord_state_idx, backend_states_.size() - 1));
+            coord_state_idx, backend_states_.size() - 1));
   }
-  BackendState* backend_state = backend_states_[params.coord_state_idx];
+  BackendState* backend_state = backend_states_[coord_state_idx];
 
-  // TODO: only do this when the sink is done; probably missing a done field
-  // in TReportExecStatus for that
-  if (params.__isset.insert_exec_status) {
-    dml_exec_state_.Update(params.insert_exec_status);
-  }
-
-  if (backend_state->ApplyExecStatusReport(params, &exec_summary_, &progress_)) {
+  if (backend_state->ApplyExecStatusReport(request, thrift_profile, &exec_summary_,
+          &progress_, &dml_exec_state_)) {
     // This backend execution has completed.
     if (VLOG_QUERY_IS_ON) {
       // Don't log backend completion if the query has already been cancelled.

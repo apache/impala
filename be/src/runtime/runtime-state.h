@@ -27,6 +27,7 @@
 #include "common/global-types.h"  // for PlanNodeId
 #include "runtime/client-cache-types.h"
 #include "runtime/dml-exec-state.h"
+#include "util/error-util-internal.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
@@ -212,12 +213,10 @@ class RuntimeState {
   /// Returns the error log lines as a string joined with '\n'.
   std::string ErrorLog();
 
-  /// Copy error_log_ to *errors
-  void GetErrors(ErrorLogMap* errors);
-
-  /// Append all accumulated errors since the last call to this function to new_errors to
-  /// be sent back to the coordinator
-  void GetUnreportedErrors(ErrorLogMap* new_errors);
+  /// Clear 'new_errors' and append all accumulated errors since the last call to this
+  /// function to 'new_errors' to be sent back to the coordinator. This has the side
+  /// effect of clearing out the internal error log map once this function returns.
+  void GetUnreportedErrors(ErrorLogMapPB* new_errors);
 
   /// Given an error message, determine whether execution should be aborted and, if so,
   /// return the corresponding error status. Otherwise, log the error and return

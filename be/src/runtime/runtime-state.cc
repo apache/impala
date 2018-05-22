@@ -186,11 +186,6 @@ string RuntimeState::ErrorLog() {
   return PrintErrorMapToString(error_log_);
 }
 
-void RuntimeState::GetErrors(ErrorLogMap* errors) {
-  lock_guard<SpinLock> l(error_log_lock_);
-  *errors = error_log_;
-}
-
 bool RuntimeState::LogError(const ErrorMsg& message, int vlog_level) {
   lock_guard<SpinLock> l(error_log_lock_);
   // All errors go to the log, unreported_error_count_ is counted independently of the
@@ -204,9 +199,12 @@ bool RuntimeState::LogError(const ErrorMsg& message, int vlog_level) {
   return false;
 }
 
-void RuntimeState::GetUnreportedErrors(ErrorLogMap* new_errors) {
+void RuntimeState::GetUnreportedErrors(ErrorLogMapPB* new_errors) {
+  new_errors->clear();
   lock_guard<SpinLock> l(error_log_lock_);
-  *new_errors = error_log_;
+  for (const ErrorLogMap::value_type& v : error_log_) {
+    (*new_errors)[v.first] = v.second;
+  }
   // Reset all messages, but keep all already reported keys so that we do not report the
   // same errors multiple times.
   ClearErrorMap(error_log_);

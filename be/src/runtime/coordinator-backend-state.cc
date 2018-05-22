@@ -21,6 +21,7 @@
 
 #include "common/object-pool.h"
 #include "exec/exec-node.h"
+#include "exec/kudu-util.h"
 #include "exec/scan-node.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
@@ -28,9 +29,12 @@
 #include "runtime/client-cache.h"
 #include "runtime/backend-client.h"
 #include "runtime/coordinator-filter-state.h"
+#include "util/error-util-internal.h"
 #include "util/uid-util.h"
 #include "util/network-util.h"
 #include "util/counting-barrier.h"
+
+#include "gen-cpp/control_service.pb.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 
 #include "common/names.h"
@@ -265,37 +269,61 @@ inline bool Coordinator::BackendState::IsDone() const {
 }
 
 bool Coordinator::BackendState::ApplyExecStatusReport(
-    const TReportExecStatusParams& backend_exec_status, ExecSummary* exec_summary,
-    ProgressUpdater* scan_range_progress) {
+    const ReportExecStatusRequestPB& backend_exec_status,
+    const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary,
+    ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state) {
+  // Hold the exec_summary's lock to avoid exposing it half-way through
+  // the update loop below.
   lock_guard<SpinLock> l1(exec_summary->lock);
-  lock_guard<mutex> l2(lock_);
+  unique_lock<mutex> lock(lock_);
   last_report_time_ms_ = MonotonicMillis();
 
   // If this backend completed previously, don't apply the update.
   if (IsDone()) return false;
-  for (const TFragmentInstanceExecStatus& instance_exec_status:
-      backend_exec_status.instance_exec_status) {
-    Status instance_status(instance_exec_status.status);
-    int instance_idx = GetInstanceIdx(instance_exec_status.fragment_instance_id);
+  for (const FragmentInstanceExecStatusPB& instance_exec_status :
+           backend_exec_status.instance_exec_status()) {
+    int64_t report_seq_no = instance_exec_status.report_seq_no();
+    int instance_idx = GetInstanceIdx(instance_exec_status.fragment_instance_id());
     DCHECK_EQ(instance_stats_map_.count(instance_idx), 1);
     InstanceStats* instance_stats = instance_stats_map_[instance_idx];
     DCHECK(instance_stats->exec_params_.instance_id ==
-        instance_exec_status.fragment_instance_id);
+        ProtoToQueryId(instance_exec_status.fragment_instance_id()));
     // Ignore duplicate or out-of-order messages.
-    if (instance_stats->done_) continue;
+    if (report_seq_no <= instance_stats->last_report_seq_no_) {
+      VLOG_QUERY << Substitute("Ignoring stale update for query instance $0 with "
+          "seq no $1", PrintId(instance_stats->exec_params_.instance_id), report_seq_no);
+      continue;
+    }
 
-    instance_stats->Update(instance_exec_status, exec_summary, scan_range_progress);
+    DCHECK(!instance_stats->done_);
+    instance_stats->Update(
+        instance_exec_status, thrift_profile, exec_summary, scan_range_progress);
+
+    // Update DML stats
+    if (instance_exec_status.has_dml_exec_status()) {
+      dml_exec_state->Update(instance_exec_status.dml_exec_status());
+    }
+
+    // Log messages aggregated by type
+    if (instance_exec_status.error_log_size() > 0) {
+      // Append the log messages from each update with the global state of the query
+      // execution
+      MergeErrorMaps(instance_exec_status.error_log(), &error_log_);
+      VLOG_FILE << "host=" << TNetworkAddressToString(host_) << " error log: " <<
+          PrintErrorMapToString(error_log_);
+    }
 
     // If a query is aborted due to an error encountered by a single fragment instance,
     // all other fragment instances will report a cancelled status; make sure not to mask
     // the original error status.
+    const Status instance_status(instance_exec_status.status());
     if (!instance_status.ok() && (status_.ok() || status_.IsCancelled())) {
       status_ = instance_status;
-      failed_instance_id_ = instance_exec_status.fragment_instance_id;
+      failed_instance_id_ = ProtoToQueryId(instance_exec_status.fragment_instance_id());
       is_fragment_failure_ = true;
     }
     DCHECK_GT(num_remaining_instances_, 0);
-    if (instance_exec_status.done) {
+    if (instance_exec_status.done()) {
       DCHECK(!instance_stats->done_);
       instance_stats->done_ = true;
       --num_remaining_instances_;
@@ -319,18 +347,9 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   // status_ has incorporated the status from all fragment instances. If the overall
   // backend status is not OK, but no specific fragment instance reported an error, then
   // this is a general backend error. Incorporate the general error into status_.
-  Status overall_backend_status(backend_exec_status.status);
+  Status overall_backend_status(backend_exec_status.status());
   if (!overall_backend_status.ok() && (status_.ok() || status_.IsCancelled())) {
     status_ = overall_backend_status;
-  }
-
-  // Log messages aggregated by type
-  if (backend_exec_status.__isset.error_log && backend_exec_status.error_log.size() > 0) {
-    // Append the log messages from each update with the global state of the query
-    // execution
-    MergeErrorMaps(backend_exec_status.error_log, &error_log_);
-    VLOG_FILE << "host=" << TNetworkAddressToString(host_) << " error log: " <<
-        PrintErrorMapToString(error_log_);
   }
 
   // TODO: keep backend-wide stopwatch?
@@ -463,15 +482,17 @@ void Coordinator::BackendState::InstanceStats::InitCounters() {
         p->GetCounter(ScanNode::BYTES_READ_COUNTER);
     if (bytes_read != nullptr) bytes_read_counters_.push_back(bytes_read);
   }
-
 }
 
 void Coordinator::BackendState::InstanceStats::Update(
-    const TFragmentInstanceExecStatus& exec_status, ExecSummary* exec_summary,
+    const FragmentInstanceExecStatusPB& exec_status,
+    const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary,
     ProgressUpdater* scan_range_progress) {
   last_report_time_ms_ = MonotonicMillis();
-  if (exec_status.done) stopwatch_.Stop();
-  profile_->Update(exec_status.profile);
+  DCHECK_GT(exec_status.report_seq_no(), last_report_seq_no_);
+  last_report_seq_no_ = exec_status.report_seq_no();
+  if (exec_status.done()) stopwatch_.Stop();
+  profile_->Update(thrift_profile);
   if (!profile_created_) {
     profile_created_ = true;
     InitCounters();
@@ -482,7 +503,6 @@ void Coordinator::BackendState::InstanceStats::Update(
   // TODO: why do this every time we get an updated instance profile?
   vector<RuntimeProfile*> children;
   profile_->GetAllChildren(&children);
-
   TExecSummary& thrift_exec_summary = exec_summary->thrift_exec_summary;
   for (RuntimeProfile* child: children) {
     int node_id = ExecNode::GetNodeIdFromProfile(child);
@@ -493,14 +513,17 @@ void Coordinator::BackendState::InstanceStats::Update(
         thrift_exec_summary.nodes[exec_summary->node_id_to_idx_map[node_id]];
     int per_fragment_instance_idx = exec_params_.per_fragment_instance_idx;
     DCHECK_LT(per_fragment_instance_idx, node_exec_summary.exec_stats.size())
-        << " node_id=" << node_id << " instance_id=" << PrintId(exec_params_.instance_id)
+        << " node_id=" << node_id << " instance_id="
+        << PrintId(exec_params_.instance_id)
         << " fragment_idx=" << exec_params_.fragment().idx;
     TExecStats& instance_stats =
         node_exec_summary.exec_stats[per_fragment_instance_idx];
 
     RuntimeProfile::Counter* rows_counter = child->GetCounter("RowsReturned");
     RuntimeProfile::Counter* mem_counter = child->GetCounter("PeakMemoryUsage");
-    if (rows_counter != nullptr) instance_stats.__set_cardinality(rows_counter->value());
+    if (rows_counter != nullptr) {
+      instance_stats.__set_cardinality(rows_counter->value());
+    }
     if (mem_counter != nullptr) instance_stats.__set_memory_used(mem_counter->value());
     instance_stats.__set_latency_ns(child->local_time());
     // TODO: track interesting per-node metrics
@@ -515,7 +538,7 @@ void Coordinator::BackendState::InstanceStats::Update(
   scan_range_progress->Update(delta);
 
   // extract the current execution state of this instance
-  current_state_ = exec_status.current_state;
+  current_state_ = exec_status.current_state();
 }
 
 void Coordinator::BackendState::InstanceStats::ToJson(Value* value, Document* document) {

@@ -38,14 +38,16 @@
 
 namespace impala {
 
-class ExecEnv;
-class Coordinator;
-class RuntimeState;
-class RowBatch;
-class Expr;
-class TupleRow;
-class Frontend;
 class ClientRequestStateCleaner;
+class Coordinator;
+class ExecEnv;
+class Expr;
+class Frontend;
+class ReportExecStatusRequestPB;
+class RowBatch;
+class RuntimeState;
+class TRuntimeProfileTree;
+class TupleRow;
 enum class AdmissionOutcome;
 
 /// Execution state of the client-facing side a query. This captures everything
@@ -158,7 +160,8 @@ class ClientRequestState {
   /// coordinator even before it becomes accessible through GetCoordinator(). These
   /// methods should be used instead of calling them directly using the coordinator
   /// object.
-  Status UpdateBackendExecStatus(const TReportExecStatusParams& params);
+  Status UpdateBackendExecStatus(const ReportExecStatusRequestPB& request,
+      const TRuntimeProfileTree& thrift_profile) WARN_UNUSED_RESULT;
   void UpdateFilter(const TUpdateFilterParams& params);
 
   ImpalaServer::SessionState* session() const { return session_.get(); }

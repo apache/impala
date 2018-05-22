@@ -55,16 +55,6 @@ class ImpalaBackendClient : public ImpalaInternalServiceClient {
     ImpalaInternalServiceClient::recv_ExecQueryFInstances(_return);
   }
 
-  void ReportExecStatus(TReportExecStatusResult& _return,
-      const TReportExecStatusParams& params, bool* send_done) {
-    DCHECK(!*send_done);
-    FAULT_INJECTION_SEND_RPC_EXCEPTION(16);
-    ImpalaInternalServiceClient::send_ReportExecStatus(params);
-    *send_done = true;
-    FAULT_INJECTION_RECV_RPC_EXCEPTION(16);
-    ImpalaInternalServiceClient::recv_ReportExecStatus(_return);
-  }
-
   void CancelQueryFInstances(TCancelQueryFInstancesResult& _return,
       const TCancelQueryFInstancesParams& params, bool* send_done) {
     DCHECK(!*send_done);

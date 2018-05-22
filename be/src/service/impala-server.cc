@@ -1008,11 +1008,12 @@ Status ImpalaServer::ExecuteInternal(
 }
 
 void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
-  PrepareQueryContext(GetThriftBackendAddress(), query_ctx);
+  PrepareQueryContext(GetThriftBackendAddress(),
+      ExecEnv::GetInstance()->krpc_address(), query_ctx);
 }
 
-void ImpalaServer::PrepareQueryContext(
-    const TNetworkAddress& backend_addr, TQueryCtx* query_ctx) {
+void ImpalaServer::PrepareQueryContext(const TNetworkAddress& backend_addr,
+    const TNetworkAddress& krpc_addr, TQueryCtx* query_ctx) {
   query_ctx->__set_pid(getpid());
   int64_t now_us = UnixMicros();
   const Timezone& utc_tz = TimezoneDatabase::GetUtcTimezone();
@@ -1031,6 +1032,7 @@ void ImpalaServer::PrepareQueryContext(
   query_ctx->__set_now_string(ToStringFromUnixMicros(now_us, *local_tz));
   query_ctx->__set_start_unix_millis(now_us / MICROS_PER_MILLI);
   query_ctx->__set_coord_address(backend_addr);
+  query_ctx->__set_coord_krpc_address(krpc_addr);
   query_ctx->__set_local_time_zone(local_tz_name);
 
   // Creating a random_generator every time is not free, but
@@ -1334,27 +1336,6 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
     *session_state = i->second;
     return Status::OK();
   }
-}
-
-void ImpalaServer::ReportExecStatus(
-    TReportExecStatusResult& return_val, const TReportExecStatusParams& params) {
-  VLOG_FILE << "ReportExecStatus() coord_state_idx=" << params.coord_state_idx;
-  // TODO: implement something more efficient here, we're currently
-  // acquiring/releasing the map lock and doing a map lookup for
-  // every report (assign each query a local int32_t id and use that to index into a
-  // vector of ClientRequestStates, w/o lookup or locking?)
-  shared_ptr<ClientRequestState> request_state =
-      GetClientRequestState(params.query_id);
-  if (request_state.get() == nullptr) {
-    // This is expected occasionally (since a report RPC might be in flight while
-    // cancellation is happening). Return an error to the caller to get it to stop.
-    const string& err = Substitute("ReportExecStatus(): Received report for unknown "
-        "query ID (probably closed or cancelled): $0", PrintId(params.query_id));
-    VLOG(1) << err;
-    Status::Expected(err).SetTStatus(&return_val);
-    return;
-  }
-  request_state->UpdateBackendExecStatus(params).SetTStatus(&return_val);
 }
 
 void ImpalaServer::InitializeConfigVariables() {
@@ -1842,7 +1823,8 @@ void ImpalaServer::AddLocalBackendToStatestore(
 
   TTopicItem& item = update.topic_entries.back();
   item.key = local_backend_id;
-  Status status = thrift_serializer_.Serialize(&local_backend_descriptor, &item.value);
+  Status status = thrift_serializer_.SerializeToString(&local_backend_descriptor,
+      &item.value);
   if (!status.ok()) {
     LOG(WARNING) << "Failed to serialize Impala backend descriptor for statestore topic:"
                  << " " << status.GetDetail();

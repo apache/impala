@@ -39,10 +39,10 @@ class TestRPCTimeout(CustomClusterTestSuite):
       pytest.skip('runs only in exhaustive')
     super(TestRPCTimeout, cls).setup_class()
 
-  def execute_query_verify_metrics(self, query, repeat = 1):
+  def execute_query_verify_metrics(self, query, query_options=None, repeat=1):
     for i in range(repeat):
       try:
-        self.client.execute(query)
+        self.execute_query(query, query_options)
       except ImpalaBeeswaxException:
         pass
     verifiers = [ MetricVerifier(i.service) for i in ImpalaCluster().impalads ]
@@ -121,20 +121,30 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=5")
-  def test_transmitdata_timeout(self, vector):
-    self.execute_query_verify_metrics(self.TEST_QUERY)
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
-      " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=6"
-      " --status_report_interval=1")
-  def test_reportexecstatus_timeout(self, vector):
-    self.execute_query_verify_metrics(self.TEST_QUERY)
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
       " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=7"
       " --datastream_sender_timeout_ms=30000")
   def test_random_rpc_timeout(self, vector):
-    self.execute_query_verify_metrics(self.TEST_QUERY, 10)
+    self.execute_query_verify_metrics(self.TEST_QUERY, None, 10)
+
+  # Inject jitter into the RPC handler of ReportExecStatus() to trigger RPC timeout.
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--status_report_interval_ms=10"
+      " --backend_client_rpc_timeout_ms=1000")
+  def test_reportexecstatus_timeout(self, vector):
+    query_options = {'debug_action': 'REPORT_EXEC_STATUS_DELAY:JITTER@1500@0.5'}
+    self.execute_query_verify_metrics(self.TEST_QUERY, query_options, 10)
+
+  # Use a small service queue memory limit and a single service thread to exercise
+  # the retry paths in the ReportExecStatus() RPC
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--status_report_interval_ms=10"
+      " --control_service_queue_mem_limit=1 --control_service_num_svc_threads=1")
+  def test_reportexecstatus_retry(self, vector):
+    self.execute_query_verify_metrics(self.TEST_QUERY, None, 10)
+
+  # Inject artificial failure during thrift profile serialization / deserialization.
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--status_report_interval_ms=10")
+  def test_reportexecstatus_profile_fail(self):
+    query_options = {'debug_action': 'REPORT_EXEC_STATUS_PROFILE:FAIL@0.8'}
+    self.execute_query_verify_metrics(self.TEST_QUERY, query_options, 10)

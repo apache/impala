@@ -53,7 +53,7 @@ Status HdfsTableWriter::Write(const uint8_t* data, int32_t len) {
     return Status(msg.str());
   }
   COUNTER_ADD(parent_->bytes_written_counter(), len);
-  stats_.bytes_written += len;
+  stats_.set_bytes_written(stats_.bytes_written() + len);
   return Status::OK();
 }
 }

@@ -910,7 +910,7 @@ void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
     topic_delta.topic_entries.push_back(TTopicItem());
     TTopicItem& topic_item = topic_delta.topic_entries.back();
     topic_item.key = MakePoolTopicKey(pool_name, host_id_);
-    Status status = thrift_serializer_.Serialize(&stats->local_stats(),
+    Status status = thrift_serializer_.SerializeToString(&stats->local_stats(),
         &topic_item.value);
     if (!status.ok()) {
       LOG(WARNING) << "Failed to serialize query pool stats: " << status.GetDetail();

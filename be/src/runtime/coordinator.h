@@ -37,20 +37,19 @@
 namespace impala {
 
 class CountingBarrier;
+class FragmentInstanceState;
+class MemTracker;
 class ObjectPool;
-class RuntimeState;
-class TUpdateCatalogRequest;
-class TReportExecStatusParams;
-class TPlanExecRequest;
-class TRuntimeProfileTree;
-class RuntimeProfile;
+class PlanRootSink;
 class QueryResultSet;
 class QuerySchedule;
-class MemTracker;
-class PlanRootSink;
-class FragmentInstanceState;
 class QueryState;
-
+class ReportExecStatusRequestPB;
+class RuntimeProfile;
+class RuntimeState;
+class TPlanExecRequest;
+class TRuntimeProfileTree;
+class TUpdateCatalogRequest;
 
 /// Query coordinator: handles execution of fragment instances on remote nodes, given a
 /// TQueryExecRequest. As part of that, it handles all interactions with the executing
@@ -91,8 +90,8 @@ class QueryState;
 /// Lock ordering: (lower-numbered acquired before higher-numbered)
 /// 1. wait_lock_
 /// 2. filter_lock_
-/// 3. exec_state_lock_, backend_states_init_lock_, filter_update_lock_,
-///    ExecSummary::lock (leafs)
+/// 3. exec_state_lock_, backend_states_init_lock_, filter_update_lock_, ExecSummary::lock
+/// 4. Coordinator::BackendState::lock_ (leafs)
 ///
 /// TODO: move into separate subdirectory and move nested classes into separate files
 /// and unnest them
@@ -127,11 +126,12 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// query is still executing. Idempotent.
   void Cancel();
 
-  /// Called by the report status RPC handler to update execution status of a
-  /// particular backend as well as dml_exec_state_ and the profile. This may block if
-  /// exec RPCs are pending.
-  Status UpdateBackendExecStatus(const TReportExecStatusParams& params)
-      WARN_UNUSED_RESULT;
+  /// Called by the report status RPC handler to update execution status of a particular
+  /// backend as well as dml_exec_state_ and the profile. This may block if exec RPCs are
+  /// pending. 'request' contains details of the status update. 'thrift_profile' is the
+  /// Thrift runtime profile from the backend.
+  Status UpdateBackendExecStatus(const ReportExecStatusRequestPB& request,
+      const TRuntimeProfileTree& thrift_profile) WARN_UNUSED_RESULT;
 
   /// Get cumulative profile aggregated over all fragments of the query.
   /// This is a snapshot of the current state of execution and will change in
@@ -148,7 +148,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// individual fragment instances are merged into a single output to retain readability.
   std::string GetErrorLog();
 
-  const ProgressUpdater& progress() { return progress_; }
+  const ProgressUpdater& progress() const { return progress_; }
 
   /// Get a copy of the current exec summary. Thread-safe.
   void GetTExecSummary(TExecSummary* exec_summary);

@@ -250,6 +250,7 @@ void RuntimeProfile::Update(const TRuntimeProfileTree& thrift_profile) {
 }
 
 void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) {
+  if (UNLIKELY(nodes.size()) == 0) return;
   DCHECK_LT(*idx, nodes.size());
   const TRuntimeProfileNode& node = nodes[*idx];
   {
@@ -826,7 +827,7 @@ Status RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   const_cast<RuntimeProfile*>(this)->ToThrift(&thrift_object);
   ThriftSerializer serializer(true);
   vector<uint8_t> serialized_buffer;
-  RETURN_IF_ERROR(serializer.Serialize(&thrift_object, &serialized_buffer));
+  RETURN_IF_ERROR(serializer.SerializeToVector(&thrift_object, &serialized_buffer));
 
   // Compress the serialized thrift string.  This uses string keys and is very
   // easy to compress.

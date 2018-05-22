@@ -33,7 +33,7 @@ Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
 
   uint8_t* buffer = NULL;
   uint32_t size = 0;
-  RETURN_IF_ERROR(serializer.Serialize<T>(msg, &size, &buffer));
+  RETURN_IF_ERROR(serializer.SerializeToBuffer(msg, &size, &buffer));
 
   /// create jbyteArray given buffer
   *serialized_msg = env->NewByteArray(size);

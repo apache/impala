@@ -296,8 +296,6 @@ class ImpalaServer : public ImpalaServiceIf,
       const apache::hive::service::cli::thrift::TRenewDelegationTokenReq& req);
 
   /// ImpalaInternalService rpcs
-  void ReportExecStatus(TReportExecStatusResult& return_val,
-      const TReportExecStatusParams& params);
   void UpdateFilter(TUpdateFilterResult& return_val,
       const TUpdateFilterParams& params);
 
@@ -308,7 +306,8 @@ class ImpalaServer : public ImpalaServiceIf,
   void PrepareQueryContext(TQueryCtx* query_ctx);
 
   /// Static helper for PrepareQueryContext() that is used from expr-benchmark.
-  static void PrepareQueryContext(const TNetworkAddress& backend_addr, TQueryCtx* query_ctx);
+  static void PrepareQueryContext(const TNetworkAddress& backend_addr,
+      const TNetworkAddress& krpc_addr, TQueryCtx* query_ctx);
 
   /// SessionHandlerIf methods
 
@@ -533,6 +532,7 @@ class ImpalaServer : public ImpalaServiceIf,
  private:
   struct ExpirationEvent;
   friend class ChildQuery;
+  friend class ControlService;
   friend class ImpalaHttpHandler;
   friend struct SessionState;
   friend class ImpalaServerTest;

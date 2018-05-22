@@ -25,10 +25,12 @@
 #include <map>
 #include <boost/scoped_ptr.hpp>
 
-#include "util/compress.h"
-#include "runtime/descriptors.h"
 #include "exec/hdfs-table-writer.h"
 #include "exec/parquet-common.h"
+#include "runtime/descriptors.h"
+#include "util/compress.h"
+
+#include "gen-cpp/control_service.pb.h"
 
 namespace impala {
 
@@ -196,7 +198,7 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   std::vector<uint8_t> compression_staging_buffer_;
 
   /// For each column, the on disk size written.
-  TParquetInsertStats parquet_insert_stats_;
+  ParquetDmlStatsPB parquet_dml_stats_;
 };
 
 }

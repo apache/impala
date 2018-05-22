@@ -141,36 +141,6 @@ private:
   std::vector<std::string> details_;
 };
 
-/// Track log messages per error code.
-typedef std::map<TErrorCode::type, TErrorLogEntry> ErrorLogMap;
-
-/// Merge error map m1 into m2. Merging of error maps occurs when the errors from
-/// multiple backends are merged into a single error map.  General log messages are
-/// simply appended, specific errors are deduplicated by either appending a new
-/// instance or incrementing the count of an existing one.
-void MergeErrorMaps(const ErrorLogMap& m1, ErrorLogMap* m2);
-
-/// Append an error to the error map. Performs the aggregation as follows: GENERAL errors
-/// are appended to the list of GENERAL errors, to keep one item each in the map, while
-/// for all other error codes only the count is incremented and only the first message
-/// is kept as a sample.
-void AppendError(ErrorLogMap* map, const ErrorMsg& e);
-
-/// Helper method to print the contents of an ErrorMap to a stream.
-void PrintErrorMap(std::ostream* stream, const ErrorLogMap& errors);
-
-/// Reset all messages and count, but keep all keys to prevent sending already reported
-/// general errors and counting the same non-general error multiple times.
-void ClearErrorMap(ErrorLogMap& errors);
-
-/// Return the number of errors within this error maps. General errors are counted
-/// individually, while specific errors are counted once per distinct occurrence.
-size_t ErrorCount(const ErrorLogMap& errors);
-
-/// Generate a string representation of the error map. Produces the same output as
-/// PrintErrorMap, but returns a string instead of using a stream.
-std::string PrintErrorMapToString(const ErrorLogMap& errors);
-
 /// Maps the HS2 TStatusCode types to the corresponding TErrorCode.
 TErrorCode::type HS2TStatusCodeToTErrorCode(
     const apache::hive::service::cli::thrift::TStatusCode::type& hs2Code);
