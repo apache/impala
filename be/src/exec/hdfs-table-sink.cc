@@ -35,6 +35,7 @@
 #include "runtime/mem-tracker.h"
 #include "util/coding-util.h"
 
+#include <limits>
 #include <vector>
 #include <sstream>
 #include <gutil/strings/substitute.h>
@@ -367,9 +368,22 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
     return Status(GetHdfsErrorMsg("Temporary HDFS file already exists: ",
         output_partition->current_file_name));
   }
-  uint64_t block_size = output_partition->partition_descriptor->block_size();
-  if (block_size == 0) block_size = output_partition->writer->default_block_size();
 
+  // This is the block size from the HDFS partition metadata.
+  uint64_t block_size = output_partition->partition_descriptor->block_size();
+  // hdfsOpenFile takes a 4 byte integer as the block size.
+  if (block_size > numeric_limits<int32_t>::max()) {
+    return Status(Substitute("HDFS block size must be smaller than 2GB but is configured "
+        "in the HDFS partition to $0.", block_size));
+  }
+
+  if (block_size == 0) block_size = output_partition->writer->default_block_size();
+  if (block_size > numeric_limits<int32_t>::max()) {
+    return Status(Substitute("HDFS block size must be smaller than 2GB but the target "
+        "table requires $0.", block_size));
+  }
+
+  DCHECK_LE(block_size, numeric_limits<int32_t>::max());
   output_partition->tmp_hdfs_file = hdfsOpenFile(output_partition->hdfs_connection,
       tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, block_size);
 

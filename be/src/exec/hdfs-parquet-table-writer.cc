@@ -865,7 +865,19 @@ Status HdfsParquetTableWriter::Init() {
 
   VLOG_FILE << "Using compression codec: " << codec;
 
-  columns_.resize(table_desc_->num_cols() - table_desc_->num_clustering_cols());
+  int num_cols = table_desc_->num_cols() - table_desc_->num_clustering_cols();
+  // When opening files using the hdfsOpenFile() API, the maximum block size is limited to
+  // 2GB.
+  int64_t min_block_size = MinBlockSize(num_cols);
+  if (min_block_size >= numeric_limits<int32_t>::max()) {
+    stringstream ss;
+    return Status(Substitute("Minimum required block size must be less than 2GB "
+        "(currently $0), try reducing the number of non-partitioning columns in the "
+        "target table (currently $1).",
+        PrettyPrinter::Print(min_block_size, TUnit::BYTES), num_cols));
+  }
+
+  columns_.resize(num_cols);
   // Initialize each column structure.
   for (int i = 0; i < columns_.size(); ++i) {
     BaseColumnWriter* writer = nullptr;
@@ -992,9 +1004,9 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   return Status::OK();
 }
 
-int64_t HdfsParquetTableWriter::MinBlockSize() const {
+int64_t HdfsParquetTableWriter::MinBlockSize(int64_t num_file_cols) const {
   // See file_size_limit_ calculation in InitNewFile().
-  return 3 * DEFAULT_DATA_PAGE_SIZE * columns_.size();
+  return 3 * DEFAULT_DATA_PAGE_SIZE * num_file_cols;
 }
 
 uint64_t HdfsParquetTableWriter::default_block_size() const {
@@ -1008,7 +1020,7 @@ uint64_t HdfsParquetTableWriter::default_block_size() const {
     block_size = HDFS_BLOCK_SIZE;
     // Blocks are usually HDFS_BLOCK_SIZE bytes, unless there are many columns, in
     // which case a per-column minimum kicks in.
-    block_size = max(block_size, MinBlockSize());
+    block_size = max(block_size, MinBlockSize(columns_.size()));
   }
   // HDFS does not like block sizes that are not aligned
   return BitUtil::RoundUp(block_size, HDFS_BLOCK_ALIGNMENT);
@@ -1029,10 +1041,10 @@ Status HdfsParquetTableWriter::InitNewFile() {
 
   // We want to output HDFS files that are no more than file_size_limit_.  If we
   // go over the limit, HDFS will split the file into multiple blocks which
-  // is undesirable.  We are under the limit, we potentially end up with more
+  // is undesirable.  If we are under the limit, we potentially end up with more
   // files than necessary.  Either way, it is not going to generate a invalid
   // file.
-  // With arbitrary encoding schemes, it is  not possible to know if appending
+  // With arbitrary encoding schemes, it is not possible to know if appending
   // a new row will push us over the limit until after encoding it.  Rolling back
   // a row can be tricky as well so instead we will stop the file when it is
   // 2 * DEFAULT_DATA_PAGE_SIZE * num_cols short of the limit. e.g. 50 cols with 8K data
@@ -1042,15 +1054,17 @@ Status HdfsParquetTableWriter::InitNewFile() {
   // that require increasing the page size).
   // TODO: this should be made dynamic based on the size of rows seen so far.
   // This would for example, let us account for very long string columns.
-  if (file_size_limit_ < MinBlockSize()) {
+  const int64_t num_cols = columns_.size();
+  if (file_size_limit_ < MinBlockSize(num_cols)) {
     stringstream ss;
     ss << "Parquet file size " << file_size_limit_ << " bytes is too small for "
-       << "a table with " << columns_.size() << " columns. Set query option "
-       << "PARQUET_FILE_SIZE to at least " << MinBlockSize() << ".";
+       << "a table with " << num_cols << " non-partitioning columns. Set query option "
+       << "PARQUET_FILE_SIZE to at least " << MinBlockSize(num_cols) << ".";
     return Status(ss.str());
   }
   file_size_limit_ -= 2 * DEFAULT_DATA_PAGE_SIZE * columns_.size();
-  DCHECK_GE(file_size_limit_, DEFAULT_DATA_PAGE_SIZE * columns_.size());
+  DCHECK_GE(file_size_limit_,
+      static_cast<int64_t>(DEFAULT_DATA_PAGE_SIZE * columns_.size()));
   file_pos_ = 0;
   row_count_ = 0;
   file_size_estimate_ = 0;

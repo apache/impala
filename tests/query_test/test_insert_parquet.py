@@ -676,3 +676,12 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 
     self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
       "functional_parquet.zipcode_incomes", expected_min_max_values)
+
+  def test_too_many_columns(self, vector, unique_database):
+    """Test that writing a Parquet table with too many columns results in an error."""
+    num_cols = 12000
+    query = "create table %s.wide stored as parquet as select \n" % unique_database
+    query += ", ".join(map(str, xrange(num_cols)))
+    query += ";\n"
+    result = self.execute_query_expect_failure(self.client, query);
+    assert "Minimum required block size must be less than 2GB" in str(result)
