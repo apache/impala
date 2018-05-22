@@ -63,7 +63,6 @@
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
-#include "util/string-parser.h"
 
 #include "common/names.h"
 
@@ -117,8 +116,6 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     pool_(pool),
     row_descriptor_(descs, tnode.row_tuples, tnode.nullable_tuples),
     resource_profile_(tnode.resource_profile),
-    debug_phase_(TExecNodePhase::INVALID),
-    debug_action_(TDebugAction::WAIT),
     limit_(tnode.limit),
     num_rows_returned_(0),
     runtime_profile_(RuntimeProfile::Create(pool_,
@@ -129,6 +126,7 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     disable_codegen_(tnode.disable_codegen),
     is_closed_(false) {
   runtime_profile_->set_metadata(id_);
+  debug_options_.phase = TExecNodePhase::INVALID;
 }
 
 ExecNode::~ExecNode() {
@@ -159,6 +157,9 @@ Status ExecNode::Prepare(RuntimeState* state) {
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state));
   }
+  reservation_manager_.Init(
+      Substitute("$0 id=$1 ptr=$2", PrintThriftEnum(type_), id_, this), runtime_profile_,
+      mem_tracker_.get(), resource_profile_, debug_options_);
   return Status::OK();
 }
 
@@ -199,12 +200,7 @@ void ExecNode::Close(RuntimeState* state) {
   ScalarExpr::Close(conjuncts_);
   if (expr_perm_pool() != nullptr) expr_perm_pool_->FreeAll();
   if (expr_results_pool() != nullptr) expr_results_pool_->FreeAll();
-  if (buffer_pool_client_.is_registered()) {
-    VLOG_FILE << id_ << " returning reservation " << resource_profile_.min_reservation;
-    state->query_state()->initial_reservations()->Return(
-        &buffer_pool_client_, resource_profile_.min_reservation);
-    state->exec_env()->buffer_pool()->DeregisterClient(&buffer_pool_client_);
-  }
+  reservation_manager_.Close(state);
   if (expr_mem_tracker_ != nullptr) expr_mem_tracker_->Close();
   if (mem_tracker_ != nullptr) {
     if (mem_tracker()->consumption() != 0) {
@@ -216,57 +212,6 @@ void ExecNode::Close(RuntimeState* state) {
     }
     mem_tracker_->Close();
   }
-}
-
-Status ExecNode::ClaimBufferReservation(RuntimeState* state) {
-  DCHECK(!buffer_pool_client_.is_registered());
-  BufferPool* buffer_pool = ExecEnv::GetInstance()->buffer_pool();
-  // Check the minimum buffer size in case the minimum buffer size used by the planner
-  // doesn't match this backend's.
-  if (resource_profile_.__isset.spillable_buffer_size &&
-      resource_profile_.spillable_buffer_size < buffer_pool->min_buffer_len()) {
-    return Status(Substitute("Spillable buffer size for node $0 of $1 bytes is less "
-                             "than the minimum buffer pool buffer size of $2 bytes",
-        id_, resource_profile_.spillable_buffer_size, buffer_pool->min_buffer_len()));
-  }
-
-  RETURN_IF_ERROR(buffer_pool->RegisterClient(
-      Substitute("$0 id=$1 ptr=$2", PrintThriftEnum(type_), id_, this),
-      state->query_state()->file_group(), state->instance_buffer_reservation(),
-      mem_tracker(), resource_profile_.max_reservation, runtime_profile(),
-      &buffer_pool_client_));
-  VLOG_FILE << id_ << " claiming reservation " << resource_profile_.min_reservation;
-  state->query_state()->initial_reservations()->Claim(
-      &buffer_pool_client_, resource_profile_.min_reservation);
-  if (debug_action_ == TDebugAction::SET_DENY_RESERVATION_PROBABILITY &&
-      (debug_phase_ == TExecNodePhase::PREPARE || debug_phase_ == TExecNodePhase::OPEN)) {
-    // We may not have been able to enable the debug action at the start of Prepare() or
-    // Open() because the client is not registered then. Do it now to be sure that it is
-    // effective.
-    RETURN_IF_ERROR(EnableDenyReservationDebugAction());
-  }
-  return Status::OK();
-}
-
-Status ExecNode::ReleaseUnusedReservation() {
-  return buffer_pool_client_.DecreaseReservationTo(
-      buffer_pool_client_.GetUnusedReservation(), resource_profile_.min_reservation);
-}
-
-Status ExecNode::EnableDenyReservationDebugAction() {
-  DCHECK_EQ(debug_action_, TDebugAction::SET_DENY_RESERVATION_PROBABILITY);
-  DCHECK(buffer_pool_client_.is_registered());
-  // Parse [0.0, 1.0] probability.
-  StringParser::ParseResult parse_result;
-  double probability = StringParser::StringToFloat<double>(
-      debug_action_param_.c_str(), debug_action_param_.size(), &parse_result);
-  if (parse_result != StringParser::PARSE_SUCCESS || probability < 0.0
-      || probability > 1.0) {
-    return Status(Substitute(
-        "Invalid SET_DENY_RESERVATION_PROBABILITY param: '$0'", debug_action_param_));
-  }
-  buffer_pool_client_.SetDebugDenyIncreaseReservation(probability);
-  return Status::OK();
 }
 
 Status ExecNode::CreateTree(
@@ -424,9 +369,7 @@ void ExecNode::SetDebugOptions(const TDebugOptions& debug_options, ExecNode* roo
   DCHECK(debug_options.__isset.phase);
   DCHECK(debug_options.__isset.action);
   if (debug_options.node_id == -1 || root->id_ == debug_options.node_id) {
-    root->debug_phase_ = debug_options.phase;
-    root->debug_action_ = debug_options.action;
-    root->debug_action_param_ = debug_options.action_param;
+    root->debug_options_ = debug_options;
   }
   for (int i = 0; i < root->children_.size(); ++i) {
     SetDebugOptions(debug_options, root->children_[i]);
@@ -461,28 +404,28 @@ void ExecNode::CollectScanNodes(vector<ExecNode*>* nodes) {
 }
 
 Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* state) {
-  DCHECK_EQ(debug_phase_, phase);
-  if (debug_action_ == TDebugAction::FAIL) {
+  DCHECK_EQ(debug_options_.phase, phase);
+  if (debug_options_.action == TDebugAction::FAIL) {
     return Status(TErrorCode::INTERNAL_ERROR, "Debug Action: FAIL");
-  } else if (debug_action_ == TDebugAction::WAIT) {
+  } else if (debug_options_.action == TDebugAction::WAIT) {
     while (!state->is_cancelled()) {
       sleep(1);
     }
     return Status::CANCELLED;
-  } else if (debug_action_ == TDebugAction::INJECT_ERROR_LOG) {
+  } else if (debug_options_.action == TDebugAction::INJECT_ERROR_LOG) {
     state->LogError(
         ErrorMsg(TErrorCode::INTERNAL_ERROR, "Debug Action: INJECT_ERROR_LOG"));
     return Status::OK();
-  } else if (debug_action_ == TDebugAction::MEM_LIMIT_EXCEEDED) {
+  } else if (debug_options_.action == TDebugAction::MEM_LIMIT_EXCEEDED) {
     return mem_tracker()->MemLimitExceeded(state, "Debug Action: MEM_LIMIT_EXCEEDED");
   } else {
-    DCHECK_EQ(debug_action_, TDebugAction::SET_DENY_RESERVATION_PROBABILITY);
-    // We can only enable the debug action right if the buffer pool client is registered.
+    DCHECK_EQ(debug_options_.action, TDebugAction::SET_DENY_RESERVATION_PROBABILITY);
+    // We can only enable the debug action if the buffer pool client is registered.
     // If the buffer client is not registered at this point (e.g. if phase is PREPARE or
     // OPEN), then we will enable the debug action at the time when the client is
     // registered.
-    if (buffer_pool_client_.is_registered()) {
-      RETURN_IF_ERROR(EnableDenyReservationDebugAction());
+    if (reservation_manager_.buffer_pool_client()->is_registered()) {
+      RETURN_IF_ERROR(reservation_manager_.EnableDenyReservationDebugAction());
     }
   }
   return Status::OK();

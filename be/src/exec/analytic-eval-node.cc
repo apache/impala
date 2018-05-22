@@ -188,17 +188,17 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
 
   // Claim reservation after the child has been opened to reduce the peak reservation
   // requirement.
-  if (!buffer_pool_client_.is_registered()) {
+  if (!buffer_pool_client()->is_registered()) {
     RETURN_IF_ERROR(ClaimBufferReservation(state));
   }
   DCHECK(input_stream_ == nullptr);
   input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
-      &buffer_pool_client_, resource_profile_.spillable_buffer_size,
+      buffer_pool_client(), resource_profile_.spillable_buffer_size,
       resource_profile_.spillable_buffer_size));
   RETURN_IF_ERROR(input_stream_->Init(id(), true));
   bool success;
   RETURN_IF_ERROR(input_stream_->PrepareForReadWrite(true, &success));
-  DCHECK(success) << "Had reservation: " << buffer_pool_client_.DebugString();
+  DCHECK(success) << "Had reservation: " << buffer_pool_client()->DebugString();
 
   for (int i = 0; i < analytic_fn_evals_.size(); ++i) {
     RETURN_IF_ERROR(analytic_fn_evals_[i]->Open(state));

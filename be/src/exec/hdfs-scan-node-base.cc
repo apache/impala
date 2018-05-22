@@ -527,8 +527,8 @@ Status HdfsScanNodeBase::StartNextScanRange(int64_t* reservation,
     *reservation = IncreaseReservationIncrementally(*reservation, ideal_scan_range_reservation);
     initial_range_ideal_reservation_stats_->UpdateCounter(ideal_scan_range_reservation);
     initial_range_actual_reservation_stats_->UpdateCounter(*reservation);
-    RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(
-        &buffer_pool_client_, *scan_range, *reservation));
+    RETURN_IF_ERROR(
+        io_mgr->AllocateBuffersForRange(buffer_pool_client(), *scan_range, *reservation));
   }
   return Status::OK();
 }
@@ -544,7 +544,7 @@ int64_t HdfsScanNodeBase::IncreaseReservationIncrementally(int64_t curr_reservat
     int64_t target = min(ideal_reservation,
         BitUtil::RoundUpToPowerOf2(curr_reservation + 1, io_mgr->max_buffer_size()));
     DCHECK_LT(curr_reservation, target);
-    bool increased = buffer_pool_client_.IncreaseReservation(target - curr_reservation);
+    bool increased = buffer_pool_client()->IncreaseReservation(target - curr_reservation);
     VLOG_FILE << "Increasing reservation from "
               << PrettyPrinter::PrintBytes(curr_reservation) << " to "
               << PrettyPrinter::PrintBytes(target) << " "

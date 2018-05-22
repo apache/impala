@@ -77,8 +77,8 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state
   // owned by this node, but duplicates some state (exprs, etc) in anticipation of it
   // being separated out further.
   builder_.reset(new PhjBuilder(id(), join_op_, child(0)->row_desc(),
-        child(1)->row_desc(), state, &buffer_pool_client_,
-        resource_profile_.spillable_buffer_size, resource_profile_.max_row_buffer_size));
+      child(1)->row_desc(), state, buffer_pool_client(),
+      resource_profile_.spillable_buffer_size, resource_profile_.max_row_buffer_size));
   RETURN_IF_ERROR(
       builder_->InitExprsAndFilters(state, eq_join_conjuncts, tnode.runtime_filters));
 
@@ -187,7 +187,7 @@ Status PartitionedHashJoinNode::Open(RuntimeState* state) {
 
 Status PartitionedHashJoinNode::AcquireResourcesForBuild(RuntimeState* state) {
   DCHECK_GE(resource_profile_.min_reservation, builder_->MinReservation());
-  if (!buffer_pool_client_.is_registered()) {
+  if (!buffer_pool_client()->is_registered()) {
     RETURN_IF_ERROR(ClaimBufferReservation(state));
   }
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
@@ -429,7 +429,7 @@ Status PartitionedHashJoinNode::PrepareSpilledPartitionForProbe(
     if (UNLIKELY(num_input_rows == largest_partition_rows)) {
       return Status(TErrorCode::PARTITIONED_HASH_JOIN_REPARTITION_FAILS, id_,
           next_partition_level, num_input_rows, NodeDebugString(),
-          buffer_pool_client_.DebugString());
+          buffer_pool_client()->DebugString());
     }
 
     RETURN_IF_ERROR(PrepareForProbe());
@@ -821,23 +821,22 @@ Status PartitionedHashJoinNode::NullAwareAntiJoinError(BufferedTupleStream* rows
       "was $1. $2/$3 of the join's reservation was available for the rows.",
       rows->num_rows(), PrettyPrinter::PrintBytes(rows->byte_size()),
       PrettyPrinter::PrintBytes(
-          buffer_pool_client_.GetUnusedReservation() + rows->BytesPinned(false)),
-      PrettyPrinter::PrintBytes(buffer_pool_client_.GetReservation())));
+          buffer_pool_client()->GetUnusedReservation() + rows->BytesPinned(false)),
+      PrettyPrinter::PrintBytes(buffer_pool_client()->GetReservation())));
 }
 
 Status PartitionedHashJoinNode::InitNullAwareProbePartition() {
   RuntimeState* state = runtime_state_;
-  unique_ptr<BufferedTupleStream> probe_rows = make_unique<BufferedTupleStream>(
-      state, child(0)->row_desc(), &buffer_pool_client_,
-      resource_profile_.spillable_buffer_size,
-      resource_profile_.max_row_buffer_size);
+  unique_ptr<BufferedTupleStream> probe_rows =
+      make_unique<BufferedTupleStream>(state, child(0)->row_desc(), buffer_pool_client(),
+          resource_profile_.spillable_buffer_size, resource_profile_.max_row_buffer_size);
   Status status = probe_rows->Init(id(), true);
   if (!status.ok()) goto error;
   bool got_buffer;
   status = probe_rows->PrepareForWrite(&got_buffer);
   if (!status.ok()) goto error;
-  DCHECK(got_buffer)
-      << "Accounted in min reservation" << buffer_pool_client_.DebugString();
+  DCHECK(got_buffer) << "Accounted in min reservation"
+                     << buffer_pool_client()->DebugString();
   null_aware_probe_partition_.reset(new ProbePartition(
       state, this, builder_->null_aware_partition(), std::move(probe_rows)));
   return Status::OK();
@@ -851,15 +850,15 @@ error:
 
 Status PartitionedHashJoinNode::InitNullProbeRows() {
   RuntimeState* state = runtime_state_;
-  null_probe_rows_ = make_unique<BufferedTupleStream>(state, child(0)->row_desc(),
-      &buffer_pool_client_, resource_profile_.spillable_buffer_size,
-      resource_profile_.max_row_buffer_size);
+  null_probe_rows_ =
+      make_unique<BufferedTupleStream>(state, child(0)->row_desc(), buffer_pool_client(),
+          resource_profile_.spillable_buffer_size, resource_profile_.max_row_buffer_size);
   // Start with stream pinned, unpin later if needed.
   RETURN_IF_ERROR(null_probe_rows_->Init(id(), true));
   bool got_buffer;
   RETURN_IF_ERROR(null_probe_rows_->PrepareForWrite(&got_buffer));
-  DCHECK(got_buffer)
-      << "Accounted in min reservation" << buffer_pool_client_.DebugString();
+  DCHECK(got_buffer) << "Accounted in min reservation"
+                     << buffer_pool_client()->DebugString();
   return Status::OK();
 }
 
