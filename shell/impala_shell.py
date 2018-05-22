@@ -398,7 +398,8 @@ class ImpalaShell(object, cmd.Cmd):
       try:
         # Look for an open quotation in the entire command, and not just the
         # current line.
-        if self.partial_cmd: line = '%s %s' % (self.partial_cmd, line)
+        if self.partial_cmd:
+          line = sqlparse.format('%s %s' % (self.partial_cmd, line), strip_comments=True)
         self._shlex_split(line)
         return True
       # If the command ends with a delimiter, check if it has an open quotation.
@@ -416,8 +417,8 @@ class ImpalaShell(object, cmd.Cmd):
     # Iterate through the line and switch the state if a single or double quote is found
     # and ignore escaped single and double quotes if the line is considered open (meaning
     # a previous single or double quote has not been closed yet)
-      state_closed = True;
-      opener = None;
+      state_closed = True
+      opener = None
       for i, char in enumerate(line):
         if state_closed and (char in ['\'', '\"']):
           state_closed = False
@@ -425,7 +426,7 @@ class ImpalaShell(object, cmd.Cmd):
         elif not state_closed and opener == char:
           if line[i - 1] != '\\':
             state_closed = True
-            opener = None;
+            opener = None
 
       return state_closed
 
@@ -1129,7 +1130,8 @@ class ImpalaShell(object, cmd.Cmd):
     query = self._create_beeswax_query(args)
     # Set posix=True and add "'" to escaped quotes
     # to deal with escaped quotes in string literals
-    lexer = shlex.shlex(query.query.lstrip(), posix=True)
+    lexer = shlex.shlex(sqlparse.format(query.query.lstrip(), strip_comments=True),
+                        posix=True)
     lexer.escapedquotes += "'"
     # Because the WITH clause may precede DML or SELECT queries,
     # just checking the first token is insufficient.
