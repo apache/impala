@@ -3746,6 +3746,21 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("COMMENT ON DATABASE db IS NULL");
     ParserError("COMMENT ON DATABASE IS 'comment'");
     ParserError("COMMENT ON DATABASE db IS");
+
+    for (String tbl : new String[]{"db.t", "t"}) {
+      ParsesOk(String.format("COMMENT ON TABLE %s IS 'comment'", tbl));
+      ParsesOk(String.format("COMMENT ON TABLE %s IS ''", tbl));
+      ParsesOk(String.format("COMMENT ON TABLE %s IS NULL", tbl));
+
+      ParsesOk(String.format("COMMENT ON VIEW %s IS 'comment'", tbl));
+      ParsesOk(String.format("COMMENT ON VIEW %s IS ''", tbl));
+      ParsesOk(String.format("COMMENT ON VIEW %s IS NULL", tbl));
+    }
+    ParserError("COMMENT ON TABLE IS 'comment'");
+    ParserError("COMMENT ON TABLE tbl IS");
+
+    ParserError("COMMENT ON VIEW IS 'comment'");
+    ParserError("COMMENT ON VIEW tbl IS");
   }
 
   @Test

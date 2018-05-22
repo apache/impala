@@ -46,6 +46,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.TestUtils;
@@ -3912,12 +3913,61 @@ public class AnalyzeDDLTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestCommentOn() {
+  public void TestCommentOnDatabase() {
     AnalyzesOk("comment on database functional is 'comment'");
     AnalyzesOk("comment on database functional is ''");
     AnalyzesOk("comment on database functional is null");
     AnalysisError("comment on database doesntexist is 'comment'",
         "Database does not exist: doesntexist");
+    AnalysisError(String.format("comment on database functional is '%s'",
+        buildLongComment()), "Comment exceeds maximum length of 256 characters. " +
+        "The given comment has 261 characters.");
+  }
+
+  @Test
+  public void TestCommentOnTable() {
+    for (Pair<String, AnalysisContext> pair : new Pair[]{
+        new Pair<>("functional.alltypes", createAnalysisCtx()),
+        new Pair<>("alltypes", createAnalysisCtx("functional"))}) {
+      AnalyzesOk(String.format("comment on table %s is 'comment'", pair.first),
+          pair.second);
+      AnalyzesOk(String.format("comment on table %s is ''", pair.first), pair.second);
+      AnalyzesOk(String.format("comment on table %s is null", pair.first), pair.second);
+    }
+    AnalysisError("comment on table doesntexist is 'comment'",
+        "Could not resolve table reference: 'default.doesntexist'");
+    AnalysisError("comment on table functional.alltypes_view is 'comment'",
+        "COMMENT ON TABLE not allowed on a view: functional.alltypes_view");
+    AnalysisError(String.format("comment on table functional.alltypes is '%s'",
+        buildLongComment()), "Comment exceeds maximum length of 256 characters. " +
+        "The given comment has 261 characters.");
+  }
+
+  @Test
+  public void TestCommentOnView() {
+    for (Pair<String, AnalysisContext> pair : new Pair[]{
+        new Pair<>("functional.alltypes_view", createAnalysisCtx()),
+        new Pair<>("alltypes_view", createAnalysisCtx("functional"))}) {
+      AnalyzesOk(String.format("comment on view %s is 'comment'", pair.first),
+          pair.second);
+      AnalyzesOk(String.format("comment on view %s is ''", pair.first), pair.second);
+      AnalyzesOk(String.format("comment on view %s is null", pair.first), pair.second);
+    }
+    AnalysisError("comment on view doesntexist is 'comment'",
+        "Could not resolve table reference: 'default.doesntexist'");
+    AnalysisError("comment on view functional.alltypes is 'comment'",
+        "COMMENT ON VIEW not allowed on a table: functional.alltypes");
+    AnalysisError(String.format("comment on table functional.alltypes_view is '%s'",
+        buildLongComment()), "Comment exceeds maximum length of 256 characters. " +
+        "The given comment has 261 characters.");
+  }
+
+  private static String buildLongComment() {
+    StringBuilder comment = new StringBuilder();
+    for (int i = 0; i < MetaStoreUtil.CREATE_MAX_COMMENT_LENGTH + 5; i++) {
+      comment.append("a");
+    }
+    return comment.toString();
   }
 
   @Test

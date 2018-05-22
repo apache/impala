@@ -3015,6 +3015,22 @@ public class AuthorizationTest extends FrontendTestBase {
         "User '%s' does not have privileges to execute 'ALTER' on: functional");
     AuthzError("comment on database doesntexist is 'comment'",
         "User '%s' does not have privileges to execute 'ALTER' on: doesntexist");
+
+    // User has ALTER privilege on functional_text_lzo.alltypes table.
+    AuthzOk("comment on table functional_text_lzo.alltypes is 'comment'");
+    // User does not have ALTER privilege on functional.alltypes table.
+    AuthzError("comment on table functional.alltypes is 'comment'",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional");
+    AuthzError("comment on table doesntexist is 'comment'",
+        "User '%s' does not have privileges to execute 'ALTER' on: default.doesntexist");
+
+    // User has ALTER privilege on functional.alltypes_view view.
+    AuthzOk("comment on view functional.alltypes_view is 'comment'");
+    // User does not have ALTER privilege on functional.view_view table.
+    AuthzError("comment on view functional.view_view is 'comment'",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional");
+    AuthzError("comment on view doesntexist is 'comment'",
+        "User '%s' does not have privileges to execute 'ALTER' on: default.doesntexist");
   }
 
   @Test

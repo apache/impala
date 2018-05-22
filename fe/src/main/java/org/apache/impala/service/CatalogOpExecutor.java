@@ -3502,12 +3502,19 @@ public class CatalogOpExecutor {
   private void alterCommentOn(TCommentOnParams params, TDdlExecResponse response)
       throws ImpalaRuntimeException, CatalogException, InternalException {
     if (params.getDb() != null) {
+      Preconditions.checkArgument(!params.isSetTable_name());
       alterCommentOnDb(params.getDb(), params.getComment(), response);
+    } else if (params.getTable_name() != null) {
+      Preconditions.checkArgument(!params.isSetDb());
+      alterCommentOnTableOrView(TableName.fromThrift(params.getTable_name()),
+          params.getComment(), response);
+    } else {
+      throw new UnsupportedOperationException("Unsupported COMMENT ON operation");
     }
   }
 
   private void alterCommentOnDb(String dbName, String comment, TDdlExecResponse response)
-      throws ImpalaRuntimeException, CatalogException, InternalException {
+      throws ImpalaRuntimeException, CatalogException {
     Db db = catalog_.getDb(dbName);
     if (db == null) {
       throw new CatalogException("Database: " + db.getName() + " does not exist.");
@@ -3580,6 +3587,34 @@ public class CatalogOpExecutor {
       result.setVersion(updatedCatalogObject.getCatalog_version());
     } finally {
       catalog_.getLock().writeLock().unlock();
+    }
+  }
+
+  private void alterCommentOnTableOrView(TableName tableName, String comment,
+      TDdlExecResponse response) throws CatalogException, InternalException,
+      ImpalaRuntimeException {
+    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
+    if (!catalog_.tryLockTable(tbl)) {
+      throw new InternalException(String.format("Error altering table/view %s due to " +
+          "lock contention.", tbl.getFullName()));
+    }
+    try {
+      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+      catalog_.getLock().writeLock().unlock();
+      org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
+      boolean isView = msTbl.getTableType().equalsIgnoreCase(
+          TableType.VIRTUAL_VIEW.toString());
+      if (comment == null) {
+        msTbl.getParameters().remove("comment");
+      } else {
+        msTbl.getParameters().put("comment", comment);
+      }
+      applyAlterTable(msTbl, true);
+      loadTableMetadata(tbl, newCatalogVersion, false, false, null);
+      addTableToCatalogUpdate(tbl, response.result);
+      addSummary(response, String.format("Updated %s.", (isView) ? "view" : "table"));
+    } finally {
+      tbl.getLock().unlock();
     }
   }
 }

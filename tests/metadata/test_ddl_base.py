@@ -97,3 +97,7 @@ class TestDdlBase(ImpalaTestSuite):
     """Extracts the DB comment from the output of DESCRIBE DATABASE"""
     result = self.client.execute("describe database {0}".format(db_name))
     return result.data[0].split('\t')[2]
+
+  def _get_table_or_view_comment(self, table_name):
+    props = self._get_tbl_properties(table_name)
+    return props["comment"] if "comment" in props else None

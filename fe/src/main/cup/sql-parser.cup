@@ -1030,6 +1030,10 @@ partition_def_list ::=
 comment_on_stmt ::=
   KW_COMMENT KW_ON KW_DATABASE ident_or_default:db_name KW_IS nullable_comment_val:comment
   {: RESULT = new CommentOnDbStmt(db_name, comment); :}
+  | KW_COMMENT KW_ON KW_TABLE table_name:table KW_IS nullable_comment_val:comment
+  {: RESULT = new CommentOnTableStmt(table, comment); :}
+  | KW_COMMENT KW_ON KW_VIEW table_name:table KW_IS nullable_comment_val:comment
+  {: RESULT = new CommentOnViewStmt(table, comment); :}
   ;
 
 // Introducing OWNER and USER keywords has a potential to be a breaking change,
