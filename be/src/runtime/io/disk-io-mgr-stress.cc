@@ -118,12 +118,11 @@ void DiskIoMgrStress::ClientThread(int client_id) {
     while (!eos) {
       ScanRange* range;
       bool needs_buffers;
-      Status status =
-          io_mgr_->GetNextUnstartedRange(client->reader.get(), &range, &needs_buffers);
+      Status status = client->reader->GetNextUnstartedRange(&range, &needs_buffers);
       CHECK(status.ok() || status.IsCancelled());
       if (range == NULL) break;
       if (needs_buffers) {
-        status = io_mgr_->AllocateBuffersForRange(client->reader.get(),
+        status = io_mgr_->AllocateBuffersForRange(
             &buffer_pool_clients_[client_id], range, MAX_BUFFER_BYTES_PER_SCAN_RANGE);
         CHECK(status.ok()) << status.GetDetail();
       }
@@ -281,6 +280,6 @@ void DiskIoMgrStress::NewClient(int i) {
       << exec_env->buffer_reservation()->DebugString();
 
   client.reader = io_mgr_->RegisterContext();
-  status = io_mgr_->AddScanRanges(client.reader.get(), client.scan_ranges);
+  status = client.reader->AddScanRanges(client.scan_ranges);
   CHECK(status.ok());
 }

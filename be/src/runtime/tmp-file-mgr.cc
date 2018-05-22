@@ -346,7 +346,7 @@ Status TmpFileMgr::FileGroup::Write(
   WriteRange::WriteDoneCallback callback = [this, tmp_handle_ptr](
       const Status& write_status) { WriteComplete(tmp_handle_ptr, write_status); };
   RETURN_IF_ERROR(
-      tmp_handle->Write(io_mgr_, io_ctx_.get(), tmp_file, file_offset, buffer, callback));
+      tmp_handle->Write(io_ctx_.get(), tmp_file, file_offset, buffer, callback));
   write_counter_->Add(1);
   bytes_written_counter_->Add(buffer.len());
   *handle = move(tmp_handle);
@@ -380,8 +380,7 @@ Status TmpFileMgr::FileGroup::ReadAsync(WriteHandle* handle, MemRange buffer) {
   read_counter_->Add(1);
   bytes_read_counter_->Add(buffer.len());
   bool needs_buffers;
-  RETURN_IF_ERROR(io_mgr_->StartScanRange(
-      io_ctx_.get(), handle->read_range_, &needs_buffers));
+  RETURN_IF_ERROR(io_ctx_->StartScanRange(handle->read_range_, &needs_buffers));
   DCHECK(!needs_buffers) << "Already provided a buffer";
   return Status::OK();
 }
@@ -477,7 +476,7 @@ Status TmpFileMgr::FileGroup::RecoverWriteError(
   // Choose another file to try. Blacklisting ensures we don't retry the same file.
   // If this fails, the status will include all the errors in 'scratch_errors_'.
   RETURN_IF_ERROR(AllocateSpace(handle->len(), &tmp_file, &file_offset));
-  return handle->RetryWrite(io_mgr_, io_ctx_.get(), tmp_file, file_offset);
+  return handle->RetryWrite(io_ctx_.get(), tmp_file, file_offset);
 }
 
 string TmpFileMgr::FileGroup::DebugString() {
@@ -522,7 +521,7 @@ int64_t TmpFileMgr::WriteHandle::len() const {
   return write_range_->len();
 }
 
-Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, RequestContext* io_ctx,
+Status TmpFileMgr::WriteHandle::Write(RequestContext* io_ctx,
     File* file, int64_t offset, MemRange buffer,
     WriteRange::WriteDoneCallback callback) {
   DCHECK(!write_in_flight_);
@@ -536,7 +535,7 @@ Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, RequestContext* io_ctx,
       new WriteRange(file->path(), offset, file->AssignDiskQueue(), callback));
   write_range_->SetData(buffer.data(), buffer.len());
   write_in_flight_ = true;
-  Status status = io_mgr->AddWriteRange(io_ctx, write_range_.get());
+  Status status = io_ctx->AddWriteRange(write_range_.get());
   if (!status.ok()) {
     // The write will not be in flight if we returned with an error.
     write_in_flight_ = false;
@@ -550,11 +549,11 @@ Status TmpFileMgr::WriteHandle::Write(DiskIoMgr* io_mgr, RequestContext* io_ctx,
 }
 
 Status TmpFileMgr::WriteHandle::RetryWrite(
-    DiskIoMgr* io_mgr, RequestContext* io_ctx, File* file, int64_t offset) {
+    RequestContext* io_ctx, File* file, int64_t offset) {
   DCHECK(write_in_flight_);
   file_ = file;
   write_range_->SetRange(file->path(), offset, file->AssignDiskQueue());
-  Status status = io_mgr->AddWriteRange(io_ctx, write_range_.get());
+  Status status = io_ctx->AddWriteRange(write_range_.get());
   if (!status.ok()) {
     // The write will not be in flight if we returned with an error.
     write_in_flight_ = false;

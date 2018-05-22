@@ -306,14 +306,14 @@ class TmpFileMgr {
     /// Starts a write of 'buffer' to 'offset' of 'file'. 'write_in_flight_' must be false
     /// before calling. After returning, 'write_in_flight_' is true on success or false on
     /// failure and 'is_cancelled_' is set to true on failure.
-    Status Write(io::DiskIoMgr* io_mgr, io::RequestContext* io_ctx, File* file,
+    Status Write(io::RequestContext* io_ctx, File* file,
         int64_t offset, MemRange buffer,
         WriteDoneCallback callback) WARN_UNUSED_RESULT;
 
     /// Retry the write after the initial write failed with an error, instead writing to
     /// 'offset' of 'file'. 'write_in_flight_' must be true before calling.
     /// After returning, 'write_in_flight_' is true on success or false on failure.
-    Status RetryWrite(io::DiskIoMgr* io_mgr, io::RequestContext* io_ctx, File* file,
+    Status RetryWrite(io::RequestContext* io_ctx, File* file,
         int64_t offset) WARN_UNUSED_RESULT;
 
     /// Called when the write has completed successfully or not. Sets 'write_in_flight_'

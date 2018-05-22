@@ -171,10 +171,10 @@ class DiskIoMgrTest : public testing::Test {
       int expected_len = -1) {
     unique_ptr<BufferDescriptor> buffer;
     bool needs_buffers;
-    ASSERT_OK(io_mgr->StartScanRange(reader, range, &needs_buffers));
+    ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
     if (needs_buffers) {
       ASSERT_OK(io_mgr->AllocateBuffersForRange(
-          reader, client, range, io_mgr->max_buffer_size()));
+          client, range, io_mgr->max_buffer_size()));
     }
     ASSERT_OK(range->GetNext(&buffer));
     ASSERT_TRUE(buffer != nullptr);
@@ -215,12 +215,12 @@ class DiskIoMgrTest : public testing::Test {
     while (max_ranges == 0 || num_ranges < max_ranges) {
       ScanRange* range;
       bool needs_buffers;
-      Status status = io_mgr->GetNextUnstartedRange(reader, &range, &needs_buffers);
+      Status status = reader->GetNextUnstartedRange(&range, &needs_buffers);
       ASSERT_TRUE(status.ok() || status.code() == expected_status.code());
       if (range == nullptr) break;
       if (needs_buffers) {
         ASSERT_OK(io_mgr->AllocateBuffersForRange(
-            reader, client, range, io_mgr->max_buffer_size() * 3));
+            client, range, io_mgr->max_buffer_size() * 3));
       }
       ValidateScanRange(io_mgr, range, expected_result, expected_len, expected_status);
       num_ranges_processed->Add(1);
@@ -246,8 +246,8 @@ class DiskIoMgrTest : public testing::Test {
       const string& function_name, int err_no, const string& expected_error);
 
   // Auxiliary function to ExecuteWriteFailureTest(). Handles the
-  // DiskIoMgr::AddWriteRange() call.
-  void AddWriteRange(DiskIoMgr* io_mgr, int num_of_writes, int32_t* data,
+  // AddWriteRange() call.
+  void AddWriteRange(int num_of_writes, int32_t* data,
       const string& tmp_file, int offset, RequestContext* writer,
       const string& expected_output);
 
@@ -309,7 +309,7 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
         *new_range = tmp_pool.Add(
             new WriteRange(tmp_file, cur_offset, num_ranges % num_disks, callback));
         (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
-        EXPECT_OK(io_mgr.AddWriteRange(writer.get(), *new_range));
+        EXPECT_OK(writer->AddWriteRange(*new_range));
         cur_offset += sizeof(int32_t);
       }
 
@@ -349,7 +349,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   *new_range = pool_.Add(new WriteRange(tmp_file, rand(), 0, callback));
 
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
-  EXPECT_OK(io_mgr.AddWriteRange(writer.get(), *new_range));
+  EXPECT_OK(writer->AddWriteRange(*new_range));
 
   // Write to a bad location in a file that exists.
   tmp_file = "/tmp/disk_io_mgr_test.txt";
@@ -367,7 +367,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
 
   *new_range = pool_.Add(new WriteRange(tmp_file, -1, 0, callback));
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
-  EXPECT_OK(io_mgr.AddWriteRange(writer.get(), *new_range));
+  EXPECT_OK(writer->AddWriteRange(*new_range));
 
   {
     unique_lock<mutex> lock(written_mutex_);
@@ -434,8 +434,7 @@ void DiskIoMgrTest::ExecuteWriteFailureTest(DiskIoMgr* io_mgr, const string& fil
   fs->SetWriteFaultInjection(function_name, err_no);
   // DiskIoMgr takes responsibility of fs from this point.
   io_mgr->SetLocalFileSystem(std::move(fs));
-  AddWriteRange(io_mgr, num_of_writes, &data, file_name, 0, writer.get(),
-      expected_error);
+  AddWriteRange(num_of_writes, &data, file_name, 0, writer.get(), expected_error);
 
   {
     unique_lock<mutex> lock(written_mutex_);
@@ -445,7 +444,7 @@ void DiskIoMgrTest::ExecuteWriteFailureTest(DiskIoMgr* io_mgr, const string& fil
   io_mgr->UnregisterContext(writer.get());
 }
 
-void DiskIoMgrTest::AddWriteRange(DiskIoMgr* io_mgr, int num_of_writes, int32_t* data,
+void DiskIoMgrTest::AddWriteRange(int num_of_writes, int32_t* data,
     const string& file_name, int offset, RequestContext* writer,
     const string& expected_output) {
   WriteRange::WriteDoneCallback callback =
@@ -454,7 +453,7 @@ void DiskIoMgrTest::AddWriteRange(DiskIoMgr* io_mgr, int num_of_writes, int32_t*
           Status(TErrorCode::DISK_IO_ERROR, expected_output), _1);
   WriteRange* write_range = pool_.Add(new WriteRange(file_name, offset, 0, callback));
   write_range->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
-  EXPECT_OK(io_mgr->AddWriteRange(writer, write_range));
+  EXPECT_OK(writer->AddWriteRange(write_range));
 }
 
 // Issue a number of writes, cancel the writer context and issue more writes.
@@ -505,7 +504,7 @@ TEST_F(DiskIoMgrTest, SingleWriterCancel) {
             new WriteRange(tmp_file, cur_offset, num_ranges % num_disks, callback));
         (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
         cur_offset += sizeof(int32_t);
-        Status add_status = io_mgr.AddWriteRange(writer.get(), *new_range);
+        Status add_status = writer->AddWriteRange(*new_range);
         EXPECT_TRUE(add_status.code() == validate_status.code());
       }
 
@@ -558,7 +557,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
           int disk_id = i % num_disks;
           ranges.push_back(InitRange(&tmp_pool, tmp_file, 0, len, disk_id, stat_val.st_mtime));
         }
-        ASSERT_OK(io_mgr.AddScanRanges(reader.get(), ranges));
+        ASSERT_OK(reader->AddScanRanges(ranges));
 
         AtomicInt32 num_ranges_processed;
         thread_group threads;
@@ -622,14 +621,14 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
       AtomicInt32 num_ranges_processed;
 
       // Issue first half the scan ranges.
-      ASSERT_OK(io_mgr.AddScanRanges(reader.get(), ranges_first_half));
+      ASSERT_OK(reader->AddScanRanges(ranges_first_half));
 
       // Read a couple of them
       ScanRangeThread(&io_mgr, reader.get(), &read_client, data, strlen(data),
           Status::OK(), 2, &num_ranges_processed);
 
       // Issue second half
-      ASSERT_OK(io_mgr.AddScanRanges(reader.get(), ranges_second_half));
+      ASSERT_OK(reader->AddScanRanges(ranges_second_half));
 
       // Start up some threads and then cancel
       thread_group threads;
@@ -693,7 +692,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         ranges.push_back(
             InitRange(&tmp_pool, tmp_file, 0, len, disk_id, stat_val.st_mtime));
       }
-      ASSERT_OK(io_mgr.AddScanRanges(reader.get(), ranges));
+      ASSERT_OK(reader->AddScanRanges(ranges));
 
       AtomicInt32 num_ranges_processed;
       thread_group threads;
@@ -757,7 +756,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         ranges.push_back(
             InitRange(&tmp_pool, tmp_file, 0, len, disk_id, stat_val.st_mtime));
       }
-      ASSERT_OK(io_mgr.AddScanRanges(reader.get(), ranges));
+      ASSERT_OK(reader->AddScanRanges(ranges));
 
       AtomicInt32 num_ranges_processed;
       int num_succesful_ranges = ranges.size() / 2;
@@ -825,20 +824,20 @@ TEST_F(DiskIoMgrTest, MemScarcity) {
     for (int i = 0; i < num_ranges; ++i) {
       ranges.push_back(InitRange(&pool_, tmp_file, 0, DATA_BYTES, 0, stat_val.st_mtime));
     }
-    ASSERT_OK(io_mgr.AddScanRanges(reader.get(), ranges));
+    ASSERT_OK(reader->AddScanRanges(ranges));
     // Keep starting new ranges without returning buffers until we run out of
     // reservation.
     while (read_client.GetUnusedReservation() >= MIN_BUFFER_SIZE) {
       ScanRange* range = nullptr;
       bool needs_buffers;
-      ASSERT_OK(io_mgr.GetNextUnstartedRange(reader.get(), &range, &needs_buffers));
+      ASSERT_OK(reader->GetNextUnstartedRange(&range, &needs_buffers));
       if (range == nullptr) break;
       ASSERT_TRUE(needs_buffers);
       // Pick a random amount of memory to reserve.
       int64_t max_bytes_to_alloc = uniform_int_distribution<int64_t>(MIN_BUFFER_SIZE,
           min<int64_t>(read_client.GetUnusedReservation(), MAX_BUFFER_SIZE * 3))(rng_);
       ASSERT_OK(io_mgr.AllocateBuffersForRange(
-          reader.get(), &read_client, range, max_bytes_to_alloc));
+          &read_client, range, max_bytes_to_alloc));
       // Start a thread fetching from the range. The thread will either finish the
       // range or be cancelled.
       threads.add_thread(new thread([&data, DATA_BYTES, range] {
@@ -910,7 +909,7 @@ TEST_F(DiskIoMgrTest, CachedReads) {
       ranges.push_back(
           InitRange(&pool_, tmp_file, 0, len, disk_id, stat_val.st_mtime, nullptr, true));
     }
-    ASSERT_OK(io_mgr.AddScanRanges(reader.get(), ranges));
+    ASSERT_OK(reader->AddScanRanges(ranges));
 
     AtomicInt32 num_ranges_processed;
     thread_group threads;
@@ -1007,7 +1006,7 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
               new_range->SetData(
                   reinterpret_cast<const uint8_t*>(data + (write_offset % strlen(data))),
                   1);
-              status = io_mgr.AddWriteRange(contexts[context_index].get(), new_range);
+              status = contexts[context_index]->AddWriteRange(new_range);
               ++write_offset;
             }
 
@@ -1093,7 +1092,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
             int disk_id = j % num_disks;
             ranges.push_back(InitRange(&tmp_pool, file_names[i].c_str(), j, 1, disk_id, mtimes[i]));
           }
-          ASSERT_OK(io_mgr.AddScanRanges(readers[i].get(), ranges));
+          ASSERT_OK(readers[i]->AddScanRanges(ranges));
         }
 
         AtomicInt32 num_ranges_processed;
@@ -1159,10 +1158,10 @@ TEST_F(DiskIoMgrTest, PartialRead) {
     ScanRange* range = InitRange(&pool_, tmp_file, 0, read_len, 0, stat_val.st_mtime);
     unique_ptr<BufferDescriptor> buffer;
     bool needs_buffers;
-    ASSERT_OK(io_mgr.StartScanRange(reader.get(), range, &needs_buffers));
+    ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
     if (needs_buffers) {
       ASSERT_OK(io_mgr.AllocateBuffersForRange(
-          reader.get(), &read_client, range, 3 * max_buffer_size));
+          &read_client, range, 3 * max_buffer_size));
     }
 
     int64_t bytes_read = 0;
@@ -1212,10 +1211,10 @@ TEST_F(DiskIoMgrTest, ZeroLengthScanRange) {
 
   ScanRange* range = InitRange(&pool_, tmp_file, 0, 0, 0, stat_val.st_mtime);
   bool needs_buffers;
-  Status status = io_mgr.StartScanRange(reader.get(), range, &needs_buffers);
+  Status status = reader->StartScanRange(range, &needs_buffers);
   ASSERT_EQ(TErrorCode::DISK_IO_ERROR, status.code());
 
-  status = io_mgr.AddScanRanges(reader.get(), vector<ScanRange*>({range}));
+  status = reader->AddScanRanges(vector<ScanRange*>({range}));
   ASSERT_EQ(TErrorCode::DISK_IO_ERROR, status.code());
 
   io_mgr.UnregisterContext(reader.get());
@@ -1248,14 +1247,13 @@ TEST_F(DiskIoMgrTest, SkipAllocateBuffers) {
   }
   bool needs_buffers;
   // Test StartScanRange().
-  ASSERT_OK(io_mgr.StartScanRange(reader.get(), ranges[0], &needs_buffers));
+  ASSERT_OK(reader->StartScanRange(ranges[0], &needs_buffers));
   EXPECT_TRUE(needs_buffers);
-  ASSERT_OK(io_mgr.StartScanRange(reader.get(), ranges[1], &needs_buffers));
+  ASSERT_OK(reader->StartScanRange(ranges[1], &needs_buffers));
   EXPECT_TRUE(needs_buffers);
 
   // Test AddScanRanges()/GetNextUnstartedRange().
-  ASSERT_OK(
-      io_mgr.AddScanRanges(reader.get(), vector<ScanRange*>({ranges[2], ranges[3]})));
+  ASSERT_OK(reader->AddScanRanges(vector<ScanRange*>({ranges[2], ranges[3]})));
 
   // Cancel two directly, cancel the other two indirectly via the context.
   ranges[0]->Cancel(Status::CANCELLED);
@@ -1295,9 +1293,9 @@ TEST_F(DiskIoMgrTest, CancelReleasesResources) {
   for (int i = 0; i < 10; ++i) {
     ScanRange* range = InitRange(&pool_, tmp_file, 0, len, 0, stat_val.st_mtime);
     bool needs_buffers;
-    ASSERT_OK(io_mgr.StartScanRange(reader.get(), range, &needs_buffers));
+    ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
     EXPECT_TRUE(needs_buffers);
-    ASSERT_OK(io_mgr.AllocateBuffersForRange(reader.get(), &read_client, range, MAX_BUFFER_SIZE));
+    ASSERT_OK(io_mgr.AllocateBuffersForRange(&read_client, range, MAX_BUFFER_SIZE));
     // Give disk I/O thread a chance to start read.
     SleepForMs(1);
 
@@ -1331,7 +1329,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
     range->Reset(nullptr, tmp_file, scan_len, 0, 0, true,
         BufferOpts::ReadInto(client_buffer.data(), buffer_len));
     bool needs_buffers;
-    ASSERT_OK(io_mgr->StartScanRange(reader.get(), range, &needs_buffers));
+    ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
     ASSERT_FALSE(needs_buffers);
 
     unique_ptr<BufferDescriptor> io_buffer;
@@ -1370,7 +1368,7 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBufferError) {
     range->Reset(nullptr, tmp_file, SCAN_LEN, 0, 0, true,
         BufferOpts::ReadInto(client_buffer.data(), SCAN_LEN));
     bool needs_buffers;
-    ASSERT_OK(io_mgr->StartScanRange(reader.get(), range, &needs_buffers));
+    ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
     ASSERT_FALSE(needs_buffers);
 
     /// Also test the cancellation path. Run multiple iterations since it is racy whether

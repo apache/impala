@@ -30,6 +30,7 @@
 #include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
+#include "runtime/io/request-context.h"
 #include "runtime/runtime-state.h"
 #include "runtime/runtime-filter.inline.h"
 #include "rpc/thrift-util.h"
@@ -1235,7 +1236,6 @@ Status HdfsParquetScanner::ProcessFooter() {
       return scan_node_->mem_tracker()->MemLimitExceeded(state_, details, metadata_size);
     }
     metadata_ptr = metadata_buffer.buffer();
-    DiskIoMgr* io_mgr = scan_node_->runtime_state()->io_mgr();
 
     // Read the header into the metadata buffer.
     ScanRange* metadata_range = scan_node_->AllocateScanRange(
@@ -1245,8 +1245,8 @@ Status HdfsParquetScanner::ProcessFooter() {
 
     unique_ptr<BufferDescriptor> io_buffer;
     bool needs_buffers;
-    RETURN_IF_ERROR(io_mgr->StartScanRange(
-          scan_node_->reader_context(), metadata_range, &needs_buffers));
+    RETURN_IF_ERROR(
+        scan_node_->reader_context()->StartScanRange(metadata_range, &needs_buffers));
     DCHECK(!needs_buffers) << "Already provided a buffer";
     RETURN_IF_ERROR(metadata_range->GetNext(&io_buffer));
     DCHECK_EQ(io_buffer->buffer(), metadata_buffer.buffer());

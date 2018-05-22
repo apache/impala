@@ -179,7 +179,7 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
 
     if (external_buffer_tag_ == ScanRange::ExternalBufferTag::CLIENT_BUFFER) {
       buffer_desc = unique_ptr<BufferDescriptor>(new BufferDescriptor(
-          io_mgr_, reader_, this, client_buffer_.data, client_buffer_.len));
+          this, client_buffer_.data, client_buffer_.len));
     } else {
       DCHECK(external_buffer_tag_ == ScanRange::ExternalBufferTag::NO_BUFFER)
           << "This code path does not handle other buffer types, i.e. HDFS cache"
@@ -207,7 +207,6 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
     buffer_desc->scan_range_offset_ = bytes_read_ - buffer_desc->len_;
 
     COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, buffer_desc->len_);
-    COUNTER_ADD(io_mgr_->total_bytes_read_counter(), buffer_desc->len_);
     COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, -1L);
   }
 
@@ -594,7 +593,6 @@ Status ScanRange::Read(
     int64_t max_chunk_size = MaxReadChunkSize();
     Status status = Status::OK();
     {
-      ScopedTimer<MonotonicStopWatch> io_mgr_read_timer(io_mgr_->read_timer());
       ScopedTimer<MonotonicStopWatch> req_context_read_timer(reader_->read_timer_);
       while (*bytes_read < bytes_to_read) {
         int chunk_size = min(bytes_to_read - *bytes_read, max_chunk_size);
@@ -650,13 +648,11 @@ Status ScanRange::Read(
           }
           // The error may be due to a bad file handle. Reopen the file handle and retry.
           // Exclude this time from the read timers.
-          io_mgr_read_timer.Stop();
           req_context_read_timer.Stop();
           ++num_retries;
           RETURN_IF_ERROR(io_mgr_->ReopenCachedHdfsFileHandle(fs_, file_string(),
               mtime(), reader_, &borrowed_hdfs_fh));
           hdfs_file = borrowed_hdfs_fh->file();
-          io_mgr_read_timer.Start();
           req_context_read_timer.Start();
         }
         if (!status.ok()) break;
@@ -749,7 +745,7 @@ Status ScanRange::ReadFromCache(
   // Create a single buffer desc for the entire scan range and enqueue that.
   // The memory is owned by the HDFS java client, not the Impala backend.
   unique_ptr<BufferDescriptor> desc = unique_ptr<BufferDescriptor>(new BufferDescriptor(
-      io_mgr_, reader_, this, reinterpret_cast<uint8_t*>(buffer), 0));
+      this, reinterpret_cast<uint8_t*>(buffer), 0));
   desc->len_ = bytes_read;
   desc->scan_range_offset_ = 0;
   desc->eosr_ = true;
@@ -777,31 +773,23 @@ void ScanRange::GetHdfsStatistics(hdfsFile hdfs_file) {
   }
 }
 
-BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr,
-    RequestContext* reader, ScanRange* scan_range, uint8_t* buffer,
-    int64_t buffer_len)
-  : io_mgr_(io_mgr),
-    reader_(reader),
-    scan_range_(scan_range),
+BufferDescriptor::BufferDescriptor(ScanRange* scan_range,
+    uint8_t* buffer, int64_t buffer_len)
+  : scan_range_(scan_range),
     buffer_(buffer),
     buffer_len_(buffer_len) {
-  DCHECK(io_mgr != nullptr);
   DCHECK(scan_range != nullptr);
   DCHECK(buffer != nullptr);
   DCHECK_GE(buffer_len, 0);
 }
 
-BufferDescriptor::BufferDescriptor(DiskIoMgr* io_mgr, RequestContext* reader,
-    ScanRange* scan_range, BufferPool::ClientHandle* bp_client,
-    BufferPool::BufferHandle handle) :
-  io_mgr_(io_mgr),
-  reader_(reader),
+BufferDescriptor::BufferDescriptor(ScanRange* scan_range,
+    BufferPool::ClientHandle* bp_client, BufferPool::BufferHandle handle) :
   scan_range_(scan_range),
   buffer_(handle.data()),
   buffer_len_(handle.len()),
   bp_client_(bp_client),
   handle_(move(handle)) {
-  DCHECK(io_mgr != nullptr);
   DCHECK(scan_range != nullptr);
   DCHECK(bp_client_->is_registered());
   DCHECK(handle_.is_open());

@@ -515,8 +515,7 @@ Status HdfsScanNodeBase::StartNextScanRange(int64_t* reservation,
     ScanRange** scan_range) {
   DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
   bool needs_buffers;
-  RETURN_IF_ERROR(io_mgr->GetNextUnstartedRange(
-        reader_context_.get(), scan_range, &needs_buffers));
+  RETURN_IF_ERROR(reader_context_->GetNextUnstartedRange(scan_range, &needs_buffers));
   if (*scan_range == nullptr) return Status::OK();
   if (needs_buffers) {
     // Check if we should increase our reservation to read this range more efficiently.
@@ -529,7 +528,7 @@ Status HdfsScanNodeBase::StartNextScanRange(int64_t* reservation,
     initial_range_ideal_reservation_stats_->UpdateCounter(ideal_scan_range_reservation);
     initial_range_actual_reservation_stats_->UpdateCounter(*reservation);
     RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(
-        reader_context_.get(), &buffer_pool_client_, *scan_range, *reservation));
+        &buffer_pool_client_, *scan_range, *reservation));
   }
   return Status::OK();
 }
@@ -596,7 +595,7 @@ Status HdfsScanNodeBase::AddDiskIoRanges(
     const vector<ScanRange*>& ranges, int num_files_queued) {
   DCHECK(!progress_.done()) << "Don't call AddScanRanges() after all ranges finished.";
   DCHECK_GT(ranges.size(), 0);
-  RETURN_IF_ERROR(runtime_state_->io_mgr()->AddScanRanges(reader_context_.get(), ranges));
+  RETURN_IF_ERROR(reader_context_->AddScanRanges(ranges));
   num_unqueued_files_.Add(-num_files_queued);
   DCHECK_GE(num_unqueued_files_.Load(), 0);
   return Status::OK();

@@ -44,6 +44,11 @@ class ScanRange;
 /// time.
 class BufferDescriptor {
  public:
+  /// Create a buffer descriptor allocated from the buffer pool. Public to
+  /// allow access by DiskIoMgr.
+  BufferDescriptor(ScanRange* scan_range, BufferPool::ClientHandle* bp_client,
+      BufferPool::BufferHandle handle);
+
   ~BufferDescriptor() {
     DCHECK(buffer_ == nullptr); // Check we didn't leak a buffer.
   }
@@ -57,24 +62,13 @@ class BufferDescriptor {
   /// Returns the offset within the scan range that this buffer starts at
   int64_t scan_range_offset() const { return scan_range_offset_; }
 
- protected:
-  // Protected methods are called from other classes in io::.
-  friend class DiskIoMgr;
-
-  /// Create a buffer descriptor for a new reader, range and data buffer.
-  BufferDescriptor(DiskIoMgr* io_mgr, RequestContext* reader,
-      ScanRange* scan_range, uint8_t* buffer, int64_t buffer_len);
-
-  /// Create a buffer descriptor allocated from the buffer pool.
-  BufferDescriptor(DiskIoMgr* io_mgr, RequestContext* reader,
-      ScanRange* scan_range, BufferPool::ClientHandle* bp_client,
-      BufferPool::BufferHandle handle);
-
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferDescriptor);
-
   /// This class is tightly coupled with ScanRange. Making them friends is easiest.
   friend class ScanRange;
+
+  /// Create a buffer descriptor for a range and data buffer.
+  BufferDescriptor(ScanRange* scan_range, uint8_t* buffer, int64_t buffer_len);
 
   /// Return true if this is a cached buffer owned by HDFS.
   bool is_cached() const;
@@ -88,11 +82,6 @@ class BufferDescriptor {
   /// or HDFS cache buffer), just prepares this descriptor to be destroyed. After this
   /// is called, buffer() is NULL. Does not acquire 'lock_'.
   void Free();
-
-  DiskIoMgr* const io_mgr_;
-
-  /// Reader that this buffer is for.
-  RequestContext* const reader_;
 
   /// Scan range that this buffer is for. Non-NULL when initialised.
   ScanRange* const scan_range_;
@@ -275,11 +264,14 @@ class ScanRange : public RequestRange {
 
   int64_t mtime() const { return mtime_; }
 
- protected:
-  // Protected methods are called from other classes in io::.
+ private:
+  DISALLOW_COPY_AND_ASSIGN(ScanRange);
+
+  /////////////////////////////////////////
+  /// BEGIN: private members that are accessed by other io:: classes
   friend class BufferDescriptor;
-  friend class DiskIoMgr;
   friend class DiskQueue;
+  friend class DiskIoMgr;
   friend class RequestContext;
 
   // Tag for the buffer associated with range. See external_buffer_tag_ for details.
@@ -332,8 +324,8 @@ class ScanRange : public RequestRange {
 
   ExternalBufferTag external_buffer_tag() const { return external_buffer_tag_; }
 
- private:
-  DISALLOW_COPY_AND_ASSIGN(ScanRange);
+  /// END: private members that are accessed by other io:: classes
+  /////////////////////////////////////////
 
   /// Enqueues a ready buffer with valid data for this range. This does not block.
   /// The caller passes ownership of buffer to the scan range and it is not

@@ -32,6 +32,7 @@
 #include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
+#include "runtime/io/request-context.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "runtime/runtime-state.h"
@@ -1003,12 +1004,11 @@ Status BaseScalarColumnReader::StartScan() {
   ScannerContext* context = parent_->context_;
   DCHECK_GT(io_reservation_, 0);
   bool needs_buffers;
-  RETURN_IF_ERROR(io_mgr->StartScanRange(
-      parent_->scan_node_->reader_context(), scan_range_, &needs_buffers));
+  RETURN_IF_ERROR(parent_->scan_node_->reader_context()->StartScanRange(
+      scan_range_, &needs_buffers));
   if (needs_buffers) {
     RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(
-        parent_->scan_node_->reader_context(), context->bp_client(),
-        scan_range_, io_reservation_));
+        context->bp_client(), scan_range_, io_reservation_));
   }
   stream_ = parent_->context_->AddStream(scan_range_, io_reservation_);
   DCHECK(stream_ != nullptr);

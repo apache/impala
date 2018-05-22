@@ -68,8 +68,8 @@ class BoolColumnReader;
 /// the split size, the mid point guarantees that we have at least 50% of the row group in
 /// the current split. ProcessSplit() then computes the column ranges for these row groups
 /// and submits them to the IoMgr for immediate scheduling (so they don't surface in
-/// DiskIoMgr::GetNextUnstartedRange()). Scheduling them immediately also guarantees they
-/// are all read at once.
+/// RequestContext::GetNextUnstartedRange()). Scheduling them immediately also guarantees
+/// they are all read at once.
 ///
 /// Like the other scanners, each parquet scanner object is one to one with a
 /// ScannerContext. Unlike the other scanners though, the context will have multiple
