@@ -52,10 +52,9 @@ Status SortNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 Status SortNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  sorter_.reset(
-      new Sorter(ordering_exprs_, is_asc_order_, nulls_first_, sort_tuple_exprs_,
-          &row_descriptor_, mem_tracker(), &buffer_pool_client_,
-          resource_profile_.spillable_buffer_size, runtime_profile(), state, id(), true));
+  sorter_.reset(new Sorter(ordering_exprs_, is_asc_order_, nulls_first_,
+      sort_tuple_exprs_, &row_descriptor_, mem_tracker(), buffer_pool_client(),
+      resource_profile_.spillable_buffer_size, runtime_profile(), state, id(), true));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
   state->CheckAndAddCodegenDisabledMessage(runtime_profile());
@@ -76,7 +75,7 @@ Status SortNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Open(state));
   // Claim reservation after the child has been opened to reduce the peak reservation
   // requirement.
-  if (!buffer_pool_client_.is_registered()) {
+  if (!buffer_pool_client()->is_registered()) {
     RETURN_IF_ERROR(ClaimBufferReservation(state));
   }
   RETURN_IF_ERROR(sorter_->Open());
@@ -108,7 +107,7 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     // for the next subplan iteration or merging spilled runs.
     returned_buffer_ = false;
     if (!IsInSubplan() && !sorter_->HasSpilledRuns()) {
-      DCHECK(!buffer_pool_client_.has_unpinned_pages());
+      DCHECK(!buffer_pool_client()->has_unpinned_pages());
       Status status = ReleaseUnusedReservation();
       DCHECK(status.ok()) << "Should not fail - no runs were spilled so no pages are "
                           << "unpinned. " << status.GetDetail();

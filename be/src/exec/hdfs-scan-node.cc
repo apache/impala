@@ -255,10 +255,10 @@ void HdfsScanNode::ReturnReservationFromScannerThread(const unique_lock<mutex>& 
     int64_t bytes) {
   DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
   // Release as much memory as possible. Must hold onto the minimum reservation, though.
-  Status status =
-      buffer_pool_client_.DecreaseReservationTo(bytes, resource_profile_.min_reservation);
+  Status status = buffer_pool_client()->DecreaseReservationTo(
+      bytes, resource_profile_.min_reservation);
   DCHECK(status.ok()) << "Not possible, scans don't unpin pages" << status.GetDetail();
-  DCHECK_GE(buffer_pool_client_.GetReservation(), resource_profile_.min_reservation);
+  DCHECK_GE(buffer_pool_client()->GetReservation(), resource_profile_.min_reservation);
 }
 
 void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
@@ -303,7 +303,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
       // Cases 5 and 6.
       if (materialized_row_batches_->Size() >= max_materialized_row_batches_) break;
       // The node's min reservation is for the first thread so we don't need to check
-      if (!buffer_pool_client_.IncreaseReservation(scanner_thread_reservation)) {
+      if (!buffer_pool_client()->IncreaseReservation(scanner_thread_reservation)) {
         COUNTER_ADD(scanner_thread_reservations_denied_counter_, 1);
         break;
       }
@@ -466,7 +466,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     return Status::OK();
   }
 
-  ScannerContext context(runtime_state_, this, &buffer_pool_client_,
+  ScannerContext context(runtime_state_, this, buffer_pool_client(),
       *scanner_thread_reservation, partition, filter_ctxs, expr_results_pool);
   context.AddStream(scan_range, *scanner_thread_reservation);
   scoped_ptr<HdfsScanner> scanner;

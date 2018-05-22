@@ -29,6 +29,7 @@
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/descriptors.h" // for RowDescriptor
+#include "runtime/reservation-manager.h"
 #include "util/blocking-queue.h"
 #include "util/runtime-profile.h"
 
@@ -225,26 +226,17 @@ class ExecNode {
  protected:
   friend class DataSink;
 
-  /// Initialize 'buffer_pool_client_' and claim the initial reservation for this
-  /// ExecNode. Only needs to be called by ExecNodes that will use the client.
-  /// The client is automatically cleaned up in Close(). Should not be called if
-  /// the client is already open.
-  ///
-  /// The ExecNode must return the initial reservation to
-  /// QueryState::initial_reservations(), which is done automatically in Close() as long
-  /// as the initial reservation is not released before Close().
-  Status ClaimBufferReservation(RuntimeState* state) WARN_UNUSED_RESULT;
+  BufferPool::ClientHandle* buffer_pool_client() {
+    return reservation_manager_.buffer_pool_client();
+  }
 
-  /// Release any unused reservation in excess of the node's initial reservation. Returns
-  /// an error if releasing the reservation requires flushing pages to disk, and that
-  /// fails. Not thread-safe if other threads are accessing this ExecNode or
-  /// 'buffer_pool_client_'.
-  Status ReleaseUnusedReservation() WARN_UNUSED_RESULT;
+  Status ClaimBufferReservation(RuntimeState* state) WARN_UNUSED_RESULT {
+    return reservation_manager_.ClaimBufferReservation(state);
+  }
 
-  /// Enable the increase reservation denial probability on 'buffer_pool_client_' based on
-  /// the 'debug_action_' set on this node. Returns an error if 'debug_action_param_' is
-  /// invalid.
-  Status EnableDenyReservationDebugAction();
+  Status ReleaseUnusedReservation() WARN_UNUSED_RESULT {
+    return reservation_manager_.ReleaseUnusedReservation();
+  }
 
   /// Extends blocking queue for row batches. Row batches have a property that
   /// they must be processed in the order they were produced, even in cancellation
@@ -299,9 +291,7 @@ class ExecNode {
 
   /// debug-only: if debug_action_ is not INVALID, node will perform action in
   /// debug_phase_
-  TExecNodePhase::type debug_phase_;
-  TDebugAction::type debug_action_;
-  std::string debug_action_param_;
+  TDebugOptions debug_options_;
 
   int64_t limit_;  // -1: no limit
   int64_t num_rows_returned_;
@@ -327,12 +317,6 @@ class ExecNode {
   /// it may be appropriate for ExecNode implementation to clear it at other points in
   /// execution where the memory is not needed.
   boost::scoped_ptr<MemPool> expr_results_pool_;
-
-  /// Buffer pool client for this node. Initialized with the node's minimum reservation
-  /// in ClaimBufferReservation(). After initialization, the client must hold onto at
-  /// least the minimum reservation so that it can be returned to the initial
-  /// reservations pool in Close().
-  BufferPool::ClientHandle buffer_pool_client_;
 
   /// Pointer to the containing SubplanNode or NULL if not inside a subplan.
   /// Set by SubplanNode::Init(). Not owned.
@@ -362,7 +346,7 @@ class ExecNode {
       TExecNodePhase::type phase, RuntimeState* state) WARN_UNUSED_RESULT {
     DCHECK_NE(phase, TExecNodePhase::INVALID);
     // Fast path for the common case when an action is not enabled for this phase.
-    if (LIKELY(debug_phase_ != phase)) return Status::OK();
+    if (LIKELY(debug_options_.phase != phase)) return Status::OK();
     return ExecDebugActionImpl(phase, state);
   }
 
@@ -381,6 +365,12 @@ class ExecNode {
   /// Set in ExecNode::Close(). Used to make Close() idempotent. This is not protected
   /// by a lock, it assumes all calls to Close() are made by the same thread.
   bool is_closed_;
+
+  /// Wraps the buffer pool client for this node. Initialized with the node's minimum
+  /// reservation in ClaimBufferReservation(). After initialization, the client must hold
+  /// onto at least the minimum reservation so that it can be returned to the initial
+  /// reservations pool in Close().
+  ReservationManager reservation_manager_;
 };
 
 inline bool ExecNode::EvalPredicate(ScalarExprEvaluator* eval, TupleRow* row) {

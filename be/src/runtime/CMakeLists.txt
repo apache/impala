@@ -58,6 +58,7 @@ add_library(Runtime
   types.cc
   raw-value.cc
   raw-value-ir.cc
+  reservation-manager.cc
   row-batch.cc
   ${ROW_BATCH_PROTO_SRCS}
   runtime-filter.cc

@@ -79,7 +79,7 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
       scanner_->Close(row_batch);
       scanner_.reset();
     }
-    int64_t scanner_reservation = buffer_pool_client_.GetReservation();
+    int64_t scanner_reservation = buffer_pool_client()->GetReservation();
     RETURN_IF_ERROR(StartNextScanRange(&scanner_reservation, &scan_range_));
     if (scan_range_ == nullptr) {
       *eos = true;
@@ -90,7 +90,7 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
         static_cast<ScanRangeMetadata*>(scan_range_->meta_data());
     int64_t partition_id = metadata->partition_id;
     HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
-    scanner_ctx_.reset(new ScannerContext(runtime_state_, this, &buffer_pool_client_,
+    scanner_ctx_.reset(new ScannerContext(runtime_state_, this, buffer_pool_client(),
         scanner_reservation, partition, filter_ctxs(), expr_results_pool()));
     scanner_ctx_->AddStream(scan_range_, scanner_reservation);
     Status status = CreateAndOpenScanner(partition, scanner_ctx_.get(), &scanner_);
