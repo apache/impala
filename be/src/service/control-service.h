@@ -66,10 +66,10 @@ class ControlService : public ControlServiceIf {
 
    /// Helper for deserializing runtime profile from the sidecar attached in the inbound
    /// call within 'rpc_context'. On success, returns the deserialized profile in
-   /// 'thrift_profile'. On failure, returns the error status;
+   /// 'thrift_profiles'. On failure, returns the error status;
    static Status GetProfile(const ReportExecStatusRequestPB& request,
        const ClientRequestState& request_state, kudu::rpc::RpcContext* rpc_context,
-       TRuntimeProfileTree* thrift_profile);
+       TRuntimeProfileForest* thrift_profiles);
 
    /// Helper for serializing 'status' as part of 'response'. Also releases memory
    /// of the RPC payload previously accounted towards the internal memory tracker.

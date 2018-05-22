@@ -27,6 +27,7 @@
 #include "common/object-pool.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
+#include "gutil/threading/thread_collision_warner.h" // for DFAKE_*
 #include "runtime/tmp-file-mgr.h"
 #include "util/counting-barrier.h"
 #include "util/uid-util.h"
@@ -63,32 +64,38 @@ class ThriftSerializer;
 /// are also managed via a separate resource reference count, which should be released as
 /// soon as the resources are not needed to free resources promptly.
 ///
-/// When any fragment instance execution returns with an error status, all
-/// fragment instances are automatically cancelled.
+/// We maintain a state denoted by BackendExecState. The initial state is PREPARING.
+/// Once all query fragment instances have finished FIS::Prepare(), the BackendExecState
+/// will transition to:
+/// - EXECUTING if all fragment instances succeeded in Prepare()
+/// - ERROR if any fragment instances failed during or after Prepare()
+/// - CANCELLED if the query is cancelled
 ///
-/// We maintain a state denoted by BackendExecState. We transition from one non-error
-/// state to the next only if *all* underlying fragment instances have done so.
-/// Eg: We transition from the PREPARING state to the EXECUTING state only if *all* the
-/// underlying fragment instances have finished Prepare().
-/// However, the behavior for transitioning from a non-error state to an error state is
-/// different for different states. If any fragment instance hits an error or cancellation
-/// during the EXECUTING state, then we immediately change the state of the query to the
-/// ERROR or CANCELLED state accordingly.
-/// However, if a fragment instance hits an error during Prepare(), we still wait for
-/// *all* fragment instances to complete preparing before transitioning to the ERROR
-/// state. This is to simplify the query lifecycle so that Prepare() is always completed
-/// before it can handle either a Cancel() RPC or a PublishFilter() RPC.
+/// Please note that even if some fragment instances hit an error during or after
+/// Prepare(), the state transition from PREPARING won't happen until all fragment
+/// instances have finished Prepare(). This makes sure the query state is initialized
+/// to handle either a Cancel() RPC or a PublishFilter() RPC after PREPARING state.
 ///
-/// Status reporting: all instances currently report their status independently.
-/// Each instance sends at least one final status report with its overall execution
-/// status, so if any of the instances encountered an error, that error will be reported.
+/// Once BackendExecState() enters EXECUTING state, any error will trigger the
+/// BackendExecState to go into ERROR state and the query execution is considered over
+/// on this backend.
+///
+/// When any fragment instance execution returns with an error status, all fragment
+/// instances are automatically cancelled. The query state thread (started by
+/// QueryExecMgr) periodically reports the overall status, the current state of execution
+/// and the profile of each fragment instance to the coordinator. The frequency of those
+/// reports is controlled by the flag status_report_interval_ms; Setting it to 0 disables
+/// periodic reporting altogether. Regardless of the value of that flag, a report is sent
+/// at least once at the end of execution with an overall status and profile (and 'done'
+/// indicator). If execution ended with an error, that error status will be part of
+/// the final report (it will not be overridden by the resulting cancellation).
 ///
 /// Thread-safe, unless noted otherwise.
 ///
 /// TODO:
 /// - set up kudu clients in Init(), remove related locking
-/// - when ReportExecStatus() encounters an error, query execution at this node
-///   gets aborted, but it's possible for the coordinator not to find out about that;
+/// - IMPALA-2990: when ReportExecStatus() encounters an error, query execution at this
+///   node gets aborted, but it's possible for the coordinator not to find out about that;
 ///   fix the coordinator to periodically ping the backends (should the coordinator
 ///   simply poll for the status reports?)
 class QueryState {
@@ -161,7 +168,7 @@ class QueryState {
   /// Sets up state required for fragment execution: memory reservations, etc. Fails if
   /// resources could not be acquired. Acquires a backend resource refcount and returns
   /// it to the caller on both success and failure. The caller must release it by
-  /// calling ReleaseExecResourceRefcount().
+  /// calling ReleaseBackendResourceRefcount().
   ///
   /// Uses few cycles and never blocks. Not idempotent, not thread-safe.
   /// The remaining public functions must be called only after Init().
@@ -169,9 +176,16 @@ class QueryState {
 
   /// Performs the runtime-intensive parts of initial setup and starts all fragment
   /// instances belonging to this query. Each instance receives its own execution
-  /// thread. Blocks until a terminal state has been reached.
-  /// Not idempotent, not thread-safe. Must only be called by the QueryState thread.
-  void StartFInstances();
+  /// thread. Not idempotent, not thread-safe. Must only be called by the query state
+  /// thread. Returns true iff all fragment instance threads were started successfully.
+  /// Returns false otherwise.
+  bool StartFInstances();
+
+  /// Monitors the execution of all underlying fragment instances and updates the query
+  /// state accordingly. This is also responsible for sending status reports periodically
+  /// to the coordinator. Not idempotent, not thread-safe. Must only be called by the
+  /// query state thread.
+  void MonitorFInstances();
 
   /// Blocks until all fragment instances have finished their Prepare phase.
   FragmentInstanceState* GetFInstanceState(const TUniqueId& instance_id);
@@ -193,14 +207,6 @@ class QueryState {
   /// Should be called by the owner of the refcount after it is done consuming query
   /// execution resources.
   void ReleaseBackendResourceRefcount();
-
-  /// Sends a ReportExecStatus rpc to the coordinator. If fis == nullptr, the
-  /// status must be an error. If fis is given, the content will depend on whether
-  /// the fis has finished its Prepare phase. It sends a report for the instance,
-  /// and it will include the profile if the fis is prepared. If the fis is not
-  /// prepared, the status must be an error.
-  /// If there is an error during the rpc, initiates cancellation.
-  void ReportExecStatus(bool done, const Status& status, FragmentInstanceState* fis);
 
   /// Checks whether spilling is enabled for this query. Must be called before the first
   /// call to BufferPool::Unpin() for the query. Returns OK if spilling is enabled. If
@@ -225,32 +231,12 @@ class QueryState {
   /// Updates the query status and the failed instance ID if it's not set already.
   /// Also notifies anyone waiting on WaitForPrepare() if this is called by the last
   /// fragment instance to complete Prepare().
-  void ErrorDuringPrepare(const Status& status, const TUniqueId& finst_id) {
-    // Do a racy check to avoid getting the lock if an error is already set.
-    if (query_status_.ok()) {
-      std::unique_lock<SpinLock> l(status_lock_);
-      if (query_status_.ok()) {
-        query_status_ = status;
-        failed_finstance_id_ = finst_id;
-      }
-    }
-    discard_result(instances_prepared_barrier_->Notify());
-  }
+  void ErrorDuringPrepare(const Status& status, const TUniqueId& finst_id);
 
   /// Called by a fragment instance thread to notify that it hit an error during Execute()
   /// Updates the query status and records the failed instance ID if they're not set
-  /// already. Also notifies anyone waiting on WaitForFinish().
-  void ErrorDuringExecute(const Status& status, const TUniqueId& finst_id) {
-    // Do a racy check to avoid getting the lock if an error is already set.
-    if (query_status_.ok()) {
-      std::unique_lock<SpinLock> l(status_lock_);
-      if (query_status_.ok()) {
-        query_status_ = status;
-        failed_finstance_id_ = finst_id;
-      }
-    }
-    instances_finished_barrier_->NotifyRemaining();
-  }
+  /// already. Also notifies anyone waiting on WaitForFinishOrTimeout().
+  void ErrorDuringExecute(const Status& status, const TUniqueId& finst_id);
 
  private:
   friend class QueryExecMgr;
@@ -261,11 +247,15 @@ class QueryState {
 
   static const int DEFAULT_BATCH_SIZE = 1024;
 
-  /// Return overall status of all fragment instances during execution. A failure
-  /// in any instance's execution (after Prepare()) will cause this function
-  /// to return an error status. Blocks until all fragment instances have finished
-  /// executing or until one of them hits an error.
-  Status WaitForFinish();
+  /// Blocks until all fragment instances have finished executing or until one of them
+  /// hits an error, or until 'timeout_ms' milliseconds has elapsed. Returns 'true' if
+  /// all fragment instances finished or one of them hits an error. Return 'false' on
+  /// time out.
+  bool WaitForFinishOrTimeout(int32_t timeout_ms);
+
+  /// Blocks until all fragment instances have finished executing or until one of them
+  /// hits an error.
+  void WaitForFinish();
 
   /// States that a query goes through during its lifecycle.
   enum class BackendExecState {
@@ -286,30 +276,28 @@ class QueryState {
     ERROR
   };
 
+  /// Pseudo-lock to verify only query state thread is updating 'backend_exec_state_'.
+  DFAKE_MUTEX(backend_exec_state_lock_);
+
   /// Current state of this query in this executor.
-  /// Thread-safety: Only updated by the QueryState thread.
+  /// Thread-safety: Only updated by the query state thread.
   BackendExecState backend_exec_state_ = BackendExecState::PREPARING;
 
-  /// Updates the BackendExecState based on 'query_status_'. A state transition happens
-  /// if the current state is a non-terminal state; the transition can either be to the
-  /// next legal state or ERROR if 'query_status_' is an error. Thread safe. This is a
-  /// helper function to StartFInstances() which executes on the QueryState thread.
-  Status UpdateBackendExecState();
-
-  /// A string representation of 'state'.
-  const char* BackendExecStateToString(const BackendExecState& state);
-
-  /// Returns 'true' if 'state' is a terminal state (FINISHED, CANCELLED, ERROR).
-  inline bool IsTerminalState(const BackendExecState& state);
-
-  /// Protects 'query_status_' and 'failed_finstance_id_'.
+  /// Protects 'overall_status_' and 'failed_finstance_id_'.
   SpinLock status_lock_;
 
   /// The overall status of this QueryState.
+  /// A backend can have an error from a specific fragment instance, or it can have a
+  /// general error that is independent of any individual fragment. If reporting a
+  /// single error, this status is always set to the error being reported. If reporting
+  /// multiple errors, the status is set by the following rules:
+  /// 1. A general error takes precedence over any fragment instance error.
+  /// 2. Any fragment instance error takes precedence over any cancelled status.
+  /// 3. If multiple fragments have errors, the first fragment to hit an error is given
+  ///    preference.
   /// Status::OK if all the fragment instances managed by this QS are also Status::OK;
-  /// Otherwise, it will reflect the first non-OK status of a FIS.
   /// Protected by 'status_lock_'.
-  Status query_status_;
+  Status overall_status_;
 
   /// ID of first fragment instance to hit an error.
   /// Protected by 'status_lock_'.
@@ -361,9 +349,8 @@ class QueryState {
 
   /// Barrier for the completion of all the fragment instances.
   /// If the 'Status' is not OK due to an error during fragment instance execution, this
-  /// barrier is unblocked immediately.
-  /// 'query_status_' will be set once this is unblocked and so will 'failed_instance_id_'
-  /// if an error is hit.
+  /// barrier is unblocked immediately. 'overall_status_' is set once this is unblocked
+  /// and so is 'failed_instance_id_' if an error is hit.
   std::unique_ptr<CountingBarrier> instances_finished_barrier_;
 
   /// map from instance id to its state (owned by obj_pool_), populated in
@@ -416,16 +403,40 @@ class QueryState {
   void ReleaseBackendResources();
 
   /// Helper for ReportExecStatus() to construct a status report to be sent to the
-  /// coordinator. If 'fis' is not NULL, the runtime profile is serialized by the Thrift
-  /// serializer 'serializer' and stored in 'profile_buf'.
-  void ConstructReport(bool done, const Status& status,
-      FragmentInstanceState* fis, ReportExecStatusRequestPB* report,
-      ThriftSerializer* serializer, uint8_t** profile_buf, uint32_t* len);
+  /// coordinator. The execution statuses (e.g. 'done' indicator) of all fragment
+  /// instances belonging to this query state are stored in 'report'. The Thrift
+  /// serialized runtime profiles of fragment instances are stored in 'profiles_forest'.
+  void ConstructReport(bool instances_started, ReportExecStatusRequestPB* report,
+      TRuntimeProfileForest* profiles_forest);
 
-  /// Same behavior as ReportExecStatus().
-  /// Cancel on error only if instances_started is true.
-  void ReportExecStatusAux(bool done, const Status& status, FragmentInstanceState* fis,
-      bool instances_started);
+  /// Gather statues and profiles of all fragment instances belonging to this query state
+  /// and send it to the coordinator via ReportExecStatus() RPC.
+  void ReportExecStatus();
+
+  /// Returns true if the overall backend status is already set with an error.
+  bool HasErrorStatus() const {
+    return !overall_status_.ok() && !overall_status_.IsCancelled();
+  }
+
+  /// Returns true if the query has reached a terminal state.
+  bool IsTerminalState() const {
+    return backend_exec_state_ == BackendExecState::FINISHED
+        || backend_exec_state_ == BackendExecState::CANCELLED
+        || backend_exec_state_ == BackendExecState::ERROR;
+  }
+
+  /// Updates the BackendExecState based on 'overall_status_'. Should only be called when
+  /// the current state is a non-terminal state. The transition can either be to the next
+  /// legal state or ERROR if 'overall_status_' is an error. Called by the query state
+  /// thread only. It acquires the 'status_lock_' to synchronize with the fragment
+  /// instance threads' updates to 'overall_status_'.
+  ///
+  /// Upon reaching a terminal state, it will call ReportExecStatus() to send the final
+  /// report to the coordinator and not expect to be called afterwards.
+  void UpdateBackendExecState();
+
+  /// A string representation of 'state'.
+  const char* BackendExecStateToString(const BackendExecState& state);
 };
 }
 

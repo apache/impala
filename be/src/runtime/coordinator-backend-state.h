@@ -85,7 +85,7 @@ class Coordinator::BackendState {
   /// IsDone() from false to true, either because it was the last fragment to complete or
   /// because it was the first error received.
   bool ApplyExecStatusReport(const ReportExecStatusRequestPB& backend_exec_status,
-      const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary,
+      const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
       ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state);
 
   /// Update completion_times, rates, and avg_profile for all fragment_stats.

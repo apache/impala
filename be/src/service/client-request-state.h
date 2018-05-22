@@ -161,7 +161,7 @@ class ClientRequestState {
   /// methods should be used instead of calling them directly using the coordinator
   /// object.
   Status UpdateBackendExecStatus(const ReportExecStatusRequestPB& request,
-      const TRuntimeProfileTree& thrift_profile) WARN_UNUSED_RESULT;
+      const TRuntimeProfileForest& thrift_profiles) WARN_UNUSED_RESULT;
   void UpdateFilter(const TUpdateFilterParams& params);
 
   ImpalaServer::SessionState* session() const { return session_.get(); }

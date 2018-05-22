@@ -1,0 +1,30 @@
+====
+---- QUERY
+# Only run without expr rewrites (constant folding) because count_rows() is
+# non-deterministic.
+select count_rows() from functional.alltypestiny;
+---- TYPES
+BIGINT
+---- RESULTS
+1
+2
+3
+4
+5
+6
+7
+8
+====
+---- QUERY
+# Due to IMPALA-3860, the error is not propagated when expr rewrites is enabled.
+select mem_test_leaks(100);
+---- TYPES
+bigint
+---- RESULTS
+100
+---- ERRORS
+#A fragment instance's last status report may be sent before calling Close() which is
+#where the memory leak is detected. So, we don't always get the following error message.
+#UDF WARNING: Memory leaked via FunctionContext::Allocate(), 100 bytes leaked via FunctionContext::TrackAllocation()
+row_regex:.*
+====

@@ -270,7 +270,7 @@ inline bool Coordinator::BackendState::IsDone() const {
 
 bool Coordinator::BackendState::ApplyExecStatusReport(
     const ReportExecStatusRequestPB& backend_exec_status,
-    const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary,
+    const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
     ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state) {
   // Hold the exec_summary's lock to avoid exposing it half-way through
   // the update loop below.
@@ -280,6 +280,10 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
 
   // If this backend completed previously, don't apply the update.
   if (IsDone()) return false;
+
+  int idx = 0;
+  const bool has_profile = thrift_profiles.profile_trees.size() > 0;
+  TRuntimeProfileTree empty_profile;
   for (const FragmentInstanceExecStatusPB& instance_exec_status :
            backend_exec_status.instance_exec_status()) {
     int64_t report_seq_no = instance_exec_status.report_seq_no();
@@ -296,8 +300,11 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     }
 
     DCHECK(!instance_stats->done_);
-    instance_stats->Update(
-        instance_exec_status, thrift_profile, exec_summary, scan_range_progress);
+    DCHECK(!has_profile || idx < thrift_profiles.profile_trees.size());
+    const TRuntimeProfileTree& profile =
+        has_profile ? thrift_profiles.profile_trees[idx++] : empty_profile;
+    instance_stats->Update(instance_exec_status, profile, exec_summary,
+        scan_range_progress);
 
     // Update DML stats
     if (instance_exec_status.has_dml_exec_status()) {
@@ -313,15 +320,6 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
           PrintErrorMapToString(error_log_);
     }
 
-    // If a query is aborted due to an error encountered by a single fragment instance,
-    // all other fragment instances will report a cancelled status; make sure not to mask
-    // the original error status.
-    const Status instance_status(instance_exec_status.status());
-    if (!instance_status.ok() && (status_.ok() || status_.IsCancelled())) {
-      status_ = instance_status;
-      failed_instance_id_ = ProtoToQueryId(instance_exec_status.fragment_instance_id());
-      is_fragment_failure_ = true;
-    }
     DCHECK_GT(num_remaining_instances_, 0);
     if (instance_exec_status.done()) {
       DCHECK(!instance_stats->done_);
@@ -347,9 +345,13 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   // status_ has incorporated the status from all fragment instances. If the overall
   // backend status is not OK, but no specific fragment instance reported an error, then
   // this is a general backend error. Incorporate the general error into status_.
-  Status overall_backend_status(backend_exec_status.status());
-  if (!overall_backend_status.ok() && (status_.ok() || status_.IsCancelled())) {
-    status_ = overall_backend_status;
+  Status overall_status(backend_exec_status.overall_status());
+  if (!overall_status.ok() && (status_.ok() || status_.IsCancelled())) {
+    status_ = overall_status;
+    if (backend_exec_status.has_fragment_instance_id()) {
+      failed_instance_id_ = ProtoToQueryId(backend_exec_status.fragment_instance_id());
+      is_fragment_failure_ = true;
+    }
   }
 
   // TODO: keep backend-wide stopwatch?

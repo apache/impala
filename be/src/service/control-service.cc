@@ -90,17 +90,17 @@ bool ControlService::Authorize(const google::protobuf::Message* req,
 
 Status ControlService::GetProfile(const ReportExecStatusRequestPB& request,
     const ClientRequestState& request_state, kudu::rpc::RpcContext* rpc_context,
-    TRuntimeProfileTree* thrift_profile) {
+    TRuntimeProfileForest* thrift_profiles) {
   // Debug action to simulate deserialization failure.
   RETURN_IF_ERROR(DebugAction(request_state.query_options(),
       "REPORT_EXEC_STATUS_PROFILE"));
-  kudu::Slice thrift_profile_slice;
+  kudu::Slice thrift_profiles_slice;
   KUDU_RETURN_IF_ERROR(rpc_context->GetInboundSidecar(
-      request.thrift_profiles_sidecar_idx(), &thrift_profile_slice),
+      request.thrift_profiles_sidecar_idx(), &thrift_profiles_slice),
       "Failed to get thrift profile sidecar");
-  uint32_t len = thrift_profile_slice.size();
-  RETURN_IF_ERROR(DeserializeThriftMsg(thrift_profile_slice.data(),
-      &len, true, thrift_profile));
+  uint32_t len = thrift_profiles_slice.size();
+  RETURN_IF_ERROR(DeserializeThriftMsg(thrift_profiles_slice.data(),
+      &len, true, thrift_profiles));
   return Status::OK();
 }
 
@@ -127,21 +127,21 @@ void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,
   // sidecar and deserialize the thrift profile if there is any. The sender may have
   // failed to serialize the Thrift profile so an empty thrift profile is valid.
   // TODO: Fix IMPALA-7232 to indicate incomplete profile in this case.
-  TRuntimeProfileTree thrift_profile;
+  TRuntimeProfileForest thrift_profiles;
   if (LIKELY(request->has_thrift_profiles_sidecar_idx())) {
     const Status& profile_status =
-        GetProfile(*request, *request_state.get(), rpc_context, &thrift_profile);
+        GetProfile(*request, *request_state.get(), rpc_context, &thrift_profiles);
     if (UNLIKELY(!profile_status.ok())) {
       LOG(ERROR) << Substitute("ReportExecStatus(): Failed to deserialize profile "
           "for query ID $0: $1", PrintId(request_state->query_id()),
           profile_status.GetDetail());
       // Do not expose a partially deserialized profile.
-      TRuntimeProfileTree empty_profile;
-      swap(thrift_profile, empty_profile);
+      TRuntimeProfileForest empty_profiles;
+      swap(thrift_profiles, empty_profiles);
     }
   }
 
-  Status resp_status = request_state->UpdateBackendExecStatus(*request, thrift_profile);
+  Status resp_status = request_state->UpdateBackendExecStatus(*request, thrift_profiles);
   RespondAndReleaseRpc(resp_status, response, rpc_context);
 }
 

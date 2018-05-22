@@ -60,15 +60,6 @@ class RuntimeState;
 /// The FIS makes an aggregated profile for the entire fragment available, which
 /// includes profile information for the plan itself as well as the output sink. It also
 /// contains a timeline of events of the fragment instance.
-/// The FIS periodically makes a ReportExecStatus RPC to the coordinator to report the
-/// execution status, the current state of the execution, and the instance profile. The
-/// frequency of those reports is controlled by the flag status_report_interval_ms;
-/// Setting that flag to 0 disables periodic reporting altogether. Regardless of the value
-/// of that flag, a report is sent at least once at the end of execution with an overall
-/// status and profile (and 'done' indicator).
-/// The FIS will send at least one final status report. If execution ended with an error,
-/// that error status will be part of the final report (it will not be overridden by
-/// the resulting cancellation).
 ///
 /// This class is thread-safe.
 /// All non-getter public functions other than Exec() block until the Prepare phase
@@ -88,7 +79,7 @@ class FragmentInstanceState {
   /// Must only be called once.
   Status Exec() WARN_UNUSED_RESULT;
 
-  /// Cancels execution and sends a final status report. Idempotent.
+  /// Cancels execution. Idempotent.
   void Cancel();
 
   /// Blocks until the Prepare phase of Exec() is finished and the exec tree is
@@ -98,6 +89,12 @@ class FragmentInstanceState {
 
   /// Publishes filter with ID 'filter_id' to this fragment instance's filter bank.
   void PublishFilter(const TPublishFilterParams& params);
+
+  /// Called periodically by query state thread to get the current status of this fragment
+  /// instance. The fragment instance's status is stored in 'instance_status' and its
+  /// Thrift runtime profile is stored in 'thrift_profile'.
+  void GetStatusReport(FragmentInstanceExecStatusPB* instance_status,
+      TRuntimeProfileTree* thrift_profile);
 
   /// Returns fragment instance's sink if this is the root fragment instance. Valid after
   /// the Prepare phase. May be nullptr.
@@ -119,13 +116,10 @@ class FragmentInstanceState {
   const TUniqueId& query_id() const { return query_ctx().query_id; }
   const TUniqueId& instance_id() const { return instance_ctx_.fragment_instance_id; }
   FInstanceExecStatePB current_state() const { return current_state_.Load(); }
+  bool final_report_sent() const { return final_report_sent_; }
   const TNetworkAddress& coord_address() const { return query_ctx().coord_address; }
+  bool IsDone() const { return current_state_.Load() == FInstanceExecStatePB::FINISHED; }
   ObjectPool* obj_pool();
-
-  /// Returns the monotonically increasing sequence number. Called by status report thread
-  /// only except for the final report which is handled by finstance exec thread after the
-  /// reporting thread has exited.
-  int64_t AdvanceReportSeqNo() { return ++report_seq_no_; }
 
   /// Returns true if the current thread is a thread executing the whole or part of
   /// a fragment instance.
@@ -152,24 +146,6 @@ class FragmentInstanceState {
   ExecNode* exec_tree_ = nullptr; // lives in obj_pool()
   RuntimeState* runtime_state_ = nullptr;  // lives in obj_pool()
 
-  /// profile reporting-related
-  std::unique_ptr<Thread> report_thread_;
-  boost::mutex report_thread_lock_;
-
-  /// Indicates that profile reporting thread should stop.
-  /// Tied to report_thread_lock_.
-  ConditionVariable stop_report_thread_cv_;
-
-  /// Indicates that profile reporting thread started.
-  /// Tied to report_thread_lock_.
-  ConditionVariable report_thread_started_cv_;
-
-  /// When the report thread starts, it sets report_thread_active_ to true and signals
-  /// report_thread_started_cv_. The report thread is shut down by setting
-  /// report_thread_active_ to false and signalling stop_report_thread_cv_. Protected
-  /// by report_thread_lock_.
-  bool report_thread_active_ = false;
-
   /// A 'fake mutex' to detect any race condition in accessing 'report_seq_no_' below.
   /// There should be only one thread doing status report at the same time.
   DFAKE_MUTEX(report_status_lock_);
@@ -177,6 +153,10 @@ class FragmentInstanceState {
   /// Monotonically increasing sequence number used in status report to prevent
   /// duplicated or out-of-order reports.
   int64_t report_seq_no_ = 0;
+
+  /// True iff the final report has already been sent. Read exclusively by the query
+  /// state thread only. Written in GetStatusReport() by the query state thread.
+  bool final_report_sent_ = false;
 
   /// Profile for timings for each stage of the plan fragment instance's lifecycle.
   /// Lives in obj_pool().
@@ -230,6 +210,10 @@ class FragmentInstanceState {
   /// Set when OpenInternal() returns.
   Promise<Status> opened_promise_;
 
+  /// Returns the monotonically increasing sequence number.
+  /// Called by query state thread only.
+  int64_t AdvanceReportSeqNo() { return ++report_seq_no_; }
+
   /// A counter for the per query, per host peak mem usage. Note that this is not the
   /// max of the peak memory of all fragments running on a host since it needs to take
   /// into account when they are running concurrently. All fragments for a single query
@@ -275,22 +259,8 @@ class FragmentInstanceState {
   Status ExecInternal() WARN_UNUSED_RESULT;
 
   /// Closes the underlying fragment instance and frees up all resources allocated in
-  /// Prepare() and Open(). Assumes the report thread is stopped. Can handle
-  /// partially-finished Prepare().
+  /// Prepare() and Open(). Can handle partially-finished Prepare().
   void Close();
-
-  /// Main loop of profile reporting thread.
-  /// Exits when notified on stop_report_thread_cv_ and report_thread_active_ is set to
-  /// false. This will not send the final report.
-  void ReportProfileThread();
-
-  /// Invoked the report callback. If 'done' is true, sends the final report with
-  /// 'status' and the profile. This type of report is sent once and only by the
-  /// instance execution thread. Otherwise, a profile-only report is sent, which the
-  /// ReportProfileThread() thread will do periodically. It's expected that only one
-  /// of instance execution thread or ReportProfileThread() should be calling this
-  /// function at a time.
-  void SendReport(bool done, const Status& status);
 
   /// Handle the execution event 'event'. This implements a state machine and will update
   /// the current execution state of this fragment instance. Also marks an event in
@@ -298,17 +268,13 @@ class FragmentInstanceState {
   /// concurrently.
   void UpdateState(const StateEvent event);
 
-  /// Called when execution is complete to finalize counters and send the final status
-  /// report.  Must be called only once. Can handle partially-finished Prepare().
+  /// Called when execution is complete to finalize counters. Must be called only once.
+  /// Can handle partially-finished Prepare().
   void Finalize(const Status& status);
 
   /// Releases the thread token for this fragment executor. Can handle
   /// partially-finished Prepare().
   void ReleaseThreadToken();
-
-  /// Stops report thread, if one is running. Blocks until report thread terminates.
-  /// Idempotent.
-  void StopReportThread();
 
   /// Print stats about scan ranges for each volumeId in params to info log.
   void PrintVolumeIds();

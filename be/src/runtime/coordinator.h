@@ -128,10 +128,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Called by the report status RPC handler to update execution status of a particular
   /// backend as well as dml_exec_state_ and the profile. This may block if exec RPCs are
-  /// pending. 'request' contains details of the status update. 'thrift_profile' is the
-  /// Thrift runtime profile from the backend.
+  /// pending. 'request' contains details of the status update. 'thrift_profiles' contains
+  /// Thrift runtime profiles of all fragment instances from the backend.
   Status UpdateBackendExecStatus(const ReportExecStatusRequestPB& request,
-      const TRuntimeProfileTree& thrift_profile) WARN_UNUSED_RESULT;
+      const TRuntimeProfileForest& thrift_profiles) WARN_UNUSED_RESULT;
 
   /// Get cumulative profile aggregated over all fragments of the query.
   /// This is a snapshot of the current state of execution and will change in

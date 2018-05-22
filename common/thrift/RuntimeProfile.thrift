@@ -102,3 +102,8 @@ struct TRuntimeProfileTree {
   1: required list<TRuntimeProfileNode> nodes
   2: optional ExecStats.TExecSummary exec_summary
 }
+
+// A list of TRuntimeProfileTree structures.
+struct TRuntimeProfileForest {
+  1: required list<TRuntimeProfileTree> profile_trees
+}

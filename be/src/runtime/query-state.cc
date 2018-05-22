@@ -53,6 +53,8 @@ using kudu::rpc::RpcSidecar;
 
 #include "common/names.h"
 
+DEFINE_int32(status_report_interval_ms, 5000,
+    "interval between profile reports; in milliseconds");
 DEFINE_int32(report_status_retry_interval_ms, 100,
     "The interval in milliseconds to wait before retrying a failed status report RPC to "
     "the coordinator.");
@@ -220,33 +222,30 @@ const char* QueryState::BackendExecStateToString(const BackendExecState& state) 
   return exec_state_to_str.at(state);
 }
 
-inline bool QueryState::IsTerminalState(const BackendExecState& state) {
-  return state == BackendExecState::FINISHED
-      || state == BackendExecState::CANCELLED
-      || state == BackendExecState::ERROR;
-}
-
-Status QueryState::UpdateBackendExecState() {
-  BackendExecState old_state = backend_exec_state_;
-
-  unique_lock<SpinLock> l(status_lock_);
-  // We shouldn't call this function if we're already in a terminal state.
-  DCHECK(!IsTerminalState(backend_exec_state_))
-      << " Current State: " << BackendExecStateToString(backend_exec_state_)
-      << " | Current Status: " << query_status_.GetDetail();
-
-  if (query_status_.IsCancelled()) {
-    // Received cancellation - go to CANCELLED state.
-    backend_exec_state_ = BackendExecState::CANCELLED;
-  } else if (!query_status_.ok()) {
-    // Error while executing - go to ERROR state.
-    backend_exec_state_ = BackendExecState::ERROR;
-  } else {
-    // Transition to the next state in the lifecycle.
-    backend_exec_state_ = old_state == BackendExecState::PREPARING ?
-        BackendExecState::EXECUTING : BackendExecState::FINISHED;
+void QueryState::UpdateBackendExecState() {
+  DFAKE_SCOPED_LOCK(backend_exec_state_lock_);
+  {
+    BackendExecState cur_state = backend_exec_state_;
+    unique_lock<SpinLock> l(status_lock_);
+    // We shouldn't call this function if we're already in a terminal state.
+    DCHECK(cur_state == BackendExecState::PREPARING ||
+        cur_state == BackendExecState::EXECUTING)
+            << " Current State: " << BackendExecStateToString(cur_state)
+            << " | Current Status: " << overall_status_.GetDetail();
+    if (overall_status_.IsCancelled()) {
+      // Received cancellation - go to CANCELLED state.
+      backend_exec_state_ = BackendExecState::CANCELLED;
+    } else if (!overall_status_.ok()) {
+      // Error while executing - go to ERROR state.
+      backend_exec_state_ = BackendExecState::ERROR;
+    } else {
+      // Transition to the next state in the lifecycle.
+      backend_exec_state_ = cur_state == BackendExecState::PREPARING ?
+          BackendExecState::EXECUTING : BackendExecState::FINISHED;
+    }
   }
-  return query_status_;
+  // Send one last report if the query has reached the terminal state.
+  if (IsTerminalState()) ReportExecStatus();
 }
 
 FragmentInstanceState* QueryState::GetFInstanceState(const TUniqueId& instance_id) {
@@ -256,74 +255,49 @@ FragmentInstanceState* QueryState::GetFInstanceState(const TUniqueId& instance_i
   return it != fis_map_.end() ? it->second : nullptr;
 }
 
-void QueryState::ReportExecStatus(bool done, const Status& status,
-    FragmentInstanceState* fis) {
-  ReportExecStatusAux(done, status, fis, true);
-}
-
-void QueryState::ConstructReport(bool done, const Status& status,
-    FragmentInstanceState* fis, ReportExecStatusRequestPB* report,
-    ThriftSerializer* serializer, uint8_t** profile_buf, uint32_t* profile_len) {
+void QueryState::ConstructReport(bool instances_started,
+    ReportExecStatusRequestPB* report, TRuntimeProfileForest* profiles_forest) {
   report->Clear();
   TUniqueIdToUniqueIdPB(query_id(), report->mutable_query_id());
   DCHECK(exec_rpc_params().__isset.coord_state_idx);
   report->set_coord_state_idx(exec_rpc_params().coord_state_idx);
-  status.ToProto(report->mutable_status());
-
-  if (fis != nullptr) {
-    // create status for 'fis'
-    FragmentInstanceExecStatusPB* instance_status = report->add_instance_exec_status();
-    instance_status->set_report_seq_no(fis->AdvanceReportSeqNo());
-    const TUniqueId& finstance_id = fis->instance_id();
-    TUniqueIdToUniqueIdPB(finstance_id, instance_status->mutable_fragment_instance_id());
-    status.ToProto(instance_status->mutable_status());
-    instance_status->set_done(done);
-    instance_status->set_current_state(fis->current_state());
-
-    // Only send updates to insert status if fragment is finished, the coordinator waits
-    // until query execution is done to use them anyhow.
-    RuntimeState* state = fis->runtime_state();
-    if (done) {
-      state->dml_exec_state()->ToProto(instance_status->mutable_dml_exec_status());
+  {
+    std::unique_lock<SpinLock> l(status_lock_);
+    overall_status_.ToProto(report->mutable_overall_status());
+    if (IsValidFInstanceId(failed_finstance_id_)) {
+      TUniqueIdToUniqueIdPB(failed_finstance_id_, report->mutable_fragment_instance_id());
     }
+  }
 
-    // Send new errors to coordinator
-    state->GetUnreportedErrors(instance_status->mutable_error_log());
+  if (instances_started) {
+    for (const auto& entry : fis_map_) {
+      FragmentInstanceState* fis = entry.second;
 
-    // Debug action to simulate failure to serialize the profile.
-    if (!DebugAction(query_options(), "REPORT_EXEC_STATUS_PROFILE").ok()) {
-      DCHECK(profile_buf == nullptr);
-      return;
-    }
+      // If this fragment instance has already sent its last report, skip it.
+      if (fis->final_report_sent()) {
+        DCHECK(fis->IsDone());
+        continue;
+      }
 
-    // Generate the runtime profile.
-    DCHECK(fis->profile() != nullptr);
-    TRuntimeProfileTree thrift_profile;
-    fis->profile()->ToThrift(&thrift_profile);
-    Status serialize_status =
-        serializer->SerializeToBuffer(&thrift_profile, profile_len, profile_buf);
-    if (UNLIKELY(!serialize_status.ok() ||
-            *profile_len > FLAGS_rpc_max_message_size)) {
-      profile_buf = nullptr;
-      LOG(ERROR) << Substitute("Failed to create $0profile for query fragment $1: "
-          "status=$2 len=$3", done ? "final " : "", PrintId(finstance_id),
-          serialize_status.ok() ? "OK" : serialize_status.GetDetail(), *profile_len);
+      // Update the status and profiles of this fragment instance.
+      FragmentInstanceExecStatusPB* instance_status = report->add_instance_exec_status();
+      profiles_forest->profile_trees.emplace_back();
+      fis->GetStatusReport(instance_status, &profiles_forest->profile_trees.back());
     }
   }
 }
 
-// TODO: rethink whether 'done' can be inferred from 'status' or 'query_status_'.
-void QueryState::ReportExecStatusAux(bool done, const Status& status,
-    FragmentInstanceState* fis, bool instances_started) {
-  // if we're reporting an error, we're done
-  DCHECK(status.ok() || done);
-  // if this is not for a specific fragment instance, we're reporting an error
-  DCHECK(fis != nullptr || !status.ok());
+void QueryState::ReportExecStatus() {
+  bool instances_started = fis_map_.size() > 0;
 
   // This will send a report even if we are cancelled.  If the query completed correctly
   // but fragments still need to be cancelled (e.g. limit reached), the coordinator will
   // be waiting for a final report and profile.
   ReportExecStatusRequestPB report;
+
+  // Gather the statuses and profiles of the fragment instances.
+  TRuntimeProfileForest profiles_forest;
+  ConstructReport(instances_started, &report, &profiles_forest);
 
   // Serialize the runtime profile with Thrift to 'profile_buf'. Note that the
   // serialization output is owned by 'serializer' so this must be alive until RPC
@@ -331,7 +305,16 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
   ThriftSerializer serializer(true);
   uint8_t* profile_buf = nullptr;
   uint32_t profile_len = 0;
-  ConstructReport(done, status, fis, &report, &serializer, &profile_buf, &profile_len);
+  Status serialize_status =
+      serializer.SerializeToBuffer(&profiles_forest, &profile_len, &profile_buf);
+  if (UNLIKELY(!serialize_status.ok() ||
+          profile_len > FLAGS_rpc_max_message_size ||
+          !DebugAction(query_options(), "REPORT_EXEC_STATUS_PROFILE").ok())) {
+    profile_buf = nullptr;
+    LOG(ERROR) << Substitute("Failed to create $0profile for query $1: "
+        "status=$2 len=$3", IsTerminalState() ? "final " : "", PrintId(query_id()),
+        serialize_status.ok() ? "OK" : serialize_status.GetDetail(), profile_len);
+  }
 
   // Try to send the RPC 3 times before failing. Sleep for 100ms between retries.
   // It's safe to retry the RPC as the coordinator handles duplicate RPC messages.
@@ -401,47 +384,63 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
   }
 }
 
+void QueryState::ErrorDuringPrepare(const Status& status, const TUniqueId& finst_id) {
+  {
+    std::unique_lock<SpinLock> l(status_lock_);
+    if (!HasErrorStatus()) {
+      overall_status_ = status;
+      failed_finstance_id_ = finst_id;
+    }
+  }
+  discard_result(instances_prepared_barrier_->Notify());
+}
+
+void QueryState::ErrorDuringExecute(const Status& status, const TUniqueId& finst_id) {
+  {
+    std::unique_lock<SpinLock> l(status_lock_);
+    if (!HasErrorStatus()) {
+      overall_status_ = status;
+      failed_finstance_id_ = finst_id;
+    }
+  }
+  instances_finished_barrier_->NotifyRemaining();
+}
+
 Status QueryState::WaitForPrepare() {
   instances_prepared_barrier_->Wait();
-
   unique_lock<SpinLock> l(status_lock_);
-  return query_status_;
+  return overall_status_;
 }
 
-Status QueryState::WaitForFinish() {
+void QueryState::WaitForFinish() {
   instances_finished_barrier_->Wait();
-
-  unique_lock<SpinLock> l(status_lock_);
-  return query_status_;
 }
 
-void QueryState::StartFInstances() {
+bool QueryState::WaitForFinishOrTimeout(int32_t timeout_ms) {
+  bool timed_out = false;
+  instances_finished_barrier_->Wait(timeout_ms, &timed_out);
+  return !timed_out;
+}
+
+bool QueryState::StartFInstances() {
   VLOG(2) << "StartFInstances(): query_id=" << PrintId(query_id())
           << " #instances=" << exec_rpc_params_.fragment_instance_ctxs.size();
   DCHECK_GT(refcnt_.Load(), 0);
   DCHECK_GT(backend_resource_refcnt_.Load(), 0) << "Should have been taken in Init()";
 
+  DCHECK_GT(exec_rpc_params_.fragment_ctxs.size(), 0);
+  TPlanFragmentCtx* fragment_ctx = &exec_rpc_params_.fragment_ctxs[0];
+  int num_unstarted_instances = exec_rpc_params_.fragment_instance_ctxs.size();
+  int fragment_ctx_idx = 0;
+
   // set up desc tbl
   DCHECK(query_ctx().__isset.desc_tbl);
-  Status status = DescriptorTbl::Create(&obj_pool_, query_ctx().desc_tbl, &desc_tbl_);
-  if (!status.ok()) {
-    ErrorDuringPrepare(status, TUniqueId());
-    Status updated_query_status = UpdateBackendExecState();
-    instances_prepared_barrier_->NotifyRemaining();
-    DCHECK(!updated_query_status.ok());
-    // TODO (IMPALA-4063): This call to ReportExecStatusAux() should internally be handled
-    // by UpdateBackendExecState().
-    ReportExecStatusAux(true, status, nullptr, false);
-    return;
-  }
+  Status start_finstances_status =
+      DescriptorTbl::Create(&obj_pool_, query_ctx().desc_tbl, &desc_tbl_);
+  if (UNLIKELY(!start_finstances_status.ok())) goto error;
   VLOG(2) << "descriptor table for query=" << PrintId(query_id())
           << "\n" << desc_tbl_->DebugString();
 
-  Status thread_create_status;
-  DCHECK_GT(exec_rpc_params_.fragment_ctxs.size(), 0);
-  TPlanFragmentCtx* fragment_ctx = &exec_rpc_params_.fragment_ctxs[0];
-  int fragment_ctx_idx = 0;
-  int num_unstarted_instances = exec_rpc_params_.fragment_instance_ctxs.size();
   fragment_events_start_time_ = MonotonicStopWatch::Now();
   for (const TPlanFragmentInstanceCtx& instance_ctx :
            exec_rpc_params_.fragment_instance_ctxs) {
@@ -476,11 +475,10 @@ void QueryState::StartFInstances() {
 
     // Inject thread creation failures through debug actions if enabled.
     Status debug_action_status = DebugAction(query_options(), "FIS_FAIL_THREAD_CREATION");
-    thread_create_status = debug_action_status.ok() ?
+    start_finstances_status = !debug_action_status.ok() ? debug_action_status :
         Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
-            [this, fis]() { this->ExecFInstance(fis); }, &t, true) :
-        debug_action_status;
-    if (!thread_create_status.ok()) {
+            [this, fis]() { this->ExecFInstance(fis); }, &t, true);
+    if (!start_finstances_status.ok()) {
       fis_map_.erase(fis->instance_id());
       fis_list.pop_back();
       // Undo refcnt increments done immediately prior to Thread::Create(). The
@@ -488,44 +486,64 @@ void QueryState::StartFInstances() {
       // neither of these decrements will free any structures.
       ReleaseBackendResourceRefcount();
       ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
-      break;
+      goto error;
     }
     t->Detach();
     --num_unstarted_instances;
   }
+  return true;
 
-  if (!thread_create_status.ok()) {
-    // We failed to start 'num_unstarted_instances', so make sure to notify
-    // 'instances_prepared_barrier_' 'num_unstarted_instances - 1' times, to unblock
-    // WaitForPrepare(). The last remaining notification will be set by the call to
-    // ErrorDuringPrepare() below.
-    while (num_unstarted_instances > 1) {
-      DonePreparing();
-      --num_unstarted_instances;
-    }
-
-    // We prioritize thread creation failure as a query killing error, even over an error
-    // during Prepare() for a FIS.
-    // We have to notify anyone waiting on WaitForPrepare() that this query has failed.
-    ErrorDuringPrepare(thread_create_status, TUniqueId());
-    Status updated_query_status = UpdateBackendExecState();
-    DCHECK(!updated_query_status.ok());
-    // Block until all the already started fragment instances finish Prepare()-ing to
-    // to report an error.
-    discard_result(WaitForPrepare());
-    ReportExecStatusAux(true, thread_create_status, nullptr, true);
-    return;
+error:
+  // This point is reached if there were general errors to start query fragment instances.
+  // Wait for all running fragment instances to finish preparing and report status to the
+  // coordinator to start query cancellation.
+  {
+    // Prioritize general errors as a query killing error, even over an error
+    // during Prepare() for a FIS. Overwrite any existing value in 'overall_status_'.
+    std::unique_lock<SpinLock> l(status_lock_);
+    overall_status_ = start_finstances_status;
+    failed_finstance_id_ = TUniqueId();
   }
-
+  // Updates the barrier for all unstarted fragment instances.
+  for (int i = 0; i < num_unstarted_instances; ++i) {
+    DonePreparing();
+  }
+  // Block until all the already started fragment instances finish Prepare()-ing before
+  // reporting the error.
   discard_result(WaitForPrepare());
-  if (!UpdateBackendExecState().ok()) return;
+  UpdateBackendExecState();
+  DCHECK(IsTerminalState());
+  return false;
+}
+
+void QueryState::MonitorFInstances() {
+  // Wait for all fragment instances to finish preparing.
+  discard_result(WaitForPrepare());
+  UpdateBackendExecState();
+  if (IsTerminalState()) goto done;
+
+  // Once all fragment instances finished preparing successfully, start periodic
+  // reporting back to the coordinator.
   DCHECK(backend_exec_state_ == BackendExecState::EXECUTING)
       << BackendExecStateToString(backend_exec_state_);
+  if (FLAGS_status_report_interval_ms > 0) {
+    while (!WaitForFinishOrTimeout(FLAGS_status_report_interval_ms)) {
+      ReportExecStatus();
+    }
+  } else {
+    WaitForFinish();
+  }
+  UpdateBackendExecState();
+  DCHECK(IsTerminalState());
 
-  discard_result(WaitForFinish());
-  if (!UpdateBackendExecState().ok()) return;
-  DCHECK(backend_exec_state_ == BackendExecState::FINISHED)
-      << BackendExecStateToString(backend_exec_state_);
+done:
+  if (backend_exec_state_ == BackendExecState::FINISHED) {
+    for (const auto& entry : fis_map_) {
+      DCHECK(entry.second->IsDone());
+    }
+  } else {
+    DCHECK_EQ(is_cancelled_.Load(), 1);
+  }
 }
 
 void QueryState::AcquireBackendResourceRefcount() {
@@ -556,8 +574,12 @@ void QueryState::ExecFInstance(FragmentInstanceState* fis) {
       << " #in-flight="
       << ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->GetValue()
       << " status=" << status;
-  // initiate cancellation if nobody has done so yet
-  if (!status.ok()) Cancel();
+
+  // Don't cancel other fragments here as the final report for "fis" may not have been
+  // sent yet. Cancellation will happen in ReportExecStatus() after sending the final
+  // report to the coordinator. Otherwise, the coordinator fragment may mark the status
+  // of this backend as "CANCELLED", masking the original error.
+
   // decrement refcount taken in StartFInstances()
   ReleaseBackendResourceRefcount();
   // decrement refcount taken in StartFInstances()

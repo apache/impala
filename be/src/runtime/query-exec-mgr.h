@@ -75,7 +75,9 @@ class QueryExecMgr : public CacheLineAligned {
       const TQueryCtx& query_ctx, int64_t mem_limit, bool* created);
 
   /// Execute instances and decrement refcount (acquire ownership of qs).
-  void StartQueryHelper(QueryState* qs);
+  /// Return only after all fragments complete unless an instances hit
+  /// an error or the query is cancelled.
+  void ExecuteQueryHelper(QueryState* qs);
 };
 }
 

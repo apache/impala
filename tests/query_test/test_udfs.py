@@ -287,12 +287,12 @@ class TestUdfExecution(TestUdfBase):
       self.run_test_case('QueryTest/udf-codegen-required', vector, use_db=unique_database)
     self.run_test_case('QueryTest/uda', vector, use_db=unique_database)
     self.run_test_case('QueryTest/udf-init-close', vector, use_db=unique_database)
-    # Some tests assume determinism or non-determinism, which depends on expr rewrites.
+    # Some tests assume no expr rewrites.
     if enable_expr_rewrites:
       self.run_test_case('QueryTest/udf-init-close-deterministic', vector,
           use_db=unique_database)
     else:
-      self.run_test_case('QueryTest/udf-non-deterministic', vector,
+      self.run_test_case('QueryTest/udf-no-expr-rewrite', vector,
           use_db=unique_database)
 
   def test_ir_functions(self, vector, unique_database):
@@ -310,8 +310,7 @@ class TestUdfExecution(TestUdfBase):
       self.run_test_case('QueryTest/udf-init-close-deterministic', vector,
           use_db=unique_database)
     else:
-      self.run_test_case('QueryTest/udf-non-deterministic', vector,
-          use_db=unique_database)
+      self.run_test_case('QueryTest/udf-no-expr-rewrite', vector, use_db=unique_database)
 
   def test_java_udfs(self, vector, unique_database):
     self.run_test_case('QueryTest/load-java-udfs', vector, use_db=unique_database)

@@ -1249,9 +1249,10 @@ beeswax::QueryState::type ClientRequestState::BeeswaxQueryState() const {
 // to call concurrently with Coordinator::Exec(). See comments for 'coord_' and
 // 'coord_exec_called_' for more details.
 Status ClientRequestState::UpdateBackendExecStatus(
-    const ReportExecStatusRequestPB& request, const TRuntimeProfileTree& thrift_profile) {
+    const ReportExecStatusRequestPB& request,
+    const TRuntimeProfileForest& thrift_profiles) {
   DCHECK(coord_.get());
-  return coord_->UpdateBackendExecStatus(request, thrift_profile);
+  return coord_->UpdateBackendExecStatus(request, thrift_profiles);
 }
 
 void ClientRequestState::UpdateFilter(const TUpdateFilterParams& params) {

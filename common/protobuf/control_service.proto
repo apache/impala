@@ -116,22 +116,19 @@ message FragmentInstanceExecStatusPB {
   // The ID of the fragment instance which this report contains
   optional UniqueIdPB fragment_instance_id = 2;
 
-  // Status of fragment execution; any error status means it's done.
-  optional StatusPB status = 3;
-
   // If true, fragment finished executing.
-  optional bool done = 4;
+  optional bool done = 3;
 
   // The current state of this fragment instance's execution.
-  optional FInstanceExecStatePB current_state = 5;
+  optional FInstanceExecStatePB current_state = 4;
 
   // Cumulative structural changes made by the table sink of this fragment
   // instance. This is sent only when 'done' above is true. Not idempotent.
-  optional DmlExecStatusPB dml_exec_status = 6;
+  optional DmlExecStatusPB dml_exec_status = 5;
 
   // Map of TErrorCode to ErrorLogEntryPB; New errors that have not been reported to
   // the coordinator by this fragment instance. Not idempotent.
-  map<int32, ErrorLogEntryPB> error_log = 7;
+  map<int32, ErrorLogEntryPB> error_log = 6;
 }
 
 message ReportExecStatusRequestPB {
@@ -147,17 +144,14 @@ message ReportExecStatusRequestPB {
   // in instance_exec_status.
   optional int32 thrift_profiles_sidecar_idx = 4;
 
-  // Cumulative status for this backend. A backend can have an error from a specific
-  // fragment instance, or it can have a general error that is independent of any
-  // individual fragment. If reporting a single error, this status is always set to
-  // the error being reported. If reporting multiple errors, the status is set by the
-  // following rules:
-  // 1. A general error takes precedence over any fragment instance error.
-  // 2. Any fragment instance error takes precedence over any cancelled status.
-  // 3. If multiple fragments have errors, prefer the error that comes first in the
-  // 'instance_exec_status' list.
-  // This status is only OK if all fragment instances included are OK.
-  optional StatusPB status = 5;
+  // Cumulative status for this backend.
+  // See QueryState::overall_status for details.
+  optional StatusPB overall_status = 5;
+
+  // The fragment instance id of the first failed fragment instance. This corresponds to
+  // the fragment which sets 'overall_status' above. Not set if 'overall_status' is a
+  // general error (e.g. failure to start fragment instances).
+  optional UniqueIdPB fragment_instance_id = 6;
 }
 
 message ReportExecStatusResponsePB {
