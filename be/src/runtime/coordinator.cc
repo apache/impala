@@ -353,6 +353,8 @@ Status Coordinator::FinishBackendStartup() {
   HistogramMetric latencies(def, 30 * 60 * 1000, 4);
   Status status = Status::OK();
   string error_hostname;
+  string max_latency_host;
+  int max_latency = 0;
   for (BackendState* backend_state: backend_states_) {
     // preserve the first non-OK, if there is one
     Status backend_status = backend_state->GetStatus();
@@ -360,10 +362,17 @@ Status Coordinator::FinishBackendStartup() {
       status = backend_status;
       error_hostname = backend_state->impalad_address().hostname;
     }
+    if (backend_state->rpc_latency() > max_latency) {
+        // Find the backend that takes the most time to acknowledge to
+        // the ExecQueryFinstances() RPC.
+        max_latency = backend_state->rpc_latency();
+        max_latency_host = TNetworkAddressToString(backend_state->impalad_address());
+    }
     latencies.Update(backend_state->rpc_latency());
   }
   query_profile_->AddInfoString(
       "Backend startup latencies", latencies.ToHumanReadable());
+  query_profile_->AddInfoString("Slowest Backend to startup", max_latency_host);
   return UpdateExecState(status, nullptr, error_hostname);
 }
 
