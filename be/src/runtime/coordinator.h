@@ -350,6 +350,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// the Coordinator object), then finalizes execution (cancels remaining backends if
   /// transitioning to CANCELLED; in all cases releases resources and calls
   /// ComputeQuerySummary()). Must not be called if exec RPCs are pending.
+  /// Will block waiting for backends to completed if transitioning to the
+  /// RETURNED_RESULTS terminal state. Does not block if already in terminal state or
+  /// transitioning to ERROR or CANCELLED.
   void HandleExecStateTransition(const ExecState old_state, const ExecState new_state);
 
   /// Return true if 'exec_state_' is RETURNED_RESULTS.

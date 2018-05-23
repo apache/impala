@@ -669,25 +669,33 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
 
   if (backend_state->ApplyExecStatusReport(params, &exec_summary_, &progress_)) {
     // This backend execution has completed.
+    if (VLOG_QUERY_IS_ON) {
+      // Don't log backend completion if the query has already been cancelled.
+      int pending_backends = backend_exec_complete_barrier_->pending();
+      if (pending_backends >= 1) {
+        VLOG_QUERY << "Backend completed:"
+                   << " host=" << TNetworkAddressToString(backend_state->impalad_address())
+                   << " remaining=" << pending_backends
+                   << " query_id=" << PrintId(query_id());
+        BackendState::LogFirstInProgress(backend_states_);
+      }
+    }
     bool is_fragment_failure;
     TUniqueId failed_instance_id;
     Status status = backend_state->GetStatus(&is_fragment_failure, &failed_instance_id);
-    int pending_backends = backend_exec_complete_barrier_->Notify();
-    if (VLOG_QUERY_IS_ON && pending_backends >= 0) {
-      VLOG_QUERY << "Backend completed:"
-                 << " host=" << TNetworkAddressToString(backend_state->impalad_address())
-                 << " remaining=" << pending_backends
-                 << " query_id=" << PrintId(query_id());
-      BackendState::LogFirstInProgress(backend_states_);
-    }
     if (!status.ok()) {
       // We may start receiving status reports before all exec rpcs are complete.
       // Can't apply state transition until no more exec rpcs will be sent.
       exec_rpcs_complete_barrier_->Wait();
+      // Transition the status if we're not already in a terminal state. This won't block
+      // because either this transitions to an ERROR state or the query is already in
+      // a terminal state.
       discard_result(UpdateExecState(status,
               is_fragment_failure ? &failed_instance_id : nullptr,
               TNetworkAddressToString(backend_state->impalad_address())));
     }
+    // We've applied all changes from the final status report - notify waiting threads.
+    backend_exec_complete_barrier_->Notify();
   }
   // If all results have been returned, return a cancelled status to force the fragment
   // instance to stop executing.
