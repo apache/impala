@@ -108,11 +108,21 @@ under the License.
       </p>
 
       <p>
-        Because the statestore's purpose is to help when things go wrong, it is not critical to the normal
-        operation of an Impala cluster. If the statestore is not running or becomes unreachable, the Impala daemons
-        continue running and distributing work among themselves as usual; the cluster just becomes less robust if
-        other Impala daemons fail while the statestore is offline. When the statestore comes back online, it re-establishes
-        communication with the Impala daemons and resumes its monitoring function.
+        Because the statestore's purpose is to help when things go wrong and
+        to broadcast metadata to coordinators, it is not always critical to the
+        normal operation of an Impala cluster. If the statestore is not running
+        or becomes unreachable, the Impala daemons continue running and
+        distributing work among themselves as usual when working with the data
+        known to Impala. The cluster just becomes less robust if other Impala
+        daemons fail, and metadata becomes less consistent as it changes while
+        the statestore is offline. When the statestore comes back online, it
+        re-establishes communication with the Impala daemons and resumes its
+        monitoring and broadcasting functions.
+      </p>
+
+      <p>
+        If you issue a DDL statement while the statestore is down, the queries
+        that access the new object the DDL created will fail.
       </p>
 
       <p conref="../shared/impala_common.xml#common/statestored_catalogd_ha_blurb"/>
