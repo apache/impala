@@ -71,7 +71,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
     # TODO(IMPALA-6772): enable for ORC formats once a new version after release-1.4.3
     # of ORC library is released.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format in ('avro', 'parquet', 'rc', 'seq') or
+        v.get_value('table_format').file_format in ('avro', 'parquet') or
         (v.get_value('table_format').file_format == 'text' and
           v.get_value('table_format').compression_codec in ('none', 'lzo')))
 
