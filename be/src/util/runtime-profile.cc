@@ -17,8 +17,10 @@
 
 #include "util/runtime-profile-counters.h"
 
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <utility>
 
 #include <boost/bind.hpp>
 #include <boost/thread/locks.hpp>
@@ -499,6 +501,24 @@ void RuntimeProfile::GetAllChildren(vector<RuntimeProfile*>* children) {
     children->push_back(i->second);
     i->second->GetAllChildren(children);
   }
+}
+
+void RuntimeProfile::SortChildrenByTotalTime() {
+  lock_guard<SpinLock> l(children_lock_);
+  // Create a snapshot of total time values so that they don't change while we're
+  // sorting. Sort the <total_time, index> pairs, then reshuffle children_.
+  vector<pair<int64_t, int64_t>> total_times;
+  for (int i = 0; i < children_.size(); ++i) {
+    total_times.emplace_back(children_[i].first->total_time_counter()->value(), i);
+  }
+  // Order by descending total time.
+  sort(total_times.begin(), total_times.end(),
+      [](const pair<int64_t, int64_t>& p1, const pair<int64_t, int64_t>& p2) {
+        return p1.first > p2.first;
+      });
+  ChildVector new_children;
+  for (const auto& p : total_times) new_children.emplace_back(children_[p.second]);
+  children_ = move(new_children);
 }
 
 void RuntimeProfile::AddInfoString(const string& key, const string& value) {

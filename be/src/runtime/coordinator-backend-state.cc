@@ -542,20 +542,8 @@ void Coordinator::FragmentStats::AddSplitStats() {
   avg_profile_->AddInfoString("split sizes", ss.str());
 }
 
-// Comparator to order RuntimeProfiles by descending total time
-typedef struct {
-  typedef pair<RuntimeProfile*, bool> Profile;
-  bool operator()(const Profile& a, const Profile& b) const {
-    // Reverse ordering: we want the longest first
-    return
-        a.first->total_time_counter()->value() > b.first->total_time_counter()->value();
-  }
-} InstanceComparator;
-
 void Coordinator::FragmentStats::AddExecStats() {
-  InstanceComparator comparator;
-  root_profile_->SortChildren(comparator);
-
+  root_profile_->SortChildrenByTotalTime();
   stringstream times_label;
   times_label
     << "min:" << PrettyPrinter::Print(
