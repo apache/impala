@@ -266,11 +266,11 @@ TEST(CountersTest, MergeAndUpdateChildOrder) {
   EXPECT_EQ("Child2", tmp_children[1]->name());
 
   // Test that changes in order of children is handled gracefully by preserving the
-  // order from the previous update.
-  profile1->SortChildren([](
-        const pair<RuntimeProfile*, bool>& p1, const pair<RuntimeProfile*, bool>& p2) {
-    return p1.first->name() > p2.first->name();
-  });
+  // order from the previous update. Sorting puts the children in descending total time
+  // order.
+  p1_child1->total_time_counter()->Set(1);
+  p1_child2->total_time_counter()->Set(2);
+  profile1->SortChildrenByTotalTime();
   profile1->GetChildren(&tmp_children);
   EXPECT_EQ("Child2", tmp_children[0]->name());
   EXPECT_EQ("Child1", tmp_children[1]->name());
