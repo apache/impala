@@ -64,6 +64,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
+import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
@@ -441,7 +442,7 @@ public class HdfsTable extends Table {
             partitions.get(0).getFileFormat(), hostIndex_);
       } else {
         fd = FileDescriptor.create(fileStatus, fileStatus.getBlockLocations(), fs,
-            hostIndex_, fileStatus.isErasureCoded(), numUnknownDiskIds);
+            hostIndex_, HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds);
       }
       newFileDescs.add(fd);
       ++loadStats.loadedFiles;
@@ -514,7 +515,7 @@ public class HdfsTable extends Table {
           BlockLocation[] locations =
               fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
             fd = FileDescriptor.create(fileStatus, locations, fs, hostIndex_,
-                fileStatus.isErasureCoded(), numUnknownDiskIds);
+                HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds);
         }
         ++loadStats.loadedFiles;
       } else {
