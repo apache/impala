@@ -345,6 +345,10 @@ under the License.
                   is not enabled on the instance of <codeph>impalad</codeph> to which you are connecting, errors
                   are displayed.
                 </p>
+                <p>
+                  See <keyword keyref="kerberos"/> for the steps to set up and
+                  use Kerberos authentication in Impala.
+                </p>
               </entry>
             </row>
             <row>
