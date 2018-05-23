@@ -182,6 +182,14 @@ def create_exec_option_dimension_from_dict(exec_option_dimensions):
   # Build a test vector out of it
   return ImpalaTestDimension('exec_option', *exec_option_dimension_values)
 
+def add_exec_option_dimension(test_suite, key, value):
+  """
+  Takes an ImpalaTestSuite object 'test_suite' and adds 'key=value' to every exec option
+  test dimension, leaving the number of tests that will be run unchanged.
+  """
+  for v in test_suite.ImpalaTestMatrix.dimensions["exec_option"]:
+    v.value[key] = value
+
 def extend_exec_option_dimension(test_suite, key, value):
   """
   Takes an ImpalaTestSuite object 'test_suite' and extends the exec option test dimension

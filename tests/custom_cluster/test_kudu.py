@@ -21,6 +21,7 @@ from kudu.schema import INT32
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
+from tests.common.test_dimensions import add_exec_option_dimension
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
 LOG = logging.getLogger(__name__)
@@ -30,6 +31,13 @@ class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):
   @classmethod
   def get_workload(cls):
     return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestKuduOperations, cls).add_test_dimensions()
+    # The default read mode of READ_LATEST does not provide high enough consistency for
+    # these tests.
+    add_exec_option_dimension(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=\

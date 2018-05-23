@@ -63,6 +63,13 @@ enum TJoinDistributionMode {
   SHUFFLE
 }
 
+// Consistency level options for Kudu scans.
+enum TKuduReadMode {
+  DEFAULT,
+  READ_LATEST,
+  READ_AT_SNAPSHOT
+}
+
 // Query options that correspond to ImpalaService.ImpalaQueryOptions, with their
 // respective defaults. Query options can be set in the following ways:
 //
@@ -288,6 +295,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift.
   67: optional i32 thread_reservation_aggregate_limit = 0;
+
+  // See comment in ImpalaService.thrift.
+  68: optional TKuduReadMode kudu_read_mode = TKuduReadMode.DEFAULT;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

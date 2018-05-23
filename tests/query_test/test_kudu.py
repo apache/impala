@@ -40,6 +40,7 @@ from pytz import utc
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfNotHdfsMinicluster
+from tests.common.test_dimensions import add_exec_option_dimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
@@ -50,6 +51,13 @@ class TestKuduOperations(KuduTestSuite):
   """
   This suite tests the different modification operations when using a kudu table.
   """
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestKuduOperations, cls).add_test_dimensions()
+    # The default read mode of READ_LATEST does not provide high enough consistency for
+    # these tests.
+    add_exec_option_dimension(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
 
   def test_out_of_range_timestamps(self, vector, cursor, kudu_client, unique_database):
     """Test timestamp values that are outside of Impala's supported date range."""
@@ -299,6 +307,7 @@ class TestKuduOperations(KuduTestSuite):
 
   def test_kudu_col_removed(self, cursor, kudu_client, unique_database):
     """Test removing a Kudu column outside of Impala."""
+    cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING)
         PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
     assert kudu_client.table_exists(
@@ -366,7 +375,7 @@ class TestKuduOperations(KuduTestSuite):
     table_name = "%s.storage_attrs" % unique_database
     types = ['boolean', 'tinyint', 'smallint', 'int', 'bigint', 'float', 'double', \
         'string', 'timestamp', 'decimal']
-
+    cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     create_query = "create table %s (id int primary key" % table_name
     for t in types:
       create_query += ", %s_col %s" % (t, t)
@@ -435,6 +444,33 @@ class TestKuduOperations(KuduTestSuite):
         or "has fewer columns than expected." in msg \
         or "Column col1 has unexpected type." in msg \
         or "Client provided column col1[int64 NULLABLE] not present in tablet" in msg
+
+  def _retry_query(self, cursor, query, expected):
+    retries = 0
+    while retries < 3:
+      cursor.execute(query)
+      result = cursor.fetchall()
+      if result == expected:
+        break
+      retries += 1
+      time.sleep(1)
+    assert retries < 3, \
+        "Did not get a correct result for %s after 3 retries: %s" % (query, result)
+
+  def test_read_modes(self, cursor, unique_database):
+    """Other Kudu tests are run with a scan level of READ_AT_SNAPSHOT to have predicable
+    scan results. This test verifies that scans work as expected at the scan level of
+    READ_LATEST by retrying the scan if the results are incorrect."""
+    table_name = "%s.test_read_latest" % unique_database
+    cursor.execute("set kudu_read_mode=READ_LATEST")
+    cursor.execute("""create table %s (a int primary key, b string) partition by hash(a)
+    partitions 8 stored as kudu""" % table_name)
+    cursor.execute("insert into %s values (0, 'a'), (1, 'b'), (2, 'c')" % table_name)
+    self._retry_query(cursor, "select * from %s order by a" % table_name,
+        [(0, 'a'), (1, 'b'), (2, 'c')])
+    cursor.execute("""insert into %s select id, string_col from functional.alltypes
+    where id > 2 limit 100""" % table_name)
+    self._retry_query(cursor, "select count(*) from %s" % table_name, [(103,)])
 
 class TestCreateExternalTable(KuduTestSuite):
 
@@ -606,6 +642,7 @@ class TestCreateExternalTable(KuduTestSuite):
        unbounded partition). It is not possible to create such a table in Impala, but
        it can be created directly in Kudu and then loaded as an external table.
        Regression test for IMPALA-5154."""
+    cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     schema_builder = SchemaBuilder()
     column_spec = schema_builder.add_column("id", INT64)
     column_spec.nullable(False)
@@ -637,6 +674,7 @@ class TestCreateExternalTable(KuduTestSuite):
   def test_column_name_case(self, cursor, kudu_client, unique_database):
     """IMPALA-5286: Tests that an external Kudu table that was created with a column name
        containing upper case letters is handled correctly."""
+    cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     table_name = '%s.kudu_external_test' % unique_database
     if kudu_client.table_exists(table_name):
       kudu_client.delete_table(table_name)
