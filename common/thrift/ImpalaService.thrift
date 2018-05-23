@@ -331,6 +331,10 @@ enum TImpalaQueryOptions {
   // across all backends for the query exceeds this number. 0 or -1 means this has no
   // effect.
   THREAD_RESERVATION_AGGREGATE_LIMIT,
+
+  // Overrides the -kudu_read_mode flag to set the consistency level for Kudu scans.
+  // Possible values are DEFAULT, READ_LATEST, and READ_AT_SNAPSHOT.
+  KUDU_READ_MODE,
 }
 
 // The summary of a DML statement.

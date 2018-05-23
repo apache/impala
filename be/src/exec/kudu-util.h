@@ -108,5 +108,11 @@ inline Status FromKuduStatus(
   return Status::Expected(err_msg);
 }
 
+/// Converts 'mode' to its equivalent ReadMode, stored in 'out'. Possible values for
+/// 'mode' are 'READ_LATEST' and 'READ_AT_SNAPSHOT'. If 'mode' is invalid, an error is
+/// returned.
+Status StringToKuduReadMode(
+    const std::string& mode, kudu::client::KuduScanner::ReadMode* out) WARN_UNUSED_RESULT;
+
 } /// namespace impala
 #endif

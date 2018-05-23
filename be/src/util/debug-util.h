@@ -57,6 +57,7 @@ std::string PrintThriftEnum(const THdfsFileFormat::type& value);
 std::string PrintThriftEnum(const THdfsSeqCompressionMode::type& value);
 std::string PrintThriftEnum(const TImpalaQueryOptions::type& value);
 std::string PrintThriftEnum(const TJoinDistributionMode::type& value);
+std::string PrintThriftEnum(const TKuduReadMode::type& value);
 std::string PrintThriftEnum(const TMetricKind::type& value);
 std::string PrintThriftEnum(const TParquetArrayResolution::type& value);
 std::string PrintThriftEnum(const TParquetFallbackSchemaResolution::type& value);

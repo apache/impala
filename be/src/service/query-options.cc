@@ -693,6 +693,19 @@ Status impala::SetQueryOption(const string& key, const string& value,
         }
         break;
       }
+      case TImpalaQueryOptions::KUDU_READ_MODE: {
+        if (iequals(value, "DEFAULT") || iequals(value, "0")) {
+          query_options->__set_kudu_read_mode(TKuduReadMode::DEFAULT);
+        } else if (iequals(value, "READ_LATEST") || iequals(value, "1")) {
+          query_options->__set_kudu_read_mode(TKuduReadMode::READ_LATEST);
+        } else if (iequals(value, "READ_AT_SNAPSHOT") || iequals(value, "2")) {
+          query_options->__set_kudu_read_mode(TKuduReadMode::READ_AT_SNAPSHOT);
+        } else {
+          return Status(Substitute("Invalid kudu_read_mode '$0'. Valid values are "
+              "DEFAULT, READ_LATEST, and READ_AT_SNAPSHOT.", value));
+        }
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
