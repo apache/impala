@@ -52,6 +52,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
+import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.util.MembershipSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,6 +123,7 @@ public class HBaseScanNode extends ScanNode {
     analyzer.materializeSlots(conjuncts_);
     computeMemLayout(analyzer);
     computeScanRangeLocations(analyzer);
+    Preconditions.checkState(!scanRangeSpecs_.isSetSplit_specs());
 
     // Call computeStats() after materializing slots and computing the mem layout.
     computeStats(analyzer);
@@ -219,7 +221,8 @@ public class HBaseScanNode extends ScanNode {
     // Assume that each node in the cluster gets a scan range, unless there are fewer
     // scan ranges than nodes.
     numNodes_ = Math.max(1,
-        Math.min(scanRanges_.size(), MembershipSnapshot.getCluster().numNodes()));
+        Math.min(scanRangeSpecs_.getConcrete_rangesSize(),
+            MembershipSnapshot.getCluster().numNodes()));
     if (LOG.isTraceEnabled()) {
       LOG.trace("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes_));
     }
@@ -291,7 +294,7 @@ public class HBaseScanNode extends ScanNode {
    * of that region server.
    */
   private void computeScanRangeLocations(Analyzer analyzer) {
-    scanRanges_ = Lists.newArrayList();
+    scanRangeSpecs_ = new TScanRangeSpec();
 
     // For empty scan node, return an empty list.
     if (isEmpty_) return;
@@ -348,11 +351,12 @@ public class HBaseScanNode extends ScanNode {
           TNetworkAddress networkAddress = addressToTNetworkAddress(locEntry.getKey());
           scanRangeLocation.addToLocations(
               new TScanRangeLocation(analyzer.getHostIndex().getIndex(networkAddress)));
-          scanRanges_.add(scanRangeLocation);
 
           TScanRange scanRange = new TScanRange();
           scanRange.setHbase_key_range(keyRange);
           scanRangeLocation.setScan_range(scanRange);
+
+          scanRangeSpecs_.addToConcrete_ranges(scanRangeLocation);
         }
         prevEndKey = curRegEndKey;
       }

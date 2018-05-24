@@ -66,6 +66,7 @@ import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRangeLocationList;
+import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTupleDescriptor;
@@ -218,12 +219,12 @@ public class PlannerTestBase extends FrontendTestBase {
     Set<THdfsPartition> scanRangePartitions = Sets.newHashSet();
     for (TPlanExecInfo execInfo: execRequest.plan_exec_info) {
       if (execInfo.per_node_scan_ranges != null) {
-        for (Map.Entry<Integer, List<TScanRangeLocationList>> entry:
-             execInfo.per_node_scan_ranges.entrySet()) {
-          if (entry.getValue() == null) {
+        for (Map.Entry<Integer, TScanRangeSpec> entry :
+            execInfo.per_node_scan_ranges.entrySet()) {
+          if (entry.getValue() == null || !entry.getValue().isSetConcrete_ranges()) {
             continue;
           }
-          for (TScanRangeLocationList locationList: entry.getValue()) {
+          for (TScanRangeLocationList locationList : entry.getValue().concrete_ranges) {
             if (locationList.scan_range.isSetHdfs_file_split()) {
               THdfsFileSplit split = locationList.scan_range.getHdfs_file_split();
               THdfsPartition partition = findPartition(entry.getKey(), split);
@@ -270,12 +271,14 @@ public class PlannerTestBase extends FrontendTestBase {
     StringBuilder result = new StringBuilder();
     for (TPlanExecInfo execInfo: execRequest.plan_exec_info) {
       if (execInfo.per_node_scan_ranges == null) continue;
-      for (Map.Entry<Integer, List<TScanRangeLocationList>> entry:
+      for (Map.Entry<Integer, TScanRangeSpec> entry :
           execInfo.per_node_scan_ranges.entrySet()) {
         result.append("NODE " + entry.getKey().toString() + ":\n");
-        if (entry.getValue() == null) continue;
+        if (entry.getValue() == null || !entry.getValue().isSetConcrete_ranges()) {
+          continue;
+        }
 
-        for (TScanRangeLocationList locations: entry.getValue()) {
+        for (TScanRangeLocationList locations : entry.getValue().concrete_ranges) {
           // print scan range
           result.append("  ");
           if (locations.scan_range.isSetHdfs_file_split()) {

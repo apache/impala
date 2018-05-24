@@ -86,7 +86,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
 
     // Minimum block size in bytes allowed for synthetic file blocks (other than the last
     // block, which may be shorter).
-    private final static long MIN_SYNTHETIC_BLOCK_SIZE = 1024 * 1024;
+    public final static long MIN_SYNTHETIC_BLOCK_SIZE = 1024 * 1024;
 
     // Internal representation of a file descriptor using a FlatBuffer.
     private final FbFileDesc fbFileDescriptor_;
@@ -130,29 +130,28 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     /**
      * Creates the file descriptor of a file represented by 'fileStatus' that
      * resides in a filesystem that doesn't support the BlockLocation API (e.g. S3).
-     * fileFormat' is the file format of the partition where this file resides and
-     * 'hostIndex' stores the network addresses of the hosts that store blocks of
-     * the parent HdfsTable.
+     * 'fileFormat' is the file format of the partition where this file resides.
      */
-    public static FileDescriptor createWithSynthesizedBlockMd(FileStatus fileStatus,
-        HdfsFileFormat fileFormat, ListMap<TNetworkAddress> hostIndex) {
+    public static FileDescriptor createWithNoBlocks(
+        FileStatus fileStatus, HdfsFileFormat fileFormat) {
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
-      int[] fbFileBlockOffets =
-          synthesizeFbBlockMd(fbb, fileStatus, fileFormat, hostIndex);
-      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, fbFileBlockOffets,
-          false));
+      return new FileDescriptor(createFbFileDesc(fbb, fileStatus, null, false));
     }
 
     /**
      * Serializes the metadata of a file descriptor represented by 'fileStatus' into a
-     * FlatBuffer using 'fbb' and returns the associated FbFileDesc object. 'blockOffsets'
-     * are the offsets of the serialized block metadata of this file in the underlying
-     * buffer.
+     * FlatBuffer using 'fbb' and returns the associated FbFileDesc object.
+     * 'fbFileBlockOffsets' are the offsets of the serialized block metadata of this file
+     * in the underlying buffer. Can be null if there are no blocks.
      */
     private static FbFileDesc createFbFileDesc(FlatBufferBuilder fbb,
         FileStatus fileStatus, int[] fbFileBlockOffets, boolean isEc) {
       int fileNameOffset = fbb.createString(fileStatus.getPath().getName());
-      int blockVectorOffset = FbFileDesc.createFileBlocksVector(fbb, fbFileBlockOffets);
+      // A negative block vector offset is used when no block offsets are specified.
+      int blockVectorOffset = -1;
+      if (fbFileBlockOffets != null) {
+        blockVectorOffset = FbFileDesc.createFileBlocksVector(fbb, fbFileBlockOffets);
+      }
       FbFileDesc.startFbFileDesc(fbb);
       FbFileDesc.addFileName(fbb, fileNameOffset);
       FbFileDesc.addLength(fbb, fileStatus.getLen());
@@ -160,7 +159,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       FbFileDesc.addIsEc(fbb, isEc);
       HdfsCompression comp = HdfsCompression.fromFileName(fileStatus.getPath().getName());
       FbFileDesc.addCompression(fbb, comp.toFb());
-      FbFileDesc.addFileBlocks(fbb, blockVectorOffset);
+      if (blockVectorOffset >= 0) FbFileDesc.addFileBlocks(fbb, blockVectorOffset);
       fbb.finish(FbFileDesc.endFbFileDesc(fbb));
       // To eliminate memory fragmentation, copy the contents of the FlatBuffer to the
       // smallest possible ByteBuffer.
@@ -168,36 +167,6 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       ByteBuffer compressedBb = ByteBuffer.allocate(bb.capacity());
       compressedBb.put(bb);
       return FbFileDesc.getRootAsFbFileDesc((ByteBuffer)compressedBb.flip());
-    }
-
-    /**
-     * Synthesizes the block metadata of a file represented by 'fileStatus' that resides
-     * in a filesystem that doesn't support the BlockLocation API. The block metadata
-     * consist of the length and offset of each file block. It serializes the
-     * block metadata into a FlatBuffer using 'fbb' and returns their offsets in the
-     * underlying buffer. 'fileFormat' is the file format of the underlying partition and
-     * 'hostIndex' stores the network addresses of the hosts that store the blocks of the
-     * parent HdfsTable.
-     */
-    private static int[] synthesizeFbBlockMd(FlatBufferBuilder fbb, FileStatus fileStatus,
-        HdfsFileFormat fileFormat, ListMap<TNetworkAddress> hostIndex) {
-      long start = 0;
-      long remaining = fileStatus.getLen();
-      long blockSize = fileStatus.getBlockSize();
-      if (blockSize < MIN_SYNTHETIC_BLOCK_SIZE) blockSize = MIN_SYNTHETIC_BLOCK_SIZE;
-      if (!fileFormat.isSplittable(HdfsCompression.fromFileName(
-          fileStatus.getPath().getName()))) {
-        blockSize = remaining;
-      }
-      List<Integer> fbFileBlockOffets = Lists.newArrayList();
-      while (remaining > 0) {
-        long len = Math.min(remaining, blockSize);
-        fbFileBlockOffets.add(FileBlock.createFbFileBlock(fbb, start, len,
-            (short) hostIndex.getIndex(REMOTE_NETWORK_ADDRESS)));
-        remaining -= len;
-        start += len;
-      }
-      return Ints.toArray(fbFileBlockOffets);
     }
 
     public String getFileName() { return fbFileDescriptor_.fileName(); }

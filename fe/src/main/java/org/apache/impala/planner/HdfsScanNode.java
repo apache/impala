@@ -49,6 +49,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
@@ -60,6 +61,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.fb.FbFileBlock;
@@ -67,6 +69,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.THdfsFileSplit;
+import org.apache.impala.thrift.TFileSplitGeneratorSpec;
 import org.apache.impala.thrift.THdfsScanNode;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPlanNode;
@@ -76,6 +79,7 @@ import org.apache.impala.thrift.TReplicaPreference;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
+import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.MembershipSnapshot;
@@ -190,6 +194,9 @@ public class HdfsScanNode extends ScanNode {
   // used for determining the scan cardinality.
   private long partitionNumRows_ = -1;
   private long extrapolatedNumRows_ = -1;
+
+  // Number of scan ranges that will be generated for all TFileSplitGeneratorSpec's.
+  private long generatedScanRangeCount_ = 0;
 
   // Estimated row count of the largest scan range. -1 if no stats are available.
   // Set in computeScanRangeLocations()
@@ -746,7 +753,7 @@ public class HdfsScanNode extends ScanNode {
 
     long scanRangeBytesLimit = analyzer.getQueryCtx().client_request.getQuery_options()
         .getMax_scan_range_length();
-    scanRanges_ = Lists.newArrayList();
+    scanRangeSpecs_ = new TScanRangeSpec();
     numPartitions_ = (sampledFiles != null) ? sampledFiles.size() : partitions_.size();
     totalFiles_ = 0;
     totalBytes_ = 0;
@@ -773,74 +780,35 @@ public class HdfsScanNode extends ScanNode {
       } catch (IOException e) {
         throw new ImpalaRuntimeException("Error determining partition fs type", e);
       }
-      boolean checkMissingDiskIds = FileSystemUtil.supportsStorageIds(partitionFs);
-      boolean partitionMissingDiskIds = false;
+      boolean fsHasBlocks = FileSystemUtil.supportsStorageIds(partitionFs);
+      if (!fsHasBlocks) {
+        // Limit the scan range length if generating scan ranges.
+        long maxBlockSize =
+            Math.max(partitionFs.getDefaultBlockSize(partition.getLocationPath()),
+                HdfsPartition.FileDescriptor.MIN_SYNTHETIC_BLOCK_SIZE);
+        if (scanRangeBytesLimit > 0) {
+          scanRangeBytesLimit = Math.min(scanRangeBytesLimit, maxBlockSize);
+        } else {
+          scanRangeBytesLimit = maxBlockSize;
+        }
+      }
       final long partitionBytes = FileDescriptor.computeTotalFileLength(fileDescs);
       long partitionMaxScanRangeBytes = 0;
+      boolean partitionMissingDiskIds = false;
       totalBytes_ += partitionBytes;
       totalFiles_ += fileDescs.size();
       for (FileDescriptor fileDesc: fileDescs) {
-        boolean fileDescMissingDiskIds = false;
-        for (int j = 0; j < fileDesc.getNumFileBlocks(); ++j) {
-          FbFileBlock block = fileDesc.getFbFileBlock(j);
-          int replicaHostCount = FileBlock.getNumReplicaHosts(block);
-          if (replicaHostCount == 0) {
-            // we didn't get locations for this block; for now, just ignore the block
-            // TODO: do something meaningful with that
-            continue;
-          }
-          // Collect the network address and volume ID of all replicas of this block.
-          List<TScanRangeLocation> locations = Lists.newArrayList();
-          for (int i = 0; i < replicaHostCount; ++i) {
-            TScanRangeLocation location = new TScanRangeLocation();
-            // Translate from the host index (local to the HdfsTable) to network address.
-            int replicaHostIdx = FileBlock.getReplicaHostIdx(block, i);
-            TNetworkAddress networkAddress =
-                partition.getTable().getHostIndex().getEntry(replicaHostIdx);
-            Preconditions.checkNotNull(networkAddress);
-            // Translate from network address to the global (to this request) host index.
-            Integer globalHostIdx = analyzer.getHostIndex().getIndex(networkAddress);
-            location.setHost_idx(globalHostIdx);
-            if (checkMissingDiskIds && !fileDesc.getIsEc() &&
-                FileBlock.getDiskId(block, i) == -1) {
-              ++numScanRangesNoDiskIds_;
-              partitionMissingDiskIds = true;
-              fileDescMissingDiskIds = true;
-            }
-            location.setVolume_id(FileBlock.getDiskId(block, i));
-            location.setIs_cached(FileBlock.isReplicaCached(block, i));
-            locations.add(location);
-          }
-          // create scan ranges, taking into account maxScanRangeLength
-          long currentOffset = FileBlock.getOffset(block);
-          long remainingLength = FileBlock.getLength(block);
-          while (remainingLength > 0) {
-            long currentLength = remainingLength;
-            if (scanRangeBytesLimit > 0 && remainingLength > scanRangeBytesLimit) {
-              currentLength = scanRangeBytesLimit;
-            }
-            TScanRange scanRange = new TScanRange();
-            scanRange.setHdfs_file_split(new THdfsFileSplit(fileDesc.getFileName(),
-                currentOffset, currentLength, partition.getId(), fileDesc.getFileLength(),
-                fileDesc.getFileCompression().toThrift(),
-                fileDesc.getModificationTime()));
-            TScanRangeLocationList scanRangeLocations = new TScanRangeLocationList();
-            scanRangeLocations.scan_range = scanRange;
-            scanRangeLocations.locations = locations;
-            scanRanges_.add(scanRangeLocations);
-            largestScanRangeBytes_ = Math.max(largestScanRangeBytes_, currentLength);
-            partitionMaxScanRangeBytes =
-                Math.max(partitionMaxScanRangeBytes, currentLength);
-            remainingLength -= currentLength;
-            currentOffset += currentLength;
-          }
-        }
-        if (fileDescMissingDiskIds) {
-          ++numFilesNoDiskIds_;
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("File blocks mapping to unknown disk ids. Dir: " +
-                partition.getLocation() + " File:" + fileDesc.toString());
-          }
+        if (!fsHasBlocks) {
+          Preconditions.checkState(fileDesc.getNumFileBlocks() == 0);
+          generateScanRangeSpecs(partition, fileDesc, scanRangeBytesLimit);
+        } else {
+          // Skips files that have no associated blocks.
+          if (fileDesc.getNumFileBlocks() == 0) continue;
+          Pair<Boolean, Long> result = transformBlocksToScanRanges(
+              partition, fileDesc, fsHasBlocks, scanRangeBytesLimit, analyzer);
+          partitionMaxScanRangeBytes =
+              Math.max(partitionMaxScanRangeBytes, result.second);
+          if (result.first) partitionMissingDiskIds = true;
         }
       }
       if (partitionMissingDiskIds) ++numPartitionsNoDiskIds_;
@@ -882,13 +850,115 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
+   * Given a fileDesc of partition, generates TScanRanges that are specifications rather
+   * than actual ranges. Defers generating the TScanRanges to the backend.
+   * Used for file systems that do not have any physical attributes associated with
+   * blocks (e.g., replica locations, caching, etc.). 'maxBlock' size determines how large
+   * the scan ranges can be (may be ignored if the file is not splittable).
+   */
+  private void generateScanRangeSpecs(
+      HdfsPartition partition, HdfsPartition.FileDescriptor fileDesc, long maxBlockSize) {
+    Preconditions.checkArgument(fileDesc.getNumFileBlocks() == 0);
+    Preconditions.checkArgument(maxBlockSize > 0);
+    if (fileDesc.getFileLength() <= 0) return;
+    boolean splittable = partition.getFileFormat().isSplittable(
+        HdfsCompression.fromFileName(fileDesc.getFileName()));
+    TFileSplitGeneratorSpec splitSpec = new TFileSplitGeneratorSpec(
+        fileDesc.toThrift(), maxBlockSize, splittable, partition.getId());
+    scanRangeSpecs_.addToSplit_specs(splitSpec);
+    long scanRangeBytes = Math.min(maxBlockSize, fileDesc.getFileLength());
+    if (splittable) {
+      generatedScanRangeCount_ +=
+          Math.ceil((double) fileDesc.getFileLength() / (double) maxBlockSize);
+    } else {
+      ++generatedScanRangeCount_;
+      scanRangeBytes = fileDesc.getFileLength();
+    }
+    largestScanRangeBytes_ = Math.max(largestScanRangeBytes_, scanRangeBytes);
+  }
+
+  /**
+   * Given a fileDesc of partition, transforms the blocks into TScanRanges. Each range
+   * is paired with information about where the block is located so that the backend
+   * coordinator can assign ranges to workers to avoid remote reads. These
+   * TScanRangeLocationLists are added to scanRanges_. A pair is returned that indicates
+   * whether the file has a missing disk id and the maximum scan range (in bytes) found.
+   */
+  private Pair<Boolean, Long> transformBlocksToScanRanges(HdfsPartition partition,
+      HdfsPartition.FileDescriptor fileDesc, boolean fsHasBlocks,
+      long scanRangeBytesLimit, Analyzer analyzer) {
+    Preconditions.checkArgument(fileDesc.getNumFileBlocks() > 0);
+    boolean fileDescMissingDiskIds = false;
+    long fileMaxScanRangeBytes = 0;
+    for (int i = 0; i < fileDesc.getNumFileBlocks(); ++i) {
+      FbFileBlock block = fileDesc.getFbFileBlock(i);
+      int replicaHostCount = FileBlock.getNumReplicaHosts(block);
+      if (replicaHostCount == 0) {
+        // we didn't get locations for this block; for now, just ignore the block
+        // TODO: do something meaningful with that
+        continue;
+      }
+      // Collect the network address and volume ID of all replicas of this block.
+      List<TScanRangeLocation> locations = Lists.newArrayList();
+      for (int j = 0; j < replicaHostCount; ++j) {
+        TScanRangeLocation location = new TScanRangeLocation();
+        // Translate from the host index (local to the HdfsTable) to network address.
+        int replicaHostIdx = FileBlock.getReplicaHostIdx(block, j);
+        TNetworkAddress networkAddress =
+            partition.getTable().getHostIndex().getEntry(replicaHostIdx);
+        Preconditions.checkNotNull(networkAddress);
+        // Translate from network address to the global (to this request) host index.
+        Integer globalHostIdx = analyzer.getHostIndex().getIndex(networkAddress);
+        location.setHost_idx(globalHostIdx);
+        if (fsHasBlocks && !fileDesc.getIsEc() && FileBlock.getDiskId(block, j) == -1) {
+          ++numScanRangesNoDiskIds_;
+          fileDescMissingDiskIds = true;
+        }
+        location.setVolume_id(FileBlock.getDiskId(block, j));
+        location.setIs_cached(FileBlock.isReplicaCached(block, j));
+        locations.add(location);
+      }
+      // create scan ranges, taking into account maxScanRangeLength
+      long currentOffset = FileBlock.getOffset(block);
+      long remainingLength = FileBlock.getLength(block);
+      while (remainingLength > 0) {
+        long currentLength = remainingLength;
+        if (scanRangeBytesLimit > 0 && remainingLength > scanRangeBytesLimit) {
+          currentLength = scanRangeBytesLimit;
+        }
+        TScanRange scanRange = new TScanRange();
+        scanRange.setHdfs_file_split(new THdfsFileSplit(fileDesc.getFileName(),
+            currentOffset, currentLength, partition.getId(), fileDesc.getFileLength(),
+            fileDesc.getFileCompression().toThrift(), fileDesc.getModificationTime()));
+        TScanRangeLocationList scanRangeLocations = new TScanRangeLocationList();
+        scanRangeLocations.scan_range = scanRange;
+        scanRangeLocations.locations = locations;
+        scanRangeSpecs_.addToConcrete_ranges(scanRangeLocations);
+        largestScanRangeBytes_ = Math.max(largestScanRangeBytes_, currentLength);
+        fileMaxScanRangeBytes = Math.max(fileMaxScanRangeBytes, currentLength);
+        remainingLength -= currentLength;
+        currentOffset += currentLength;
+      }
+    }
+    if (fileDescMissingDiskIds) {
+      ++numFilesNoDiskIds_;
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("File blocks mapping to unknown disk ids. Dir: "
+            + partition.getLocation() + " File:" + fileDesc.toString());
+      }
+    }
+
+    return new Pair<Boolean, Long>(fileDescMissingDiskIds, fileMaxScanRangeBytes);
+  }
+
+  /**
    * Computes the average row size, input and output cardinalities, and estimates the
    * number of nodes.
    * Requires that computeScanRangeLocations() has been called.
    */
   @Override
   public void computeStats(Analyzer analyzer) {
-    Preconditions.checkNotNull(scanRanges_);
+    Preconditions.checkNotNull(scanRangeSpecs_);
     super.computeStats(analyzer);
     computeCardinalities();
     computeNumNodes(analyzer, cardinality_);
@@ -1014,54 +1084,67 @@ public class HdfsScanNode extends ScanNode {
    * ranges that cannot will be round-robined across the cluster.
    */
   protected void computeNumNodes(Analyzer analyzer, long cardinality) {
-    Preconditions.checkNotNull(scanRanges_);
+    Preconditions.checkNotNull(scanRangeSpecs_);
     MembershipSnapshot cluster = MembershipSnapshot.getCluster();
     HashSet<TNetworkAddress> localHostSet = Sets.newHashSet();
     int totalNodes = 0;
     int numLocalRanges = 0;
     int numRemoteRanges = 0;
-    for (TScanRangeLocationList range: scanRanges_) {
-      boolean anyLocal = false;
-      for (TScanRangeLocation loc: range.locations) {
-        TNetworkAddress dataNode = analyzer.getHostIndex().getEntry(loc.getHost_idx());
-        if (cluster.contains(dataNode)) {
-          anyLocal = true;
-          // Use the full datanode address (including port) to account for the test
-          // minicluster where there are multiple datanodes and impalads on a single
-          // host.  This assumes that when an impalad is colocated with a datanode,
-          // there are the same number of impalads as datanodes on this host in this
-          // cluster.
-          localHostSet.add(dataNode);
+    if (scanRangeSpecs_.isSetConcrete_ranges()) {
+      for (TScanRangeLocationList range : scanRangeSpecs_.concrete_ranges) {
+        boolean anyLocal = false;
+        if (range.isSetLocations()) {
+          for (TScanRangeLocation loc : range.locations) {
+            TNetworkAddress dataNode =
+                analyzer.getHostIndex().getEntry(loc.getHost_idx());
+            if (cluster.contains(dataNode)) {
+              anyLocal = true;
+              // Use the full datanode address (including port) to account for the test
+              // minicluster where there are multiple datanodes and impalads on a single
+              // host.  This assumes that when an impalad is colocated with a datanode,
+              // there are the same number of impalads as datanodes on this host in this
+              // cluster.
+              localHostSet.add(dataNode);
+            }
+          }
         }
+        // This range has at least one replica with a colocated impalad, so assume it
+        // will be scheduled on one of those nodes.
+        if (anyLocal) {
+          ++numLocalRanges;
+        } else {
+          ++numRemoteRanges;
+        }
+        // Approximate the number of nodes that will execute locally assigned ranges to
+        // be the smaller of the number of locally assigned ranges and the number of
+        // hosts that hold block replica for those ranges.
+        int numLocalNodes = Math.min(numLocalRanges, localHostSet.size());
+        // The remote ranges are round-robined across all the impalads.
+        int numRemoteNodes = Math.min(numRemoteRanges, cluster.numNodes());
+        // The local and remote assignments may overlap, but we don't know by how much so
+        // conservatively assume no overlap.
+        totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numNodes());
+        // Exit early if all hosts have a scan range assignment, to avoid extraneous work
+        // in case the number of scan ranges dominates the number of nodes.
+        if (totalNodes == cluster.numNodes()) break;
       }
-      // This range has at least one replica with a colocated impalad, so assume it
-      // will be scheduled on one of those nodes.
-      if (anyLocal) {
-        ++numLocalRanges;
-      } else {
-        ++numRemoteRanges;
-      }
-      // Approximate the number of nodes that will execute locally assigned ranges to
-      // be the smaller of the number of locally assigned ranges and the number of
-      // hosts that hold block replica for those ranges.
-      int numLocalNodes = Math.min(numLocalRanges, localHostSet.size());
-      // The remote ranges are round-robined across all the impalads.
-      int numRemoteNodes = Math.min(numRemoteRanges, cluster.numNodes());
-      // The local and remote assignments may overlap, but we don't know by how much so
-      // conservatively assume no overlap.
-      totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numNodes());
-      // Exit early if all hosts have a scan range assignment, to avoid extraneous work
-      // in case the number of scan ranges dominates the number of nodes.
-      if (totalNodes == cluster.numNodes()) break;
+    }
+    // Handle the generated range specifications.
+    if (totalNodes < cluster.numNodes() && scanRangeSpecs_.isSetSplit_specs()) {
+      Preconditions.checkState(
+          generatedScanRangeCount_ >= scanRangeSpecs_.getSplit_specsSize());
+      numRemoteRanges += generatedScanRangeCount_;
+      totalNodes = Math.min(numRemoteRanges, cluster.numNodes());
     }
     // Tables can reside on 0 nodes (empty table), but a plan node must always be
     // executed on at least one node.
     numNodes_ = (cardinality == 0 || totalNodes == 0) ? 1 : totalNodes;
     if (LOG.isTraceEnabled()) {
-      LOG.trace("computeNumNodes totalRanges=" + scanRanges_.size() +
-          " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges +
-          " localHostSet.size=" + localHostSet.size() +
-          " clusterNodes=" + cluster.numNodes());
+      LOG.trace("computeNumNodes totalRanges="
+          + (scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_)
+          + " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges
+          + " localHostSet.size=" + localHostSet.size()
+          + " clusterNodes=" + cluster.numNodes());
     }
   }
 
@@ -1154,10 +1237,11 @@ public class HdfsScanNode extends ScanNode {
           maxScanRangeNumRows_ == -1 ? "unavailable" : maxScanRangeNumRows_));
       output.append("\n");
       if (numScanRangesNoDiskIds_ > 0) {
-        output.append(String.format("%smissing disk ids: " +
-            "partitions=%s/%s files=%s/%s scan ranges %s/%s\n", detailPrefix,
-            numPartitionsNoDiskIds_, numPartitions_, numFilesNoDiskIds_,
-            totalFiles_, numScanRangesNoDiskIds_, scanRanges_.size()));
+        output.append(String.format("%smissing disk ids: "
+                + "partitions=%s/%s files=%s/%s scan ranges %s/%s\n",
+            detailPrefix, numPartitionsNoDiskIds_, numPartitions_, numFilesNoDiskIds_,
+            totalFiles_, numScanRangesNoDiskIds_,
+            scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_));
       }
       // Groups the min max original conjuncts by tuple descriptor.
       output.append(getMinMaxOriginalConjunctsExplainString(detailPrefix));
@@ -1250,12 +1334,15 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
-    Preconditions.checkNotNull(scanRanges_, "Cost estimation requires scan ranges.");
-    if (scanRanges_.isEmpty()) {
+    Preconditions.checkNotNull(scanRangeSpecs_, "Cost estimation requires scan ranges.");
+    long scanRangeSize =
+        scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_;
+    if (scanRangeSize == 0) {
       nodeResourceProfile_ = ResourceProfile.noReservation(0);
       return;
     }
-    Preconditions.checkState(0 < numNodes_ && numNodes_ <= scanRanges_.size());
+
+    Preconditions.checkState(0 < numNodes_ && numNodes_ <= scanRangeSize);
     Preconditions.checkNotNull(desc_);
     Preconditions.checkState(desc_.getTable() instanceof HdfsTable);
     HdfsTable table = (HdfsTable) desc_.getTable();
@@ -1274,8 +1361,8 @@ public class HdfsScanNode extends ScanNode {
       // excluding partition columns and columns that are populated from file metadata.
       perHostScanRanges = columnReservations.size();
     } else {
-      perHostScanRanges = (int) Math.ceil((
-          (double) scanRanges_.size() / (double) numNodes_) * SCAN_RANGE_SKEW_FACTOR);
+      perHostScanRanges = (int) Math.ceil(
+          ((double) scanRangeSize / (double) numNodes_) * SCAN_RANGE_SKEW_FACTOR);
     }
 
     // The non-MT scan node requires at least one scanner thread.
@@ -1293,7 +1380,7 @@ public class HdfsScanNode extends ScanNode {
       }
     }
 
-    long avgScanRangeBytes = (long) Math.ceil(totalBytes_ / (double) scanRanges_.size());
+    long avgScanRangeBytes = (long) Math.ceil(totalBytes_ / (double) scanRangeSize);
     // The +1 accounts for an extra I/O buffer to read past the scan range due to a
     // trailing record spanning Hdfs blocks.
     long maxIoBufferSize =

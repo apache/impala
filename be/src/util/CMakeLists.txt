@@ -47,6 +47,7 @@ add_library(Util
   disk-info.cc
   error-util.cc
   filesystem-util.cc
+  flat_buffer.cc
   hdfs-util.cc
   hdfs-bulk-ops.cc
   hdr-histogram.cc

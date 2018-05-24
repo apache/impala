@@ -20,10 +20,13 @@
 #include <boost/unordered_set.hpp>
 
 #include "common/names.h"
+#include "flatbuffers/flatbuffers.h"
+#include "gen-cpp/CatalogObjects_generated.h"
 #include "scheduling/scheduler.h"
 
 using namespace impala;
 using namespace impala::test;
+using namespace org::apache::impala::fb;
 
 DECLARE_int32(krpc_port);
 
@@ -61,6 +64,10 @@ const string Cluster::IP_PREFIX = "10";
 
 /// Default size for new blocks is 1MB.
 const int64_t Block::DEFAULT_BLOCK_SIZE = 1 << 20;
+/// Default size for files is 4MB.
+const int64_t FileSplitGeneratorSpec::DEFAULT_FILE_SIZE = 1 << 22;
+/// Default size for file splits is 1 MB.
+const int64_t FileSplitGeneratorSpec::DEFAULT_BLOCK_SIZE = 1 << 20;
 
 int Cluster::AddHost(bool has_backend, bool has_datanode, bool is_executor) {
   int host_idx = hosts_.size();
@@ -193,6 +200,17 @@ void Schema::AddMultiBlockTable(const TableName& table_name, int num_blocks,
   tables_[table_name] = table;
 }
 
+void Schema::AddFileSplitGeneratorSpecs(
+    const TableName& table_name, const std::vector<FileSplitGeneratorSpec>& specs) {
+  Table* table = &tables_[table_name];
+  table->specs.insert(table->specs.end(), specs.begin(), specs.end());
+}
+
+void Schema::AddFileSplitGeneratorDefaultSpecs(const TableName& table_name, int num) {
+  Table* table = &tables_[table_name];
+  for (int i = 0; i < num; ++i) table->specs.push_back(FileSplitGeneratorSpec());
+}
+
 const Table& Schema::GetTable(const TableName& table_name) const {
   auto it = tables_.find(table_name);
   DCHECK(it != tables_.end());
@@ -207,8 +225,8 @@ const vector<TNetworkAddress>& Plan::referenced_datanodes() const {
   return referenced_datanodes_;
 }
 
-const vector<TScanRangeLocationList>& Plan::scan_range_locations() const {
-  return scan_range_locations_;
+const TScanRangeSpec& Plan::scan_range_specs() const {
+  return scan_range_specs_;
 }
 
 void Plan::AddTableScan(const TableName& table_name) {
@@ -218,7 +236,14 @@ void Plan::AddTableScan(const TableName& table_name) {
     const Block& block = blocks[i];
     TScanRangeLocationList scan_range_locations;
     BuildTScanRangeLocationList(table_name, block, i, &scan_range_locations);
-    scan_range_locations_.push_back(scan_range_locations);
+    scan_range_specs_.concrete_ranges.push_back(scan_range_locations);
+  }
+  const vector<FileSplitGeneratorSpec>& specs = table.specs;
+  for (int i = 0; i < specs.size(); ++i) {
+    const FileSplitGeneratorSpec& file_spec = specs[i];
+    TFileSplitGeneratorSpec spec;
+    BuildScanRangeSpec(table_name, file_spec, i, &spec);
+    scan_range_specs_.split_specs.push_back(spec);
   }
 }
 
@@ -252,6 +277,27 @@ void Plan::BuildScanRange(const TableName& table_name, const Block& block, int b
   file_split.file_compression = THdfsCompression::NONE;
   file_split.mtime = 1;
   scan_range->__set_hdfs_file_split(file_split);
+}
+
+void Plan::BuildScanRangeSpec(const TableName& table_name,
+    const FileSplitGeneratorSpec& spec, int spec_idx,
+    TFileSplitGeneratorSpec* thrift_spec) {
+  THdfsFileDesc thrift_file;
+
+  flatbuffers::FlatBufferBuilder fb_builder;
+  auto file_name =
+      fb_builder.CreateString(table_name + "_spec_" + std::to_string(spec_idx));
+  auto fb_file_desc = CreateFbFileDesc(fb_builder, file_name, spec.length);
+  fb_builder.Finish(fb_file_desc);
+
+  string buffer(
+      reinterpret_cast<const char*>(fb_builder.GetBufferPointer()), fb_builder.GetSize());
+  thrift_file.__set_file_desc_data(buffer);
+
+  thrift_spec->__set_partition_id(0);
+  thrift_spec->__set_file_desc(thrift_file);
+  thrift_spec->__set_max_block_size(spec.block_size);
+  thrift_spec->__set_is_splittable(spec.is_splittable);
 }
 
 int Plan::FindOrInsertDatanodeIndex(int cluster_datanode_idx) {
@@ -459,9 +505,24 @@ Status SchedulerWrapper::Compute(bool exec_at_coord, Result* result) {
 
   // Compute Assignment.
   FragmentScanRangeAssignment* assignment = result->AddAssignment();
+  const vector<TScanRangeLocationList>* locations = nullptr;
+  vector<TScanRangeLocationList> expanded_locations;
+  if (plan_.scan_range_specs().split_specs.empty()) {
+    // directly use the concrete ranges.
+    locations = &plan_.scan_range_specs().concrete_ranges;
+  } else {
+    // union concrete ranges and expanded specs.
+    for (const TScanRangeLocationList& range : plan_.scan_range_specs().concrete_ranges) {
+      expanded_locations.push_back(range);
+    }
+    RETURN_IF_ERROR(scheduler_->GenerateScanRanges(
+        plan_.scan_range_specs().split_specs, &expanded_locations));
+    locations = &expanded_locations;
+  }
+  DCHECK(locations != nullptr);
   return scheduler_->ComputeScanRangeAssignment(*scheduler_->GetExecutorsConfig(), 0,
-      nullptr, false, plan_.scan_range_locations(), plan_.referenced_datanodes(),
-      exec_at_coord, plan_.query_options(), nullptr, assignment);
+      nullptr, false, *locations, plan_.referenced_datanodes(), exec_at_coord,
+      plan_.query_options(), nullptr, assignment);
 }
 
 void SchedulerWrapper::AddBackend(const Host& host) {

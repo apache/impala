@@ -180,8 +180,29 @@ struct Block {
   static const int64_t DEFAULT_BLOCK_SIZE;
 };
 
+struct FileSplitGeneratorSpec {
+  FileSplitGeneratorSpec() {}
+  FileSplitGeneratorSpec(int64_t length, int64_t block, bool splittable)
+    : length(length), block_size(block), is_splittable(splittable) {}
+
+  /// Length of file for which to generate file splits.
+  int64_t length = DEFAULT_FILE_SIZE;
+
+  /// Size of each split.
+  int64_t block_size = DEFAULT_BLOCK_SIZE;
+
+  bool is_splittable = true;
+
+  static const int64_t DEFAULT_FILE_SIZE;
+  static const int64_t DEFAULT_BLOCK_SIZE;
+};
+
+/// A table models multiple partitions, some of which represent their files explicitly
+/// with Blocks or with FileSplitGeneratorSpecs. A table can consist of both
+/// representations.
 struct Table {
   std::vector<Block> blocks;
+  std::vector<FileSplitGeneratorSpec> specs;
 };
 
 class Schema {
@@ -213,6 +234,16 @@ class Schema {
   void AddMultiBlockTable(const TableName& table_name, int num_blocks,
       ReplicaPlacement replica_placement, int num_replicas, int num_cached_replicas);
 
+  /// Adds FileSplitGeneratorSpecs to table named 'table_name'. If the table does not
+  /// exist, creates a new table. Otherwise, adds the 'specs' to an existing table.
+  void AddFileSplitGeneratorSpecs(
+      const TableName& table_name, const std::vector<FileSplitGeneratorSpec>& specs);
+
+  /// Adds 'num' default FileSplitGeneratorSpecs to table named 'table_name'. If the table
+  /// does not exist, creates a new table. Otherwise, adds the 'specs' to an existing
+  /// table.
+  void AddFileSplitGeneratorDefaultSpecs(const TableName& table_name, int num);
+
   const Table& GetTable(const TableName& table_name) const;
 
   const Cluster& cluster() const { return cluster_; }
@@ -240,11 +271,11 @@ class Plan {
 
   const std::vector<TNetworkAddress>& referenced_datanodes() const;
 
-  const std::vector<TScanRangeLocationList>& scan_range_locations() const;
+  const TScanRangeSpec& scan_range_specs() const;
 
   /// Add a scan of table 'table_name' to the plan. This method will populate the internal
-  /// list of TScanRangeLocationList and can be called multiple times for the same table
-  /// to schedule additional scans.
+  /// TScanRangeSpecs and can be called multiple times for the same table to schedule
+  /// additional scans.
   void AddTableScan(const TableName& table_name);
 
  private:
@@ -260,15 +291,20 @@ class Plan {
   /// Map from plan host index to an index in 'referenced_datanodes_'.
   std::unordered_map<int, int> host_idx_to_datanode_idx_;
 
-  /// List of all scan range locations, which can be passed to the Scheduler.
-  std::vector<TScanRangeLocationList> scan_range_locations_;
+  /// Scan range specs that are scheduled by the Scheduler.
+  TScanRangeSpec scan_range_specs_;
 
   /// Initialize a TScanRangeLocationList object in place.
   void BuildTScanRangeLocationList(const TableName& table_name, const Block& block,
       int block_idx, TScanRangeLocationList* scan_range_locations);
 
-  void BuildScanRange(const TableName& table_name, const Block& block, int block_idx,
-      TScanRange* scan_range);
+  /// Initializes a scan range for a Block.
+  void BuildScanRange(
+      const TableName& table_name, const Block& block, int block_idx, TScanRange* range);
+
+  /// Initializes a scan range for a FileSplitGeneratorSpec.
+  void BuildScanRangeSpec(const TableName& table_name, const FileSplitGeneratorSpec& spec,
+      int spec_idx, TFileSplitGeneratorSpec* thrift_spec);
 
   /// Look up the plan-local host index of 'cluster_datanode_idx'. If the host has not
   /// been added to the plan before, it will add it to 'referenced_datanodes_' and return

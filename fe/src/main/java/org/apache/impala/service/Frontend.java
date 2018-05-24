@@ -887,7 +887,7 @@ public class Frontend {
     Set<TTableName> tablesWithMissingDiskIds = Sets.newTreeSet();
     for (ScanNode scanNode: scanNodes) {
       result.putToPer_node_scan_ranges(
-          scanNode.getId().asInt(), scanNode.getScanRangeLocations());
+          scanNode.getId().asInt(), scanNode.getScanRangeSpecs());
 
       TTableName tableName = scanNode.getTupleDesc().getTableName().toThrift();
       if (scanNode.isTableMissingStats()) tablesMissingStats.add(tableName);

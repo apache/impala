@@ -74,7 +74,7 @@ struct BackendExecParams {
 /// map from an impalad host address to the list of assigned fragment instance params.
 typedef std::map<TNetworkAddress, BackendExecParams> PerBackendExecParams;
 
-/// execution parameters for a single fragment instance; used to assemble the
+/// Execution parameters for a single fragment instance; used to assemble the
 /// TPlanFragmentInstanceCtx
 struct FInstanceExecParams {
   TUniqueId instance_id;
@@ -88,7 +88,7 @@ struct FInstanceExecParams {
   /// uniquely identify it to a receiver. -1 = invalid.
   int sender_id;
 
-  /// the parent FragmentExecParams
+  /// The parent FragmentExecParams
   const FragmentExecParams& fragment_exec_params;
   const TPlanFragment& fragment() const;
 
