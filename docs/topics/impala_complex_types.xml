@@ -349,16 +349,6 @@ under the License.
         </p>
 
         <p>
-          Each table, or each partition within a table, can have a separate file format, and you can change file format at the table or
-          partition level through an <codeph>ALTER TABLE</codeph> statement. Because this flexibility makes it difficult to guarantee ahead
-          of time that all the data files for a table or partition are in a compatible format, Impala does not throw any errors when you
-          change the file format for a table or partition using <codeph>ALTER TABLE</codeph>. Any errors come at runtime when Impala
-          actually processes a table or partition that contains nested types and is not in one of the supported formats. If a query on a
-          partitioned table only processes some partitions, and all those partitions are in one of the supported formats, the query
-          succeeds.
-        </p>
-
-        <p>
           Because Impala does not parse the data structures containing nested types for unsupported formats such as text, Avro,
           SequenceFile, or RCFile, you cannot use data files in these formats with Impala, even if the query does not refer to the nested
           type columns. Also, if a table using an unsupported format originally contained nested type columns, and then those columns were
@@ -366,20 +356,24 @@ under the License.
           nested type data and Impala queries on that table will generate errors.
         </p>
 
-        <note rev="2.6.0 IMPALA-2844">
-          <p rev="2.6.0 IMPALA-2844">
+        <p rev="2.6.0 IMPALA-2844">
             The one exception to the preceding rule is <codeph>COUNT(*)</codeph> queries on RCFile tables that include complex types.
             Such queries are allowed in <keyword keyref="impala26_full"/> and higher.
-          </p>
-        </note>
+        </p>
 
         <p>
-          You can perform DDL operations (even <codeph>CREATE TABLE</codeph>) for tables involving complex types in file formats other than
-          Parquet. The DDL support lets you set up intermediate tables in your ETL pipeline, to be populated by Hive, before the final stage
-          where the data resides in a Parquet table and is queryable by Impala. Also, you can have a partitioned table with complex type
-          columns that uses a non-Parquet format, and use <codeph>ALTER TABLE</codeph> to change the file format to Parquet for individual
-          partitions. When you put Parquet data files into those partitions, Impala can execute queries against that data as long as the
-          query does not involve any of the non-Parquet partitions.
+          You can perform DDL operations for tables involving complex types in
+          most file formats other than Parquet. You cannot create tables in
+          Impala with complex types using text files.
+        </p>
+
+        <p>
+          You can have a partitioned table with complex type columns that uses
+          a non-Parquet format, and use <codeph>ALTER TABLE</codeph> to change
+          the file format to Parquet for individual partitions. When you put
+          Parquet data files into those partitions, Impala can execute queries
+          against that data as long as the query does not involve any of the
+          non-Parquet partitions.
         </p>
 
         <p>
@@ -491,21 +485,16 @@ under the License.
 
       <conbody>
 
-<!-- HiveQL functions like nested type constructors and posexplode(): https://cwiki.apache.org/confluence/display/Hive/LanguageManual+UDF -->
-
-<!-- HiveQL complex types: https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types#LanguageManualTypes-ComplexTypes -->
-
-<!-- HiveQL lateral views: https://cwiki.apache.org/confluence/display/Hive/LanguageManual+LateralView -->
-
         <p>
           Impala can query Parquet tables containing <codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph> columns
           produced by Hive. There are some differences to be aware of between the Impala SQL and HiveQL syntax for complex types, primarily
           for queries.
         </p>
-
         <p>
-          The syntax for specifying <codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph> types in a <codeph>CREATE
-          TABLE</codeph> statement is compatible between Impala and Hive.
+          Impala supports a subset of the syntax that Hive supports for
+          specifying <codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and
+            <codeph>MAP</codeph> types in the <codeph>CREATE TABLE</codeph>
+          statements.
         </p>
 
         <p>
@@ -674,27 +663,22 @@ under the License.
         <p>
           Unions are not currently supported.
         </p>
-
         <p>
-          Array, struct, and map column type declarations are specified in the <codeph>CREATE TABLE</codeph> statement. You can also add or
-          change the type of complex columns through the <codeph>ALTER TABLE</codeph> statement.
-        </p>
-
-        <note>
-          <p>
-            Currently, Impala queries allow complex types only in tables that use the Parquet format. If an Impala query encounters complex
-            types in a table or partition using another file format, the query returns a runtime error.
-          </p>
-
-          <p>
-            The Impala DDL support for complex types works for all file formats, so that you can create tables using text or other
-            non-Parquet formats for Hive to use as staging tables in an ETL cycle that ends with the data in a Parquet table. You can also
-            use <codeph>ALTER TABLE ... SET FILEFORMAT PARQUET</codeph> to change the file format of an existing table containing complex
-            types to Parquet, after which Impala can query it. Make sure to load Parquet files into the table after changing the file
-            format, because the <codeph>ALTER TABLE ... SET FILEFORMAT</codeph> statement does not convert existing data to the new file
-            format.
-          </p>
-        </note>
+          <codeph>Array</codeph>, <codeph>struct</codeph>, and
+            <codeph>map</codeph> column type declarations are specified in the
+            <codeph>CREATE TABLE</codeph> statement. You can also add or change
+          the type of complex columns through the <codeph>ALTER TABLE</codeph>
+          statement. </p>
+        <p> Currently, Impala queries allow complex types only in tables that
+          use the Parquet format. If an Impala query encounters complex types in
+          a table or partition using another file format, the query returns a
+          runtime error. </p>
+        <p> You can use <codeph>ALTER TABLE ... SET FILEFORMAT PARQUET</codeph>
+          to change the file format of an existing table containing complex
+          types to Parquet, after which Impala can query it. Make sure to load
+          Parquet files into the table after changing the file format, because
+          the <codeph>ALTER TABLE ... SET FILEFORMAT</codeph> statement does not
+          convert existing data to the new file format. </p>
 
         <p conref="../shared/impala_common.xml#common/complex_types_partitioning"/>
 
