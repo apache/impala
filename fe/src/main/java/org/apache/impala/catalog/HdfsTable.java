@@ -37,7 +37,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -324,8 +323,8 @@ public class HdfsTable extends Table {
     // have changed since last load (more details in hasFileChanged()).
     private final boolean reuseFileMd_;
 
-    public FileMetadataLoadRequest(Path path, List<HdfsPartition> partitions,
-       boolean reuseFileMd) {
+    public FileMetadataLoadRequest(
+        Path path, List<HdfsPartition> partitions, boolean reuseFileMd) {
       hdfsPath_ = path;
       partitionList_ = partitions;
       reuseFileMd_ = reuseFileMd;
@@ -340,7 +339,7 @@ public class HdfsTable extends Table {
     }
 
     public String debugString() {
-      String loadType = reuseFileMd_? "Refreshed" : "Loaded";
+      String loadType = reuseFileMd_ ? "Refreshed" : "Loaded";
       return String.format("%s file metadata for path: %s", loadType,
           hdfsPath_.toString());
     }
@@ -404,12 +403,8 @@ public class HdfsTable extends Table {
    *   for each file under it.
    * - For every valid data file, enumerate all its blocks and their corresponding hosts
    *   and disk IDs if the underlying file system supports the block locations API
-   *   (for ex: HDFS). For other file systems (like S3) we synthesize the file metadata
-   *   manually by splitting the file ranges into fixed size blocks.
-   * For filesystems that don't support BlockLocation API, synthesize file blocks
-   * by manually splitting the file range into fixed-size blocks.  That way, scan
-   * ranges can be derived from file blocks as usual.  All synthesized blocks are given
-   * an invalid network address so that the scheduler will treat them as remote.
+   *   (for ex: HDFS). For other file systems (like S3), per-block information is not
+   *   available so it's not stored.
    */
   private FileMetadataLoadStats resetAndLoadFileMetadata(
       Path partDir, List<HdfsPartition> partitions) throws IOException {
@@ -421,7 +416,7 @@ public class HdfsTable extends Table {
     }
 
     FileSystem fs = partDir.getFileSystem(CONF);
-    boolean synthesizeFileMd = !FileSystemUtil.supportsStorageIds(fs);
+    boolean supportsBlocks = FileSystemUtil.supportsStorageIds(fs);
     RemoteIterator<LocatedFileStatus> fileStatusIter =
         FileSystemUtil.listFiles(fs, partDir, false);
     if (fileStatusIter == null) return loadStats;
@@ -434,14 +429,12 @@ public class HdfsTable extends Table {
         continue;
       }
       FileDescriptor fd;
-      // Block locations are manually synthesized if the underlying fs does not support
-      // the block location API.
-      if (synthesizeFileMd) {
-        fd = FileDescriptor.createWithSynthesizedBlockMd(fileStatus,
-            partitions.get(0).getFileFormat(), hostIndex_);
+      if (supportsBlocks) {
+        fd = FileDescriptor.create(fileStatus, fileStatus.getBlockLocations(), fs,
+            hostIndex_, numUnknownDiskIds);
       } else {
-        fd = FileDescriptor.create(fileStatus,
-            fileStatus.getBlockLocations(), fs, hostIndex_, numUnknownDiskIds);
+        fd = FileDescriptor.createWithNoBlocks(
+            fileStatus, partitions.get(0).getFileFormat());
       }
       newFileDescs.add(fd);
       ++loadStats.loadedFiles;
@@ -485,10 +478,9 @@ public class HdfsTable extends Table {
     FileSystem fs = partDir.getFileSystem(CONF);
     FileStatus[] fileStatuses = FileSystemUtil.listStatus(fs, partDir);
     if (fileStatuses == null) return loadStats;
-    boolean synthesizeFileMd = !FileSystemUtil.supportsStorageIds(fs);
+    boolean supportsBlocks = FileSystemUtil.supportsStorageIds(fs);
     Reference<Long> numUnknownDiskIds = new Reference<Long>(Long.valueOf(0));
     List<FileDescriptor> newFileDescs = Lists.newArrayList();
-    HdfsFileFormat fileFormat = partitions.get(0).getFileFormat();
     // If there is a cached partition mapped to this path, we recompute the block
     // locations even if the underlying files have not changed (hasFileChanged()).
     // This is done to keep the cached block metadata up to date.
@@ -507,14 +499,14 @@ public class HdfsTable extends Table {
       String fileName = fileStatus.getPath().getName().toString();
       FileDescriptor fd = fileDescsByName.get(fileName);
       if (isPartitionMarkedCached || hasFileChanged(fd, fileStatus)) {
-        if (synthesizeFileMd) {
-          fd = FileDescriptor.createWithSynthesizedBlockMd(fileStatus,
-              fileFormat, hostIndex_);
-        } else {
+        if (supportsBlocks) {
           BlockLocation[] locations =
-            fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+              fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
           fd = FileDescriptor.create(fileStatus, locations, fs, hostIndex_,
               numUnknownDiskIds);
+        } else {
+          fd = FileDescriptor.createWithNoBlocks(
+              fileStatus, partitions.get(0).getFileFormat());
         }
         ++loadStats.loadedFiles;
       } else {
@@ -565,7 +557,6 @@ public class HdfsTable extends Table {
     return TCatalogObjectType.TABLE;
   }
   public boolean isMarkedCached() { return isMarkedCached_; }
-
   public Collection<HdfsPartition> getPartitions() { return partitionMap_.values(); }
   public Map<Long, HdfsPartition> getPartitionMap() { return partitionMap_; }
   public Set<Long> getNullPartitionIds(int i) { return nullPartitionIds_.get(i); }
@@ -625,8 +616,7 @@ public class HdfsTable extends Table {
    * Gets the HdfsPartition matching the given partition spec. Returns null if no match
    * was found.
    */
-  public HdfsPartition getPartition(
-      List<PartitionKeyValue> partitionSpec) {
+  public HdfsPartition getPartition(List<PartitionKeyValue> partitionSpec) {
     List<TPartitionKeyValue> partitionKeyValues = Lists.newArrayList();
     for (PartitionKeyValue kv: partitionSpec) {
       String value = PartitionKeyValue.getPartitionKeyValueString(
@@ -688,9 +678,7 @@ public class HdfsTable extends Table {
           break;
         }
       }
-      if (matchFound) {
-        return partition;
-      }
+      if (matchFound) return partition;
     }
     return null;
   }
@@ -702,8 +690,7 @@ public class HdfsTable extends Table {
       List<List<TPartitionKeyValue>> partitionSet) {
     List<HdfsPartition> partitions = Lists.newArrayList();
     for (List<TPartitionKeyValue> kv : partitionSet) {
-      HdfsPartition partition =
-          getPartitionFromThriftPartitionSpec(kv);
+      HdfsPartition partition = getPartitionFromThriftPartitionSpec(kv);
       if (partition != null) partitions.add(partition);
     }
     return partitions;
@@ -876,7 +863,7 @@ public class HdfsTable extends Table {
     Preconditions.checkState(numPaths > 0);
     FileSystem tableFs;
     try {
-      tableFs  = (new Path(getLocation())).getFileSystem(CONF);
+      tableFs = (new Path(getLocation())).getFileSystem(CONF);
     } catch (IOException e) {
       throw new CatalogException("Invalid table path for table: " + getFullName(), e);
     }
@@ -896,7 +883,7 @@ public class HdfsTable extends Table {
       boolean reuseFileMd) throws CatalogException {
     int numPathsToLoad = partsByPath.size();
     // For tables without partitions we have no file metadata to load.
-    if (numPathsToLoad == 0)  return;
+    if (numPathsToLoad == 0) return;
 
     int threadPoolSize = getLoadingThreadPoolSize(numPathsToLoad);
     LOG.info(String.format("Loading file and block metadata for %s paths for table %s " +
@@ -1030,7 +1017,6 @@ public class HdfsTable extends Table {
     loadMetadataAndDiskIds(partsByPath, false);
     return addedParts;
   }
-
 
   /**
    * Creates a new HdfsPartition from a specified StorageDescriptor and an HMS partition
@@ -1203,8 +1189,7 @@ public class HdfsTable extends Table {
     // refer to this to understand how to create new partitions.
     HdfsStorageDescriptor hdfsStorageDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
-    HdfsPartition partition = HdfsPartition.defaultPartition(this,
-        hdfsStorageDescriptor);
+    HdfsPartition partition = HdfsPartition.defaultPartition(this, hdfsStorageDescriptor);
     partitionMap_.put(partition.getId(), partition);
   }
 
@@ -1350,8 +1335,7 @@ public class HdfsTable extends Table {
     // in the Hive Metastore. Note: This is a relatively "cheap" operation
     // (~.3 secs for 30K partitions).
     Set<String> msPartitionNames = Sets.newHashSet();
-    msPartitionNames.addAll(
-        client.listPartitionNames(db_.getName(), name_, (short) -1));
+    msPartitionNames.addAll(client.listPartitionNames(db_.getName(), name_, (short) -1));
     // Names of loaded partitions in this table
     Set<String> partitionNames = Sets.newHashSet();
     // Partitions for which file metadata must be loaded, grouped by partition paths.
@@ -1682,13 +1666,13 @@ public class HdfsTable extends Table {
     }
     avroSchema_ = hdfsTable.isSetAvroSchema() ? hdfsTable.getAvroSchema() : null;
     isMarkedCached_ =
-      HdfsCachingUtil.validateCacheParams(getMetaStoreTable().getParameters());
+        HdfsCachingUtil.validateCacheParams(getMetaStoreTable().getParameters());
   }
 
   @Override
   public TTableDescriptor toThriftDescriptor(int tableId,
       Set<Long> referencedPartitions) {
-    // Create thrift descriptors to send to the BE.  The BE does not
+    // Create thrift descriptors to send to the BE. The BE does not
     // need any information below the THdfsPartition level.
     TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
         getTColumnDescriptors(), numClusteringCols_, name_, db_.getName());
@@ -1856,7 +1840,7 @@ public class HdfsTable extends Table {
    *
    * path e.g. c1=1/c2=2/c3=3
    * partitionKeys The ordered partition keys. e.g.("c1", "c2", "c3")
-   * depth The start position in partitionKeys to match the path name.
+   * depth. The start position in partitionKeys to match the path name.
    * partitionValues The partition values used to create a partition.
    * partitionExprs The list of LiteralExprs which is used to avoid duplicate partitions.
    * E.g. Having /c1=0001 and /c1=01, we should make sure only one partition
@@ -1923,7 +1907,7 @@ public class HdfsTable extends Table {
         expr = LiteralExpr.create(value, type);
         // Skip large value which exceeds the MAX VALUE of specified Type.
         if (expr instanceof NumericLiteral) {
-          if (NumericLiteral.isOverflow(((NumericLiteral)expr).getValue(), type)) {
+          if (NumericLiteral.isOverflow(((NumericLiteral) expr).getValue(), type)) {
             LOG.warn(String.format("Skip the overflow value (%s) for Type (%s).",
                 value, type.toSql()));
             return null;

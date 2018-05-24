@@ -28,11 +28,13 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
+#include "flatbuffers/flatbuffers.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/Types_types.h"
 #include "runtime/exec-env.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/container-util.h"
+#include "util/flat_buffer.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/runtime-profile-counters.h"
@@ -41,6 +43,7 @@
 
 using boost::algorithm::join;
 using namespace apache::thrift;
+using namespace org::apache::impala::fb;
 using namespace strings;
 
 DECLARE_bool(use_krpc);
@@ -222,6 +225,45 @@ const TBackendDescriptor& Scheduler::LookUpBackendDesc(
   return *desc;
 }
 
+Status Scheduler::GenerateScanRanges(const vector<TFileSplitGeneratorSpec>& specs,
+    vector<TScanRangeLocationList>* generated_scan_ranges) {
+  for (const auto& spec : specs) {
+    // Converts the spec to one or more scan ranges.
+    const FbFileDesc* fb_desc =
+        flatbuffers::GetRoot<FbFileDesc>(spec.file_desc.file_desc_data.c_str());
+    DCHECK(fb_desc->file_blocks() == nullptr || fb_desc->file_blocks()->size() == 0);
+
+    long scan_range_offset = 0;
+    long remaining = fb_desc->length();
+    long scan_range_length = std::min(spec.max_block_size, fb_desc->length());
+    if (!spec.is_splittable) scan_range_length = fb_desc->length();
+
+    while (remaining > 0) {
+      THdfsFileSplit hdfs_scan_range;
+      THdfsCompression::type compression;
+      RETURN_IF_ERROR(FromFbCompression(fb_desc->compression(), &compression));
+      hdfs_scan_range.__set_file_compression(compression);
+      hdfs_scan_range.__set_file_length(fb_desc->length());
+      hdfs_scan_range.__set_file_name(fb_desc->file_name()->str());
+      hdfs_scan_range.__set_length(scan_range_length);
+      hdfs_scan_range.__set_mtime(fb_desc->last_modification_time());
+      hdfs_scan_range.__set_offset(scan_range_offset);
+      hdfs_scan_range.__set_partition_id(spec.partition_id);
+      TScanRange scan_range;
+      scan_range.__set_hdfs_file_split(hdfs_scan_range);
+      TScanRangeLocationList scan_range_list;
+      scan_range_list.__set_scan_range(scan_range);
+
+      generated_scan_ranges->push_back(scan_range_list);
+      scan_range_offset += scan_range_length;
+      remaining -= scan_range_length;
+      scan_range_length = (scan_range_length > remaining ? remaining : scan_range_length);
+    }
+  }
+
+  return Status::OK();
+}
+
 Status Scheduler::ComputeScanRangeAssignment(
     const BackendConfig& executor_config, QuerySchedule* schedule) {
   RuntimeProfile::Counter* total_assignment_timer =
@@ -247,11 +289,26 @@ Status Scheduler::ComputeScanRangeAssignment(
 
       FragmentScanRangeAssignment* assignment =
           &schedule->GetFragmentExecParams(fragment.idx)->scan_range_assignment;
+
+      const vector<TScanRangeLocationList>* locations = nullptr;
+      vector<TScanRangeLocationList> expanded_locations;
+      if (entry.second.split_specs.empty()) {
+        // directly use the concrete ranges.
+        locations = &entry.second.concrete_ranges;
+      } else {
+        // union concrete ranges and expanded specs.
+        expanded_locations.insert(expanded_locations.end(),
+            entry.second.concrete_ranges.begin(), entry.second.concrete_ranges.end());
+        RETURN_IF_ERROR(
+            GenerateScanRanges(entry.second.split_specs, &expanded_locations));
+        locations = &expanded_locations;
+      }
+      DCHECK(locations != nullptr);
       RETURN_IF_ERROR(
           ComputeScanRangeAssignment(executor_config, node_id, node_replica_preference,
-              node_random_replica, entry.second, exec_request.host_list, exec_at_coord,
+              node_random_replica, *locations, exec_request.host_list, exec_at_coord,
               schedule->query_options(), total_assignment_timer, assignment));
-      schedule->IncNumScanRanges(entry.second.size());
+      schedule->IncNumScanRanges(locations->size());
     }
   }
   return Status::OK();
@@ -526,6 +583,7 @@ Status Scheduler::ComputeScanRangeAssignment(const BackendConfig& executor_confi
       exec_at_coord ? coord_only_backend_config_ : executor_config, total_assignments_,
       total_local_assignments_);
 
+  // Holds scan ranges that must be assigned for remote reads.
   vector<const TScanRangeLocationList*> remote_scan_range_locations;
 
   // Loop over all scan ranges, select an executor for those with local impalads and

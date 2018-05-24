@@ -115,7 +115,8 @@ TEST_F(SchedulerTest, ScanTableTwice) {
   EXPECT_EQ(0, result.NumCachedAssignedBytes());
 }
 
-// TODO: This test can be removed once we have the non-random backend round-robin by rank.
+/// TODO: This test can be removed once we have the non-random backend round-robin by
+/// rank.
 /// Schedule randomly over 3 backends and ensure that each backend is at least used once.
 TEST_F(SchedulerTest, RandomReads) {
   Cluster cluster;
@@ -380,6 +381,95 @@ TEST_F(SchedulerTest, TestSendUpdates) {
   // Two backends are registered, so the scheduler will pick a random one.
   EXPECT_EQ(1 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes(0));
   EXPECT_EQ(0, result.NumTotalAssignedBytes(1));
+}
+
+TEST_F(SchedulerTest, TestGeneratedSingleSplit) {
+  Cluster cluster;
+
+  cluster.AddHosts(3, true, true);
+
+  Schema schema(cluster);
+  schema.AddFileSplitGeneratorDefaultSpecs("T", 1);
+
+  Plan plan(schema);
+  plan.AddTableScan("T");
+  plan.SetRandomReplica(true);
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+  ASSERT_OK(scheduler.Compute(&result));
+
+  EXPECT_EQ(FileSplitGeneratorSpec::DEFAULT_FILE_SIZE
+          / FileSplitGeneratorSpec::DEFAULT_BLOCK_SIZE,
+      result.NumTotalAssignments());
+  EXPECT_EQ(
+      1 * FileSplitGeneratorSpec::DEFAULT_FILE_SIZE, result.NumTotalAssignedBytes());
+}
+
+TEST_F(SchedulerTest, TestGeneratedMultiSplit) {
+  Cluster cluster;
+
+  cluster.AddHosts(3, true, true);
+
+  Schema schema(cluster);
+  schema.AddFileSplitGeneratorDefaultSpecs("T", 100);
+
+  Plan plan(schema);
+  plan.AddTableScan("T");
+  plan.SetRandomReplica(true);
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+  ASSERT_OK(scheduler.Compute(&result));
+
+  EXPECT_EQ(100 * FileSplitGeneratorSpec::DEFAULT_FILE_SIZE
+          / FileSplitGeneratorSpec::DEFAULT_BLOCK_SIZE,
+      result.NumTotalAssignments());
+  EXPECT_EQ(
+      100 * FileSplitGeneratorSpec::DEFAULT_FILE_SIZE, result.NumTotalAssignedBytes());
+}
+
+TEST_F(SchedulerTest, TestGeneratedVariableSizeSplit) {
+  Cluster cluster;
+
+  cluster.AddHosts(3, true, true);
+
+  Schema schema(cluster);
+  schema.AddFileSplitGeneratorSpecs(
+      "T", {{100, 100, true}, {100, 1, false}, {100, 10, true}});
+
+  Plan plan(schema);
+  plan.AddTableScan("T");
+  plan.SetRandomReplica(true);
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+  ASSERT_OK(scheduler.Compute(&result));
+
+  EXPECT_EQ(12, result.NumTotalAssignments());
+  EXPECT_EQ(300, result.NumTotalAssignedBytes());
+}
+
+TEST_F(SchedulerTest, TestBlockAndGenerateSplit) {
+  Cluster cluster;
+
+  cluster.AddHosts(3, true, true);
+  Schema schema(cluster);
+  schema.AddMultiBlockTable("T", 2, ReplicaPlacement::LOCAL_ONLY, 3);
+  schema.AddFileSplitGeneratorSpecs(
+      "T", {{100, 100, true}, {100, 1, false}, {100, 10, true}});
+
+  Plan plan(schema);
+  plan.AddTableScan("T");
+
+  Result result(plan);
+  SchedulerWrapper scheduler(plan);
+  ASSERT_OK(scheduler.Compute(&result));
+
+  EXPECT_EQ(14, result.NumTotalAssignments());
+  EXPECT_EQ(300 + 2 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes());
+  EXPECT_EQ(2 * Block::DEFAULT_BLOCK_SIZE, result.NumDiskAssignedBytes());
+  EXPECT_EQ(0, result.NumCachedAssignedBytes());
 }
 
 /// IMPALA-4329: Test scheduling with no backends.

@@ -48,6 +48,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
+import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.util.KuduUtil;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
@@ -193,7 +194,7 @@ public class KuduScanNode extends ScanNode {
   private void computeScanRangeLocations(Analyzer analyzer,
       KuduClient client, org.apache.kudu.client.KuduTable rpcTable)
       throws ImpalaRuntimeException {
-    scanRanges_ = Lists.newArrayList();
+    scanRangeSpecs_ = new TScanRangeSpec();
 
     List<KuduScanToken> scanTokens = createScanTokens(client, rpcTable);
     for (KuduScanToken token: scanTokens) {
@@ -225,7 +226,7 @@ public class KuduScanNode extends ScanNode {
       TScanRangeLocationList locs = new TScanRangeLocationList();
       locs.setScan_range(scanRange);
       locs.locations = locations;
-      scanRanges_.add(locs);
+      scanRangeSpecs_.addToConcrete_ranges(locs);
     }
   }
 

@@ -366,9 +366,9 @@ struct TPlanExecInfo {
   // it is unpartitioned.
   1: required list<Planner.TPlanFragment> fragments
 
-  // A map from scan node ids to a list of scan range locations.
+  // A map from scan node ids to a scan range specification.
   // The node ids refer to scan nodes in fragments[].plan
-  2: optional map<Types.TPlanNodeId, list<Planner.TScanRangeLocationList>>
+  2: optional map<Types.TPlanNodeId, Planner.TScanRangeSpec>
       per_node_scan_ranges
 }
 

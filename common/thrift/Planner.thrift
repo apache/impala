@@ -101,6 +101,14 @@ struct TScanRangeLocationList {
   2: list<TScanRangeLocation> locations
 }
 
+// A specification for scan ranges. Scan ranges can be
+// concrete or specs, which are used to generate concrete ranges.
+// Each type is stored in a separate list.
+struct TScanRangeSpec {
+   1: optional list<TScanRangeLocationList> concrete_ranges
+   2: optional list<PlanNodes.TFileSplitGeneratorSpec> split_specs
+}
+
 // A plan: tree of plan fragments that materializes either a query result or the build
 // side of a join used by another plan; it consists of a sequence of plan fragments.
 // TODO: rename both this and PlanNodes.TPlan (TPlan should be something like TExecPlan

@@ -195,8 +195,29 @@ struct THBaseKeyRange {
   2: optional string stopKey
 }
 
+// Specifies how THdfsFileSplits can be generated from HDFS files.
+// Currently used for files that do not have block locations,
+// such as S3, ADLS, and Local. The Frontend creates these and the
+// coordinator's scheduler expands them into THdfsFileSplits.
+// The plan is to use TFileSplitGeneratorSpec as well for HDFS
+// files with block information. Doing so will permit the FlatBuffer
+// representation used to represent block information to pass from the
+// FrontEnd to the Coordinator without transforming to a heavier
+// weight Thrift representation. See IMPALA-6458.
+struct TFileSplitGeneratorSpec {
+  1: required CatalogObjects.THdfsFileDesc file_desc
+
+  // Maximum length of a file split to generate.
+  2: required i64 max_block_size
+
+  3: required bool is_splittable
+
+  // ID of partition within the THdfsTable associated with this scan node.
+  4: required i64 partition_id
+}
+
 // Specification of an individual data range which is held in its entirety
-// by a storage server
+// by a storage server.
 struct TScanRange {
   // one of these must be set for every TScanRange
   1: optional THdfsFileSplit hdfs_file_split
