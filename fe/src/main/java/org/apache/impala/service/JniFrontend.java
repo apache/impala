@@ -19,14 +19,15 @@ package org.apache.impala.service;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -34,6 +35,11 @@ import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.security.Groups;
+import org.apache.hadoop.security.JniBasedUnixGroupsMappingWithFallback;
+import org.apache.hadoop.security.JniBasedUnixGroupsNetgroupMappingWithFallback;
+import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
+import org.apache.hadoop.security.ShellBasedUnixGroupsNetgroupMapping;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.authorization.AuthorizationConfig;
@@ -69,6 +75,8 @@ import org.apache.impala.thrift.TGetFunctionsParams;
 import org.apache.impala.thrift.TGetFunctionsResult;
 import org.apache.impala.thrift.TGetHadoopConfigRequest;
 import org.apache.impala.thrift.TGetHadoopConfigResponse;
+import org.apache.impala.thrift.TGetHadoopGroupsRequest;
+import org.apache.impala.thrift.TGetHadoopGroupsResponse;
 import org.apache.impala.thrift.TGetTablesParams;
 import org.apache.impala.thrift.TGetTablesResult;
 import org.apache.impala.thrift.TLoadDataReq;
@@ -569,6 +577,7 @@ public class JniFrontend {
 
   // Caching this saves ~50ms per call to getHadoopConfigAsHtml
   private static final Configuration CONF = new Configuration();
+  private static final Groups GROUPS = Groups.getUserToGroupsMappingService(CONF);
 
   /**
    * Returns a string of all loaded Hadoop configuration parameters as a table of keys
@@ -608,14 +617,68 @@ public class JniFrontend {
   }
 
   /**
+   * Returns the list of Hadoop groups for the given user name.
+   */
+  public byte[] getHadoopGroups(byte[] serializedRequest) throws ImpalaException {
+    TGetHadoopGroupsRequest request = new TGetHadoopGroupsRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
+    TGetHadoopGroupsResponse result = new TGetHadoopGroupsResponse();
+    try {
+      result.setGroups(GROUPS.getGroups(request.getUser()));
+    } catch (IOException e) {
+      // HACK: https://issues.apache.org/jira/browse/HADOOP-15505
+      // There is no easy way to know if no groups found for a user
+      // other than reading the exception message.
+      if (e.getMessage().startsWith("No groups found for user")) {
+        result.setGroups(Collections.<String>emptyList());
+      } else {
+        LOG.error("Error getting Hadoop groups for user: " + request.getUser(), e);
+        throw new InternalException(e.getMessage());
+      }
+    }
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * Returns an error string describing configuration issue with the groups mapping
+   * provider implementation.
+   */
+  @VisibleForTesting
+  protected static String checkGroupsMappingProvider(Configuration conf) {
+    String provider = conf.get(CommonConfigurationKeys.HADOOP_SECURITY_GROUP_MAPPING);
+    // Shell-based groups mapping providers fork a new process for each call.
+    // This can cause issues such as zombie processes, running out of file descriptors,
+    // etc.
+    if (ShellBasedUnixGroupsNetgroupMapping.class.getName().equals(provider)) {
+      return String.format("Hadoop groups mapping provider: %s is " +
+          "known to be problematic. Consider using: %s instead.",
+          provider, JniBasedUnixGroupsNetgroupMappingWithFallback.class.getName());
+    }
+    if (ShellBasedUnixGroupsMapping.class.getName().equals(provider)) {
+      return String.format("Hadoop groups mapping provider: %s is " +
+          "known to be problematic. Consider using: %s instead.",
+          provider, JniBasedUnixGroupsMappingWithFallback.class.getName());
+    }
+    return "";
+  }
+
+  /**
    * Returns an error string describing all configuration issues. If no config issues are
    * found, returns an empty string.
    */
-  public String checkConfiguration() {
+  public String checkConfiguration() throws ImpalaException {
     StringBuilder output = new StringBuilder();
     output.append(checkLogFilePermission());
     output.append(checkFileSystem(CONF));
     output.append(checkShortCircuitRead(CONF));
+    if (BackendConfig.INSTANCE.isAuthorizedProxyGroupEnabled()) {
+      output.append(checkGroupsMappingProvider(CONF));
+    }
     return output.toString();
   }
 
