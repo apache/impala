@@ -43,6 +43,7 @@ Flask == 0.10.1
   MarkupSafe == 0.23
   Werkzeug == 0.11.3
   itsdangerous == 0.24
+gcovr == 3.4
 kazoo == 2.2.1
 ordereddict == 1.1
 pexpect == 3.3
