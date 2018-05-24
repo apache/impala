@@ -165,8 +165,7 @@ class TestPartitionMetadataUncompressedTextOnly(ImpalaTestSuite):
     Should be able to query partitions with supported codecs."""
     TBL_NAME = "multi_text_compression"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
-    TBL_LOCATION = get_fs_path(
-        '{0}/{1}.db/{2}'.format(WAREHOUSE, unique_database, TBL_NAME))
+    TBL_LOCATION = '%s/%s.db/%s' % (WAREHOUSE, unique_database, TBL_NAME)
 
     file_format = vector.get_value('table_format').file_format
     # Clean up any existing data in the table directory.
