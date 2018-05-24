@@ -49,10 +49,14 @@ ADLS_CLIENT_ID = os.getenv("azure_client_id")
 ADLS_TENANT_ID = os.getenv("azure_tenant_id")
 ADLS_CLIENT_SECRET = os.getenv("azure_client_secret")
 
+def prepend_with_fs(fs, path):
+  """Prepend 'path' with 'fs' if it's not already the prefix."""
+  return path if path.startswith(fs) else "%s%s" % (fs, path)
+
 def get_fs_path(path):
-  return "%s%s" % (FILESYSTEM_PREFIX, path)
+  return prepend_with_fs(FILESYSTEM_PREFIX, path)
 
 def get_secondary_fs_path(path):
-  return "%s%s" % (SECONDARY_FILESYSTEM, path)
+  return prepend_with_fs(SECONDARY_FILESYSTEM, path)
 
 WAREHOUSE = get_fs_path('/test-warehouse')
