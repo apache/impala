@@ -318,9 +318,12 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 0 == impalad_service.get_num_in_flight_queries()
 
   def test_cancellation(self):
-    """Test cancellation (Ctrl+C event)."""
-    args = '-q "select sleep(100000)"'
-    p = ImpalaShell(args)
+    """Test cancellation (Ctrl+C event). Run a query that sleeps 10ms per row so will run
+    for 110s if not cancelled, but will detect cancellation quickly because of the small
+    batch size."""
+    query = "set num_nodes=1; set mt_dop=1; set batch_size=1; \
+             select sleep(10) from functional_parquet.alltypesagg"
+    p = ImpalaShell('-q "{0}"'.format(query))
     sleep(6)
     os.kill(p.pid(), signal.SIGINT)
     result = p.get_result()
