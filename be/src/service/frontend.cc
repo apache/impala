@@ -57,6 +57,16 @@ DEFINE_string(authorized_proxy_user_config, "",
     "users. For example: hue=user1,user2;admin=*");
 DEFINE_string(authorized_proxy_user_config_delimiter, ",",
     "Specifies the delimiter used in authorized_proxy_user_config. ");
+DEFINE_string(authorized_proxy_group_config, "",
+    "Specifies the set of authorized proxy groups (users who can delegate to other "
+    "users belonging to the specified groups during authorization) and whom they are "
+    "allowed to delegate. Input is a semicolon-separated list of key=value pairs of "
+    "authorized proxy users to the group(s) they can delegate to. These groups are "
+    "specified as a list of groups separated by a delimiter (which defaults to comma and "
+    "may be changed via --authorized_proxy_group_config_delimiter), or '*' to indicate "
+    "all users. For example: hue=group1,group2;admin=*");
+DEFINE_string(authorized_proxy_group_config_delimiter, ",",
+    "Specifies the delimiter used in authorized_proxy_group_config. ");
 DEFINE_string(kudu_master_hosts, "", "Specifies the default Kudu master(s). The given "
     "value should be a comma separated list of hostnames or IP addresses; ports are "
     "optional.");
@@ -68,6 +78,7 @@ Frontend::Frontend() {
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "([B)[B", &get_hadoop_config_id_},
     {"getAllHadoopConfigs", "()[B", &get_hadoop_configs_id_},
+    {"getHadoopGroups", "([B)[B", &get_hadoop_groups_id_},
     {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
     {"updateCatalogCache", "([B)[B", &update_catalog_cache_id_},
     {"updateMembership", "([B)V", &update_membership_id_},
@@ -240,6 +251,11 @@ Status Frontend::GetAllHadoopConfigs(TGetAllHadoopConfigsResponse* result) {
 Status Frontend::GetHadoopConfig(const TGetHadoopConfigRequest& request,
     TGetHadoopConfigResponse* response) {
   return JniUtil::CallJniMethod(fe_, get_hadoop_config_id_, request, response);
+}
+
+Status Frontend::GetHadoopGroups(const TGetHadoopGroupsRequest& request,
+    TGetHadoopGroupsResponse* response) {
+  return JniUtil::CallJniMethod(fe_, get_hadoop_groups_id_, request, response);
 }
 
 Status Frontend::LoadData(const TLoadDataReq& request, TLoadDataResp* response) {

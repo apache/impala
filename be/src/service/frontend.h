@@ -153,6 +153,10 @@ class Frontend {
   Status GetHadoopConfig(const TGetHadoopConfigRequest& request,
       TGetHadoopConfigResponse* response);
 
+  /// Returns (in the output parameter) the list of groups for the given user.
+  Status GetHadoopGroups(const TGetHadoopGroupsRequest& request,
+      TGetHadoopGroupsResponse* response);
+
   /// Loads a single file or set of files into a table or partition. Saves the RPC
   /// response in the TLoadDataResp output parameter. Returns OK if the operation
   /// completed successfully.
@@ -186,6 +190,7 @@ class Frontend {
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfig(byte[])
   jmethodID get_hadoop_configs_id_;  // JniFrontend.getAllHadoopConfigs()
+  jmethodID get_hadoop_groups_id_;  // JniFrontend.getHadoopGroups()
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
   jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache(byte[][])
   jmethodID update_membership_id_; // JniFrontend.updateMembership()

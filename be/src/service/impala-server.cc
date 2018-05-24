@@ -26,6 +26,7 @@
 #include <boost/unordered_set.hpp>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/lexical_cast.hpp>
 #include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
@@ -113,6 +114,8 @@ DECLARE_string(nn);
 DECLARE_int32(nn_port);
 DECLARE_string(authorized_proxy_user_config);
 DECLARE_string(authorized_proxy_user_config_delimiter);
+DECLARE_string(authorized_proxy_group_config);
+DECLARE_string(authorized_proxy_group_config_delimiter);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disk_spill_encryption);
 DECLARE_bool(use_krpc);
@@ -311,29 +314,22 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   }
 
   if (!FLAGS_authorized_proxy_user_config.empty()) {
-    // Parse the proxy user configuration using the format:
-    // <proxy user>=<comma separated list of users they are allowed to delegate>
-    // See FLAGS_authorized_proxy_user_config for more details.
-    vector<string> proxy_user_config;
-    split(proxy_user_config, FLAGS_authorized_proxy_user_config, is_any_of(";"),
-        token_compress_on);
-    if (proxy_user_config.size() > 0) {
-      for (const string& config: proxy_user_config) {
-        size_t pos = config.find("=");
-        if (pos == string::npos) {
-          CLEAN_EXIT_WITH_ERROR(Substitute("Invalid proxy user configuration. No "
-              "mapping value specified for the proxy user. For more information review "
-              "usage of the --authorized_proxy_user_config flag: $0", config));
-        }
-        string proxy_user = config.substr(0, pos);
-        string config_str = config.substr(pos + 1);
-        vector<string> parsed_allowed_users;
-        split(parsed_allowed_users, config_str,
-            is_any_of(FLAGS_authorized_proxy_user_config_delimiter), token_compress_on);
-        unordered_set<string> allowed_users(parsed_allowed_users.begin(),
-            parsed_allowed_users.end());
-        authorized_proxy_user_config_.insert(make_pair(proxy_user, allowed_users));
-      }
+    Status status = PopulateAuthorizedProxyConfig(FLAGS_authorized_proxy_user_config,
+        FLAGS_authorized_proxy_user_config_delimiter, &authorized_proxy_user_config_);
+    if (!status.ok()) {
+      CLEAN_EXIT_WITH_ERROR(Substitute("Invalid proxy user configuration."
+          "No mapping value specified for the proxy user. For more information review "
+          "usage of the --authorized_proxy_user_config flag: $0", status.GetDetail()));
+    }
+  }
+
+  if (!FLAGS_authorized_proxy_group_config.empty()) {
+    Status status = PopulateAuthorizedProxyConfig(FLAGS_authorized_proxy_group_config,
+        FLAGS_authorized_proxy_group_config_delimiter, &authorized_proxy_group_config_);
+    if (!status.ok()) {
+      CLEAN_EXIT_WITH_ERROR(Substitute("Invalid proxy group configuration. "
+          "No mapping value specified for the proxy group. For more information review "
+          "usage of the --authorized_proxy_group_config flag: $0", status.GetDetail()));
     }
   }
 
@@ -396,6 +392,38 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   is_coordinator_ = FLAGS_is_coordinator;
   is_executor_ = FLAGS_is_executor;
   exec_env_->SetImpalaServer(this);
+}
+
+Status ImpalaServer::PopulateAuthorizedProxyConfig(
+    const string& authorized_proxy_config,
+    const string& authorized_proxy_config_delimiter,
+    AuthorizedProxyMap* authorized_proxy_config_map) {
+  // Parse the proxy user configuration using the format:
+  // <proxy user>=<comma separated list of users/groups they are allowed to delegate>
+  // See FLAGS_authorized_proxy_user_config or FLAGS_authorized_proxy_group_config
+  // for more details.
+  vector<string> proxy_config;
+  split(proxy_config, authorized_proxy_config, is_any_of(";"),
+      token_compress_on);
+  if (proxy_config.size() > 0) {
+    for (const string& config: proxy_config) {
+      size_t pos = config.find("=");
+      if (pos == string::npos) {
+        return Status(config);
+      }
+      string proxy_user = config.substr(0, pos);
+      boost::trim(proxy_user);
+      string config_str = config.substr(pos + 1);
+      boost::trim(config_str);
+      vector<string> parsed_allowed_users_or_groups;
+      split(parsed_allowed_users_or_groups, config_str,
+          is_any_of(authorized_proxy_config_delimiter), token_compress_on);
+      unordered_set<string> allowed_users_or_groups(
+          parsed_allowed_users_or_groups.begin(), parsed_allowed_users_or_groups.end());
+      authorized_proxy_config_map->insert({proxy_user, allowed_users_or_groups});
+    }
+  }
+  return Status::OK();
 }
 
 Status ImpalaServer::LogLineageRecord(const ClientRequestState& client_request_state) {
@@ -1336,8 +1364,9 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
   stringstream error_msg;
   error_msg << "User '" << user << "' is not authorized to delegate to '"
             << do_as_user << "'.";
-  if (authorized_proxy_user_config_.size() == 0) {
-    error_msg << " User delegation is disabled.";
+  if (authorized_proxy_user_config_.size() == 0 &&
+      authorized_proxy_group_config_.size() == 0) {
+    error_msg << " User/group delegation is disabled.";
     VLOG(1) << error_msg;
     return Status::Expected(error_msg.str());
   }
@@ -1352,13 +1381,45 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
 
   // Check if the proxy user exists. If he/she does, then check if they are allowed
   // to delegate to the do_as_user.
-  ProxyUserMap::const_iterator proxy_user =
+  AuthorizedProxyMap::const_iterator proxy_user =
       authorized_proxy_user_config_.find(short_user);
   if (proxy_user != authorized_proxy_user_config_.end()) {
-    for (const string& user: proxy_user->second) {
-      if (user == "*" || user == do_as_user) return Status::OK();
+    boost::unordered_set<string> users = proxy_user->second;
+    if (users.find("*") != users.end() ||
+        users.find(do_as_user) != users.end()) {
+      return Status::OK();
     }
   }
+
+  if (authorized_proxy_group_config_.size() > 0) {
+    // Check if the groups of do_as_user are in the authorized proxy groups.
+    AuthorizedProxyMap::const_iterator proxy_group =
+        authorized_proxy_group_config_.find(short_user);
+    if (proxy_group != authorized_proxy_group_config_.end()) {
+      boost::unordered_set<string> groups = proxy_group->second;
+      if (groups.find("*") != groups.end()) return Status::OK();
+
+      TGetHadoopGroupsRequest req;
+      req.__set_user(do_as_user);
+      TGetHadoopGroupsResponse res;
+      int64_t start = MonotonicMillis();
+      Status status = exec_env_->frontend()->GetHadoopGroups(req, &res);
+      VLOG_QUERY << "Getting Hadoop groups for user: " << short_user << " took " <<
+          (PrettyPrinter::Print(MonotonicMillis() - start, TUnit::TIME_MS));
+      if (!status.ok()) {
+        LOG(ERROR) << "Error getting Hadoop groups for user: " << short_user << ": "
+            << status.GetDetail();
+        return status;
+      }
+
+      for (const string& do_as_group : res.groups) {
+        if (groups.find(do_as_group) != groups.end()) {
+          return Status::OK();
+        }
+      }
+    }
+  }
+
   VLOG(1) << error_msg;
   return Status::Expected(error_msg.str());
 }

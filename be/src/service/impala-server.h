@@ -466,6 +466,7 @@ class ImpalaServer : public ImpalaServiceIf,
   friend class ChildQuery;
   friend class ImpalaHttpHandler;
   friend struct SessionState;
+  friend class ImpalaServerTest;
 
   boost::scoped_ptr<ImpalaHttpHandler> http_handler_;
 
@@ -813,6 +814,18 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Expire 'crs' and cancel it with status 'status'.
   void ExpireQuery(ClientRequestState* crs, const Status& status);
 
+  typedef boost::unordered_map<std::string, boost::unordered_set<std::string>>
+      AuthorizedProxyMap;
+  /// Populates authorized proxy config into the given map.
+  /// For example:
+  /// - authorized_proxy_config: foo=abc,def;bar=ghi
+  /// - authorized_proxy_config_delimiter: ,
+  /// - authorized_proxy_map: {foo:[abc, def], bar=s[ghi]}
+  static Status PopulateAuthorizedProxyConfig(
+      const std::string& authorized_proxy_config,
+      const std::string& authorized_proxy_config_delimiter,
+      AuthorizedProxyMap* authorized_proxy_map);
+
   /// Guards query_log_ and query_log_index_
   boost::mutex query_log_lock_;
 
@@ -1013,12 +1026,14 @@ class ImpalaServer : public ImpalaServiceIf,
   /// update. Updated with each catalog topic heartbeat from the statestore.
   int64_t min_subscriber_catalog_topic_version_;
 
-  /// Map of short usernames of authorized proxy users to the set of user(s) they are
+  /// Map of short usernames of authorized proxy users to the set of users they are
   /// allowed to delegate to. Populated by parsing the --authorized_proxy_users_config
   /// flag.
-  typedef boost::unordered_map<std::string, boost::unordered_set<std::string>>
-      ProxyUserMap;
-  ProxyUserMap authorized_proxy_user_config_;
+  AuthorizedProxyMap authorized_proxy_user_config_;
+  /// Map of short usernames of authorized proxy users to the set of groups they are
+  /// allowed to delegate to. Populated by parsing the --authorized_proxy_groups_config
+  /// flag.
+  AuthorizedProxyMap authorized_proxy_group_config_;
 
   /// Guards queries_by_timestamp_. See "Locking" in the class comment for lock
   /// acquisition order.

@@ -820,6 +820,16 @@ struct TGetAllHadoopConfigsResponse {
   1: optional map<string, string> configs;
 }
 
+struct TGetHadoopGroupsRequest {
+  // The user name to get the groups from.
+  1: required string user
+}
+
+struct TGetHadoopGroupsResponse {
+  // The list of groups that the user belongs to.
+  1: required list<string> groups
+}
+
 // For creating a test descriptor table. The tuples and their memory layout are computed
 // in the FE.
 struct TBuildTestDescriptorTableParams {
