@@ -87,7 +87,7 @@ public class FrontendTestBase {
   protected final List<Table> testTables_ = Lists.newArrayList();
   protected final String[][] hintStyles_ = new String[][] {
       new String[] { "/* +", "*/" }, // traditional commented hint
-      new String[] { "\n-- +", "\n" }, // eol commented hint
+      new String[] { "-- +", "\n" }, // eol commented hint
       new String[] { "[", "]" } // legacy style
   };
 
