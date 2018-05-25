@@ -989,8 +989,6 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
 
       <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
-      <p conref="../shared/impala_common.xml#common/regular_expression_whole_string"/>
-
 <!-- Currently, there isn't any IRLIKE synonym, so REGEXP and IREGEXP are different in that respect.
      I pinged IMPALA-1787 to check if that's intentional.
       <p>
@@ -1005,9 +1003,7 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
         built-in function. (Currently, there is not any case-insensitive equivalent for the <codeph>regexp_extract()</codeph> function.)
       </p>
 
-      <note rev="1.3.1">
-        <p rev="1.3.1" conref="../shared/impala_common.xml#common/regexp_matching"/>
-      </note>
+      <p rev="1.3.1" conref="../shared/impala_common.xml#common/regexp_matching"/>
 
       <p conref="../shared/impala_common.xml#common/regexp_re2"/>
 
@@ -1632,8 +1628,6 @@ where
 
       <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
-      <p conref="../shared/impala_common.xml#common/regular_expression_whole_string"/>
-
       <p>
         The <codeph>RLIKE</codeph> operator is a synonym for <codeph>REGEXP</codeph>.
       </p>
@@ -1645,9 +1639,7 @@ where
         built-in function.
       </p>
 
-      <note rev="1.3.1">
-          <p rev="1.3.1" conref="../shared/impala_common.xml#common/regexp_matching"/>
-      </note>
+      <p rev="1.3.1" conref="../shared/impala_common.xml#common/regexp_matching"/>
 
       <p conref="../shared/impala_common.xml#common/regexp_re2"/>
 
