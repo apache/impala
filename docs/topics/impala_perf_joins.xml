@@ -85,13 +85,13 @@ under the License.
       <li>
         Join the next smallest table, then the next smallest, and so on.
       </li>
+    </ul>
 
-      <li>
+      <p>
         For example, if you had tables <codeph>BIG</codeph>, <codeph>MEDIUM</codeph>, <codeph>SMALL</codeph>, and
         <codeph>TINY</codeph>, the logical join order to try would be <codeph>BIG</codeph>, <codeph>TINY</codeph>,
         <codeph>SMALL</codeph>, <codeph>MEDIUM</codeph>.
-      </li>
-    </ul>
+      </p>
 
     <p>
       The terms <q>largest</q> and <q>smallest</q> refers to the size of the intermediate result set based on the
@@ -153,8 +153,7 @@ under the License.
         immediately after the <codeph>SELECT</codeph> and any <codeph>DISTINCT</codeph> or <codeph>ALL</codeph>
         keywords. The <codeph>STRAIGHT_JOIN</codeph> keyword turns off
         the reordering of join clauses that Impala does internally, and produces a plan that relies on the join
-        clauses being ordered optimally in the query text. In this case, rewrite the query so that the largest
-        table is on the left, followed by the next largest, and so on until the smallest table is on the right.
+        clauses being ordered optimally in the query text.
       </p>
 
       <note>
