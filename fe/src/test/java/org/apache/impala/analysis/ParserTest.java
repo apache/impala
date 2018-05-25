@@ -360,6 +360,8 @@ public class ParserTest extends FrontendTestBase {
     for (String[] hintStyle: hintStyles_) {
       String prefix = hintStyle[0];
       String suffix = hintStyle[1];
+      // Test unexpected token
+      ParserError(prefix + suffix,"Syntax error in line 1:\n" + prefix + suffix);
       // Test join hints.
       TestJoinHints(String.format(
           "select * from functional.alltypes a join %sbroadcast%s " +
