@@ -74,13 +74,16 @@ class KuduTestSuite(ImpalaTestSuite):
   def get_db_name(cls):
     # When py.test runs with the xdist plugin, several processes are started and each
     # process runs some partition of the tests. It's possible that multiple processes
-    # will call this method. A random value is generated so the processes won't try
-    # to use the same database at the same time. The value is cached so within a single
+    # will call this method. To avoid multiple processes using the same database at the
+    # same time, the database name is formed by concatenating the test class name, the pid
+    # and a random value. The class name distinguishes classes and the pid distinguishes
+    # the same class run in different processes. The value is cached so within a single
     # process the same database name is always used for the class. This doesn't need to
     # be thread-safe since multi-threading is never used.
     if not cls.__DB_NAME:
-      cls.__DB_NAME = \
-          choice(ascii_lowercase) + "".join(sample(ascii_lowercase + digits, 5))
+      salt = choice(ascii_lowercase) + "".join(sample(ascii_lowercase + digits, 5))
+      cls.__DB_NAME = cls.__name__.lower() + "_" + str(os.getpid()) + "_" + salt
+
     return cls.__DB_NAME
 
   @classmethod
