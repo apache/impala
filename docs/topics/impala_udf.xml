@@ -185,6 +185,11 @@ select real_words(letters) from word_games;</codeblock>
           </li>
 
           <li>
+            Hive/Java UDFs must extend
+              <codeph>org.apache.hadoop.hive.ql.exec.UDF</codeph> class.
+          </li>
+
+          <li>
             Currently, Hive UDFs that accept or return the <codeph>TIMESTAMP</codeph> type are not supported.
           </li>
 
