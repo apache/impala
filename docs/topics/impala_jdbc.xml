@@ -108,11 +108,6 @@ under the License.
         applications with Impala 2.0 and higher, for queries that return large result sets.
       </p>
 
-      <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
-
-      <p conref="../shared/impala_common.xml#common/jdbc_odbc_complex_types"/>
-      <p conref="../shared/impala_common.xml#common/jdbc_odbc_complex_types_views"/>
-
     </conbody>
   </concept>
 

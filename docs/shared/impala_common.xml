@@ -2352,23 +2352,6 @@ show functions in _impala_builtins like '*<varname>substring</varname>*';
         clause to <q>rename</q> a column by selecting it with a column alias.
       </p>
 
-      <p rev="2.3.0" id="jdbc_odbc_complex_types">
-        The Impala complex types (<codeph>STRUCT</codeph>, <codeph>ARRAY</codeph>, or <codeph>MAP</codeph>)
-        are available in <keyword keyref="impala23_full"/> and higher.
-        To use these types with JDBC requires version 2.5.28 or higher of the JDBC Connector for Impala.
-        To use these types with ODBC requires version 2.5.30 or higher of the ODBC Connector for Impala.
-        Consider upgrading all JDBC and ODBC drivers at the same time you upgrade from <keyword keyref="impala23_full"/> or higher.
-      </p>
-
-      <p rev="2.3.0" id="jdbc_odbc_complex_types_views">
-        Although the result sets from queries involving complex types consist of all scalar values,
-        the queries involve join notation and column references that might not be understood by
-        a particular JDBC or ODBC connector. Consider defining a view that represents the
-        flattened version of a table containing complex type columns, and pointing the JDBC
-        or ODBC application at the view.
-        See <xref href="../topics/impala_complex_types.xml#complex_types"/> for details.
-      </p>
-
       <p rev="2.3.0" id="complex_types_aggregation_explanation">
         To access a column with a complex type (<codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, or <codeph>MAP</codeph>)
         in an aggregation function, you unpack the individual elements using join notation in the query,
