@@ -21,6 +21,7 @@ import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.junit.Assert;
@@ -30,7 +31,7 @@ import com.google.common.base.Preconditions;
 
 /**
  * Tests that the ExprRewriter framework covers all clauses as well as nested statements.
- * Does not test specific rewrite rules.
+ * It also tests some specific rewrite rules.
  */
 public class ExprRewriterTest extends AnalyzerTest {
 
@@ -165,6 +166,61 @@ public class ExprRewriterTest extends AnalyzerTest {
       RewritesOk("delete a from " +
           "functional_kudu.testtbl a join functional.testtbl b on a.zip = b.zip", 4, 2);
       RewritesOk("delete functional_kudu.testtbl where exists (" + stmt_ + ")", 24, 12);
+    }
+  }
+
+  /**
+   * construct an in-list: string_col in [offset ... offset + length)
+   */
+  private void CreateInList(int offset, int length, StringBuilder stmtSb) {
+    stmtSb.append("string_col in(");
+    for (int j = 0; j < length - 1; ++j) {
+      stmtSb.append("'c").append(offset + j).append("',");
+    }
+    stmtSb.append("'c").append(offset + length - 1).append("')");
+  }
+
+  private void CheckNumChangesByEqualityDisjunctsToInRule(
+      String stmt, int expectedNumChanges) throws ImpalaException {
+    StatementBase parsedStmt = (StatementBase) ParsesOk(stmt);
+    AnalyzesOkNoRewrite(parsedStmt);
+    ExprRewriter rewriter = new ExprRewriter(EqualityDisjunctsToInRule.INSTANCE);
+    parsedStmt.rewriteExprs(rewriter);
+    Assert.assertEquals(expectedNumChanges, rewriter.getNumChanges());
+  }
+
+  @Test
+  public void TestEqualityDisjunctsToInRuleSizeLimit() throws ImpalaException {
+    String stmtPrefix = "select count(*) from functional.alltypes where ( ";
+    // Test that EqualityDisjunctsToInRule doesn't create an expr with a number of
+    // children exceeding the limit.
+    {
+      // Create a disjunct with 2 in-lists of length Expr.EXPR_CHILDREN_LIMIT - 1.
+      StringBuilder stmtSb = new StringBuilder(stmtPrefix);
+      for (int i = 0; i < 2; ++i) {
+        int offset = (Expr.EXPR_CHILDREN_LIMIT - 1) * i;
+        CreateInList(offset, Expr.EXPR_CHILDREN_LIMIT - 1, stmtSb);
+        if (i != 1) stmtSb.append(" or ");
+      }
+      stmtSb.append(")");
+      CheckNumChangesByEqualityDisjunctsToInRule(stmtSb.toString(), 0);
+    }
+    {
+      // Create a disjunct with an in-list of length Expr.EXPR_CHILDREN_LIMIT - 1 and a
+      // EQ predicate.
+      StringBuilder stmtSb = new StringBuilder(stmtPrefix);
+      CreateInList(0, Expr.EXPR_CHILDREN_LIMIT - 1, stmtSb);
+      stmtSb.append("or string_col='").append(Expr.EXPR_CHILDREN_LIMIT - 1).append("')");
+      CheckNumChangesByEqualityDisjunctsToInRule(stmtSb.toString(), 0);
+    }
+    {
+      // Create a disjunct with an in-list of length Expr.EXPR_CHILDREN_LIMIT - 2 and 2
+      // EQ predicates.
+      StringBuilder stmtSb = new StringBuilder(stmtPrefix);
+      CreateInList(0, Expr.EXPR_CHILDREN_LIMIT - 2, stmtSb);
+      stmtSb.append("or string_col='").append(Expr.EXPR_CHILDREN_LIMIT - 2)
+          .append("' or string_col='").append(Expr.EXPR_CHILDREN_LIMIT - 1).append("')");
+      CheckNumChangesByEqualityDisjunctsToInRule(stmtSb.toString(), 1);
     }
   }
 }

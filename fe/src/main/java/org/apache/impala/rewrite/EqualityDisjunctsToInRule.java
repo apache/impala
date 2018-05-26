@@ -53,10 +53,10 @@ public class EqualityDisjunctsToInRule implements ExprRewriteRule {
   }
 
   /**
-   * Takes the children of an OR predicate and attempts to combine them into a single IN predicate.
-   * The transformation is applied if one of the children is an IN predicate and the other child
-   * is a compatible IN predicate or equality predicate. Returns the transformed expr or null
-   * if no transformation was possible.
+   * Takes the children of an OR predicate and attempts to combine them into a single IN
+   * predicate. The transformation is applied if one of the children is an IN predicate
+   * and the other child is a compatible IN predicate or equality predicate. Returns the
+   * transformed expr or null if no transformation was possible.
    */
   private Expr rewriteInAndOtherExpr(Expr child0, Expr child1) {
     InPredicate inPred = null;
@@ -64,27 +64,31 @@ public class EqualityDisjunctsToInRule implements ExprRewriteRule {
     if (child0 instanceof InPredicate) {
       inPred = (InPredicate) child0;
       otherPred = child1;
-    }
-    else if (child1 instanceof InPredicate) {
+    } else if (child1 instanceof InPredicate) {
       inPred = (InPredicate) child1;
       otherPred = child0;
     }
-    if (inPred == null || inPred.isNotIn() || inPred.contains(Subquery.class)) return null;
-    if (!inPred.getChild(0).equals(otherPred.getChild(0))) return null;
+    if (inPred == null || inPred.isNotIn() || inPred.contains(Subquery.class) ||
+        !inPred.getChild(0).equals(otherPred.getChild(0))) {
+      return null;
+    }
 
     // other predicate can be OR predicate or IN predicate
     List<Expr> newInList = Lists.newArrayList(
         inPred.getChildren().subList(1, inPred.getChildren().size()));
     if (Expr.IS_EXPR_EQ_LITERAL_PREDICATE.apply(otherPred)) {
+      if (newInList.size() + 1 == Expr.EXPR_CHILDREN_LIMIT) return null;
       newInList.add(otherPred.getChild(1));
-    } else
-      if (otherPred instanceof InPredicate && !((InPredicate) otherPred).isNotIn()
-          && !otherPred.contains(Subquery.class)) {
-        newInList.addAll(
-            otherPred.getChildren().subList(1, otherPred.getChildren().size()));
-      } else {
+    } else if (otherPred instanceof InPredicate && !((InPredicate) otherPred).isNotIn()
+        && !otherPred.contains(Subquery.class)) {
+      if (newInList.size() + otherPred.getChildren().size() > Expr.EXPR_CHILDREN_LIMIT) {
         return null;
       }
+      newInList.addAll(
+          otherPred.getChildren().subList(1, otherPred.getChildren().size()));
+    } else {
+      return null;
+    }
 
     return new InPredicate(inPred.getChild(0), newInList, false);
   }
