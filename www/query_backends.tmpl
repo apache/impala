@@ -64,7 +64,7 @@ $(document).ready(function() {
                      {data: 'num_instances'},
                      {data: 'num_remaining_instances'},
                      {data: 'done'},
-                     {data: 'peak_mem_consumption'},
+                     {data: 'peak_mem_consumption', render: renderSize},
                      {data: 'time_since_last_heard_from'}],
         "order": [[ 0, "desc" ]],
         "pageLength": 100
