@@ -33,8 +33,9 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(64.00 KB\).*
+# TODO: reenable once IMPALA-6338 is fixed
+#row_regex: .*1 of 1 Runtime Filter Published.*
+#row_regex: .*Filter 0 \(64.00 KB\).*
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -46,8 +47,9 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(256.00 KB\).*
+# TODO: reenable once IMPALA-6338 is fixed
+#row_regex: .*1 of 1 Runtime Filter Published.*
+#row_regex: .*Filter 0 \(256.00 KB\).*
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -59,8 +61,9 @@ select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(512.00 KB\).*
+# TODO: reenable once IMPALA-6338 is fixed
+#row_regex: .*1 of 1 Runtime Filter Published.*
+#row_regex: .*Filter 0 \(512.00 KB\).*
 ====
 ---- QUERY
 SET RUNTIME_FILTER_MODE=GLOBAL;
@@ -115,8 +118,9 @@ with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
 select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
     join (select * from l LIMIT 1000000) b on a.l_orderkey = -b.l_orderkey;
 ---- RUNTIME_PROFILE
-row_regex: .*0 of 1 Runtime Filter Published.*
-row_regex: .*Filter 0 \(64.00 KB\).*
+# TODO: reenable once IMPALA-6338 is fixed
+#row_regex: .*0 of 1 Runtime Filter Published.*
+#row_regex: .*Filter 0 \(64.00 KB\).*
 ====
 
 
