@@ -22,6 +22,7 @@ import pytest
 import signal
 import ssl
 import socket
+import sys
 import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -30,15 +31,12 @@ from tests.shell.util import run_impala_shell_cmd, run_impala_shell_cmd_no_expec
     ImpalaShell
 
 REQUIRED_MIN_OPENSSL_VERSION = 0x10001000L
-HAS_LEGACY_OPENSSL = True
+REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12 = (2,7,9)
 SKIP_SSL_MSG = "Legacy OpenSSL module detected"
-try:
-  HAS_LEGACY_OPENSSL = ssl.OPENSSL_VERSION_NUMBER < REQUIRED_MIN_OPENSSL_VERSION
+HAS_LEGACY_OPENSSL = getattr(ssl, "OPENSSL_VERSION_NUMBER", None)
+if HAS_LEGACY_OPENSSL is not None:
   SKIP_SSL_MSG = "Only have OpenSSL version %X, but test requires %X" % (
     ssl.OPENSSL_VERSION_NUMBER, REQUIRED_MIN_OPENSSL_VERSION)
-except AttributeError:
-  # Old ssl module versions don't even have OPENSSL_VERSION_NUMBER as a member.
-  pass
 
 class TestClientSsl(CustomClusterTestSuite):
   """Tests for a client using SSL (particularly, the Impala Shell) """
@@ -124,6 +122,8 @@ class TestClientSsl(CustomClusterTestSuite):
                                     statestored_args=TLS_V12_ARGS,
                                     catalogd_args=TLS_V12_ARGS)
   @pytest.mark.skipif(HAS_LEGACY_OPENSSL, reason=SKIP_SSL_MSG)
+  @pytest.mark.skipif(sys.version_info < REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12, \
+      reason="Python version too old to allow Thrift client to use TLSv1.2")
   def test_tls_v12(self, vector):
     self._validate_positive_cases("%s/server-cert.pem" % self.CERT_DIR)
 
