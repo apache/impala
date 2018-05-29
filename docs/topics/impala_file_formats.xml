@@ -110,6 +110,24 @@ under the License.
               Yes: <codeph>CREATE TABLE</codeph>, <codeph>INSERT</codeph>, <codeph>LOAD DATA</codeph>, and query.
             </entry>
           </row>
+          <row id="orc_support">
+            <entry>
+              <xref href="impala_orc.xml#orc">ORC</xref>
+            </entry>
+            <entry>
+              Structured
+            </entry>
+            <entry>
+              gzip, Snappy, LZO, LZ4; currently gzip by default
+            </entry>
+            <entry>
+              Yes, in Impala 2.12.0 and higher.
+            </entry>
+            <entry>
+              No. Import data by using <codeph>LOAD DATA</codeph> on data files already in the right format, or use
+              <codeph>INSERT</codeph> in Hive followed by <codeph>REFRESH <varname>table_name</varname></codeph> in Impala.
+            </entry>
+          </row>
           <row id="txtfile_support">
             <entry>
               <xref href="impala_txtfile.xml#txtfile">Text</xref>
@@ -201,8 +219,8 @@ under the License.
     </table>
 
     <p rev="DOCS-1370">
-      Impala can only query the file formats listed in the preceding table.
-      In particular, Impala does not support the ORC file format.
+      Impala can only query the file formats listed in the preceding table. The ORC support is an experimental feature
+      since Impala-2.12. To disable it, set --enable_orc_scanner to false when starting the cluster.
     </p>
 
     <p>
