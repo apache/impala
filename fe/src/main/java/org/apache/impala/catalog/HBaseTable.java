@@ -642,12 +642,16 @@ public class HBaseTable extends Table {
     // If the serverLoad is null, the master doesn't have information for this region's
     // server. This shouldn't normally happen.
     if (serverLoad == null) {
-      LOG.error("Unable to find load for server: " + location.getServerName() +
+      LOG.error("Unable to find server load for server: " + location.getServerName() +
           " for location " + info.getRegionNameAsString());
       return 0;
     }
     RegionLoad regionLoad = serverLoad.getRegionsLoad().get(info.getRegionName());
-
+    if (regionLoad == null) {
+      LOG.error("Unable to find regions load for server: " + location.getServerName() +
+          " for location " + info.getRegionNameAsString());
+      return 0;
+    }
     final long megaByte = 1024L * 1024L;
     return regionLoad.getStorefileSizeMB() * megaByte;
   }
