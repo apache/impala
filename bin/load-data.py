@@ -167,7 +167,8 @@ def exec_hive_query_from_file_beeline(file_name):
   output_file = file_name + ".log"
   hive_cmd = "{0} {1} -f {2}".format(HIVE_CMD, hive_args, file_name)
   is_success = exec_cmd(hive_cmd, exit_on_error=False, out_file=output_file)
-  shutil.rmtree(unique_dir)
+  if unique_dir:
+    shutil.rmtree(unique_dir)
 
   if is_success:
     LOG.info("Finished execution of hive SQL: {0}".format(file_name))
