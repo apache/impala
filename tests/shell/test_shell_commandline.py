@@ -579,9 +579,10 @@ class TestImpalaShell(ImpalaTestSuite):
     results = run_impala_shell_cmd('--query="%s"' % (stmt))
     expected_output = "Modified %d row(s), %d row error(s)" %\
         (expected_rows_modified, expected_row_errors)
-    assert expected_output in results.stderr
+    assert expected_output in results.stderr, results.stderr
 
   @SkipIf.kudu_not_supported
+  @pytest.mark.xfail(reason='IMPALA-7089')
   def test_kudu_dml_reporting(self, unique_database):
     db = unique_database
     run_impala_shell_cmd('--query="create table %s.dml_test (id int primary key, '\
