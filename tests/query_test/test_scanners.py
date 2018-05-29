@@ -36,7 +36,8 @@ from tests.common.skip import (
     SkipIfS3,
     SkipIfADLS,
     SkipIfIsilon,
-    SkipIfLocal)
+    SkipIfLocal,
+    SkipIfNotHdfsMinicluster)
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_exec_option_dimension,
@@ -1056,6 +1057,7 @@ class TestScannerReservation(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_scanners(self, vector):
     self.run_test_case('QueryTest/scanner-reservation', vector)
 
