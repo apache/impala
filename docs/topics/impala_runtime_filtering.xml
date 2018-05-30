@@ -166,7 +166,7 @@ under the License.
     <conbody>
       <p>
         The <term>filter</term> that is transmitted between plan fragments is essentially a list
-        of values for join key columns. When this list is values is transmitted in time to a scan node,
+        of values for join key columns. When this list of values is transmitted in time to a scan node,
         Impala can filter out non-matching values immediately after reading them, rather than transmitting
         the raw data to another host to compare against the in-memory hash table on that host.
       </p>
