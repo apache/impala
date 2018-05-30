@@ -315,6 +315,9 @@ class RowBatch {
   /// pool and buffers.
   void TransferResourceOwnership(RowBatch* dest);
 
+  /// Update accounting so that attached memory is accounted against 'new_tracker'.
+  void SetMemTracker(MemTracker* new_tracker);
+
   void CopyRow(TupleRow* src, TupleRow* dest) {
     memcpy(dest, src, num_tuples_per_row_ * sizeof(Tuple*));
   }

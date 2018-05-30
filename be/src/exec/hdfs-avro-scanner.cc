@@ -493,73 +493,93 @@ Status HdfsAvroScanner::InitNewRange() {
 }
 
 Status HdfsAvroScanner::ProcessRange(RowBatch* row_batch) {
-  if (record_pos_ == num_records_in_block_) {
-    // Read new data block
-    RETURN_IF_FALSE(stream_->ReadZLong(&num_records_in_block_, &parse_status_));
-    if (num_records_in_block_ < 0) {
-      return Status(TErrorCode::AVRO_INVALID_RECORD_COUNT, stream_->filename(),
-          num_records_in_block_, stream_->file_offset());
-    }
-    int64_t compressed_size;
-    RETURN_IF_FALSE(stream_->ReadZLong(&compressed_size, &parse_status_));
-    if (compressed_size < 0) {
-      return Status(TErrorCode::AVRO_INVALID_COMPRESSED_SIZE, stream_->filename(),
-          compressed_size, stream_->file_offset());
-    }
-    uint8_t* compressed_data;
-    RETURN_IF_FALSE(stream_->ReadBytes(
-        compressed_size, &compressed_data, &parse_status_));
-
-    if (header_->is_compressed) {
-      if (header_->compression_type == THdfsCompression::SNAPPY) {
-        // Snappy-compressed data block includes trailing 4-byte checksum,
-        // decompressor_ doesn't expect this
-        compressed_size -= SnappyDecompressor::TRAILING_CHECKSUM_LEN;
+  // Process blocks until we hit eos, the limit or the batch fills up. Check
+  // AtCapacity() at the end of the loop to guarantee that we process at least one row
+  // so that we make progress even if the batch starts off with AtCapacity() == true,
+  // which can happen if the tuple buffer is > 8MB.
+  DCHECK_GT(row_batch->capacity(), row_batch->num_rows());
+  while (!eos_ && !scan_node_->ReachedLimit()) {
+    if (record_pos_ == num_records_in_block_) {
+      // Read new data block
+      RETURN_IF_FALSE(stream_->ReadZLong(&num_records_in_block_, &parse_status_));
+      if (num_records_in_block_ < 0) {
+        return Status(TErrorCode::AVRO_INVALID_RECORD_COUNT, stream_->filename(),
+            num_records_in_block_, stream_->file_offset());
       }
-      SCOPED_TIMER(decompress_timer_);
-      RETURN_IF_ERROR(decompressor_->ProcessBlock(false, compressed_size,
-          compressed_data, &data_block_len_, &data_block_));
-    } else {
-      data_block_ = compressed_data;
-      data_block_len_ = compressed_size;
+      int64_t compressed_size;
+      RETURN_IF_FALSE(stream_->ReadZLong(&compressed_size, &parse_status_));
+      if (compressed_size < 0) {
+        return Status(TErrorCode::AVRO_INVALID_COMPRESSED_SIZE, stream_->filename(),
+            compressed_size, stream_->file_offset());
+      }
+      uint8_t* compressed_data;
+      RETURN_IF_FALSE(stream_->ReadBytes(
+          compressed_size, &compressed_data, &parse_status_));
+
+      if (header_->is_compressed) {
+        if (header_->compression_type == THdfsCompression::SNAPPY) {
+          // Snappy-compressed data block includes trailing 4-byte checksum,
+          // decompressor_ doesn't expect this
+          compressed_size -= SnappyDecompressor::TRAILING_CHECKSUM_LEN;
+        }
+        SCOPED_TIMER(decompress_timer_);
+        RETURN_IF_ERROR(decompressor_->ProcessBlock(false, compressed_size,
+            compressed_data, &data_block_len_, &data_block_));
+      } else {
+        data_block_ = compressed_data;
+        data_block_len_ = compressed_size;
+      }
+      data_block_end_ = data_block_ + data_block_len_;
+      record_pos_ = 0;
     }
-    data_block_end_ = data_block_ + data_block_len_;
-    record_pos_ = 0;
-  }
 
-  // Process block data
-  while (record_pos_ != num_records_in_block_) {
-    SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+    int64_t prev_record_pos = record_pos_;
+    int block_start_row = row_batch->num_rows();
+    // Process the remaining data in the current block. Always process at least one row
+    // to ensure we make progress even if the batch starts off with AtCapacity() == true.
+    DCHECK_GT(row_batch->capacity(), row_batch->num_rows());
+    while (record_pos_ != num_records_in_block_) {
+      SCOPED_TIMER(scan_node_->materialize_tuple_timer());
 
-    Tuple* tuple = tuple_;
-    TupleRow* tuple_row = row_batch->GetRow(row_batch->AddRow());
-    int max_tuples = row_batch->capacity() - row_batch->num_rows();
-    max_tuples = min<int64_t>(max_tuples, num_records_in_block_ - record_pos_);
-    int num_to_commit;
-    if (scan_node_->materialized_slots().empty()) {
-      // No slots to materialize (e.g. count(*)), no need to decode data
-      num_to_commit = WriteTemplateTuples(tuple_row, max_tuples);
-    } else if (codegend_decode_avro_data_ != nullptr) {
-      num_to_commit = codegend_decode_avro_data_(this, max_tuples,
-          row_batch->tuple_data_pool(), &data_block_, data_block_end_, tuple, tuple_row);
-    } else {
-      num_to_commit = DecodeAvroData(max_tuples, row_batch->tuple_data_pool(),
-          &data_block_, data_block_end_, tuple, tuple_row);
+      Tuple* tuple = tuple_;
+      TupleRow* tuple_row = row_batch->GetRow(row_batch->AddRow());
+      int max_tuples = row_batch->capacity() - row_batch->num_rows();
+      max_tuples = min<int64_t>(max_tuples, num_records_in_block_ - record_pos_);
+      int num_to_commit;
+      if (scan_node_->materialized_slots().empty()) {
+        // No slots to materialize (e.g. count(*)), no need to decode data
+        num_to_commit = WriteTemplateTuples(tuple_row, max_tuples);
+      } else if (codegend_decode_avro_data_ != nullptr) {
+        num_to_commit = codegend_decode_avro_data_(this, max_tuples,
+            row_batch->tuple_data_pool(), &data_block_, data_block_end_, tuple, tuple_row);
+      } else {
+        num_to_commit = DecodeAvroData(max_tuples, row_batch->tuple_data_pool(),
+            &data_block_, data_block_end_, tuple, tuple_row);
+      }
+      RETURN_IF_ERROR(parse_status_);
+      RETURN_IF_ERROR(CommitRows(num_to_commit, row_batch));
+      record_pos_ += max_tuples;
+      COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
+      if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
     }
-    RETURN_IF_ERROR(parse_status_);
-    RETURN_IF_ERROR(CommitRows(num_to_commit, row_batch));
-    record_pos_ += max_tuples;
-    COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
-    if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) break;
-  }
 
-  if (record_pos_ == num_records_in_block_) {
-    if (decompressor_.get() != nullptr && !decompressor_->reuse_output_buffer()) {
-      row_batch->tuple_data_pool()->AcquireData(data_buffer_pool_.get(), false);
+    if (record_pos_ == num_records_in_block_) {
+      if (decompressor_.get() != nullptr && !decompressor_->reuse_output_buffer()) {
+        if (prev_record_pos == 0 && row_batch->num_rows() == block_start_row) {
+          // Did not return any rows from current block in this or a previous
+          // ProcessRange() call - we can recycle the memory. This optimisation depends on
+          // passing keep_current_chunk = false to the AcquireData() call below, so that
+          // the current chunk only contains data for the current Avro block.
+          data_buffer_pool_->Clear();
+        } else {
+          // Returned rows may reference data buffers - need to attach to batch.
+          row_batch->tuple_data_pool()->AcquireData(data_buffer_pool_.get(), false);
+        }
+      }
+      RETURN_IF_ERROR(ReadSync());
     }
-    RETURN_IF_ERROR(ReadSync());
+    if (row_batch->AtCapacity()) break;
   }
-
   return Status::OK();
 }
 

@@ -223,6 +223,25 @@ void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
   limit_metric_ = metrics->AddGauge(Substitute("$0.limit", prefix), limit_);
 }
 
+void MemTracker::TransferTo(MemTracker* dst, int64_t bytes) {
+  DCHECK_EQ(all_trackers_.back(), dst->all_trackers_.back())
+      << "Must have same root";
+  // Find the common ancestor and update trackers between 'this'/'dst' and
+  // the common ancestor. This logic handles all cases, including the
+  // two trackers being the same or being ancestors of each other because
+  // 'all_trackers_' includes the current tracker.
+  int ancestor_idx = all_trackers_.size() - 1;
+  int dst_ancestor_idx = dst->all_trackers_.size() - 1;
+  while (ancestor_idx > 0 && dst_ancestor_idx > 0
+      && all_trackers_[ancestor_idx - 1] == dst->all_trackers_[dst_ancestor_idx - 1]) {
+    --ancestor_idx;
+    --dst_ancestor_idx;
+  }
+  MemTracker* common_ancestor = all_trackers_[ancestor_idx];
+  ReleaseLocal(bytes, common_ancestor);
+  dst->ConsumeLocal(bytes, common_ancestor);
+}
+
 // Calling this on the query tracker results in output like:
 //
 //  Query(4a4c81fedaed337d:4acadfda00000000) Limit=10.00 GB Total=508.28 MB Peak=508.45 MB
