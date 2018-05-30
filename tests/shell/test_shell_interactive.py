@@ -516,6 +516,24 @@ class TestImpalaShellInteractive(object):
     assert '| 1"23"4 |' in result.stdout
 
   @pytest.mark.execute_serially
+  def test_comment_with_quotes(self):
+    # IMPALA-2751: Comment does not need to have matching quotes
+    queries = [
+      "select -- '\n1;",
+      'select -- "\n1;',
+      "select -- \"'\n 1;",
+      "select /*'\n*/ 1;",
+      'select /*"\n*/ 1;',
+      "select /*\"'\n*/ 1;",
+      "with a as (\nselect 1\n-- '\n) select * from a",
+      'with a as (\nselect 1\n-- "\n) select * from a',
+      "with a as (\nselect 1\n-- '\"\n) select * from a",
+    ]
+    for query in queries:
+      result = run_impala_shell_interactive(query)
+      assert '| 1 |' in result.stdout
+
+  @pytest.mark.execute_serially
   def test_shell_prompt(self):
     proc = pexpect.spawn(SHELL_CMD)
     proc.expect(":21000] default>")
