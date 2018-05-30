@@ -455,6 +455,12 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
   Reset();
 }
 
+void RowBatch::SetMemTracker(MemTracker* new_tracker) {
+  tuple_data_pool_.SetMemTracker(new_tracker);
+  mem_tracker_->TransferTo(new_tracker, tuple_ptrs_size_);
+  mem_tracker_ = new_tracker;
+}
+
 int64_t RowBatch::GetDeserializedSize(const TRowBatch& batch) {
   return batch.uncompressed_size + batch.tuple_offsets.size() * sizeof(Tuple*);
 }

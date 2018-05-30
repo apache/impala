@@ -181,13 +181,15 @@ class ScanNode : public ExecNode {
   /// Aggregated scanner thread counters
   RuntimeProfile::ThreadCounters* scanner_thread_counters_;
 
-  /// The number of active scanner threads that are not blocked by IO.
+  /// The number of scanner threads currently running.
   RuntimeProfile::Counter active_scanner_thread_counter_;
 
   /// Average number of active scanner threads
   /// This should be created in Open and stopped when all the scanner threads are done.
   RuntimeProfile::Counter* average_scanner_thread_concurrency_;
 
+  /// Cumulative number of scanner threads created during the scan. Some may be created
+  /// and then destroyed, so this can exceed the peak number of threads.
   RuntimeProfile::Counter* num_scanner_threads_started_counter_;
 
   /// Expressions to evaluate the input rows for filtering against runtime filters.

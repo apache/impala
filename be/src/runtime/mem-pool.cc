@@ -184,11 +184,7 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
   src->total_reserved_bytes_ -= total_transfered_bytes;
   total_reserved_bytes_ += total_transfered_bytes;
 
-  // Skip unnecessary atomic ops if the mem_trackers are the same.
-  if (src->mem_tracker_ != mem_tracker_) {
-    src->mem_tracker_->Release(total_transfered_bytes);
-    mem_tracker_->Consume(total_transfered_bytes);
-  }
+  src->mem_tracker_->TransferTo(mem_tracker_, total_transfered_bytes);
 
   // insert new chunks after current_chunk_idx_
   vector<ChunkInfo>::iterator insert_chunk = chunks_.begin() + current_chunk_idx_ + 1;
@@ -210,6 +206,11 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
   if (!keep_current) src->FreeAll();
   DCHECK(src->CheckIntegrity(false));
   DCHECK(CheckIntegrity(false));
+}
+
+void MemPool::SetMemTracker(MemTracker* new_tracker) {
+  mem_tracker_->TransferTo(new_tracker, total_reserved_bytes_);
+  mem_tracker_ = new_tracker;
 }
 
 string MemPool::DebugString() {
@@ -244,8 +245,10 @@ bool MemPool::CheckIntegrity(bool check_current_chunk_empty) {
 
   // check that current_chunk_idx_ points to the last chunk with allocated data
   int64_t total_allocated = 0;
+  int64_t total_reserved = 0;
   for (int i = 0; i < chunks_.size(); ++i) {
     DCHECK_GT(chunks_[i].size, 0);
+    total_reserved += chunks_[i].size;
     if (i < current_chunk_idx_) {
       DCHECK_GT(chunks_[i].allocated_bytes, 0);
     } else if (i == current_chunk_idx_) {
@@ -257,5 +260,6 @@ bool MemPool::CheckIntegrity(bool check_current_chunk_empty) {
     total_allocated += chunks_[i].allocated_bytes;
   }
   DCHECK_EQ(total_allocated, total_allocated_bytes_);
+  DCHECK_EQ(total_reserved, total_reserved_bytes_);
   return true;
 }

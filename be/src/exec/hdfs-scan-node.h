@@ -151,15 +151,30 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// the number of cores.
   int max_num_scanner_threads_;
 
+  // MemTracker for queued row batches. Initialized in Prepare(). Owned by RuntimeState.
+  MemTracker* row_batches_mem_tracker_ = nullptr;
+
   // Number of times scanner threads were not created because of reservation increase
   // being denied.
   RuntimeProfile::Counter* scanner_thread_reservations_denied_counter_ = nullptr;
+
+  /// The number of row batches enqueued into the row batch queue.
+  RuntimeProfile::Counter* row_batches_enqueued_ = nullptr;
+
+  /// The total bytes of row batches enqueued into the row batch queue.
+  RuntimeProfile::Counter* row_batch_bytes_enqueued_ = nullptr;
 
   /// The wait time for fetching a row batch from the row batch queue.
   RuntimeProfile::Counter* row_batches_get_timer_ = nullptr;
 
   /// The wait time for enqueuing a row batch into the row batch queue.
   RuntimeProfile::Counter* row_batches_put_timer_ = nullptr;
+
+  /// Maximum capacity of the row batch queue.
+  RuntimeProfile::HighWaterMarkCounter* row_batches_max_capacity_ = nullptr;
+
+  /// Peak memory consumption of the materialized batch queue. Updated in Close().
+  RuntimeProfile::Counter* row_batches_peak_mem_consumption_ = nullptr;
 
   /// Tries to spin up as many scanner threads as the quota allows. Called explicitly
   /// (e.g., when adding new ranges) or when threads are available for this scan node.

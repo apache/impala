@@ -176,6 +176,67 @@ TEST(MemTestTest, TrackerHierarchy) {
   c2.Release(60);
 }
 
+// Test that we can transfer between MemTrackers without temporary double-counting
+// in ancestors
+TEST(MemTestTest, TransferTo) {
+  MemTracker root(100);
+  MemTracker parent(-1, "", &root);
+  MemTracker uncle(-1, "", &root);
+  MemTracker child1(-1, "", &parent);
+  MemTracker child2(-1, "", &parent);
+
+  child1.Consume(100);
+  // To self.
+  child1.TransferTo(&child1, 100);
+  EXPECT_EQ(child1.consumption(), 100);
+  EXPECT_EQ(child1.peak_consumption(), 100);
+  EXPECT_EQ(parent.consumption(), 100);
+  EXPECT_EQ(parent.peak_consumption(), 100);
+
+  // Child to parent.
+  child1.TransferTo(&parent, 100);
+  EXPECT_EQ(child1.consumption(), 0);
+  EXPECT_EQ(child1.peak_consumption(), 100);
+  EXPECT_EQ(parent.consumption(), 100);
+  EXPECT_EQ(parent.peak_consumption(), 100);
+
+  // Parent to child
+  parent.TransferTo(&child1, 100);
+  EXPECT_EQ(child1.consumption(), 100);
+  EXPECT_EQ(child1.peak_consumption(), 100);
+  EXPECT_EQ(parent.consumption(), 100);
+  EXPECT_EQ(parent.peak_consumption(), 100);
+
+  // Child to child.
+  child1.TransferTo(&child2, 50);
+  EXPECT_EQ(child1.consumption(), 50);
+  EXPECT_EQ(child2.consumption(), 50);
+  EXPECT_EQ(child2.peak_consumption(), 50);
+  EXPECT_EQ(parent.consumption(), 100);
+  EXPECT_EQ(parent.peak_consumption(), 100);
+
+  // Child to uncle.
+  child1.TransferTo(&uncle, 50);
+  EXPECT_EQ(child1.consumption(), 0);
+  EXPECT_EQ(uncle.consumption(), 50);
+  EXPECT_EQ(uncle.peak_consumption(), 50);
+  EXPECT_EQ(parent.consumption(), 50);
+  EXPECT_EQ(parent.peak_consumption(), 100);
+  EXPECT_EQ(root.consumption(), 100);
+  EXPECT_EQ(root.peak_consumption(), 100);
+
+  // Child to root
+  child2.TransferTo(&root, 50);
+  EXPECT_EQ(child2.consumption(), 0);
+  EXPECT_EQ(parent.consumption(), 0);
+  EXPECT_EQ(parent.peak_consumption(), 100);
+  EXPECT_EQ(root.consumption(), 100);
+  EXPECT_EQ(root.peak_consumption(), 100);
+
+  uncle.Release(50);
+  root.Release(50);
+}
+
 class GcFunctionHelper {
  public:
   static const int NUM_RELEASE_BYTES = 1;

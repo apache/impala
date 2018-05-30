@@ -155,6 +155,9 @@ class MemPool {
   /// All offsets handed out by calls to GetCurrentOffset() for 'src' become invalid.
   void AcquireData(MemPool* src, bool keep_current);
 
+  /// Change the MemTracker, updating consumption on the current and new tracker.
+  void SetMemTracker(MemTracker* new_tracker);
+
   std::string DebugString();
 
   int64_t total_allocated_bytes() const { return total_allocated_bytes_; }

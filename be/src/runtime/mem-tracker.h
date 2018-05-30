@@ -234,6 +234,12 @@ class MemTracker {
     }
   }
 
+  /// Transfer 'bytes' of consumption from this tracker to 'dst', updating
+  /// all ancestors up to the first shared ancestor. Must not be used if
+  /// 'dst' has a limit, or an ancestor with a limit, that is not a common
+  /// ancestor with the tracker, because this does not check memory limits.
+  void TransferTo(MemTracker* dst, int64_t bytes);
+
   /// Returns true if a valid limit of this tracker or one of its ancestors is
   /// exceeded.
   bool AnyLimitExceeded() {
