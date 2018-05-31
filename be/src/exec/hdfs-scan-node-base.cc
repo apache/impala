@@ -122,6 +122,7 @@ Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
 Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ScanNode::Prepare(state));
+  AddBytesReadCounters();
 
   // Prepare collection conjuncts
   for (const auto& entry: conjuncts_map_) {
@@ -348,27 +349,25 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   reader_context_ = runtime_state_->io_mgr()->RegisterContext();
 
   // Initialize HdfsScanNode specific counters
-  // TODO: Revisit counters and move the counters specific to multi-threaded scans
-  // into HdfsScanNode.
-  read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_READ_TIMER);
-  open_file_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_OPEN_FILE_TIMER);
+  hdfs_read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_READ_TIMER);
+  hdfs_open_file_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_OPEN_FILE_TIMER);
   per_read_thread_throughput_counter_ = runtime_profile()->AddDerivedCounter(
       PER_READ_THREAD_THROUGHPUT_COUNTER, TUnit::BYTES_PER_SECOND,
-      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_, read_timer_));
+      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_,
+      hdfs_read_timer_));
   scan_ranges_complete_counter_ =
       ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TUnit::UNIT);
+  collection_items_read_counter_ =
+      ADD_COUNTER(runtime_profile(), COLLECTION_ITEMS_READ_COUNTER, TUnit::UNIT);
   if (DiskInfo::num_disks() < 64) {
     num_disks_accessed_counter_ =
         ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TUnit::UNIT);
   } else {
     num_disks_accessed_counter_ = NULL;
   }
-  num_scanner_threads_started_counter_ =
-      ADD_COUNTER(runtime_profile(), NUM_SCANNER_THREADS_STARTED, TUnit::UNIT);
-
   reader_context_->set_bytes_read_counter(bytes_read_counter());
-  reader_context_->set_read_timer(read_timer());
-  reader_context_->set_open_file_timer(open_file_timer());
+  reader_context_->set_read_timer(hdfs_read_timer_);
+  reader_context_->set_open_file_timer(hdfs_open_file_timer_);
   reader_context_->set_active_read_thread_counter(&active_hdfs_read_thread_counter_);
   reader_context_->set_disks_accessed_bitmap(&disks_accessed_bitmap_);
 
@@ -425,8 +424,7 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
 
   StopAndFinalizeCounters();
 
-  // There should be no active scanner threads and hdfs read threads.
-  DCHECK_EQ(active_scanner_thread_counter_.value(), 0);
+  // There should be no active hdfs read threads.
   DCHECK_EQ(active_hdfs_read_thread_counter_.value(), 0);
 
   if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
@@ -763,7 +761,7 @@ void HdfsScanNodeBase::RangeComplete(const THdfsFileFormat::type& file_type,
 
 void HdfsScanNodeBase::RangeComplete(const THdfsFileFormat::type& file_type,
     const vector<THdfsCompression::type>& compression_types, bool skipped) {
-  scan_ranges_complete_counter()->Add(1);
+  scan_ranges_complete_counter_->Add(1);
   progress_.Update(1);
   HdfsCompressionTypesSet compression_set;
   for (int i = 0; i < compression_types.size(); ++i) {

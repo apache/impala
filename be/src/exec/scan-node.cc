@@ -20,14 +20,26 @@
 #include <boost/bind.hpp>
 
 #include "exprs/scalar-expr.h"
+#include "runtime/io/disk-io-mgr.h"
+#include "runtime/row-batch.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
+#include "util/disk-info.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 
 DEFINE_int32(runtime_filter_wait_time_ms, 1000, "(Advanced) the maximum time, in ms, "
     "that a scan node will wait for expected runtime filters to arrive.");
+
+// The maximum capacity of batch_queue_ per scanner thread that can
+// be created. This is multiplied by 'max_num_scanner_threads' to get an upper
+// bound on the queue size. This reduces the queue size on systems with many disks
+// and makes the num_scanner_threads query option more effective at reducing memory
+// consumption. For now, make this relatively high. We should consider lowering
+// this or using a better heuristic (e.g. based on queued memory).
+DEFINE_int32_hidden(max_queued_row_batches_per_scanner_thread, 5,
+    "(Advanced) the maximum number of queued row batches per scanner thread.");
 
 using boost::algorithm::join;
 
@@ -51,6 +63,8 @@ const string ScanNode::SCANNER_THREAD_TOTAL_WALLCLOCK_TIME =
     "ScannerThreadsTotalWallClockTime";
 const string ScanNode::AVERAGE_SCANNER_THREAD_CONCURRENCY =
     "AverageScannerThreadConcurrency";
+const string ScanNode::PEAK_SCANNER_THREAD_CONCURRENCY =
+    "PeakScannerThreadConcurrency";
 const string ScanNode::AVERAGE_HDFS_READ_THREAD_CONCURRENCY =
     "AverageHdfsReadThreadConcurrency";
 const string ScanNode::NUM_SCANNER_THREADS_STARTED =
@@ -96,28 +110,25 @@ Status ScanNode::Prepare(RuntimeState* state) {
   runtime_state_ = state;
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
-  scanner_thread_counters_ =
-      ADD_THREAD_COUNTERS(runtime_profile(), SCANNER_THREAD_COUNTERS_PREFIX);
-  bytes_read_counter_ =
-      ADD_COUNTER(runtime_profile(), BYTES_READ_COUNTER, TUnit::BYTES);
-  bytes_read_timeseries_counter_ = ADD_TIME_SERIES_COUNTER(runtime_profile(),
-      BYTES_READ_COUNTER, bytes_read_counter_);
   rows_read_counter_ =
       ADD_COUNTER(runtime_profile(), ROWS_READ_COUNTER, TUnit::UNIT);
-  collection_items_read_counter_ =
-      ADD_COUNTER(runtime_profile(), COLLECTION_ITEMS_READ_COUNTER, TUnit::UNIT);
-  total_throughput_counter_ = runtime_profile()->AddRateCounter(
-      TOTAL_THROUGHPUT_COUNTER, bytes_read_counter_);
-  materialize_tuple_timer_ = ADD_CHILD_TIMER(runtime_profile(), MATERIALIZE_TUPLE_TIMER,
-      SCANNER_THREAD_TOTAL_WALLCLOCK_TIME);
+  materialize_tuple_timer_ = ADD_TIMER(runtime_profile(), MATERIALIZE_TUPLE_TIMER);
 
   DCHECK_EQ(filter_exprs_.size(), filter_ctxs_.size());
   for (int i = 0; i < filter_exprs_.size(); ++i) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Create(*filter_exprs_[i], state, pool_,
         expr_perm_pool(), expr_results_pool(), &filter_ctxs_[i].expr_eval));
   }
-
   return Status::OK();
+}
+
+void ScanNode::AddBytesReadCounters() {
+  bytes_read_counter_ =
+      ADD_COUNTER(runtime_profile(), BYTES_READ_COUNTER, TUnit::BYTES);
+  bytes_read_timeseries_counter_ = ADD_TIME_SERIES_COUNTER(runtime_profile(),
+      BYTES_READ_COUNTER, bytes_read_counter_);
+  total_throughput_counter_ = runtime_profile()->AddRateCounter(
+      TOTAL_THROUGHPUT_COUNTER, bytes_read_counter_);
 }
 
 Status ScanNode::Open(RuntimeState* state) {
@@ -127,7 +138,6 @@ Status ScanNode::Open(RuntimeState* state) {
   for (FilterContext& ctx : filter_ctxs_) {
     RETURN_IF_ERROR(ctx.expr_eval->Open(state));
   }
-
   return Status::OK();
 }
 
@@ -178,4 +188,121 @@ bool ScanNode::WaitForRuntimeFilters() {
   return false;
 }
 
+void ScanNode::ScannerThreadState::Prepare(ScanNode* parent) {
+  RuntimeProfile* profile = parent->runtime_profile();
+  row_batches_mem_tracker_ = parent->runtime_state_->obj_pool()->Add(new MemTracker(
+        -1, "Queued Batches", parent->mem_tracker(), false));
+
+  thread_counters_ = ADD_THREAD_COUNTERS(profile, SCANNER_THREAD_COUNTERS_PREFIX);
+  num_threads_started_ = ADD_COUNTER(profile, NUM_SCANNER_THREADS_STARTED, TUnit::UNIT);
+  row_batches_enqueued_ =
+      ADD_COUNTER(profile, "RowBatchesEnqueued", TUnit::UNIT);
+  row_batch_bytes_enqueued_ =
+      ADD_COUNTER(profile, "RowBatchBytesEnqueued", TUnit::BYTES);
+  row_batches_get_timer_ = ADD_TIMER(profile, "RowBatchQueueGetWaitTime");
+  row_batches_put_timer_ = ADD_TIMER(profile, "RowBatchQueuePutWaitTime");
+  row_batches_max_capacity_ =
+      profile->AddHighWaterMarkCounter("RowBatchQueueCapacity", TUnit::UNIT);
+  row_batches_peak_mem_consumption_ =
+      ADD_COUNTER(profile, "RowBatchQueuePeakMemoryUsage", TUnit::BYTES);
+}
+
+void ScanNode::ScannerThreadState::Open(
+    ScanNode* parent, int64_t max_row_batches_override) {
+  RuntimeState* state = parent->runtime_state_;
+  max_num_scanner_threads_ = CpuInfo::num_cores();
+  if (state->query_options().num_scanner_threads > 0) {
+    max_num_scanner_threads_ = state->query_options().num_scanner_threads;
+  }
+  DCHECK_GT(max_num_scanner_threads_, 0);
+
+  int max_row_batches = max_row_batches_override;
+  if (max_row_batches_override <= 0) {
+    // Legacy heuristic to determine the size, based on the idea that more disks means a
+    // faster producer. Also used for Kudu under the assumption that the scan runs
+    // co-located with a Kudu tablet server and that the tablet server is using disks
+    // similarly as a datanode would.
+    // TODO: IMPALA-7096: re-evaluate this heuristic to get a tighter bound on memory
+    // consumption, we could do something better.
+    max_row_batches = max(1, min(
+        10 * (DiskInfo::num_disks() + io::DiskIoMgr::REMOTE_NUM_DISKS),
+        max_num_scanner_threads_ * FLAGS_max_queued_row_batches_per_scanner_thread));
+  }
+  if (state->query_options().__isset.mt_dop && state->query_options().mt_dop > 0) {
+    // To avoid a significant memory increase when running the multithreaded scans
+    // with mt_dop > 0 (if mt_dop is not supported for this scan), then adjust the number
+    // of maximally queued row batches per scan instance based on MT_DOP. The max
+    // materialized row batches is at least 2 to allow for some parallelism between
+    // the producer/consumer.
+    max_row_batches = max(2, max_row_batches / state->query_options().mt_dop);
+  }
+  VLOG_QUERY << "Max row batch queue size for scan node '" << parent->id()
+      << "' in fragment instance '" << PrintId(state->fragment_instance_id())
+      << "': " << max_row_batches;
+  batch_queue_.reset(new RowBatchQueue(max_row_batches));
+
+  // Start measuring the scanner thread concurrency only once the node is opened.
+  average_concurrency_ = parent->runtime_profile()->AddSamplingCounter(
+      AVERAGE_SCANNER_THREAD_CONCURRENCY, [&num_active=num_active_] () {
+        return num_active.Load();
+      });
+  peak_concurrency_ = parent->runtime_profile()->AddHighWaterMarkCounter(
+      PEAK_SCANNER_THREAD_CONCURRENCY, TUnit::UNIT);
+}
+
+void ScanNode::ScannerThreadState::AddThread(unique_ptr<Thread> thread) {
+  VLOG_RPC << "Thread started: " << thread->name();
+  COUNTER_ADD(num_threads_started_, 1);
+  num_active_.Add(1);
+  peak_concurrency_->Add(1);
+  scanner_threads_.AddThread(move(thread));
+}
+
+bool ScanNode::ScannerThreadState::DecrementNumActive() {
+  peak_concurrency_->Add(-1);
+  return num_active_.Add(-1) == 0;
+}
+
+void ScanNode::ScannerThreadState::EnqueueBatch(
+    unique_ptr<RowBatch> row_batch) {
+  // Only need to count tuple_data_pool() bytes since after IMPALA-5307, no buffers are
+  // returned from the scan node.
+  int64_t bytes = row_batch->tuple_data_pool()->total_reserved_bytes();
+  row_batch->SetMemTracker(row_batches_mem_tracker_);
+  batch_queue_->AddBatch(move(row_batch));
+  COUNTER_ADD(row_batches_enqueued_, 1);
+  COUNTER_ADD(row_batch_bytes_enqueued_, bytes);
+}
+
+bool ScanNode::ScannerThreadState::EnqueueBatchWithTimeout(
+    unique_ptr<RowBatch>* row_batch, int64_t timeout_micros) {
+  // Only need to count tuple_data_pool() bytes since after IMPALA-5307, no buffers are
+  // returned from the scan node.
+  int64_t bytes = (*row_batch)->tuple_data_pool()->total_reserved_bytes();
+  // Transfer memory ownership before enqueueing. If the caller retries, this transfer
+  // is idempotent.
+  (*row_batch)->SetMemTracker(row_batches_mem_tracker_);
+  if (!batch_queue_->BlockingPutWithTimeout(move(*row_batch), timeout_micros)) {
+    return false;
+  }
+  COUNTER_ADD(row_batches_enqueued_, 1);
+  COUNTER_ADD(row_batch_bytes_enqueued_, bytes);
+  return true;
+}
+
+void ScanNode::ScannerThreadState::Shutdown() {
+  if (batch_queue_ != nullptr) batch_queue_->Shutdown();
+}
+
+void ScanNode::ScannerThreadState::Close() {
+  scanner_threads_.JoinAll();
+  DCHECK_EQ(num_active_.Load(), 0) << "There should be no active threads";
+  if (batch_queue_ != nullptr) {
+    row_batches_put_timer_->Set(batch_queue_->total_put_wait_time());
+    row_batches_get_timer_->Set(batch_queue_->total_get_wait_time());
+    row_batches_peak_mem_consumption_->Set(row_batches_mem_tracker_->peak_consumption());
+    batch_queue_->Cleanup();
+  }
+  if (row_batches_mem_tracker_ != nullptr) row_batches_mem_tracker_->Close();
+}
 }

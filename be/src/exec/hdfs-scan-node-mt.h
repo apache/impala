@@ -40,13 +40,13 @@ class HdfsScanNodeMt : public HdfsScanNodeBase {
   HdfsScanNodeMt(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
   ~HdfsScanNodeMt();
 
-  virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
-  virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
+  virtual Status Prepare(RuntimeState* state) override WARN_UNUSED_RESULT;
+  virtual Status Open(RuntimeState* state) override WARN_UNUSED_RESULT;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos)
-      WARN_UNUSED_RESULT;
-  virtual void Close(RuntimeState* state);
+      override WARN_UNUSED_RESULT;
+  virtual void Close(RuntimeState* state) override;
 
-  virtual bool HasRowBatchQueue() const { return false; }
+  virtual bool HasRowBatchQueue() const override { return false; }
 
  private:
   /// Current scan range and corresponding scanner.

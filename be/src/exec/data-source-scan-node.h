@@ -45,23 +45,23 @@ class DataSourceScanNode : public ScanNode {
   ~DataSourceScanNode();
 
   /// Load the data source library and create the ExternalDataSourceExecutor.
-  virtual Status Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state) override;
 
   /// Open the data source and initialize the first row batch.
-  virtual Status Open(RuntimeState* state);
+  virtual Status Open(RuntimeState* state) override;
 
   /// Fill the next row batch, calls GetNext() on the external scanner.
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
 
   /// NYI
-  virtual Status Reset(RuntimeState* state);
+  virtual Status Reset(RuntimeState* state) override;
 
   /// Close the scanner, and report errors.
-  virtual void Close(RuntimeState* state);
+  virtual void Close(RuntimeState* state) override;
 
  protected:
   /// Write debug string of this into out.
-  virtual void DebugString(int indentation_level, std::stringstream* out) const;
+  virtual void DebugString(int indentation_level, std::stringstream* out) const override;
 
  private:
   /// Used to call the external data source.
