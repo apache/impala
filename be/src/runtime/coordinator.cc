@@ -364,10 +364,10 @@ Status Coordinator::FinishBackendStartup() {
       error_hostname = backend_state->impalad_address().hostname;
     }
     if (backend_state->rpc_latency() > max_latency) {
-        // Find the backend that takes the most time to acknowledge to
-        // the ExecQueryFinstances() RPC.
-        max_latency = backend_state->rpc_latency();
-        max_latency_host = TNetworkAddressToString(backend_state->impalad_address());
+      // Find the backend that takes the most time to acknowledge to
+      // the ExecQueryFinstances() RPC.
+      max_latency = backend_state->rpc_latency();
+      max_latency_host = TNetworkAddressToString(backend_state->impalad_address());
     }
     latencies.Update(backend_state->rpc_latency());
   }
