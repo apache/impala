@@ -899,11 +899,13 @@ Database
       </p>
 
       <p>
-        URIs represent the HDFS paths you specify as part of statements such as <codeph>CREATE EXTERNAL
-        TABLE</codeph> and <codeph>LOAD DATA</codeph>. Typically, you specify what look like UNIX paths, but these
-        locations can also be prefixed with <codeph>hdfs://</codeph> to make clear that they are really URIs. To
-        set privileges for a URI, specify the name of a directory, and the privilege applies to all the files in
-        that directory and any directories underneath it.
+        URIs represent the file paths you specify as part of statements such
+        as <codeph>CREATE EXTERNAL TABLE</codeph> and <codeph>LOAD
+        DATA</codeph>. Typically, you specify what look like UNIX paths, but
+        these locations can also be prefixed with <codeph>hdfs://</codeph> to
+        make clear that they are really URIs. To set privileges for a URI,
+        specify the name of a directory, and the privilege applies to all the
+        files in that directory and any directories underneath it.
       </p>
 
       <p rev="2.3.0 collevelauth">
@@ -916,18 +918,37 @@ Database
       </p>
 
       <p>
-        URIs must start with either <codeph>hdfs://</codeph> or <codeph>file://</codeph>. If a URI starts with
-        anything else, it will cause an exception and the policy file will be invalid. When defining URIs for HDFS,
-        you must also specify the NameNode. For example:
-<codeblock>data_read = server=server1-&gt;uri=file:///path/to/dir, \
+        URIs must start with <codeph>hdfs://</codeph>,
+        <codeph>s3a://</codeph>, <codeph>adl://</codeph>, or
+          <codeph>file://</codeph>. If a URI starts with an absolute path, the
+        path will be appended to the default filesystem prefix. For example, if
+        you specify:
+<codeblock>
+GRANT ALL ON URI '/tmp';
+</codeblock> The above
+        statement effectively becomes the following where the default filesystem
+        is HDFS.
+<codeblock>
+GRANT ALL ON URI 'hdfs://localhost:20500/tmp';
+</codeblock>
+      </p>
+
+      <p>
+        When defining URIs for HDFS, you must also specify the NameNode. For
+        example:
+<codeblock>
+data_read = server=server1-&gt;uri=file:///path/to/dir, \
 server=server1-&gt;uri=hdfs://namenode:port/path/to/dir
 </codeblock>
         <note type="warning">
           <p>
-            Because the NameNode host and port must be specified, enable High Availability (HA) to ensure
-            that the URI will remain constant even if the NameNode changes.
+            Because the NameNode host and port must be specified, enable High
+            Availability (HA) to ensure that the URI will remain constant even
+            if the NameNode changes.
           </p>
-<codeblock>data_read = server=server1-&gt;uri=file:///path/to/dir,\ server=server1-&gt;uri=hdfs://ha-nn-uri/path/to/dir
+<codeblock>
+data_read = server=server1-&gt;uri=file:///path/to/dir, \
+server=server1-&gt;uri=hdfs://ha-nn-uri/path/to/dir
 </codeblock>
         </note>
       </p>
