@@ -233,33 +233,41 @@ under the License.
     <title>Hardware Requirements</title>
 
     <conbody>
-
       <p>
-        <indexterm audience="hidden">hardware requirements</indexterm>
-        <indexterm audience="hidden">capacity</indexterm>
-        <indexterm audience="hidden">RAM</indexterm>
-        <indexterm audience="hidden">memory</indexterm>
-        <indexterm audience="hidden">CPU</indexterm>
-        <indexterm audience="hidden">processor</indexterm>
-        <indexterm audience="hidden">Intel</indexterm>
-        <indexterm audience="hidden">AMD</indexterm>
-        During join operations, portions of data from each joined table are loaded into memory. Data sets can be
-        very large, so ensure your hardware has sufficient memory to accommodate the joins you anticipate
-        completing.
+        The memory allocation should be consistent across Impala executor
+        nodes. A single Impala executor with a lower memory limit than the rest
+        can easily become a bottleneck and lead to suboptimal performance.
       </p>
 
       <p>
-        While requirements vary according to data set size, the following is generally recommended:
+        This guideline does not apply to coordinator-only nodes.
       </p>
-
-      <ul>
-        <li rev="2.0.0">
-          CPU - Impala version 2.2 and higher uses the SSSE3 instruction set, which is included in newer processors.
-          <note>
-            This required level of processor is the same as in Impala version 1.x. The Impala 2.0 and 2.1 releases
-            had a stricter requirement for the SSE4.1 instruction set, which has now been relaxed.
-          </note>
-<!--
+    </conbody>
+    <concept id="concept_dqy_n1w_zdb">
+      <title>Hardware Requirements for Optimal Join Performance</title>
+      <conbody>
+        <p>
+          During join operations, portions of data from each joined table are
+          loaded into memory. Data sets can be very large, so ensure your
+          hardware has sufficient memory to accommodate the joins you anticipate
+          completing.
+        </p>
+        <p> While requirements vary according to data set size, the following is
+          generally recommended:
+        </p>
+        <ul>
+          <li rev="2.0.0"> CPU
+            <p>
+              Impala version 2.2 and higher uses the SSSE3
+              instruction set, which is included in newer processors.
+            </p>
+            <note>
+              This required level of processor is the same as in Impala
+              version 1.x. The Impala 2.0 and 2.1 releases had a stricter
+              requirement for the SSE4.1 instruction set, which has now been
+              relaxed.
+            </note>
+            <!--
           For best performance use:
           <ul>
             <li>
@@ -271,24 +279,34 @@ under the License.
             </li>
           </ul>
 -->
-        </li>
+          </li>
+          <li rev="1.2">
+            Memory
+            <p>
+              128 GB or more recommended, ideally 256 GB
+              or more. If the intermediate results during query processing on a
+              particular node exceed the amount of memory available to Impala on
+              that node, the query writes temporary work data to disk, which can
+              lead to long query times. Note that because the work is
+              parallelized, and intermediate results for aggregate queries are
+              typically smaller than the original data, Impala can query and
+              join tables that are much larger than the memory available on an
+              individual node.
+            </p>
+          </li>
+          <li>
+            Storage
+            <p>
+              DataNodes with 12 or more disks each. I/O speeds are
+              often the limiting factor for disk performance with Impala. Ensure
+              that you have sufficient disk space to store the data Impala will
+              be querying.
+            </p>
+          </li>
+        </ul>
+      </conbody>
+    </concept>
 
-        <li rev="1.2">
-          Memory - 128 GB or more recommended, ideally 256 GB or more. If the intermediate results during query
-          processing on a particular node exceed the amount of memory available to Impala on that node, the query
-          writes temporary work data to disk, which can lead to long query times. Note that because the work is
-          parallelized, and intermediate results for aggregate queries are typically smaller than the original
-          data, Impala can query and join tables that are much larger than the memory available on an individual
-          node.
-        </li>
-
-        <li>
-          Storage - DataNodes with 12 or more disks each. I/O speeds are often the limiting factor for disk
-          performance with Impala. Ensure that you have sufficient disk space to store the data Impala will be
-          querying.
-        </li>
-      </ul>
-    </conbody>
   </concept>
 
   <concept id="prereqs_account">
