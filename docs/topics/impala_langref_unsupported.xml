@@ -172,6 +172,10 @@ under the License.
         </li>
 
         <li>
+          <codeph>SHOW TBLPROPERTIES</codeph>
+        </li>
+
+        <li>
           <codeph>SHOW INDEXES</codeph>
         </li>
 
