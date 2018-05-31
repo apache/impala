@@ -54,8 +54,8 @@ class TestRuntimeFilters(ImpalaTestSuite):
     mode"""
     now = time.time()
     self.run_test_case('QueryTest/runtime_filters_wait', vector)
-    duration = time.time() - now
-    assert duration < WAIT_TIME_MS, \
+    duration_s = time.time() - now
+    assert duration_s < (WAIT_TIME_MS / 1000), \
         "Query took too long (%ss, possibly waiting for missing filters?)" % str(duration)
 
   def test_file_filtering(self, vector):
@@ -91,8 +91,8 @@ class TestBloomFilters(ImpalaTestSuite):
     mode"""
     now = time.time()
     self.run_test_case('QueryTest/bloom_filters_wait', vector)
-    duration = time.time() - now
-    assert duration < 60, \
+    duration_s = time.time() - now
+    assert duration_s < (WAIT_TIME_MS / 1000), \
         "Query took too long (%ss, possibly waiting for missing filters?)" % str(duration)
 
 
