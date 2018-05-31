@@ -505,7 +505,7 @@ Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
   RETURN_IF_ERROR(jni_frame.push(env));
   jobject result = NULL;
   {
-    SCOPED_TIMER(scan_node_->read_timer());
+    SCOPED_TIMER(scan_node_->hbase_read_timer());
     while (true) {
       DCHECK(resultscanner_ != NULL);
       // result_ = resultscanner_.next();

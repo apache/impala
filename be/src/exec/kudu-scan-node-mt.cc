@@ -75,7 +75,7 @@ Status KuduScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
   bool scanner_eos = false;
   RETURN_IF_ERROR(scanner_->GetNext(row_batch, &scanner_eos));
   if (scanner_eos) {
-    scan_ranges_complete_counter()->Add(1);
+    scan_ranges_complete_counter_->Add(1);
     scan_token_ = nullptr;
   }
   scanner_->KeepKuduScannerAlive();

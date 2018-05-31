@@ -114,8 +114,32 @@ struct ScanRangeMetadata {
 /// Scanners may also use the same filters to eliminate rows at finer granularities
 /// (e.g. per row).
 ///
-/// TODO: Revisit and minimize metrics. Move those specific to legacy multi-threaded
-/// scans into HdfsScanNode.
+/// Counters:
+///
+///   TotalRawHdfsReadTime - the total wall clock time spent by Disk I/O threads in HDFS
+///     read operations. For example, if we have 3 reading threads and each spent 1 sec,
+///     this counter will report 3 sec.
+///
+///   TotalRawHdfsOpenFileTime - the total wall clock time spent by Disk I/O threads in
+///     HDFS open operations.
+///
+///   PerReadThreadRawHdfsThroughput - the read throughput in bytes/sec for each HDFS
+///     read thread while it is executing I/O operations on behalf of this scan.
+///
+///   NumDisksAccessed - number of distinct disks accessed by HDFS scan. Each local disk
+///     is counted as a disk and each remote disk queue (e.g. HDFS remote reads, S3)
+///     is counted as a distinct disk.
+///
+///   AverageHdfsReadThreadConcurrency - the average number of HDFS read threads
+///     executing read operations on behalf of this scan. Higher values show that this
+///     scan is using a larger proportion of the I/O capacity of the system. Lower values
+///     show that either this thread is not I/O bound or that it is getting a small share
+///     of the I/O capacity of the system because of other concurrently executing
+///     queries.
+///
+///   Hdfs Read Thread Concurrency Bucket - the bucket counting (%) of HDFS read thread
+///     concurrency.
+///
 /// TODO: Once the legacy scan node has been removed, several functions can be made
 /// non-virtual. Also merge this class with HdfsScanNodeMt.
 class HdfsScanNodeBase : public ScanNode {
@@ -123,12 +147,13 @@ class HdfsScanNodeBase : public ScanNode {
   HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
   ~HdfsScanNodeBase();
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) WARN_UNUSED_RESULT;
-  virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
-  virtual void Codegen(RuntimeState* state);
-  virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
-  virtual Status Reset(RuntimeState* state) WARN_UNUSED_RESULT;
-  virtual void Close(RuntimeState* state);
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state)
+      override WARN_UNUSED_RESULT;
+  virtual Status Prepare(RuntimeState* state) override WARN_UNUSED_RESULT;
+  virtual void Codegen(RuntimeState* state) override;
+  virtual Status Open(RuntimeState* state) override WARN_UNUSED_RESULT;
+  virtual Status Reset(RuntimeState* state) override WARN_UNUSED_RESULT;
+  virtual void Close(RuntimeState* state) override;
 
   /// Returns true if this node uses separate threads for scanners that append RowBatches
   /// to a queue, false otherwise.
@@ -292,8 +317,6 @@ class HdfsScanNodeBase : public ScanNode {
   virtual void TransferToScanNodePool(MemPool* pool);
 
   /// map from volume id to <number of split, per volume split lengths>
-  /// TODO: move this into some global .h, no need to include this file just for this
-  /// typedef
   typedef boost::unordered_map<int32_t, std::pair<int, int64_t>> PerVolumeStats;
 
   /// Update the per volume stats with the given scan range params list
@@ -486,6 +509,18 @@ class HdfsScanNodeBase : public ScanNode {
   /// HDFS read thread concurrency bucket: bucket[i] refers to the number of sample
   /// taken where there are i concurrent hdfs read thread running. Created in Open().
   std::vector<RuntimeProfile::Counter*>* hdfs_read_thread_concurrency_bucket_ = nullptr;
+
+  /// HDFS read throughput per Disk I/O thread [bytes/sec],
+  RuntimeProfile::Counter* per_read_thread_throughput_counter_ = nullptr;
+
+  /// Total number of disks accessed for this scan node.
+  RuntimeProfile::Counter* num_disks_accessed_counter_ = nullptr;
+
+  /// Total file read time in I/O mgr disk thread.
+  RuntimeProfile::Counter* hdfs_read_timer_ = nullptr;
+
+  /// Total time spent opening file handles in I/O mgr disk thread.
+  RuntimeProfile::Counter* hdfs_open_file_timer_ = nullptr;
 
   /// Track stats about ideal/actual reservation for initial scan ranges so we can
   /// determine if the scan got all of the reservation it wanted. Does not include

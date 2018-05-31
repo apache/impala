@@ -178,6 +178,11 @@ class BlockingQueue : public CacheLineAligned {
     return SizeLocked(write_lock);
   }
 
+  bool AtCapacity() const {
+    boost::unique_lock<boost::mutex> write_lock(put_lock_);
+    return SizeLocked(write_lock) >= max_elements_;
+  }
+
   int64_t total_get_wait_time() const {
     // Hold lock to make sure the value read is consistent (i.e. no torn read).
     boost::lock_guard<boost::mutex> read_lock(get_lock_);

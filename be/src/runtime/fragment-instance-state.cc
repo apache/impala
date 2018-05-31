@@ -29,7 +29,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/plan-root-sink.h"
 #include "exec/exec-node.h"
-#include "exec/hdfs-scan-node-base.h"  // for PerVolumeStats
+#include "exec/hdfs-scan-node-base.h"
 #include "exec/exchange-node.h"
 #include "exec/scan-node.h"
 #include "runtime/exec-env.h"

@@ -31,7 +31,6 @@
 #include "exec/filter-context.h"
 #include "exec/hdfs-scan-node-base.h"
 #include "util/counting-barrier.h"
-#include "util/thread.h"
 
 namespace impala {
 
@@ -76,24 +75,22 @@ class HdfsScanNode : public HdfsScanNodeBase {
   HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
   ~HdfsScanNode();
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) WARN_UNUSED_RESULT;
-  virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
-  virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos)
+  virtual Status Prepare(RuntimeState* state) override WARN_UNUSED_RESULT;
+  virtual Status Open(RuntimeState* state) override WARN_UNUSED_RESULT;
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override
       WARN_UNUSED_RESULT;
-  virtual void Close(RuntimeState* state);
+  virtual void Close(RuntimeState* state) override;
 
-  virtual bool HasRowBatchQueue() const { return true; }
+  virtual bool HasRowBatchQueue() const override { return true; }
 
   bool done() const { return done_; }
 
   /// Adds ranges to the io mgr queue and starts up new scanner threads if possible.
   virtual Status AddDiskIoRanges(const std::vector<io::ScanRange*>& ranges,
-      int num_files_queued) WARN_UNUSED_RESULT;
+      int num_files_queued) override WARN_UNUSED_RESULT;
 
   /// Adds a materialized row batch for the scan node.  This is called from scanner
-  /// threads.
-  /// This function will block if materialized_row_batches_ is full.
+  /// threads. This function will block if the row batch queue is full.
   void AddMaterializedRowBatch(std::unique_ptr<RowBatch> row_batch);
 
   /// Called by scanners when a range is complete. Used to record progress and set done_.
@@ -102,24 +99,17 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// batch queue. Otherwise, we may lose the last batch due to racing with shutting down
   /// the RowBatch queue.
   virtual void RangeComplete(const THdfsFileFormat::type& file_type,
-      const std::vector<THdfsCompression::type>& compression_type, bool skipped = false);
+      const std::vector<THdfsCompression::type>& compression_type, bool skipped = false)
+      override;
 
   /// Transfers all memory from 'pool' to 'scan_node_pool_'.
-  virtual void TransferToScanNodePool(MemPool* pool);
+  virtual void TransferToScanNodePool(MemPool* pool) override;
 
  private:
+  ScannerThreadState thread_state_;
+
   /// Released when initial ranges are issued in the first call to GetNext().
   CountingBarrier ranges_issued_barrier_{1};
-
-  /// Thread group for all scanner worker threads
-  ThreadGroup scanner_threads_;
-
-  /// Outgoing row batches queue. Row batches are produced asynchronously by the scanner
-  /// threads and consumed by the main thread.
-  boost::scoped_ptr<RowBatchQueue> materialized_row_batches_;
-
-  /// Maximum size of materialized_row_batches_.
-  int max_materialized_row_batches_;
 
   /// Lock protects access between scanner thread and main query thread (the one calling
   /// GetNext()) for all fields below.  If this lock and any other locks needs to be taken
@@ -145,36 +135,9 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// -1 if no callback is registered.
   int thread_avail_cb_id_ = -1;
 
-  /// Maximum number of scanner threads. Set to 'NUM_SCANNER_THREADS' if that query
-  /// option is set. Otherwise, it's set to the number of cpu cores. Scanner threads
-  /// are generally cpu bound so there is no benefit in spinning up more threads than
-  /// the number of cores.
-  int max_num_scanner_threads_;
-
-  // MemTracker for queued row batches. Initialized in Prepare(). Owned by RuntimeState.
-  MemTracker* row_batches_mem_tracker_ = nullptr;
-
   // Number of times scanner threads were not created because of reservation increase
   // being denied.
   RuntimeProfile::Counter* scanner_thread_reservations_denied_counter_ = nullptr;
-
-  /// The number of row batches enqueued into the row batch queue.
-  RuntimeProfile::Counter* row_batches_enqueued_ = nullptr;
-
-  /// The total bytes of row batches enqueued into the row batch queue.
-  RuntimeProfile::Counter* row_batch_bytes_enqueued_ = nullptr;
-
-  /// The wait time for fetching a row batch from the row batch queue.
-  RuntimeProfile::Counter* row_batches_get_timer_ = nullptr;
-
-  /// The wait time for enqueuing a row batch into the row batch queue.
-  RuntimeProfile::Counter* row_batches_put_timer_ = nullptr;
-
-  /// Maximum capacity of the row batch queue.
-  RuntimeProfile::HighWaterMarkCounter* row_batches_max_capacity_ = nullptr;
-
-  /// Peak memory consumption of the materialized batch queue. Updated in Close().
-  RuntimeProfile::Counter* row_batches_peak_mem_consumption_ = nullptr;
 
   /// Tries to spin up as many scanner threads as the quota allows. Called explicitly
   /// (e.g., when adding new ranges) or when threads are available for this scan node.
@@ -208,7 +171,7 @@ class HdfsScanNode : public HdfsScanNodeBase {
   void ReturnReservationFromScannerThread(const boost::unique_lock<boost::mutex>& lock,
       int64_t bytes);
 
-  /// Checks for eos conditions and returns batches from materialized_row_batches_.
+  /// Checks for eos conditions and returns batches from the row batch queue.
   Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos)
       WARN_UNUSED_RESULT;
 

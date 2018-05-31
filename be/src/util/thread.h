@@ -127,6 +127,8 @@ class Thread {
   /// support retrieving the tid, returns Thread::INVALID_THREAD_ID.
   int64_t tid() const { return tid_; }
 
+  const std::string& name() const { return name_; }
+
   static const int64_t INVALID_THREAD_ID = -1;
 
  private:

@@ -331,6 +331,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
   ScalarExprEvaluator* const* evals = conjunct_evals_.data();
   int num_conjuncts = conjuncts_.size();
   DCHECK_EQ(num_conjuncts, conjunct_evals_.size());
+  int64_t rows_read = 0;
 
   while (true) {
     {
@@ -338,6 +339,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
       // copy rows until we hit the limit/capacity or until we exhaust input_batch_
       while (!ReachedLimit() && !row_batch->AtCapacity() && InputBatchHasNext()) {
         RETURN_IF_ERROR(MaterializeNextRow(state->local_time_zone(), tuple_pool, tuple));
+        ++rows_read;
         int row_idx = row_batch->AddRow();
         TupleRow* tuple_row = row_batch->GetRow(row_idx);
         tuple_row->SetTuple(tuple_idx_, tuple);
@@ -350,10 +352,10 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
         }
         ++next_row_idx_;
       }
-      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-
       if (ReachedLimit() || row_batch->AtCapacity() || input_batch_->eos) {
         *eos = ReachedLimit() || input_batch_->eos;
+        COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+        COUNTER_ADD(rows_read_counter_, rows_read);
         return Status::OK();
       }
     }

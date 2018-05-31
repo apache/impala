@@ -23,67 +23,80 @@
 #include "exec/exec-node.h"
 #include "exec/filter-context.h"
 #include "util/runtime-profile.h"
+#include "util/thread.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
 namespace impala {
 
 class TScanRange;
 
-/// Abstract base class of all scan nodes; introduces SetScanRange().
-//
+/// Abstract base class of all scan nodes. Subclasses support different storage layers
+/// and different threading models.
+///
 /// Includes ScanNode common counters:
-///   BytesRead - total bytes read by this scan node. Provided as a counter as well
-///     as a time series that samples the counter.
-//
-///   TotalRawReadTime - it measures the total time spent in underlying reads.
-///     For HDFS files, this is the time in the disk-io-mgr's reading threads for
-///     this node. For example, if we have 3 reading threads and each spent
-///     1 sec, this counter will report 3 sec.
-///     For HBase, this is the time spent in the region server.
-//
-///   TotalReadThroughput - BytesRead divided by the total time spent in this node
-///     (from Open to Close). For IO bounded queries, this should be very close to the
-///     total throughput of all the disks.
-//
-///   PerDiskRawHdfsThroughput - the read throughput for each disk. If all the data reside
-///     on disk, this should be the read throughput the disk, regardless of whether the
-///     query is IO bounded or not.
-//
-///   NumDisksAccessed - number of disks accessed.
-//
-///   AverageScannerThreadConcurrency - the average number of active scanner threads. A
-///     scanner thread is considered active if it is not blocked by IO. This number would
-///     be low (less than 1) for IO-bound queries. For cpu-bound queries, this number
-///     would be close to the max scanner threads allowed.
-//
-///   AverageHdfsReadThreadConcurrency - the average number of active hdfs reading threads
-///     reading for this scan node. For IO bound queries, this should be close to the
-///     number of disk.
-//
-///   Hdfs Read Thread Concurrency Bucket - the bucket counting (%) of hdfs read thread
-///     concurrency.
-//
+///   BytesRead - total bytes read from disk by this scan node. Provided as a counter
+///     as well as a time series that samples the counter. Only implemented for scan node
+///     subclasses that expose the bytes read, e.g. HDFS and HBase.
+///
+///   TotalReadThroughput - BytesRead divided by the total wall clock time that this scan
+///     was executing (from Open() to Close()). This gives the aggregate rate that data
+///     is read from disks. If this is the only scan executing, ideally this will
+///     approach the maximum bandwidth supported by the disks.
+///
+///   RowsRead - number of top-level rows/tuples read from the storage layer, including
+///     those discarded by predicate evaluation. Used for all types of scans.
+///
+///   CollectionItemsRead - total number of nested collection items read by the scan.
+///     Only created for scans (e.g. Parquet) that support nested types.
+///
+///   ScanRangesComplete - number of scan ranges completed. Initialized for scans that
+///     have a concept of "scan range".
+///
+///   MaterializeTupleTime - wall clock time spent materializing tuples and evaluating
+///     predicates.
+///
+/// The following counters are specific to multithreaded scan node implementations:
+///
+///   PeakScannerThreadConcurrency - the peak number of scanner threads executing at any
+///     one time. Present only for multithreaded scan nodes.
+///
+///   AverageScannerThreadConcurrency - the average number of scanner threads executing
+///     between Open() and the time when the scan completes. Present only for
+///     multithreaded scan nodes.
+///
 ///   NumScannerThreadsStarted - the number of scanner threads started for the duration
 ///     of the ScanNode. This is at most the number of scan ranges but should be much
 ///     less since a single scanner thread will likely process multiple scan ranges.
-//
-///   ScanRangesComplete - number of scan ranges completed
-//
-///   MaterializeTupleTime - time spent in creating in-memory tuple format
-//
-///   ScannerThreadsTotalWallClockTime - total time spent in all scanner threads.
-//
+///     This is *not* the same as peak scanner thread concurrency because the number of
+///     scanner threads can fluctuate during execution of the scan.
+///
+///   ScannerThreadsTotalWallClockTime - total wall clock time spent in all scanner
+///     threads.
+///
 ///   ScannerThreadsUserTime, ScannerThreadsSysTime,
 ///   ScannerThreadsVoluntaryContextSwitches, ScannerThreadsInvoluntaryContextSwitches -
 ///     these are aggregated counters across all scanner threads of this scan node. They
 ///     are taken from getrusage. See RuntimeProfile::ThreadCounters for details.
-//
+///
+///   RowBatchesEnqueued, RowBatchBytesEnqueued - Number of row batches and bytes enqueued
+///     in the scan node's output queue.
+///
+///   RowBatchQueueGetWaitTime - Wall clock time that the fragment execution thread spent
+///     blocked waiting for row batches to be added to the scan node's output queue.
+///
+///   RowBatchQueuePutWaitTime - Wall clock time that the scanner threads spent blocked
+///     waiting for space in the scan node's output queue when it is full.
+///
+///   RowBatchQueueCapacity - capacity in batches of the scan node's output queue.
+///
+///   RowBatchQueuePeakMemoryUsage - peak memory consumption of row batches enqueued in
+///     the scan node's output queue.
+///
 class ScanNode : public ExecNode {
  public:
   ScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
     : ExecNode(pool, tnode, descs),
-      scan_range_params_(NULL),
-      active_scanner_thread_counter_(TUnit::UNIT, 0) {}
+      scan_range_params_(NULL) {}
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) WARN_UNUSED_RESULT;
   virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
@@ -107,28 +120,8 @@ class ScanNode : public ExecNode {
   RuntimeProfile::Counter* collection_items_read_counter() const {
     return collection_items_read_counter_;
   }
-  RuntimeProfile::Counter* read_timer() const { return read_timer_; }
-  RuntimeProfile::Counter* open_file_timer() const { return open_file_timer_; }
-  RuntimeProfile::Counter* total_throughput_counter() const {
-    return total_throughput_counter_;
-  }
-  RuntimeProfile::Counter* per_read_thread_throughput_counter() const {
-    return per_read_thread_throughput_counter_;
-  }
   RuntimeProfile::Counter* materialize_tuple_timer() const {
     return materialize_tuple_timer_;
-  }
-  RuntimeProfile::Counter* scan_ranges_complete_counter() const {
-    return scan_ranges_complete_counter_;
-  }
-  RuntimeProfile::ThreadCounters* scanner_thread_counters() const {
-    return scanner_thread_counters_;
-  }
-  RuntimeProfile::Counter& active_scanner_thread_counter() {
-    return active_scanner_thread_counter_;
-  }
-  RuntimeProfile::Counter* average_scanner_thread_concurrency() const {
-    return average_scanner_thread_concurrency_;
   }
 
   /// names of ScanNode common counters
@@ -146,6 +139,7 @@ class ScanNode : public ExecNode {
   static const std::string SCANNER_THREAD_COUNTERS_PREFIX;
   static const std::string SCANNER_THREAD_TOTAL_WALLCLOCK_TIME;
   static const std::string AVERAGE_SCANNER_THREAD_CONCURRENCY;
+  static const std::string PEAK_SCANNER_THREAD_CONCURRENCY;
   static const std::string AVERAGE_HDFS_READ_THREAD_CONCURRENCY;
   static const std::string NUM_SCANNER_THREADS_STARTED;
 
@@ -159,38 +153,33 @@ class ScanNode : public ExecNode {
   /// The scan ranges this scan node is responsible for. Not owned.
   const std::vector<TScanRangeParams>* scan_range_params_;
 
-  RuntimeProfile::Counter* bytes_read_counter_; // # bytes read from the scanner
-  /// Time series of the bytes_read_counter_
-  RuntimeProfile::TimeSeriesCounter* bytes_read_timeseries_counter_;
-  /// # top-level rows/tuples read from the scanner
-  /// (including those discarded by EvalConjucts())
-  RuntimeProfile::Counter* rows_read_counter_;
+  /// Total bytes read from the scanner. Initialised in subclasses that track
+  /// bytes read, including HDFS and HBase by calling AddBytesReadCounters().
+  RuntimeProfile::Counter* bytes_read_counter_ = nullptr;
+
+  /// Time series of 'bytes_read_counter_', initialized at the same time.
+  RuntimeProfile::TimeSeriesCounter* bytes_read_timeseries_counter_ = nullptr;
+
+  /// Wall based aggregate read throughput [bytes/sec]. Depends on 'bytes_read_counter_'
+  /// and initialized at the same time.
+  RuntimeProfile::Counter* total_throughput_counter_ = nullptr;
+
+  /// # top-level rows/tuples read from the scanner, including those discarded by
+  /// EvalConjuncts(). Used for all types of scans.
+  RuntimeProfile::Counter* rows_read_counter_ = nullptr;
+
   /// # items the scanner read into CollectionValues. For example, for schema
   /// array<struct<B: INT, array<C: INT>> and tuple
   /// [(2, [(3)]), (4, [])] this counter will be 3: (2, [(3)]), (3) and (4, [])
-  RuntimeProfile::Counter* collection_items_read_counter_;
-  RuntimeProfile::Counter* read_timer_; // total read time
-  RuntimeProfile::Counter* open_file_timer_; // total time spent opening file handles
-  /// Wall based aggregate read throughput [bytes/sec]
-  RuntimeProfile::Counter* total_throughput_counter_;
-  /// Per thread read throughput [bytes/sec]
-  RuntimeProfile::Counter* per_read_thread_throughput_counter_;
-  RuntimeProfile::Counter* num_disks_accessed_counter_;
-  RuntimeProfile::Counter* materialize_tuple_timer_;  // time writing tuple slots
-  RuntimeProfile::Counter* scan_ranges_complete_counter_;
-  /// Aggregated scanner thread counters
-  RuntimeProfile::ThreadCounters* scanner_thread_counters_;
+  /// Initialized by subclasses that support scanning nested types.
+  RuntimeProfile::Counter* collection_items_read_counter_ = nullptr;
 
-  /// The number of scanner threads currently running.
-  RuntimeProfile::Counter active_scanner_thread_counter_;
+  /// Total time writing tuple slots. Used for all types of scans.
+  RuntimeProfile::Counter* materialize_tuple_timer_ = nullptr;
 
-  /// Average number of active scanner threads
-  /// This should be created in Open and stopped when all the scanner threads are done.
-  RuntimeProfile::Counter* average_scanner_thread_concurrency_;
-
-  /// Cumulative number of scanner threads created during the scan. Some may be created
-  /// and then destroyed, so this can exceed the peak number of threads.
-  RuntimeProfile::Counter* num_scanner_threads_started_counter_;
+  /// Total number of scan ranges completed. Initialised in subclasses that have a
+  /// concept of "scan range", including HDFS and Kudu.
+  RuntimeProfile::Counter* scan_ranges_complete_counter_ = nullptr;
 
   /// Expressions to evaluate the input rows for filtering against runtime filters.
   std::vector<ScalarExpr*> filter_exprs_;
@@ -200,13 +189,126 @@ class ScanNode : public ExecNode {
   /// the per-scanner ScannerContext. Correspond to exprs in 'filter_exprs_'.
   std::vector<FilterContext> filter_ctxs_;
 
+  /// Initializes 'bytes_read_counter_', 'bytes_read_timeseries_counter_' and
+  /// 'total_throughput_counter_'
+  void AddBytesReadCounters();
+
   /// Waits for runtime filters to arrive, checking every 20ms. Max wait time is specified
   /// by the 'runtime_filter_wait_time_ms' flag, which is overridden by the query option
   /// of the same name. Returns true if all filters arrived within the time limit (as
   /// measured from the time of RuntimeFilterBank::RegisterFilter()), false otherwise.
   bool WaitForRuntimeFilters();
-};
 
+  /// Additional state only used by multi-threaded scan node implementations.
+  /// The lifecycle is as follows:
+  /// 1. Prepare() is called.
+  /// 2. Open() is called.
+  /// 3. Other methods can be called.
+  /// 4. Shutdown() is called to prevent new batches being added to the queue.
+  /// 5. Close() is called to release all resources.
+  class ScannerThreadState {
+   public:
+    /// Called from *ScanNode::Prepare() to initialize counters and MemTracker.
+    void Prepare(ScanNode* parent);
+
+    /// Called from *ScanNode::Open() to create the row batch queue and start periodic
+    /// counters running. 'max_row_batches_override' determines size of the row batch
+    /// queue if >= 0. Otherwise the size is automatically determined.
+    void Open(ScanNode* parent, int64_t max_row_batches_override);
+
+    /// Called when no more batches need to be enqueued or dequeued. Shuts down the
+    /// queue. Thread-safe.
+    void Shutdown();
+
+    /// Waits for all scanner threads to finish and cleans up the queue. Called from
+    /// *ScanNode::Close(). No other methods can be called after this. Not thread-safe.
+    void Close();
+
+    /// Add a new scanner thread to the thread group. Not thread-safe: only one thread
+    /// should call AddThread() at a time.
+    void AddThread(std::unique_ptr<Thread> thread);
+
+    /// Get the number of active scanner threads. Thread-safe.
+    int32_t GetNumActive() const { return num_active_.Load(); }
+
+    /// Get the number of started scanner threads. Thread-safe.
+    int32_t GetNumStarted() const { return num_threads_started_->value(); }
+
+    /// Called from a scanner thread that is exiting to decrement the number of active
+    /// scanner threads. Returns true if this was the last thread to exit. Thread-safe.
+    bool DecrementNumActive();
+
+    /// Adds a materialized row batch for the scan node.  This is called from scanner
+    /// threads. This function will block if the row batch queue is full. Thread-safe.
+    void EnqueueBatch(std::unique_ptr<RowBatch> row_batch);
+
+    /// Adds a materialized row batch for the scan node. This is called from scanner
+    /// threads. This function will block for up to timeout_micros if the row batch
+    /// queue is full. Return true and takes ownership of '*row_batch' if the batch
+    /// was successfully enqueued. Returns false if the timeout expired or the queue
+    /// was shut down and the batch could not be enqueued and does not take ownership
+    /// of '*row_batch'. Thread-safe.
+    bool EnqueueBatchWithTimeout(std::unique_ptr<RowBatch>* row_batch,
+        int64_t timeout_micros);
+
+    RowBatchQueue* batch_queue() { return batch_queue_.get(); }
+    RuntimeProfile::ThreadCounters* thread_counters() const { return thread_counters_; }
+    int max_num_scanner_threads() const { return max_num_scanner_threads_; }
+
+   private:
+    /// Thread group for all scanner threads.
+    ThreadGroup scanner_threads_;
+
+    /// Maximum number of scanner threads. Set to 'NUM_SCANNER_THREADS' if that query
+    /// option is set. Otherwise, it's set to the number of cpu cores. Scanner threads
+    /// are generally cpu bound so there is no benefit in spinning up more threads than
+    /// the number of cores. Set in Open().
+    int max_num_scanner_threads_ = 0;
+
+    // MemTracker for queued row batches. Initialized in Prepare(). Owned by RuntimeState.
+    MemTracker* row_batches_mem_tracker_ = nullptr;
+
+    /// Outgoing row batches queue. Row batches are produced asynchronously by the scanner
+    /// threads and consumed by the main fragment thread that calls GetNext() on the scan
+    /// node.
+    boost::scoped_ptr<RowBatchQueue> batch_queue_;
+
+    /// The number of scanner threads currently running.
+    AtomicInt32 num_active_{0};
+
+    /// Aggregated scanner thread CPU time counters.
+    RuntimeProfile::ThreadCounters* thread_counters_ = nullptr;
+
+    /// Average number of executing scanner threads
+    /// This should be created in Open and stopped when all the scanner threads are done.
+    RuntimeProfile::Counter* average_concurrency_ = nullptr;
+
+    /// Peak number of executing scanner threads.
+    RuntimeProfile::HighWaterMarkCounter* peak_concurrency_ = nullptr;
+
+    /// Cumulative number of scanner threads created during the scan. Some may be created
+    /// and then destroyed, so this can exceed the peak number of threads.
+    RuntimeProfile::Counter* num_threads_started_ = nullptr;
+
+    /// The number of row batches enqueued into the row batch queue.
+    RuntimeProfile::Counter* row_batches_enqueued_ = nullptr;
+
+    /// The total bytes of row batches enqueued into the row batch queue.
+    RuntimeProfile::Counter* row_batch_bytes_enqueued_ = nullptr;
+
+    /// The wait time for fetching a row batch from the row batch queue.
+    RuntimeProfile::Counter* row_batches_get_timer_ = nullptr;
+
+    /// The wait time for enqueuing a row batch into the row batch queue.
+    RuntimeProfile::Counter* row_batches_put_timer_ = nullptr;
+
+    /// Maximum capacity of the row batch queue.
+    RuntimeProfile::HighWaterMarkCounter* row_batches_max_capacity_ = nullptr;
+
+    /// Peak memory consumption of the materialized batch queue. Updated in Close().
+    RuntimeProfile::Counter* row_batches_peak_mem_consumption_ = nullptr;
+  };
+};
 }
 
 #endif

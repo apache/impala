@@ -24,7 +24,6 @@
 
 #include "exec/kudu-scan-node-base.h"
 #include "gutil/gscoped_ptr.h"
-#include "util/thread.h"
 
 namespace impala {
 
@@ -42,29 +41,25 @@ class KuduScanNode : public KuduScanNodeBase {
 
   ~KuduScanNode();
 
-  virtual Status Open(RuntimeState* state);
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual void Close(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state) override;
+  virtual Status Open(RuntimeState* state) override;
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
+  virtual void Close(RuntimeState* state) override;
 
  private:
   friend class KuduScanner;
 
-  // Outgoing row batches queue. Row batches are produced asynchronously by the scanner
-  // threads and consumed by the main thread.
-  boost::scoped_ptr<RowBatchQueue> materialized_row_batches_;
+  ScannerThreadState thread_state_;
 
-  /// Protects access to state accessed by scanner threads, such as 'status_' or
-  /// 'num_active_scanners_'.
+  /// Protects access to state accessed by scanner threads, such as 'status_' and 'done_'.
+  /// Writers to 'done_' must hold lock to prevent races when updating, but readers can
+  /// read without holding lock, provided they can tolerate stale reads.
   boost::mutex lock_;
 
   /// The current status of the scan, set to non-OK if any problems occur, e.g. if an
   /// error occurs in a scanner.
   /// Protected by lock_
   Status status_;
-
-  /// Number of active running scanner threads.
-  /// Protected by lock_
-  int num_active_scanners_;
 
   /// Set to true when the scan is complete (either because all scan tokens have been
   /// processed, the limit was reached or some error occurred).
@@ -73,15 +68,6 @@ class KuduScanNode : public KuduScanNodeBase {
   /// The tradeoff is occasionally doing some extra work versus increasing lock
   /// contention.
   volatile bool done_;
-
-  /// Thread group for all scanner worker threads
-  ThreadGroup scanner_threads_;
-
-  /// Maximum number of scanner threads. Set to 'NUM_SCANNER_THREADS' if that query
-  /// option is set. Otherwise, it's set to the number of cpu cores. Scanner threads
-  /// are generally cpu bound so there is no benefit in spinning up more threads than
-  /// the number of cores.
-  int max_num_scanner_threads_;
 
   /// The id of the callback added to the thread resource manager when a thread
   /// is available. Used to remove the callback before this scan node is destroyed.
@@ -105,7 +91,7 @@ class KuduScanNode : public KuduScanNodeBase {
       bool first_thread, const std::string& name, const std::string* initial_token);
 
   /// Processes a single scan token. Row batches are fetched using 'scanner' and enqueued
-  /// in 'materialized_row_batches_' until the scanner reports eos, an error occurs, or
+  /// in the row batch queue until the scanner reports eos, an error occurs, or
   /// the limit is reached.
   Status ProcessScanToken(KuduScanner* scanner, const std::string& scan_token);
 
