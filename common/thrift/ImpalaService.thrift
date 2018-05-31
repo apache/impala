@@ -322,6 +322,15 @@ enum TImpalaQueryOptions {
   // workaround if the planner's memory estimate is too high and prevents a runnable
   // query from being admitted. 0 or -1 means this has no effect. Defaults to 0.
   MAX_MEM_ESTIMATE_FOR_ADMISSION,
+
+  // Admission control will reject queries when the number of reserved threads per backend
+  // for the query exceeds this number. 0 or -1 means this has no effect.
+  THREAD_RESERVATION_LIMIT,
+
+  // Admission control will reject queries when the total number of reserved threads
+  // across all backends for the query exceeds this number. 0 or -1 means this has no
+  // effect.
+  THREAD_RESERVATION_AGGREGATE_LIMIT,
 }
 
 // The summary of a DML statement.

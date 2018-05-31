@@ -673,6 +673,26 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_max_mem_estimate_for_admission(bytes_limit);
         break;
       }
+      case TImpalaQueryOptions::THREAD_RESERVATION_LIMIT:
+      case TImpalaQueryOptions::THREAD_RESERVATION_AGGREGATE_LIMIT: {
+        // Parsing logic is identical for these two options.
+        StringParser::ParseResult status;
+        int val = StringParser::StringToInt<int>(value.c_str(), value.size(), &status);
+        if (status != StringParser::PARSE_SUCCESS) {
+          return Status(Substitute("Invalid thread count: '$0'.", value));
+        }
+        if (val < -1) {
+          return Status(Substitute("Invalid thread count: '$0'. "
+              "Only -1 and non-negative values are allowed.", val));
+        }
+        if (option == TImpalaQueryOptions::THREAD_RESERVATION_LIMIT) {
+          query_options->__set_thread_reservation_limit(val);
+        } else {
+          DCHECK_EQ(option, TImpalaQueryOptions::THREAD_RESERVATION_AGGREGATE_LIMIT);
+          query_options->__set_thread_reservation_aggregate_limit(val);
+        }
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.

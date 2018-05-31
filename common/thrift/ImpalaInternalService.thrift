@@ -311,6 +311,12 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift.
   65: optional i64 max_mem_estimate_for_admission = 0;
+
+  // See comment in ImpalaService.thrift.
+  66: optional i32 thread_reservation_limit = 0;
+
+  // See comment in ImpalaService.thrift.
+  67: optional i32 thread_reservation_aggregate_limit = 0;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

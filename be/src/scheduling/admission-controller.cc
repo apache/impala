@@ -120,8 +120,8 @@ const string REASON_MEM_LIMIT_TOO_LOW_FOR_RESERVATION =
     "plan. See the query profile for more information about the per-node memory "
     "requirements.";
 const string REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION =
-    "minimum memory reservation is greater than memory available to the query "
-    "for buffer reservations. Increase the buffer_pool_limit to $0. See the query "
+    "minimum memory reservation on backend '$0' is greater than memory available to the "
+    "query for buffer reservations. Increase the buffer_pool_limit to $1. See the query "
     "profile for more information about the per-node memory requirements.";
 const string REASON_MIN_RESERVATION_OVER_POOL_MEM =
     "minimum memory reservation needed is greater than pool max mem resources. Pool "
@@ -140,6 +140,12 @@ const string REASON_REQ_OVER_POOL_MEM =
 const string REASON_REQ_OVER_NODE_MEM =
     "request memory needed $0 per node is greater than process mem limit $1 of $2.\n\n"
     "Use the MEM_LIMIT query option to indicate how much memory is required per node.";
+const string REASON_THREAD_RESERVATION_LIMIT_EXCEEDED =
+    "thread reservation on backend '$0' is greater than the THREAD_RESERVATION_LIMIT "
+    "query option value: $1 > $2.";
+const string REASON_THREAD_RESERVATION_AGG_LIMIT_EXCEEDED =
+    "sum of thread reservations across all $0 backends is greater than the "
+    "THREAD_RESERVATION_AGGREGATE_LIMIT query option value: $1 > $2.";
 
 // Queue decision details
 // $0 = num running queries, $1 = num queries limit
@@ -406,17 +412,24 @@ bool AdmissionController::RejectImmediately(const QuerySchedule& schedule,
   // the checks isn't particularly important, though some thought was given to ordering
   // them in a way that might make the sense for a user.
 
-  // Compute the max (over all backends) min_mem_reservation_bytes, the cluster total
-  // (across all backends) min_mem_reservation_bytes and the min (over all backends)
+  // Compute the max (over all backends) and cluster total (across all backends) for
+  // min_mem_reservation_bytes and thread_reservation and the min (over all backends)
   // min_proc_mem_limit.
-  int64_t max_min_mem_reservation_bytes = -1;
+  pair<const TNetworkAddress*, int64_t> largest_min_mem_reservation(nullptr, -1);
   int64_t cluster_min_mem_reservation_bytes = 0;
+  pair<const TNetworkAddress*, int64_t> max_thread_reservation(nullptr, 0);
   pair<const TNetworkAddress*, int64_t> min_proc_mem_limit(
       nullptr, std::numeric_limits<int64_t>::max());
+  int64_t cluster_thread_reservation = 0;
   for (const auto& e : schedule.per_backend_exec_params()) {
     cluster_min_mem_reservation_bytes += e.second.min_mem_reservation_bytes;
-    if (e.second.min_mem_reservation_bytes > max_min_mem_reservation_bytes) {
-      max_min_mem_reservation_bytes = e.second.min_mem_reservation_bytes;
+    if (e.second.min_mem_reservation_bytes > largest_min_mem_reservation.second) {
+      largest_min_mem_reservation =
+          make_pair(&e.first, e.second.min_mem_reservation_bytes);
+    }
+    cluster_thread_reservation += e.second.thread_reservation;
+    if (e.second.thread_reservation > max_thread_reservation.second) {
+      max_thread_reservation = make_pair(&e.first, e.second.thread_reservation);
     }
     if (e.second.proc_mem_limit < min_proc_mem_limit.second) {
       min_proc_mem_limit.first = &e.first;
@@ -425,25 +438,44 @@ bool AdmissionController::RejectImmediately(const QuerySchedule& schedule,
   }
 
   // Checks related to the min buffer reservation against configured query memory limits:
-  if (schedule.query_options().__isset.buffer_pool_limit
-      && schedule.query_options().buffer_pool_limit > 0) {
-    if (max_min_mem_reservation_bytes > schedule.query_options().buffer_pool_limit) {
+  const TQueryOptions& query_opts = schedule.query_options();
+  if (query_opts.__isset.buffer_pool_limit && query_opts.buffer_pool_limit > 0) {
+    if (largest_min_mem_reservation.second > query_opts.buffer_pool_limit) {
       *rejection_reason = Substitute(REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION,
-          PrintBytes(max_min_mem_reservation_bytes));
+          TNetworkAddressToString(*largest_min_mem_reservation.first),
+          PrintBytes(largest_min_mem_reservation.second));
       return true;
     }
-  } else if (schedule.query_options().__isset.mem_limit
-      && schedule.query_options().mem_limit > 0) {
-    const int64_t mem_limit = schedule.query_options().mem_limit;
+  } else if (query_opts.__isset.mem_limit && query_opts.mem_limit > 0) {
+    // If buffer_pool_limit is not explicitly set, it's calculated from mem_limit.
+    const int64_t mem_limit = query_opts.mem_limit;
     const int64_t max_reservation =
         ReservationUtil::GetReservationLimitFromMemLimit(mem_limit);
-    if (max_min_mem_reservation_bytes > max_reservation) {
-      const int64_t required_mem_limit =
-          ReservationUtil::GetMinMemLimitFromReservation(max_min_mem_reservation_bytes);
+    if (largest_min_mem_reservation.second > max_reservation) {
+      const int64_t required_mem_limit = ReservationUtil::GetMinMemLimitFromReservation(
+          largest_min_mem_reservation.second);
       *rejection_reason = Substitute(REASON_MEM_LIMIT_TOO_LOW_FOR_RESERVATION,
-          PrintBytes(max_min_mem_reservation_bytes), PrintBytes(required_mem_limit));
+          PrintBytes(largest_min_mem_reservation.second), PrintBytes(required_mem_limit));
       return true;
     }
+  }
+
+  // Check thread reservation limits.
+  if (query_opts.__isset.thread_reservation_limit
+      && query_opts.thread_reservation_limit > 0
+      && max_thread_reservation.second > query_opts.thread_reservation_limit) {
+    *rejection_reason = Substitute(REASON_THREAD_RESERVATION_LIMIT_EXCEEDED,
+        TNetworkAddressToString(*max_thread_reservation.first),
+        max_thread_reservation.second, query_opts.thread_reservation_limit);
+    return true;
+  }
+  if (query_opts.__isset.thread_reservation_aggregate_limit
+      && query_opts.thread_reservation_aggregate_limit > 0
+      && cluster_thread_reservation > query_opts.thread_reservation_aggregate_limit) {
+    *rejection_reason = Substitute(REASON_THREAD_RESERVATION_AGG_LIMIT_EXCEEDED,
+        schedule.per_backend_exec_params().size(), cluster_thread_reservation,
+        query_opts.thread_reservation_aggregate_limit);
+    return true;
   }
 
   // Checks related to pool max_requests:

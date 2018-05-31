@@ -19,8 +19,9 @@ minimum memory reservation needed is greater than pool max mem resources.
 set buffer_pool_limit=10mb;
 select distinct * from functional_parquet.alltypesagg
 ---- CATCH
-minimum memory reservation is greater than memory available to the query
- for buffer reservations. Increase the buffer_pool_limit to 68.09 MB.
+row_regex:.*minimum memory reservation on backend '.*'
+ is greater than memory available to the query
+ for buffer reservations\. Increase the buffer_pool_limit to 68.09 MB\.
 ====
 ---- QUERY
 set mem_limit=1024;

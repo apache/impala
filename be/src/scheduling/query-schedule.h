@@ -46,7 +46,8 @@ typedef std::unordered_map<TNetworkAddress, PerNodeScanRanges>
     FragmentScanRangeAssignment;
 
 /// Execution parameters for a single backend. Computed by Scheduler::Schedule(), set
-/// via QuerySchedule::set_per_backend_exec_params(). Used as an input to a BackendState.
+/// via QuerySchedule::set_per_backend_exec_params(). Used as an input to
+/// AdmissionController and a BackendState.
 struct BackendExecParams {
   /// The fragment instance params assigned to this backend. All instances of a
   /// particular fragment are contiguous in this vector. Query lifetime;
@@ -58,17 +59,22 @@ struct BackendExecParams {
   // concurrently-executing operators at any point in query execution. It may be less
   // than the initial reservation total claims (below) if execution of some operators
   // never overlaps, which allows reuse of reservations.
-  int64_t min_mem_reservation_bytes;
+  int64_t min_mem_reservation_bytes = 0;
 
   // Total of the initial buffer reservations that we expect to be claimed on this
   // backend for all fragment instances in instance_params. I.e. the sum over all
   // operators in all fragment instances that execute on this backend. This is used for
   // an optimization in InitialReservation. Measured in bytes.
-  int64_t initial_mem_reservation_total_claims;
+  int64_t initial_mem_reservation_total_claims = 0;
+
+  // Total thread reservation for fragment instances scheduled on this backend. This is
+  // the peak number of required threads that may be required by the
+  // concurrently-executing fragment instances at any point in query execution.
+  int64_t thread_reservation = 0;
 
   // The process memory limit of this backend. Obtained from the scheduler's executors
   // configuration which is updated by membership updates from the statestore.
-  int64_t proc_mem_limit;
+  int64_t proc_mem_limit = 0;
 };
 
 /// map from an impalad host address to the list of assigned fragment instance params.

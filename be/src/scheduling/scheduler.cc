@@ -783,6 +783,7 @@ void Scheduler::ComputeBackendExecParams(
       be_params.min_mem_reservation_bytes += f.fragment.min_mem_reservation_bytes;
       be_params.initial_mem_reservation_total_claims +=
           f.fragment.initial_mem_reservation_total_claims;
+      be_params.thread_reservation += f.fragment.thread_reservation;
     }
   }
 
