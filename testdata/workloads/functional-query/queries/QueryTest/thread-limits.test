@@ -1,0 +1,104 @@
+====
+---- QUERY
+# Test per-backend limit. The coordinator will get 2 fragments + 1 scanner thread
+# scheduled on it.
+set thread_reservation_limit=2;
+select count(*) from alltypes
+---- CATCH
+row_regex:.*Rejected query from pool default-pool: thread reservation on backend '.*'
+ is greater than the THREAD_RESERVATION_LIMIT query option value: 3 > 2\.
+====
+---- QUERY
+# Test the boundary case where the thread reservation is exactly the required threads.
+set thread_reservation_limit=3;
+select count(*) from alltypes
+---- TYPES
+BIGINT
+---- RESULTS
+7300
+====
+---- QUERY
+# Zero means no limit.
+set thread_reservation_limit=0;
+select count(*) from alltypes
+---- TYPES
+BIGINT
+---- RESULTS
+7300
+====
+---- QUERY
+# -1 means no limit.
+set thread_reservation_limit=-1;
+select count(*) from alltypes
+---- TYPES
+BIGINT
+---- RESULTS
+7300
+====
+---- QUERY
+# MT_DOP is factored into reservation.
+set thread_reservation_limit=3;
+set mt_dop=4;
+select count(*) from alltypes
+---- CATCH
+row_regex:.*Rejected query from pool default-pool: thread reservation on backend '.*'
+ is greater than the THREAD_RESERVATION_LIMIT query option value: 5 > 3\.
+====
+---- QUERY
+# Higher aggregate limit can reject based on sum of total threads. Assume >= 2 impalads
+# with scan ranges plus the coordinator fragment.
+set thread_reservation_aggregate_limit=3;
+select count(*) from alltypes
+---- CATCH
+row_regex:.*Rejected query from pool default-pool: sum of thread reservations across
+ all [0-9]+ backends is greater than the THREAD_RESERVATION_AGGREGATE_LIMIT query option
+ value: [0-9]+ > 3\.
+====
+---- QUERY
+# tpch_parquet.nation has only one file, which means only one instance of the scan fragment,
+# which means it only has 3 aggregate threads.
+set thread_reservation_aggregate_limit=3;
+select count(*) from tpch_parquet.nation
+---- TYPES
+BIGINT
+---- RESULTS
+25
+====
+---- QUERY
+# tpch_parquet.orders has two files, which means only more instances of the scan fragment,
+# which means it has more than 3 aggregate threads, assuming at least two impalads.
+set thread_reservation_aggregate_limit=3;
+select count(*) from tpch_parquet.orders
+---- CATCH
+row_regex:.*Rejected query from pool default-pool: sum of thread reservations across
+ all [0-9]+ backends is greater than the THREAD_RESERVATION_AGGREGATE_LIMIT query option
+ value: [0-9]+ > 3\.
+====
+---- QUERY
+# Running on a single impalad gets us under the aggregate limit.
+set num_nodes=1;
+set thread_reservation_aggregate_limit=3;
+select count(*) from alltypes
+---- TYPES
+BIGINT
+---- RESULTS
+7300
+====
+---- QUERY
+# 0 means no limit.
+set thread_reservation_aggregate_limit=0;
+select count(*) from alltypes
+---- TYPES
+BIGINT
+---- RESULTS
+7300
+====
+---- QUERY
+# -1 means no limit.
+set thread_reservation_aggregate_limit=-1;
+select count(*) from alltypes
+---- TYPES
+BIGINT
+---- RESULTS
+7300
+====
