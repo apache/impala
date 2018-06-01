@@ -50,7 +50,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
          v.get_value('table_format').compression_codec == 'snap' and
          v.get_value('table_format').compression_type == 'block'))
 
-  @SkipIfLocal.hdfs_client
+  @SkipIfLocal.hdfs_client # TODO: this dependency might not exist anymore
   def test_multiple_partitions_same_location(self, vector, unique_database):
     """Regression test for IMPALA-597. Verifies Impala is able to properly read
     tables that have multiple partitions pointing to the same location.
@@ -59,16 +59,10 @@ class TestPartitionMetadata(ImpalaTestSuite):
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
     TBL_LOCATION = '%s/%s.db/%s' % (WAREHOUSE, unique_database, TBL_NAME)
     file_format = vector.get_value('table_format').file_format
-    # Cleanup any existing data in the table directory.
-    self.filesystem_client.delete_file_dir(TBL_NAME, recursive=True)
     # Create the table
     self.client.execute(
         "create table %s (i int) partitioned by(j int) stored as %s location '%s'"
         % (FQ_TBL_NAME, STORED_AS_ARGS[file_format], TBL_LOCATION))
-
-    # Point multiple partitions to the same location and use partition locations that
-    # do not contain a key=value path.
-    self.filesystem_client.make_dir(TBL_NAME + '/p')
 
     # Point both partitions to the same location.
     self.client.execute("alter table %s add partition (j=1) location '%s/p'"
