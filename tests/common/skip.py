@@ -86,6 +86,7 @@ class SkipIf:
       reason="Kudu is not supported")
   not_s3 = pytest.mark.skipif(not IS_S3, reason="S3 Filesystem needed")
   not_hdfs = pytest.mark.skipif(not IS_HDFS, reason="HDFS Filesystem needed")
+  not_ec = pytest.mark.skipif(not IS_EC, reason="Erasure Coding needed")
   no_secondary_fs = pytest.mark.skipif(not SECONDARY_FILESYSTEM,
       reason="Secondary filesystem needed")
   not_krpc = pytest.mark.skipif(pytest.config.option.test_no_krpc,

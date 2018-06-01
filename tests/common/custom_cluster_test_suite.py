@@ -140,6 +140,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if pytest.config.option.test_no_krpc:
       cmd.append("--disable_krpc")
 
+    if os.environ.get("ERASURE_CODING") == "true":
+      cmd.append("--impalad_args=--default_query_options=allow_erasure_coded_files=true")
+
     try:
       check_call(cmd + options, close_fds=True)
     finally:

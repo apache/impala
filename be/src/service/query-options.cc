@@ -690,6 +690,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
           return Status(Substitute("Invalid kudu_read_mode '$0'. Valid values are "
               "DEFAULT, READ_LATEST, and READ_AT_SNAPSHOT.", value));
         }
+      }
+      case TImpalaQueryOptions::ALLOW_ERASURE_CODED_FILES: {
+        query_options->__set_allow_erasure_coded_files(
+            iequals(value, "true") || iequals(value, "1"));
         break;
       }
       default:

@@ -33,6 +33,7 @@ from subprocess import check_call
 from testdata.common import widetable
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
+    SkipIf,
     SkipIfS3,
     SkipIfADLS,
     SkipIfEC,
@@ -1082,3 +1083,11 @@ class TestScannerReservation(ImpalaTestSuite):
   def test_scanners(self, vector):
     self.run_test_case('QueryTest/scanner-reservation', vector)
 
+class TestErasureCoding(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @SkipIf.not_ec
+  def test_erasure_coding(self, vector):
+    self.run_test_case('QueryTest/hdfs-erasure-coding', vector)

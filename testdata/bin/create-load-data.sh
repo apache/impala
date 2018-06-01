@@ -142,6 +142,10 @@ function start-impala {
   else
     START_CLUSTER_ARGS_INT+=("-s 3")
   fi
+  if [[ "${ERASURE_CODING}" == true ]]; then
+    START_CLUSTER_ARGS="${START_CLUSTER_ARGS} \
+      --impalad_args=--default_query_options=allow_erasure_coded_files=true"
+  fi
   START_CLUSTER_ARGS_INT+=("${START_CLUSTER_ARGS}")
   ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_DATA_LOADING_LOGS_DIR} \
     ${START_CLUSTER_ARGS_INT[@]}

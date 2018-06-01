@@ -326,6 +326,9 @@ enum TImpalaQueryOptions {
   // Overrides the -kudu_read_mode flag to set the consistency level for Kudu scans.
   // Possible values are DEFAULT, READ_LATEST, and READ_AT_SNAPSHOT.
   KUDU_READ_MODE,
+
+  // Allow reading of erasure coded files.
+  ALLOW_ERASURE_CODED_FILES,
 }
 
 // The summary of a DML statement.

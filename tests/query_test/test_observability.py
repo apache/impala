@@ -15,9 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
-from tests.common.impala_cluster import ImpalaCluster
+from tests.util.filesystem_utils import IS_EC
 import logging
 import pytest
 import re
@@ -117,9 +118,12 @@ class TestObservability(ImpalaTestSuite):
         profile
     # For this query, the planner sets NUM_NODES=1, NUM_SCANNER_THREADS=1,
     # RUNTIME_FILTER_MODE=0 and MT_DOP=0
-    assert "Query Options (set by configuration and planner): MEM_LIMIT=8589934592," \
-        "NUM_NODES=1,NUM_SCANNER_THREADS=1,RUNTIME_FILTER_MODE=0,MT_DOP=0\n" \
-        in profile
+    expected_str = ("Query Options (set by configuration and planner): "
+        "MEM_LIMIT=8589934592,NUM_NODES=1,NUM_SCANNER_THREADS=1,"
+        "RUNTIME_FILTER_MODE=0,MT_DOP=0{erasure_coding}\n")
+    expected_str = expected_str.format(
+        erasure_coding=",ALLOW_ERASURE_CODED_FILES=1" if IS_EC else "")
+    assert expected_str in profile
 
   def test_exec_summary(self):
     """Test that the exec summary is populated correctly in every query state"""

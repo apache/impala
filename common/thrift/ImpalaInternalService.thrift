@@ -298,6 +298,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift.
   68: optional TKuduReadMode kudu_read_mode = TKuduReadMode.DEFAULT;
+
+  // Allow reading of erasure coded files in HDFS.
+  69: optional bool allow_erasure_coded_files = false;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

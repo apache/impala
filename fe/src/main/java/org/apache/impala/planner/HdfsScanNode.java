@@ -799,6 +799,12 @@ public class HdfsScanNode extends ScanNode {
       totalBytes_ += partitionBytes;
       totalFiles_ += fileDescs.size();
       for (FileDescriptor fileDesc: fileDescs) {
+        if (!analyzer.getQueryOptions().isAllow_erasure_coded_files() &&
+            fileDesc.getIsEc()) {
+          throw new ImpalaRuntimeException(String.format(
+              "Scanning of HDFS erasure-coded file (%s/%s) is not supported",
+              partition.getLocation(), fileDesc.getFileName()));
+        }
         if (!fsHasBlocks) {
           Preconditions.checkState(fileDesc.getNumFileBlocks() == 0);
           generateScanRangeSpecs(partition, fileDesc, scanRangeBytesLimit);
