@@ -30,7 +30,9 @@
       { "hash": "13a1acd7e42b533c39b9f4eea1c17823bde4c1c5",
         "comment": "Not applicable to 2.x: 3.x erasure coding"},
       { "hash": "5c7d3b12e3aa750e7ab88e3ef1092d5218e53cc2",
-        "comment": "IMPALA-6131: Already picked with a different Change-Id than master"}
+        "comment": "IMPALA-6131: Already picked with a different Change-Id than master"},
+      { "hash": "56a740c07a6d80921e86fee769033fab5ad1ccf3",
+        "comment": "Not applicable to 2.x: 3.x erasure coding"}
     ]
   }
 ]
