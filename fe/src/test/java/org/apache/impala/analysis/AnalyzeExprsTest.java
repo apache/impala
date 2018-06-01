@@ -2082,8 +2082,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "No matching function with signature: if(BOOLEAN).");
 
     // Test IsNull() conditional function.
-    for (PrimitiveType t: PrimitiveType.values()) {
-      String literal = typeToLiteralValue_.get(t);
+    for (String literal : typeToLiteralValue_.values()) {
       AnalyzesOk(String.format("select isnull(%s, %s)", literal, literal));
       AnalyzesOk(String.format("select isnull(%s, NULL)", literal));
       AnalyzesOk(String.format("select isnull(NULL, %s)", literal));

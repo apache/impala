@@ -1256,7 +1256,7 @@ public class HdfsScanNode extends ScanNode {
     }
     Preconditions.checkState(0 < numNodes_ && numNodes_ <= scanRanges_.size());
     Preconditions.checkNotNull(desc_);
-    Preconditions.checkNotNull(desc_.getTable() instanceof HdfsTable);
+    Preconditions.checkState(desc_.getTable() instanceof HdfsTable);
     HdfsTable table = (HdfsTable) desc_.getTable();
     List<Long> columnReservations = null;
     if (fileFormats_.contains(HdfsFileFormat.PARQUET)

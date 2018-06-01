@@ -55,7 +55,7 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     Preconditions.checkNotNull(fn_);
-    Preconditions.checkNotNull(fn_ instanceof ScalarFunction);
+    Preconditions.checkState(fn_ instanceof ScalarFunction);
     ScalarFunction udf = (ScalarFunction) fn_;
 
     if (hasSignature()) {
