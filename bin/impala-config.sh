@@ -403,7 +403,6 @@ if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
     if ${IMPALA_HOME}/bin/check-s3-access.sh; then
       export S3_ACCESS_VALIDATED=1
       export DEFAULT_FS="s3a://${S3_BUCKET}"
-      export FILESYSTEM_PREFIX="${DEFAULT_FS}"
     else
       return 1
     fi
