@@ -63,7 +63,8 @@ class ImpalaClient(object):
                kerberos_service_name="impala", use_ssl=False, ca_cert=None, user=None,
                ldap_password=None, use_ldap=False):
     self.connected = False
-    self.impalad = impalad
+    self.impalad_host = impalad[0].encode('ascii', 'ignore')
+    self.impalad_port = int(impalad[1])
     self.kerberos_host_fqdn = kerberos_host_fqdn
     self.imp_service = None
     self.transport = None
@@ -278,28 +279,32 @@ class ImpalaClient(object):
     # sasl does not accept unicode strings, explicitly encode the string into ascii.
     # The kerberos_host_fqdn option exposes the SASL client's hostname attribute to
     # the user. impala-shell checks to ensure this host matches the host in the kerberos
-    # principal. So in the presence of a load balancer, the its hostname is expected by
+    # principal. So when a load balancer is configured to be used, its hostname is expected by
     # impala-shell. Setting this option to the load balancer hostname allows impala-shell to
     # connect directly to an impalad.
     if self.kerberos_host_fqdn is not None:
-      host, port = (self.kerberos_host_fqdn.split(':')[0].encode('ascii', 'ignore'),
-            int(self.impalad[1]))
+      sasl_host = self.kerberos_host_fqdn.split(':')[0].encode('ascii', 'ignore')
     else:
-      host, port = self.impalad[0].encode('ascii', 'ignore'), int(self.impalad[1])
+      sasl_host = self.impalad_host
+
+    # Always use the hostname and port passed in to -i / --impalad as the host for the purpose of
+    # creating the actual socket.
+    sock_host = self.impalad_host
+    sock_port = self.impalad_port
     if self.use_ssl:
       if self.ca_cert is None:
         # No CA cert means don't try to verify the certificate
-        sock = TSSLSocketWithWildcardSAN(host, port, validate=False)
+        sock = TSSLSocketWithWildcardSAN(sock_host, sock_port, validate=False)
       else:
-        sock = TSSLSocketWithWildcardSAN(host, port, validate=True, ca_certs=self.ca_cert)
+        sock = TSSLSocketWithWildcardSAN(sock_host, sock_port, validate=True, ca_certs=self.ca_cert)
     else:
-      sock = TSocket(host, port)
+      sock = TSocket(sock_host, sock_port)
     if not (self.use_ldap or self.use_kerberos):
       return TBufferedTransport(sock)
     # Initializes a sasl client
     def sasl_factory():
       sasl_client = sasl.Client()
-      sasl_client.setAttr("host", host)
+      sasl_client.setAttr("host", sasl_host)
       if self.use_ldap:
         sasl_client.setAttr("username", self.user)
         sasl_client.setAttr("password", self.ldap_password)

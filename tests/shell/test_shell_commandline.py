@@ -21,8 +21,9 @@ import os
 import pytest
 import re
 import signal
+import shlex
 
-from subprocess import call
+from subprocess import call, Popen, PIPE
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf
@@ -609,3 +610,35 @@ class TestImpalaShell(ImpalaTestSuite):
   def test_missing_query_file(self):
     result = run_impala_shell_cmd('-f nonexistent.sql', expect_success=False)
     assert "Could not open file 'nonexistent.sql'" in result.stderr
+
+  def test_socket_opening(self):
+    ''' Tests that the impala daemon will always open a socket against
+    the host[:port] specified by the -i option with or without the
+    -b option '''
+
+    impala_daemon_port = 42000
+    load_balancer_fqdn = "my-load-balancer.local"
+    ncat_timeout = 1
+    # Building an one-off shell cmd instead of using Util::ImpalaShell since we need
+    # to customize the impala daemon socket
+    shell_cmd =  "%s/bin/impala-shell.sh" % (os.environ['IMPALA_HOME'])
+    args1 = "-i localhost:%d" % (impala_daemon_port,)
+    args2 = "-b %s" % (load_balancer_fqdn,)
+
+    # Verify that impala-shell tries to create a socket again localhost:42000 as
+    # specified by -i option without the -b option
+    impalad_sock = Popen(shlex.split("nc -lp %d -w %d" % (impala_daemon_port, ncat_timeout,)),
+                            stdout = PIPE, stderr = PIPE)
+    impala_shell = Popen(shlex.split("%s %s" % (shell_cmd, args1, )))
+    impalad_sock_stdout, impalad_sock_stderr = impalad_sock.communicate()
+    expected_output = "PingImpalaService"
+    assert expected_output in impalad_sock_stdout
+
+    # Verify that impala-shell tries to create a socket again localhost:42000 as
+    # specified by -i option with the -b option
+
+    impalad_sock = Popen(shlex.split("nc -lp %d -w %d" % (impala_daemon_port, ncat_timeout,)),
+                            stdout = PIPE, stderr = PIPE)
+    impala_shell = Popen(shlex.split("%s %s %s" % (shell_cmd, args1, args2, )))
+    impalad_sock_stdout, impalad_sock_stderr = impalad_sock.communicate()
+    assert expected_output in impalad_sock_stdout
