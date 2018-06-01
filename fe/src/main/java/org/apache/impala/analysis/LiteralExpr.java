@@ -183,7 +183,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
     try {
       val = FeSupport.EvalExprWithoutRow(constExpr, queryCtx);
     } catch (InternalException e) {
-      LOG.error(String.format("Failed to evaluate expr '%s'",
+      LOG.error(String.format("Failed to evaluate expr '%s': %s",
           constExpr.toSql(), e.getMessage()));
       return null;
     }

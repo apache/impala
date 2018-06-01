@@ -406,7 +406,7 @@ public class Path {
       rootDesc_.getPath().getCanonicalPath(result);
       currentType = rootDesc_.getType();
     } else {
-      Preconditions.checkNotNull(isRootedAtTable());
+      Preconditions.checkState(isRootedAtTable());
       result.add(rootTable_.getTableName().getDb());
       result.add(rootTable_.getTableName().getTbl());
       currentType = rootTable_.getType().getItemType();

@@ -36,6 +36,7 @@ import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolType;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 
 /**
@@ -230,8 +231,9 @@ public class ScalarFunction extends Function {
           fn.hasVarArgs(), fn.getArgs());
     } catch (AnalysisException e) {
       // This should never happen
-      Preconditions.checkState(false, "Builtin symbol '" + symbol + "'" + argTypes
-          + " not found!" + e.getStackTrace());
+      Preconditions.checkState(false, "Builtin symbol '" + symbol + "'" +
+          argTypes + " not found: " +
+          Throwables.getStackTraceAsString(e));
       throw new RuntimeException("Builtin symbol not found!", e);
     }
     return fn;

@@ -49,7 +49,7 @@ public class DiskIdMapper {
 
     // Per-host ID generator for storage UUID to Short ID mapping. This maps each host
     // to the corresponding latest 0-based ID stored in a short.
-    private HashMap<String, Short> storageIdGenerator_ = Maps.newHashMap();
+    private final HashMap<String, Short> storageIdGenerator_ = Maps.newHashMap();
 
     /**
      * Returns a disk id (0-based) index for storageUuid on host 'host'. Generates a

@@ -2006,7 +2006,7 @@ public class ParserTest extends FrontendTestBase {
       ParserError(String.format("CREATE %s Foo LOCATION", kw));
       ParserError(String.format("CREATE %s Foo LOCATION 'dfsd' 'dafdsf'", kw));
 
-      ParserError(String.format("CREATE Foo", kw));
+      ParserError(String.format("CREATE Foo"));
       ParserError(String.format("CREATE %s 'Foo'", kw));
       ParserError(String.format("CREATE %s", kw));
       ParserError(String.format("CREATE %s IF EXISTS Foo", kw));

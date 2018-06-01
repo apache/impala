@@ -483,11 +483,11 @@ public class UdfExecutorTest {
         createDouble(1.1), createDouble(1.2), createDouble(1.3));
     TestUdf(null, TestUdf.class, createSmallInt(1 + 2), createSmallInt(1),
         createSmallInt(2));
-    TestUdf(null, TestUdf.class, createBoolean(true && true),
+    TestUdf(null, TestUdf.class, createBoolean(true),
         createBoolean(true), createBoolean(true));
     TestUdf(null, TestUdf.class, createInt(5 + 6 + 7), createInt(5),
         createInt(6), createInt(7));
-    TestUdf(null, TestUdf.class, createBoolean(true && true && true),
+    TestUdf(null, TestUdf.class, createBoolean(true),
         createBoolean(true), createBoolean(true), createBoolean(true));
     TestUdf(null, TestUdf.class, createFloat(1.1f + 1.2f + 1.3f),
         createFloat(1.1f), createFloat(1.2f), createFloat(1.3f));
@@ -495,7 +495,7 @@ public class UdfExecutorTest {
         createDouble(1.2));
     TestUdf(null, TestUdf.class, createInt(5 + 6 + 7 + 8), createInt(5),
         createInt(6), createInt(7), createInt(8));
-    TestUdf(null, TestUdf.class, createBoolean(true && true && true && true),
+    TestUdf(null, TestUdf.class, createBoolean(true),
         createBoolean(true), createBoolean(true), createBoolean(true),
         createBoolean(true));
     freeAllocations();
