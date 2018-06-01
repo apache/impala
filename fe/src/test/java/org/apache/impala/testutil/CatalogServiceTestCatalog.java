@@ -21,6 +21,7 @@ import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.catalog.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TUniqueId;
 
 /**
@@ -51,6 +52,7 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
    * Sentry Policy Service.
    */
   public static CatalogServiceCatalog createWithAuth(SentryConfig config) {
+    FeSupport.loadLibrary();
     CatalogServiceCatalog cs =
         new CatalogServiceTestCatalog(false, 16, 0, config, new TUniqueId());
     try {
