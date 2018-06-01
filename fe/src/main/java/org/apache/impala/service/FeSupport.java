@@ -350,10 +350,11 @@ public class FeSupport {
   }
 
   /**
-   * This function should only be called explicitly by the FeSupport to ensure that
-   * native functions are loaded.
+   * This function should be called explicitly by the FeSupport to ensure that
+   * native functions are loaded. Tests that depend on JniCatalog or JniFrontend
+   * being instantiated should also call this function.
    */
-  private static synchronized void loadLibrary() {
+  public static synchronized void loadLibrary() {
     if (loaded_) return;
     LOG.info("Loading libfesupport.so");
     NativeLibUtil.loadLibrary("libfesupport.so");
