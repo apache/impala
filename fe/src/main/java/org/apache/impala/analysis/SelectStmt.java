@@ -934,17 +934,14 @@ public class SelectStmt extends QueryStmt {
     }
   }
 
-  /**
-   * Returns the SQL string corresponding to this SelectStmt.
-   */
   @Override
-  public String toSql() {
+  public String toSql(boolean rewritten) {
     // Return the SQL string before inline-view expression substitution.
-    if (sqlString_ != null) return sqlString_;
+    if (!rewritten && sqlString_ != null) return sqlString_;
 
     StringBuilder strBuilder = new StringBuilder();
     if (withClause_ != null) {
-      strBuilder.append(withClause_.toSql());
+      strBuilder.append(withClause_.toSql(rewritten));
       strBuilder.append(" ");
     }
 
@@ -961,7 +958,9 @@ public class SelectStmt extends QueryStmt {
       strBuilder.append((i+1 != selectList_.getItems().size()) ? ", " : "");
     }
     // From clause
-    if (!fromClause_.isEmpty()) { strBuilder.append(fromClause_.toSql()); }
+    if (!fromClause_.isEmpty()) {
+      strBuilder.append(fromClause_.toSql(rewritten));
+    }
     // Where clause
     if (whereClause_ != null) {
       strBuilder.append(" WHERE ");

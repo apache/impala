@@ -895,10 +895,10 @@ public class InsertStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(boolean rewritten) {
     StringBuilder strBuilder = new StringBuilder();
 
-    if (withClause_ != null) strBuilder.append(withClause_.toSql() + " ");
+    if (withClause_ != null) strBuilder.append(withClause_.toSql(rewritten) + " ");
 
     strBuilder.append(getOpName());
     if (!planHints_.isEmpty() && hintLoc_ == HintLocation.Start) {
@@ -927,7 +927,7 @@ public class InsertStmt extends StatementBase {
       strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(getPlanHints()));
     }
     if (!needsGeneratedQueryStatement_) {
-      strBuilder.append(" " + queryStmt_.toSql());
+      strBuilder.append(" " + queryStmt_.toSql(rewritten));
     }
     return strBuilder.toString();
   }

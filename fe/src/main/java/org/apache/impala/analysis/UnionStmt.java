@@ -551,24 +551,25 @@ public class UnionStmt extends QueryStmt {
   }
 
   @Override
-  public String toSql() {
-    if (toSqlString_ != null) return toSqlString_;
+  public String toSql(boolean rewritten) {
+    if (!rewritten && toSqlString_ != null) return toSqlString_;
+
     StringBuilder strBuilder = new StringBuilder();
     Preconditions.checkState(operands_.size() > 0);
 
     if (withClause_ != null) {
-      strBuilder.append(withClause_.toSql());
+      strBuilder.append(withClause_.toSql(rewritten));
       strBuilder.append(" ");
     }
 
-    strBuilder.append(operands_.get(0).getQueryStmt().toSql());
+    strBuilder.append(operands_.get(0).getQueryStmt().toSql(rewritten));
     for (int i = 1; i < operands_.size() - 1; ++i) {
       strBuilder.append(" UNION " +
           ((operands_.get(i).getQualifier() == Qualifier.ALL) ? "ALL " : ""));
       if (operands_.get(i).getQueryStmt() instanceof UnionStmt) {
         strBuilder.append("(");
       }
-      strBuilder.append(operands_.get(i).getQueryStmt().toSql());
+      strBuilder.append(operands_.get(i).getQueryStmt().toSql(rewritten));
       if (operands_.get(i).getQueryStmt() instanceof UnionStmt) {
         strBuilder.append(")");
       }
@@ -583,10 +584,10 @@ public class UnionStmt extends QueryStmt {
             !lastQueryStmt.hasLimit() && !lastQueryStmt.hasOffset() &&
             !lastQueryStmt.hasOrderByClause())) {
       strBuilder.append("(");
-      strBuilder.append(lastQueryStmt.toSql());
+      strBuilder.append(lastQueryStmt.toSql(rewritten));
       strBuilder.append(")");
     } else {
-      strBuilder.append(lastQueryStmt.toSql());
+      strBuilder.append(lastQueryStmt.toSql(rewritten));
     }
     // Order By clause
     if (hasOrderByClause()) {

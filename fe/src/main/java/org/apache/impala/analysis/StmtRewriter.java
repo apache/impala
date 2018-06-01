@@ -97,8 +97,7 @@ public class StmtRewriter {
     // Currently only SubqueryRewriter touches the where clause. Recurse into the where
     // clause when the need arises.
     rewriteSelectStmtHook(stmt, analyzer);
-    stmt.sqlString_ = null;
-    if (LOG.isTraceEnabled()) LOG.trace("rewritten stmt: " + stmt.toSql());
+    if (LOG.isTraceEnabled()) LOG.trace("Rewritten SQL: " + stmt.toSql(true));
   }
 
   /**

@@ -89,6 +89,9 @@ public abstract class ModifyStmt extends StatementBase {
   // position in the target table. Set in createSourceStmt() during analysis.
   protected ArrayList<Integer> referencedColumns_;
 
+  // SQL string of the ModifyStmt. Set in analyze().
+  protected String sqlString_;
+
   public ModifyStmt(List<String> targetTablePath, FromClause fromClause,
       List<Pair<SlotRef, Expr>> assignmentExprs, Expr wherePredicate) {
     targetTablePath_ = Preconditions.checkNotNull(targetTablePath);
@@ -166,6 +169,8 @@ public abstract class ModifyStmt extends StatementBase {
     sourceStmt_.analyze(analyzer);
     // Add target table to descriptor table.
     analyzer.getDescTbl().setTargetTable(table_);
+
+    sqlString_ = toSql();
   }
 
   @Override
@@ -311,7 +316,5 @@ public abstract class ModifyStmt extends StatementBase {
   public QueryStmt getQueryStmt() { return sourceStmt_; }
   public abstract DataSink createDataSink();
   @Override
-  public abstract String toSql();
-
-
+  public abstract String toSql(boolean rewritten);
 }

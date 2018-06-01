@@ -456,7 +456,7 @@ public class AnalysisContext {
       // reset() and re-analyzed. For a CTAS statement, the types represent column types
       // of the table that will be created, including the partition columns, if any.
       List<Type> origResultTypes = Lists.newArrayList();
-      for (Expr e: analysisResult_.stmt_.getResultExprs()) {
+      for (Expr e : analysisResult_.stmt_.getResultExprs()) {
         origResultTypes.add(e.getType());
       }
       List<String> origColLabels =
@@ -472,13 +472,20 @@ public class AnalysisContext {
       // Re-analyze the stmt with a new analyzer.
       analysisResult_.analyzer_ = createAnalyzer(stmtTableCache);
       analysisResult_.stmt_.reset();
-      analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
+      try {
+        analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
+      } catch (AnalysisException e) {
+        LOG.error(String.format("Error analyzing the rewritten query.\n" +
+            "Original SQL: %s\nRewritten SQL: %s", analysisResult_.stmt_.toSql(),
+            analysisResult_.stmt_.toSql(true)));
+        throw e;
+      }
 
       // Restore the original result types and column labels.
       analysisResult_.stmt_.castResultExprs(origResultTypes);
       analysisResult_.stmt_.setColLabels(origColLabels);
       if (LOG.isTraceEnabled()) {
-        LOG.trace("rewrittenStmt: " + analysisResult_.stmt_.toSql());
+        LOG.trace("Rewritten SQL: " + analysisResult_.stmt_.toSql(true));
       }
 
       // Restore privilege requests found during the first pass

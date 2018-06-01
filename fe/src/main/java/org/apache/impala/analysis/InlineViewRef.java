@@ -324,6 +324,11 @@ public class InlineViewRef extends TableRef {
 
   @Override
   protected String tableRefToSql() {
+    return tableRefToSql(false);
+  }
+
+  @Override
+  protected String tableRefToSql(boolean rewritten) {
     // Enclose the alias in quotes if Hive cannot parse it without quotes.
     // This is needed for view compatibility between Impala and Hive.
     String aliasSql = null;
@@ -335,7 +340,7 @@ public class InlineViewRef extends TableRef {
     Preconditions.checkNotNull(aliasSql);
     StringBuilder sql = new StringBuilder()
         .append("(")
-        .append(queryStmt_.toSql())
+        .append(queryStmt_.toSql(rewritten))
         .append(") ")
         .append(aliasSql);
     // Add explicit col labels for debugging even though this syntax isn't supported.

@@ -24,6 +24,7 @@ import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
+import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -222,5 +223,118 @@ public class ExprRewriterTest extends AnalyzerTest {
           .append("' or string_col='").append(Expr.EXPR_CHILDREN_LIMIT - 1).append("')");
       CheckNumChangesByEqualityDisjunctsToInRule(stmtSb.toString(), 1);
     }
+  }
+
+  @Test
+  public void TestToSql() {
+    TQueryOptions options = new TQueryOptions();
+    options.setEnable_expr_rewrites(true);
+    AnalysisContext ctx = createAnalysisCtx(options);
+
+    //----------------------
+    // Test query rewrites.
+    //----------------------
+    assertToSql(ctx, "select 1 + 1", "SELECT 1 + 1", "SELECT 2");
+
+    assertToSql(ctx,
+        "select (case when true then 1 else id end) from functional.alltypes " +
+        "union " +
+        "select 1 + 1",
+        "SELECT (CASE WHEN TRUE THEN 1 ELSE id END) FROM functional.alltypes " +
+        "UNION " +
+        "SELECT 1 + 1",
+        "SELECT 1 FROM functional.alltypes UNION SELECT 2");
+
+    assertToSql(ctx,
+        "values(1, '2', 3, 4.1), (1, '2', 3, 4.1)",
+        "VALUES((1, '2', 3, 4.1), (1, '2', 3, 4.1))",
+        "SELECT 1, '2', 3, 4.1 UNION ALL SELECT 1, '2', 3, 4.1");
+
+    //-------------------------
+    // Test subquery rewrites.
+    //-------------------------
+    assertToSql(ctx, "select * from (" +
+        "select * from functional.alltypes where id = (select 1 + 1)) a",
+        "SELECT * FROM (SELECT * FROM functional.alltypes WHERE id = (SELECT 1 + 1)) a",
+        "SELECT * FROM (SELECT * FROM functional.alltypes LEFT SEMI JOIN " +
+        "(SELECT 2) `$a$1` (`$c$1`) ON id = `$a$1`.`$c$1`) a");
+
+    assertToSql(ctx,
+        "select * from (select * from functional.alltypes where id = (select 1 + 1)) a " +
+        "union " +
+        "select * from (select * from functional.alltypes where id = (select 1 + 1)) b",
+        "SELECT * FROM (SELECT * FROM functional.alltypes WHERE id = (SELECT 1 + 1)) a " +
+        "UNION " +
+        "SELECT * FROM (SELECT * FROM functional.alltypes WHERE id = (SELECT 1 + 1)) b",
+        "SELECT * FROM (SELECT * FROM functional.alltypes LEFT SEMI JOIN (SELECT 2) " +
+        "`$a$1` (`$c$1`) ON id = `$a$1`.`$c$1`) a " +
+        "UNION " +
+        "SELECT * FROM (SELECT * FROM functional.alltypes LEFT SEMI JOIN (SELECT 2) " +
+        "`$a$1` (`$c$1`) ON id = `$a$1`.`$c$1`) b");
+
+    assertToSql(ctx, "select * from " +
+        "(select (case when true then 1 else id end) from functional.alltypes " +
+        "union select 1 + 1) v",
+        "SELECT * FROM (SELECT (CASE WHEN TRUE THEN 1 ELSE id END) " +
+        "FROM functional.alltypes UNION SELECT 1 + 1) v",
+        "SELECT * FROM (SELECT 1 FROM functional.alltypes " +
+        "UNION SELECT 2) v");
+
+    //---------------------
+    // Test CTAS rewrites.
+    //---------------------
+    assertToSql(ctx,
+        "create table ctas_test as select 1 + 1",
+        "CREATE TABLE default.ctas_test\n" +
+        "STORED AS TEXTFILE\n" +
+        " AS SELECT 1 + 1",
+        "CREATE TABLE default.ctas_test\n" +
+        "STORED AS TEXTFILE\n" +
+        " AS SELECT 2");
+
+    //--------------------
+    // Test DML rewrites.
+    //--------------------
+    // Insert
+    assertToSql(ctx,
+        "insert into functional.alltypes(id) partition(year=2009, month=10) " +
+        "select 1 + 1",
+        "INSERT INTO TABLE functional.alltypes(id) " +
+        "PARTITION (year=2009, month=10) SELECT 1 + 1",
+        "INSERT INTO TABLE functional.alltypes(id) " +
+        "PARTITION (year=2009, month=10) SELECT 2");
+
+    if (RuntimeEnv.INSTANCE.isKuduSupported()) {
+      // Update.
+      assertToSql(ctx, "update functional_kudu.alltypes " +
+          "set string_col = 'test' where id = (select 1 + 1)",
+          "UPDATE functional_kudu.alltypes SET string_col = 'test' " +
+          "FROM functional_kudu.alltypes WHERE id = (SELECT 1 + 1)",
+          "UPDATE functional_kudu.alltypes SET string_col = 'test' " +
+          "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) " +
+          "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 1 + 1)");
+
+      // Delete
+      assertToSql(ctx, "delete functional_kudu.alltypes " +
+          "where id = (select 1 + 1)",
+          "DELETE FROM functional_kudu.alltypes " +
+          "WHERE id = (SELECT 1 + 1)",
+          "DELETE functional_kudu.alltypes " +
+          "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) " +
+          "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 1 + 1)");
+    }
+
+    // We don't do any rewrite for WITH clause.
+    StatementBase stmt = (StatementBase) AnalyzesOk("with t as (select 1 + 1) " +
+        "select id from functional.alltypes union select id from functional.alltypesagg",
+        ctx);
+    Assert.assertEquals(stmt.toSql(), stmt.toSql(true));
+  }
+
+  private void assertToSql(AnalysisContext ctx, String query, String expectedToSql,
+      String expectedToRewrittenSql) {
+    StatementBase stmt = (StatementBase) AnalyzesOk(query, ctx);
+    Assert.assertEquals(expectedToSql, stmt.toSql());
+    Assert.assertEquals(expectedToRewrittenSql, stmt.toSql(true));
   }
 }

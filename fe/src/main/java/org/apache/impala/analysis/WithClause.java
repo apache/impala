@@ -117,6 +117,10 @@ public class WithClause implements ParseNode {
 
   @Override
   public String toSql() {
+    return toSql(false);
+  }
+
+  public String toSql(boolean rewritten) {
     List<String> viewStrings = Lists.newArrayList();
     for (View view: views_) {
       // Enclose the view alias and explicit labels in quotes if Hive cannot parse it
@@ -126,7 +130,7 @@ public class WithClause implements ParseNode {
         aliasSql += "(" + Joiner.on(", ").join(
             ToSqlUtils.getIdentSqlList(view.getOriginalColLabels())) + ")";
       }
-      viewStrings.add(aliasSql + " AS (" + view.getQueryStmt().toSql() + ")");
+      viewStrings.add(aliasSql + " AS (" + view.getQueryStmt().toSql(rewritten) + ")");
     }
     return "WITH " + Joiner.on(",").join(viewStrings);
   }

@@ -68,7 +68,9 @@ public class DeleteStmt extends ModifyStmt {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(boolean rewritten) {
+    if (!rewritten && sqlString_ != null) return sqlString_;
+
     StringBuilder b = new StringBuilder();
     b.append("DELETE");
     if (fromClause_.size() > 1 || targetTableRef_.hasExplicitAlias()) {
@@ -76,10 +78,10 @@ public class DeleteStmt extends ModifyStmt {
       if (targetTableRef_.hasExplicitAlias()) {
         b.append(targetTableRef_.getExplicitAlias());
       } else {
-        b.append(targetTableRef_.toSql());
+        b.append(targetTableRef_.toSql(rewritten));
       }
     }
-    b.append(fromClause_.toSql());
+    b.append(fromClause_.toSql(rewritten));
     if (wherePredicate_ != null) {
       b.append(" WHERE ");
       b.append(wherePredicate_.toSql());
