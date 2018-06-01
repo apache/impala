@@ -297,9 +297,12 @@ row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ---- QUERY
 # Test spilling join with many duplicates in join key. We don't expect this to succeed
 # with a memory constraint: see IMPALA-4857.
+# The additional "order by" and "limit" clauses make sure that a successful
+# query does not too much data to the client.
 set buffer_pool_limit=167m;
 select *
 from lineitem l1 join lineitem l2 on l1.l_linenumber = l2.l_linenumber
+order by l1.l_orderkey desc, l1.l_linenumber desc limit 10
 ---- CATCH
 Repartitioning did not reduce the size of a spilled partition
 ====
