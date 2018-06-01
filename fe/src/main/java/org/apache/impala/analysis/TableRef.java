@@ -572,17 +572,25 @@ public class TableRef implements ParseNode {
     return ToSqlUtils.getPathSql(path) + ((aliasSql != null) ? " " + aliasSql : "");
   }
 
+  protected String tableRefToSql(boolean rewritten) {
+    return tableRefToSql();
+  }
+
   @Override
   public String toSql() {
+    return toSql(false);
+  }
+
+  public String toSql(boolean rewritten) {
     if (joinOp_ == null) {
       // prepend "," if we're part of a sequence of table refs w/o an
       // explicit JOIN clause
-      return (leftTblRef_ != null ? ", " : "") + tableRefToSql();
+      return (leftTblRef_ != null ? ", " : "") + tableRefToSql(rewritten);
     }
 
     StringBuilder output = new StringBuilder(" " + joinOp_.toString() + " ");
     if(!joinHints_.isEmpty()) output.append(ToSqlUtils.getPlanHintsSql(joinHints_) + " ");
-    output.append(tableRefToSql());
+    output.append(tableRefToSql(rewritten));
     if (usingColNames_ != null) {
       output.append(" USING (").append(Joiner.on(", ").join(usingColNames_)).append(")");
     } else if (onClause_ != null) {

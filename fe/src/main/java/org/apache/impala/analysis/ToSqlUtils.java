@@ -186,9 +186,13 @@ public class ToSqlUtils {
 
   /**
    * Returns the "CREATE TABLE" SQL string corresponding to the given
-   * CreateTableAsSelectStmt statement.
+   * CreateTableAsSelectStmt statement. If rewritten is true, returns the rewritten SQL
+   * only if the statement was rewritten. Otherwise, the original SQL will be returned
+   * instead. It is the caller's responsibility to know if/when the statement was indeed
+   * rewritten.
    */
-  public static String getCreateTableSql(CreateTableAsSelectStmt stmt) {
+  public static String getCreateTableSql(CreateTableAsSelectStmt stmt,
+      boolean rewritten) {
     CreateTableStmt innerStmt = stmt.getCreateStmt();
     // Only add partition column labels to output. Table columns must not be specified as
     // they are deduced from the select statement.
@@ -212,7 +216,7 @@ public class ToSqlUtils {
         innerStmt.isExternal(), innerStmt.getIfNotExists(), innerStmt.getRowFormat(),
         HdfsFileFormat.fromThrift(innerStmt.getFileFormat()), HdfsCompression.NONE, null,
         innerStmt.getLocation());
-    return createTableSql + " AS " + stmt.getQueryStmt().toSql();
+    return createTableSql + " AS " + stmt.getQueryStmt().toSql(rewritten);
   }
 
   /**

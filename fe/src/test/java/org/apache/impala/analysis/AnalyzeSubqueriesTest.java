@@ -711,7 +711,7 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         " where a.int_col between t.tinyint_col and t.bigint_col)",
         "Unsupported predicate with subquery: " +
         "EXISTS (SELECT id FROM functional.alltypessmall a " +
-        "WHERE a.int_col >= t.tinyint_col AND a.int_col <= t.bigint_col)");
+        "WHERE a.int_col BETWEEN t.tinyint_col AND t.bigint_col)");
 
     // Uncorrelated EXISTS in a query with GROUP BY
     AnalyzesOk("select id, count(*) from functional.alltypes t " +

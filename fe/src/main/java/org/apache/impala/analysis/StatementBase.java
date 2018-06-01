@@ -130,7 +130,13 @@ public abstract class StatementBase implements ParseNode {
   public Analyzer getAnalyzer() { return analyzer_; }
   public boolean isAnalyzed() { return analyzer_ != null; }
 
-  public String toSql() { return ""; }
+  public String toSql() { return toSql(false); }
+  /**
+   * If rewritten is true, returns the rewritten SQL only if the statement was
+   * rewritten. Otherwise, the original SQL will be returned instead. It is the caller's
+   * responsibility to know if/when the statement was indeed rewritten.
+   */
+  public String toSql(boolean rewritten) { return ""; }
   public void setIsExplain() { isExplain_ = true; }
   public boolean isExplain() { return isExplain_; }
 

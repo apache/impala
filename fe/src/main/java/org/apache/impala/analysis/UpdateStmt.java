@@ -77,17 +77,19 @@ public class UpdateStmt extends ModifyStmt {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(boolean rewritten) {
+    if (!rewritten && sqlString_ != null) return sqlString_;
+
     StringBuilder b = new StringBuilder();
     b.append("UPDATE ");
 
     if (fromClause_ == null) {
-      b.append(targetTableRef_.toSql());
+      b.append(targetTableRef_.toSql(rewritten));
     } else {
       if (targetTableRef_.hasExplicitAlias()) {
         b.append(targetTableRef_.getExplicitAlias());
       } else {
-        b.append(targetTableRef_.toSql());
+        b.append(targetTableRef_.toSql(rewritten));
       }
     }
     b.append(" SET");
@@ -104,7 +106,7 @@ public class UpdateStmt extends ModifyStmt {
           i.second.toSql()));
     }
 
-    b.append(fromClause_.toSql());
+    b.append(fromClause_.toSql(rewritten));
 
     if (wherePredicate_ != null) {
       b.append(" WHERE ");
