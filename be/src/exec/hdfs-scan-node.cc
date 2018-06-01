@@ -40,6 +40,15 @@
 
 DEFINE_int32(max_row_batches, 0, "the maximum size of materialized_row_batches_");
 
+// The maximum capacity of materialized_row_batches_ per scanner thread that can
+// be created. This is multiplied by 'max_num_scanner_threads_' to get an upper
+// bound on the queue size. This reduces the queue size on systems with many disks
+// and makes the num_scanner_threads query option more effective at reducing memory
+// consumption. For now, make this relatively high. We should consider lowering
+// this or using a better heuristic (e.g. based on queued memory).
+DEFINE_int32_hidden(max_queued_row_batches_per_scanner_thread, 5,
+    "(Advanced) the maximum number of queued row batches per scanner thread.");
+
 #ifndef NDEBUG
 DECLARE_bool(skip_file_runtime_filtering);
 #endif
@@ -132,9 +141,18 @@ Status HdfsScanNode::GetNextInternal(
 }
 
 Status HdfsScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  if (state->query_options().num_scanner_threads > 0) {
+    max_num_scanner_threads_ = state->query_options().num_scanner_threads;
+  }
+  DCHECK_GT(max_num_scanner_threads_, 0);
+
   int default_max_row_batches = FLAGS_max_row_batches;
   if (default_max_row_batches <= 0) {
-    default_max_row_batches = 10 * (DiskInfo::num_disks() + DiskIoMgr::REMOTE_NUM_DISKS);
+    // TODO: IMPALA-7096: re-evaluate this heuristic to get a tighter bound on memory
+    // consumption, we could do something better.
+    default_max_row_batches = min(
+        10 * DiskInfo::num_disks() + DiskIoMgr::REMOTE_NUM_DISKS,
+        max_num_scanner_threads_ * FLAGS_max_queued_row_batches_per_scanner_thread);
   }
   if (state->query_options().__isset.mt_dop && state->query_options().mt_dop > 0) {
     // To avoid a significant memory increase, adjust the number of maximally queued
@@ -184,11 +202,6 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   average_scanner_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
       AVERAGE_SCANNER_THREAD_CONCURRENCY, &active_scanner_thread_counter_);
-
-  if (runtime_state_->query_options().num_scanner_threads > 0) {
-    max_num_scanner_threads_ = runtime_state_->query_options().num_scanner_threads;
-  }
-  DCHECK_GT(max_num_scanner_threads_, 0);
 
   thread_avail_cb_id_ = runtime_state_->resource_pool()->AddThreadAvailableCb(
       bind<void>(mem_fn(&HdfsScanNode::ThreadTokenAvailableCb), this, _1));
