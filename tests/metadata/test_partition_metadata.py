@@ -15,11 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import (create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
-from tests.util.filesystem_utils import get_fs_path, WAREHOUSE
+from tests.util.filesystem_utils import get_fs_path, WAREHOUSE, FILESYSTEM_PREFIX
 
 # Map from the test dimension file_format string to the SQL "STORED AS"
 # argument.
@@ -163,6 +164,8 @@ class TestPartitionMetadataUncompressedTextOnly(ImpalaTestSuite):
   def test_unsupported_text_compression(self, vector, unique_database):
     """Test querying tables with a mix of supported and unsupported compression codecs.
     Should be able to query partitions with supported codecs."""
+    if FILESYSTEM_PREFIX:
+      pytest.xfail("IMPALA-7099: this test's filesystem prefix handling is broken")
     TBL_NAME = "multi_text_compression"
     FQ_TBL_NAME = unique_database + "." + TBL_NAME
     TBL_LOCATION = '%s/%s.db/%s' % (WAREHOUSE, unique_database, TBL_NAME)
