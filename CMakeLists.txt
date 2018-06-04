@@ -88,6 +88,7 @@ set_dep_root(GLOG)
 set_dep_root(GPERFTOOLS)
 set_dep_root(GTEST)
 set_dep_root(LIBEV)
+set_dep_root(LIBUNWIND)
 set_dep_root(LLVM)
 set(LLVM_DEBUG_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION})
 set_dep_root(LZ4)
@@ -342,6 +343,13 @@ if (NOT APPLE)
 endif()
 
 ###################################################################
+
+## libunwind
+if (NOT APPLE)
+  find_package(LibUnwind REQUIRED)
+  include_directories(SYSTEM ${LIBUNWIND_INCLUDE_DIR})
+  IMPALA_ADD_THIRDPARTY_LIB(libunwind ${LIBUNWIND_INCLUDE_DIR} ${LIBUNWIND_STATIC_LIB} "")
+endif()
 
 # Required for KRPC_GENERATE, which converts protobuf to stubs.
 find_package(KRPC REQUIRED)
