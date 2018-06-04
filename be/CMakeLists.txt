@@ -442,6 +442,7 @@ set (IMPALA_DEPENDENCIES
   gflags
   krb5
   libev
+  libunwind
   pprof
   breakpad_client
   hdfs
