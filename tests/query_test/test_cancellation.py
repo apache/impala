@@ -40,14 +40,20 @@ QUERIES = {'select l_returnflag from lineitem' : None,
 
 QUERY_TYPE = ["SELECT", "CTAS"]
 
-# Time to sleep between issuing query and canceling
-CANCEL_DELAY_IN_SECONDS = range(5)
+# Time to sleep between issuing query and canceling. Favor small times since races
+# are prone to occur more often when the time between RPCs is small.
+CANCEL_DELAY_IN_SECONDS = [0, 0.01, 0.1, 1, 4]
 
 # Number of times to execute/cancel each query under test
 NUM_CANCELATION_ITERATIONS = 1
 
 # Test cancellation on both running and hung queries
 DEBUG_ACTIONS = [None, 'WAIT']
+
+# Verify close rpc running concurrently with fetch rpc. The two cases verify:
+# False: close and fetch rpc run concurrently.
+# True: cancel rpc is enough to ensure that the fetch rpc is unblocked.
+JOIN_BEFORE_CLOSE = [False, True]
 
 # Extra dimensions to test order by without limit
 SORT_QUERY = 'select * from lineitem order by l_orderkey'
@@ -70,6 +76,8 @@ class TestCancellation(ImpalaTestSuite):
         ImpalaTestDimension('cancel_delay', *CANCEL_DELAY_IN_SECONDS))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('action', *DEBUG_ACTIONS))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('join_before_close', *JOIN_BEFORE_CLOSE))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('buffer_pool_limit', 0))
 
@@ -116,6 +124,7 @@ class TestCancellation(ImpalaTestSuite):
         query = "create table ctas_cancel stored as %sfile as %s" %\
             (file_format, query)
 
+    join_before_close = vector.get_value('join_before_close')
     action = vector.get_value('action')
     # node ID 0 is the scan node
     debug_action = '0:GETNEXT:' + action if action != None else ''
@@ -145,15 +154,36 @@ class TestCancellation(ImpalaTestSuite):
       cancel_result = self.client.cancel(handle)
       assert cancel_result.status_code == 0,\
           'Unexpected status code from cancel request: %s' % cancel_result
+
+      if join_before_close:
+        thread.join()
+
+      close_error = None
+      try:
+        self.client.close_query(handle)
+      except ImpalaBeeswaxException as e:
+        close_error = e
+
+      # Before accessing fetch_results_error we need to join the fetch thread
       thread.join()
 
       if thread.fetch_results_error is None:
-        # If the query is cancelled while it's in the fetch rpc, it gets unregistered and
-        # therefore closed. Only call close on queries that did not fail fetch.
-        self.client.close_query(handle)
-      elif 'Cancelled' not in str(thread.fetch_results_error):
-        # If fetch failed for any reason other than cancellation, raise the error.
-        raise thread.fetch_results_error
+        # If the fetch rpc didn't result in CANCELLED (and auto-close the query) then
+        # the close rpc should have succeeded.
+        assert close_error is None
+      elif close_error is None:
+        # If the close rpc succeeded, then the fetch rpc should have either succeeded,
+        # failed with 'Cancelled' or failed with 'Invalid query handle' (if the close
+        # rpc occured before the fetch rpc).
+        if thread.fetch_results_error is not None:
+          assert 'Cancelled' in str(thread.fetch_results_error) or \
+            ('Invalid query handle' in str(thread.fetch_results_error) \
+             and not join_before_close)
+      else:
+        # If the close rpc encountered an exception, then it must be due to fetch
+        # noticing the cancellation and doing the auto-close.
+        assert 'Invalid or unknown query handle' in str(close_error)
+        assert 'Cancelled' in str(thread.fetch_results_error)
 
       if query_type == "CTAS":
         self.cleanup_test_table(vector.get_value('table_format'))
@@ -207,7 +237,7 @@ class TestCancellationSerial(TestCancellation):
 class TestCancellationFullSort(TestCancellation):
   @classmethod
   def add_test_dimensions(cls):
-    super(TestCancellation, cls).add_test_dimensions()
+    super(TestCancellationFullSort, cls).add_test_dimensions()
     # Override dimensions to only execute the order-by without limit query.
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('query', SORT_QUERY))
