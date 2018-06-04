@@ -466,7 +466,7 @@ class TupleDescriptor {
   void AddSlot(SlotDescriptor* slot);
 
   /// Returns slots in their physical order.
-  vector<SlotDescriptor*> SlotsOrderedByIdx() const;
+  std::vector<SlotDescriptor*> SlotsOrderedByIdx() const;
 };
 
 class DescriptorTbl {
