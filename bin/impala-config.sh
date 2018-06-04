@@ -608,6 +608,8 @@ export USER="${USER-`id -un`}"
 # TODO: figure out how to turn this off only the stuff that can't run with it.
 #LIBHDFS_OPTS="-Xcheck:jni -Xcheck:nabounds"
 export LIBHDFS_OPTS="${LIBHDFS_OPTS:-} -Djava.library.path=${HADOOP_LIB_DIR}/native/"
+LIBHDFS_OPTS+=" -XX:ErrorFile=${IMPALA_LOGS_DIR}/hs_err_pid%p.log"
+
 
 # IMPALA-5080: Our use of PermGen space sometimes exceeds the default maximum while
 # running tests that load UDF jars.
