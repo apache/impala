@@ -23,7 +23,7 @@ import re
 import shutil
 import unittest
 
-from tempfile import mkdtemp as make_tmp_dir
+from tempfile import mkdtemp
 from time import sleep
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -78,7 +78,7 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
 
   def start_cluster_using_rules(self, redaction_rules, log_level=2, vmodule=""):
     '''Start Impala with a custom log dir and redaction rules.'''
-    self.tmp_dir = make_tmp_dir()
+    self.tmp_dir = mkdtemp(prefix="test_redaction_", dir=os.getenv("LOG_DIR"))
     os.chmod(self.tmp_dir, 0o777)
     LOG.info("tmp_dir is " + self.tmp_dir)
     os.mkdir(self.log_dir)
