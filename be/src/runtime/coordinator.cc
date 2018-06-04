@@ -77,6 +77,7 @@ Coordinator::Coordinator(
 Coordinator::~Coordinator() {
   // Must have entered a terminal exec state guaranteeing resources were released.
   DCHECK_NE(exec_state_, ExecState::EXECUTING);
+  DCHECK_LE(backend_exec_complete_barrier_->pending(), 0);
   // Release the coordinator's reference to the query control structures.
   if (query_state_ != nullptr) {
     ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(query_state_);
@@ -645,6 +646,13 @@ void Coordinator::Cancel() {
   DCHECK(exec_rpcs_complete_barrier_ != nullptr &&
       exec_rpcs_complete_barrier_->pending() <= 0) << "Exec() must be called first";
   discard_result(SetNonErrorTerminalState(ExecState::CANCELLED));
+  // CancelBackends() is called for all transitions into a terminal state except
+  // for RETURNED_RESULTS. We need to call it now because after Cancel() is called
+  // the coordinator is not guaranteed to get UpdateBackendExecStatus() calls, and
+  // so we need to unblock the backend_exec_complete_barrier_.
+  // TODO: Remove this once IMPALA-6984 is fixed. It won't be necessary since
+  // CancelBackends() will be called when transitioning to RETURNED_RESULTS.
+  if (ReturnedAllResults()) CancelBackends();
 }
 
 void Coordinator::CancelBackends() {
