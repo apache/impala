@@ -186,9 +186,6 @@ public class HdfsTable extends Table implements FeFsTable {
   // table metadata loading.
   private final HashMap<String, HdfsPartition> nameToPartitionMap_ = Maps.newHashMap();
 
-  // Store all the partition ids of an HdfsTable.
-  private final HashSet<Long> partitionIds_ = Sets.newHashSet();
-
   // The partition used as a prototype when creating new partitions during
   // insertion. New partitions inherit file format and other settings from
   // the prototype.
@@ -587,8 +584,11 @@ public class HdfsTable extends Table implements FeFsTable {
     return partitionLocationCompressor_;
   }
 
+  // Returns an unmodifiable set of the partition IDs from partitionMap_.
   @Override // FeFsTable
-  public Set<Long> getPartitionIds() { return partitionIds_; }
+  public Set<Long> getPartitionIds() {
+    return Collections.unmodifiableSet(partitionMap_.keySet());
+  }
 
   @Override // FeFsTable
   public TreeMap<LiteralExpr, HashSet<Long>> getPartitionValueMap(int i) {
@@ -746,7 +746,6 @@ public class HdfsTable extends Table implements FeFsTable {
    * Clear the partitions of an HdfsTable and the associated metadata.
    */
   private void resetPartitions() {
-    partitionIds_.clear();
     partitionMap_.clear();
     nameToPartitionMap_.clear();
     partitionValuesMap_.clear();
@@ -1094,7 +1093,6 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   private void updatePartitionMdAndColStats(HdfsPartition partition) {
     if (partition.getPartitionValues().size() != numClusteringCols_) return;
-    partitionIds_.add(partition.getId());
     nameToPartitionMap_.put(partition.getPartitionName(), partition);
     if (!isStoredInImpaladCatalogCache()) return;
     for (int i = 0; i < partition.getPartitionValues().size(); ++i) {
@@ -1142,8 +1140,6 @@ public class HdfsTable extends Table implements FeFsTable {
     Preconditions.checkArgument(partition.getPartitionValues().size() ==
         numClusteringCols_);
     Long partitionId = partition.getId();
-    // Remove the partition id from the list of partition ids and other mappings.
-    partitionIds_.remove(partitionId);
     partitionMap_.remove(partitionId);
     nameToPartitionMap_.remove(partition.getPartitionName());
     if (!isStoredInImpaladCatalogCache()) return partition;
