@@ -363,11 +363,18 @@ else
 fi
 
 if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
-  if ${IMPALA_HOME}/bin/check-s3-access.sh; then
-    export DEFAULT_FS="s3a://${S3_BUCKET}"
-    export FILESYSTEM_PREFIX="${DEFAULT_FS}"
+  # We guard the S3 access check with a variable. This check hits a rate-limited endpoint
+  # on AWS and multiple inclusions of S3 can exceed the limit, causing the check to fail.
+  if [[ "${S3_ACCESS_VALIDATED}" -ne 1 ]]; then
+    if ${IMPALA_HOME}/bin/check-s3-access.sh; then
+      export S3_ACCESS_VALIDATED=1
+      export DEFAULT_FS="s3a://${S3_BUCKET}"
+      export FILESYSTEM_PREFIX="${DEFAULT_FS}"
+    else
+      return 1
+    fi
   else
-    return 1
+    echo "S3 access already validated"
   fi
 elif [ "${TARGET_FILESYSTEM}" = "adls" ]; then
   # Basic error checking
