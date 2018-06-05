@@ -276,17 +276,15 @@ public class HdfsPartitionPruner {
     }
     if (op == Operator.DISTINCT_FROM) {
       // Case: SlotRef IS DISTINCT FROM Literal
+      matchingIds.addAll(tbl_.getPartitionIds());
       if (literal instanceof NullLiteral) {
-        matchingIds.addAll(tbl_.getPartitionIds());
         Set<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
         matchingIds.removeAll(nullIds);
-        return matchingIds;
       } else {
-        matchingIds.addAll(tbl_.getPartitionIds());
         HashSet<Long> ids = partitionValueMap.get(literal);
         if (ids != null) matchingIds.removeAll(ids);
-        return matchingIds;
       }
+      return matchingIds;
     }
     if (op == Operator.NE) {
       // Case: SlotRef != Literal
