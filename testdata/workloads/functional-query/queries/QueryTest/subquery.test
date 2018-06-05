@@ -1021,3 +1021,13 @@ where 7 = (select id from functional.alltypestiny
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-7108: Select from an inline view that returns a single row.
+select count(*) from functional.alltypes
+where int_col = (select f.id from (
+                 select * from functional.alltypes order by 1 limit 1) f)
+---- RESULTS
+730
+---- TYPES
+BIGINT
+====

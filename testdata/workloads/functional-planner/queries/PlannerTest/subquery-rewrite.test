@@ -2761,3 +2761,48 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-7108: Select from an inline view that returns a single row.
+select * from functional.alltypes
+where int_col = (select f.id from (
+                 select * from functional.alltypes order by 1 limit 1) f)
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = id
+|  runtime filters: RF000 <- id
+|
+|--02:TOP-N [LIMIT=1]
+|  |  order by: id ASC
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> int_col
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = id
+|  runtime filters: RF000 <- id
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  04:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: id ASC
+|  |  limit: 1
+|  |
+|  02:TOP-N [LIMIT=1]
+|  |  order by: id ASC
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> int_col
+====

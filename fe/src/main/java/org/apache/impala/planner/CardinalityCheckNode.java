@@ -42,7 +42,7 @@ public class CardinalityCheckNode extends PlanNode {
 
   protected CardinalityCheckNode(PlanNodeId id, PlanNode child, String displayStmt) {
     super(id, "CARDINALITY CHECK");
-    Preconditions.checkState(child.getLimit() == 2);
+    Preconditions.checkState(child.getLimit() <= 2);
     cardinality_ = 1;
     limit_ = 1;
     displayStatement_ = displayStmt;

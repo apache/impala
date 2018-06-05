@@ -1057,11 +1057,12 @@ public class SelectStmt extends QueryStmt {
   public SelectStmt clone() { return new SelectStmt(this); }
 
   /**
-   * Check if the stmt returns a single row. This can happen
+   * Check if the stmt returns at most one row. This can happen
    * in the following cases:
    * 1. select stmt with a 'limit 1' clause
    * 2. select stmt with an aggregate function and no group by.
    * 3. select stmt with no from clause.
+   * 4. select from an inline view that returns at most one row.
    *
    * This function may produce false negatives because the cardinality of the
    * result set also depends on the data a stmt is processing.
@@ -1074,6 +1075,15 @@ public class SelectStmt extends QueryStmt {
     if (fromClause_.isEmpty()) return true;
     // Aggregation with no group by and no DISTINCT
     if (hasAggInfo() && !hasGroupByClause() && !selectList_.isDistinct()) return true;
+    // Select from an inline view that returns at most one row.
+    List<TableRef> tableRefs = fromClause_.getTableRefs();
+    if (tableRefs.size() == 1 && tableRefs.get(0) instanceof InlineViewRef) {
+      InlineViewRef inlineView = (InlineViewRef)tableRefs.get(0);
+      if (inlineView.queryStmt_ instanceof SelectStmt) {
+        SelectStmt selectStmt = (SelectStmt)inlineView.queryStmt_;
+        return selectStmt.returnsSingleRow();
+      }
+    }
     // In all other cases, return false.
     return false;
   }
