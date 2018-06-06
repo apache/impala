@@ -21,10 +21,10 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.RolePrivilege;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
-import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
@@ -237,8 +237,8 @@ public class PrivilegeSpec implements ParseNode {
       throw new AnalysisException("Only 'SELECT' privileges are allowed " +
           "in a column privilege spec.");
     }
-    Table table = analyzeTargetTable(analyzer);
-    if (table instanceof View) {
+    FeTable table = analyzeTargetTable(analyzer);
+    if (table instanceof FeView) {
       throw new AnalysisException("Column-level privileges on views are not " +
           "supported.");
     }
@@ -266,14 +266,14 @@ public class PrivilegeSpec implements ParseNode {
    * 3. Table does not exist.
    * 4. The privilege level is not supported on tables, e.g. CREATE.
    */
-  private Table analyzeTargetTable(Analyzer analyzer) throws AnalysisException {
+  private FeTable analyzeTargetTable(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(scope_ == TPrivilegeScope.TABLE ||
         scope_ == TPrivilegeScope.COLUMN);
     Preconditions.checkState(!Strings.isNullOrEmpty(tableName_.getTbl()));
     if (privilegeLevel_ == TPrivilegeLevel.CREATE) {
       throw new AnalysisException("Create-level privileges on tables are not supported.");
     }
-    Table table = null;
+    FeTable table = null;
     try {
       dbName_ = analyzer.getTargetDbName(tableName_);
       Preconditions.checkNotNull(dbName_);

@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.analysis.DescriptorTable;
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
@@ -43,7 +43,7 @@ public class KuduTableSink extends TableSink {
   // expression i matches a column index into the Kudu schema at targetColdIdxs[i].
   private final ArrayList<Integer> targetColIdxs_;
 
-  public KuduTableSink(Table targetTable, Op sinkOp,
+  public KuduTableSink(FeTable targetTable, Op sinkOp,
       List<Integer> referencedColumns) {
     super(targetTable, sinkOp);
     targetColIdxs_ = referencedColumns != null

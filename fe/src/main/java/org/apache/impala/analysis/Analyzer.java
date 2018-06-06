@@ -39,16 +39,16 @@ import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.DatabaseNotFoundException;
-import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeCatalog;
+import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.ImpalaException;
@@ -349,7 +349,7 @@ public class Analyzer {
   private final ArrayList<Analyzer> ancestors_;
 
   // map from lowercase table alias to a view definition in this analyzer's scope
-  private final Map<String, View> localViews_ = Maps.newHashMap();
+  private final Map<String, FeView> localViews_ = Maps.newHashMap();
 
   // Map from lowercase table alias to descriptor. Tables without an explicit alias
   // are assigned two implicit aliases: the unqualified and fully-qualified table name.
@@ -469,9 +469,9 @@ public class Analyzer {
    * definition with the same alias has already been registered or if the number of
    * explicit column labels is greater than the number of columns in the view statement.
    */
-  public void registerLocalView(View view) throws AnalysisException {
+  public void registerLocalView(FeView view) throws AnalysisException {
     Preconditions.checkState(view.isLocalView());
-    if (view.hasColLabels()) {
+    if (view.getColLabels() != null) {
       List<String> viewLabels = view.getColLabels();
       List<String> queryStmtLabels = view.getQueryStmt().getColLabels();
       if (viewLabels.size() > queryStmtLabels.size()) {
@@ -551,7 +551,7 @@ public class Analyzer {
       String viewAlias = tableRef.getPath().get(0).toLowerCase();
       Analyzer analyzer = this;
       do {
-        View localView = analyzer.localViews_.get(viewAlias);
+        FeView localView = analyzer.localViews_.get(viewAlias);
         if (localView != null) return new InlineViewRef(localView, tableRef);
         analyzer = (analyzer.ancestors_.isEmpty() ? null : analyzer.ancestors_.get(0));
       } while (analyzer != null);
@@ -583,10 +583,10 @@ public class Analyzer {
 
     Preconditions.checkNotNull(resolvedPath);
     if (resolvedPath.destTable() != null) {
-      Table table = resolvedPath.destTable();
-      if (table instanceof View) return new InlineViewRef((View) table, tableRef);
+      FeTable table = resolvedPath.destTable();
+      if (table instanceof FeView) return new InlineViewRef((FeView) table, tableRef);
       // The table must be a base table.
-      Preconditions.checkState(table instanceof HdfsTable ||
+      Preconditions.checkState(table instanceof FeFsTable ||
           table instanceof KuduTable ||
           table instanceof HBaseTable ||
           table instanceof DataSourceTable);
@@ -770,7 +770,7 @@ public class Analyzer {
       List<TableName> candidateTbls = Path.getCandidateTables(rawPath, getDefaultDb());
       for (int tblNameIdx = 0; tblNameIdx < candidateTbls.size(); ++tblNameIdx) {
         TableName tblName = candidateTbls.get(tblNameIdx);
-        Table tbl = null;
+        FeTable tbl = null;
         try {
           tbl = getTable(tblName.getDb(), tblName.getTbl());
         } catch (AnalysisException e) {
@@ -1303,7 +1303,7 @@ public class Analyzer {
   }
 
   public DescriptorTable getDescTbl() { return globalState_.descTbl; }
-  public ImpaladCatalog getCatalog() { return globalState_.stmtTableCache.catalog; }
+  public FeCatalog getCatalog() { return globalState_.stmtTableCache.catalog; }
   public StmtTableCache getStmtTableCache() { return globalState_.stmtTableCache; }
   public Set<String> getAliases() { return aliasMap_.keySet(); }
 
@@ -2354,10 +2354,10 @@ public class Analyzer {
    * Throws a TableLoadingException if the registered table failed to load.
    * Does not register authorization requests or access events.
    */
-  public Table getTable(String dbName, String tableName)
+  public FeTable getTable(String dbName, String tableName)
       throws AnalysisException, TableLoadingException {
     TableName tblName = new TableName(dbName, tableName);
-    Table table = globalState_.stmtTableCache.tables.get(tblName);
+    FeTable table = globalState_.stmtTableCache.tables.get(tblName);
     if (table == null) {
       if (!globalState_.stmtTableCache.dbs.contains(tblName.getDb())) {
         throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + tblName.getDb());
@@ -2384,8 +2384,8 @@ public class Analyzer {
    * regardless of the state of the table (i.e. whether it exists, is loaded, etc.).
    * If addAccessEvent is true adds an access event for successfully loaded tables.
    */
-  public Table getTable(TableName tableName, Privilege privilege, boolean addAccessEvent)
-      throws AnalysisException, TableLoadingException {
+  public FeTable getTable(TableName tableName, Privilege privilege,
+      boolean addAccessEvent) throws AnalysisException, TableLoadingException {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilege);
     tableName = getFqTableName(tableName);
@@ -2396,12 +2396,12 @@ public class Analyzer {
       registerPrivReq(new PrivilegeRequestBuilder()
           .allOf(privilege).onTable(tableName.getDb(), tableName.getTbl()).toRequest());
     }
-    Table table = getTable(tableName.getDb(), tableName.getTbl());
+    FeTable table = getTable(tableName.getDb(), tableName.getTbl());
     Preconditions.checkNotNull(table);
     if (addAccessEvent) {
       // Add an audit event for this access
       TCatalogObjectType objectType = TCatalogObjectType.TABLE;
-      if (table instanceof View) objectType = TCatalogObjectType.VIEW;
+      if (table instanceof FeView) objectType = TCatalogObjectType.VIEW;
       globalState_.accessEvents.add(new TAccessEvent(
           tableName.toString(), objectType, privilege.toString()));
     }
@@ -2416,7 +2416,7 @@ public class Analyzer {
    * AuthorizationException is thrown.
    * If the table or the db does not exist in the Catalog, an AnalysisError is thrown.
    */
-  public Table getTable(TableName tableName, Privilege privilege)
+  public FeTable getTable(TableName tableName, Privilege privilege)
       throws AnalysisException {
     try {
       return getTable(tableName, privilege, true);
@@ -2434,11 +2434,11 @@ public class Analyzer {
    *
    * If the database does not exist in the catalog an AnalysisError is thrown.
    */
-  public Db getDb(String dbName, Privilege privilege) throws AnalysisException {
+  public FeDb getDb(String dbName, Privilege privilege) throws AnalysisException {
     return getDb(dbName, privilege, true);
   }
 
-  public Db getDb(String dbName, Privilege privilege, boolean throwIfDoesNotExist)
+  public FeDb getDb(String dbName, Privilege privilege, boolean throwIfDoesNotExist)
       throws AnalysisException {
     PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
     if (privilege == Privilege.ANY) {
@@ -2448,7 +2448,7 @@ public class Analyzer {
       registerPrivReq(pb.allOf(privilege).onDb(dbName).toRequest());
     }
 
-    Db db = getDb(dbName, throwIfDoesNotExist);
+    FeDb db = getDb(dbName, throwIfDoesNotExist);
     globalState_.accessEvents.add(new TAccessEvent(
         dbName, TCatalogObjectType.DATABASE, privilege.toString()));
     return db;
@@ -2457,9 +2457,9 @@ public class Analyzer {
   /**
    * Returns a Catalog Db object without checking for privileges.
    */
-  public Db getDb(String dbName, boolean throwIfDoesNotExist)
+  public FeDb getDb(String dbName, boolean throwIfDoesNotExist)
       throws AnalysisException {
-    Db db = getCatalog().getDb(dbName);
+    FeDb db = getCatalog().getDb(dbName);
     if (db == null && throwIfDoesNotExist) {
       throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     }
@@ -2479,7 +2479,7 @@ public class Analyzer {
     registerPrivReq(new PrivilegeRequestBuilder().allOf(privilege)
         .onTable(dbName,  tableName).toRequest());
     try {
-      Db db = getCatalog().getDb(dbName);
+      FeDb db = getCatalog().getDb(dbName);
       if (db == null) {
         throw new DatabaseNotFoundException("Database not found: " + dbName);
       }
@@ -2543,7 +2543,7 @@ public class Analyzer {
         && g.hasEdge(a.asInt(), b.asInt()));
   }
 
-  public Map<String, View> getLocalViews() { return localViews_; }
+  public Map<String, FeView> getLocalViews() { return localViews_; }
 
   /**
    * Add a warning that will be displayed to the user. Ignores null messages. Once
@@ -2575,10 +2575,10 @@ public class Analyzer {
    * for the given table and privilege. The table must be a base table or a
    * catalog view (not a local view).
    */
-  public void registerAuthAndAuditEvent(Table table, Privilege priv) {
+  public void registerAuthAndAuditEvent(FeTable table, Privilege priv) {
     // Add access event for auditing.
-    if (table instanceof View) {
-      View view = (View) table;
+    if (table instanceof FeView) {
+      FeView view = (FeView) table;
       Preconditions.checkState(!view.isLocalView());
       addAccessEvent(new TAccessEvent(
           table.getFullName(), TCatalogObjectType.VIEW,

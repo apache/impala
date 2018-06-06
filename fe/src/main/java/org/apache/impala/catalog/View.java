@@ -43,7 +43,7 @@ import com.google.common.collect.Lists;
  * Refreshing or invalidating a view will reload the view's definition but will not
  * affect the metadata of the underlying tables (if any).
  */
-public class View extends Table {
+public class View extends Table implements FeView {
 
   // The original SQL-string given as view definition. Set during analysis.
   // Corresponds to Hive's viewOriginalText.
@@ -165,7 +165,11 @@ public class View extends Table {
 
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.VIEW; }
+
+  @Override // FeView
   public QueryStmt getQueryStmt() { return queryStmt_; }
+
+  @Override // FeView
   public boolean isLocalView() { return isLocalView_; }
 
   /**
@@ -173,11 +177,7 @@ public class View extends Table {
    */
   public List<String> getOriginalColLabels() { return colLabels_; }
 
-  /**
-   * Returns the explicit column labels for this view, or null if they need to be derived
-   * entirely from the underlying query statement. The returned list has at least as many
-   * elements as the number of column labels in the query stmt.
-   */
+  @Override
   public List<String> getColLabels() {
     if (colLabels_ == null) return null;
     if (colLabels_.size() >= queryStmt_.getColLabels().size()) return colLabels_;
@@ -186,8 +186,6 @@ public class View extends Table {
         colLabels_.size(), queryStmt_.getColLabels().size()));
     return explicitColLabels;
   }
-
-  public boolean hasColLabels() { return colLabels_ != null; }
 
   @Override
   public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {

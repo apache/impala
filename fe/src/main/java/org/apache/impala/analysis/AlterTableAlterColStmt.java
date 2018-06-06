@@ -19,12 +19,11 @@ package org.apache.impala.analysis;
 
 import java.util.Map;
 
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableAlterColParams;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -101,7 +100,7 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    Table t = getTargetTable();
+    FeTable t = getTargetTable();
     if (t instanceof HBaseTable) {
       throw new AnalysisException(
           "ALTER TABLE CHANGE/ALTER COLUMN not currently supported on HBase tables.");

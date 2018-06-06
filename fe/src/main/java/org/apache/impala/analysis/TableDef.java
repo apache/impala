@@ -25,10 +25,10 @@ import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.RowFormat;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TAccessEvent;
@@ -307,9 +307,9 @@ class TableDef {
    * must be an HDFS table. If there are errors during the analysis, this will throw an
    * AnalysisException.
    */
-  public static void analyzeSortColumns(List<String> sortCols, Table table)
+  public static void analyzeSortColumns(List<String> sortCols, FeTable table)
       throws AnalysisException {
-    Preconditions.checkState(table instanceof HdfsTable);
+    Preconditions.checkState(table instanceof FeFsTable);
     analyzeSortColumns(sortCols, Column.toColumnNames(table.getNonClusteringColumns()),
         Column.toColumnNames(table.getClusteringColumns()));
   }

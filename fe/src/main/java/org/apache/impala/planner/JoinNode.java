@@ -29,7 +29,7 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.ColumnStats;
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TJoinDistributionMode;
@@ -422,7 +422,7 @@ public abstract class JoinNode extends PlanNode {
     private static boolean hasNumRowsAndNdvStats(SlotDescriptor slotDesc) {
       if (slotDesc.getColumn() == null) return false;
       if (!slotDesc.getStats().hasNumDistinctValues()) return false;
-      Table tbl = slotDesc.getParent().getTable();
+      FeTable tbl = slotDesc.getParent().getTable();
       if (tbl == null || tbl.getNumRows() == -1) return false;
       return true;
     }

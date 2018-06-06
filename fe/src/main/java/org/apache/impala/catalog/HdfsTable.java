@@ -113,7 +113,7 @@ import com.google.common.collect.Sets;
  * The partition keys constitute the clustering columns.
  *
  */
-public class HdfsTable extends Table {
+public class HdfsTable extends Table implements FeFsTable {
   // hive's default value for table property 'serialization.null.format'
   private static final String DEFAULT_NULL_COLUMN_VALUE = "\\N";
 
@@ -352,21 +352,16 @@ public class HdfsTable extends Table {
         new HdfsPartitionLocationCompressor(numClusteringCols_);
   }
 
-  /**
-   * Returns true if the table resides at a location which supports caching (e.g. HDFS).
-   */
+  @Override // FeFsTable
   public boolean isLocationCacheable() {
     return FileSystemUtil.isPathCacheable(new Path(getLocation()));
   }
 
-  /**
-   * Returns true if the table and all its partitions reside at locations which
-   * support caching (e.g. HDFS).
-   */
+  @Override // FeFsTable
   public boolean isCacheable() {
     if (!isLocationCacheable()) return false;
     if (!isMarkedCached() && numClusteringCols_ > 0) {
-      for (HdfsPartition partition: getPartitions()) {
+      for (FeFsPartition partition: getPartitions()) {
         if (partition.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
           continue;
         }
@@ -556,27 +551,41 @@ public class HdfsTable extends Table {
   public TCatalogObjectType getCatalogObjectType() {
     return TCatalogObjectType.TABLE;
   }
+
+  @Override // FeFsTable
   public boolean isMarkedCached() { return isMarkedCached_; }
-  public Collection<HdfsPartition> getPartitions() { return partitionMap_.values(); }
-  public Map<Long, HdfsPartition> getPartitionMap() { return partitionMap_; }
+
+  @Override // FeFsTable
+  public Collection<? extends FeFsPartition> getPartitions() {
+    return partitionMap_.values();
+  }
+
+  @Override // FeFsTable
+  public Map<Long, ? extends FeFsPartition> getPartitionMap() {
+    return partitionMap_;
+  }
+
+  @Override // FeFsTable
   public Set<Long> getNullPartitionIds(int i) { return nullPartitionIds_.get(i); }
+
   public HdfsPartitionLocationCompressor getPartitionLocationCompressor() {
     return partitionLocationCompressor_;
   }
+
+  @Override // FeFsTable
   public Set<Long> getPartitionIds() { return partitionIds_; }
+
+  @Override // FeFsTable
   public TreeMap<LiteralExpr, HashSet<Long>> getPartitionValueMap(int i) {
     return partitionValuesMap_.get(i);
   }
 
-  /**
-   * Returns the value Hive is configured to use for NULL partition key values.
-   * Set during load.
-   */
-  public String getNullPartitionKeyValue() { return nullPartitionKeyValue_; }
+  @Override // FeFsTable
+  public String getNullPartitionKeyValue() {
+    return nullPartitionKeyValue_; // Set during load.
+  }
 
-  /*
-   * Returns the storage location (HDFS path) of this table.
-   */
+  @Override // FeFsTable
   public String getLocation() {
     return super.getMetaStoreTable().getSd().getLocation();
   }
@@ -1454,11 +1463,7 @@ public class HdfsTable extends Table {
     return msTbl.getParameters().containsKey(TBL_PROP_SKIP_HEADER_LINE_COUNT);
   }
 
-  /**
-   * Parses and returns the value of the 'skip.header.line.count' table property. If the
-   * value is not set for the table, returns 0. If parsing fails or a value < 0 is found,
-   * the error parameter is updated to contain an error message.
-   */
+  @Override // FeTable
   public int parseSkipHeaderLineCount(StringBuilder error) {
     if (!hasSkipHeaderLineCount()) return 0;
     return parseSkipHeaderLineCount(getMetaStoreTable().getParameters(), error);
@@ -1753,14 +1758,16 @@ public class HdfsTable extends Table {
     return hdfsTable;
   }
 
+  @Override // FeFsTable
   public long getTotalHdfsBytes() { return fileMetadataStats_.totalFileBytes; }
+
+  @Override // FeFsTable
   public String getHdfsBaseDir() { return hdfsBaseDir_; }
   public Path getHdfsBaseDirPath() { return new Path(hdfsBaseDir_); }
+  @Override // FeFsTable
   public boolean isAvroTable() { return avroSchema_ != null; }
 
-  /**
-   * Get the index of hosts that store replicas of blocks of this table.
-   */
+  @Override // FeFsTable
   public ListMap<TNetworkAddress> getHostIndex() { return hostIndex_; }
 
   /**
@@ -1938,6 +1945,7 @@ public class HdfsTable extends Table {
    * - the row count statistic is zero and the file bytes is non-zero
    * Otherwise, returns a value >= 1.
    */
+  @Override // FeFsTable
   public long getExtrapolatedNumRows(long fileBytes) {
     if (!isStatsExtrapolationEnabled()) return -1;
     if (fileBytes == 0) return 0;
@@ -1954,6 +1962,7 @@ public class HdfsTable extends Table {
    * Reconciles the Impalad-wide --enable_stats_extrapolation flag and the
    * TBL_PROP_ENABLE_STATS_EXTRAPOLATION table property
    */
+  @Override // FeFsTable
   public boolean isStatsExtrapolationEnabled() {
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     String propVal = msTbl.getParameters().get(TBL_PROP_ENABLE_STATS_EXTRAPOLATION);
@@ -1961,11 +1970,7 @@ public class HdfsTable extends Table {
     return Boolean.parseBoolean(propVal);
   }
 
-  /**
-   * Returns statistics on this table as a tabular result set. Used for the
-   * SHOW TABLE STATS statement. The schema of the returned TResultSet is set
-   * inside this method.
-   */
+  @Override // FeFsTable
   public TResultSet getTableStats() {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
@@ -1995,7 +2000,7 @@ public class HdfsTable extends Table {
     // Pretty print partitions and their stats.
     ArrayList<HdfsPartition> orderedPartitions =
         Lists.newArrayList(partitionMap_.values());
-    Collections.sort(orderedPartitions);
+    Collections.sort(orderedPartitions, HdfsPartition.KV_COMPARATOR);
 
     long totalCachedBytes = 0L;
     for (HdfsPartition p: orderedPartitions) {
@@ -2076,11 +2081,7 @@ public class HdfsTable extends Table {
     return result;
   }
 
-  /**
-   * Returns files info for the given dbname/tableName and partition spec.
-   * Returns files info for all partitions, if partition spec is null, ordered
-   * by partition.
-   */
+  @Override // FeFsTable
   public TResultSet getFiles(List<List<TPartitionKeyValue>> partitionSet)
       throws CatalogException {
     TResultSet result = new TResultSet();
@@ -2098,7 +2099,7 @@ public class HdfsTable extends Table {
       // Get a list of HdfsPartition objects for the given partition set.
       orderedPartitions = getPartitionsFromPartitionSet(partitionSet);
     }
-    Collections.sort(orderedPartitions);
+    Collections.sort(orderedPartitions, HdfsPartition.KV_COMPARATOR);
 
     for (HdfsPartition p: orderedPartitions) {
       List<FileDescriptor> orderedFds = Lists.newArrayList(p.getFileDescriptors());
@@ -2140,23 +2141,15 @@ public class HdfsTable extends Table {
         hmsPartition.getSd(), hmsPartition);
     refreshPartitionFileMetadata(refreshedPartition);
     Preconditions.checkArgument(oldPartition == null
-        || oldPartition.compareTo(refreshedPartition) == 0);
+        || HdfsPartition.KV_COMPARATOR.compare(oldPartition, refreshedPartition) == 0);
     dropPartition(oldPartition);
     addPartition(refreshedPartition);
   }
 
-  /**
-   * Selects a random sample of files from the given list of partitions such that the sum
-   * of file sizes is at least 'percentBytes' percent of the total number of bytes in
-   * those partitions and at least 'minSampleBytes'. The sample is returned as a map from
-   * partition id to a list of file descriptors selected from that partition.
-   * This function allocates memory proportional to the number of files in 'inputParts'.
-   * Its implementation tries to minimize the constant factor and object generation.
-   * The given 'randomSeed' is used for random number generation.
-   * The 'percentBytes' parameter must be between 0 and 100.
-   */
+  @Override // FeFsTable
   public Map<Long, List<FileDescriptor>> getFilesSample(
-      Collection<HdfsPartition> inputParts, long percentBytes, long minSampleBytes,
+      Collection<? extends FeFsPartition> inputParts,
+      long percentBytes, long minSampleBytes,
       long randomSeed) {
     Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
     Preconditions.checkState(minSampleBytes >= 0);
@@ -2174,8 +2167,8 @@ public class HdfsTable extends Table {
 
     // Ensure a consistent ordering of files for repeatable runs. The files within a
     // partition are already ordered based on how they are loaded in the catalog.
-    List<HdfsPartition> orderedParts = Lists.newArrayList(inputParts);
-    Collections.sort(orderedParts);
+    List<FeFsPartition> orderedParts = Lists.newArrayList(inputParts);
+    Collections.sort(orderedParts, HdfsPartition.KV_COMPARATOR);
 
     // fileIdxs contains indexes into the file descriptor lists of all inputParts
     // parts[i] contains the partition corresponding to fileIdxs[i]
@@ -2185,10 +2178,10 @@ public class HdfsTable extends Table {
     // multiple times during the sampling, regardless of the sample percent. We purposely
     // avoid generating objects proportional to the number of files.
     int[] fileIdxs = new int[totalNumFiles];
-    HdfsPartition[] parts = new HdfsPartition[totalNumFiles];
+    FeFsPartition[] parts = new FeFsPartition[totalNumFiles];
     int idx = 0;
     long totalBytes = 0;
-    for (HdfsPartition part: orderedParts) {
+    for (FeFsPartition part: orderedParts) {
       totalBytes += part.getSize();
       int numFds = part.getNumFileDescriptors();
       for (int fileIdx = 0; fileIdx < numFds; ++fileIdx) {
@@ -2210,7 +2203,7 @@ public class HdfsTable extends Table {
     Map<Long, List<FileDescriptor>> result = Maps.newHashMap();
     while (selectedBytes < targetBytes && numFilesRemaining > 0) {
       int selectedIdx = Math.abs(rnd.nextInt()) % numFilesRemaining;
-      HdfsPartition part = parts[selectedIdx];
+      FeFsPartition part = parts[selectedIdx];
       Long partId = Long.valueOf(part.getId());
       List<FileDescriptor> sampleFileIdxs = result.get(partId);
       if (sampleFileIdxs == null) {

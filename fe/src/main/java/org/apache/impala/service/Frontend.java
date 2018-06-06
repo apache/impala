@@ -78,6 +78,8 @@ import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
@@ -645,15 +647,15 @@ public class Frontend {
    * Returns all databases in catalog cache that match the pattern of 'matcher' and are
    * accessible to 'user'.
    */
-  public List<Db> getDbs(PatternMatcher matcher, User user)
+  public List<? extends FeDb> getDbs(PatternMatcher matcher, User user)
       throws InternalException {
-    List<Db> dbs = impaladCatalog_.get().getDbs(matcher);
+    List<? extends FeDb> dbs = impaladCatalog_.get().getDbs(matcher);
     // If authorization is enabled, filter out the databases the user does not
     // have permissions on.
     if (authzConfig_.isEnabled()) {
-      Iterator<Db> iter = dbs.iterator();
+      Iterator<? extends FeDb> iter = dbs.iterator();
       while (iter.hasNext()) {
-        Db db = iter.next();
+        FeDb db = iter.next();
         if (!isAccessibleToUser(db, user)) iter.remove();
       }
     }
@@ -663,7 +665,7 @@ public class Frontend {
   /**
    * Check whether database is accessible to given user.
    */
-  private boolean isAccessibleToUser(Db db, User user)
+  private boolean isAccessibleToUser(FeDb db, User user)
       throws InternalException {
     if (db.getName().toLowerCase().equals(Catalog.DEFAULT_DB.toLowerCase())) {
       // Default DB should always be shown.
@@ -717,8 +719,8 @@ public class Frontend {
   public TResultSet getTableStats(String dbName, String tableName, TShowStatsOp op)
       throws ImpalaException {
     Table table = impaladCatalog_.get().getTable(dbName, tableName);
-    if (table instanceof HdfsTable) {
-      return ((HdfsTable) table).getTableStats();
+    if (table instanceof FeFsTable) {
+      return ((FeFsTable) table).getTableStats();
     } else if (table instanceof HBaseTable) {
       return ((HBaseTable) table).getTableStats();
     } else if (table instanceof DataSourceTable) {

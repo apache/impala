@@ -32,7 +32,6 @@ import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import com.google.common.collect.Lists;
 

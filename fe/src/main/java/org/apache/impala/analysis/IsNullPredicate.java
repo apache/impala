@@ -18,11 +18,11 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.ScalarType;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Reference;
@@ -142,7 +142,7 @@ public class IsNullPredicate extends Predicate {
     if (isSingleColumnPredicate(slotRefRef, null)) {
       SlotDescriptor slotDesc = slotRefRef.getRef().getDesc();
       if (!slotDesc.getStats().hasNulls()) return;
-      Table table = slotDesc.getParent().getTable();
+      FeTable table = slotDesc.getParent().getTable();
       if (table != null && table.getNumRows() > 0) {
         long numRows = table.getNumRows();
         if (isNotNull_) {

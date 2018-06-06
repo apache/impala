@@ -26,7 +26,7 @@ import org.apache.impala.authorization.AuthorizeableFn;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.catalog.ImpaladCatalog;
-import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -65,7 +65,7 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
   protected Function fn_;
 
   // Db object for function fn_. Set in analyze().
-  protected Db db_;
+  protected FeDb db_;
 
   // Set in analyze()
   protected String sqlString_;

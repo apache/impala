@@ -30,8 +30,8 @@ import org.apache.impala.authorization.AuthorizeableTable;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.catalog.AuthorizationException;
-import org.apache.impala.catalog.Db;
-import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.FeCatalog;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
@@ -62,7 +62,7 @@ public class AnalysisContext {
   private final EventSequence timeline_;
 
   // Set in analyzeAndAuthorize().
-  private ImpaladCatalog catalog_;
+  private FeCatalog catalog_;
   private AnalysisResult analysisResult_;
 
   // Use Hive's scheme for auto-generating column labels. Only used for testing.
@@ -75,7 +75,7 @@ public class AnalysisContext {
     timeline_ = timeline;
   }
 
-  public ImpaladCatalog getCatalog() { return catalog_; }
+  public FeCatalog getCatalog() { return catalog_; }
   public TQueryCtx getQueryCtx() { return queryCtx_; }
   public TQueryOptions getQueryOptions() {
     return queryCtx_.client_request.query_options;
@@ -621,7 +621,7 @@ public class AnalysisContext {
    */
   private boolean checkSystemDbAccess(String dbName, Privilege privilege)
       throws AuthorizationException {
-    Db db = catalog_.getDb(dbName);
+    FeDb db = catalog_.getDb(dbName);
     if (db != null && db.isSystemDb()) {
       switch (privilege) {
         case VIEW_METADATA:

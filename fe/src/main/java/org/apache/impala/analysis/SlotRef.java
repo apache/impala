@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -114,7 +114,7 @@ public class SlotRef extends Expr {
     }
 
     numDistinctValues_ = desc_.getStats().getNumDistinctValues();
-    Table rootTable = resolvedPath.getRootTable();
+    FeTable rootTable = resolvedPath.getRootTable();
     if (rootTable != null && rootTable.getNumRows() > 0) {
       // The NDV cannot exceed the #rows in the table.
       numDistinctValues_ = Math.min(numDistinctValues_, rootTable.getNumRows());

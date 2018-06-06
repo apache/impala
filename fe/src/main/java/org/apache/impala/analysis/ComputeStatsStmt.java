@@ -27,12 +27,14 @@ import java.util.Set;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.PrintUtils;
@@ -106,7 +108,7 @@ public class ComputeStatsStmt extends StatementBase {
   protected final TableSampleClause sampleParams_;
 
   // Set during analysis.
-  protected Table table_;
+  protected FeTable table_;
 
   // Effective sampling percent based on the total number of bytes in the files sample.
   // Set to -1 for non-HDFS tables or if TABLESAMPLE was not specified.
@@ -342,7 +344,7 @@ public class ComputeStatsStmt extends StatementBase {
     }
     table_ = analyzer.getTable(tableName_, Privilege.ALTER);
 
-    if (!(table_ instanceof HdfsTable)) {
+    if (!(table_ instanceof FeFsTable)) {
       if (partitionSet_ != null) {
         throw new AnalysisException("COMPUTE INCREMENTAL ... PARTITION not supported " +
             "for non-HDFS table " + tableName_);
@@ -358,7 +360,7 @@ public class ComputeStatsStmt extends StatementBase {
           throw new AnalysisException(colName + " not found in table: " +
               table_.getName());
         }
-        if (table_ instanceof HdfsTable && table_.isClusteringColumn(col)) {
+        if (table_ instanceof FeFsTable && table_.isClusteringColumn(col)) {
           throw new AnalysisException("COMPUTE STATS not supported for partitioning " +
               "column " + col.getName() + " of HDFS table.");
         }
@@ -370,9 +372,9 @@ public class ComputeStatsStmt extends StatementBase {
       }
     }
 
-    HdfsTable hdfsTable = null;
-    if (table_ instanceof HdfsTable) {
-      hdfsTable = (HdfsTable)table_;
+    FeFsTable hdfsTable = null;
+    if (table_ instanceof FeFsTable) {
+      hdfsTable = (FeFsTable)table_;
       if (hdfsTable.isAvroTable()) checkIncompleteAvroSchema(hdfsTable);
       if (isIncremental_ && hdfsTable.getNumClusteringCols() == 0 &&
           partitionSet_ != null) {
@@ -435,7 +437,9 @@ public class ComputeStatsStmt extends StatementBase {
               " does not have statistics, recomputing stats for the whole table");
         }
 
-        for (HdfsPartition p: hdfsTable.getPartitions()) {
+        Collection<? extends FeFsPartition> allPartitions =
+            hdfsTable.getPartitions();
+        for (FeFsPartition p: allPartitions) {
           if (p.isDefaultPartition()) continue;
           TPartitionStats partStats = p.getPartitionStats();
           if (!p.hasIncrementalStats() || tableIsMissingColStats) {
@@ -460,7 +464,7 @@ public class ComputeStatsStmt extends StatementBase {
         }
       } else {
         // Always compute stats on a set of partitions when told to.
-        for (HdfsPartition targetPartition: partitionSet_.getPartitions()) {
+        for (FeFsPartition targetPartition: partitionSet_.getPartitions()) {
           filterPreds.add(targetPartition.getConjunctSql());
           List<String> partValues = Lists.newArrayList();
           for (LiteralExpr partValue: targetPartition.getPartitionValues()) {
@@ -470,9 +474,11 @@ public class ComputeStatsStmt extends StatementBase {
           expectedPartitions_.add(partValues);
         }
         // Create a hash set out of partitionSet_ for O(1) lookups.
-        HashSet<HdfsPartition> targetPartitions =
+        // TODO(todd) avoid loading all partitions.
+        HashSet<FeFsPartition> targetPartitions =
             Sets.newHashSet(partitionSet_.getPartitions());
-        for (HdfsPartition p : hdfsTable.getPartitions()) {
+        Collection<? extends FeFsPartition> allPartitions = hdfsTable.getPartitions();
+        for (FeFsPartition p : allPartitions) {
           if (p.isDefaultPartition()) continue;
           if (targetPartitions.contains(p)) continue;
           TPartitionStats partStats = p.getPartitionStats();
@@ -583,10 +589,10 @@ public class ComputeStatsStmt extends StatementBase {
    */
   private String analyzeTableSampleClause(Analyzer analyzer) throws AnalysisException {
     if (sampleParams_ == null) return "";
-    if (!(table_ instanceof HdfsTable)) {
+    if (!(table_ instanceof FeFsTable)) {
       throw new AnalysisException("TABLESAMPLE is only supported on HDFS tables.");
     }
-    HdfsTable hdfsTable = (HdfsTable) table_;
+    FeFsTable hdfsTable = (FeFsTable) table_;
     if (!hdfsTable.isStatsExtrapolationEnabled()) {
       throw new AnalysisException(String.format(
           "COMPUTE STATS TABLESAMPLE requires stats extrapolation which is disabled.\n" +
@@ -606,8 +612,9 @@ public class ComputeStatsStmt extends StatementBase {
     // Compute the sample of files and set 'sampleFileBytes_'.
     long minSampleBytes = analyzer.getQueryOptions().compute_stats_min_sample_size;
     long samplePerc = sampleParams_.getPercentBytes();
+    Collection<? extends FeFsPartition> partitions = hdfsTable.getPartitions();
     Map<Long, List<FileDescriptor>> sample = hdfsTable.getFilesSample(
-        hdfsTable.getPartitions(), samplePerc, minSampleBytes, sampleSeed);
+        partitions, samplePerc, minSampleBytes, sampleSeed);
     long sampleFileBytes = 0;
     for (List<FileDescriptor> fds: sample.values()) {
       for (FileDescriptor fd: fds) sampleFileBytes += fd.getFileLength();
@@ -643,7 +650,7 @@ public class ComputeStatsStmt extends StatementBase {
    * AnalysisException for such ill-created Avro tables. Does nothing if
    * the column definitions match the Avro schema exactly.
    */
-  private void checkIncompleteAvroSchema(HdfsTable table) throws AnalysisException {
+  private void checkIncompleteAvroSchema(FeFsTable table) throws AnalysisException {
     Preconditions.checkState(table.isAvroTable());
     org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
     // The column definitions from 'CREATE TABLE (column definitions) ...'
@@ -708,8 +715,8 @@ public class ComputeStatsStmt extends StatementBase {
    * the partition level.
    */
   private boolean updateTableStatsOnly() {
-    if (!(table_ instanceof HdfsTable)) return true;
-    return !isIncremental_ && ((HdfsTable) table_).isStatsExtrapolationEnabled();
+    if (!(table_ instanceof FeFsTable)) return true;
+    return !isIncremental_ && ((FeFsTable) table_).isStatsExtrapolationEnabled();
   }
 
   /**
@@ -747,14 +754,15 @@ public class ComputeStatsStmt extends StatementBase {
    * false otherwise.
    */
   public boolean isColumnar() {
-    if (!(table_ instanceof HdfsTable)) return false;
-    Collection<HdfsPartition> affectedPartitions = null;
+    if (!(table_ instanceof FeFsTable)) return false;
+    Collection<? extends FeFsPartition> affectedPartitions = null;
     if (partitionSet_ != null) {
       affectedPartitions = partitionSet_.getPartitions();
     } else {
-      affectedPartitions = ((HdfsTable) table_).getPartitions();
+      FeFsTable hdfsTable = (FeFsTable)table_;
+      affectedPartitions = hdfsTable.getPartitions();
     }
-    for (HdfsPartition partition: affectedPartitions) {
+    for (FeFsPartition partition: affectedPartitions) {
       if (partition.getFileFormat() != HdfsFileFormat.PARQUET
           && partition.getFileFormat() != HdfsFileFormat.ORC)
         return false;
@@ -794,10 +802,10 @@ public class ComputeStatsStmt extends StatementBase {
     params.setExpect_all_partitions(expectAllPartitions_);
     if (!expectAllPartitions_) params.setExpected_partitions(expectedPartitions_);
     if (isIncremental_) {
-      params.setNum_partition_cols(((HdfsTable)table_).getNumClusteringCols());
+      params.setNum_partition_cols(((FeFsTable)table_).getNumClusteringCols());
     }
-    if (table_ instanceof HdfsTable) {
-      params.setTotal_file_bytes(((HdfsTable)table_).getTotalHdfsBytes());
+    if (table_ instanceof FeFsTable) {
+      params.setTotal_file_bytes(((FeFsTable)table_).getTotalHdfsBytes());
     }
     return params;
   }

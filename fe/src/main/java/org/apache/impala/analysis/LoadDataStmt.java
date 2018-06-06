@@ -29,10 +29,10 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
@@ -107,7 +107,7 @@ public class LoadDataStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     dbName_ = analyzer.getTargetDbName(tableName_);
-    Table table = analyzer.getTable(tableName_, Privilege.INSERT);
+    FeTable table = analyzer.getTable(tableName_, Privilege.INSERT);
     if (!(table instanceof HdfsTable)) {
       throw new AnalysisException("LOAD DATA only supported for HDFS tables: " +
           dbName_ + "." + getTbl());
@@ -205,7 +205,7 @@ public class LoadDataStmt extends StatementBase {
           "target table (%s) because Impala does not have WRITE access to HDFS " +
           "location: ", hdfsTable.getFullName());
 
-      HdfsPartition partition;
+      FeFsPartition partition;
       String location;
       if (partitionSpec_ != null) {
         partition = hdfsTable.getPartition(partitionSpec_.getPartitionSpecKeyValues());

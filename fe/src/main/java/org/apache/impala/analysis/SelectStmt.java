@@ -24,9 +24,9 @@ import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ColumnAliasGenerator;
@@ -473,7 +473,7 @@ public class SelectStmt extends QueryStmt {
       // The resolved path targets a registered tuple descriptor of a catalog
       // table. Expand the '*' based on the Hive-column order.
       TupleDescriptor tupleDesc = resolvedPath.destTupleDesc();
-      Table table = tupleDesc.getTable();
+      FeTable table = tupleDesc.getTable();
       for (Column c: table.getColumnsInHiveOrder()) {
         addStarResultExpr(resolvedPath, analyzer, c.getName());
       }

@@ -17,14 +17,11 @@
 
 package org.apache.impala.analysis;
 
-import java.util.Collection;
-
+import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetRowFormatParams;
@@ -60,13 +57,13 @@ public class AlterTableSetRowFormatStmt extends AlterTableSetStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    Table tbl = getTargetTable();
+    FeTable tbl = getTargetTable();
     if (!(tbl instanceof HdfsTable)) {
       throw new AnalysisException(String.format("ALTER TABLE SET ROW FORMAT is only " +
           "supported on HDFS tables. Conflicting table: %1$s", tbl.getFullName()));
     }
     if (partitionSet_ != null) {
-      for (HdfsPartition partition: partitionSet_.getPartitions()) {
+      for (FeFsPartition partition: partitionSet_.getPartitions()) {
         if (partition.getFileFormat() != HdfsFileFormat.TEXT &&
             partition.getFileFormat() != HdfsFileFormat.SEQUENCE_FILE) {
           throw new AnalysisException(String.format("ALTER TABLE SET ROW FORMAT is " +

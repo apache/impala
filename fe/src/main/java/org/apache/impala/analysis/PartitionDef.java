@@ -21,8 +21,8 @@ import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
@@ -81,7 +81,7 @@ public class PartitionDef implements ParseNode {
       location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
     }
 
-    Table table;
+    FeTable table;
     try {
       table = analyzer.getTable(partitionSpec_.getTableName(), Privilege.ALTER,
           false);
@@ -89,8 +89,8 @@ public class PartitionDef implements ParseNode {
       throw new AnalysisException(e.getMessage(), e);
     }
 
-    Preconditions.checkState(table instanceof HdfsTable);
-    HdfsTable hdfsTable = (HdfsTable)table;
+    Preconditions.checkState(table instanceof FeFsTable);
+    FeFsTable hdfsTable = (FeFsTable)table;
 
     boolean shouldCache;
     if (cacheOp_ != null) {

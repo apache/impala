@@ -18,8 +18,8 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.View;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
@@ -45,9 +45,9 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
     dbName_ = analyzer.getTargetDbName(tableName_);
     owner_ = analyzer.getUser().getName();
 
-    Table table = analyzer.getTable(tableName_, Privilege.ALTER);
+    FeTable table = analyzer.getTable(tableName_, Privilege.ALTER);
     Preconditions.checkNotNull(table);
-    if (!(table instanceof View)) {
+    if (!(table instanceof FeView)) {
       throw new AnalysisException(String.format(
           "ALTER VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
     }

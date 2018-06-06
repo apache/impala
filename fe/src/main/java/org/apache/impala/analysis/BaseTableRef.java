@@ -17,8 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
@@ -89,7 +89,7 @@ public class BaseTableRef extends TableRef {
    * Analyze the 'skip.header.line.count' property.
    */
   private void analyzeSkipHeaderLineCount() throws AnalysisException {
-    Table table = getTable();
+    FeTable table = getTable();
     if (!(table instanceof HdfsTable)) return;
     HdfsTable hdfsTable = (HdfsTable)table;
 

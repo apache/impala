@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -268,7 +268,7 @@ public class TableRef implements ParseNode {
     return null;
   }
 
-  public Table getTable() {
+  public FeTable getTable() {
     Preconditions.checkNotNull(resolvedPath_);
     return resolvedPath_.getRootTable();
   }

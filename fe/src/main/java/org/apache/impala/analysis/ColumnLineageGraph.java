@@ -32,8 +32,7 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.Id;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.thrift.TEdgeType;
@@ -688,7 +687,7 @@ public class ColumnLineageGraph {
     targetColumnLabels_.addAll(columnLabels);
   }
 
-  public void addTargetColumnLabels(Table dstTable) {
+  public void addTargetColumnLabels(FeTable dstTable) {
     Preconditions.checkNotNull(dstTable);
     String tblFullName = dstTable.getFullName();
     for (String columnName: dstTable.getColumnNames()) {

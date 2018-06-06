@@ -20,7 +20,7 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TFunctionCategory;
@@ -56,7 +56,7 @@ public class ShowCreateFunctionStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     functionName_.analyze(analyzer);
-    Db db = analyzer.getDb(functionName_.getDb(), Privilege.VIEW_METADATA);
+    FeDb db = analyzer.getDb(functionName_.getDb(), Privilege.VIEW_METADATA);
     List<Function> functions = db.getFunctions(category_, functionName_.getFunction());
     if (functions.isEmpty()) {
       throw new AnalysisException("Function " + functionName_.getFunction() + "() " +

@@ -18,7 +18,7 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDropDbParams;
 
@@ -64,7 +64,7 @@ public class DropDbStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    Db db = analyzer.getDb(dbName_, Privilege.DROP, false);
+    FeDb db = analyzer.getDb(dbName_, Privilege.DROP, false);
     if (db == null && !ifExists_) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName_);
     }

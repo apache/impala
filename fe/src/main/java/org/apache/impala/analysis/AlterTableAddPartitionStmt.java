@@ -21,8 +21,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Sets;
 
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TAlterTableAddPartitionParams;
@@ -83,7 +83,7 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    Table table = getTargetTable();
+    FeTable table = getTargetTable();
     if (table instanceof KuduTable) {
       throw new AnalysisException("ALTER TABLE ADD PARTITION is not supported for " +
           "Kudu tables: " + table.getTableName());

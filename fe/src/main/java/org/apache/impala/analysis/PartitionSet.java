@@ -22,8 +22,8 @@ import java.util.Set;
 
 import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.HdfsPartition;
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Reference;
@@ -44,13 +44,13 @@ public class PartitionSet extends PartitionSpecBase {
   private final List<Expr> partitionExprs_;
 
   // Result of analysis
-  private List<HdfsPartition> partitions_ = Lists.newArrayList();
+  private List<FeFsPartition> partitions_ = Lists.newArrayList();
 
   public PartitionSet(List<Expr> partitionExprs) {
     this.partitionExprs_ = ImmutableList.copyOf(partitionExprs);
   }
 
-  public List<HdfsPartition> getPartitions() { return partitions_; }
+  public List<FeFsPartition> getPartitions() { return partitions_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
@@ -107,7 +107,7 @@ public class PartitionSet extends PartitionSpecBase {
   // specified partition specs add IF EXISTS by setting partitionShouldExists_ to null.
   // The given conjuncts are assumed to only reference partition columns.
   private void addIfExists(
-      Analyzer analyzer, Table table, List<Expr> conjuncts) {
+      Analyzer analyzer, FeTable table, List<Expr> conjuncts) {
     boolean add = false;
     Set<String> partColNames = Sets.newHashSet();
     Reference<SlotRef> slotRef = new Reference<>();
@@ -173,7 +173,7 @@ public class PartitionSet extends PartitionSpecBase {
 
   public List<List<TPartitionKeyValue>> toThrift() {
     List<List<TPartitionKeyValue>> thriftPartitionSet = Lists.newArrayList();
-    for (HdfsPartition hdfsPartition : partitions_) {
+    for (FeFsPartition hdfsPartition : partitions_) {
       List<TPartitionKeyValue> thriftPartitionSpec = Lists.newArrayList();
       for (int i = 0; i < table_.getNumClusteringCols(); ++i) {
         String key = table_.getColumns().get(i).getName();

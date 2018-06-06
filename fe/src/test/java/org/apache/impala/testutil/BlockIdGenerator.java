@@ -28,11 +28,11 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 
 import org.apache.impala.catalog.Catalog;
-import org.apache.impala.catalog.Db;
-import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.util.PatternMatcher;
 
@@ -61,9 +61,9 @@ public class BlockIdGenerator {
 
       // Load all tables in the catalog
       Catalog catalog = CatalogServiceTestCatalog.create();
-      for (Db database: catalog.getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
+      for (FeDb database: catalog.getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
         for (String tableName: database.getAllTableNames()) {
-          Table table = database.getTable(tableName);
+          FeTable table = database.getTable(tableName);
           // Only do this for hdfs tables
           if (table == null || !(table instanceof HdfsTable)) {
             continue;
@@ -72,7 +72,7 @@ public class BlockIdGenerator {
 
           // Write the output as <tablename>: <blockid1> <blockid2> <etc>
           writer.write(tableName + ":");
-          for (HdfsPartition partition: hdfsTable.getPartitions()) {
+          for (FeFsPartition partition: hdfsTable.getPartitions()) {
             // Ignore the default partition.
             if (partition.getId() ==
                     ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {

@@ -59,7 +59,7 @@ import com.google.common.collect.Maps;
  * is more general than Hive's CLUSTER BY ... INTO BUCKETS clause (which partitions
  * a key range into a fixed number of buckets).
  */
-public abstract class Table extends CatalogObjectImpl {
+public abstract class Table extends CatalogObjectImpl implements FeTable {
   private static final Logger LOG = Logger.getLogger(Table.class);
   protected org.apache.hadoop.hive.metastore.api.Table msTable_;
   protected final Db db_;
@@ -128,7 +128,10 @@ public abstract class Table extends CatalogObjectImpl {
   public ReentrantLock getLock() { return tableLock_; }
   public abstract TTableDescriptor toThriftDescriptor(
       int tableId, Set<Long> referencedPartitions);
+
+  @Override // FeTable
   public abstract TCatalogObjectType getCatalogObjectType();
+
   public long getMetadataOpsCount() { return metadataOpsCount_.get(); }
   public long getEstimatedMetadataSize() { return estimatedMetadataSize_.get(); }
   public void setEstimatedMetadataSize(long estimatedMetadataSize) {
@@ -306,6 +309,7 @@ public abstract class Table extends CatalogObjectImpl {
     return newTable;
   }
 
+  @Override // FeTable
   public boolean isClusteringColumn(Column c) {
     return c.getPosition() < numClusteringCols_;
   }
@@ -431,20 +435,27 @@ public abstract class Table extends CatalogObjectImpl {
      return type;
    }
 
+  @Override // FeTable
   public Db getDb() { return db_; }
+
+  @Override // FeTable
   public String getName() { return name_; }
+
+  @Override // FeTable
   public String getFullName() { return (db_ != null ? db_.getName() + "." : "") + name_; }
+
+  @Override // FeTable
   public TableName getTableName() {
     return new TableName(db_ != null ? db_.getName() : null, name_);
   }
-  @Override
+
+  @Override // CatalogObject
   public String getUniqueName() { return "TABLE:" + getFullName(); }
 
+  @Override // FeTable
   public ArrayList<Column> getColumns() { return colsByPos_; }
 
-  /**
-   * Returns a list of the column names ordered by position.
-   */
+  @Override // FeTable
   public List<String> getColumnNames() { return Column.toColumnNames(colsByPos_); }
 
   /**
@@ -462,44 +473,31 @@ public abstract class Table extends CatalogObjectImpl {
    * Subclasses should override this if they provide a storage handler class. Currently
    * only HBase tables need to provide a storage handler.
    */
+  @Override // FeTable
   public String getStorageHandlerClassName() { return null; }
 
-  /**
-   * Returns an unmodifiable list of all columns, but with partition columns at the end of
-   * the list rather than the beginning. This is equivalent to the order in
-   * which Hive enumerates columns.
-   */
+  @Override // FeTable
   public List<Column> getColumnsInHiveOrder() {
     ArrayList<Column> columns = Lists.newArrayList(getNonClusteringColumns());
     columns.addAll(getClusteringColumns());
     return Collections.unmodifiableList(columns);
   }
 
-
-  /**
-   * Returns an unmodifiable list of all partition columns.
-   */
+  @Override // FeTable
   public List<Column> getClusteringColumns() {
     return Collections.unmodifiableList(colsByPos_.subList(0, numClusteringCols_));
   }
 
-  /**
-   * Returns an unmodifiable list of all columns excluding any partition columns.
-   */
+  @Override // FeTable
   public List<Column> getNonClusteringColumns() {
     return Collections.unmodifiableList(colsByPos_.subList(numClusteringCols_,
         colsByPos_.size()));
   }
 
-  /**
-   * Case-insensitive lookup. Returns null if the column with 'name' is not found.
-   */
+  @Override // FeTable
   public Column getColumn(String name) { return colsByName_.get(name.toLowerCase()); }
 
-  /**
-   * Returns the metastore.api.Table object this Table was created from. Returns null
-   * if the derived Table object was not created from a metastore Table (ex. InlineViews).
-   */
+  @Override // FeTable
   public org.apache.hadoop.hive.metastore.api.Table getMetaStoreTable() {
     return msTable_;
   }
@@ -508,6 +506,7 @@ public abstract class Table extends CatalogObjectImpl {
     msTable_ = msTbl;
   }
 
+  @Override // FeTable
   public int getNumClusteringCols() { return numClusteringCols_; }
 
   /**
@@ -520,8 +519,13 @@ public abstract class Table extends CatalogObjectImpl {
     numClusteringCols_ = n;
   }
 
+  @Override // FeTable
   public long getNumRows() { return tableStats_.num_rows; }
+
+  @Override // FeTable
   public TTableStats getTTableStats() { return tableStats_; }
+
+  @Override // FeTable
   public ArrayType getType() { return type_; }
 
   public static boolean isExternalTable(

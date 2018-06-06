@@ -20,10 +20,10 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
@@ -39,7 +39,7 @@ public class ShowStatsStmt extends StatementBase {
   protected final TableName tableName_;
 
   // Set during analysis.
-  protected Table table_;
+  protected FeTable table_;
 
   public ShowStatsStmt(TableName tableName, TShowStatsOp op) {
     op_ = Preconditions.checkNotNull(op);
@@ -75,11 +75,11 @@ public class ShowStatsStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     table_ = analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
     Preconditions.checkNotNull(table_);
-    if (table_ instanceof View) {
+    if (table_ instanceof FeView) {
       throw new AnalysisException(String.format(
           "%s not applicable to a view: %s", getSqlPrefix(), table_.getFullName()));
     }
-    if (table_ instanceof HdfsTable) {
+    if (table_ instanceof FeFsTable) {
       if (table_.getNumClusteringCols() == 0 && op_ == TShowStatsOp.PARTITIONS) {
         throw new AnalysisException("Table is not partitioned: " + table_.getFullName());
       }

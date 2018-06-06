@@ -28,7 +28,7 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.PrimitiveType;
@@ -267,7 +267,7 @@ public class MetadataOp {
     }
 
     ImpaladCatalog catalog = fe.getCatalog();
-    for (Db db: fe.getDbs(schemaPatternMatcher, user)) {
+    for (FeDb db: fe.getDbs(schemaPatternMatcher, user)) {
       if (fnPatternMatcher != PatternMatcher.MATCHER_MATCH_NONE) {
         // Get function metadata
         List<Function> fns = db.getFunctions(null, fnPatternMatcher);

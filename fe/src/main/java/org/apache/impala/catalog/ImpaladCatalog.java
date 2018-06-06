@@ -20,7 +20,6 @@ package org.apache.impala.catalog;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.fs.Path;
@@ -73,7 +72,7 @@ import com.google.common.base.Preconditions;
  * The CatalogServiceId is also tracked to detect if a different instance of the catalog
  * service has been started, in which case a full topic update is required.
  */
-public class ImpaladCatalog extends Catalog {
+public class ImpaladCatalog extends Catalog implements FeCatalog {
   private static final Logger LOG = Logger.getLogger(ImpaladCatalog.class);
   private static final TUniqueId INITIAL_CATALOG_SERVICE_ID = new TUniqueId(0L, 0L);
   public static final String BUILTINS_DB = "_impala_builtins";
@@ -222,19 +221,12 @@ public class ImpaladCatalog extends Catalog {
   }
 
 
-  /**
-   * Issues a load request to the catalogd for the given tables.
-   */
+  @Override // FeCatalog
   public void prioritizeLoad(Set<TableName> tableNames) throws InternalException {
     FeSupport.PrioritizeLoad(tableNames);
   }
 
-  /**
-   * Causes the calling thread to wait until a catalog update notification has been sent
-   * or the given timeout has been reached. A timeout value of 0 indicates an indefinite
-   * wait. Does not protect against spurious wakeups, so this should be called in a loop.
-   *
-   */
+  @Override // FeCatalog
   public void waitForCatalogUpdate(long timeoutMs) {
     synchronized (catalogUpdateEventNotifier_) {
       try {
@@ -246,15 +238,7 @@ public class ImpaladCatalog extends Catalog {
   }
 
 
-  /**
-   * Returns the HDFS path where the metastore would create the given table. If the table
-   * has a "location" set, that will be returned. Otherwise the path will be resolved
-   * based on the location of the parent database. The metastore folder hierarchy is:
-   * <warehouse directory>/<db name>.db/<table name>
-   * Except for items in the default database which will be:
-   * <warehouse directory>/<table name>
-   * This method handles both of these cases.
-   */
+  @Override // FeCatalog
   public Path getTablePath(org.apache.hadoop.hive.metastore.api.Table msTbl)
       throws TException {
     try (MetaStoreClient msClient = getMetaStoreClient()) {
@@ -510,23 +494,22 @@ public class ImpaladCatalog extends Catalog {
     }
   }
 
-  /**
-   * Returns true if the ImpaladCatalog is ready to accept requests (has
-   * received and processed a valid catalog topic update from the StateStore),
-   * false otherwise.
-   */
+  @Override // FeCatalog
   public boolean isReady() {
     return lastSyncedCatalogVersion_.get() > INITIAL_CATALOG_VERSION;
   }
 
   // Only used for testing.
+  @Override // FeCatalog
   public void setIsReady(boolean isReady) {
     lastSyncedCatalogVersion_.incrementAndGet();
     synchronized (catalogUpdateEventNotifier_) {
       catalogUpdateEventNotifier_.notifyAll();
     }
   }
+  @Override // FeCatalog
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
+  @Override // FeCatalog
   public String getDefaultKuduMasterHosts() { return defaultKuduMasterHosts_; }
 
   private void LibCacheSetNeedsRefresh(String hdfsLocation) {
@@ -539,6 +522,8 @@ public class ImpaladCatalog extends Catalog {
       LOG.error("LibCacheRemoveEntry(" + hdfsLibFile + ") failed.");
     }
   }
+
+  @Override
   public TUniqueId getCatalogServiceId() { return catalogServiceId_; }
 
   public static Db getBuiltinsDb() { return builtinsDb_; }

@@ -19,7 +19,7 @@
 package org.apache.impala.planner;
 
 import org.apache.impala.analysis.DescriptorTable;
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
@@ -32,7 +32,7 @@ import org.apache.impala.thrift.TTableSinkType;
  * data from a plan fragment into an HBase table using HTable.
  */
 public class HBaseTableSink extends TableSink {
-  public HBaseTableSink(Table targetTable) {
+  public HBaseTableSink(FeTable targetTable) {
     super(targetTable, Op.INSERT);
   }
 

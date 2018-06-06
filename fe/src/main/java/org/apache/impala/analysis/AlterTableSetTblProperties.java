@@ -26,6 +26,8 @@ import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
@@ -177,10 +179,10 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
    * null, then the method ensures that 'skip.header.line.count' is supported for its
    * table type. If it is null, then this check is omitted.
    */
-  public static void analyzeSkipHeaderLineCount(Table table,
+  public static void analyzeSkipHeaderLineCount(FeTable table,
       Map<String, String> tblProperties) throws AnalysisException {
     if (tblProperties.containsKey(HdfsTable.TBL_PROP_SKIP_HEADER_LINE_COUNT)) {
-      if (table != null && !(table instanceof HdfsTable)) {
+      if (table != null && !(table instanceof FeFsTable)) {
         throw new AnalysisException(String.format("Table property " +
             "'skip.header.line.count' is only supported for HDFS tables."));
       }
@@ -198,7 +200,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
    * Returns a list of positions of the sort columns within the table's list of
    * columns.
    */
-  public static List<Integer> analyzeSortColumns(Table table,
+  public static List<Integer> analyzeSortColumns(FeTable table,
       Map<String, String> tblProperties) throws AnalysisException {
     if (!tblProperties.containsKey(
         AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS)) {

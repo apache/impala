@@ -18,8 +18,8 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 
 /**
@@ -39,7 +39,7 @@ public class AlterTableSetStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    Table t = getTargetTable();
+    FeTable t = getTargetTable();
     // TODO: Support ALTER TABLE SET on HBase tables. Requires validating changes
     // to the SERDEPROPERTIES and TBLPROPERTIES to ensure the table metadata does not
     // become invalid.

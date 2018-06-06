@@ -20,9 +20,9 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.TableLoadingException;
-import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -96,13 +96,13 @@ public class DropTableOrViewStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     dbName_ = analyzer.getTargetDbName(tableName_);
     try {
-      Table table = analyzer.getTable(tableName_, Privilege.DROP, true);
+      FeTable table = analyzer.getTable(tableName_, Privilege.DROP, true);
       Preconditions.checkNotNull(table);
-      if (table instanceof View && dropTable_) {
+      if (table instanceof FeView && dropTable_) {
         throw new AnalysisException(String.format(
             "DROP TABLE not allowed on a view: %s.%s", dbName_, getTbl()));
       }
-      if (!(table instanceof View) && !dropTable_) {
+      if (!(table instanceof FeView) && !dropTable_) {
         throw new AnalysisException(String.format(
             "DROP VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
       }
