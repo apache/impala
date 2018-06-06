@@ -429,7 +429,7 @@ if __name__ == "__main__":
       "flatbuffers", "gcc", "gflags", "glog", "gperftools", "gtest", "libev", "libunwind",
       "lz4", "openldap", "openssl", "orc", "protobuf",
       "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib"])
-  packages.insert(0, Package("llvm", "5.0.1-asserts"))
+  packages.insert(0, Package("llvm", "5.0.1-asserts-p1"))
   bootstrap(toolchain_root, packages)
 
   # Download the CDH components if necessary.
