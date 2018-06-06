@@ -602,13 +602,6 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
 
           <li>
             <p>
-              Each kind of struct has a <codeph>null()</codeph> member function that returns an instance of the
-              struct with the <codeph>is_null</codeph> flag set.
-            </p>
-          </li>
-
-          <li>
-            <p>
               Impala cannot process UDFs that accept composite or nested types
               as arguments or return them as result values. This limitation
               applies both to Impala UDFs written in C++ and Java-based Hive
