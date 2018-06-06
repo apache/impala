@@ -27,11 +27,11 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
@@ -51,7 +51,7 @@ public class DescribeResultFactory {
   // Empty column used to format description output table.
   private final static TColumnValue EMPTY = new TColumnValue().setString_val("");
 
-  public static TDescribeResult buildDescribeDbResult(Db db,
+  public static TDescribeResult buildDescribeDbResult(FeDb db,
     TDescribeOutputStyle outputFormat) {
     switch (outputFormat) {
       case MINIMAL: return describeDbMinimal(db);
@@ -67,7 +67,7 @@ public class DescribeResultFactory {
    * Builds results for a DESCRIBE DATABASE <db> command. This consists of the database
    * location and comment.
    */
-  private static TDescribeResult describeDbMinimal(Db db) {
+  private static TDescribeResult describeDbMinimal(FeDb db) {
     TDescribeResult descResult = new TDescribeResult();
 
     org.apache.hadoop.hive.metastore.api.Database msDb = db.getMetaStoreDb();
@@ -122,7 +122,7 @@ public class DescribeResultFactory {
    * Builds a TDescribeResult that contains the result of a DESCRIBE FORMATTED|EXTENDED
    * DATABASE <db> command. Output all the database's properties.
    */
-  private static TDescribeResult describeDbExtended(Db db) {
+  private static TDescribeResult describeDbExtended(FeDb db) {
     TDescribeResult descResult = describeDbMinimal(db);
     org.apache.hadoop.hive.metastore.api.Database msDb = db.getMetaStoreDb();
     String ownerName = null;
@@ -184,7 +184,7 @@ public class DescribeResultFactory {
    * Hive's MetadataFormatUtils class is used to build the results.  filteredColumns is a
    * list of columns the user is authorized to view.
    */
-  public static TDescribeResult buildDescribeFormattedResult(Table table,
+  public static TDescribeResult buildDescribeFormattedResult(FeTable table,
       List<Column> filteredColumns) {
     TDescribeResult result = new TDescribeResult();
     result.results = Lists.newArrayList();

@@ -76,17 +76,16 @@ import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DatabaseNotFoundException;
-import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
@@ -146,6 +145,7 @@ import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
@@ -163,39 +163,53 @@ public class Frontend {
   // Max time to wait for a catalog update notification.
   public static final long MAX_CATALOG_UPDATE_WAIT_TIME_MS = 2 * 1000;
 
-  //TODO: Make the reload interval configurable.
+  // TODO: Make the reload interval configurable.
   private static final int AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS = 5 * 60;
 
-  private final AtomicReference<ImpaladCatalog> impaladCatalog_ =
-      new AtomicReference<ImpaladCatalog>();
+  private final FeCatalogManager catalogManager_;
   private final AuthorizationConfig authzConfig_;
-  private final AtomicReference<AuthorizationChecker> authzChecker_;
+  /**
+   * Authorization checker. Initialized and periodically loaded by a task
+   * running on the {@link #policyReader_} thread.
+   */
+  private final AtomicReference<AuthorizationChecker> authzChecker_ =
+      new AtomicReference<>();
   private final ScheduledExecutorService policyReader_ =
       Executors.newScheduledThreadPool(1);
-  private final String defaultKuduMasterHosts_;
 
-  public Frontend(AuthorizationConfig authorizationConfig,
-      String defaultKuduMasterHosts) {
-    this(authorizationConfig, new ImpaladCatalog(defaultKuduMasterHosts));
+  public Frontend(AuthorizationConfig authorizationConfig) {
+    this(authorizationConfig, FeCatalogManager.createFromBackendConfig());
   }
 
   /**
-   * C'tor used by tests to pass in a custom ImpaladCatalog.
+   * Create a frontend with a specific catalog instance which will not allow
+   * updates and will be used for all requests.
    */
-  public Frontend(AuthorizationConfig authorizationConfig, ImpaladCatalog catalog) {
+  @VisibleForTesting
+  public Frontend(AuthorizationConfig authorizationConfig,
+      FeCatalog testCatalog) {
+    this(authorizationConfig, FeCatalogManager.createForTests(testCatalog));
+  }
+
+  private Frontend(AuthorizationConfig authorizationConfig,
+      FeCatalogManager catalogManager) {
     authzConfig_ = authorizationConfig;
-    impaladCatalog_.set(catalog);
-    defaultKuduMasterHosts_ = catalog.getDefaultKuduMasterHosts();
-    authzChecker_ = new AtomicReference<AuthorizationChecker>(
-        new AuthorizationChecker(authzConfig_, impaladCatalog_.get().getAuthPolicy()));
+    catalogManager_ = catalogManager;
+
+    // Load the authorization policy once at startup, initializing
+    // authzChecker_. This ensures that, if the policy fails to load,
+    // we will throw an exception and fail to start.
+    AuthorizationPolicyReader policyReaderTask =
+        new AuthorizationPolicyReader(authzConfig_);
+    policyReaderTask.run();
+
     // If authorization is enabled, reload the policy on a regular basis.
     if (authzConfig_.isEnabled() && authzConfig_.isFileBasedPolicy()) {
       // Stagger the reads across nodes
       Random randomGen = new Random(UUID.randomUUID().hashCode());
       int delay = AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS + randomGen.nextInt(60);
 
-      policyReader_.scheduleAtFixedRate(
-          new AuthorizationPolicyReader(authzConfig_),
+      policyReader_.scheduleAtFixedRate(policyReaderTask,
           delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
     }
   }
@@ -222,26 +236,16 @@ public class Frontend {
     }
   }
 
-  public ImpaladCatalog getCatalog() { return impaladCatalog_.get(); }
+  public FeCatalog getCatalog() { return catalogManager_.getOrCreateCatalog(); }
+
   public AuthorizationChecker getAuthzChecker() { return authzChecker_.get(); }
 
   public TUpdateCatalogCacheResponse updateCatalogCache(
       TUpdateCatalogCacheRequest req) throws CatalogException, TException {
-    if (req.is_delta) return impaladCatalog_.get().updateCatalog(req);
-
-    // If this is not a delta, this update should replace the current
-    // Catalog contents so create a new catalog and populate it.
-    ImpaladCatalog catalog = new ImpaladCatalog(defaultKuduMasterHosts_);
-
-    TUpdateCatalogCacheResponse response = catalog.updateCatalog(req);
-
-    // Now that the catalog has been updated, replace the references to
-    // impaladCatalog_/authzChecker_. This ensures that clients don't see the catalog
-    // disappear. The catalog is guaranteed to be ready since updateCatalog() has a
-    // postcondition of isReady() == true.
-    impaladCatalog_.set(catalog);
-    authzChecker_.set(new AuthorizationChecker(authzConfig_, catalog.getAuthPolicy()));
-    return response;
+    TUpdateCatalogCacheResponse resp = catalogManager_.updateCatalogCache(req);
+    authzChecker_.set(new AuthorizationChecker(
+        authzConfig_, getCatalog().getAuthPolicy()));
+    return resp;
   }
 
   /**
@@ -555,7 +559,7 @@ public class Frontend {
     // Get the destination for the load. If the load is targeting a partition,
     // this the partition location. Otherwise this is the table location.
     String destPathString = null;
-    ImpaladCatalog catalog = impaladCatalog_.get();
+    FeCatalog catalog = getCatalog();
     if (request.isSetPartition_spec()) {
       destPathString = catalog.getHdfsPartition(tableName.getDb(),
           tableName.getTbl(), request.getPartition_spec()).getLocation();
@@ -616,7 +620,7 @@ public class Frontend {
    */
   public List<String> getTableNames(String dbName, PatternMatcher matcher,
       User user) throws ImpalaException {
-    List<String> tblNames = impaladCatalog_.get().getTableNames(dbName, matcher);
+    List<String> tblNames = getCatalog().getTableNames(dbName, matcher);
     if (authzConfig_.isEnabled()) {
       Iterator<String> iter = tblNames.iterator();
       while (iter.hasNext()) {
@@ -635,7 +639,7 @@ public class Frontend {
    * Returns a list of columns of a table using 'matcher' and are accessible
    * to the given user.
    */
-  public List<Column> getColumns(Table table, PatternMatcher matcher,
+  public List<Column> getColumns(FeTable table, PatternMatcher matcher,
       User user) throws InternalException {
     Preconditions.checkNotNull(table);
     Preconditions.checkNotNull(matcher);
@@ -660,7 +664,7 @@ public class Frontend {
    */
   public List<? extends FeDb> getDbs(PatternMatcher matcher, User user)
       throws InternalException {
-    List<? extends FeDb> dbs = impaladCatalog_.get().getDbs(matcher);
+    List<? extends FeDb> dbs = getCatalog().getDbs(matcher);
     // If authorization is enabled, filter out the databases the user does not
     // have permissions on.
     if (authzConfig_.isEnabled()) {
@@ -692,7 +696,7 @@ public class Frontend {
    * matches all data sources.
    */
   public List<? extends FeDataSource> getDataSrcs(String pattern) {
-    return impaladCatalog_.get().getDataSources(
+    return getCatalog().getDataSources(
         PatternMatcher.createHivePatternMatcher(pattern));
   }
 
@@ -701,7 +705,7 @@ public class Frontend {
    */
   public TResultSet getColumnStats(String dbName, String tableName)
       throws ImpalaException {
-    Table table = impaladCatalog_.get().getTable(dbName, tableName);
+    FeTable table = getCatalog().getTable(dbName, tableName);
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
     result.setSchema(resultSchema);
@@ -729,7 +733,7 @@ public class Frontend {
    */
   public TResultSet getTableStats(String dbName, String tableName, TShowStatsOp op)
       throws ImpalaException {
-    Table table = impaladCatalog_.get().getTable(dbName, tableName);
+    FeTable table = getCatalog().getTable(dbName, tableName);
     if (table instanceof FeFsTable) {
       return ((FeFsTable) table).getTableStats();
     } else if (table instanceof HBaseTable) {
@@ -755,7 +759,7 @@ public class Frontend {
   public List<Function> getFunctions(TFunctionCategory category,
       String dbName, String fnPattern, boolean exactMatch)
       throws DatabaseNotFoundException {
-    Db db = impaladCatalog_.get().getDb(dbName);
+    FeDb db = getCatalog().getDb(dbName);
     if (db == null) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
@@ -783,7 +787,7 @@ public class Frontend {
    */
   public TDescribeResult describeDb(String dbName, TDescribeOutputStyle outputStyle)
       throws ImpalaException {
-    Db db = impaladCatalog_.get().getDb(dbName);
+    FeDb db = getCatalog().getDb(dbName);
     return DescribeResultFactory.buildDescribeDbResult(db, outputStyle);
   }
 
@@ -794,7 +798,7 @@ public class Frontend {
    */
   public TDescribeResult describeTable(TTableName tableName,
       TDescribeOutputStyle outputStyle, User user) throws ImpalaException {
-    Table table = impaladCatalog_.get().getTable(tableName.db_name, tableName.table_name);
+    FeTable table = getCatalog().getTable(tableName.db_name, tableName.table_name);
     List<Column> filteredColumns;
     if (authzConfig_.isEnabled()) {
       // First run a table check
@@ -1120,14 +1124,14 @@ public class Frontend {
 
       // create finalization params of insert stmt
       InsertStmt insertStmt = analysisResult.getInsertStmt();
-      if (insertStmt.getTargetTable() instanceof HdfsTable) {
+      if (insertStmt.getTargetTable() instanceof FeFsTable) {
         TFinalizeParams finalizeParams = new TFinalizeParams();
         finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
         finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
         finalizeParams.setTable_id(DescriptorTable.TABLE_SINK_ID);
         String db = insertStmt.getTargetTableName().getDb();
         finalizeParams.setTable_db(db == null ? queryCtx.session.database : db);
-        HdfsTable hdfsTable = (HdfsTable) insertStmt.getTargetTable();
+        FeFsTable hdfsTable = (FeFsTable) insertStmt.getTargetTable();
         finalizeParams.setHdfs_base_dir(hdfsTable.getHdfsBaseDir());
         finalizeParams.setStaging_dir(
             hdfsTable.getHdfsBaseDir() + "/_impala_insert_staging");
@@ -1208,10 +1212,10 @@ public class Frontend {
    */
   public TResultSet getTableFiles(TShowFilesParams request)
       throws ImpalaException{
-    Table table = impaladCatalog_.get().getTable(request.getTable_name().getDb_name(),
+    FeTable table = getCatalog().getTable(request.getTable_name().getDb_name(),
         request.getTable_name().getTable_name());
-    if (table instanceof HdfsTable) {
-      return ((HdfsTable) table).getFiles(request.getPartition_set());
+    if (table instanceof FeFsTable) {
+      return ((FeFsTable) table).getFiles(request.getPartition_set());
     } else {
       throw new InternalException("SHOW FILES only supports Hdfs table. " +
           "Unsupported table class: " + table.getClass());

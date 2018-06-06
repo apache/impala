@@ -77,4 +77,6 @@ struct TBackendGflags {
   25: required bool enable_orc_scanner
 
   26: required string authorized_proxy_group_config
+
+  27: required bool use_local_catalog
 }

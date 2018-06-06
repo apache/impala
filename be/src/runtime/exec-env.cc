@@ -84,6 +84,10 @@ DEFINE_bool(disable_admission_control, false, "Disables admission control.");
 DEFINE_bool(use_krpc, true, "If true, use KRPC for the DataStream subsystem. "
     "Otherwise use Thrift RPC.");
 
+DEFINE_bool_hidden(use_local_catalog, false,
+  "Use experimental implementation of a local catalog. If this is set, "
+  "the catalog service is not used and does not need to be started.");
+
 DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);
 DECLARE_int32(num_cores);
