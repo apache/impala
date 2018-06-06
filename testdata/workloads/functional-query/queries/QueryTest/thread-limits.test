@@ -102,3 +102,23 @@ BIGINT
 ---- RESULTS
 7300
 ====
+---- QUERY
+# Default value should prevent crazy queries from running.
+# The below query should have > 3000 required threads per backend.
+set mt_dop=3;
+with
+ c1 as (select count(*) from functional.alltypes),
+ c2 as (select * from c1 union select * from c1),
+ c4 as (select * from c2 union select * from c2),
+ c8 as (select * from c4 union select * from c4),
+ c16 as (select * from c8 union select * from c8),
+ c32 as (select * from c16 union select * from c16),
+ c64 as (select * from c32 union select * from c32),
+ c128 as (select * from c64 union select * from c64),
+ c256 as (select * from c128 union select * from c128),
+ c512 as (select * from c256 union select * from c256)
+select * from c512 union select * from c512;
+---- CATCH
+row_regex:.*Rejected query from pool default-pool: thread reservation on backend '.*'
+ is greater than the THREAD_RESERVATION_LIMIT query option value: [0-9]* > 3000\.
+====
