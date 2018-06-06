@@ -332,7 +332,7 @@ public abstract class Catalog {
    * The results are sorted in String.CASE_INSENSITIVE_ORDER.
    * matcher must not be null.
    */
-  private List<String> filterStringsByPattern(Iterable<String> candidates,
+  public static List<String> filterStringsByPattern(Iterable<String> candidates,
       PatternMatcher matcher) {
     Preconditions.checkNotNull(matcher);
     List<String> filtered = Lists.newArrayList();
@@ -343,9 +343,9 @@ public abstract class Catalog {
     return filtered;
   }
 
-  private static class CatalogObjectOrder implements Comparator<CatalogObject> {
+  private static class CatalogObjectOrder implements Comparator<HasName> {
     @Override
-    public int compare(CatalogObject o1, CatalogObject o2) {
+    public int compare(HasName o1, HasName o2) {
       return String.CASE_INSENSITIVE_ORDER.compare(o1.getName(), o2.getName());
     }
   }
@@ -357,7 +357,7 @@ public abstract class Catalog {
    * The results are sorted in CATALOG_OBJECT_ORDER.
    * matcher must not be null.
    */
-  private <T extends CatalogObject> List<T> filterCatalogObjectsByPattern(
+  public static <T extends HasName> List<T> filterCatalogObjectsByPattern(
       Iterable<? extends T> candidates, PatternMatcher matcher) {
     Preconditions.checkNotNull(matcher);
     List<T> filtered = Lists.newArrayList();

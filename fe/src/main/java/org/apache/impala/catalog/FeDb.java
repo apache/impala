@@ -26,10 +26,11 @@ import org.apache.impala.util.PatternMatcher;
 /**
  * Frontend interface for interacting with a database.
  */
-public interface FeDb {
+public interface FeDb extends HasName {
   /**
    * @return the name of the database
    */
+  @Override
   String getName();
 
   /**
