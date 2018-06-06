@@ -291,7 +291,10 @@ struct TQueryOptions {
   65: optional i64 max_mem_estimate_for_admission = 0;
 
   // See comment in ImpalaService.thrift.
-  66: optional i32 thread_reservation_limit = 0;
+  // The default values is set fairly high based on empirical data - queries with up to
+  // this number of reserved threads have run successfully as part of production
+  // workloads but with very degraded performance.
+  66: optional i32 thread_reservation_limit = 3000;
 
   // See comment in ImpalaService.thrift.
   67: optional i32 thread_reservation_aggregate_limit = 0;
