@@ -168,6 +168,8 @@ class LocalDb implements FeDb {
 
   @Override
   public TDatabase toThrift() {
-    throw new UnsupportedOperationException("TODO");
+    TDatabase tdb = new TDatabase(name_);
+    tdb.setMetastore_db(getMetaStoreDb());
+    return tdb;
   }
 }

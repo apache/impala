@@ -28,12 +28,12 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
-import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TColumn;
@@ -266,7 +266,7 @@ public class MetadataOp {
       return result;
     }
 
-    ImpaladCatalog catalog = fe.getCatalog();
+    FeCatalog catalog = fe.getCatalog();
     for (FeDb db: fe.getDbs(schemaPatternMatcher, user)) {
       if (fnPatternMatcher != PatternMatcher.MATCHER_MATCH_NONE) {
         // Get function metadata
@@ -279,7 +279,7 @@ public class MetadataOp {
         List<String> tableComments = Lists.newArrayList();
         List<String> tableTypes = Lists.newArrayList();
         for (String tabName: fe.getTableNames(db.getName(), tablePatternMatcher, user)) {
-          Table table = catalog.getTable(db.getName(), tabName);
+          FeTable table = catalog.getTable(db.getName(), tabName);
           if (table == null) continue;
 
           String comment = null;

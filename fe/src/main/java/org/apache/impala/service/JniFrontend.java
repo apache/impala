@@ -148,7 +148,7 @@ public class JniFrontend {
     }
     LOG.info(JniUtil.getJavaVersion());
 
-    frontend_ = new Frontend(authConfig, cfg.kudu_master_hosts);
+    frontend_ = new Frontend(authConfig);
   }
 
   /**

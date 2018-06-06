@@ -68,6 +68,11 @@ public class LocalCatalog implements FeCatalog {
   private Map<String, FeDb> dbs_ = Maps.newHashMap();
   private static final Db builtinsDb_ = new BuiltinsDb(ImpaladCatalog.BUILTINS_DB);
 
+  public static FeCatalog create(String defaultKuduMasterHosts) {
+    // TODO(todd): store the kudu master hosts
+    return new LocalCatalog(new DirectMetaProvider());
+  }
+
   public LocalCatalog(MetaProvider metaProvider) {
     metaProvider_ = Preconditions.checkNotNull(metaProvider);
   }
@@ -187,7 +192,7 @@ public class LocalCatalog implements FeCatalog {
 
   @Override
   public AuthorizationPolicy getAuthPolicy() {
-    throw new UnsupportedOperationException("TODO");
+    return null; // TODO(todd): implement auth policy
   }
 
   @Override
