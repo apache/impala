@@ -54,4 +54,12 @@ fi
 export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/share/clang\
 :${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin/\
 :$PATH"
-run-clang-tidy.py -header-filter "${PIPE_DIRS%?}" -j"${CORES}" ${DIRS}
+TMP_STDERR=$(mktemp)
+trap "rm $TMP_STDERR" EXIT
+if ! run-clang-tidy.py -quiet -header-filter "${PIPE_DIRS%?}" \
+                       -j"${CORES}" ${DIRS} 2> ${TMP_STDERR};
+then
+  echo "run-clang-tidy.py hit an error, dumping stderr output"
+  cat ${TMP_STDERR} >&2
+  exit 1
+fi
