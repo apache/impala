@@ -53,7 +53,7 @@ import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.analysis.UnionStmt;
 import org.apache.impala.analysis.UnionStmt.UnionOperand;
 import org.apache.impala.catalog.ColumnStats;
-import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
@@ -1305,7 +1305,7 @@ public class SingleNodePlanner {
     FeTable table = tblRef.getTable();
     if (table instanceof FeFsTable) {
       return createHdfsScanPlan(tblRef, aggInfo, conjuncts, analyzer);
-    } else if (table instanceof DataSourceTable) {
+    } else if (table instanceof FeDataSourceTable) {
       scanNode = new DataSourceScanNode(ctx_.getNextNodeId(), tblRef.getDesc(),
           conjuncts);
       scanNode.init(analyzer);

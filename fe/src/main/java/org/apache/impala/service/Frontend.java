@@ -75,10 +75,10 @@ import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.DataSource;
-import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDataSource;
+import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.Function;
@@ -691,7 +691,7 @@ public class Frontend {
    * Returns all data sources that match the pattern. If pattern is null,
    * matches all data sources.
    */
-  public List<DataSource> getDataSrcs(String pattern) {
+  public List<? extends FeDataSource> getDataSrcs(String pattern) {
     return impaladCatalog_.get().getDataSources(
         PatternMatcher.createHivePatternMatcher(pattern));
   }
@@ -734,8 +734,8 @@ public class Frontend {
       return ((FeFsTable) table).getTableStats();
     } else if (table instanceof HBaseTable) {
       return ((HBaseTable) table).getTableStats();
-    } else if (table instanceof DataSourceTable) {
-      return ((DataSourceTable) table).getTableStats();
+    } else if (table instanceof FeDataSourceTable) {
+      return ((FeDataSourceTable) table).getTableStats();
     } else if (table instanceof KuduTable) {
       if (op == TShowStatsOp.RANGE_PARTITIONS) {
         return ((KuduTable) table).getRangePartitions();

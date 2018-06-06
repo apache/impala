@@ -46,6 +46,7 @@ import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.DataSource;
+import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Role;
@@ -319,12 +320,12 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, thriftParams);
 
     TGetDataSrcsResult result = new TGetDataSrcsResult();
-    List<DataSource> dataSources = frontend_.getDataSrcs(params.pattern);
+    List<? extends FeDataSource> dataSources = frontend_.getDataSrcs(params.pattern);
     result.setData_src_names(Lists.<String>newArrayListWithCapacity(dataSources.size()));
     result.setLocations(Lists.<String>newArrayListWithCapacity(dataSources.size()));
     result.setClass_names(Lists.<String>newArrayListWithCapacity(dataSources.size()));
     result.setApi_versions(Lists.<String>newArrayListWithCapacity(dataSources.size()));
-    for (DataSource dataSource: dataSources) {
+    for (FeDataSource dataSource: dataSources) {
       result.addToData_src_names(dataSource.getName());
       result.addToLocations(dataSource.getLocation());
       result.addToClass_names(dataSource.getClassName());

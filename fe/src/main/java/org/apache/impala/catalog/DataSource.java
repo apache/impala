@@ -17,8 +17,6 @@
 
 package org.apache.impala.catalog;
 
-import org.apache.hadoop.fs.Path;
-
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDataSource;
@@ -28,7 +26,7 @@ import com.google.common.base.Objects;
  * Represents a data source in the catalog. Contains the data source name and all
  * information needed to locate and load the data source.
  */
-public class DataSource extends CatalogObjectImpl {
+public class DataSource extends CatalogObjectImpl implements FeDataSource {
   private final String dataSrcName_;
   private final String className_;
   private final String apiVersionString_;
@@ -57,9 +55,11 @@ public class DataSource extends CatalogObjectImpl {
   public String getName() { return dataSrcName_; }
   @Override
   public String getUniqueName() { return "DATA_SOURCE:" + dataSrcName_.toLowerCase(); }
-
+  @Override // FeDataSource
   public String getLocation() { return location_; }
+  @Override // FeDataSource
   public String getClassName() { return className_; }
+  @Override // FeDataSource
   public String getApiVersion() { return apiVersionString_; }
 
   public TDataSource toThrift() {

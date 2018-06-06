@@ -33,7 +33,7 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.DataSource;
-import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.extdatasource.ExternalDataSourceExecutor;
@@ -69,7 +69,7 @@ import com.google.common.collect.Lists;
 public class DataSourceScanNode extends ScanNode {
   private final static Logger LOG = LoggerFactory.getLogger(DataSourceScanNode.class);
   private final TupleDescriptor desc_;
-  private final DataSourceTable table_;
+  private final FeDataSourceTable table_;
 
   // The converted conjuncts_ that were accepted by the data source. A conjunct can
   // be converted if it contains only disjunctive predicates of the form
@@ -87,7 +87,7 @@ public class DataSourceScanNode extends ScanNode {
   public DataSourceScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts) {
     super(id, desc, "SCAN DATA SOURCE");
     desc_ = desc;
-    table_ = (DataSourceTable) desc_.getTable();
+    table_ = (FeDataSourceTable) desc_.getTable();
     conjuncts_ = conjuncts;
     acceptedPredicates_ = null;
     acceptedConjuncts_ = null;

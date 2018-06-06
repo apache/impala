@@ -24,8 +24,8 @@ import static org.apache.impala.catalog.DataSourceTable.TBL_PROP_INIT_STRING;
 import static org.apache.impala.catalog.DataSourceTable.TBL_PROP_LOCATION;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -51,7 +51,7 @@ public class CreateTableDataSrcStmt extends CreateTableStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     String dataSourceName = getTblProperties().get(TBL_PROP_DATA_SRC_NAME);
-    DataSource dataSource = analyzer.getCatalog().getDataSource(dataSourceName);
+    FeDataSource dataSource = analyzer.getCatalog().getDataSource(dataSourceName);
     if (dataSource == null) {
       throw new AnalysisException("Data source does not exist: " + dataSourceName);
     }
