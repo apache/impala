@@ -177,7 +177,8 @@ class TestCancellation(ImpalaTestSuite):
         # rpc occured before the fetch rpc).
         if thread.fetch_results_error is not None:
           assert 'Cancelled' in str(thread.fetch_results_error) or \
-            ('Invalid query handle' in str(thread.fetch_results_error) \
+            (('Invalid query handle' in str(thread.fetch_results_error) or
+              'Default TException' in str(thread.fetch_results_error))
              and not join_before_close)
       else:
         # If the close rpc encountered an exception, then it must be due to fetch
