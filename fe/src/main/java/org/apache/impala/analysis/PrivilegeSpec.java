@@ -20,7 +20,7 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.RolePrivilege;
@@ -242,7 +242,7 @@ public class PrivilegeSpec implements ParseNode {
       throw new AnalysisException("Column-level privileges on views are not " +
           "supported.");
     }
-    if (table instanceof DataSourceTable) {
+    if (table instanceof FeDataSourceTable) {
       throw new AnalysisException("Column-level privileges on external data " +
           "source tables are not supported.");
     }

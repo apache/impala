@@ -56,11 +56,10 @@ public interface FeCatalog {
       List<TPartitionKeyValue> partition_spec) throws CatalogException;
 
   /** @see Catalog#getDataSources(PatternMatcher) */
-  List<DataSource> getDataSources(PatternMatcher createHivePatternMatcher);
+  List<? extends FeDataSource> getDataSources(PatternMatcher createHivePatternMatcher);
 
   /** @see Catalog#getDataSource(String) */
-  // TODO(todd): introduce FeDataSource
-  public DataSource getDataSource(String dataSourceName);
+  public FeDataSource getDataSource(String dataSourceName);
 
   /** @see Catalog#getFunction(Function, Function.CompareMode) */
   // TODO(todd): introduce FeFunction

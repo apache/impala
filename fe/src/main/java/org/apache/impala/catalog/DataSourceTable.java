@@ -39,14 +39,14 @@ import org.apache.impala.util.TResultRowBuilder;
 import com.google.common.base.Preconditions;
 
 /**
- * Represents a table backed by an external data source. All data source properties are
- * stored as table properties (persisted in the metastore) because the DataSource catalog
- * object is not persisted so the DataSource catalog object will not exist if the catalog
- * server is restarted, but the table does not need the DataSource catalog object in
- * order to scan the table. Tables that contain the TBL_PROP_DATA_SRC_NAME table
- * parameter are assumed to be backed by an external data source.
+ * All data source properties are stored as table properties (persisted in the
+ * metastore) because the DataSource catalog object is not persisted so the
+ * DataSource catalog object will not exist if the catalog server is restarted,
+ * but the table does not need the DataSource catalog object in order to scan
+ * the table. Tables that contain the TBL_PROP_DATA_SRC_NAME table parameter are
+ * assumed to be backed by an external data source.
  */
-public class DataSourceTable extends Table {
+public class DataSourceTable extends Table implements FeDataSourceTable {
   private final static Logger LOG = LoggerFactory.getLogger(DataSourceTable.class);
 
   /**
@@ -85,13 +85,16 @@ public class DataSourceTable extends Table {
   /**
    * Gets the the data source.
    */
+  @Override // FeDataSourceTable
   public TDataSource getDataSource() { return dataSource_; }
 
   /**
    * Gets the table init string passed to the data source.
    */
+  @Override // FeDataSourceTable
   public String getInitString() { return initString_; }
 
+  @Override // FeDataSourceTable
   public int getNumNodes() { return 1; }
 
   @Override
@@ -210,6 +213,7 @@ public class DataSourceTable extends Table {
    * SHOW TABLE STATS statement. The schema of the returned TResultSet is set
    * inside this method.
    */
+  @Override // FeDataSourceTable
   public TResultSet getTableStats() {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();

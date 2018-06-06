@@ -40,6 +40,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.FeCatalog;
+import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
@@ -589,7 +590,7 @@ public class Analyzer {
       Preconditions.checkState(table instanceof FeFsTable ||
           table instanceof KuduTable ||
           table instanceof HBaseTable ||
-          table instanceof DataSourceTable);
+          table instanceof FeDataSourceTable);
       return new BaseTableRef(tableRef, resolvedPath);
     } else {
       return new CollectionTableRef(tableRef, resolvedPath);
