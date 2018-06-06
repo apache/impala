@@ -17,28 +17,13 @@
 
 package org.apache.impala.catalog;
 
-import org.apache.impala.thrift.TCatalogObjectType;
-
 /**
- * Interface that all catalog objects implement.
+ * Interface for named catalog objects, used for sorting and pattern
+ * matching.
  */
-public interface CatalogObject extends HasName {
-  // Returns the TCatalogObject type of this Catalog object.
-  public TCatalogObjectType getCatalogObjectType();
-
-  // Returns the unqualified object name.
-  @Override
+public interface HasName {
+  /**
+   * @return the unqualified name of the object
+   */
   public String getName();
-
-  // Returns the unique name of this catalog object.
-  public String getUniqueName();
-
-  // Returns the version of this catalog object.
-  public long getCatalogVersion();
-
-  // Sets the version of this catalog object.
-  public void setCatalogVersion(long newVersion);
-
-  // Returns true if this CatalogObject has had its metadata loaded, false otherwise.
-  public boolean isLoaded();
 }
