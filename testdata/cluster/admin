@@ -479,7 +479,9 @@ function restart {
 }
 
 function delete_data {
+  # Delete namenode, datanode and KMS data while preserving directory structure.
   rm -rf "$NODES_DIR/$NODE_PREFIX"*/data/dfs/{nn,dn}/*
+  rm -f "$NODES_DIR/$NODE_PREFIX"*/data/kms.keystore
   delete_kudu_data
 }
 
