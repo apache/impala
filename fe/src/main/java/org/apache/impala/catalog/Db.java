@@ -57,7 +57,7 @@ import com.google.common.collect.Maps;
  * value is the base64 representation of the thrift serialized function object.
  *
  */
-public class Db extends CatalogObjectImpl {
+public class Db extends CatalogObjectImpl implements FeDb {
   private static final Logger LOG = LoggerFactory.getLogger(Db.class);
   private final TDatabase thriftDb_;
 
@@ -123,9 +123,11 @@ public class Db extends CatalogObjectImpl {
     return msDb.getParameters().remove(k) != null;
   }
 
+  @Override // FeDb
   public boolean isSystemDb() { return isSystemDb_; }
+  @Override // FeDb
   public TDatabase toThrift() { return thriftDb_; }
-  @Override
+  @Override // FeDb
   public String getName() { return thriftDb_.getDb_name(); }
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.DATABASE; }
@@ -149,6 +151,7 @@ public class Db extends CatalogObjectImpl {
    */
   public List<Table> getTables() { return tableCache_.getValues(); }
 
+  @Override
   public boolean containsTable(String tableName) {
     return tableCache_.contains(tableName.toLowerCase());
   }
@@ -157,6 +160,7 @@ public class Db extends CatalogObjectImpl {
    * Returns the Table with the given name if present in the table cache or null if the
    * table does not exist in the cache.
    */
+  @Override // FeTable
   public Table getTable(String tblName) { return tableCache_.get(tblName); }
 
   /**
@@ -205,26 +209,19 @@ public class Db extends CatalogObjectImpl {
   private static final FunctionResolutionOrder FUNCTION_RESOLUTION_ORDER =
       new FunctionResolutionOrder();
 
-  /**
-   * Returns the metastore.api.Database object this Database was created from.
-   * Returns null if it is not related to a hive database such as builtins_db.
-   */
+  @Override // FeDb
   public org.apache.hadoop.hive.metastore.api.Database getMetaStoreDb() {
     return thriftDb_.getMetastore_db();
   }
 
-  /**
-   * Returns the number of functions in this database.
-   */
+  @Override // FeDb
   public int numFunctions() {
     synchronized (functions_) {
       return functions_.size();
     }
   }
 
-  /**
-   * See comment in Catalog.
-   */
+  @Override // FeDb
   public boolean containsFunction(String name) {
     synchronized (functions_) {
       return functions_.get(name) != null;
@@ -234,6 +231,7 @@ public class Db extends CatalogObjectImpl {
   /*
    * See comment in Catalog.
    */
+  @Override // FeDb
   public Function getFunction(Function desc, Function.CompareMode mode) {
     synchronized (functions_) {
       List<Function> fns = functions_.get(desc.functionName());
@@ -455,6 +453,7 @@ public class Db extends CatalogObjectImpl {
   /**
    * Returns all functions with the given name
    */
+  @Override // FeDb
   public List<Function> getFunctions(String name) {
     List<Function> result = Lists.newArrayList();
     Preconditions.checkNotNull(name);
@@ -467,9 +466,7 @@ public class Db extends CatalogObjectImpl {
     return result;
   }
 
-  /**
-   * Returns all functions with the given name and category.
-   */
+  @Override
   public List<Function> getFunctions(TFunctionCategory category, String name) {
     List<Function> result = Lists.newArrayList();
     Preconditions.checkNotNull(category);

@@ -54,11 +54,11 @@ import org.apache.impala.analysis.UnionStmt;
 import org.apache.impala.analysis.UnionStmt.UnionOperand;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.HdfsPartition;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -1212,7 +1212,7 @@ public class SingleNodePlanner {
     // Do partition pruning before deciding which slots to materialize because we might
     // end up removing some predicates.
     HdfsPartitionPruner pruner = new HdfsPartitionPruner(tupleDesc);
-    List<HdfsPartition> partitions = pruner.prunePartitions(analyzer, conjuncts, false);
+    List<FeFsPartition> partitions = pruner.prunePartitions(analyzer, conjuncts, false);
 
     // Mark all slots referenced by the remaining conjuncts as materialized.
     analyzer.materializeSlots(conjuncts);
@@ -1229,7 +1229,7 @@ public class SingleNodePlanner {
     if (fastPartitionKeyScans && tupleDesc.hasClusteringColsOnly()) {
       HashSet<List<Expr>> uniqueExprs = new HashSet<List<Expr>>();
 
-      for (HdfsPartition partition: partitions) {
+      for (FeFsPartition partition: partitions) {
         // Ignore empty partitions to match the behavior of the scan based approach.
         if (partition.isDefaultPartition() || partition.getSize() == 0) {
           continue;
@@ -1301,8 +1301,9 @@ public class SingleNodePlanner {
       Expr.removeDuplicates(conjuncts);
     }
 
-    Table table = tblRef.getTable();
-    if (table instanceof HdfsTable) {
+    // TODO(todd) introduce FE interfaces for DataSourceTable, HBaseTable, KuduTable
+    FeTable table = tblRef.getTable();
+    if (table instanceof FeFsTable) {
       return createHdfsScanPlan(tblRef, aggInfo, conjuncts, analyzer);
     } else if (table instanceof DataSourceTable) {
       scanNode = new DataSourceScanNode(ctx_.getNextNodeId(), tblRef.getDesc(),

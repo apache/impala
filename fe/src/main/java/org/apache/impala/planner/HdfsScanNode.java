@@ -50,8 +50,9 @@ import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.HdfsCompression;
+import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
@@ -164,7 +165,7 @@ public class HdfsScanNode extends ScanNode {
   private final HdfsTable tbl_;
 
   // List of partitions to be scanned. Partitions have been pruned.
-  private final List<HdfsPartition> partitions_;
+  private final List<FeFsPartition> partitions_;
 
   // Parameters for table sampling. Null if not sampling.
   private final TableSampleClause sampleParams_;
@@ -277,9 +278,9 @@ public class HdfsScanNode extends ScanNode {
    * class comments above for details.
    */
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
-      List<HdfsPartition> partitions, TableRef hdfsTblRef, AggregateInfo aggInfo) {
+      List<FeFsPartition> partitions, TableRef hdfsTblRef, AggregateInfo aggInfo) {
     super(id, desc, "SCAN HDFS");
-    Preconditions.checkState(desc.getTable() instanceof HdfsTable);
+    Preconditions.checkState(desc.getTable() instanceof FeFsTable);
     tbl_ = (HdfsTable)desc.getTable();
     conjuncts_ = conjuncts;
     partitions_ = partitions;
@@ -300,7 +301,7 @@ public class HdfsScanNode extends ScanNode {
   @Override
   protected String debugString() {
     ToStringHelper helper = Objects.toStringHelper(this);
-    for (HdfsPartition partition: partitions_) {
+    for (FeFsPartition partition: partitions_) {
       helper.add("Partition " + partition.getId() + ":", partition.toString());
     }
     return helper.addValue(super.debugString()).toString();
@@ -422,7 +423,7 @@ public class HdfsScanNode extends ScanNode {
       }
     }
 
-    for (HdfsPartition part: partitions_) {
+    for (FeFsPartition part: partitions_) {
       HdfsFileFormat format = part.getInputFormatDescriptor().getFileFormat();
       if (format.isComplexTypesSupported()) continue;
       // If the file format allows querying just scalar typed columns and the query
@@ -760,7 +761,7 @@ public class HdfsScanNode extends ScanNode {
     largestScanRangeBytes_ = 0;
     maxScanRangeNumRows_ = -1;
     fileFormats_ = Sets.newHashSet();
-    for (HdfsPartition partition: partitions_) {
+    for (FeFsPartition partition: partitions_) {
       List<FileDescriptor> fileDescs = partition.getFileDescriptors();
       if (sampledFiles != null) {
         // If we are sampling, check whether this partition is included in the sample.
@@ -785,7 +786,7 @@ public class HdfsScanNode extends ScanNode {
         // Limit the scan range length if generating scan ranges.
         long maxBlockSize =
             Math.max(partitionFs.getDefaultBlockSize(partition.getLocationPath()),
-                HdfsPartition.FileDescriptor.MIN_SYNTHETIC_BLOCK_SIZE);
+                FileDescriptor.MIN_SYNTHETIC_BLOCK_SIZE);
         if (scanRangeBytesLimit > 0) {
           scanRangeBytesLimit = Math.min(scanRangeBytesLimit, maxBlockSize);
         } else {
@@ -857,7 +858,7 @@ public class HdfsScanNode extends ScanNode {
    * the scan ranges can be (may be ignored if the file is not splittable).
    */
   private void generateScanRangeSpecs(
-      HdfsPartition partition, HdfsPartition.FileDescriptor fileDesc, long maxBlockSize) {
+      FeFsPartition partition, FileDescriptor fileDesc, long maxBlockSize) {
     Preconditions.checkArgument(fileDesc.getNumFileBlocks() == 0);
     Preconditions.checkArgument(maxBlockSize > 0);
     if (fileDesc.getFileLength() <= 0) return;
@@ -884,8 +885,8 @@ public class HdfsScanNode extends ScanNode {
    * TScanRangeLocationLists are added to scanRanges_. A pair is returned that indicates
    * whether the file has a missing disk id and the maximum scan range (in bytes) found.
    */
-  private Pair<Boolean, Long> transformBlocksToScanRanges(HdfsPartition partition,
-      HdfsPartition.FileDescriptor fileDesc, boolean fsHasBlocks,
+  private Pair<Boolean, Long> transformBlocksToScanRanges(FeFsPartition partition,
+      FileDescriptor fileDesc, boolean fsHasBlocks,
       long scanRangeBytesLimit, Analyzer analyzer) {
     Preconditions.checkArgument(fileDesc.getNumFileBlocks() > 0);
     boolean fileDescMissingDiskIds = false;
@@ -1052,7 +1053,7 @@ public class HdfsScanNode extends ScanNode {
     partitionNumRows_ = -1;
     hasCorruptTableStats_ = false;
     if (tbl_.getNumClusteringCols() > 0) {
-      for (HdfsPartition p: partitions_) {
+      for (FeFsPartition p: partitions_) {
         // Check for corrupt partition stats
         long partNumRows = p.getNumRows();
         if (partNumRows < -1  || (partNumRows == 0 && p.getSize() > 0))  {

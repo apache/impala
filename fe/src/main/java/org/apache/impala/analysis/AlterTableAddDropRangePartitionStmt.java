@@ -20,8 +20,8 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableAddDropRangePartitionParams;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -87,7 +87,7 @@ public class AlterTableAddDropRangePartitionStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    Table table = getTargetTable();
+    FeTable table = getTargetTable();
     if (!(table instanceof KuduTable)) {
       throw new AnalysisException(String.format("Table %s does not support range " +
           "partitions: RANGE %s", table.getFullName(), rangePartitionSpec_.toSql()));

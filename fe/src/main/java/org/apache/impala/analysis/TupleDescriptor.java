@@ -26,10 +26,10 @@ import java.util.Map;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.thrift.TTupleDescriptor;
 
 import com.google.common.base.Joiner;
@@ -139,13 +139,13 @@ public class TupleDescriptor {
     return result;
   }
 
-  public Table getTable() {
+  public FeTable getTable() {
     if (path_ == null) return null;
     return path_.getRootTable();
   }
 
   public TableName getTableName() {
-    Table t = getTable();
+    FeTable t = getTable();
     return (t == null) ? null : t.getTableName();
   }
 
@@ -334,7 +334,7 @@ public class TupleDescriptor {
    * Return true if the slots being materialized are all partition columns.
    */
   public boolean hasClusteringColsOnly() {
-    Table table = getTable();
+    FeTable table = getTable();
     if (!(table instanceof HdfsTable) || table.getNumClusteringCols() == 0) return false;
 
     HdfsTable hdfsTable = (HdfsTable)table;

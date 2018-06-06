@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.authorization.PrivilegeRequest;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 
@@ -82,7 +83,7 @@ public class WithClause implements ParseNode {
       withClauseAnalyzer.registerLocalView(view);
     }
     // Register all local views with the analyzer.
-    for (View localView: withClauseAnalyzer.getLocalViews().values()) {
+    for (FeView localView: withClauseAnalyzer.getLocalViews().values()) {
       analyzer.registerLocalView(localView);
     }
     // Record audit events because the resolved table references won't generate any
@@ -121,7 +122,7 @@ public class WithClause implements ParseNode {
       // Enclose the view alias and explicit labels in quotes if Hive cannot parse it
       // without quotes. This is needed for view compatibility between Impala and Hive.
       String aliasSql = ToSqlUtils.getIdentSql(view.getName());
-      if (view.hasColLabels()) {
+      if (view.getColLabels() != null) {
         aliasSql += "(" + Joiner.on(", ").join(
             ToSqlUtils.getIdentSqlList(view.getOriginalColLabels())) + ")";
       }

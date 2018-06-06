@@ -31,6 +31,7 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.log4j.Logger;
 
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -154,7 +155,7 @@ public class HdfsCachingUtil {
    * data. Also updates the partition's metadata to remove the cache directive ID.
    * No-op if the table is not cached.
    */
-  public static void removePartitionCacheDirective(HdfsPartition part)
+  public static void removePartitionCacheDirective(FeFsPartition part)
       throws ImpalaException {
     Preconditions.checkNotNull(part);
     Map<String, String> parameters = part.getParameters();

@@ -20,6 +20,7 @@ package org.apache.impala.catalog;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,7 +76,7 @@ import com.google.flatbuffers.FlatBufferBuilder;
  * order with NULLs sorting last. The ordering is useful for displaying partitions
  * in SHOW statements.
  */
-public class HdfsPartition implements Comparable<HdfsPartition> {
+public class HdfsPartition implements FeFsPartition {
   /**
    * Metadata for a single file in this partition.
    */
@@ -446,17 +447,17 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   // store intermediate state for statistics computations.
   private Map<String, String> hmsParameters_;
 
+  @Override // FeFsPartition
   public HdfsStorageDescriptor getInputFormatDescriptor() {
     return fileFormatDescriptor_;
   }
 
+  @Override // FeFsPartition
   public boolean isDefaultPartition() {
     return id_ == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID;
   }
 
-  /**
-   * Returns true if the partition resides at a location which can be cached (e.g. HDFS).
-   */
+  @Override // FeFsPartition
   public boolean isCacheable() {
     return FileSystemUtil.isPathCacheable(new Path(getLocation()));
   }
@@ -470,6 +471,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    * TODO: Consider storing the PartitionKeyValue in HdfsPartition. It would simplify
    * this code would be useful in other places, such as fromThrift().
    */
+  @Override // FeFsPartition
   public String getPartitionName() {
     List<String> partitionCols = Lists.newArrayList();
     for (int i = 0; i < getTable().getNumClusteringCols(); ++i) {
@@ -480,11 +482,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         partitionCols, getPartitionValuesAsStrings(true));
   }
 
-  /**
-   * Returns a list of partition values as strings. If mapNullsToHiveKey is true, any NULL
-   * value is returned as the table's default null partition key string value, otherwise
-   * they are returned as 'NULL'.
-   */
+  @Override
   public List<String> getPartitionValuesAsStrings(boolean mapNullsToHiveKey) {
     List<String> ret = Lists.newArrayList();
     for (LiteralExpr partValue: getPartitionValues()) {
@@ -498,13 +496,10 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     return ret;
   }
 
-  /**
-   * Utility method which returns a string of conjuncts of equality exprs to exactly
-   * select this partition (e.g. ((month=2009) AND (year=2012)).
-   * TODO: Remove this when the TODO elsewhere in this file to save and expose the
-   * list of TPartitionKeyValues has been resolved.
-   */
+  @Override // FeFsPartition
   public String getConjunctSql() {
+    // TODO: Remove this when the TODO elsewhere in this file to save and expose the
+    // list of TPartitionKeyValues has been resolved.
     List<String> partColSql = Lists.newArrayList();
     for (Column partCol: getTable().getClusteringColumns()) {
       partColSql.add(ToSqlUtils.getIdentSql(partCol.getName()));
@@ -546,10 +541,14 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   public String getLocation() {
     return (location_ != null) ? location_.toString() : null;
   }
+  @Override // FeFsPartition
   public Path getLocationPath() { return new Path(getLocation()); }
+  @Override // FeFsPartition
   public long getId() { return id_; }
+  @Override // FeFsPartition
   public HdfsTable getTable() { return table_; }
   public void setNumRows(long numRows) { numRows_ = numRows; }
+  @Override // FeFsPartition
   public long getNumRows() { return numRows_; }
   public boolean isMarkedCached() { return isMarkedCached_; }
   void markCached() { isMarkedCached_ = true; }
@@ -566,6 +565,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         fileFormatDescriptor_.getFileFormat().serializationLib());
   }
 
+  @Override // FeFsPartition
   public HdfsFileFormat getFileFormat() {
     return fileFormatDescriptor_.getFileFormat();
   }
@@ -578,8 +578,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     return cachedMsPartitionDescriptor_.sdSerdeInfo;
   }
 
-  // May return null if no per-partition stats were recorded, or if the per-partition
-  // stats could not be deserialised from the parameter map.
+  @Override // FeFsPartition
   public TPartitionStats getPartitionStats() {
     try {
       return PartitionStatsUtil.partStatsFromParameters(hmsParameters_);
@@ -591,17 +590,16 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     }
   }
 
+  @Override // FeFsPartition
   public boolean hasIncrementalStats() {
     TPartitionStats partStats = getPartitionStats();
     return partStats != null && partStats.intermediate_col_stats != null;
   }
 
-  /**
-   * Returns the HDFS permissions Impala has to this partition's directory - READ_ONLY,
-   * READ_WRITE, etc.
-   */
+  @Override // FeFsPartition
   public TAccessLevel getAccessLevel() { return accessLevel_; }
 
+  @Override // FeFsPartition
   public Map<String, String> getParameters() { return hmsParameters_; }
 
   public void putToParameters(String k, String v) { hmsParameters_.put(k, v); }
@@ -617,17 +615,18 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   public void markDirty() { isDirty_ = true; }
   public boolean isDirty() { return isDirty_; }
 
-  /**
-   * Returns an immutable list of partition key expressions
-   */
+  @Override // FeFsPartition
   public List<LiteralExpr> getPartitionValues() { return partitionKeyValues_; }
+  @Override // FeFsPartition
   public LiteralExpr getPartitionValue(int i) { return partitionKeyValues_.get(i); }
+  @Override // FeFsPartition
   public List<HdfsPartition.FileDescriptor> getFileDescriptors() {
     return fileDescriptors_;
   }
   public void setFileDescriptors(List<FileDescriptor> descriptors) {
     fileDescriptors_ = descriptors;
   }
+  @Override // FeFsPartition
   public int getNumFileDescriptors() {
     return fileDescriptors_ == null ? 0 : fileDescriptors_.size();
   }
@@ -775,9 +774,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
         TAccessLevel.READ_WRITE);
   }
 
-  /**
-   * Return the size (in bytes) of all the files inside this partition
-   */
+  @Override
   public long getSize() {
     long result = 0;
     for (HdfsPartition.FileDescriptor fileDescriptor: fileDescriptors_) {
@@ -930,11 +927,14 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   }
 
   /**
-   * Comparison method to allow ordering of HdfsPartitions by their partition-key values.
+   * Comparator to allow ordering of partitions by their partition-key values.
    */
-  @Override
-  public int compareTo(HdfsPartition o) {
-    return comparePartitionKeyValues(partitionKeyValues_, o.getPartitionValues());
+  public static final KeyValueComparator KV_COMPARATOR = new KeyValueComparator();
+  public static class KeyValueComparator implements Comparator<FeFsPartition> {
+    @Override
+    public int compare(FeFsPartition o1, FeFsPartition o2) {
+      return comparePartitionKeyValues(o1.getPartitionValues(), o2.getPartitionValues());
+    }
   }
 
   @VisibleForTesting

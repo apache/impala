@@ -22,9 +22,10 @@ import java.util.List;
 
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -74,23 +75,23 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
     super.analyze(analyzer);
     location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
 
-    Table table = getTargetTable();
+    FeTable table = getTargetTable();
     Preconditions.checkNotNull(table);
     if (table instanceof HdfsTable) {
       HdfsTable hdfsTable = (HdfsTable) table;
       if (getPartitionSet() != null) {
         // Targeting a partition rather than a table.
-        List<HdfsPartition> partitions = getPartitionSet().getPartitions();
+        List<FeFsPartition> partitions = getPartitionSet().getPartitions();
         if (partitions.isEmpty()) { return; }
         if (partitions.size() != 1) {
           // Sort the partitions to get a consistent error reporting.
-          List<HdfsPartition> sortedPartitions = Lists.newArrayList(partitions);
-          Collections.sort(sortedPartitions);
+          List<FeFsPartition> sortedPartitions = Lists.newArrayList(partitions);
+          Collections.sort(sortedPartitions, HdfsPartition.KV_COMPARATOR);
           List<String> sortedPartitionNames =
               Lists.transform(sortedPartitions.subList(0, NUM_PARTITION_LOG_LIMIT),
-                  new Function<HdfsPartition, String>() {
+                  new Function<FeFsPartition, String>() {
                     @Override
-                    public String apply(HdfsPartition hdfsPartition) {
+                    public String apply(FeFsPartition hdfsPartition) {
                       return hdfsPartition.getPartitionName();
                     }
                   });

@@ -38,8 +38,8 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduColumn;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.InternalException;
@@ -734,7 +734,7 @@ public final class RuntimeFilterGenerator {
       ScanNode targetNode) {
     Preconditions.checkState(targetExpr.isBoundByTupleIds(targetNode.getTupleIds()));
     TupleDescriptor baseTblDesc = targetNode.getTupleDesc();
-    Table tbl = baseTblDesc.getTable();
+    FeTable tbl = baseTblDesc.getTable();
     if (tbl.getNumClusteringCols() == 0) return false;
     List<SlotId> sids = Lists.newArrayList();
     targetExpr.getIds(null, sids);

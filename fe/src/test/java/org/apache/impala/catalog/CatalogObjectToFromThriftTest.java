@@ -92,7 +92,7 @@ public class CatalogObjectToFromThriftTest {
       HdfsTable newHdfsTable = (HdfsTable) newTable;
       Assert.assertEquals(newHdfsTable.getPartitions().size(), 25);
       boolean foundDefaultPartition = false;
-      for (HdfsPartition hdfsPart: newHdfsTable.getPartitions()) {
+      for (FeFsPartition hdfsPart: newHdfsTable.getPartitions()) {
         if (hdfsPart.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
           Assert.assertEquals(foundDefaultPartition, false);
           foundDefaultPartition = true;
@@ -215,9 +215,9 @@ public class CatalogObjectToFromThriftTest {
     // Get any partition with valid HMS parameters to create a
     // dummy partition.
     HdfsPartition part = null;
-    for (HdfsPartition partition: hdfsTable.getPartitions()) {
+    for (FeFsPartition partition: hdfsTable.getPartitions()) {
       if (!partition.isDefaultPartition()) {
-        part = partition;
+        part = (HdfsPartition) partition;
         break;
       }
     }

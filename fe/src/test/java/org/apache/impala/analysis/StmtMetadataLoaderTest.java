@@ -22,6 +22,7 @@ import java.util.Arrays;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -65,7 +66,7 @@ public class StmtMetadataLoaderTest {
   private void validateTables(StmtTableCache stmtTableCache, String[] expectedTables) {
     String[] actualTables = new String[stmtTableCache.tables.size()];
     int idx = 0;
-    for (Table t: stmtTableCache.tables.values()) {
+    for (FeTable t: stmtTableCache.tables.values()) {
       Assert.assertTrue(t.isLoaded());
       actualTables[idx++] = t.getFullName();
     }

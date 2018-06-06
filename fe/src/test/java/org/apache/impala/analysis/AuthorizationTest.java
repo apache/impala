@@ -39,6 +39,7 @@ import org.apache.impala.authorization.AuthorizeableTable;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.AuthorizationException;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
@@ -2118,7 +2119,7 @@ public class AuthorizationTest extends FrontendTestBase {
         "functional_avro", "functional_parquet", "functional_seq_snap",
         "functional_text_lzo", "tpcds", "tpch");
 
-    List<Db> dbs = fe_.getDbs(PatternMatcher.createHivePatternMatcher("*"), USER);
+    List<? extends FeDb> dbs = fe_.getDbs(PatternMatcher.createHivePatternMatcher("*"), USER);
     assertEquals(expectedDbs, extractDbNames(dbs));
 
     dbs = fe_.getDbs(PatternMatcher.MATCHER_MATCH_ALL, USER);
@@ -2141,9 +2142,9 @@ public class AuthorizationTest extends FrontendTestBase {
     assertEquals(expectedDbs, extractDbNames(dbs));
   }
 
-  private List<String> extractDbNames(List<Db> dbs) {
+  private List<String> extractDbNames(List<? extends FeDb> dbs) {
     List<String> names = Lists.newArrayListWithCapacity(dbs.size());
-    for (Db db: dbs) names.add(db.getName());
+    for (FeDb db: dbs) names.add(db.getName());
     return names;
   }
 

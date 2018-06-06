@@ -20,10 +20,10 @@ package org.apache.impala.planner;
 import java.util.List;
 
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.thrift.TSinkAction;
 
 import com.google.common.base.Preconditions;
@@ -73,11 +73,11 @@ public abstract class TableSink extends DataSink {
   }
 
   // Table which is to be populated by this sink.
-  protected final Table targetTable_;
+  protected final FeTable targetTable_;
   // The type of operation to be performed by this sink.
   protected final Op sinkOp_;
 
-  public TableSink(Table targetTable, Op sinkAction) {
+  public TableSink(FeTable targetTable, Op sinkAction) {
     targetTable_ = targetTable;
     sinkOp_ = sinkAction;
   }
@@ -90,7 +90,7 @@ public abstract class TableSink extends DataSink {
    * For HDFS tables 'sortColumns' specifies the indices into the list of non-clustering
    * columns of the target table that are stored in the 'sort.columns' table property.
    */
-  public static TableSink create(Table table, Op sinkAction,
+  public static TableSink create(FeTable table, Op sinkAction,
       List<Expr> partitionKeyExprs,  List<Integer> referencedColumns,
       boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns) {
     Preconditions.checkNotNull(partitionKeyExprs);

@@ -20,8 +20,8 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TTableName;
@@ -42,7 +42,7 @@ public class ShowFilesStmt extends StatementBase {
   private final PartitionSet partitionSet_;
 
   // Set during analysis.
-  protected Table table_;
+  protected FeTable table_;
 
   public ShowFilesStmt(TableName tableName, PartitionSet partitionSet) {
     tableName_ = Preconditions.checkNotNull(tableName);
@@ -75,7 +75,7 @@ public class ShowFilesStmt extends StatementBase {
     }
     table_ = tableRef.getTable();
     Preconditions.checkNotNull(table_);
-    if (!(table_ instanceof HdfsTable)) {
+    if (!(table_ instanceof FeFsTable)) {
       throw new AnalysisException(String.format(
           "SHOW FILES not applicable to a non hdfs table: %s", tableName_));
     }

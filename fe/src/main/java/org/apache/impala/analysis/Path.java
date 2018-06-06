@@ -22,10 +22,10 @@ import java.util.List;
 
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 
 import com.google.common.base.Joiner;
@@ -129,7 +129,7 @@ public class Path {
   // Catalog table that this resolved path is rooted at, if any.
   // Null if the path is rooted at a registered tuple that does not
   // belong to a catalog table/view.
-  private final Table rootTable_;
+  private final FeTable rootTable_;
 
   // Root path that a relative path was created from.
   private final Path rootPath_;
@@ -165,7 +165,7 @@ public class Path {
   /**
    * Constructs a Path rooted at the given rootTable.
    */
-  public Path(Table rootTable, List<String> rawPath) {
+  public Path(FeTable rootTable, List<String> rawPath) {
     Preconditions.checkNotNull(rootTable);
     Preconditions.checkNotNull(rawPath);
     rootTable_ = rootTable;
@@ -293,7 +293,7 @@ public class Path {
     return result;
   }
 
-  public Table getRootTable() { return rootTable_; }
+  public FeTable getRootTable() { return rootTable_; }
   public TupleDescriptor getRootDesc() { return rootDesc_; }
   public boolean isRootedAtTable() { return rootTable_ != null; }
   public boolean isRootedAtTuple() { return rootDesc_ != null; }
@@ -336,7 +336,7 @@ public class Path {
     return null;
   }
 
-  public Table destTable() {
+  public FeTable destTable() {
     Preconditions.checkState(isResolved_);
     if (rootTable_ != null && rootDesc_ == null && matchedTypes_.isEmpty()) {
       return rootTable_;

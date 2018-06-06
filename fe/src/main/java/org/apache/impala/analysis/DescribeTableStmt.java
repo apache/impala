@@ -23,10 +23,9 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDescribeOutputStyle;
@@ -60,7 +59,7 @@ public class DescribeTableStmt extends StatementBase {
   private Path path_;
 
   /// The fully qualified name of the root table, set after analysis.
-  private Table table_;
+  private FeTable table_;
 
   /// Struct type with the fields to display for the described path.
   /// Only set when describing a path to a nested collection.
@@ -84,7 +83,7 @@ public class DescribeTableStmt extends StatementBase {
     return sb.toString() + StringUtils.join(rawPath_, ".");
   }
 
-  public Table getTable() { return table_; }
+  public FeTable getTable() { return table_; }
   public TDescribeOutputStyle getOutputStyle() { return outputStyle_; }
 
   @Override

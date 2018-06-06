@@ -32,9 +32,9 @@ import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TupleId;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
@@ -182,7 +182,7 @@ public class Planner {
       if (ctx_.isInsertOrCtas()) {
         InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
         List<Expr> exprs = Lists.newArrayList();
-        Table targetTable = insertStmt.getTargetTable();
+        FeTable targetTable = insertStmt.getTargetTable();
         Preconditions.checkNotNull(targetTable);
         if (targetTable instanceof KuduTable) {
           if (ctx_.isInsert()) {

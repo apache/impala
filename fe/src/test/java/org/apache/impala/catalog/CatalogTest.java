@@ -289,13 +289,13 @@ public class CatalogTest {
   public void TestPartitions() throws CatalogException {
     HdfsTable table =
         (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypes");
-    Collection<HdfsPartition> partitions = table.getPartitions();
+    Collection<? extends FeFsPartition> partitions = table.getPartitions();
 
     // check that partition keys cover the date range 1/1/2009-12/31/2010
     // and that we have one file per partition, plus the default partition
     assertEquals(25, partitions.size());
     Set<Long> months = Sets.newHashSet();
-    for (HdfsPartition p: partitions) {
+    for (FeFsPartition p: partitions) {
       if (p.getId() == DEFAULT_PARTITION_ID) {
         continue;
       }

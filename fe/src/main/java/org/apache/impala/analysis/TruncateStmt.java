@@ -20,8 +20,8 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TTruncateParams;
 
@@ -39,7 +39,7 @@ public class TruncateStmt extends StatementBase {
   private final boolean ifExists_;
 
   // Set in analyze().
-  private Table table_;
+  private FeTable table_;
 
   public TruncateStmt(TableName tableName, boolean ifExists) {
     Preconditions.checkNotNull(tableName);
@@ -63,7 +63,7 @@ public class TruncateStmt extends StatementBase {
       throw e;
     }
     // We only support truncating hdfs tables now.
-    if (!(table_ instanceof HdfsTable)) {
+    if (!(table_ instanceof FeFsTable)) {
       throw new AnalysisException(String.format(
           "TRUNCATE TABLE not supported on non-HDFS table: %s", table_.getFullName()));
     }

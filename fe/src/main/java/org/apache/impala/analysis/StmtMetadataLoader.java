@@ -21,10 +21,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.impala.catalog.Db;
-import org.apache.impala.catalog.ImpaladCatalog;
-import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.View;
+import org.apache.impala.catalog.FeCatalog;
+import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.util.EventSequence;
@@ -55,7 +55,7 @@ public class StmtMetadataLoader {
 
   // Results of the loading process. See StmtTableCache.
   private final Set<String> dbs_ = Sets.newHashSet();
-  private final Map<TableName, Table> loadedTbls_ = Maps.newHashMap();
+  private final Map<TableName, FeTable> loadedTbls_ = Maps.newHashMap();
 
   // Metrics for the metadata load.
   // Number of prioritizedLoad() RPCs issued to the catalogd.
@@ -71,12 +71,12 @@ public class StmtMetadataLoader {
    * in the Catalog at the time this StmtTableCache was generated.
    */
   public static final class StmtTableCache {
-    public final ImpaladCatalog catalog;
+    public final FeCatalog catalog;
     public final Set<String> dbs;
-    public final Map<TableName, Table> tables;
+    public final Map<TableName, FeTable> tables;
 
-    public StmtTableCache(ImpaladCatalog catalog, Set<String> dbs,
-        Map<TableName, Table> tables) {
+    public StmtTableCache(FeCatalog catalog, Set<String> dbs,
+        Map<TableName, FeTable> tables) {
       this.catalog = Preconditions.checkNotNull(catalog);
       this.dbs = Preconditions.checkNotNull(dbs);
       this.tables = Preconditions.checkNotNull(tables);
@@ -136,7 +136,7 @@ public class StmtMetadataLoader {
     Preconditions.checkState(dbs_.isEmpty() && loadedTbls_.isEmpty());
     Preconditions.checkState(numLoadRequestsSent_ == 0);
     Preconditions.checkState(numCatalogUpdatesReceived_ == 0);
-    ImpaladCatalog catalog = fe_.getCatalog();
+    FeCatalog catalog = fe_.getCatalog();
     Set<TableName> missingTbls = getMissingTables(catalog, tbls);
     // There are no missing tables. Return to avoid making an RPC to the CatalogServer
     // and adding events to the timeline.
@@ -172,7 +172,9 @@ public class StmtMetadataLoader {
       }
 
       // Catalog may have been restarted, always use the latest reference.
-      ImpaladCatalog currCatalog = fe_.getCatalog();
+      // TODO(todd) is this necessary in the case of the LocalCatalog impl?
+      // or maybe the whole loadTables() function is unnecessarily complex in that case?
+      FeCatalog currCatalog = fe_.getCatalog();
       boolean hasCatalogRestarted = currCatalog != catalog;
       if (hasCatalogRestarted && LOG.isWarnEnabled()) {
         LOG.warn(String.format(
@@ -237,23 +239,23 @@ public class StmtMetadataLoader {
    * Path.getCandidateTables(). Non-existent tables are ignored and not returned or
    * added to 'loadedTbls_'.
    */
-  private Set<TableName> getMissingTables(ImpaladCatalog catalog, Set<TableName> tbls) {
+  private Set<TableName> getMissingTables(FeCatalog catalog, Set<TableName> tbls) {
     Set<TableName> missingTbls = Sets.newHashSet();
     Set<TableName> viewTbls = Sets.newHashSet();
     for (TableName tblName: tbls) {
       if (loadedTbls_.containsKey(tblName)) continue;
-      Db db = catalog.getDb(tblName.getDb());
+      FeDb db = catalog.getDb(tblName.getDb());
       if (db == null) continue;
       dbs_.add(tblName.getDb());
-      Table tbl = db.getTable(tblName.getTbl());
+      FeTable tbl = db.getTable(tblName.getTbl());
       if (tbl == null) continue;
       if (!tbl.isLoaded()) {
         missingTbls.add(tblName);
         continue;
       }
       loadedTbls_.put(tblName, tbl);
-      if (tbl instanceof View) {
-        viewTbls.addAll(collectTableCandidates(((View) tbl).getQueryStmt()));
+      if (tbl instanceof FeView) {
+        viewTbls.addAll(collectTableCandidates(((FeView) tbl).getQueryStmt()));
       }
     }
     // Recursively collect loaded/missing tables from loaded views.

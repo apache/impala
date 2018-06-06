@@ -40,7 +40,7 @@ import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.DataSource;
-import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.StructType;
@@ -84,7 +84,6 @@ import org.apache.impala.thrift.TShowRolesResult;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
 import org.apache.impala.thrift.TTableName;
-import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateMembershipRequest;
 import org.apache.impala.util.GlogAppender;
@@ -287,11 +286,11 @@ public class JniFrontend {
     User user = params.isSetSession() ?
         new User(TSessionStateUtil.getEffectiveUser(params.getSession())) :
         ImpalaInternalAdminUser.getInstance();
-    List<Db> dbs = frontend_.getDbs(
+    List<? extends FeDb> dbs = frontend_.getDbs(
         PatternMatcher.createHivePatternMatcher(params.pattern), user);
     TGetDbsResult result = new TGetDbsResult();
     List<TDatabase> tDbs = Lists.newArrayListWithCapacity(dbs.size());
-    for (Db db: dbs) tDbs.add(db.toThrift());
+    for (FeDb db: dbs) tDbs.add(db.toThrift());
     result.setDbs(tDbs);
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {

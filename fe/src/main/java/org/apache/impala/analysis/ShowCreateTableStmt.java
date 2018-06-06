@@ -20,8 +20,8 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.View;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableName;
@@ -60,9 +60,9 @@ public class ShowCreateTableStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     tableName_ = analyzer.getFqTableName(tableName_);
-    Table table = analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
-    if (table instanceof View) {
-      View view = (View)table;
+    FeTable table = analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
+    if (table instanceof FeView) {
+      FeView view = (FeView)table;
       // Analyze the view query statement with its own analyzer for authorization.
       Analyzer viewAnalyzer = new Analyzer(analyzer);
       // Only show the view's query if the user has permissions to execute the query, to

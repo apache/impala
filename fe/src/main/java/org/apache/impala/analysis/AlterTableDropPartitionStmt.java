@@ -18,8 +18,8 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableDropPartitionParams;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -74,7 +74,7 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    Table table = getTargetTable();
+    FeTable table = getTargetTable();
     if (table instanceof KuduTable) {
       throw new AnalysisException("ALTER TABLE DROP PARTITION is not supported for " +
           "Kudu tables: " + partitionSet_.toSql());

@@ -23,6 +23,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ScalarFunction;
@@ -474,7 +475,7 @@ public class FunctionCallExpr extends Expr {
     }
 
     // User needs DB access.
-    Db db = analyzer.getDb(fnName_.getDb(), Privilege.VIEW_METADATA, true);
+    FeDb db = analyzer.getDb(fnName_.getDb(), Privilege.VIEW_METADATA, true);
     if (!db.containsFunction(fnName_.getFunction())) {
       throw new AnalysisException(fnName_ + "() unknown");
     }

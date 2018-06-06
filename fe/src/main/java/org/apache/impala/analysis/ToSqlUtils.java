@@ -41,6 +41,8 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.parse.HiveLexer;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsCompression;
@@ -50,7 +52,6 @@ import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.View;
 import org.apache.impala.util.KuduUtil;
 
 /**
@@ -218,9 +219,9 @@ public class ToSqlUtils {
    * Returns a "CREATE TABLE" or "CREATE VIEW" statement that creates the specified
    * table.
    */
-  public static String getCreateTableSql(Table table) throws CatalogException {
+  public static String getCreateTableSql(FeTable table) throws CatalogException {
     Preconditions.checkNotNull(table);
-    if (table instanceof View) return getCreateViewSql((View)table);
+    if (table instanceof FeView) return getCreateViewSql((FeView)table);
     org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
     // Use a LinkedHashMap to preserve the ordering of the table properties.
     LinkedHashMap<String, String> properties = Maps.newLinkedHashMap(msTable.getParameters());
@@ -405,7 +406,7 @@ public class ToSqlUtils {
     return sb.toString();
   }
 
-  public static String getCreateViewSql(View view) {
+  public static String getCreateViewSql(FeView view) {
     StringBuffer sb = new StringBuffer();
     sb.append("CREATE VIEW ");
     // Use toSql() to ensure that the table name and query statement are normalized

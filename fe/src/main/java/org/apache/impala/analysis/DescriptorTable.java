@@ -24,11 +24,11 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.catalog.View;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TDescriptorTable;
@@ -50,9 +50,9 @@ public class DescriptorTable {
   // The target table of a table sink, may be null.
   // Table id 0 is reserved for it. Set in QueryStmt.analyze() that produces a table sink,
   // e.g. InsertStmt.analyze(), ModifyStmt.analyze().
-  private Table targetTable_;
+  private FeTable targetTable_;
   // For each table, the set of partitions that are referenced by at least one scan range.
-  private final HashMap<Table, HashSet<Long>> referencedPartitionsPerTable_ =
+  private final HashMap<FeTable, HashSet<Long>> referencedPartitionsPerTable_ =
       Maps.newHashMap();
   // 0 is reserved for table sinks
   public static final int TABLE_SINK_ID = 0;
@@ -104,13 +104,13 @@ public class DescriptorTable {
   public Collection<SlotDescriptor> getSlotDescs() { return slotDescs_.values(); }
   public SlotId getMaxSlotId() { return slotIdGenerator_.getMaxId(); }
 
-  public void setTargetTable(Table table) { targetTable_ = table; }
+  public void setTargetTable(FeTable table) { targetTable_ = table; }
 
   /**
    * Find the set of referenced partitions for the given table.  Allocates a set if
    * none has been allocated for the table yet.
    */
-  private HashSet<Long> getReferencedPartitions(Table table) {
+  private HashSet<Long> getReferencedPartitions(FeTable table) {
     HashSet<Long> refPartitions = referencedPartitionsPerTable_.get(table);
     if (refPartitions == null) {
       refPartitions = new HashSet<Long>();
@@ -123,7 +123,7 @@ public class DescriptorTable {
    * Add the partition with ID partitionId to the set of referenced partitions for the
    * given table.
    */
-  public void addReferencedPartition(Table table, long partitionId) {
+  public void addReferencedPartition(FeTable table, long partitionId) {
     getReferencedPartitions(table).add(Long.valueOf(partitionId));
   }
 
@@ -152,9 +152,9 @@ public class DescriptorTable {
   public TDescriptorTable toThrift() {
     TDescriptorTable result = new TDescriptorTable();
     // Maps from base table to its table id used in the backend.
-    HashMap<Table, Integer> tableIdMap = Maps.newHashMap();
+    HashMap<FeTable, Integer> tableIdMap = Maps.newHashMap();
     // Used to check table level consistency
-    HashMap<TableName, Table> referencedTables = Maps.newHashMap();
+    HashMap<TableName, FeTable> referencedTables = Maps.newHashMap();
 
     if (targetTable_ != null) {
       tableIdMap.put(targetTable_, TABLE_SINK_ID);
@@ -164,13 +164,13 @@ public class DescriptorTable {
       // inline view of a non-constant select has a non-materialized tuple descriptor
       // in the descriptor table just for type checking, which we need to skip
       if (!tupleDesc.isMaterialized()) continue;
-      Table table = tupleDesc.getTable();
+      FeTable table = tupleDesc.getTable();
       Integer tableId = tableIdMap.get(table);
-      if (table != null && !(table instanceof View)) {
+      if (table != null && !(table instanceof FeView)) {
         TableName tblName = table.getTableName();
         // Verify table level consistency in the same query by checking that references to
         // the same Table refer to the same table instance.
-        Table checkTable = referencedTables.get(tblName);
+        FeTable checkTable = referencedTables.get(tblName);
         Preconditions.checkState(checkTable == null || table == checkTable);
         if (tableId == null) {
           tableId = nextTableId_++;
@@ -188,7 +188,7 @@ public class DescriptorTable {
         result.addToSlotDescriptors(slotD.toThrift());
       }
     }
-    for (Table tbl: tableIdMap.keySet()) {
+    for (FeTable tbl: tableIdMap.keySet()) {
       HashSet<Long> referencedPartitions = null; // null means include all partitions.
       // We don't know which partitions are needed for INSERT, so do not prune partitions.
       if (tbl != targetTable_) referencedPartitions = getReferencedPartitions(tbl);

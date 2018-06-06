@@ -21,8 +21,8 @@ import java.util.List;
 
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -204,7 +204,7 @@ abstract public class ScanNode extends PlanNode {
 
   @Override
   protected String getDisplayLabelDetail() {
-    Table table = desc_.getTable();
+    FeTable table = desc_.getTable();
     List<String> path = Lists.newArrayList();
     path.add(table.getDb().getName());
     path.add(table.getName());

@@ -21,7 +21,7 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.DataSourceTable;
-import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TTableName;
@@ -35,7 +35,7 @@ public abstract class AlterTableStmt extends StatementBase {
   protected final TableName tableName_;
 
   // Set during analysis.
-  protected Table table_;
+  protected FeTable table_;
 
   protected AlterTableStmt(TableName tableName) {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
@@ -57,7 +57,7 @@ public abstract class AlterTableStmt extends StatementBase {
    * Can only be called after analysis, returns the Table object of the target of this
    * ALTER TABLE statement.
    */
-  protected Table getTargetTable() {
+  protected FeTable getTargetTable() {
     Preconditions.checkNotNull(table_);
     return table_;
   }

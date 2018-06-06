@@ -23,11 +23,12 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -188,7 +189,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
     // The full privilege check for the database will be done as part of the INSERT
     // analysis.
-    Db db = analyzer.getDb(createStmt_.getDb(), Privilege.ANY);
+    FeDb db = analyzer.getDb(createStmt_.getDb(), Privilege.ANY);
     if (db == null) {
       throw new AnalysisException(
           Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + createStmt_.getDb());
@@ -202,21 +203,23 @@ public class CreateTableAsSelectStmt extends StatementBase {
     org.apache.hadoop.hive.metastore.api.Table msTbl =
         CatalogOpExecutor.createMetaStoreTable(createStmt_.toThrift());
 
-    try (MetaStoreClient client = analyzer.getCatalog().getMetaStoreClient()) {
+    try {
       // Set a valid location of this table using the same rules as the metastore. If the
       // user specified a location for the table this will be a no-op.
       msTbl.getSd().setLocation(analyzer.getCatalog().getTablePath(msTbl).toString());
 
-      Table tmpTable = null;
+      FeTable tmpTable = null;
       if (KuduTable.isKuduTable(msTbl)) {
-        tmpTable = KuduTable.createCtasTarget(db, msTbl, createStmt_.getColumnDefs(),
+        // TODO(todd): avoid downcast to 'Db' here
+        tmpTable = KuduTable.createCtasTarget((Db)db, msTbl, createStmt_.getColumnDefs(),
             createStmt_.getPrimaryKeyColumnDefs(),
             createStmt_.getKuduPartitionParams());
       } else if (HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
-        tmpTable = HdfsTable.createCtasTarget(db, msTbl);
+        // TODO(todd): avoid downcast to 'Db' here
+        tmpTable = HdfsTable.createCtasTarget((Db)db, msTbl);
       }
       Preconditions.checkState(tmpTable != null &&
-          (tmpTable instanceof HdfsTable || tmpTable instanceof KuduTable));
+          (tmpTable instanceof FeFsTable || tmpTable instanceof KuduTable));
 
       insertStmt_.setTargetTable(tmpTable);
     } catch (Exception e) {

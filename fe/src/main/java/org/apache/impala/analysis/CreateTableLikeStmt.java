@@ -21,8 +21,8 @@ import java.util.List;
 
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -159,7 +159,7 @@ public class CreateTableLikeStmt extends StatementBase {
     }
 
     // Make sure the source table exists and the user has permission to access it.
-    Table srcTable = analyzer.getTable(srcTableName_, Privilege.VIEW_METADATA);
+    FeTable srcTable = analyzer.getTable(srcTableName_, Privilege.VIEW_METADATA);
     if (KuduTable.isKuduTable(srcTable.getMetaStoreTable())) {
       throw new AnalysisException("Cloning a Kudu table using CREATE TABLE LIKE is " +
           "not supported.");

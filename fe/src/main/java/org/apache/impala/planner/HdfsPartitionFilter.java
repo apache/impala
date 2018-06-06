@@ -28,7 +28,8 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.NotImplementedException;
@@ -56,7 +57,7 @@ public class HdfsPartitionFilter {
   // indices into Table.getColumnNames()
   private final ArrayList<Integer> refdKeys_ = Lists.newArrayList();
 
-  public HdfsPartitionFilter(Expr predicate, HdfsTable tbl, Analyzer analyzer) {
+  public HdfsPartitionFilter(Expr predicate, FeFsTable tbl, Analyzer analyzer) {
     predicate_ = predicate;
 
     // populate lhsSlotRefs_ and refdKeys_
@@ -83,14 +84,14 @@ public class HdfsPartitionFilter {
    * Evaluate a filter against a batch of partitions and return the partition ids
    * that pass the filter.
    */
-  public HashSet<Long> getMatchingPartitionIds(ArrayList<HdfsPartition> partitions,
+  public HashSet<Long> getMatchingPartitionIds(ArrayList<FeFsPartition> partitions,
       Analyzer analyzer) throws ImpalaException {
     HashSet<Long> result = new HashSet<Long>();
     // List of predicates to evaluate
     ArrayList<Expr> predicates = new ArrayList<Expr>(partitions.size());
     long[] partitionIds = new long[partitions.size()];
     int indx = 0;
-    for (HdfsPartition p: partitions) {
+    for (FeFsPartition p: partitions) {
       predicates.add(buildPartitionPredicate(p, analyzer));
       partitionIds[indx++] = p.getId();
     }
@@ -110,13 +111,13 @@ public class HdfsPartitionFilter {
    * Construct a predicate for a given partition by substituting the SlotRefs
    * for the partition cols with the respective partition-key values.
    */
-  private Expr buildPartitionPredicate(HdfsPartition partition, Analyzer analyzer)
+  private Expr buildPartitionPredicate(FeFsPartition p, Analyzer analyzer)
       throws ImpalaException {
     // construct smap
     ExprSubstitutionMap sMap = new ExprSubstitutionMap();
     for (int i = 0; i < refdKeys_.size(); ++i) {
       sMap.put(
-          lhsSlotRefs_.get(i), partition.getPartitionValues().get(refdKeys_.get(i)));
+          lhsSlotRefs_.get(i), p.getPartitionValues().get(refdKeys_.get(i)));
     }
 
     Expr literalPredicate = predicate_.substitute(sMap, analyzer, false);

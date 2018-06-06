@@ -20,7 +20,7 @@ package org.apache.impala.analysis;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TCreateDbParams;
@@ -92,7 +92,7 @@ public class CreateDbStmt extends StatementBase {
     // this Impala instance. If that happens, the caller will not get an
     // AnalysisException when creating the database, they will get a Hive
     // AlreadyExistsException once the request has been sent to the metastore.
-    Db db = analyzer.getDb(getDb(), Privilege.CREATE, false);
+    FeDb db = analyzer.getDb(getDb(), Privilege.CREATE, false);
     if (db != null && !ifNotExists_) {
       throw new AnalysisException(Analyzer.DB_ALREADY_EXISTS_ERROR_MSG + getDb());
     }

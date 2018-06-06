@@ -17,15 +17,12 @@
 
 package org.apache.impala.analysis;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
@@ -34,7 +31,6 @@ import org.apache.impala.thrift.TTablePropertyType;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 
 /**
@@ -71,7 +67,7 @@ public class AlterTableSortByStmt extends AlterTableStmt {
     super.analyze(analyzer);
 
     // Disallow setting sort columns on HBase and Kudu tables.
-    Table targetTable = getTargetTable();
+    FeTable targetTable = getTargetTable();
     if (targetTable instanceof HBaseTable) {
       throw new AnalysisException("ALTER TABLE SORT BY not supported on HBase tables.");
     }

@@ -22,9 +22,9 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.slf4j.Logger;
@@ -43,7 +43,7 @@ public class InlineViewRef extends TableRef {
 
   // Catalog or local view that is referenced.
   // Null for inline views parsed directly from a query string.
-  private final View view_;
+  private final FeView view_;
 
   // If not null, these will serve as the column labels for the inline view. This provides
   // a layer of separation between column labels visible from outside the inline view
@@ -93,7 +93,7 @@ public class InlineViewRef extends TableRef {
   /**
    * C'tor for creating inline views that replace a local or catalog view ref.
    */
-  public InlineViewRef(View view, TableRef origTblRef) {
+  public InlineViewRef(FeView view, TableRef origTblRef) {
     super(view.getTableName().toPath(), origTblRef.getExplicitAlias(),
         origTblRef.getPrivilege());
     queryStmt_ = view.getQueryStmt().clone();

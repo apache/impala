@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
@@ -57,7 +58,7 @@ public class HdfsTableSink extends TableSink {
   // populate the RowGroup::sorting_columns list in parquet files.
   private List<Integer> sortColumns_ = Lists.newArrayList();
 
-  public HdfsTableSink(Table targetTable, List<Expr> partitionKeyExprs,
+  public HdfsTableSink(FeTable targetTable, List<Expr> partitionKeyExprs,
       boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns) {
     super(targetTable, Op.INSERT);
     Preconditions.checkState(targetTable instanceof HdfsTable);

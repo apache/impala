@@ -20,8 +20,9 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsPartition;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetCachedParams;
@@ -60,7 +61,7 @@ public class AlterTableSetCachedStmt extends AlterTableSetStmt {
     super.analyze(analyzer);
     cacheOp_.analyze(analyzer);
 
-    Table table = getTargetTable();
+    FeTable table = getTargetTable();
     Preconditions.checkNotNull(table);
     if (!(table instanceof HdfsTable)) {
       throw new AnalysisException("ALTER TABLE SET [CACHED|UNCACHED] must target an " +
@@ -73,9 +74,9 @@ public class AlterTableSetCachedStmt extends AlterTableSetStmt {
       HdfsTable hdfsTable = (HdfsTable)table;
       StringBuilder nameSb = new StringBuilder();
       if (partitionSet != null) {
-        List<HdfsPartition> parts = partitionSet.getPartitions();
+        List<FeFsPartition> parts = partitionSet.getPartitions();
         nameSb.append("Partition(s) (");
-        for(HdfsPartition part: parts) {
+        for(FeFsPartition part: parts) {
           isCacheable = isCacheable && part.isCacheable();
           if(!part.isCacheable()) nameSb.append(part.getPartitionName());
         }

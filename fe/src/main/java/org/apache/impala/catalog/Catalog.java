@@ -35,7 +35,6 @@ import org.apache.impala.util.PatternMatcher;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import org.apache.impala.util.TUniqueIdUtil;
 
 /**
  * Thread safe interface for reading and updating metadata stored in the Hive MetaStore.

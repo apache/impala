@@ -25,11 +25,12 @@ import java.util.Set;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
@@ -114,7 +115,7 @@ public class InsertStmt extends StatementBase {
   private QueryStmt queryStmt_;
 
   // Set in analyze(). Contains metadata of target table to determine type of sink.
-  private Table table_;
+  private FeTable table_;
 
   // Set in analyze(). Exprs correspond to the partitionKeyValues, if specified, or to
   // the partition columns for Kudu tables.
@@ -422,7 +423,7 @@ public class InsertStmt extends StatementBase {
     }
 
     // We do not support (in|up)serting into views.
-    if (table_ instanceof View) {
+    if (table_ instanceof FeView) {
       throw new AnalysisException(
           String.format("Impala does not support %sing into views: %s", getOpName(),
               table_.getFullName()));
@@ -652,7 +653,7 @@ public class InsertStmt extends StatementBase {
    *           If an expression is not compatible with its target column
    */
   private void prepareExpressions(List<Column> selectExprTargetColumns,
-      List<Expr> selectListExprs, Table tbl, Analyzer analyzer)
+      List<Expr> selectListExprs, FeTable tbl, Analyzer analyzer)
       throws AnalysisException {
     // Temporary lists of partition key exprs and names in an arbitrary order.
     List<Expr> tmpPartitionKeyExprs = new ArrayList<Expr>();
@@ -842,8 +843,8 @@ public class InsertStmt extends StatementBase {
 
   public List<PlanHint> getPlanHints() { return planHints_; }
   public TableName getTargetTableName() { return targetTableName_; }
-  public Table getTargetTable() { return table_; }
-  public void setTargetTable(Table table) { this.table_ = table; }
+  public FeTable getTargetTable() { return table_; }
+  public void setTargetTable(FeTable table) { this.table_ = table; }
   public boolean isOverwrite() { return overwrite_; }
 
   /**
