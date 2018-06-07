@@ -958,6 +958,8 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
   }
   // Metric is decremented in UnregisterQuery().
   ImpaladMetrics::NUM_QUERIES_REGISTERED->Increment(1L);
+  VLOG_QUERY << "Registered query query_id=" << PrintId(query_id)
+             << " session_id=" << PrintId(request_state->session_id());
   return Status::OK();
 }
 
