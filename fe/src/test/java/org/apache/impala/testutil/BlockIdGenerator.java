@@ -19,6 +19,7 @@ package org.apache.impala.testutil;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.hadoop.fs.Path;
@@ -28,12 +29,12 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 
 import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.util.PatternMatcher;
 
 /**
@@ -72,7 +73,9 @@ public class BlockIdGenerator {
 
           // Write the output as <tablename>: <blockid1> <blockid2> <etc>
           writer.write(tableName + ":");
-          for (FeFsPartition partition: hdfsTable.getPartitions()) {
+          Collection<? extends FeFsPartition> parts =
+              FeCatalogUtils.loadAllPartitions(hdfsTable);
+          for (FeFsPartition partition: parts) {
             List<FileDescriptor> fileDescriptors = partition.getFileDescriptors();
             for (FileDescriptor fd : fileDescriptors) {
               Path p = new Path(partition.getLocation(), fd.getFileName());

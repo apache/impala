@@ -28,9 +28,8 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
-import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.service.FeSupport;
@@ -84,14 +83,14 @@ public class HdfsPartitionFilter {
    * Evaluate a filter against a batch of partitions and return the partition ids
    * that pass the filter.
    */
-  public HashSet<Long> getMatchingPartitionIds(ArrayList<FeFsPartition> partitions,
+  public HashSet<Long> getMatchingPartitionIds(ArrayList<PrunablePartition> partitions,
       Analyzer analyzer) throws ImpalaException {
     HashSet<Long> result = new HashSet<Long>();
     // List of predicates to evaluate
     ArrayList<Expr> predicates = new ArrayList<Expr>(partitions.size());
     long[] partitionIds = new long[partitions.size()];
     int indx = 0;
-    for (FeFsPartition p: partitions) {
+    for (PrunablePartition p: partitions) {
       predicates.add(buildPartitionPredicate(p, analyzer));
       partitionIds[indx++] = p.getId();
     }
@@ -111,7 +110,7 @@ public class HdfsPartitionFilter {
    * Construct a predicate for a given partition by substituting the SlotRefs
    * for the partition cols with the respective partition-key values.
    */
-  private Expr buildPartitionPredicate(FeFsPartition p, Analyzer analyzer)
+  private Expr buildPartitionPredicate(PrunablePartition p, Analyzer analyzer)
       throws ImpalaException {
     // construct smap
     ExprSubstitutionMap sMap = new ExprSubstitutionMap();

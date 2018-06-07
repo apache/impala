@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import static org.junit.Assert.fail;
 
+import java.util.Collection;
 import java.util.Map;
 
 import org.apache.impala.analysis.LiteralExpr;
@@ -96,7 +97,9 @@ public class CatalogObjectToFromThriftTest {
       HdfsTable newHdfsTable = (HdfsTable) newTable;
       Assert.assertEquals(newHdfsTable.getPartitions().size(), 24);
       Assert.assertEquals(newHdfsTable.getPartitionIds().size(), 24);
-      for (FeFsPartition hdfsPart: newHdfsTable.getPartitions()) {
+      Collection<? extends FeFsPartition> parts =
+          FeCatalogUtils.loadAllPartitions(newHdfsTable);
+      for (FeFsPartition hdfsPart: parts) {
         Assert.assertEquals(hdfsPart.getFileDescriptors().size(), 1);
         Assert.assertTrue(
             hdfsPart.getFileDescriptors().get(0).getNumFileBlocks() > 0);
@@ -215,9 +218,10 @@ public class CatalogObjectToFromThriftTest {
     HdfsTable hdfsTable = (HdfsTable) table;
     // Get any partition with valid HMS parameters to create a
     // dummy partition.
-    HdfsPartition part = (HdfsPartition)Iterables.getFirst(
-        hdfsTable.getPartitions(), null);
-    Assert.assertNotNull(part);
+    long id = Iterables.getFirst(hdfsTable.getPartitionIds(), -1L);
+    HdfsPartition part = (HdfsPartition) FeCatalogUtils.loadPartition(
+        hdfsTable, id);
+    Assert.assertNotNull(part);;
     // Create a dummy partition with an invalid decimal type.
     try {
       HdfsPartition dummyPart = new HdfsPartition(hdfsTable, part.toHmsPartition(),

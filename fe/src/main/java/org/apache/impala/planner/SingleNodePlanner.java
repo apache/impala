@@ -1212,7 +1212,7 @@ public class SingleNodePlanner {
     // Do partition pruning before deciding which slots to materialize because we might
     // end up removing some predicates.
     HdfsPartitionPruner pruner = new HdfsPartitionPruner(tupleDesc);
-    List<FeFsPartition> partitions = pruner.prunePartitions(analyzer, conjuncts, false);
+    List<? extends FeFsPartition> partitions = pruner.prunePartitions(analyzer, conjuncts, false);
 
     // Mark all slots referenced by the remaining conjuncts as materialized.
     analyzer.materializeSlots(conjuncts);

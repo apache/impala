@@ -81,7 +81,7 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
       HdfsTable hdfsTable = (HdfsTable) table;
       if (getPartitionSet() != null) {
         // Targeting a partition rather than a table.
-        List<FeFsPartition> partitions = getPartitionSet().getPartitions();
+        List<? extends FeFsPartition> partitions = getPartitionSet().getPartitions();
         if (partitions.isEmpty()) { return; }
         if (partitions.size() != 1) {
           // Sort the partitions to get a consistent error reporting.

@@ -366,7 +366,7 @@ public class HdfsTable extends Table implements FeFsTable {
   public boolean isCacheable() {
     if (!isLocationCacheable()) return false;
     if (!isMarkedCached() && numClusteringCols_ > 0) {
-      for (FeFsPartition partition: getPartitions()) {
+      for (FeFsPartition partition: partitionMap_.values()) {
         if (!partition.isCacheable()) {
           return false;
         }
@@ -558,13 +558,26 @@ public class HdfsTable extends Table implements FeFsTable {
   public boolean isMarkedCached() { return isMarkedCached_; }
 
   @Override // FeFsTable
-  public Collection<? extends FeFsPartition> getPartitions() {
+  public Collection<? extends PrunablePartition> getPartitions() {
     return partitionMap_.values();
   }
 
   @Override // FeFsTable
-  public Map<Long, ? extends FeFsPartition> getPartitionMap() {
+  public Map<Long, ? extends PrunablePartition> getPartitionMap() {
     return partitionMap_;
+  }
+
+  @Override // FeFsTable
+  public List<FeFsPartition> loadPartitions(Collection<Long> ids) {
+    List<FeFsPartition> partitions = Lists.newArrayListWithCapacity(ids.size());
+    for (Long id : ids) {
+      HdfsPartition partition = partitionMap_.get(id);
+      if (partition == null) {
+        throw new IllegalArgumentException("no such partition id " + id);
+      }
+      partitions.add(partition);
+    }
+    return partitions;
   }
 
   @Override // FeFsTable

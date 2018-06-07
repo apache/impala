@@ -19,6 +19,7 @@ package org.apache.impala.service;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -61,6 +62,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnNotFoundException;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
@@ -818,7 +820,10 @@ public class CatalogOpExecutor {
       HdfsTable table) throws ImpalaException {
     Preconditions.checkState(params.isSetPartition_stats());
     List<HdfsPartition> modifiedParts = Lists.newArrayList();
-    for (FeFsPartition fePartition: table.getPartitions()) {
+    // TODO(todd) only load the partitions that were modified in 'params'.
+    Collection<? extends FeFsPartition> parts =
+        FeCatalogUtils.loadAllPartitions(table);
+    for (FeFsPartition fePartition: parts) {
       // TODO(todd): avoid downcast to implementation class
       HdfsPartition partition = (HdfsPartition)fePartition;
 
@@ -1265,7 +1270,9 @@ public class CatalogOpExecutor {
 
     // List of partitions that were modified as part of this operation.
     List<HdfsPartition> modifiedParts = Lists.newArrayList();
-    for (FeFsPartition fePart: hdfsTable.getPartitions()) {
+    Collection<? extends FeFsPartition> parts =
+        FeCatalogUtils.loadAllPartitions(hdfsTable);
+    for (FeFsPartition fePart: parts) {
       // TODO(todd): avoid downcast
       HdfsPartition part = (HdfsPartition) fePart;
       boolean isModified = false;
@@ -1484,7 +1491,9 @@ public class CatalogOpExecutor {
       }
     }
     if (table.getNumClusteringCols() > 0) {
-      for (FeFsPartition part: hdfsTable.getPartitions()) {
+      Collection<? extends FeFsPartition> parts =
+          FeCatalogUtils.loadAllPartitions(hdfsTable);
+      for (FeFsPartition part: parts) {
         if (part.isMarkedCached()) {
           try {
             HdfsCachingUtil.removePartitionCacheDirective(part);
@@ -1530,7 +1539,9 @@ public class CatalogOpExecutor {
       catalog_.getLock().writeLock().unlock();
       try {
         HdfsTable hdfsTable = (HdfsTable)table;
-        for (FeFsPartition part: hdfsTable.getPartitions()) {
+        Collection<? extends FeFsPartition> parts =
+            FeCatalogUtils.loadAllPartitions(hdfsTable);
+        for (FeFsPartition part: parts) {
           FileSystemUtil.deleteAllVisibleFiles(new Path(part.getLocation()));
         }
 
@@ -2569,7 +2580,9 @@ public class CatalogOpExecutor {
       if (tbl.getNumClusteringCols() > 0) {
         // If this is a partitioned table, submit cache directives for all uncached
         // partitions.
-        for (FeFsPartition fePartition: hdfsTable.getPartitions()) {
+        Collection<? extends FeFsPartition> parts =
+            FeCatalogUtils.loadAllPartitions(hdfsTable);
+        for (FeFsPartition fePartition: parts) {
           // TODO(todd): avoid downcast
           HdfsPartition partition = (HdfsPartition) fePartition;
           // Only issue cache directives if the data is uncached or the cache directive
@@ -2621,7 +2634,9 @@ public class CatalogOpExecutor {
       if (cacheDirId != null) HdfsCachingUtil.removeTblCacheDirective(msTbl);
       // Uncache all table partitions.
       if (tbl.getNumClusteringCols() > 0) {
-        for (FeFsPartition fePartition: hdfsTable.getPartitions()) {
+        Collection<? extends FeFsPartition> parts =
+            FeCatalogUtils.loadAllPartitions(hdfsTable);
+        for (FeFsPartition fePartition: parts) {
           // TODO(todd): avoid downcast
           HdfsPartition partition = (HdfsPartition) fePartition;
           if (partition.isMarkedCached()) {
@@ -3287,7 +3302,9 @@ public class CatalogOpExecutor {
         HashSet<String> partsToCreate =
             Sets.newHashSet(update.getCreated_partitions());
         partsToLoadMetadata = Sets.newHashSet(partsToCreate);
-        for (FeFsPartition partition: ((HdfsTable) table).getPartitions()) {
+        Collection<? extends FeFsPartition> parts =
+            FeCatalogUtils.loadAllPartitions((HdfsTable)table);
+        for (FeFsPartition partition: parts) {
           // TODO: In the BE we build partition names without a trailing char. In FE
           // we build partition name with a trailing char. We should make this
           // consistent.

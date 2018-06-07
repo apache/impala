@@ -74,7 +74,7 @@ public class AlterTableSetCachedStmt extends AlterTableSetStmt {
       HdfsTable hdfsTable = (HdfsTable)table;
       StringBuilder nameSb = new StringBuilder();
       if (partitionSet != null) {
-        List<FeFsPartition> parts = partitionSet.getPartitions();
+        List<? extends FeFsPartition> parts = partitionSet.getPartitions();
         nameSb.append("Partition(s) (");
         for(FeFsPartition part: parts) {
           isCacheable = isCacheable && part.isCacheable();
