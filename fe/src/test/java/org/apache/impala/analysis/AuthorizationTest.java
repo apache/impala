@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
@@ -40,7 +41,6 @@ import org.apache.impala.catalog.AuthorizationException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ScalarFunction;
-import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
@@ -78,7 +78,6 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -1808,204 +1807,193 @@ public class AuthorizationTest extends FrontendTestBase {
         "User '%s' does not have privileges to access: functional.allcomplextypes");
   }
 
-  // Expected output of DESCRIBE for a functional table.
-  private static final List<String> EXPECTED_DESCRIBE_ALLTYPESSMALL =
-      Lists.newArrayList(
-      "id","int","",
-      "int_col","int", "",
-      "year","int", ""
+  private static class DescribeResult {
+    // List of column names.
+    private final List<String> columns_;
+    // The value of the describe result's location field.
+    private final String location_;
+
+    public DescribeResult(List<String> columns, String location) {
+      this.columns_ = columns;
+      this.location_ = location;
+    }
+
+    public DescribeResult(List<String> columns) {
+      this(columns, null);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      DescribeResult that = (DescribeResult) o;
+      return Objects.equals(columns_, that.columns_) &&
+          Objects.equals(location_, that.location_);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(columns_, location_);
+    }
+
+    @Override
+    public String toString() {
+      return "DescribeResult{" +
+          "columns=" + columns_ +
+          ", location='" + location_ + '\'' +
+          '}';
+    }
+  }
+
+  // Expected output of DESCRIBE for functional.alltypessmall.
+  private static final DescribeResult EXPECTED_DESCRIBE_ALLTYPESSMALL =
+      new DescribeResult(Lists.newArrayList(
+          "id",
+          "int_col",
+          "year"
+      ));
+
+  // Expected output of DESCRIBE for functional.alltypesagg.
+  private static final DescribeResult EXPECTED_DESCRIBE_ALLTYPESAGG =
+      new DescribeResult(Lists.newArrayList(
+          "id",
+          "bool_col",
+          "tinyint_col",
+          "smallint_col",
+          "int_col",
+          "bigint_col",
+          "float_col",
+          "double_col",
+          "date_string_col",
+          "string_col",
+          "timestamp_col",
+          "year",
+          "month",
+          "day"
+      ));
+
+  // Expected output of DESCRIBE for functional.alltypesagg.
+  private static final DescribeResult EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG =
+      new DescribeResult(Lists.newArrayList(
+          "id",
+          "bool_col",
+          "tinyint_col",
+          "smallint_col",
+          "int_col",
+          "bigint_col",
+          "float_col",
+          "double_col",
+          "date_string_col",
+          "string_col",
+          "timestamp_col",
+          "year",
+          "month",
+          "day"),
+          "hdfs://localhost:20500/test-warehouse/alltypesagg"
       );
 
-  // Expected output of DESCRIBE for a functional table.
-  private static final List<String> EXPECTED_DESCRIBE_ALLTYPESAGG =
-      Lists.newArrayList(
-      "id","int","",
-      "bool_col","boolean","",
-      "tinyint_col","tinyint","",
-      "smallint_col","smallint", "",
-      "int_col","int", "",
-      "bigint_col","bigint", "",
-      "float_col","float", "",
-      "double_col","double", "",
-      "date_string_col","string", "",
-      "string_col","string", "",
-      "timestamp_col","timestamp", "",
-      "year","int", "",
-      "month","int", "",
-      "day","int", ""
-      );
-
-  // Expected output of DESCRIBE for a functional table.
-  // "*" is used when the output is variable such as time or user.
-  private static final List<String> EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG =
-      ImmutableList.<String>builder().add(
-      "# col_name","data_type","comment",
-      "","NULL","NULL",
-      "id","int","NULL",
-      "bool_col","boolean","NULL",
-      "tinyint_col","tinyint","NULL",
-      "smallint_col","smallint","NULL",
-      "int_col","int","NULL",
-      "bigint_col","bigint","NULL",
-      "float_col","float","NULL",
-      "double_col","double","NULL",
-      "date_string_col","string","NULL",
-      "string_col","string","NULL",
-      "timestamp_col","timestamp","NULL",
-      "","NULL","NULL",
-      "# Partition Information","NULL","NULL",
-      "# col_name","data_type","comment",
-      "","NULL","NULL",
-      "year","int","NULL",
-      "month","int","NULL",
-      "day","int","NULL",
-      "","NULL","NULL",
-      "# Detailed Table Information","NULL","NULL",
-      "Database:","functional","NULL",
-      "Owner:","*","NULL",
-      "CreateTime:","*","NULL",
-      "LastAccessTime:","UNKNOWN","NULL")
-      // Account for minor differences between Hive 1 and Hive 2
-      .addAll(MiniclusterProfile.MINICLUSTER_PROFILE == 2
-          ? ImmutableList.<String>of("Protect Mode:", "None", "NULL")
-          : ImmutableList.<String>of())
-      .add(
-      "Retention:","0","NULL",
-      "Location:","hdfs://localhost:20500/test-warehouse/alltypesagg","NULL",
-      "Table Type:","EXTERNAL_TABLE","NULL",
-      "Table Parameters:","NULL","NULL",
-      "","DO_NOT_UPDATE_STATS","true",
-      "","EXTERNAL","TRUE")
-      .addAll(MiniclusterProfile.MINICLUSTER_PROFILE == 2
-          ? ImmutableList.of("", "STATS_GENERATED_VIA_STATS_TASK", "true")
-          : ImmutableList.of("", "STATS_GENERATED", "TASK"))
-      .add(
-      "","impala.lastComputeStatsTime","*",
-      "","numRows","11000",
-      "","totalSize","834279",
-      "","transient_lastDdlTime","*",
-      "","NULL","NULL",
-      "# Storage Information","NULL","NULL",
-      "SerDe Library:","org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe","NULL",
-      "InputFormat:","org.apache.hadoop.mapred.TextInputFormat","NULL",
-      "OutputFormat:","org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat","NULL",
-      "Compressed:","No","NULL",
-      "Num Buckets:","0","NULL",
-      "Bucket Columns:","[]","NULL",
-      "Sort Columns:","[]","NULL",
-      "Storage Desc Params:","NULL","NULL",
-      "","escape.delim","\\\\",
-      "","field.delim",",",
-      "","serialization.format",","
-      ).build();
-
-  // Expected output of DESCRIBE for a functional table.
-  // "*" is used when the output is variable such as time or user.
-  private static final List<String> EXPECTED_DESCRIBE_EXTENDED_ALLTYPESSMALL =
-      ImmutableList.<String>builder().add(
-      "# col_name","data_type","comment",
-      "","NULL","NULL",
-      "id","int","NULL",
-      "int_col","int","NULL",
-      "","NULL","NULL",
-      "# Partition Information","NULL","NULL",
-      "# col_name","data_type","comment",
-      "","NULL","NULL",
-      "year","int","NULL",
-      "","NULL","NULL",
-      "# Detailed Table Information","NULL","NULL",
-      "Database:","functional","NULL",
-      "Owner:","*","NULL",
-      "CreateTime:","*","NULL",
-      "LastAccessTime:","UNKNOWN","NULL")
-      .addAll(MiniclusterProfile.MINICLUSTER_PROFILE == 2
-          ? ImmutableList.<String>of("Protect Mode:", "None", "NULL")
-          : ImmutableList.<String>of())
-      .add(
-      "Retention:","0","NULL",
-      "Table Type:","EXTERNAL_TABLE","NULL",
-      "Table Parameters:","NULL","NULL",
-      "","DO_NOT_UPDATE_STATS","true",
-      "","EXTERNAL","TRUE")
-      .addAll(MiniclusterProfile.MINICLUSTER_PROFILE == 2
-          ? ImmutableList.of("", "STATS_GENERATED_VIA_STATS_TASK", "true")
-          : ImmutableList.of("", "STATS_GENERATED", "TASK"))
-      .add(
-      "","impala.lastComputeStatsTime","*",
-      "","numRows","100",
-      "","totalSize","6472",
-      "","transient_lastDdlTime","*",
-      "","NULL","NULL",
-      "# Storage Information","NULL","NULL",
-      "SerDe Library:","org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe","NULL",
-      "InputFormat:","org.apache.hadoop.mapred.TextInputFormat","NULL",
-      "OutputFormat:","org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat","NULL",
-      "Compressed:","No","NULL",
-      "Num Buckets:","0","NULL",
-      "Bucket Columns:","[]","NULL",
-      "Sort Columns:","[]","NULL",
-      "Storage Desc Params:","NULL","NULL",
-      "","escape.delim","\\\\",
-      "","field.delim",",",
-      "","serialization.format",","
-      ).build();
+  // Expected output of DESCRIBE for functional.alltypessmall.
+  private static final DescribeResult EXPECTED_DESCRIBE_EXTENDED_ALLTYPESSMALL =
+      new DescribeResult(Lists.newArrayList(
+          "id",
+          "int_col",
+          "year"
+      ));
 
   @Test
   public void TestDescribeTableResults() throws ImpalaException {
-    // Verify MINIMAL describe contains all columns
-    TDescribeResult result = fe_.describeTable(new TTableName("functional","alltypesagg"),
-        TDescribeOutputStyle.MINIMAL, USER);
-    Assert.assertEquals(EXPECTED_DESCRIBE_ALLTYPESAGG, resultToStringList(result));
+    // Running these statements force the tables to be loaded into the catalog, which
+    // allows running this test independently of other tests.
+    AuthzOk("describe functional.alltypesagg");
+    AuthzOk("describe functional.alltypessmall");
 
-    // Verify EXTENDED output contains all columns and data
-    result = fe_.describeTable(new TTableName("functional","alltypesagg"),
-        TDescribeOutputStyle.EXTENDED, USER);
-    // TODO: re-enable once IMPALA-7143 is fixed
-    // verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG,
-    // resultToStringList(result));
-
-    // Verify FORMATTED output contains all columns and data
-    result = fe_.describeTable(new TTableName("functional","alltypesagg"),
-        TDescribeOutputStyle.FORMATTED, USER);
-    // TODO: re-enable once IMPALA-7143 is fixed
-    // verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG,
-    //    resultToStringList(result));
+    // Verify MINIMAL describe contains all columns.
+    TDescribeOutputStyle style = TDescribeOutputStyle.MINIMAL;
+    TDescribeResult result = fe_.describeTable(new TTableName("functional",
+        "alltypesagg"), style, USER);
+    assertEquals(EXPECTED_DESCRIBE_ALLTYPESAGG, toDescribeResult(result, style));
 
     // Verify MINIMAL describe on restricted table shows limited columns.
-    result = fe_.describeTable(new TTableName("functional","alltypessmall"),
-        TDescribeOutputStyle.MINIMAL, USER);
-    Assert.assertEquals(EXPECTED_DESCRIBE_ALLTYPESSMALL,
-        resultToStringList(result));
+    style = TDescribeOutputStyle.MINIMAL;
+    result = fe_.describeTable(new TTableName("functional", "alltypessmall"), style,
+        USER);
+    assertEquals(EXPECTED_DESCRIBE_ALLTYPESSMALL, toDescribeResult(result, style));
 
-    // Verify FORMATTED output contains all columns and data
-    result = fe_.describeTable(new TTableName("functional","alltypessmall"),
-        TDescribeOutputStyle.FORMATTED, USER);
-    // TODO: re-enable once IMPALA-7143 is fixed
-    // verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESSMALL,
-    //    resultToStringList(result));
-  }
+    for (TDescribeOutputStyle s : new TDescribeOutputStyle[]{
+        TDescribeOutputStyle.EXTENDED, TDescribeOutputStyle.FORMATTED}) {
+      // Verify FORMATTED/EXTENDED output contains all columns and metadata.
+      result = fe_.describeTable(new TTableName("functional", "alltypesagg"), s, USER);
+      assertEquals(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG, toDescribeResult(result, s));
 
-  // Compares two arrays but skips an expected value that contains '*' since we need to
-  // compare output but some values change based on builds, environments, etc.
-  private void verifyOutputWithOptionalData(List<String> expected, List<String> actual) {
-    Assert.assertEquals("Size difference. Expected: " + expected + " Actual: " + actual,
-        expected.size(), actual.size());
-    for (int idx = 0; idx < expected.size(); idx++) {
-      if (!expected.get(idx).equals("*")) {
-        Assert.assertEquals(expected.get(idx), actual.get(idx));
-      }
+      // Verify FORMATTED output contains all columns and metadata.
+      result = fe_.describeTable(new TTableName("functional", "alltypessmall"), s, USER);
+      assertEquals(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESSMALL, toDescribeResult(result, s));
     }
   }
 
-  // Convert TDescribeResult to ArrayList of strings.
-  private static List<String> resultToStringList(TDescribeResult result) {
-    List<String> strarr = new ArrayList<String>();
-    for (TResultRow row: result.getResults()) {
-      for (TColumnValue col: row.getColVals()) {
-        strarr.add(col.getString_val() == null ? "NULL": col.getString_val().trim());
-      }
+  private static DescribeResult toDescribeResult(TDescribeResult result,
+      TDescribeOutputStyle style) {
+    List<String> columns = new ArrayList<>();
+    String location = null;
+    List<TResultRow> rows = result.getResults();
+    switch (style) {
+      case MINIMAL:
+        // Example output:
+        // [[bool_col,boolean,]
+        //  [month,int,]]
+        for (TResultRow row : rows) {
+          columns.add(row.getColVals().get(0).getString_val().trim());
+        }
+        break;
+      case EXTENDED:
+      case FORMATTED:
+        // Example output:
+        // [[name,type,comment],
+        //  [#col_name,data_type,comment],
+        //  [,,],
+        //  [bool_col,boolean,],
+        //  [tinyint_col,tinyint,],
+        //  [,,],
+        //  [#PartitionInformation,,],
+        //  [#col_name,data_type,comment],
+        //  [,,],
+        //  [year,int,],
+        //  [month,int,],
+        //  [,,],
+        //  [#DetailedTableInformation,,],
+        //  [Database:,functional,],
+        //  [Location:,hdfs://localhost:20500/test-warehouse/alltypes,],
+        //  [,,]
+        //  [#StorageInformation,,]
+        //  [SerDeLibrary:,org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe,]
+        //  [InputFormat:,org.apache.hadoop.mapred.TextInputFormat,]]
+        int rowIdx = 0;
+        while (rowIdx < rows.size()) {
+          List<TColumnValue> cols = rows.get(rowIdx).getColVals();
+          if (cols.get(0).getString_val().startsWith("Location")) {
+            Preconditions.checkState(location == null);
+            location = cols.get(1).getString_val().trim();
+          } else if (cols.get(0).getString_val().startsWith("# col_name")) {
+            // To get the column names, we need to ignore the first empty line and stop
+            // until we see another empty line.
+            rowIdx += 2; // Skips over the first empty line.
+            Preconditions.checkElementIndex(rowIdx, rows.size());
+            cols = rows.get(rowIdx).getColVals();
+            // Stop when we see the next empty line.
+            while (!cols.get(0).getString_val().trim().isEmpty()) {
+              columns.add(cols.get(0).getString_val().trim());
+              rowIdx++;
+              Preconditions.checkElementIndex(rowIdx, rows.size());
+              cols = rows.get(rowIdx).getColVals();
+            }
+          }
+          rowIdx++;
+        }
+        break;
+      default:
+        throw new IllegalArgumentException("Invalid describe output style: " + style);
     }
-    return strarr;
+    return new DescribeResult(columns, location);
   }
 
   @Test
