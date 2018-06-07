@@ -16,7 +16,6 @@
 
 package org.apache.impala.catalog.local;
 
-
 /**
  * Exception indicating an error loading catalog information into
  * the impalad.
@@ -30,5 +29,9 @@ public class LocalCatalogException extends RuntimeException {
 
   public LocalCatalogException(String msg, Throwable cause) {
     super(msg, cause);
+  }
+
+  public LocalCatalogException(Throwable cause) {
+    super(cause);
   }
 }

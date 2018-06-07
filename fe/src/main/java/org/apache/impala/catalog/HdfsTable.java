@@ -114,9 +114,6 @@ import com.google.common.collect.Sets;
  *
  */
 public class HdfsTable extends Table implements FeFsTable {
-  // hive's default value for table property 'serialization.null.format'
-  private static final String DEFAULT_NULL_COLUMN_VALUE = "\\N";
-
   // Name of default partition for unpartitioned tables
   private static final String DEFAULT_PARTITION_NAME = "";
 
@@ -809,7 +806,7 @@ public class HdfsTable extends Table implements FeFsTable {
         // to this table's partition list. Skip the partition.
         if (partition == null) continue;
         if (msPartition.getParameters() != null) {
-          partition.setNumRows(getRowCount(msPartition.getParameters()));
+          partition.setNumRows(FeCatalogUtils.getRowCount(msPartition.getParameters()));
         }
         if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
           // TODO: READ_ONLY isn't exactly correct because the it's possible the
@@ -1566,7 +1563,7 @@ public class HdfsTable extends Table implements FeFsTable {
     // set NULL indicator string from table properties
     nullColumnValue_ =
         msTbl.getParameters().get(serdeConstants.SERIALIZATION_NULL_FORMAT);
-    if (nullColumnValue_ == null) nullColumnValue_ = DEFAULT_NULL_COLUMN_VALUE;
+    if (nullColumnValue_ == null) nullColumnValue_ = FeFsTable.DEFAULT_NULL_COLUMN_VALUE;
 
     // Excludes partition columns.
     nonPartFieldSchemas_.addAll(msTbl.getSd().getCols());
@@ -1622,7 +1619,7 @@ public class HdfsTable extends Table implements FeFsTable {
       // this table's partition list. Skip the partition.
       if (partition == null) continue;
       if (msPartition.getParameters() != null) {
-        partition.setNumRows(getRowCount(msPartition.getParameters()));
+        partition.setNumRows(FeCatalogUtils.getRowCount(msPartition.getParameters()));
       }
       if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
         // TODO: READ_ONLY isn't exactly correct because the it's possible the

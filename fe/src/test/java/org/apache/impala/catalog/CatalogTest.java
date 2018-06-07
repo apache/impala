@@ -37,7 +37,6 @@ import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.service.FeSupport;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.junit.Test;
@@ -51,9 +50,9 @@ public class CatalogTest {
   private static CatalogServiceCatalog catalog_ =
       CatalogServiceTestCatalog.create();
 
-  private void checkTableCols(Db db, String tblName, int numClusteringCols,
+  public static void checkTableCols(FeDb db, String tblName, int numClusteringCols,
       String[] colNames, Type[] colTypes) throws TableLoadingException {
-    Table tbl = db.getTable(tblName);
+    FeTable tbl = db.getTable(tblName);
     assertEquals(tbl.getName(), tblName);
     assertEquals(tbl.getNumClusteringCols(), numClusteringCols);
     List<Column> cols = tbl.getColumns();

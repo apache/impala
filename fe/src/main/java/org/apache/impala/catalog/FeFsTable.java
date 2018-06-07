@@ -34,6 +34,9 @@ import org.apache.impala.util.ListMap;
  * Frontend interface for interacting with a filesystem-backed table.
  */
 public interface FeFsTable extends FeTable {
+  /** hive's default value for table property 'serialization.null.format' */
+  public static final String DEFAULT_NULL_COLUMN_VALUE = "\\N";
+
   /**
    * @return true if the table and all its partitions reside at locations which
    * support caching (e.g. HDFS).

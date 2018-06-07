@@ -21,17 +21,30 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import javax.annotation.concurrent.Immutable;
+
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 
 /**
  * Table instance loaded from {@link LocalCatalog}.
@@ -43,19 +56,23 @@ class LocalTable implements FeTable {
   private final LocalDb db_;
   /** The lower-case name of the table. */
   private final String name_;
+  private final SchemaInfo schemaInfo_;
 
   public static LocalTable load(LocalDb db, String tblName) {
+    // In order to know which kind of table subclass to instantiate, we need
+    // to eagerly grab and parse the top-level Table object from the HMS.
+    SchemaInfo schemaInfo = SchemaInfo.load(db, tblName);
+
     // TODO: change this function to instantiate the appropriate
     // subclass based on the table type (eg view, hbase table, etc)
-    return new LocalTable(db, tblName);
+    return new LocalTable(db, tblName, schemaInfo);
   }
 
-  public LocalTable(LocalDb db, String tblName) {
-    Preconditions.checkNotNull(db);
-    Preconditions.checkNotNull(tblName);
+  public LocalTable(LocalDb db, String tblName, SchemaInfo schemaInfo) {
+    this.db_ = Preconditions.checkNotNull(db);
+    this.name_ = Preconditions.checkNotNull(tblName);
+    this.schemaInfo_ = Preconditions.checkNotNull(schemaInfo);
     Preconditions.checkArgument(tblName.toLowerCase().equals(tblName));
-    this.db_ = db;
-    this.name_ = tblName;
   }
 
   @Override
@@ -65,17 +82,18 @@ class LocalTable implements FeTable {
 
   @Override
   public Table getMetaStoreTable() {
-    throw new UnsupportedOperationException("TODO");
+    return schemaInfo_.msTable_;
   }
 
   @Override
   public String getStorageHandlerClassName() {
-    throw new UnsupportedOperationException("TODO");
+    // Subclasses should override as appropriate.
+    return null;
   }
 
   @Override
   public TCatalogObjectType getCatalogObjectType() {
-    throw new UnsupportedOperationException("TODO");
+    return TCatalogObjectType.TABLE;
   }
 
   @Override
@@ -95,47 +113,53 @@ class LocalTable implements FeTable {
 
   @Override
   public ArrayList<Column> getColumns() {
-    throw new UnsupportedOperationException("TODO");
+    // TODO(todd) why does this return ArrayList instead of List?
+    return new ArrayList<>(schemaInfo_.colsByPos_);
   }
 
   @Override
   public List<Column> getColumnsInHiveOrder() {
-    throw new UnsupportedOperationException("TODO");
+    ArrayList<Column> columns = Lists.newArrayList(getNonClusteringColumns());
+    columns.addAll(getClusteringColumns());
+    return columns;
   }
 
   @Override
   public List<String> getColumnNames() {
-    throw new UnsupportedOperationException("TODO");
+    return Column.toColumnNames(schemaInfo_.colsByPos_);
   }
 
   @Override
   public List<Column> getClusteringColumns() {
-    throw new UnsupportedOperationException("TODO");
+    return ImmutableList.copyOf(
+        schemaInfo_.colsByPos_.subList(0, schemaInfo_.numClusteringCols_));
   }
 
   @Override
   public List<Column> getNonClusteringColumns() {
-    throw new UnsupportedOperationException("TODO");
+    return ImmutableList.copyOf(schemaInfo_.colsByPos_.subList(
+        schemaInfo_.numClusteringCols_,
+        schemaInfo_.colsByPos_.size()));
   }
 
   @Override
   public int getNumClusteringCols() {
-    throw new UnsupportedOperationException("TODO");
+    return schemaInfo_.numClusteringCols_;
   }
 
   @Override
   public boolean isClusteringColumn(Column c) {
-    throw new UnsupportedOperationException("TODO");
+    return schemaInfo_.isClusteringColumn(c);
   }
 
   @Override
   public Column getColumn(String name) {
-    throw new UnsupportedOperationException("TODO");
+    return schemaInfo_.colsByName_.get(name.toLowerCase());
   }
 
   @Override
   public ArrayType getType() {
-    throw new UnsupportedOperationException("TODO");
+    return schemaInfo_.type_;
   }
 
   @Override
@@ -145,16 +169,107 @@ class LocalTable implements FeTable {
 
   @Override
   public long getNumRows() {
-    throw new UnsupportedOperationException("TODO");
+    return schemaInfo_.tableStats_.num_rows;
   }
 
   @Override
   public TTableStats getTTableStats() {
-    throw new UnsupportedOperationException("TODO");
+    return schemaInfo_.tableStats_;
   }
 
   @Override
   public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
     throw new UnsupportedOperationException("TODO");
+  }
+
+  /**
+   * The table schema, loaded from the HMS Table object. This is common
+   * to all Table implementations and includes the column definitions and
+   * table-level stats.
+   *
+   * TODO(todd): some of this code is lifted from 'Table' and, with some
+   * effort, could be refactored to avoid duplication.
+   */
+  @Immutable
+  private static class SchemaInfo {
+    private final Table msTable_;
+
+    private final ArrayType type_;
+    private final ImmutableList<Column> colsByPos_;
+    private final ImmutableMap<String, Column> colsByName_;
+
+    private final int numClusteringCols_;
+    private final String nullColumnValue_;
+
+    private final TTableStats tableStats_;
+
+    /**
+     * Load the schema info from the metastore.
+     */
+    static SchemaInfo load(LocalDb db, String tblName) {
+      try {
+        Table msTbl = db.getCatalog().getMetaProvider().loadTable(
+            db.getName(), tblName);
+        return new SchemaInfo(msTbl);
+      } catch (TException e) {
+        throw new LocalCatalogException(String.format(
+            "Could not load table %s.%s from metastore",
+            db.getName(), tblName), e);
+      } catch (TableLoadingException e) {
+        // In this case, the exception message already has the table name
+        // in the exception message.
+        throw new LocalCatalogException(e);
+      }
+    }
+
+    SchemaInfo(Table msTbl) throws TableLoadingException {
+      msTable_ = msTbl;
+      // set NULL indicator string from table properties
+      String tableNullFormat =
+          msTbl.getParameters().get(serdeConstants.SERIALIZATION_NULL_FORMAT);
+      nullColumnValue_ = tableNullFormat != null ? tableNullFormat :
+          FeFsTable.DEFAULT_NULL_COLUMN_VALUE;
+
+      final String fullName = msTbl.getDbName() + "." + msTbl.getTableName();
+
+      // The number of clustering columns is the number of partition keys.
+      numClusteringCols_ = msTbl.getPartitionKeys().size();
+      // Add all columns to the table. Ordering is important: partition columns first,
+      // then all other columns.
+      colsByPos_ = FeCatalogUtils.fieldSchemasToColumns(
+          Iterables.concat(msTbl.getPartitionKeys(),
+                           msTbl.getSd().getCols()),
+          fullName);
+      FeCatalogUtils.validateClusteringColumns(
+          colsByPos_.subList(0, numClusteringCols_), fullName);
+      colsByName_ = indexColumnNames(colsByPos_);
+      type_ = new ArrayType(columnsToStructType(colsByPos_));
+
+      tableStats_ = new TTableStats(
+          FeCatalogUtils.getRowCount(msTable_.getParameters()));
+      tableStats_.setTotal_file_bytes(
+          FeCatalogUtils.getTotalSize(msTable_.getParameters()));
+    }
+
+    private static StructType columnsToStructType(List<Column> cols) {
+      ArrayList<StructField> fields = Lists.newArrayListWithCapacity(cols.size());
+      for (Column col : cols) {
+        fields.add(new StructField(col.getName(), col.getType(), col.getComment()));
+      }
+      return new StructType(fields);
+    }
+
+    private static ImmutableMap<String, Column> indexColumnNames(List<Column> cols) {
+      ImmutableMap.Builder<String, Column> builder = ImmutableMap.builder();
+      for (Column col : cols) {
+        builder.put(col.getName().toLowerCase(), col);
+      }
+      return builder.build();
+    }
+
+    private boolean isClusteringColumn(Column c) {
+      Preconditions.checkArgument(colsByPos_.get(c.getPosition()) == c);
+      return c.getPosition() < numClusteringCols_;
+    }
   }
 }
