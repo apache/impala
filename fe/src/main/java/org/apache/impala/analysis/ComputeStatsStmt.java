@@ -27,6 +27,7 @@ import java.util.Set;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
@@ -438,7 +439,7 @@ public class ComputeStatsStmt extends StatementBase {
         }
 
         Collection<? extends FeFsPartition> allPartitions =
-            hdfsTable.getPartitions();
+            FeCatalogUtils.loadAllPartitions(hdfsTable);
         for (FeFsPartition p: allPartitions) {
           TPartitionStats partStats = p.getPartitionStats();
           if (!p.hasIncrementalStats() || tableIsMissingColStats) {
@@ -476,7 +477,8 @@ public class ComputeStatsStmt extends StatementBase {
         // TODO(todd) avoid loading all partitions.
         HashSet<FeFsPartition> targetPartitions =
             Sets.newHashSet(partitionSet_.getPartitions());
-        Collection<? extends FeFsPartition> allPartitions = hdfsTable.getPartitions();
+        Collection<? extends FeFsPartition> allPartitions =
+            FeCatalogUtils.loadAllPartitions(hdfsTable);
         for (FeFsPartition p : allPartitions) {
           if (targetPartitions.contains(p)) continue;
           TPartitionStats partStats = p.getPartitionStats();
@@ -610,7 +612,9 @@ public class ComputeStatsStmt extends StatementBase {
     // Compute the sample of files and set 'sampleFileBytes_'.
     long minSampleBytes = analyzer.getQueryOptions().compute_stats_min_sample_size;
     long samplePerc = sampleParams_.getPercentBytes();
-    Collection<? extends FeFsPartition> partitions = hdfsTable.getPartitions();
+    // TODO(todd): can we avoid loading all the partitions for this?
+    Collection<? extends FeFsPartition> partitions =
+        FeCatalogUtils.loadAllPartitions(hdfsTable);
     Map<Long, List<FileDescriptor>> sample = hdfsTable.getFilesSample(
         partitions, samplePerc, minSampleBytes, sampleSeed);
     long sampleFileBytes = 0;
@@ -758,7 +762,7 @@ public class ComputeStatsStmt extends StatementBase {
       affectedPartitions = partitionSet_.getPartitions();
     } else {
       FeFsTable hdfsTable = (FeFsTable)table_;
-      affectedPartitions = hdfsTable.getPartitions();
+      affectedPartitions = FeCatalogUtils.loadAllPartitions(hdfsTable);
     }
     for (FeFsPartition partition: affectedPartitions) {
       if (partition.getFileFormat() != HdfsFileFormat.PARQUET

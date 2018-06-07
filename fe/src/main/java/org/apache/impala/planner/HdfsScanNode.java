@@ -165,7 +165,7 @@ public class HdfsScanNode extends ScanNode {
   private final HdfsTable tbl_;
 
   // List of partitions to be scanned. Partitions have been pruned.
-  private final List<FeFsPartition> partitions_;
+  private final List<? extends FeFsPartition> partitions_;
 
   // Parameters for table sampling. Null if not sampling.
   private final TableSampleClause sampleParams_;
@@ -278,7 +278,7 @@ public class HdfsScanNode extends ScanNode {
    * class comments above for details.
    */
   public HdfsScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
-      List<FeFsPartition> partitions, TableRef hdfsTblRef, AggregateInfo aggInfo) {
+      List<? extends FeFsPartition> partitions, TableRef hdfsTblRef, AggregateInfo aggInfo) {
     super(id, desc, "SCAN HDFS");
     Preconditions.checkState(desc.getTable() instanceof FeFsTable);
     tbl_ = (HdfsTable)desc.getTable();

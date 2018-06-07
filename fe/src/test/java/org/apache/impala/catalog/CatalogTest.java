@@ -287,7 +287,8 @@ public class CatalogTest {
   public void TestPartitions() throws CatalogException {
     HdfsTable table =
         (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypes");
-    Collection<? extends FeFsPartition> partitions = table.getPartitions();
+    Collection<? extends FeFsPartition> partitions =
+        FeCatalogUtils.loadAllPartitions(table);
 
     // check that partition keys cover the date range 1/1/2009-12/31/2010
     // and that we have one file per partition.

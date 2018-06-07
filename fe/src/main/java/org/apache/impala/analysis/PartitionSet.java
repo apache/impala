@@ -43,14 +43,14 @@ import com.google.common.collect.Sets;
 public class PartitionSet extends PartitionSpecBase {
   private final List<Expr> partitionExprs_;
 
-  // Result of analysis
-  private List<FeFsPartition> partitions_ = Lists.newArrayList();
+  // Result of analysis, null until analysis is complete.
+  private List<? extends FeFsPartition> partitions_;
 
   public PartitionSet(List<Expr> partitionExprs) {
     this.partitionExprs_ = ImmutableList.copyOf(partitionExprs);
   }
 
-  public List<FeFsPartition> getPartitions() { return partitions_; }
+  public List<? extends FeFsPartition> getPartitions() { return partitions_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {

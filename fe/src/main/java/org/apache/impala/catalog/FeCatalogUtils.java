@@ -17,12 +17,15 @@
 
 package org.apache.impala.catalog;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 
 /**
  * Static utility functions shared between FeCatalog implementations.
@@ -120,4 +123,29 @@ public abstract class FeCatalogUtils {
     return -1;
   }
 
+  /**
+   * Convenience method to load exactly one partition from a table.
+   *
+   * TODO(todd): upon moving to Java8 this could be a default method
+   * in FeFsTable.
+   */
+  public static FeFsPartition loadPartition(FeFsTable table,
+      long partitionId) {
+    Collection<? extends FeFsPartition> partCol = table.loadPartitions(
+        Collections.singleton(partitionId));
+    if (partCol.size() != 1) {
+      throw new AssertionError(String.format(
+          "expected exactly one result fetching partition ID %s from table %s " +
+          "(got %s)", partitionId, table.getFullName(), partCol.size()));
+    }
+    return Iterables.getOnlyElement(partCol);
+  }
+
+  /**
+   * Load all partitions from the given table.
+   */
+  public static Collection<? extends FeFsPartition> loadAllPartitions(
+      FeFsTable table) {
+    return table.loadPartitions(table.getPartitionIds());
+  }
 }

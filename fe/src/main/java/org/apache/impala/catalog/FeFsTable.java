@@ -109,7 +109,7 @@ public interface FeFsTable extends FeTable {
   /**
    * @return all partitions of this table
    */
-  Collection<? extends FeFsPartition> getPartitions();
+  Collection<? extends PrunablePartition> getPartitions();
 
   /**
    * @return identifiers for all partitions in this table
@@ -117,9 +117,9 @@ public interface FeFsTable extends FeTable {
   public Set<Long> getPartitionIds();
 
   /**
-   * @return the map from partition identifier to partition object
+   * Returns the map from partition identifier to prunable partition.
    */
-  Map<Long, ? extends FeFsPartition> getPartitionMap();
+  Map<Long, ? extends PrunablePartition> getPartitionMap();
 
   /**
    * @param the index of the target partitioning column
@@ -133,6 +133,13 @@ public interface FeFsTable extends FeTable {
    * index 'colIdx'.
    */
   Set<Long> getNullPartitionIds(int colIdx);
+
+  /**
+   * Returns the full partition objects for the given partition IDs, which must
+   * have been obtained by prior calls to the above methods.
+   * @throws IllegalArgumentException if any partition ID does not exist
+   */
+  List<? extends FeFsPartition> loadPartitions(Collection<Long> ids);
 
   /**
    * Parses and returns the value of the 'skip.header.line.count' table property. If the

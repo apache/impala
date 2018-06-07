@@ -75,7 +75,7 @@ import com.google.flatbuffers.FlatBufferBuilder;
  * order with NULLs sorting last. The ordering is useful for displaying partitions
  * in SHOW statements.
  */
-public class HdfsPartition implements FeFsPartition {
+public class HdfsPartition implements FeFsPartition, PrunablePartition {
   /**
    * Metadata for a single file in this partition.
    */
