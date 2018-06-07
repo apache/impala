@@ -172,4 +172,8 @@ class LocalDb implements FeDb {
     tdb.setMetastore_db(getMetaStoreDb());
     return tdb;
   }
+
+  LocalCatalog getCatalog() {
+    return catalog_;
+  }
 }

@@ -21,8 +21,10 @@ import static org.junit.Assert.*;
 
 import java.util.Set;
 
+import org.apache.impala.catalog.CatalogTest;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.util.PatternMatcher;
 import org.junit.Before;
 import org.junit.Test;
@@ -57,7 +59,7 @@ public class LocalCatalogTest {
   }
 
   @Test
-  public void testTables() throws Exception {
+  public void testListTables() throws Exception {
     Set<String> names = ImmutableSet.copyOf(catalog_.getTableNames(
         "functional", PatternMatcher.MATCHER_MATCH_ALL));
     assertTrue(names.contains("alltypes"));
@@ -73,4 +75,21 @@ public class LocalCatalogTest {
     assertEquals("functional.alltypes", t.getFullName());
   }
 
+  @Test
+  public void testLoadTableBasics() throws Exception {
+    FeDb functionalDb = catalog_.getDb("functional");
+    CatalogTest.checkTableCols(functionalDb, "alltypes", 2,
+        new String[]
+          {"year", "month", "id", "bool_col", "tinyint_col", "smallint_col",
+           "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
+           "string_col", "timestamp_col"},
+        new Type[]
+          {Type.INT, Type.INT, Type.INT,
+           Type.BOOLEAN, Type.TINYINT, Type.SMALLINT,
+           Type.INT, Type.BIGINT, Type.FLOAT,
+           Type.DOUBLE, Type.STRING, Type.STRING,
+           Type.TIMESTAMP});
+    FeTable t = functionalDb.getTable("alltypes");
+    assertEquals(7300, t.getNumRows());
+  }
 }

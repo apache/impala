@@ -25,7 +25,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
@@ -174,8 +173,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * Sets 'tableStats_' by extracting the table statistics from the given HMS table.
    */
   public void setTableStats(org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    tableStats_ = new TTableStats(getRowCount(msTbl.getParameters()));
-    tableStats_.setTotal_file_bytes(getTotalSize(msTbl.getParameters()));
+    tableStats_ = new TTableStats(FeCatalogUtils.getRowCount(msTbl.getParameters()));
+    tableStats_.setTotal_file_bytes(FeCatalogUtils.getTotalSize(msTbl.getParameters()));
   }
 
   public void addColumn(Column col) {
@@ -240,29 +239,6 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
         continue;
       }
     }
-  }
-
-  /**
-   * Returns the value of the ROW_COUNT constant, or -1 if not found.
-   */
-  protected static long getRowCount(Map<String, String> parameters) {
-    return getLongParam(StatsSetupConst.ROW_COUNT, parameters);
-  }
-
-  protected static long getTotalSize(Map<String, String> parameters) {
-    return getLongParam(StatsSetupConst.TOTAL_SIZE, parameters);
-  }
-
-  private static long getLongParam(String key, Map<String, String> parameters) {
-    if (parameters == null) return -1;
-    String value = parameters.get(key);
-    if (value == null) return -1;
-    try {
-      return Long.valueOf(value);
-    } catch (NumberFormatException exc) {
-      // ignore
-    }
-    return -1;
   }
 
   /**
@@ -411,29 +387,11 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   }
 
   /**
-   * Gets the ColumnType from the given FieldSchema by using Impala's SqlParser.
-   * Throws a TableLoadingException if the FieldSchema could not be parsed.
-   * The type can either be:
-   *   - Supported by Impala, in which case the type is returned.
-   *   - A type Impala understands but is not yet implemented (e.g. date), the type is
-   *     returned but type.IsSupported() returns false.
-   *   - A supported type that exceeds an Impala limit, e.g., on the nesting depth.
-   *   - A type Impala can't understand at all, and a TableLoadingException is thrown.
+   * @see FeCatalogUtils#parseColumnType(FieldSchema, String)
    */
-   protected Type parseColumnType(FieldSchema fs) throws TableLoadingException {
-     Type type = Type.parseColumnType(fs.getType());
-     if (type == null) {
-       throw new TableLoadingException(String.format(
-           "Unsupported type '%s' in column '%s' of table '%s'",
-           fs.getType(), fs.getName(), getName()));
-     }
-     if (type.exceedsMaxNestingDepth()) {
-       throw new TableLoadingException(String.format(
-           "Type exceeds the maximum nesting depth of %s:\n%s",
-           Type.MAX_NESTING_DEPTH, type.toSql()));
-     }
-     return type;
-   }
+  protected Type parseColumnType(FieldSchema fs) throws TableLoadingException {
+    return FeCatalogUtils.parseColumnType(fs, getName());
+  }
 
   @Override // FeTable
   public Db getDb() { return db_; }
