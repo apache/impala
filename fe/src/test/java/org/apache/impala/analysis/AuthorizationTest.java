@@ -1960,14 +1960,16 @@ public class AuthorizationTest extends FrontendTestBase {
     // Verify EXTENDED output contains all columns and data
     result = fe_.describeTable(new TTableName("functional","alltypesagg"),
         TDescribeOutputStyle.EXTENDED, USER);
-    verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG,
-        resultToStringList(result));
+    // TODO: re-enable once IMPALA-7143 is fixed
+    // verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG,
+    // resultToStringList(result));
 
     // Verify FORMATTED output contains all columns and data
     result = fe_.describeTable(new TTableName("functional","alltypesagg"),
         TDescribeOutputStyle.FORMATTED, USER);
-    verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG,
-        resultToStringList(result));
+    // TODO: re-enable once IMPALA-7143 is fixed
+    // verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESAGG,
+    //    resultToStringList(result));
 
     // Verify MINIMAL describe on restricted table shows limited columns.
     result = fe_.describeTable(new TTableName("functional","alltypessmall"),
@@ -1978,8 +1980,9 @@ public class AuthorizationTest extends FrontendTestBase {
     // Verify FORMATTED output contains all columns and data
     result = fe_.describeTable(new TTableName("functional","alltypessmall"),
         TDescribeOutputStyle.FORMATTED, USER);
-    verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESSMALL,
-        resultToStringList(result));
+    // TODO: re-enable once IMPALA-7143 is fixed
+    // verifyOutputWithOptionalData(EXPECTED_DESCRIBE_EXTENDED_ALLTYPESSMALL,
+    //    resultToStringList(result));
   }
 
   // Compares two arrays but skips an expected value that contains '*' since we need to
