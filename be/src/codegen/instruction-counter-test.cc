@@ -73,19 +73,19 @@ llvm::Module* CodegenMulAdd(llvm::LLVMContext* context) {
 
 TEST_F(InstructionCounterTest, Count) {
   llvm::Module* MulAddModule = CodegenMulAdd(&context_);
-  InstructionCounter* instruction_counter = new InstructionCounter();
-  instruction_counter->visit(*MulAddModule);
-  instruction_counter->PrintCounters();
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TOTAL_FUNCTIONS), 1);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TOTAL_INSTS), 3);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TERMINATOR_INSTS), 1);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::MEMORY_INSTS), 0);
+  InstructionCounter instruction_counter;
+  instruction_counter.visit(*MulAddModule);
+  instruction_counter.PrintCounters();
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS), 1);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TOTAL_INSTS), 3);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TERMINATOR_INSTS), 1);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::MEMORY_INSTS), 0);
 
   // Test Reset
-  instruction_counter->ResetCount();
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TOTAL_FUNCTIONS), 0);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TOTAL_INSTS), 0);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::MEMORY_INSTS), 0);
+  instruction_counter.ResetCount();
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS), 0);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TOTAL_INSTS), 0);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::MEMORY_INSTS), 0);
 }
 
 // IR output from CodegenGcd
@@ -152,25 +152,25 @@ llvm::Module* CodegenGcd(llvm::LLVMContext* context) {
 
 TEST_F(InstructionCounterTest, TestMemInstrCount) {
   llvm::Module* GcdModule = CodegenGcd(&context_);
-  InstructionCounter* instruction_counter = new InstructionCounter();
-  instruction_counter->visit(*GcdModule);
-  std::cout << instruction_counter->PrintCounters();
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TOTAL_FUNCTIONS), 1);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TOTAL_BLOCKS), 5);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TOTAL_INSTS), 11);
+  InstructionCounter instruction_counter;
+  instruction_counter.visit(*GcdModule);
+  std::cout << instruction_counter.PrintCounters();
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS), 1);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TOTAL_BLOCKS), 5);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TOTAL_INSTS), 11);
   // Test Category Totals
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TERMINATOR_INSTS), 5);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::MEMORY_INSTS), 0);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::OTHER_INSTS), 4);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TERMINATOR_INSTS), 5);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::MEMORY_INSTS), 0);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::OTHER_INSTS), 4);
 
   // Test Reset
-  instruction_counter->ResetCount();
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TOTAL_FUNCTIONS), 0);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TOTAL_BLOCKS), 0);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TOTAL_INSTS), 0);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::TERMINATOR_INSTS), 0);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::MEMORY_INSTS), 0);
-  EXPECT_EQ(instruction_counter->GetCount(InstructionCounter::OTHER_INSTS), 0);
+  instruction_counter.ResetCount();
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TOTAL_FUNCTIONS), 0);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TOTAL_BLOCKS), 0);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TOTAL_INSTS), 0);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::TERMINATOR_INSTS), 0);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::MEMORY_INSTS), 0);
+  EXPECT_EQ(instruction_counter.GetCount(InstructionCounter::OTHER_INSTS), 0);
 }
 
 }  // namespace impala

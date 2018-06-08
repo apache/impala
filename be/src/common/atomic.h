@@ -105,6 +105,12 @@ class AtomicInt {
     return base::subtle::Barrier_CompareAndSwap(&value_, old_val, new_val) == old_val;
   }
 
+  /// Store 'new_val' and return the previous value. Implies a Release memory barrier
+  /// (i.e. the same as Store()).
+  ALWAYS_INLINE T Swap(T new_val) {
+    return base::subtle::Release_AtomicExchange(&value_, new_val);
+  }
+
  private:
   T value_;
 
@@ -130,6 +136,11 @@ class AtomicPtr {
   /// Atomic store with "release" memory-ordering semantic.
   ALWAYS_INLINE void Store(T* val) { ptr_.Store(reinterpret_cast<intptr_t>(val)); }
 
+  /// Store 'new_val' and return the previous value. Implies a Release memory barrier
+  /// (i.e. the same as Store()).
+  ALWAYS_INLINE T* Swap(T* val) {
+    return reinterpret_cast<T*>(ptr_.Swap(reinterpret_cast<intptr_t>(val)));
+  }
  private:
   internal::AtomicInt<intptr_t> ptr_;
 };

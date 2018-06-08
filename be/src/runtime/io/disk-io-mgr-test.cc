@@ -1041,7 +1041,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
   unique_ptr<BufferPool::ClientHandle[]> clients(
       new BufferPool::ClientHandle[NUM_READERS]);
   vector<unique_ptr<RequestContext>> readers(NUM_READERS);
-  vector<char*> results(NUM_READERS);
+  vector<unique_ptr<char[]>> results(NUM_READERS);
 
   // Initialize data for each reader.  The data will be
   // 'abcd...' for reader one, 'bcde...' for reader two (wrapping around at 'z')
@@ -1063,8 +1063,8 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
     stat(file_names[i].c_str(), &stat_val);
     mtimes[i] = stat_val.st_mtime;
 
-    results[i] = new char[DATA_LEN + 1];
-    memset(results[i], 0, DATA_LEN + 1);
+    results[i].reset(new char[DATA_LEN + 1]);
+    memset(results[i].get(), 0, DATA_LEN + 1);
   }
 
   // This exercises concurrency, run the test multiple times

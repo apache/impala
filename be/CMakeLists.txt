@@ -510,12 +510,18 @@ FUNCTION(ADD_BE_TEST TEST_NAME)
   ADD_DEPENDENCIES(be-test ${TEST_NAME})
 ENDFUNCTION()
 
+FUNCTION(ENABLE_LSAN_FOR_TEST TEST_NAME)
+  SET_TESTS_PROPERTIES(${TEST_NAME} PROPERTIES ENVIRONMENT
+      "ASAN_OPTIONS=handle_segv=0 detect_leaks=1 allocator_may_return_null=1")
+  SET_TESTS_PROPERTIES(${TEST_NAME} PROPERTIES ENVIRONMENT
+      "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/bin/lsan-suppressions.txt")
+ENDFUNCTION()
+
 # Same as ADD_BE_TEST, but also enable LeakSanitizer.
 # TODO: IMPALA-2746: we should make this the default.
 FUNCTION(ADD_BE_LSAN_TEST TEST_NAME)
   ADD_BE_TEST(${TEST_NAME})
-  SET_TESTS_PROPERTIES(${TEST_NAME} PROPERTIES ENVIRONMENT
-      "ASAN_OPTIONS=handle_segv=0 detect_leaks=1 allocator_may_return_null=1")
+  ENABLE_LSAN_FOR_TEST(${TEST_NAME})
 ENDFUNCTION()
 
 # Similar utility function for tests that use the UDF SDK
@@ -532,6 +538,7 @@ FUNCTION(ADD_UDF_TEST TEST_NAME)
   ADD_TEST(${TEST_NAME} "${BUILD_OUTPUT_ROOT_DIRECTORY}/${DIR_NAME}/${TEST_NAME}"
     -log_dir=$ENV{IMPALA_BE_TEST_LOGS_DIR})
   ADD_DEPENDENCIES(be-test ${TEST_NAME})
+  ENABLE_LSAN_FOR_TEST(${TEST_NAME})
 ENDFUNCTION()
 
 # Function to generate rule to cross compile a source file to an IR module.

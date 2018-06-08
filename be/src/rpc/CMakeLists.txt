@@ -39,20 +39,20 @@ add_library(Rpc
 )
 add_dependencies(Rpc gen-deps)
 
-ADD_BE_TEST(thrift-util-test)
-ADD_BE_TEST(thrift-server-test)
-# The thrift-server-test uses some utilites from the Kudu security test code.
+ADD_BE_LSAN_TEST(thrift-util-test)
+ADD_BE_TEST(thrift-server-test) # TODO: this test leaks servers
+# The thrift-server-test uses some utilities from the Kudu security test code.
 target_link_libraries(thrift-server-test security-test-for-impala)
 
-ADD_BE_TEST(authentication-test)
+ADD_BE_LSAN_TEST(authentication-test)
 
-ADD_BE_TEST(rpc-mgr-test)
+ADD_BE_TEST(rpc-mgr-test) # TODO: this test leaks various KRPC things
 add_dependencies(rpc-mgr-test rpc_test_proto)
 target_link_libraries(rpc-mgr-test rpc_test_proto)
 target_link_libraries(rpc-mgr-test security-test-for-impala)
 target_link_libraries(rpc-mgr-test ${KRB5_REALM_OVERRIDE})
 
-ADD_BE_TEST(rpc-mgr-kerberized-test)
+ADD_BE_TEST(rpc-mgr-kerberized-test) # TODO: this test leaks various KRPC things
 add_dependencies(rpc-mgr-kerberized-test rpc_test_proto)
 target_link_libraries(rpc-mgr-kerberized-test rpc_test_proto)
 target_link_libraries(rpc-mgr-kerberized-test security-test-for-impala)

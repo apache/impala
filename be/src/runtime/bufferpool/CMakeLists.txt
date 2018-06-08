@@ -31,8 +31,8 @@ add_library(BufferPool
 )
 add_dependencies(BufferPool gen-deps)
 
-ADD_BE_TEST(buffer-allocator-test)
-ADD_BE_TEST(buffer-pool-test)
-ADD_BE_TEST(free-list-test)
-ADD_BE_TEST(reservation-tracker-test)
-ADD_BE_TEST(suballocator-test)
+ADD_BE_LSAN_TEST(buffer-allocator-test)
+ADD_BE_LSAN_TEST(buffer-pool-test)
+ADD_BE_LSAN_TEST(free-list-test)
+ADD_BE_LSAN_TEST(reservation-tracker-test)
+ADD_BE_LSAN_TEST(suballocator-test)

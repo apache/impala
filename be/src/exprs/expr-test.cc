@@ -168,6 +168,9 @@ class ScopedLocalUnixTimestampConversionOverride {
 
 class ExprTest : public testing::Test {
  protected:
+  // Pool for objects to be destroyed during test teardown.
+  ObjectPool pool_;
+
   // Maps from enum value of primitive integer type to the minimum value that is
   // outside of the next smaller-resolution type. For example the value for type
   // TYPE_SMALLINT is numeric_limits<int8_t>::max()+1. There is a GREATEST test in
@@ -237,6 +240,8 @@ class ExprTest : public testing::Test {
     default_type_strs_[TYPE_TIMESTAMP] = default_timestamp_str_;
     default_type_strs_[TYPE_DECIMAL] = default_decimal_str_;
   }
+
+  virtual void TearDown() { pool_.Clear(); }
 
   string GetValue(const string& expr, const ColumnType& expr_type,
       bool expect_error = false) {
@@ -1023,7 +1028,7 @@ class ExprTest : public testing::Test {
   template<class T>
   bool ParseString(const string& str, T* val);
 
-  // Create a Literal expression out of 'str'.
+  // Create a Literal expression out of 'str'. Adds the returned literal to pool_.
   Literal* CreateLiteral(const ColumnType& type, const string& str);
 
   // Helper function for LiteralConstruction test. Creates a Literal expression
@@ -1050,6 +1055,15 @@ class ExprTest : public testing::Test {
     } else {
       TestIsNull("cast(" + stmt + " as timestamp)", TYPE_TIMESTAMP);
     }
+  }
+
+  // Wrapper around UdfTestHarness::CreateTestContext() that stores the context in
+  // 'pool_' to be automatically cleaned up.
+  FunctionContext* CreateUdfTestContext(const FunctionContext::TypeDesc& return_type,
+      const std::vector<FunctionContext::TypeDesc>& arg_types,
+      RuntimeState* state = nullptr, MemPool* pool = nullptr) {
+    return pool_.Add(
+        UdfTestHarness::CreateTestContext(return_type, arg_types, state, pool));
   }
 };
 
@@ -1182,51 +1196,51 @@ Literal* ExprTest::CreateLiteral(const ColumnType& type, const string& str) {
     case TYPE_BOOLEAN: {
       bool v = false;
       EXPECT_TRUE(ParseString<bool>(str, &v));
-      return new Literal(type, v);
+      return pool_.Add(new Literal(type, v));
     }
     case TYPE_TINYINT: {
       int8_t v = 0;
       EXPECT_TRUE(ParseString<int8_t>(str, &v));
-      return new Literal(type, v);
+      return pool_.Add(new Literal(type, v));
     }
     case TYPE_SMALLINT: {
       int16_t v = 0;
       EXPECT_TRUE(ParseString<int16_t>(str, &v));
-      return new Literal(type, v);
+      return pool_.Add(new Literal(type, v));
     }
     case TYPE_INT: {
       int32_t v = 0;
       EXPECT_TRUE(ParseString<int32_t>(str, &v));
-      return new Literal(type, v);
+      return pool_.Add(new Literal(type, v));
     }
     case TYPE_BIGINT: {
       int64_t v = 0;
       EXPECT_TRUE(ParseString<int64_t>(str, &v));
-      return new Literal(type, v);
+      return pool_.Add(new Literal(type, v));
     }
     case TYPE_FLOAT: {
       float v = 0;
       EXPECT_TRUE(ParseString<float>(str, &v));
-      return new Literal(type, v);
+      return pool_.Add(new Literal(type, v));
     }
     case TYPE_DOUBLE: {
       double v = 0;
       EXPECT_TRUE(ParseString<double>(str, &v));
-      return new Literal(type, v);
+      return pool_.Add(new Literal(type, v));
     }
     case TYPE_STRING:
     case TYPE_VARCHAR:
     case TYPE_CHAR:
-      return new Literal(type, str);
+      return pool_.Add(new Literal(type, str));
     case TYPE_TIMESTAMP: {
       TimestampValue v;
       EXPECT_TRUE(ParseString<TimestampValue>(str, &v));
-      return new Literal(type, v);
+      return pool_.Add(new Literal(type, v));
     }
     case TYPE_DECIMAL: {
       double v = 0;
       EXPECT_TRUE(ParseString<double>(str, &v));
-      return new Literal(type, v);
+      return pool_.Add(new Literal(type, v));
     }
     default:
       DCHECK(false) << "Invalid type: " << type.DebugString();
@@ -1238,6 +1252,7 @@ template <typename T>
 void ExprTest::TestSingleLiteralConstruction(
     const ColumnType& type, const T& value, const string& string_val) {
   ObjectPool pool;
+
   RuntimeState state(TQueryCtx(), ExecEnv::GetInstance());
   MemTracker tracker;
   MemPool mem_pool(&tracker);
@@ -3826,7 +3841,7 @@ TEST_F(ExprTest, StringFunctions) {
   FunctionContext::TypeDesc str_desc;
   str_desc.type = FunctionContext::Type::TYPE_STRING;
   std::vector<FunctionContext::TypeDesc> v(3, str_desc);
-  auto context = UdfTestHarness::CreateTestContext(str_desc, v, nullptr, &pool);
+  FunctionContext* context = CreateUdfTestContext(str_desc, v, nullptr, &pool);
 
   StringVal giga(static_cast<uint8_t*>(giga_buf->data()), StringVal::MAX_LENGTH);
   StringVal a("A");
@@ -3863,7 +3878,7 @@ TEST_F(ExprTest, StringFunctions) {
   EXPECT_TRUE(r4.is_null);
   // Re-create context to clear the error from failed allocation.
   UdfTestHarness::CloseContext(context);
-  context = UdfTestHarness::CreateTestContext(str_desc, v, nullptr, &pool);
+  context = CreateUdfTestContext(str_desc, v, nullptr, &pool);
 
   // Similar test for second overflow.  This tests overflowing on re-allocation.
   (*short_buf)[4095] = 'Z';
@@ -3872,7 +3887,7 @@ TEST_F(ExprTest, StringFunctions) {
   EXPECT_TRUE(r5.is_null);
   // Re-create context to clear the error from failed allocation.
   UdfTestHarness::CloseContext(context);
-  context = UdfTestHarness::CreateTestContext(str_desc, v, nullptr, &pool);
+  context = CreateUdfTestContext(str_desc, v, nullptr, &pool);
 
   // Finally, test expanding to exactly MAX_LENGTH
   // There are 4 Zs in giga4 (not including the trailing one, as we truncate that)
@@ -7370,8 +7385,6 @@ void ValidateLayout(const vector<ScalarExpr*>& exprs, int expected_byte_size,
 }
 
 TEST_F(ExprTest, ResultsLayoutTest) {
-  ObjectPool pool;
-
   vector<ScalarExpr*> exprs;
   map<int, set<int>> expected_offsets;
 
@@ -7412,9 +7425,9 @@ TEST_F(ExprTest, ResultsLayoutTest) {
     // With one expr, all offsets should be 0.
     expected_offsets[t.GetByteSize()] = set<int>({0});
     if (t.type != TYPE_TIMESTAMP) {
-      exprs.push_back(pool.Add(CreateLiteral(t, "0")));
+      exprs.push_back(CreateLiteral(t, "0"));
     } else {
-      exprs.push_back(pool.Add(CreateLiteral(t, "2016-11-09")));
+      exprs.push_back(CreateLiteral(t, "2016-11-09"));
     }
     if (t.IsVarLenStringType()) {
       ValidateLayout(exprs, 16, 0, expected_offsets);
@@ -7430,28 +7443,27 @@ TEST_F(ExprTest, ResultsLayoutTest) {
 
   // Test layout adding a bunch of exprs.  This is designed to trigger padding.
   // The expected result is computed along the way
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_BOOLEAN, "0")));
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_TINYINT, "0")));
-  exprs.push_back(pool.Add(CreateLiteral(ColumnType::CreateCharType(1), "0")));
+  exprs.push_back(CreateLiteral(TYPE_BOOLEAN, "0"));
+  exprs.push_back(CreateLiteral(TYPE_TINYINT, "0"));
+  exprs.push_back(CreateLiteral(ColumnType::CreateCharType(1), "0"));
   expected_offsets[1].insert(expected_byte_size);
   expected_offsets[1].insert(expected_byte_size + 1);
   expected_offsets[1].insert(expected_byte_size + 2);
   expected_byte_size += 3 * 1 + 1;  // 1 byte of padding
 
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_SMALLINT, "0")));
+  exprs.push_back(CreateLiteral(TYPE_SMALLINT, "0"));
   expected_offsets[2].insert(expected_byte_size);
   expected_byte_size += 2; // No padding before CHAR
 
-  exprs.push_back(pool.Add(CreateLiteral(ColumnType::CreateCharType(3), "0")));
+  exprs.push_back(CreateLiteral(ColumnType::CreateCharType(3), "0"));
   expected_offsets[3].insert(expected_byte_size);
   expected_byte_size += 3 + 3; // 3 byte of padding
   ASSERT_EQ(expected_byte_size % 4, 0);
 
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_INT, "0")));
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_FLOAT, "0")));
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_FLOAT, "0")));
-  exprs.push_back(pool.Add(
-      CreateLiteral(ColumnType::CreateDecimalType(9, 0), "0")));
+  exprs.push_back(CreateLiteral(TYPE_INT, "0"));
+  exprs.push_back(CreateLiteral(TYPE_FLOAT, "0"));
+  exprs.push_back(CreateLiteral(TYPE_FLOAT, "0"));
+  exprs.push_back(CreateLiteral(ColumnType::CreateDecimalType(9, 0), "0"));
   expected_offsets[4].insert(expected_byte_size);
   expected_offsets[4].insert(expected_byte_size + 4);
   expected_offsets[4].insert(expected_byte_size + 8);
@@ -7459,12 +7471,11 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_byte_size += 4 * 4 + 4;  // 4 bytes of padding
   ASSERT_EQ(expected_byte_size % 8, 0);
 
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_BIGINT, "0")));
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_BIGINT, "0")));
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_BIGINT, "0")));
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_DOUBLE, "0")));
-  exprs.push_back(pool.Add(
-      CreateLiteral(ColumnType::CreateDecimalType(18, 0), "0")));
+  exprs.push_back(CreateLiteral(TYPE_BIGINT, "0"));
+  exprs.push_back(CreateLiteral(TYPE_BIGINT, "0"));
+  exprs.push_back(CreateLiteral(TYPE_BIGINT, "0"));
+  exprs.push_back(CreateLiteral(TYPE_DOUBLE, "0"));
+  exprs.push_back(CreateLiteral(ColumnType::CreateDecimalType(18, 0), "0"));
   expected_offsets[8].insert(expected_byte_size);
   expected_offsets[8].insert(expected_byte_size + 8);
   expected_offsets[8].insert(expected_byte_size + 16);
@@ -7473,20 +7484,18 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_byte_size += 5 * 8;      // No more padding
   ASSERT_EQ(expected_byte_size % 8, 0);
 
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_TIMESTAMP, "2016-11-09")));
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_TIMESTAMP, "2016-11-09")));
-  exprs.push_back(pool.Add(
-      CreateLiteral(ColumnType::CreateDecimalType(20, 0), "0")));
+  exprs.push_back(CreateLiteral(TYPE_TIMESTAMP, "2016-11-09"));
+  exprs.push_back(CreateLiteral(TYPE_TIMESTAMP, "2016-11-09"));
+  exprs.push_back(CreateLiteral(ColumnType::CreateDecimalType(20, 0), "0"));
   expected_offsets[16].insert(expected_byte_size);
   expected_offsets[16].insert(expected_byte_size + 16);
   expected_offsets[16].insert(expected_byte_size + 32);
   expected_byte_size += 3 * 16;
   ASSERT_EQ(expected_byte_size % 8, 0);
 
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_STRING, "0")));
-  exprs.push_back(pool.Add(CreateLiteral(TYPE_STRING, "0")));
-  exprs.push_back(pool.Add(
-      CreateLiteral(ColumnType::CreateVarcharType(1), "0")));
+  exprs.push_back(CreateLiteral(TYPE_STRING, "0"));
+  exprs.push_back(CreateLiteral(TYPE_STRING, "0"));
+  exprs.push_back(CreateLiteral(ColumnType::CreateVarcharType(1), "0"));
   expected_offsets[0].insert(expected_byte_size);
   expected_offsets[0].insert(expected_byte_size + 16);
   expected_offsets[0].insert(expected_byte_size + 32);

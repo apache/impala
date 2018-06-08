@@ -1960,7 +1960,7 @@ void BufferPoolTest::TestRandomInternalMulti(
   }
 
   AtomicInt32 stop_maintenance(0);
-  thread* maintenance_thread = new thread([&pool, &stop_maintenance]() {
+  thread maintenance_thread([&pool, &stop_maintenance]() {
     while (stop_maintenance.Load() == 0) {
       pool.Maintenance();
       SleepForMs(50);
@@ -1968,7 +1968,7 @@ void BufferPoolTest::TestRandomInternalMulti(
   });
   workers.join_all();
   stop_maintenance.Add(1);
-  maintenance_thread->join();
+  maintenance_thread.join();
   global_reservations_.Close();
 }
 

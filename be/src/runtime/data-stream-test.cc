@@ -84,10 +84,6 @@ DECLARE_string(datastream_service_queue_mem_limit);
 
 DECLARE_bool(use_krpc);
 
-// We reserve contiguous memory for senders in SetUp. If a test uses more
-// senders, a DCHECK will fail and you should increase this value.
-static const int MAX_SENDERS = 16;
-static const int MAX_RECEIVERS = 16;
 static const PlanNodeId DEST_NODE_ID = 1;
 static const int BATCH_CAPACITY = 100;  // rows
 static const int PER_ROW_DATA = 8;
@@ -238,9 +234,6 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
     hash_sink_.output_partition.__isset.partition_exprs = true;
     hash_sink_.output_partition.partition_exprs.push_back(expr);
 
-    // Ensure that individual sender info addresses don't change
-    sender_info_.reserve(MAX_SENDERS);
-    receiver_info_.reserve(MAX_RECEIVERS);
     if (GetParam() == USE_THRIFT) {
       StartThriftBackend();
     } else {
@@ -329,38 +322,36 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
   vector<TPlanFragmentDestination> dest_;
 
   struct SenderInfo {
-    thread* thread_handle;
+    unique_ptr<thread> thread_handle;
     Status status;
-    int num_bytes_sent;
-
-    SenderInfo(): thread_handle(nullptr), num_bytes_sent(0) {}
+    int num_bytes_sent = 0;
   };
-  vector<SenderInfo> sender_info_;
+  // Allocate each SenderInfo separately so the address doesn't change.
+  vector<unique_ptr<SenderInfo>> sender_info_;
 
   struct ReceiverInfo {
     TPartitionType::type stream_type;
     int num_senders;
     int receiver_num;
 
-    thread* thread_handle;
+    unique_ptr<thread> thread_handle;
     shared_ptr<DataStreamRecvrBase> stream_recvr;
     Status status;
-    int num_rows_received;
+    int num_rows_received = 0;
     multiset<int64_t> data_values;
 
     ReceiverInfo(TPartitionType::type stream_type, int num_senders, int receiver_num)
       : stream_type(stream_type),
         num_senders(num_senders),
-        receiver_num(receiver_num),
-        thread_handle(nullptr),
-        num_rows_received(0) {}
+        receiver_num(receiver_num) {}
 
     ~ReceiverInfo() {
-      delete thread_handle;
+      thread_handle.reset();
       stream_recvr.reset();
     }
   };
-  vector<ReceiverInfo> receiver_info_;
+  // Allocate each ReceiveInfo separately so the address doesn't change.
+  vector<unique_ptr<ReceiverInfo>> receiver_info_;
 
   // Create an instance id and add it to dest_
   void GetNextInstanceId(TUniqueId* instance_id) {
@@ -447,15 +438,16 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
     RuntimeProfile* profile = RuntimeProfile::Create(&obj_pool_, "TestReceiver");
     TUniqueId instance_id;
     GetNextInstanceId(&instance_id);
-    receiver_info_.push_back(ReceiverInfo(stream_type, num_senders, receiver_num));
-    ReceiverInfo& info = receiver_info_.back();
-    info.stream_recvr = stream_mgr_->CreateRecvr(row_desc_, instance_id, DEST_NODE_ID,
+    receiver_info_.emplace_back(
+        make_unique<ReceiverInfo>(stream_type, num_senders, receiver_num));
+    ReceiverInfo* info = receiver_info_.back().get();
+    info->stream_recvr = stream_mgr_->CreateRecvr(row_desc_, instance_id, DEST_NODE_ID,
         num_senders, buffer_size, is_merging, profile, &tracker_, &buffer_pool_client_);
     if (!is_merging) {
-      info.thread_handle = new thread(&DataStreamTest::ReadStream, this, &info);
+      info->thread_handle.reset(new thread(&DataStreamTest::ReadStream, this, info));
     } else {
-      info.thread_handle = new thread(&DataStreamTest::ReadStreamMerging, this, &info,
-          profile);
+      info->thread_handle.reset(new thread(&DataStreamTest::ReadStreamMerging, this, info,
+          profile));
     }
     if (out_id != nullptr) *out_id = instance_id;
   }
@@ -463,8 +455,8 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
   void JoinReceivers() {
     VLOG_QUERY << "join receiver\n";
     for (int i = 0; i < receiver_info_.size(); ++i) {
-      receiver_info_[i].thread_handle->join();
-      receiver_info_[i].stream_recvr->Close();
+      receiver_info_[i]->thread_handle->join();
+      receiver_info_[i]->stream_recvr->Close();
     }
   }
 
@@ -510,20 +502,20 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
     int64_t total = 0;
     multiset<int64_t> all_data_values;
     for (int i = 0; i < receiver_info_.size(); ++i) {
-      ReceiverInfo& info = receiver_info_[i];
-      EXPECT_OK(info.status);
-      total += info.data_values.size();
-      ASSERT_EQ(info.stream_type, stream_type);
-      ASSERT_EQ(info.num_senders, num_senders);
+      ReceiverInfo* info = receiver_info_[i].get();
+      EXPECT_OK(info->status);
+      total += info->data_values.size();
+      ASSERT_EQ(info->stream_type, stream_type);
+      ASSERT_EQ(info->num_senders, num_senders);
       if (stream_type == TPartitionType::UNPARTITIONED) {
         EXPECT_EQ(
-            NUM_BATCHES * BATCH_CAPACITY * num_senders, info.data_values.size());
+            NUM_BATCHES * BATCH_CAPACITY * num_senders, info->data_values.size());
       }
-      all_data_values.insert(info.data_values.begin(), info.data_values.end());
+      all_data_values.insert(info->data_values.begin(), info->data_values.end());
 
       int k = 0;
-      for (multiset<int64_t>::iterator j = info.data_values.begin();
-           j != info.data_values.end(); ++j, ++k) {
+      for (multiset<int64_t>::iterator j = info->data_values.begin();
+           j != info->data_values.end(); ++j, ++k) {
         if (stream_type == TPartitionType::UNPARTITIONED) {
           // unpartitioned streams contain all values as many times as there are
           // senders
@@ -533,7 +525,7 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
           int64_t value = *j;
           uint64_t hash_val = RawValue::GetHashValueFastHash(&value, TYPE_BIGINT,
               DataStreamSender::EXCHANGE_HASH_SEED);
-          EXPECT_EQ(hash_val % receiver_info_.size(), info.receiver_num);
+          EXPECT_EQ(hash_val % receiver_info_.size(), info->receiver_num);
         }
       }
     }
@@ -553,8 +545,8 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
 
   void CheckSenders() {
     for (int i = 0; i < sender_info_.size(); ++i) {
-      EXPECT_OK(sender_info_[i].status);
-      EXPECT_GT(sender_info_[i].num_bytes_sent, 0);
+      EXPECT_OK(sender_info_[i]->status);
+      EXPECT_GT(sender_info_[i]->num_bytes_sent, 0);
     }
   }
 
@@ -595,18 +587,16 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
                    int channel_buffer_size = 1024) {
     VLOG_QUERY << "start sender";
     int num_senders = sender_info_.size();
-    ASSERT_LT(num_senders, MAX_SENDERS);
-    sender_info_.push_back(SenderInfo());
-    SenderInfo& info = sender_info_.back();
-    info.thread_handle =
+    sender_info_.emplace_back(make_unique<SenderInfo>());
+    sender_info_.back()->thread_handle.reset(
         new thread(&DataStreamTest::Sender, this, num_senders, channel_buffer_size,
-                   partition_type, GetParam() == USE_THRIFT);
+                   partition_type, GetParam() == USE_THRIFT));
   }
 
   void JoinSenders() {
     VLOG_QUERY << "join senders\n";
     for (int i = 0; i < sender_info_.size(); ++i) {
-      sender_info_[i].thread_handle->join();
+      sender_info_[i]->thread_handle->join();
     }
   }
 
@@ -640,22 +630,22 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
     EXPECT_OK(sender->Prepare(&state, &tracker_));
     EXPECT_OK(sender->Open(&state));
     scoped_ptr<RowBatch> batch(CreateRowBatch());
-    SenderInfo& info = sender_info_[sender_num];
+    SenderInfo* info = sender_info_[sender_num].get();
     int next_val = 0;
     for (int i = 0; i < NUM_BATCHES; ++i) {
       GetNextBatch(batch.get(), &next_val);
       VLOG_QUERY << "sender " << sender_num << ": #rows=" << batch->num_rows();
-      info.status = sender->Send(&state, batch.get());
-      if (!info.status.ok()) break;
+      info->status = sender->Send(&state, batch.get());
+      if (!info->status.ok()) break;
     }
     VLOG_QUERY << "closing sender" << sender_num;
-    info.status.MergeStatus(sender->FlushFinal(&state));
+    info->status.MergeStatus(sender->FlushFinal(&state));
     sender->Close(&state);
     if (is_thrift) {
-      info.num_bytes_sent = static_cast<DataStreamSender*>(
+      info->num_bytes_sent = static_cast<DataStreamSender*>(
           sender.get())->GetNumDataBytesSent();
     } else {
-      info.num_bytes_sent = static_cast<KrpcDataStreamSender*>(
+      info->num_bytes_sent = static_cast<KrpcDataStreamSender*>(
           sender.get())->GetNumDataBytesSent();
     }
 
@@ -745,7 +735,7 @@ TEST_P(DataStreamTest, UnknownSenderSmallResult) {
   GetNextInstanceId(&dummy_id);
   StartSender(TPartitionType::UNPARTITIONED, TOTAL_DATA_SIZE + 1024);
   JoinSenders();
-  EXPECT_EQ(sender_info_[0].status.code(), TErrorCode::DATASTREAM_SENDER_TIMEOUT);
+  EXPECT_EQ(sender_info_[0]->status.code(), TErrorCode::DATASTREAM_SENDER_TIMEOUT);
 }
 
 TEST_P(DataStreamTest, UnknownSenderLargeResult) {
@@ -754,7 +744,7 @@ TEST_P(DataStreamTest, UnknownSenderLargeResult) {
   GetNextInstanceId(&dummy_id);
   StartSender();
   JoinSenders();
-  EXPECT_EQ(sender_info_[0].status.code(), TErrorCode::DATASTREAM_SENDER_TIMEOUT);
+  EXPECT_EQ(sender_info_[0]->status.code(), TErrorCode::DATASTREAM_SENDER_TIMEOUT);
 }
 
 TEST_P(DataStreamTest, Cancel) {
@@ -764,8 +754,8 @@ TEST_P(DataStreamTest, Cancel) {
   StartReceiver(TPartitionType::UNPARTITIONED, 1, 1, 1024, true, &instance_id);
   stream_mgr_->Cancel(instance_id);
   JoinReceivers();
-  EXPECT_TRUE(receiver_info_[0].status.IsCancelled());
-  EXPECT_TRUE(receiver_info_[1].status.IsCancelled());
+  EXPECT_TRUE(receiver_info_[0]->status.IsCancelled());
+  EXPECT_TRUE(receiver_info_[1]->status.IsCancelled());
 }
 
 TEST_P(DataStreamTest, BasicTest) {
@@ -867,12 +857,13 @@ TEST_P(DataStreamTestShortDeserQueue, TestNoDeadlock) {
 
   // Setup the receiver.
   RuntimeProfile* profile = RuntimeProfile::Create(&obj_pool_, "TestReceiver");
-  receiver_info_.push_back(ReceiverInfo(TPartitionType::UNPARTITIONED, 4, 1));
-  ReceiverInfo& info = receiver_info_.back();
-  info.stream_recvr = stream_mgr_->CreateRecvr(row_desc_, instance_id, DEST_NODE_ID,
+  receiver_info_.emplace_back(
+      make_unique<ReceiverInfo>(TPartitionType::UNPARTITIONED, 4, 1));
+  ReceiverInfo* info = receiver_info_.back().get();
+  info->stream_recvr = stream_mgr_->CreateRecvr(row_desc_, instance_id, DEST_NODE_ID,
       4, 1024 * 1024, false, profile, &tracker_, &buffer_pool_client_);
-  info.thread_handle = new thread(
-      &DataStreamTestShortDeserQueue_TestNoDeadlock_Test::ReadStream, this, &info);
+  info->thread_handle.reset(new thread(
+      &DataStreamTestShortDeserQueue_TestNoDeadlock_Test::ReadStream, this, info));
 
   JoinSenders();
   CheckSenders();

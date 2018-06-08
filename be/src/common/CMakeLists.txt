@@ -49,8 +49,8 @@ add_library(GlobalFlags
 )
 add_dependencies(GlobalFlags gen-deps)
 
-ADD_BE_TEST(atomic-test)
-ADD_BE_TEST(thread-debug-info-test)
+ADD_BE_LSAN_TEST(atomic-test)
+ADD_BE_LSAN_TEST(thread-debug-info-test)
 
 # Generate config.h from config.h.in, filling in variables from CMake
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
