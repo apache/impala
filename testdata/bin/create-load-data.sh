@@ -134,6 +134,31 @@ echo "SNAPSHOT_FILE=${SNAPSHOT_FILE:-}"
 echo "CM_HOST=${CM_HOST:-}"
 echo "REMOTE_LOAD=${REMOTE_LOAD:-}"
 
+function start-impala {
+  : ${START_CLUSTER_ARGS=""}
+  START_CLUSTER_ARGS_INT=""
+  if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
+    START_CLUSTER_ARGS_INT+=("--impalad_args=--abort_on_config_error=false -s 1")
+  else
+    START_CLUSTER_ARGS_INT+=("-s 3")
+  fi
+  START_CLUSTER_ARGS_INT+=("${START_CLUSTER_ARGS}")
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_DATA_LOADING_LOGS_DIR} \
+    ${START_CLUSTER_ARGS_INT}
+}
+
+function restart-cluster {
+  # Break out each individual step for clarity
+  echo "Shutting down Impala"
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --kill
+  echo "Shutting down the minicluster"
+  ${IMPALA_HOME}/testdata/bin/kill-all.sh
+  echo "Starting the minicluster"
+  ${IMPALA_HOME}/testdata/bin/run-all.sh
+  echo "Starting Impala"
+  start-impala
+}
+
 function load-custom-schemas {
   # HDFS commandline calls are slow, so consolidate the manipulation into
   # as few calls as possible by populating a temporary directory with the
@@ -500,7 +525,9 @@ function check-hdfs-health {
     if [[ "$NUMBER_UNDER_REPLICATED" -eq "$LAST_NUMBER_UNDER_REPLICATED" ]] ; then
       echo "There are under-replicated blocks in HDFS and HDFS is not making progress"\
           "in $SLEEP_SEC seconds. Attempting to restart HDFS to resolve this issue."
-      ${IMPALA_HOME}/testdata/bin/run-mini-dfs.sh
+      # IMPALA-7119: Other minicluster components (like HBase) can fail if HDFS is
+      # restarted by itself, so restart the whole cluster, including Impala.
+      restart-cluster
     fi
     LAST_NUMBER_UNDER_REPLICATED="$NUMBER_UNDER_REPLICATED"
     echo "$NUMBER_UNDER_REPLICATED under replicated blocks remaining."
@@ -515,16 +542,8 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
 fi
 
 # Start Impala
-: ${START_CLUSTER_ARGS=""}
-if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
-  START_CLUSTER_ARGS="--impalad_args=--abort_on_config_error=false -s 1 ${START_CLUSTER_ARGS}"
-else
-  START_CLUSTER_ARGS="-s 3 ${START_CLUSTER_ARGS}"
-fi
 if [[ -z "$REMOTE_LOAD" ]]; then
-  run-step "Starting Impala cluster" start-impala-cluster.log \
-    ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_DATA_LOADING_LOGS_DIR} \
-    ${START_CLUSTER_ARGS}
+  run-step "Starting Impala cluster" start-impala-cluster.log start-impala
 fi
 
 # The hdfs environment script sets up kms (encryption) and cache pools (hdfs caching).
