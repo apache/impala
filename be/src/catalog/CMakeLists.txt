@@ -26,4 +26,4 @@ add_library(Catalog
 )
 add_dependencies(Catalog gen-deps)
 
-ADD_BE_TEST(catalog-util-test)
+ADD_BE_LSAN_TEST(catalog-util-test)

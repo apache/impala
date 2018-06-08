@@ -107,6 +107,6 @@ add_custom_target(test-loop.bc
   SOURCES ${CMAKE_SOURCE_DIR}/testdata/llvm/test-loop.cc
 )
 
-ADD_BE_TEST(llvm-codegen-test)
+ADD_BE_LSAN_TEST(llvm-codegen-test)
 add_dependencies(llvm-codegen-test test-loop.bc)
-ADD_BE_TEST(instruction-counter-test)
+ADD_BE_LSAN_TEST(instruction-counter-test)

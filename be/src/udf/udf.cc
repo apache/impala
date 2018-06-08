@@ -79,6 +79,8 @@ class FreePool {
 class MemPool {
  public:
   uint8_t* Allocate(int byte_size) {
+    // TODO: this function is called with this == nullptr from UdaTestHarness. This works
+    // for now because MemPool has no members or virtual functions.
     return reinterpret_cast<uint8_t*>(malloc(byte_size));
   }
 };

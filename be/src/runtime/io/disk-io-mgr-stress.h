@@ -42,6 +42,7 @@ class DiskIoMgrStress {
  public:
   DiskIoMgrStress(int num_disks, int num_threads_per_disk, int num_clients,
       bool includes_cancellation);
+  ~DiskIoMgrStress();
 
   /// Run the test for 'sec'.  If 0, run forever
   void Run(int sec);
@@ -84,7 +85,7 @@ class DiskIoMgrStress {
 
   /// Array of clients
   int num_clients_;
-  Client* clients_;
+  std::unique_ptr<Client[]> clients_;
 
   /// Client MemTrackers, one per client.
   std::vector<std::unique_ptr<MemTracker>> client_mem_trackers_;

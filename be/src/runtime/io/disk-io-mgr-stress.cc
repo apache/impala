@@ -96,13 +96,15 @@ DiskIoMgrStress::DiskIoMgrStress(int num_disks, int num_threads_per_disk,
     CreateTempFile(files_[i].filename.c_str(), files_[i].data.c_str());
   }
 
-  clients_ = new Client[num_clients_];
+  clients_.reset(new Client[num_clients_]);
   client_mem_trackers_.resize(num_clients_);
   buffer_pool_clients_.reset(new BufferPool::ClientHandle[num_clients_]);
   for (int i = 0; i < num_clients_; ++i) {
     NewClient(i);
   }
 }
+
+DiskIoMgrStress::~DiskIoMgrStress() { }
 
 void DiskIoMgrStress::ClientThread(int client_id) {
   Client* client = &clients_[client_id];

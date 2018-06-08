@@ -236,10 +236,10 @@ static void TestAcquireReleaseLoadStore() {
   const int ITERS = 1000000;
   AtomicInt<T> control(-1);
   T payload = -1;
-  thread* t_a = new thread(AcquireReleaseThreadA<T>, 0, 1, ITERS, &control, &payload);
-  thread* t_b = new thread(AcquireReleaseThreadB<T>, 1, 0, ITERS, &control, &payload);
-  t_a->join();
-  t_b->join();
+  thread t_a(AcquireReleaseThreadA<T>, 0, 1, ITERS, &control, &payload);
+  thread t_b(AcquireReleaseThreadB<T>, 1, 0, ITERS, &control, &payload);
+  t_a.join();
+  t_b.join();
 }
 
 TEST(AtomicTest, MultipleTreadsAcquireReleaseLoadStoreInt) {

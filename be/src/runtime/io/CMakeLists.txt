@@ -36,4 +36,4 @@ add_dependencies(Io gen-deps)
 add_executable(disk-io-mgr-stress-test disk-io-mgr-stress-test.cc)
 target_link_libraries(disk-io-mgr-stress-test ${IMPALA_TEST_LINK_LIBS})
 
-ADD_BE_TEST(disk-io-mgr-test)
+ADD_BE_LSAN_TEST(disk-io-mgr-test)

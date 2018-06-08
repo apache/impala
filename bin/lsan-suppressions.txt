@@ -15,23 +15,20 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# This file suppresses Leak Sanitizer errors, following
+# https://clang.llvm.org/docs/LeakSanitizer.html
 
-# where to put generated libraries
-set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/scheduling")
+# The JVM leaks things directly from libjvm.so and indirectly via inflate().
+leak:libjvm.so
+leak:inflate
 
-# where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/scheduling")
+# Some test utilities have deliberate leaks
+leak:InProcessImpalaServer::StartWithEphemeralPorts
+leak:InProcessStatestore::StartWithEphemeralPorts
 
-# TODO: Move other scheduling-related classes here
-add_library(Scheduling STATIC
-  admission-controller.cc
-  backend-config.cc
-  query-schedule.cc
-  request-pool-service.cc
-  scheduler-test-util.cc
-  scheduler.cc
-)
-add_dependencies(Scheduling gen-deps)
+# MemTestPrepare is deliberately used to simulate a UDF leaking memory.
+leak:MemTestPrepare
 
-ADD_BE_LSAN_TEST(scheduler-test)
-ADD_BE_LSAN_TEST(backend-config-test)
+# TODO: IMPALA-2746: fix these unnecessary leaks.
+# The UDF and UDA test harnesses are sloppy and leak result allocations.
+leak:impala::FunctionContextImpl::AllocateForResults

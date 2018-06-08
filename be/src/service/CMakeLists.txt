@@ -74,7 +74,7 @@ target_link_libraries(impalad
   ${IMPALA_LINK_LIBS}
 )
 
-ADD_BE_TEST(session-expiry-test session-expiry-test.cc)
-ADD_BE_TEST(hs2-util-test hs2-util-test.cc)
-ADD_BE_TEST(query-options-test query-options-test.cc)
-ADD_BE_TEST(impala-server-test impala-server-test.cc)
+ADD_BE_TEST(session-expiry-test session-expiry-test.cc) # TODO: this leaks thrift server
+ADD_BE_LSAN_TEST(hs2-util-test hs2-util-test.cc)
+ADD_BE_LSAN_TEST(query-options-test query-options-test.cc)
+ADD_BE_LSAN_TEST(impala-server-test impala-server-test.cc)

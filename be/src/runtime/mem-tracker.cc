@@ -130,8 +130,7 @@ void MemTracker::CloseAndUnregisterFromParent() {
 }
 
 void MemTracker::EnableReservationReporting(const ReservationTrackerCounters& counters) {
-  ReservationTrackerCounters* new_counters = new ReservationTrackerCounters(counters);
-  reservation_counters_.Store(new_counters);
+  delete reservation_counters_.Swap(new ReservationTrackerCounters(counters));
 }
 
 int64_t MemTracker::GetPoolMemReserved() {

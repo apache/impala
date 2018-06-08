@@ -30,4 +30,4 @@ add_library(Statestore
 )
 add_dependencies(Statestore gen-deps)
 
-ADD_BE_TEST(statestore-test)
+ADD_BE_LSAN_TEST(statestore-test)

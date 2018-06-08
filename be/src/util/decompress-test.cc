@@ -449,7 +449,7 @@ TEST_F(DecompressorTest, LZ4Huge) {
 
   // Generate a big random payload.
   int payload_len = numeric_limits<int>::max();
-  uint8_t* payload = new uint8_t[payload_len];
+  unique_ptr<uint8_t[]> payload(new uint8_t[payload_len]);
   for (int i = 0 ; i < payload_len; ++i) payload[i] = rand();
 
   scoped_ptr<Codec> compressor;
@@ -462,9 +462,10 @@ TEST_F(DecompressorTest, LZ4Huge) {
 
   // Trying to compress it should give an error
   int64_t compressed_len = max_size;
-  uint8_t* compressed = new uint8_t[max_size];
-  EXPECT_ERROR(compressor->ProcessBlock(true, payload_len, payload,
-      &compressed_len, &compressed), TErrorCode::LZ4_COMPRESSION_INPUT_TOO_LARGE);
+  unique_ptr<uint8_t[]> compressed(new uint8_t[max_size]);
+  uint8_t* compressed_ptr = compressed.get();
+  EXPECT_ERROR(compressor->ProcessBlock(true, payload_len, payload.get(),
+      &compressed_len, &compressed_ptr), TErrorCode::LZ4_COMPRESSION_INPUT_TOO_LARGE);
 }
 
 }
