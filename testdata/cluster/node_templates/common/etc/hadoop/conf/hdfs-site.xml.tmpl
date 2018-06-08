@@ -107,6 +107,15 @@
     <value>true</value>
   </property>
 
+  <!-- The default behavior of the namenode is to exclude datanodes with the number of
+    connections 2x higher than the average among all the datanodes from being considered
+    for replication. In the minicluster we have to use every datanode for every block
+    so this should be disabled. -->
+  <property>
+    <name>dfs.namenode.replication.considerLoad</name>
+    <value>false</value>
+  </property>
+
   <!-- Location of the KMS key provider -->
   <property>
     <name>dfs.encryption.key.provider.uri</name>
