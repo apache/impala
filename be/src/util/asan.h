@@ -29,7 +29,7 @@
 #define ASAN_NO_INSTRUMENTATION
 #endif
 
-#if defined (ADDRESS_SANITIZER) && __clang_major__ >= 3 && __clang_minor__ >= 7
+#if defined(ADDRESS_SANITIZER)
 #include <sanitizer/lsan_interface.h>
 #define IGNORE_LEAKING_OBJECT(p) __lsan_ignore_object(p)
 #else

@@ -510,6 +510,14 @@ FUNCTION(ADD_BE_TEST TEST_NAME)
   ADD_DEPENDENCIES(be-test ${TEST_NAME})
 ENDFUNCTION()
 
+# Same as ADD_BE_TEST, but also enable LeakSanitizer.
+# TODO: IMPALA-2746: we should make this the default.
+FUNCTION(ADD_BE_LSAN_TEST TEST_NAME)
+  ADD_BE_TEST(${TEST_NAME})
+  SET_TESTS_PROPERTIES(${TEST_NAME} PROPERTIES ENVIRONMENT
+      "ASAN_OPTIONS=handle_segv=0 detect_leaks=1 allocator_may_return_null=1")
+ENDFUNCTION()
+
 # Similar utility function for tests that use the UDF SDK
 FUNCTION(ADD_UDF_TEST TEST_NAME)
   # This gets the directory where the test is from (e.g. 'exprs' or 'runtime')
