@@ -21,7 +21,7 @@ from copy import copy
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfEC, SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
@@ -169,7 +169,6 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
   def test_low_mem_limit_q6(self, vector):
     self.low_memory_limit_test(vector, 'tpch-q6', self.MIN_MEM_FOR_TPCH['Q6'])
 
-  @SkipIfEC.fix_later
   def test_low_mem_limit_q7(self, vector):
     self.low_memory_limit_test(vector, 'tpch-q7', self.MIN_MEM_FOR_TPCH['Q7'])
 
