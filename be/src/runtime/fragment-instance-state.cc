@@ -365,13 +365,8 @@ void FragmentInstanceState::SendReport(bool done, const Status& status) {
   DCHECK(status.ok() || done);
   DCHECK(runtime_state_ != nullptr);
 
-  if (VLOG_FILE_IS_ON) {
-    VLOG_FILE << "Reporting " << (done ? "final " : "") << "profile for instance "
-        << PrintId(runtime_state_->fragment_instance_id());
-    stringstream ss;
-    profile()->PrettyPrint(&ss);
-    VLOG_FILE << ss.str();
-  }
+  VLOG_FILE << "Reporting " << (done ? "final " : "") << "profile for instance "
+      << PrintId(runtime_state_->fragment_instance_id());
 
   // Update the counter for the peak per host mem usage.
   if (per_host_mem_usage_ != nullptr) {
