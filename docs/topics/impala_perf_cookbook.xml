@@ -340,9 +340,8 @@ under the License.
         </li>
 
         <li>
-          Do not compress the table data. Compressing the table data will
-          likely cause the data to span more nodes and eliminate skew caused by
-          compression.
+          Do not compress the table data. The uncompressed table data spans more
+          nodes and eliminates skew caused by compression.
         </li>
 
         <li>
