@@ -32,6 +32,7 @@ struct tm;
 namespace impala {
 
 /// Takes a Kudu status and returns an impala one, if it's not OK.
+/// Evaluates the prepend argument only if the status is not OK.
 #define KUDU_RETURN_IF_ERROR(expr, prepend) \
   do { \
     kudu::Status _s = (expr); \

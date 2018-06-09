@@ -88,6 +88,9 @@ class KuduScanner {
     return reinterpret_cast<Tuple*>(mem + scan_node_->tuple_desc()->byte_size());
   }
 
+  /// Builds the error string by adding the PlanNode id and KuduTable to the message.
+  string BuildErrorString(const char* msg);
+
   KuduScanNodeBase* scan_node_;
   RuntimeState* state_;
 
