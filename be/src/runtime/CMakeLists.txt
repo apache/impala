@@ -69,6 +69,7 @@ add_library(Runtime
   scanner-mem-limiter.cc
   sorted-run-merger.cc
   sorter.cc
+  sorter-ir.cc
   string-value.cc
   thread-resource-mgr.cc
   timestamp-parse-util.cc
