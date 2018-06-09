@@ -399,7 +399,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
 
   int64_t total_splits = 0;
   for (const auto& fd: file_descs_) total_splits += fd.second->splits.size();
-  progress_.Init(Substitute("Splits complete (node=$0)", total_splits), total_splits);
+  progress_.Init(Substitute("Splits complete (node=$0)", id_), total_splits);
   return Status::OK();
 }
 
