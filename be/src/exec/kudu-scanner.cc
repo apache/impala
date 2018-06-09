@@ -17,11 +17,11 @@
 
 #include "exec/kudu-scanner.h"
 
+#include <string>
+#include <vector>
 #include <kudu/client/row_result.h>
 #include <kudu/client/value.h>
 #include <thrift/protocol/TDebugProtocol.h>
-#include <vector>
-#include <string>
 
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr.h"
@@ -146,23 +146,26 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
   DCHECK(scanner_ == NULL);
   kudu::client::KuduScanner* scanner;
   KUDU_RETURN_IF_ERROR(kudu::client::KuduScanToken::DeserializeIntoScanner(
-      scan_node_->kudu_client(), scan_token, &scanner),
-      "Unable to deserialize scan token");
+                           scan_node_->kudu_client(), scan_token, &scanner),
+      BuildErrorString("Unable to deserialize scan token"));
   scanner_.reset(scanner);
 
   if (UNLIKELY(FLAGS_pick_only_leaders_for_tests)) {
     KUDU_RETURN_IF_ERROR(scanner_->SetSelection(kudu::client::KuduClient::LEADER_ONLY),
-                         "Could not set replica selection.");
+        BuildErrorString("Could not set replica selection"));
   }
   kudu::client::KuduScanner::ReadMode mode =
       MODE_READ_AT_SNAPSHOT == FLAGS_kudu_read_mode ?
           kudu::client::KuduScanner::READ_AT_SNAPSHOT :
           kudu::client::KuduScanner::READ_LATEST;
-  KUDU_RETURN_IF_ERROR(scanner_->SetReadMode(mode), "Could not set scanner ReadMode");
+  KUDU_RETURN_IF_ERROR(
+      scanner_->SetReadMode(mode), BuildErrorString("Could not set scanner ReadMode"));
   KUDU_RETURN_IF_ERROR(scanner_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms),
-      "Could not set scanner timeout");
-  VLOG_ROW << "Starting KuduScanner with ReadMode=" << mode << " timeout=" <<
-      FLAGS_kudu_operation_timeout_ms;
+      BuildErrorString("Could not set scanner timeout"));
+  VLOG_ROW << "Starting KuduScanner with ReadMode=" << mode
+           << " timeout=" << FLAGS_kudu_operation_timeout_ms
+           << " node with id=" << scan_node_->id()
+           << " Kudu table=" << scan_node_->table_->name();
 
   if (!timestamp_slots_.empty()) {
     uint64_t row_format_flags =
@@ -213,14 +216,14 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
           KUDU_RETURN_IF_ERROR(
               scanner_->AddConjunctPredicate(scan_node_->table_->NewComparisonPredicate(
                   col_name, KuduPredicate::ComparisonOp::GREATER_EQUAL, min_value)),
-              "Failed to add min predicate");
+              BuildErrorString("Failed to add min predicate"));
 
           KuduValue* max_value;
           RETURN_IF_ERROR(CreateKuduValue(col_type, max, &max_value));
           KUDU_RETURN_IF_ERROR(
               scanner_->AddConjunctPredicate(scan_node_->table_->NewComparisonPredicate(
                   col_name, KuduPredicate::ComparisonOp::LESS_EQUAL, max_value)),
-              "Failed to add max predicate");
+              BuildErrorString("Failed to add max predicate"));
         }
       }
     }
@@ -228,12 +231,12 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
 
   if (scan_node_->limit() != -1 && conjunct_evals_.empty()) {
     KUDU_RETURN_IF_ERROR(scanner_->SetLimit(scan_node_->limit()),
-        "Failed to set limit on scan.");
+        BuildErrorString("Failed to set limit on scan"));
   }
 
   {
     SCOPED_TIMER(state_->total_storage_wait_timer());
-    KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");
+    KUDU_RETURN_IF_ERROR(scanner_->Open(), BuildErrorString("Unable to open scanner"));
   }
   *eos = false;
   return Status::OK();
@@ -340,12 +343,18 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
 Status KuduScanner::GetNextScannerBatch() {
   SCOPED_TIMER(state_->total_storage_wait_timer());
   int64_t now = MonotonicMicros();
-  KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_kudu_batch_), "Unable to advance iterator");
+  KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_kudu_batch_),
+      BuildErrorString("Unable to advance iterator"));
   COUNTER_ADD(scan_node_->kudu_round_trips(), 1);
   cur_kudu_batch_num_read_ = 0;
   COUNTER_ADD(scan_node_->rows_read_counter(), cur_kudu_batch_.NumRows());
   last_alive_time_micros_ = now;
   return Status::OK();
+}
+
+string KuduScanner::BuildErrorString(const char* msg) {
+  return Substitute("$0 for node with id '$1' for Kudu table '$2'", msg, scan_node_->id(),
+      scan_node_->table_->name());
 }
 
 }  // namespace impala
