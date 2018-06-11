@@ -174,3 +174,8 @@ Parquet v1 file with RLE encoded boolean column "b" and int column "i".
 Created for IMPALA-6324, generated with modified parquet-mr. Contains 279 rows,
 139 with value false, and 140 with value true. "i" is always 1 if "b" is True
 and always 0 if "b" is false.
+
+dict_encoding_with_large_bit_width.parquet:
+Parquet file with a single TINYINT column "i" with 33 rows. Created by a modified
+Impala to use 9 bit dictionary indices for encoding. Reading this file used to lead
+to DCHECK errors (IMPALA-7147).

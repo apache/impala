@@ -713,6 +713,22 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case(
         'QueryTest/parquet-rle-encoded-bool', vector, unique_database)
 
+  def test_dict_encoding_with_large_bit_width(self, vector, unique_database):
+    """IMPALA-7147: Test that Impala can decode dictionary encoded pages where the
+       dictionary index bit width is larger than the encoded byte's bit width.
+    """
+    TABLE_NAME = "dict_encoding_with_large_bit_width"
+    self.client.execute("CREATE TABLE {0}.{1} (i tinyint) STORED AS PARQUET".format(
+        unique_database, TABLE_NAME))
+    table_loc = get_fs_path(
+        "/test-warehouse/{0}.db/{1}".format(unique_database, TABLE_NAME))
+    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
+        "/testdata/data/{0}.parquet".format(TABLE_NAME), table_loc])
+
+    result = self.execute_query(
+        "select * from {0}.{1}".format(unique_database, TABLE_NAME))
+    assert(len(result.data) == 33)
+
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
 # 1. default scan range
