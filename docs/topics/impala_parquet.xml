@@ -188,118 +188,99 @@ This <codeph>PARQUET</codeph> keyword is recommended for new code.
   </prolog>
 
     <conbody>
-
-      <p>
-        Choose from the following techniques for loading data into Parquet tables, depending on whether the
-        original data is already in an Impala table, or exists as raw data files outside Impala.
-      </p>
-
-      <p>
-        If you already have data in an Impala or Hive table, perhaps in a different file format or partitioning
-        scheme, you can transfer the data to a Parquet table using the Impala <codeph>INSERT...SELECT</codeph>
-        syntax. You can convert, filter, repartition, and do other things to the data as part of this same
-        <codeph>INSERT</codeph> statement. See <xref href="#parquet_compression"/> for some examples showing how to
-        insert data into Parquet tables.
-      </p>
-
-      <p conref="../shared/impala_common.xml#common/insert_hints"/>
-
+      <p> Choose from the following techniques for loading data into Parquet
+        tables, depending on whether the original data is already in an Impala
+        table, or exists as raw data files outside Impala. </p>
+      <p> If you already have data in an Impala or Hive table, perhaps in a
+        different file format or partitioning scheme, you can transfer the data
+        to a Parquet table using the Impala <codeph>INSERT...SELECT</codeph>
+        syntax. You can convert, filter, repartition, and do other things to the
+        data as part of this same <codeph>INSERT</codeph> statement. See <xref
+          href="#parquet_compression"/> for some examples showing how to insert
+        data into Parquet tables. </p>
+      <p>When inserting into partitioned tables, especially using the Parquet
+        file format, you can include a hint in the <codeph>INSERT</codeph>
+        statement to fine-tune the overall performance of the operation and its
+        resource usage. See <keyword keyref="hints"/> for using hints in the
+          <codeph>INSERT</codeph> statements.</p>
       <p conref="../shared/impala_common.xml#common/insert_parquet_blocksize"/>
-
-      <draft-comment translate="no">
-Add an example here.
-</draft-comment>
-
-      <p>
-        Avoid the <codeph>INSERT...VALUES</codeph> syntax for Parquet tables, because
-        <codeph>INSERT...VALUES</codeph> produces a separate tiny data file for each
-        <codeph>INSERT...VALUES</codeph> statement, and the strength of Parquet is in its handling of data
-        (compressing, parallelizing, and so on) in <ph rev="parquet_block_size">large</ph> chunks.
-      </p>
-
-      <p>
-        If you have one or more Parquet data files produced outside of Impala, you can quickly make the data
-        queryable through Impala by one of the following methods:
-      </p>
-
+      <draft-comment translate="no"> Add an example here. </draft-comment>
+      <p> Avoid the <codeph>INSERT...VALUES</codeph> syntax for Parquet tables,
+        because <codeph>INSERT...VALUES</codeph> produces a separate tiny data
+        file for each <codeph>INSERT...VALUES</codeph> statement, and the
+        strength of Parquet is in its handling of data (compressing,
+        parallelizing, and so on) in <ph rev="parquet_block_size">large</ph>
+        chunks. </p>
+      <p> If you have one or more Parquet data files produced outside of Impala,
+        you can quickly make the data queryable through Impala by one of the
+        following methods: </p>
       <ul>
-        <li>
-          The <codeph>LOAD DATA</codeph> statement moves a single data file or a directory full of data files into
-          the data directory for an Impala table. It does no validation or conversion of the data. The original
-          data files must be somewhere in HDFS, not the local filesystem.
-          <draft-comment translate="no">
-Add an example here.
-</draft-comment>
+        <li> The <codeph>LOAD DATA</codeph> statement moves a single data file
+          or a directory full of data files into the data directory for an
+          Impala table. It does no validation or conversion of the data. The
+          original data files must be somewhere in HDFS, not the local
+          filesystem. <draft-comment translate="no"> Add an example here.
+          </draft-comment>
         </li>
-
-        <li>
-          The <codeph>CREATE TABLE</codeph> statement with the <codeph>LOCATION</codeph> clause creates a table
-          where the data continues to reside outside the Impala data directory. The original data files must be
-          somewhere in HDFS, not the local filesystem. For extra safety, if the data is intended to be long-lived
-          and reused by other applications, you can use the <codeph>CREATE EXTERNAL TABLE</codeph> syntax so that
-          the data files are not deleted by an Impala <codeph>DROP TABLE</codeph> statement.
-          <draft-comment translate="no">
-Add an example here.
-</draft-comment>
+        <li> The <codeph>CREATE TABLE</codeph> statement with the
+            <codeph>LOCATION</codeph> clause creates a table where the data
+          continues to reside outside the Impala data directory. The original
+          data files must be somewhere in HDFS, not the local filesystem. For
+          extra safety, if the data is intended to be long-lived and reused by
+          other applications, you can use the <codeph>CREATE EXTERNAL
+            TABLE</codeph> syntax so that the data files are not deleted by an
+          Impala <codeph>DROP TABLE</codeph> statement. <draft-comment
+            translate="no"> Add an example here. </draft-comment>
         </li>
-
-        <li>
-          If the Parquet table already exists, you can copy Parquet data files directly into it, then use the
-          <codeph>REFRESH</codeph> statement to make Impala recognize the newly added data. Remember to preserve
-          the block size of the Parquet data files by using the <codeph>hadoop distcp -pb</codeph> command rather
-          than a <codeph>-put</codeph> or <codeph>-cp</codeph> operation on the Parquet files. See
-          <xref href="#parquet_compression_multiple"/> for an example of this kind of operation.
-        </li>
+        <li> If the Parquet table already exists, you can copy Parquet data
+          files directly into it, then use the <codeph>REFRESH</codeph>
+          statement to make Impala recognize the newly added data. Remember to
+          preserve the block size of the Parquet data files by using the
+            <codeph>hadoop distcp -pb</codeph> command rather than a
+            <codeph>-put</codeph> or <codeph>-cp</codeph> operation on the
+          Parquet files. See <xref href="#parquet_compression_multiple"/> for an
+          example of this kind of operation. </li>
       </ul>
-
-      <note conref="../shared/impala_common.xml#common/restrictions_nonimpala_parquet"/>
-
-      <p>
-        Recent versions of Sqoop can produce Parquet output files using the <codeph>--as-parquetfile</codeph>
-        option.
-      </p>
-
+      <note
+        conref="../shared/impala_common.xml#common/restrictions_nonimpala_parquet"/>
+      <p> Recent versions of Sqoop can produce Parquet output files using the
+          <codeph>--as-parquetfile</codeph> option. </p>
       <p conref="../shared/impala_common.xml#common/sqoop_timestamp_caveat"/>
-
-      <p>
-        If the data exists outside Impala and is in some other format, combine both of the preceding techniques.
-        First, use a <codeph>LOAD DATA</codeph> or <codeph>CREATE EXTERNAL TABLE ... LOCATION</codeph> statement to
-        bring the data into an Impala table that uses the appropriate file format. Then, use an
-        <codeph>INSERT...SELECT</codeph> statement to copy the data to the Parquet table, converting to Parquet
-        format as part of the process.
-      </p>
-
-      <draft-comment translate="no">
-Add an example here.
-</draft-comment>
-
-      <p>
-        Loading data into Parquet tables is a memory-intensive operation, because the incoming data is buffered
-        until it reaches <ph rev="parquet_block_size">one data block</ph> in size, then that chunk of data is
-        organized and compressed in memory before being written out. The memory consumption can be larger when
-        inserting data into partitioned Parquet tables, because a separate data file is written for each
-        combination of partition key column values, potentially requiring several
-        <ph rev="parquet_block_size">large</ph> chunks to be manipulated in memory at once.
-      </p>
-
-      <p>
-        When inserting into a partitioned Parquet table, Impala redistributes the data among the nodes to reduce
-        memory consumption. You might still need to temporarily increase the memory dedicated to Impala during the
-        insert operation, or break up the load operation into several <codeph>INSERT</codeph> statements, or both.
-      </p>
-
-      <note>
-        All the preceding techniques assume that the data you are loading matches the structure of the destination
-        table, including column order, column names, and partition layout. To transform or reorganize the data,
-        start by loading the data into a Parquet table that matches the underlying structure of the data, then use
-        one of the table-copying techniques such as <codeph>CREATE TABLE AS SELECT</codeph> or <codeph>INSERT ...
-        SELECT</codeph> to reorder or rename columns, divide the data among multiple partitions, and so on. For
-        example to take a single comprehensive Parquet data file and load it into a partitioned table, you would
-        use an <codeph>INSERT ... SELECT</codeph> statement with dynamic partitioning to let Impala create separate
-        data files with the appropriate partition values; for an example, see
-        <xref href="impala_insert.xml#insert"/>.
-      </note>
-
+      <p> If the data exists outside Impala and is in some other format, combine
+        both of the preceding techniques. First, use a <codeph>LOAD
+          DATA</codeph> or <codeph>CREATE EXTERNAL TABLE ... LOCATION</codeph>
+        statement to bring the data into an Impala table that uses the
+        appropriate file format. Then, use an <codeph>INSERT...SELECT</codeph>
+        statement to copy the data to the Parquet table, converting to Parquet
+        format as part of the process. </p>
+      <draft-comment translate="no"> Add an example here. </draft-comment>
+      <p> Loading data into Parquet tables is a memory-intensive operation,
+        because the incoming data is buffered until it reaches <ph
+          rev="parquet_block_size">one data block</ph> in size, then that chunk
+        of data is organized and compressed in memory before being written out.
+        The memory consumption can be larger when inserting data into
+        partitioned Parquet tables, because a separate data file is written for
+        each combination of partition key column values, potentially requiring
+        several <ph rev="parquet_block_size">large</ph> chunks to be manipulated
+        in memory at once. </p>
+      <p> When inserting into a partitioned Parquet table, Impala redistributes
+        the data among the nodes to reduce memory consumption. You might still
+        need to temporarily increase the memory dedicated to Impala during the
+        insert operation, or break up the load operation into several
+          <codeph>INSERT</codeph> statements, or both. </p>
+      <note> All the preceding techniques assume that the data you are loading
+        matches the structure of the destination table, including column order,
+        column names, and partition layout. To transform or reorganize the data,
+        start by loading the data into a Parquet table that matches the
+        underlying structure of the data, then use one of the table-copying
+        techniques such as <codeph>CREATE TABLE AS SELECT</codeph> or
+          <codeph>INSERT ... SELECT</codeph> to reorder or rename columns,
+        divide the data among multiple partitions, and so on. For example to
+        take a single comprehensive Parquet data file and load it into a
+        partitioned table, you would use an <codeph>INSERT ... SELECT</codeph>
+        statement with dynamic partitioning to let Impala create separate data
+        files with the appropriate partition values; for an example, see <xref
+          href="impala_insert.xml#insert"/>. </note>
     </conbody>
 
   </concept>
