@@ -108,7 +108,6 @@ inline int BatchedBitReader::UnpackAndDecodeBatch(
   DCHECK(buffer_pos_ != nullptr);
   DCHECK_GE(bit_width, 0);
   DCHECK_LE(bit_width, MAX_BITWIDTH);
-  DCHECK_LE(bit_width, sizeof(T) * 8);
   DCHECK_GE(num_values, 0);
 
   const uint8_t* new_buffer_pos;
