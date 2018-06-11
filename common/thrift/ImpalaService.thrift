@@ -79,7 +79,8 @@ enum TImpalaQueryOptions {
 
   // DEBUG ONLY:
   // Accepted formats:
-  // 1. "[<backend number>:]<node id>:<TExecNodePhase>:<TDebugAction>",
+  // 1. ExecNode actions
+  //  "[<instance idx>:]<node id>:<TExecNodePhase>:<TDebugAction>",
   //  the exec node with the given id will perform the specified action in the given
   //  phase. If the optional backend number (starting from 0) is specified, only that
   //  backend instance will perform the debug action, otherwise all backends will behave
@@ -87,11 +88,19 @@ enum TImpalaQueryOptions {
   //  If the string doesn't have the required format or if any of its components is
   //  invalid, the option is ignored.
   //
-  // 2. <sleep_label>:<sleep_time_ms>,
-  //  <sleep_label> is used as a string key that represents a location in the codebase
-  //  where sleep() is to be executed for <sleep_time_ms> milliseconds.
-  //  Available sleep_label : SLEEP_BEFORE_ADMISSION_MS,
-  //  SLEEP_AFTER_COORDINATOR_STARTS_MS, SLEEP_AFTER_ADMISSION_OUTCOME_MS
+  // 2. Global actions
+  //  "<global label>:<command>@<param0>@<param1>@...<paramN>",
+  //  global labels are marked in the code with DEBUG_ACTION*() macros.
+  //  Available global actions:
+  //  - SLEEP@<ms> will sleep for the 'ms' milliseconds.
+  //  - JITTER@<ms>[@<probability>] will sleep for a random amount of time between 0
+  //    and 'ms' milliseconds with the given probability. If <probability> is omitted,
+  //    it is 1.0.
+  //  - FAIL[@<probability>] returns an INTERNAL_ERROR status with the given
+  //    probability. If <probability> is omitted, it is 1.0.
+  //
+  // Only a single ExecNode action is allowed, but multiple global actions can be
+  // specified. To specify multiple actions, separate them with "|".
   DEBUG_ACTION,
 
   ABORT_ON_DEFAULT_LIMIT_EXCEEDED, // Removed

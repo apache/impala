@@ -108,21 +108,40 @@ std::string GetStackTrace();
 /// Returns the backend name in "host:port" form suitable for human consumption.
 std::string GetBackendString();
 
-/// Slow path implementing SleepIfSetInDebugOptions() for the case where 'query_options'
-/// is non-empty.
-void SleepIfSetInDebugOptionsImpl(
-    const TQueryOptions& query_options, const string& sleep_label);
+/// Tokenize 'debug_actions' into a list of tokenized rows, where columns are separated
+/// by ':' and rows by '|'. i.e. if debug_actions="a:b:c|x:y", then the returned
+/// structure is {{"a", "b", "c"}, {"x", "y"}}
+typedef std::list<std::vector<string>> DebugActionTokens;
+DebugActionTokens TokenizeDebugActions(const string& debug_actions);
 
-/// If sleep time is specified in the debug_action query option in the format
-/// <sleep_label>:<sleep_time_ms>, where <sleep_label> is a string and <sleep_time_ms>
-/// is an integer, and 'sleep_label' matches the one specified in the query option, then
-/// this methods extracts the corresponding <sleep_time_ms> and initiates a sleep for that
-/// many milliseconds.
-static inline void SleepIfSetInDebugOptions(
-    const TQueryOptions& query_options, const string& sleep_label) {
-  // Make sure this is very cheap if debug actions are not in use.
-  if (LIKELY(query_options.debug_action.empty())) return;
-  return SleepIfSetInDebugOptionsImpl(query_options, sleep_label);
+/// Tokenize 'action' which has an optional parameter separated by '@'. i.e. "x@y"
+/// becomes {"x", "y"} and "x" becomes {"x"}.
+std::vector<std::string> TokenizeDebugActionParams(const string& action);
+
+/// Slow path implementing DebugAction() for the case where
+/// 'query_options.debug_action' is non-empty.
+Status DebugActionImpl(
+    const TQueryOptions& query_options, const char* label) WARN_UNUSED_RESULT;
+
+/// If debug_action query option has a "global action" (i.e. not exec-node specific)
+/// and matches the given 'label', apply the the action. See ImpalaService.thrift for
+/// details of the format and available global actions. For ExecNode code, use
+/// ExecNode::ExecDebugAction() instead.
+WARN_UNUSED_RESULT static inline Status DebugAction(
+    const TQueryOptions& query_options, const char* label) {
+  if (LIKELY(query_options.debug_action.empty())) return Status::OK();
+  return DebugActionImpl(query_options, label);
+}
+
+/// Like DebugAction() but for use in contexts that can't safely propagate an error
+/// status. Debug action FAIL should not be used in these contexts and will be logged
+/// and ignored.
+static inline void DebugActionNoFail(
+    const TQueryOptions& query_options, const char* label) {
+  Status status = DebugAction(query_options, label);
+  if (!status.ok()) {
+    LOG(ERROR) << "Ignoring debug action failure: " << status.GetDetail();
+  }
 }
 
 // FILE_CHECKs are conditions that we expect to be true but could fail due to a malformed

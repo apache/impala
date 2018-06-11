@@ -41,9 +41,6 @@ DEFINE_int64(queue_wait_timeout_ms, 60 * 1000, "Maximum amount of time (in "
 
 namespace impala {
 
-// Available 'sleep_label' string that can be used in the debug_action query option.
-static const string SLEEP_AFTER_ADMISSION_OUTCOME_MS = "SLEEP_AFTER_ADMISSION_OUTCOME_MS";
-
 /// Convenience method.
 std::string PrintBytes(int64_t value) {
   return PrettyPrinter::Print(value, TUnit::BYTES);
@@ -628,7 +625,8 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule,
       Substitute(
           PROFILE_INFO_VAL_INITIAL_QUEUE_REASON, wait_time_ms, not_admitted_reason));
 
-  SleepIfSetInDebugOptions(schedule->query_options(), SLEEP_AFTER_ADMISSION_OUTCOME_MS);
+  // Disallow the FAIL action here. It would leave the queue in an inconsistent state.
+  DebugActionNoFail(schedule->query_options(), "AC_AFTER_ADMISSION_OUTCOME");
 
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);

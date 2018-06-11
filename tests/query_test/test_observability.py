@@ -90,7 +90,7 @@ class TestObservability(ImpalaTestSuite):
     """Tests that the query profile shows expected query states."""
     query = "select count(*) from functional.alltypes"
     handle = self.execute_query_async(query,
-        {"debug_action": "SLEEP_BEFORE_ADMISSION_MS:1000"})
+        {"debug_action": "CRS_BEFORE_ADMISSION:SLEEP@1000"})
     # If ExecuteStatement() has completed and the query is paused in the admission control
     # phase, then the query must be in COMPILED state.
     profile = self.client.get_runtime_profile(handle)
@@ -125,7 +125,7 @@ class TestObservability(ImpalaTestSuite):
     """Test that the exec summary is populated correctly in every query state"""
     query = "select count(*) from functional.alltypes"
     handle = self.execute_query_async(query,
-        {"debug_action": "SLEEP_BEFORE_ADMISSION_MS:1000"})
+        {"debug_action": "CRS_BEFORE_ADMISSION:SLEEP@1000"})
     # If ExecuteStatement() has completed and the query is paused in the admission control
     # phase, then the coordinator has not started yet and exec_summary should be empty.
     exec_summary = self.client.get_exec_summary(handle)

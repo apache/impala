@@ -528,7 +528,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_beeswax_client()
     try:
-      client.set_configuration_option("debug_action", "SLEEP_BEFORE_ADMISSION_MS:2000")
+      client.set_configuration_option("debug_action", "CRS_BEFORE_ADMISSION:SLEEP@2000")
       client.set_configuration_option("mem_limit", self.PROC_MEM_TEST_LIMIT + 1 )
       handle = client.execute_async("select 1")
       sleep(1)
@@ -537,7 +537,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           "Ready to be Rejected but already cancelled, query id=")
       client.clear_configuration()
 
-      client.set_configuration_option("debug_action", "SLEEP_BEFORE_ADMISSION_MS:2000")
+      client.set_configuration_option("debug_action", "CRS_BEFORE_ADMISSION:SLEEP@2000")
       handle = client.execute_async("select 1")
       sleep(1)
       client.close_query(handle)
@@ -545,7 +545,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           "Ready to be Admitted immediately but already cancelled, query id=")
 
       client.set_configuration_option("debug_action",
-          "SLEEP_AFTER_COORDINATOR_STARTS_MS:2000")
+          "CRS_AFTER_COORD_STARTS:SLEEP@2000")
       handle = client.execute_async("select 1")
       sleep(1)
       client.close_query(handle)
@@ -555,7 +555,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       client.clear_configuration()
       handle = client.execute_async("select sleep(10000)")
       client.set_configuration_option("debug_action",
-          "SLEEP_AFTER_ADMISSION_OUTCOME_MS:2000")
+          "AC_AFTER_ADMISSION_OUTCOME:SLEEP@2000")
       queued_query_handle = client.execute_async("select 1")
       sleep(1)
       assert client.get_state(queued_query_handle) == QueryState.COMPILED

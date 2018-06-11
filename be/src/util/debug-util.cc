@@ -18,6 +18,7 @@
 #include "util/debug-util.h"
 
 #include <iomanip>
+#include <random>
 #include <sstream>
 #include <boost/tokenizer.hpp>
 
@@ -42,6 +43,9 @@ extern void DumpStackTraceToString(std::string* s);
 #include "common/names.h"
 
 using boost::char_separator;
+using boost::is_any_of;
+using boost::split;
+using boost::token_compress_on;
 using boost::tokenizer;
 using namespace beeswax;
 using namespace parquet;
@@ -286,13 +290,102 @@ string GetBackendString() {
   return Substitute("$0:$1", FLAGS_hostname, FLAGS_be_port);
 }
 
-void SleepIfSetInDebugOptionsImpl(
-    const TQueryOptions& query_options, const string& sleep_label) {
-  vector<string> components;
-  boost::split(components, query_options.debug_action, boost::is_any_of(":"));
-  if (components.size() == 2 && components[0].compare(sleep_label) == 0) {
-    SleepForMs(atoi(components[1].c_str()));
+DebugActionTokens TokenizeDebugActions(const string& debug_actions) {
+  DebugActionTokens results;
+  list<string> actions;
+  split(actions, debug_actions, is_any_of("|"), token_compress_on);
+  for (const string& a : actions) {
+    vector<string> components;
+    split(components, a, is_any_of(":"), token_compress_on);
+    results.push_back(components);
   }
+  return results;
+}
+
+vector<string> TokenizeDebugActionParams(const string& action) {
+  vector<string> tokens;
+  split(tokens, action, is_any_of("@"), token_compress_on);
+  return tokens;
+}
+
+/// Helper to DebugActionImpl(). Given a probability as a string (e.g. "0.3"),
+/// determine whether the action should be executed, as returned in 'should_execute'.
+/// Returns true if the parsing was successful.
+static bool ParseProbability(const string& prob_str, bool* should_execute) {
+  StringParser::ParseResult parse_result;
+  double probability = StringParser::StringToFloat<double>(
+      prob_str.c_str(), prob_str.size(), &parse_result);
+  if (parse_result != StringParser::PARSE_SUCCESS ||
+      probability < 0.0 || probability > 1.0) {
+    return false;
+  }
+  // +1L ensures probability of 0.0 and 1.0 work as expected.
+  *should_execute = rand() < probability * (RAND_MAX + 1L);
+  return true;
+}
+
+Status DebugActionImpl(
+    const TQueryOptions& query_options, const char* label) {
+  const DebugActionTokens& action_list = TokenizeDebugActions(
+      query_options.debug_action);
+  static const char ERROR_MSG[] = "Invalid debug_action $0:$1 ($2)";
+  for (const vector<string>& components : action_list) {
+    if (components.size() != 2 || components[0].compare(label) != 0) continue;
+    // 'tokens' becomes {command, param0, param1, ... }
+    vector<string> tokens = TokenizeDebugActionParams(components[1]);
+    DCHECK_GE(tokens.size(), 1);
+    const string& cmd = tokens[0];
+    int sleep_millis = 0;
+    if (cmd.compare("SLEEP") == 0) {
+      // SLEEP@<millis>
+      if (tokens.size() != 2) {
+        return Status(Substitute(ERROR_MSG, components[0], components[1],
+                "expected SLEEP@<ms>"));
+      }
+      sleep_millis = atoi(tokens[1].c_str());
+    } else if (cmd.compare("JITTER") == 0) {
+      // JITTER@<millis>[@<probability>}
+      if (tokens.size() < 2 || tokens.size() > 3) {
+        return Status(Substitute(ERROR_MSG, components[0], components[1],
+                "expected JITTER@<ms>[@<probability>]"));
+      }
+      int max_millis = atoi(tokens[1].c_str());
+      if (tokens.size() == 3) {
+        bool should_execute = true;
+        if (!ParseProbability(tokens[2], &should_execute)) {
+          return Status(Substitute(ERROR_MSG, components[0], components[1],
+                  "invalid probability"));
+        }
+        if (!should_execute) continue;
+      }
+      sleep_millis = rand() % (max_millis + 1);
+    } else if (cmd.compare("FAIL") == 0) {
+      // FAIL[@<probability>]
+      if (tokens.size() > 2) {
+        return Status(Substitute(ERROR_MSG, components[0], components[1],
+                "expected FAIL[@<probability>]"));
+      }
+      if (tokens.size() == 2) {
+        bool should_execute = true;
+        if (!ParseProbability(tokens[1], &should_execute)) {
+          return Status(Substitute(ERROR_MSG, components[0], components[1],
+                  "invalid probability"));
+        }
+        if (!should_execute) continue;
+      }
+      return Status(TErrorCode::INTERNAL_ERROR, Substitute("Debug Action: $0:$1",
+              components[0], components[1]));
+    } else {
+      return Status(Substitute(ERROR_MSG, components[0], components[1],
+              "invalid command"));
+    }
+    if (sleep_millis > 0) {
+      VLOG(1) << Substitute("Debug Action: $0:$1 sleeping for $2 ms",
+          components[0], components[1], sleep_millis);
+      SleepForMs(sleep_millis);
+    }
+  }
+  return Status::OK();
 }
 
 }

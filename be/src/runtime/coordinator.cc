@@ -334,6 +334,7 @@ void Coordinator::StartBackendExec() {
   for (BackendState* backend_state: backend_states_) {
     ExecEnv::GetInstance()->exec_rpc_thread_pool()->Offer(
         [backend_state, this, &debug_options]() {
+          DebugActionNoFail(schedule_.query_options(), "COORD_BEFORE_EXEC_RPC");
           backend_state->Exec(query_ctx(), debug_options, filter_routing_table_,
               exec_rpcs_complete_barrier_.get());
         });
