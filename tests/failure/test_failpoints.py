@@ -103,6 +103,9 @@ class TestFailpoints(ImpalaTestSuite):
 
     for node_id in plan_node_ids:
       debug_action = '%d:%s:%s' % (node_id, location, FAILPOINT_ACTION_MAP[action])
+      # IMPALA-7046: add jitter to backend startup to exercise various failure paths.
+      debug_action += '|COORD_BEFORE_EXEC_RPC:JITTER@100@0.3'
+
       LOG.info('Current debug action: SET DEBUG_ACTION=%s' % debug_action)
       vector.get_value('exec_option')['debug_action'] = debug_action
 
