@@ -305,11 +305,12 @@ function copy-and-load-dependent-tables {
   # temporary location for that table to use. Should find a better way to handle this.
   echo COPYING AND LOADING DATA FOR DEPENDENT TABLES
   hadoop fs -rm -r -f /test-warehouse/alltypesmixedformat \
-    /tmp/alltypes_rc /tmp/alltypes_seq
+    /tmp/alltypes_rc /tmp/alltypes_seq /tmp/alltypes_parquet
   hadoop fs -mkdir -p /tmp/alltypes_seq/year=2009 \
-    /tmp/alltypes_rc/year=2009
+    /tmp/alltypes_rc/year=2009 /tmp/alltypes_parquet/year=2009
   hadoop fs -cp /test-warehouse/alltypes_seq/year=2009/month=2/ /tmp/alltypes_seq/year=2009
   hadoop fs -cp /test-warehouse/alltypes_rc/year=2009/month=3/ /tmp/alltypes_rc/year=2009
+  hadoop fs -cp /test-warehouse/alltypes_parquet/year=2009/month=4/ /tmp/alltypes_parquet/year=2009
 
   # Create a hidden file in AllTypesSmall
   hadoop fs -cp -f /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
@@ -333,7 +334,7 @@ function copy-and-load-dependent-tables {
   #
   # See: logs/data_loading/copy-and-load-dependent-tables.log)
   # See also: IMPALA-4345
-  hadoop fs -chmod -R 777 /tmp/alltypes_rc /tmp/alltypes_seq
+  hadoop fs -chmod -R 777 /tmp/alltypes_rc /tmp/alltypes_seq /tmp/alltypes_parquet
 
   # For tables that rely on loading data from local fs test-wareload-house
   # TODO: Find a good way to integrate this with the normal data loading scripts

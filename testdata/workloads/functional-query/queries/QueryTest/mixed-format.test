@@ -6,7 +6,7 @@ select count(*), sum(int_col) from functional.alltypesmixedformat
 ---- TYPES
 bigint, bigint
 ---- RESULTS
-900,4050
+1200,5400
 ====
 ---- QUERY
 # Restrict set of partitions (still multi-format)

@@ -23,7 +23,6 @@ PLAN-ROOT SINK
 |       table: rows=100000 size=12.60MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100000
-|     parquet dictionary predicates: c_salutation = 'Mrs.'
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=255B cardinality=16667
 |
@@ -64,7 +63,6 @@ PLAN-ROOT SINK
 |       table: rows=100000 size=12.60MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100000
-|     parquet dictionary predicates: c_salutation = 'Mrs.'
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=255B cardinality=16667
 |
@@ -104,7 +102,6 @@ PLAN-ROOT SINK
 |       table: rows=100000 size=12.60MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100000
-|     parquet dictionary predicates: c_salutation = 'Mrs.'
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=255B cardinality=16667
 |
@@ -144,7 +141,6 @@ PLAN-ROOT SINK
 |       table: rows=287514 size=31.19MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=287514
-|     parquet dictionary predicates: sr_return_quantity < 10
 |     mem-estimate=80.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=1 row-size=88B cardinality=28751
 |
@@ -221,7 +217,6 @@ PLAN-ROOT SINK
 |       table: rows=73049 size=9.84MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73049
-|     parquet dictionary predicates: a.d_holiday = 'Y'
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
 |     tuple-ids=0 row-size=303B cardinality=36525
 |
@@ -303,7 +298,6 @@ PLAN-ROOT SINK
 |  |       table: rows=73049 size=9.84MB
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=73049
-|  |     parquet dictionary predicates: d1.d_fy_week_seq = 1000
 |  |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
 |  |     tuple-ids=3 row-size=8B cardinality=7
 |  |

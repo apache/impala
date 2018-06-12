@@ -105,8 +105,9 @@ class TestRowsAvailability(ImpalaTestSuite):
 
   @staticmethod
   def __parse_time_ms(duration):
-    """Parses a duration string of the form 1h2h3m4s5.6ms into milliseconds."""
-    matches = re.findall(r'([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+(\.[0-9]+)?ms)?',
+    """Parses a duration string of the form 1h2h3m4s5.6ms7.8ns into milliseconds."""
+    matches = re.findall(r'([0-9]+h)?([0-9]+m)?([0-9]+s)?'\
+                         '([0-9]+(\.[0-9]+)?ms)?([0-9]+(\.[0-9]+)?ns)?',
                          duration)
     # Expect exactly two matches because all groups are optional in the regex.
     if matches is None or len(matches) != 2:

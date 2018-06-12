@@ -55,6 +55,10 @@ ALTER TABLE alltypesmixedformat SET FILEFORMAT RCFILE;
 LOAD DATA INPATH '/tmp/alltypes_rc/year=2009/month=3/'
 OVERWRITE INTO TABLE alltypesmixedformat PARTITION (year=2009, month=3);
 
+ALTER TABLE alltypesmixedformat SET FILEFORMAT PARQUET;
+LOAD DATA INPATH '/tmp/alltypes_parquet/year=2009/month=4'
+OVERWRITE INTO TABLE alltypesmixedformat PARTITION (year=2009, month=4);
+
 ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=1)
   SET SERDEPROPERTIES('field.delim'=',', 'escape.delim'='\\');
 ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=1)
@@ -65,6 +69,8 @@ ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=2)
   SET FILEFORMAT SEQUENCEFILE;
 ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=3)
   SET FILEFORMAT RCFILE;
+ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=4)
+  SET FILEFORMAT PARQUET;
 
 DROP TABLE IF EXISTS functional_parquet.chars_formats;
 CREATE EXTERNAL TABLE functional_parquet.chars_formats

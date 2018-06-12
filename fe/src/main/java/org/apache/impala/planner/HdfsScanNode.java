@@ -357,7 +357,6 @@ public class HdfsScanNode extends ScanNode {
     checkForSupportedFileFormats();
 
     assignCollectionConjuncts(analyzer);
-    computeDictionaryFilterConjuncts(analyzer);
 
     // compute scan range locations with optional sampling
     computeScanRangeLocations(analyzer);
@@ -376,7 +375,16 @@ public class HdfsScanNode extends ScanNode {
     }
 
     if (fileFormats_.contains(HdfsFileFormat.PARQUET)) {
-      computeMinMaxTupleAndConjuncts(analyzer);
+      // Compute min-max conjuncts only if the PARQUET_READ_STATISTICS query option is
+      // set to true.
+      if (analyzer.getQueryOptions().parquet_read_statistics) {
+        computeMinMaxTupleAndConjuncts(analyzer);
+      }
+      // Compute dictionary conjuncts only if the PARQUET_DICTIONARY_FILTERING query
+      // option is set to true.
+      if (analyzer.getQueryOptions().parquet_dictionary_filtering) {
+        computeDictionaryFilterConjuncts(analyzer);
+      }
     }
 
     if (canApplyParquetCountStarOptimization(analyzer, fileFormats_)) {

@@ -156,7 +156,6 @@ PLAN-ROOT SINK
 |       partitions: 24/24 rows=7300
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=310
-|     parquet dictionary predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
 |     mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=1 row-size=20B cardinality=730
 |
@@ -197,7 +196,6 @@ PLAN-ROOT SINK
 |       partitions: 24/24 rows=7300
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=310
-|     parquet dictionary predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
 |     mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
 |     tuple-ids=1 row-size=20B cardinality=730
 |

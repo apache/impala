@@ -86,7 +86,8 @@ YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCRE
 '2009','1',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=1'
 '2009','2',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','SEQUENCE_FILE','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=2'
 '2009','3',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','RC_FILE','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=3'
-'Total','',-1,3,regex:.+KB,'0B','','','',''
+'2009','4',-1,1,regex:.+KB,'NOT CACHED','NOT CACHED','PARQUET','false','$NAMENODE/test-warehouse/alltypesmixedformat/year=2009/month=4'
+'Total','',-1,4,regex:.+KB,'0B','','','',''
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====

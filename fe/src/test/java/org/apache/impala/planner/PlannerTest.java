@@ -321,6 +321,15 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testParquetFilteringDisabled() {
+    TQueryOptions options = new TQueryOptions();
+    options.setParquet_dictionary_filtering(false);
+    options.setParquet_read_statistics(false);
+    runPlannerTestFile("parquet-filtering-disabled", options,
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN));
+  }
+
+  @Test
   public void testKudu() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     addTestDb("kudu_planner_test", "Test DB for Kudu Planner.");
