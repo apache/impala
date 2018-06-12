@@ -28,14 +28,18 @@ if [ "$#" -ne 3 ]; then
   exit 1
 fi
 
-if [ ! -d $3 ]; then
-  echo "Directory $3 does not exist. This script expects the output directory to exist."
+gdb=$1
+target=$2
+dest_dir=$3
+
+if [ ! -d $dest_dir ]; then
+  echo "Directory $dest_dir does not exist. This script expects the output directory to exist."
   exit 1
 fi
 
 # Generate the list of shared libs path to copy.
 shared_libs_to_copy=$(mktemp)
-$1 --pid $2 --batch -ex 'info shared' 2> /dev/null | sed '1,/Shared Object Library/d' |
+$gdb --pid $target --batch -ex 'info shared' 2> /dev/null | sed '1,/Shared Object Library/d' |
     sed 's/\(.*\s\)\(\/.*\)/\2/' | grep \/ > $shared_libs_to_copy
 
 echo "Generated shared library listing for the process."
@@ -43,10 +47,10 @@ echo "Generated shared library listing for the process."
 # Copy the files to the target directory keeping the directory structure intact.
 # We use rsync instead of 'cp --parents' since the latter has permission issues
 # copying from system level directories. https://goo.gl/6yYNhw
-rsync -LR --files-from=$shared_libs_to_copy / $3
+rsync -LR --files-from=$shared_libs_to_copy / $dest_dir
 
-echo "Copied the shared libraries to the target directory: $3"
+echo "Copied the shared libraries to the target directory: $dest_dir"
 
 rm -f $shared_libs_to_copy
 # Make sure the impala user has write permissions on all the copied sharedlib paths.
-chmod 755 -R $3
+chmod 755 -R $dest_dir
