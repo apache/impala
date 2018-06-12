@@ -300,12 +300,14 @@ void Statestore::Topic::ToJson(Document* document, Value* topic_json) {
 Statestore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
     const RegistrationId& registration_id, const TNetworkAddress& network_address,
     const vector<TTopicRegistration>& subscribed_topics)
-    : subscriber_id_(subscriber_id),
-      registration_id_(registration_id),
-      network_address_(network_address) {
-  for (const TTopicRegistration& topic: subscribed_topics) {
-    GetTopicsMapForId(topic.topic_name)->emplace(piecewise_construct,
-        forward_as_tuple(topic.topic_name), forward_as_tuple(topic.is_transient));
+  : subscriber_id_(subscriber_id),
+    registration_id_(registration_id),
+    network_address_(network_address) {
+  for (const TTopicRegistration& topic : subscribed_topics) {
+    GetTopicsMapForId(topic.topic_name)
+        ->emplace(piecewise_construct, forward_as_tuple(topic.topic_name),
+            forward_as_tuple(
+                topic.is_transient, topic.populate_min_subscriber_topic_version));
   }
 }
 
@@ -697,18 +699,22 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, UpdateKind update_kin
   return Status::OK();
 }
 
-void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
-    UpdateKind update_kind, TUpdateStateRequest* update_state_request) {
+void Statestore::GatherTopicUpdates(const Subscriber& subscriber, UpdateKind update_kind,
+    TUpdateStateRequest* update_state_request) {
+  DCHECK(update_kind == UpdateKind::TOPIC_UPDATE
+      || update_kind == UpdateKind::PRIORITY_TOPIC_UPDATE)
+      << static_cast<int>(update_kind);
+  // Indices into update_state_request->topic_deltas where we need to populate
+  // 'min_subscriber_topic_version'. GetMinSubscriberTopicVersion() is somewhat
+  // expensive so we want to avoid calling it unless necessary.
+  vector<TTopicDelta*> deltas_needing_min_version;
   {
-    DCHECK(update_kind == UpdateKind::TOPIC_UPDATE
-        || update_kind ==  UpdateKind::PRIORITY_TOPIC_UPDATE)
-        << static_cast<int>(update_kind);
     const bool is_priority = update_kind == UpdateKind::PRIORITY_TOPIC_UPDATE;
-    const Subscriber::Topics& subscribed_topics = is_priority
-        ? subscriber.priority_subscribed_topics()
-        : subscriber.non_priority_subscribed_topics();
+    const Subscriber::Topics& subscribed_topics = is_priority ?
+        subscriber.priority_subscribed_topics() :
+        subscriber.non_priority_subscribed_topics();
     shared_lock<shared_mutex> l(topics_map_lock_);
-    for (const auto& subscribed_topic: subscribed_topics) {
+    for (const auto& subscribed_topic : subscribed_topics) {
       auto topic_it = topics_.find(subscribed_topic.first);
       DCHECK(topic_it != topics_.end());
       TopicEntry::Version last_processed_version =
@@ -718,16 +724,20 @@ void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
           update_state_request->topic_deltas[subscribed_topic.first];
       topic_delta.topic_name = subscribed_topic.first;
       topic_it->second.BuildDelta(subscriber.id(), last_processed_version, &topic_delta);
+      if (subscribed_topic.second.populate_min_subscriber_topic_version) {
+        deltas_needing_min_version.push_back(&topic_delta);
+      }
     }
   }
 
   // Fill in the min subscriber topic version. This must be done after releasing
   // topics_map_lock_.
-  lock_guard<mutex> l(subscribers_lock_);
-  typedef map<TopicId, TTopicDelta> TopicDeltaMap;
-  for (TopicDeltaMap::value_type& topic_delta: update_state_request->topic_deltas) {
-    topic_delta.second.__set_min_subscriber_topic_version(
-        GetMinSubscriberTopicVersion(topic_delta.first));
+  if (!deltas_needing_min_version.empty()) {
+    lock_guard<mutex> l(subscribers_lock_);
+    for (TTopicDelta* delta : deltas_needing_min_version) {
+      delta->__set_min_subscriber_topic_version(
+          GetMinSubscriberTopicVersion(delta->topic_name));
+    }
   }
 }
 

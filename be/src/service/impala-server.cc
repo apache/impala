@@ -356,12 +356,12 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   // Register the membership callback if running in a real cluster.
   if (!TestInfo::is_test()) {
-    auto cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
-         vector<TTopicDelta>* topic_updates) {
+    auto cb = [this](const StatestoreSubscriber::TopicDeltaMap& state,
+        vector<TTopicDelta>* topic_updates) {
       this->MembershipCallback(state, topic_updates);
     };
-    ABORT_IF_ERROR(
-        exec_env->subscriber()->AddTopic(Statestore::IMPALA_MEMBERSHIP_TOPIC, true, cb));
+    ABORT_IF_ERROR(exec_env->subscriber()->AddTopic(
+        Statestore::IMPALA_MEMBERSHIP_TOPIC, true, false, cb));
 
     if (FLAGS_is_coordinator && !FLAGS_use_local_catalog) {
       auto catalog_cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
@@ -369,7 +369,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
         this->CatalogUpdateCallback(state, topic_updates);
       };
       ABORT_IF_ERROR(exec_env->subscriber()->AddTopic(
-            CatalogServer::IMPALA_CATALOG_TOPIC, true, catalog_cb));
+          CatalogServer::IMPALA_CATALOG_TOPIC, true, true, catalog_cb));
     }
   }
 
@@ -1517,6 +1517,7 @@ void ImpalaServer::CatalogUpdateCallback(
   // Always update the minimum subscriber version for the catalog topic.
   {
     unique_lock<mutex> unique_lock(catalog_version_lock_);
+    DCHECK(delta.__isset.min_subscriber_topic_version);
     min_subscriber_catalog_topic_version_ = delta.min_subscriber_topic_version;
   }
   catalog_version_update_cv_.NotifyAll();

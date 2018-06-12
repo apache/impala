@@ -590,3 +590,96 @@ class TestStatestore():
     sub.register(topics=[reg])
     LOG.info("Re-registered with id {0}, waiting for update".format(sub.subscriber_id))
     sub.wait_for_update(topic_name, target_updates)
+
+  def test_min_subscriber_topic_version(self):
+    self._do_test_min_subscriber_topic_version(False)
+
+  def test_min_subscriber_topic_version_with_straggler(self):
+    self._do_test_min_subscriber_topic_version(True)
+
+  def _do_test_min_subscriber_topic_version(self, simulate_straggler):
+    """Implementation of test that the 'min_subscriber_topic_version' flag is correctly
+    set when requested. This tests runs two subscribers concurrently and tracks the
+    minimum version each has processed. If 'simulate_straggler' is true, one subscriber
+    rejects updates so that its version is not advanced."""
+    topic_name = "test_min_subscriber_topic_version_%s" % uuid.uuid1()
+
+    # This lock is held while processing the update to protect last_to_versions.
+    update_lock = threading.Lock()
+    last_to_versions = {}
+    TOTAL_SUBSCRIBERS = 2
+    def callback(sub, args, is_producer, sub_name):
+      """Callback for subscriber to verify min_subscriber_topic_version behaviour.
+      If 'is_producer' is true, this acts as the producer, otherwise it acts as the
+      consumer. 'sub_name' is a name used to index into last_to_versions."""
+      if topic_name not in args.topic_deltas:
+        # The update doesn't contain our topic.
+        pass
+      with update_lock:
+        LOG.info("{0} got update {1}".format(sub_name,
+            repr(args.topic_deltas[topic_name])))
+        LOG.info("Versions: {0}".format(last_to_versions))
+        to_version = args.topic_deltas[topic_name].to_version
+        from_version = args.topic_deltas[topic_name].from_version
+        min_subscriber_topic_version = \
+            args.topic_deltas[topic_name].min_subscriber_topic_version
+
+        if is_producer:
+          assert min_subscriber_topic_version is not None
+          assert (to_version == 0 and min_subscriber_topic_version == 0) or\
+              min_subscriber_topic_version < to_version,\
+              "'to_version' hasn't been created yet by this subscriber."
+          # Only validate version once all subscribers have processed an update.
+          if len(last_to_versions) == TOTAL_SUBSCRIBERS:
+            min_to_version = min(last_to_versions.values())
+            assert min_subscriber_topic_version <= min_to_version,\
+                "The minimum subscriber topic version seen by the producer cannot get " +\
+                "ahead of the minimum version seem by the consumer, by definition."
+            assert min_subscriber_topic_version >= min_to_version - 2,\
+                "The min topic version can be two behind the last version seen by " + \
+                "this subscriber because the updates for both subscribers are " + \
+                "prepared in parallel and because it's possible that the producer " + \
+                "processes two updates in-between consumer updates. This is not " + \
+                "absolute but depends on updates not being delayed a large amount."
+        else:
+          # Consumer did not request topic version.
+          assert min_subscriber_topic_version is None
+
+        # Check the 'to_version' and update 'last_to_versions'.
+        last_to_version = last_to_versions.get(sub_name, 0)
+        if to_version > 0:
+          # Non-empty update.
+          assert from_version == last_to_version
+        # Stragglers should accept the first update then skip later ones.
+        skip_update = simulate_straggler and not is_producer and last_to_version > 0
+        if not skip_update: last_to_versions[sub_name] = to_version
+
+        if is_producer:
+          delta = self.make_topic_update(topic_name)
+          return TUpdateStateResponse(status=STATUS_OK, topic_updates=[delta],
+                                      skipped=False)
+        elif skip_update:
+          return TUpdateStateResponse(status=STATUS_OK, topic_updates=[], skipped=True)
+        else:
+          return DEFAULT_UPDATE_STATE_RESPONSE
+
+    # Two concurrent subscribers, which pushes out updates and checks the minimum
+    # version, the other which just consumes the updates.
+    def producer_callback(sub, args): return callback(sub, args, True, "producer")
+    def consumer_callback(sub, args): return callback(sub, args, False, "consumer")
+    consumer_sub = StatestoreSubscriber(update_cb=consumer_callback)
+    consumer_reg = TTopicRegistration(topic_name=topic_name, is_transient=True)
+    producer_sub = StatestoreSubscriber(update_cb=producer_callback)
+    producer_reg = TTopicRegistration(topic_name=topic_name, is_transient=True,
+        populate_min_subscriber_topic_version=True)
+    NUM_UPDATES = 6
+    (
+      consumer_sub.start()
+          .register(topics=[consumer_reg])
+    )
+    (
+      producer_sub.start()
+          .register(topics=[producer_reg])
+          .wait_for_update(topic_name, NUM_UPDATES)
+    )
+    consumer_sub.wait_for_update(topic_name, NUM_UPDATES)

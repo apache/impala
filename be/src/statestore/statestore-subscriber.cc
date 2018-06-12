@@ -138,7 +138,8 @@ StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
 }
 
 Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
-    bool is_transient, const UpdateCallback& callback) {
+    bool is_transient, bool populate_min_subscriber_topic_version,
+    const UpdateCallback& callback) {
   lock_guard<shared_mutex> exclusive_lock(lock_);
   if (is_registered_) return Status("Subscriber already started, can't add new topic");
   TopicRegistration& registration = topic_registrations_[topic_id];
@@ -151,6 +152,8 @@ Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
     registration.update_interval_timer.Start();
   }
   registration.is_transient = is_transient;
+  registration.populate_min_subscriber_topic_version =
+      populate_min_subscriber_topic_version;
   return Status::OK();
 }
 
@@ -164,6 +167,8 @@ Status StatestoreSubscriber::Register() {
     TTopicRegistration thrift_topic;
     thrift_topic.topic_name = registration.first;
     thrift_topic.is_transient = registration.second.is_transient;
+    thrift_topic.populate_min_subscriber_topic_version =
+        registration.second.populate_min_subscriber_topic_version;
     request.topic_registrations.push_back(thrift_topic);
   }
 
