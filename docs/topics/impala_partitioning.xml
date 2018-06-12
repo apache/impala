@@ -143,19 +143,27 @@ under the License.
         </li>
 
         <li>
-          <codeph><xref href="impala_alter_table.xml#alter_table">ALTER TABLE</xref></codeph>: you can add or drop partitions, to work with
-          different portions of a huge data set. You can designate the HDFS directory that holds the data files for a specific partition.
-          With data partitioned by date values, you might <q>age out</q> data that is no longer relevant.
-          <note conref="../shared/impala_common.xml#common/add_partition_set_location"/>
+          <codeph><xref href="impala_alter_table.xml#alter_table">ALTER
+              TABLE</xref></codeph>: you can add or drop partitions, to work
+          with different portions of a huge data set. You can designate the HDFS
+          directory that holds the data files for a specific partition. With
+          data partitioned by date values, you might <q>age out</q> data that is
+          no longer relevant. <note
+            conref="../shared/impala_common.xml#common/add_partition_set_location"
+          />
         </li>
 
         <li>
-          <codeph><xref href="impala_insert.xml#insert">INSERT</xref></codeph>: When you insert data into a partitioned table, you identify
-          the partitioning columns. One or more values from each inserted row are not stored in data files, but instead determine the
-          directory where that row value is stored. You can also specify which partition to load a set of data into, with <codeph>INSERT
-          OVERWRITE</codeph> statements; you can replace the contents of a specific partition but you cannot append data to a specific
-          partition.
-          <p rev="1.3.1" conref="../shared/impala_common.xml#common/insert_inherit_permissions"/>
+          <codeph><xref href="impala_insert.xml#insert">INSERT</xref></codeph>:
+          When you insert data into a partitioned table, you identify the
+          partitioning columns. One or more values from each inserted row are
+          not stored in data files, but instead determine the directory where
+          that row value is stored. You can also specify which partition to load
+          a set of data into, with <codeph>INSERT OVERWRITE</codeph> statements;
+          you can replace the contents of a specific partition but you cannot
+          append data to a specific partition. <p rev="1.3.1"
+            conref="../shared/impala_common.xml#common/insert_inherit_permissions"
+          />
         </li>
 
         <li>
@@ -242,7 +250,8 @@ insert into weather <b>partition (year=2014, month=04, day)</b> select 'sunny',2
 
     <conbody>
 
-      <p rev="1.3.1" conref="../shared/impala_common.xml#common/insert_inherit_permissions"/>
+      <p rev="1.3.1"
+        conref="../shared/impala_common.xml#common/insert_inherit_permissions"/>
 
     </conbody>
 
@@ -377,7 +386,8 @@ insert into weather <b>partition (year=2014, month=04, day)</b> select 'sunny',2
 
         <p conref="../shared/impala_common.xml#common/partitions_and_views"/>
 
-        <p conref="../shared/impala_common.xml#common/analytic_partition_pruning_caveat"/>
+        <p
+          conref="../shared/impala_common.xml#common/analytic_partition_pruning_caveat"/>
 
       </conbody>
 
@@ -408,18 +418,37 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
 </codeblock>
 
         <p>
-          Dynamic partition pruning involves using information only available at run time, such as the result of a subquery:
+          Dynamic partition pruning involves using information only available
+          at run time, such as the result of a subquery. The following example
+          shows a simple dynamic partition pruning.
         </p>
 
 <codeblock conref="../shared/impala_common.xml#common/simple_dpp_example"/>
 
-<!-- Former example. Not sure it really would trigger DPP. SELECT COUNT(*) FROM sales_table WHERE year = (SELECT MAX(year) FROM some_other_table); -->
+        <p>
+          In the above example, Impala evaluates the subquery, sends the
+          subquery results to all Impala nodes participating in the query, and
+          then each <cmdname>impalad</cmdname> daemon uses the dynamic partition
+          pruning optimization to read only the partitions with the relevant key
+          values.
+        </p>
 
         <p>
-          In this case, Impala evaluates the subquery, sends the subquery results to all Impala nodes participating in the query, and then
-          each <cmdname>impalad</cmdname> daemon uses the dynamic partition pruning optimization to read only the partitions with the
-          relevant key values.
+          The output query plan from the <codeph>EXPLAIN</codeph> statement
+          shows that runtime filters are enabled. The plan also shows that it
+          expects to read all 5 partitions of the <codeph>yy</codeph> table,
+          indicating that static partition pruning will not happen.
         </p>
+
+        <p>The Filter summary in the <codeph>PROFILE</codeph> output shows that
+          the scan node filtered out based on a runtime filter of dynamic
+          partition pruning. </p>
+
+<codeblock>Filter 0 (1.00 MB):
+ - Files processed: 3
+ - <b>Files rejected: 1 (1)</b>
+ - Files total: 3 (3)
+</codeblock>
 
         <p>
           Dynamic partition pruning is especially effective for queries involving joins of several large partitioned tables. Evaluating the
@@ -429,7 +458,8 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
           and the amount of intermediate data stored and transmitted across the network during the query.
         </p>
 
-        <p conref="../shared/impala_common.xml#common/spill_to_disk_vs_dynamic_partition_pruning"/>
+        <p
+          conref="../shared/impala_common.xml#common/spill_to_disk_vs_dynamic_partition_pruning"/>
 
         <p>
           Dynamic partition pruning is part of the runtime filtering feature, which applies to other kinds of queries in addition to queries
@@ -479,7 +509,8 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
         </li>
 
         <li>
-          <p conref="../shared/impala_common.xml#common/complex_types_partitioning"/>
+          <p
+            conref="../shared/impala_common.xml#common/complex_types_partitioning"/>
         </li>
 
         <li>
@@ -559,7 +590,8 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
         formats.
       </p>
 
-      <note conref="../shared/impala_common.xml#common/add_partition_set_location"/>
+      <note
+        conref="../shared/impala_common.xml#common/add_partition_set_location"/>
 
       <p>
         What happens to the data files when a partition is dropped depends on whether the partitioned table is designated as internal or
@@ -615,7 +647,8 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
 
       <note type="important">
         <p conref="../shared/impala_common.xml#common/cs_or_cis"/>
-        <p conref="../shared/impala_common.xml#common/incremental_stats_after_full"/>
+        <p
+          conref="../shared/impala_common.xml#common/incremental_stats_after_full"/>
         <p conref="../shared/impala_common.xml#common/incremental_stats_caveats"/>
       </note>
 
