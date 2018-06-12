@@ -344,18 +344,21 @@ under the License.
       </p>
 
       <p>
-        The following example shows a query that uses a single runtime filter (labelled <codeph>RF00</codeph>)
-        to prune the partitions that are scanned in one stage of the query, based on evaluating the
-        result set of a subquery:
+        The following example shows a query that uses a single runtime filter,
+        labeled <codeph>RF000</codeph>, to prune the partitions that are scanned
+        in one stage of the query, based on evaluating the result set of a
+        subquery:
       </p>
 
 <codeblock conref="../shared/impala_common.xml#common/simple_dpp_example"/>
 
       <p>
-        The query profile (displayed by the <codeph>PROFILE</codeph> command in <cmdname>impala-shell</cmdname>)
-        contains both the <codeph>EXPLAIN</codeph> plan and more detailed information about the internal
-        workings of the query. The profile output includes a section labelled the <q>filter routing table</q>,
-        with information about each filter based on its ID.
+        The query profile (displayed by the <codeph>PROFILE</codeph> command
+        in <cmdname>impala-shell</cmdname>) contains both the
+          <codeph>EXPLAIN</codeph> plan and more detailed information about the
+        internal workings of the query. The profile output includes the
+          <codeph>Filter routing table</codeph> section with information about
+        each filter based on its ID.
       </p>
     </conbody>
   </concept>

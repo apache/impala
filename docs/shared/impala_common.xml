@@ -1798,42 +1798,44 @@ from length_demo;
       </p>
 
 <codeblock id="simple_dpp_example">
-create table yy (s string) partitioned by (year int) stored as parquet;
-insert into yy partition (year) values ('1999', 1999), ('2000', 2000),
-  ('2001', 2001), ('2010',2010);
-compute stats yy;
+CREATE TABLE yy (s STRING) PARTITIONED BY (year INT);
+INSERT INTO yy PARTITION (year) VALUES ('1999', 1999), ('2000', 2000),
+  ('2001', 2001), ('2010', 2010), ('2018', 2018);
+COMPUTE STATS yy;
 
-create table yy2 (s string) partitioned by (year int) stored as parquet;
-insert into yy2 partition (year) values ('1999', 1999), ('2000', 2000),
-  ('2001', 2001);
-compute stats yy2;
+CREATE TABLE yy2 (s STRING, year INT);
+INSERT INTO yy2 VALUES ('1999', 1999), ('2000', 2000), ('2001', 2001);
+COMPUTE STATS yy2;
 
--- The query reads an unknown number of partitions, whose key values are only
--- known at run time. The 'runtime filters' lines show how the information about
--- the partitions is calculated in query fragment 02, and then used in query
--- fragment 00 to decide which partitions to skip.
-explain select s from yy2 where year in (select year from yy where year between 2000 and 2005);
-+----------------------------------------------------------+
-| Explain String                                           |
-+----------------------------------------------------------+
-| Estimated Per-Host Requirements: Memory=16.00MB VCores=2 |
-|                                                          |
-| 04:EXCHANGE [UNPARTITIONED]                              |
-| |                                                        |
-| 02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]                 |
-| |  hash predicates: year = year                          |
-| |  <b>runtime filters: RF000 &lt;- year</b>                        |
-| |                                                        |
-| |--03:EXCHANGE [BROADCAST]                               |
-| |  |                                                     |
-| |  01:SCAN HDFS [dpp.yy]                                 |
-| |     partitions=2/4 files=2 size=468B                   |
-| |                                                        |
-| 00:SCAN HDFS [dpp.yy2]                                   |
-|    partitions=2/3 files=2 size=468B                      |
-|    <b>runtime filters: RF000 -> year</b>                        |
-+----------------------------------------------------------+
+-- The following query reads an unknown number of partitions, whose key values
+-- are only known at run time. The 'runtime filters' lines show how the
+-- information about the partitions is calculated in query fragment 02, and then
+-- used in query fragment 00 to decide which partitions to skip.
+
+EXPLAIN SELECT s FROM yy WHERE year IN (SELECT year FROM yy2);
++--------------------------------------------------------------------------+
+| PLAN-ROOT SINK                                                           |
+| |                                                                        |
+| 04:EXCHANGE [UNPARTITIONED]                                              |
+| |                                                                        |
+| 02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]                                 |
+| |  hash predicates: year = year                                          |
+| |  <b>runtime filters: RF000 &lt;- year</b>                              |
+| |                                                                        |
+| |--03:EXCHANGE [BROADCAST]                                               |
+| |  |                                                                     |
+| |  01:SCAN HDFS [default.yy2]                                            |
+| |     partitions=1/1 files=1 size=620B                                   |
+| |                                                                        |
+| 00:SCAN HDFS [default.yy]                                                |
+|    <b>partitions=5/5</b> files=5 size=1.71KB                             |
+|    runtime filters: RF000 -> year                                        |
++--------------------------------------------------------------------------+
+
+SELECT s FROM yy WHERE year IN (SELECT year FROM yy2); -- Returns 3 rows from yy
+PROFILE;
 </codeblock>
+
       <p id="order_by_scratch_dir">
         By default, intermediate files used during large sort, join, aggregation, or analytic function operations
         are stored in the directory <filepath>/tmp/impala-scratch</filepath> . These files are removed when the
