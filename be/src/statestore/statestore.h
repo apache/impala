@@ -331,10 +331,16 @@ class Statestore : public CacheLineAligned {
 
     /// Information about a subscriber's subscription to a specific topic.
     struct TopicSubscription {
-      TopicSubscription(bool is_transient) : is_transient(is_transient) {}
+      TopicSubscription(bool is_transient, bool populate_min_subscriber_topic_version)
+        : is_transient(is_transient),
+          populate_min_subscriber_topic_version(populate_min_subscriber_topic_version) {}
 
       /// Whether entries written by this subscriber should be considered transient.
       const bool is_transient;
+
+      /// Whether min_subscriber_topic_version needs to be filled in for this
+      /// subscription.
+      const bool populate_min_subscriber_topic_version;
 
       /// The last topic entry version successfully processed by this subscriber. Only
       /// written by a single thread at a time but can be read concurrently.

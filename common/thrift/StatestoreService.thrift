@@ -139,6 +139,12 @@ struct TTopicRegistration {
   // True if updates to this topic from this subscriber should be removed upon the
   // subscriber's failure or disconnection
   2: required bool is_transient;
+
+  // If true, min_subscriber_topic_version is computed and set in topic updates sent
+  // to this subscriber to this subscriber. Should only be set to true if this is
+  // actually required - computing the version is relatively expensive compared to
+  // other aspects of preparing topic updates - see IMPALA-6816.
+  3: required bool populate_min_subscriber_topic_version = false;
 }
 
 struct TRegisterSubscriberRequest {

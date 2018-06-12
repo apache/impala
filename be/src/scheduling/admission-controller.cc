@@ -18,7 +18,6 @@
 #include "scheduling/admission-controller.h"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
 #include <gutil/strings/substitute.h>
 
@@ -243,9 +242,11 @@ AdmissionController::~AdmissionController() {
 Status AdmissionController::Init() {
   RETURN_IF_ERROR(Thread::Create("scheduling", "admission-thread",
       &AdmissionController::DequeueLoop, this, &dequeue_thread_));
-  StatestoreSubscriber::UpdateCallback cb =
-    bind<void>(mem_fn(&AdmissionController::UpdatePoolStats), this, _1, _2);
-  Status status = subscriber_->AddTopic(Statestore::IMPALA_REQUEST_QUEUE_TOPIC, true, cb);
+  auto cb = [this](
+      const StatestoreSubscriber::TopicDeltaMap& state,
+      vector<TTopicDelta>* topic_updates) { UpdatePoolStats(state, topic_updates); };
+  Status status =
+      subscriber_->AddTopic(Statestore::IMPALA_REQUEST_QUEUE_TOPIC, true, false, cb);
   if (!status.ok()) {
     status.AddDetail("AdmissionController failed to register request queue topic");
   }
