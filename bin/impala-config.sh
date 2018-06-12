@@ -34,17 +34,6 @@
 # this script because scripts outside this repository may need to be updated and that
 # is not practical at this time.
 
-export JAVA_HOME="${JAVA_HOME:-/usr/java/default}"
-if [ ! -d "$JAVA_HOME" ]; then
-  echo "JAVA_HOME must be set to the location of your JDK!"
-  return 1
-fi
-export JAVA="$JAVA_HOME/bin/java"
-if [[ ! -e "$JAVA" ]]; then
-  echo "Could not find java binary at $JAVA" >&2
-  return 1
-fi
-
 if ! [[ "'$IMPALA_HOME'" =~ [[:blank:]] ]]; then
   if [ -z "$IMPALA_HOME" ]; then
     if [[ ! -z "$ZSH_NAME" ]]; then
@@ -233,6 +222,32 @@ unset IMPALA_LLAMA_MINIKDC_URL
 . "$IMPALA_HOME/bin/impala-config-branch.sh"
 if [ -f "$IMPALA_HOME/bin/impala-config-local.sh" ]; then
   . "$IMPALA_HOME/bin/impala-config-local.sh"
+fi
+
+# It is important to have a coherent view of the JAVA_HOME and JAVA executable.
+# The JAVA_HOME should be determined first, then the JAVA executable should be
+# derived from JAVA_HOME. bin/bootstrap_development.sh adds code to
+# bin/impala-config-local.sh to set JAVA_HOME, so it is important to pick up that
+# setting before deciding what JAVA_HOME to use.
+
+# Try to detect the system's JAVA_HOME
+# If javac exists, then the system has a Java SDK (JRE does not have javac).
+# Follow the symbolic links and use this to determine the system's JAVA_HOME.
+SYSTEM_JAVA_HOME="/usr/java/default"
+if [ -n "$(which javac)" ]; then
+  SYSTEM_JAVA_HOME=$(which javac | xargs readlink -f | sed "s:/bin/javac::")
+fi
+
+# Prefer the JAVA_HOME set in the environment, but use the system's JAVA_HOME otherwise
+export JAVA_HOME="${JAVA_HOME:-${SYSTEM_JAVA_HOME}}"
+if [ ! -d "$JAVA_HOME" ]; then
+  echo "JAVA_HOME must be set to the location of your JDK!"
+  return 1
+fi
+export JAVA="$JAVA_HOME/bin/java"
+if [[ ! -e "$JAVA" ]]; then
+  echo "Could not find java binary at $JAVA" >&2
+  return 1
 fi
 
 #########################################################################################
