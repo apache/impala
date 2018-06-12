@@ -52,7 +52,6 @@ PLAN-ROOT SINK
      partitions: 24/24 rows=7300
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=621
-   parquet dictionary predicates: id < 10
    mem-estimate=80.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=97B cardinality=365
 ====

@@ -268,7 +268,7 @@ public abstract class FeCatalogUtils {
    */
   public static HdfsFileFormat getMajorityFormat(
       Iterable<? extends FeFsPartition> partitions) {
-    Map<HdfsFileFormat, Integer> numPartitionsByFormat = Maps.newHashMap();
+    Map<HdfsFileFormat, Integer> numPartitionsByFormat = Maps.newTreeMap();
     for (FeFsPartition partition: partitions) {
       HdfsFileFormat format = partition.getInputFormatDescriptor().getFileFormat();
       Integer numPartitions = numPartitionsByFormat.get(format);

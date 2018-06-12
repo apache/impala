@@ -1255,27 +1255,27 @@ PLAN-ROOT SINK
 # Mixed table format scan
 select * from functional.alltypesmixedformat
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=32.00KB Threads=2
+Max Per-Host Resource Reservation: Memory=88.00KB Threads=2
 Per-Host Resource Estimates: Memory=16.00MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional.alltypesmixedformat
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=2
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypesmixedformat]
-   partitions=3/3 files=3 size=58.17KB
+   partitions=4/4 files=4 size=66.61KB
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/3 rows=unavailable
+     partitions: 0/4 rows=unavailable
      columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=1
    tuple-ids=0 row-size=88B cardinality=unavailable
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=32.00KB Threads=3
+Max Per-Host Resource Reservation: Memory=88.00KB Threads=3
 Per-Host Resource Estimates: Memory=16.00MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional.alltypesmixedformat
@@ -1290,18 +1290,18 @@ PLAN-ROOT SINK
 |  tuple-ids=0 row-size=88B cardinality=unavailable
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=2
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=2
 00:SCAN HDFS [functional.alltypesmixedformat, RANDOM]
-   partitions=3/3 files=3 size=58.17KB
+   partitions=4/4 files=4 size=66.61KB
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/3 rows=unavailable
+     partitions: 0/4 rows=unavailable
      columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=1
    tuple-ids=0 row-size=88B cardinality=unavailable
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=64.00KB Threads=5
+Max Per-Host Resource Reservation: Memory=176.00KB Threads=5
 Per-Host Resource Estimates: Memory=32.00MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional.alltypesmixedformat
@@ -1316,15 +1316,15 @@ PLAN-ROOT SINK
 |  tuple-ids=0 row-size=88B cardinality=unavailable
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Host Resources: mem-estimate=32.00MB mem-reservation=64.00KB thread-reservation=4
+Per-Host Resources: mem-estimate=32.00MB mem-reservation=176.00KB thread-reservation=4
 00:SCAN HDFS [functional.alltypesmixedformat, RANDOM]
-   partitions=3/3 files=3 size=58.17KB
+   partitions=4/4 files=4 size=66.61KB
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/3 rows=unavailable
+     partitions: 0/4 rows=unavailable
      columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=1
    tuple-ids=0 row-size=88B cardinality=unavailable
 ====
 # HBase scan
