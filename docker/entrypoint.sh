@@ -80,7 +80,6 @@ function build() {
 function impala_environment() {
   pushd /home/impdev/Impala
   export IMPALA_HOME=/home/impdev/Impala
-  export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
   source bin/impala-config.sh
   popd
 }
