@@ -54,4 +54,15 @@ Status TruncateUp(const string& str, int32_t max_length, string* result) {
   return Status::OK();
 }
 
+bool CommaSeparatedContains(const std::string& cs_list, const std::string& item) {
+  size_t pos = 0;
+  while (pos < cs_list.size()) {
+    size_t comma_pos = cs_list.find(",", pos);
+    if (comma_pos == string::npos) return cs_list.compare(pos, string::npos, item) == 0;
+    if (cs_list.compare(pos, comma_pos - pos, item) == 0) return true;
+    pos = comma_pos + 1;
+  }
+  return false;
+}
+
 }

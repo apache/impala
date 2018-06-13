@@ -37,6 +37,9 @@ Status TruncateDown(const std::string& str, int32_t max_length, std::string* res
 WARN_UNUSED_RESULT
 Status TruncateUp(const std::string& str, int32_t max_length, std::string* result);
 
+/// Return true if the comma-separated string 'cs_list' contains 'item' as one of
+/// the comma-separated values.
+bool CommaSeparatedContains(const std::string& cs_list, const std::string& item);
 }
 
 #endif
