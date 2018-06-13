@@ -52,9 +52,10 @@ class InProcessImpalaServer {
   /// member variables. Internally this will call StartWithClientservers() and
   /// SetCatalogInitialized(). The default values for statestore_host and statestore_port
   /// indicate that a statestore connection should not be used. These values are directly
-  /// forwarded to the ExecEnv.
-  static InProcessImpalaServer* StartWithEphemeralPorts(
-      const std::string& statestore_host, int statestore_port);
+  /// forwarded to the ExecEnv. Returns ok and sets *server on success. On failure returns
+  /// an error. *server may or may not be set on error, but is always invalid to use.
+  static Status StartWithEphemeralPorts(const std::string& statestore_host,
+      int statestore_port, InProcessImpalaServer** server);
 
   /// Starts all servers, including the beeswax and hs2 client
   /// servers.
@@ -99,8 +100,9 @@ class InProcessStatestore {
  public:
 
   // Creates and starts an InProcessStatestore with ports chosen from the ephemeral port
-  // range. Returns NULL if no server could be started.
-  static InProcessStatestore* StartWithEphemeralPorts();
+  // range. Returns OK and sets *statestore on success. On failure, an error is
+  /// returned and *statestore may or may not be set but is always invalid to use.
+  static Status StartWithEphemeralPorts(InProcessStatestore** statestore);
 
   /// Constructs but does not start the statestore.
   InProcessStatestore(int statestore_port, int webserver_port);

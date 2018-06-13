@@ -8691,9 +8691,11 @@ int main(int argc, char** argv) {
   FLAGS_abort_on_config_error = false;
   VLOG_CONNECTION << "creating test env";
   VLOG_CONNECTION << "starting backends";
-  InProcessStatestore* ips = InProcessStatestore::StartWithEphemeralPorts();
-  InProcessImpalaServer* impala_server =
-      InProcessImpalaServer::StartWithEphemeralPorts(FLAGS_hostname, ips->port());
+  InProcessStatestore* ips;
+  ABORT_IF_ERROR(InProcessStatestore::StartWithEphemeralPorts(&ips));
+  InProcessImpalaServer* impala_server;
+  ABORT_IF_ERROR(InProcessImpalaServer::StartWithEphemeralPorts(
+      FLAGS_hostname, ips->port(), &impala_server));
   executor_ = new ImpaladQueryExecutor(impala_server->hostname(),
       impala_server->beeswax_port());
   ABORT_IF_ERROR(executor_->Setup());

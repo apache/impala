@@ -37,7 +37,8 @@ namespace impala {
 TEST(StatestoreTest, SmokeTest) {
   // All allocations done by 'new' to avoid problems shutting down Thrift servers
   // gracefully.
-  InProcessStatestore* ips = InProcessStatestore::StartWithEphemeralPorts();
+  InProcessStatestore* ips;
+  ASSERT_OK(InProcessStatestore::StartWithEphemeralPorts(&ips));
   ASSERT_TRUE(ips != NULL) << "Could not start Statestore";
   // Port already in use
   InProcessStatestore* statestore_wont_start =
@@ -69,7 +70,8 @@ TEST(StatestoreSslTest, SmokeTest) {
   server_key << impala_home << "/be/src/testutil/server-key.pem";
   FLAGS_ssl_private_key = server_key.str();
 
-  InProcessStatestore* statestore =  InProcessStatestore::StartWithEphemeralPorts();
+  InProcessStatestore* statestore;
+  ASSERT_OK(InProcessStatestore::StartWithEphemeralPorts(&statestore));
   if (statestore == NULL) FAIL() << "Unable to start Statestore";
 
   vector<int> used_ports;
