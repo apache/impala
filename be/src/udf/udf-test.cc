@@ -250,6 +250,31 @@ TEST(UdfTest, TestDecimalVal) {
   EXPECT_NE(null1.is_null, d1.is_null);
 }
 
+TEST(UdfTest, TestFloatVal) {
+  FloatVal f1(1.0);
+  FloatVal f2(1.0);
+
+  // 1.0 == 1.0
+  EXPECT_EQ(f1, f2);
+
+  // convert to nulls
+  f1.is_null = true;
+  f2.is_null = true;
+  // nulls
+  EXPECT_EQ(f1, f2);
+
+  // change the value contained in one of the nulls
+  f1.val = 0.0;
+  // nulls
+  EXPECT_EQ(f1, f2);
+
+  // convert to non-nulls
+  f1.is_null = false;
+  f2.is_null = false;
+  // 0.0 != 1.0
+  EXPECT_NE(f1, f2);
+}
+
 TEST(UdfTest, TestVarArgs) {
   vector<StringVal> input;
   input.push_back(StringVal("Hello"));
