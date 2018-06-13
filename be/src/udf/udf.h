@@ -524,7 +524,9 @@ struct FloatVal : public AnyVal {
   }
 
   bool operator==(const FloatVal& other) const {
-    return is_null == other.is_null && val == other.val;
+    if (is_null && other.is_null) return true;
+    if (is_null || other.is_null) return false;
+    return val == other.val;
   }
   bool operator!=(const FloatVal& other) const { return !(*this == other); }
 };
