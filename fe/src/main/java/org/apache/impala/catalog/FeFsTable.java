@@ -32,6 +32,9 @@ import org.apache.impala.util.ListMap;
 
 /**
  * Frontend interface for interacting with a filesystem-backed table.
+ *
+ * TODO(vercegovac): various method names and comments in this interface refer
+ * to HDFS where they should be more generically "Fs".
  */
 public interface FeFsTable extends FeTable {
   /** hive's default value for table property 'serialization.null.format' */
@@ -61,6 +64,9 @@ public interface FeFsTable extends FeTable {
 
   /**
    * @return the value Hive is configured to use for NULL partition key values.
+   *
+   * TODO(todd): this is an HMS-wide setting, rather than a per-table setting.
+   * Perhaps this should move to the FeCatalog interface?
    */
   public String getNullPartitionKeyValue();
 
@@ -82,6 +88,11 @@ public interface FeFsTable extends FeTable {
    * @return the total number of bytes stored for this table.
    */
   long getTotalHdfsBytes();
+
+  /**
+   * @return the total number of files stored on HDFS for this table
+   */
+  long getTotalNumFiles();
 
   /**
    * @return true if this table is backed by the Avro file format

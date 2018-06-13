@@ -1255,8 +1255,7 @@ public class HdfsTable extends Table implements FeFsTable {
       try {
         if (loadTableSchema) {
             // set nullPartitionKeyValue from the hive conf.
-            nullPartitionKeyValue_ = client.getConfigValue(
-                "hive.exec.default.partition.name", "__HIVE_DEFAULT_PARTITION__");
+            nullPartitionKeyValue_ = MetaStoreUtil.getNullPartitionKeyValue(client);
             loadSchema(msTbl);
             loadAllColumnStats(client);
         }
@@ -1776,6 +1775,9 @@ public class HdfsTable extends Table implements FeFsTable {
   public long getTotalHdfsBytes() { return fileMetadataStats_.totalFileBytes; }
 
   @Override // FeFsTable
+  public long getTotalNumFiles() { return fileMetadataStats_.numFiles; }
+
+  @Override // FeFsTable
   public String getHdfsBaseDir() { return hdfsBaseDir_; }
   public Path getHdfsBaseDirPath() { return new Path(hdfsBaseDir_); }
   @Override // FeFsTable
@@ -1989,18 +1991,24 @@ public class HdfsTable extends Table implements FeFsTable {
 
   @Override // FeFsTable
   public TResultSet getTableStats() {
+    return getTableStats(this);
+  }
+
+  // TODO(todd): move to FeCatalogUtils. Upon moving to Java 8, could be
+  // a default method of FeFsTable.
+  public static TResultSet getTableStats(FeFsTable table) {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
     result.setSchema(resultSchema);
 
-    for (int i = 0; i < numClusteringCols_; ++i) {
+    for (int i = 0; i < table.getNumClusteringCols(); ++i) {
       // Add the partition-key values as strings for simplicity.
-      Column partCol = getColumns().get(i);
+      Column partCol = table.getColumns().get(i);
       TColumn colDesc = new TColumn(partCol.getName(), Type.STRING.toThrift());
       resultSchema.addToColumns(colDesc);
     }
 
-    boolean statsExtrap = isStatsExtrapolationEnabled();
+    boolean statsExtrap = table.isStatsExtrapolationEnabled();
 
     resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
     if (statsExtrap) {
@@ -2015,12 +2023,12 @@ public class HdfsTable extends Table implements FeFsTable {
     resultSchema.addToColumns(new TColumn("Location", Type.STRING.toThrift()));
 
     // Pretty print partitions and their stats.
-    ArrayList<HdfsPartition> orderedPartitions =
-        Lists.newArrayList(partitionMap_.values());
+    List<FeFsPartition> orderedPartitions = new ArrayList<>(
+        FeCatalogUtils.loadAllPartitions(table));
     Collections.sort(orderedPartitions, HdfsPartition.KV_COMPARATOR);
 
     long totalCachedBytes = 0L;
-    for (HdfsPartition p: orderedPartitions) {
+    for (FeFsPartition p: orderedPartitions) {
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
 
       // Add the partition-key values (as strings for simplicity).
@@ -2033,7 +2041,7 @@ public class HdfsTable extends Table implements FeFsTable {
       // Compute and report the extrapolated row count because the set of files could
       // have changed since we last computed stats for this partition. We also follow
       // this policy during scan-cardinality estimation.
-      if (statsExtrap) rowBuilder.add(getExtrapolatedNumRows(p.getSize()));
+      if (statsExtrap) rowBuilder.add(table.getExtrapolatedNumRows(p.getSize()));
       rowBuilder.add(p.getFileDescriptors().size()).addBytes(p.getSize());
       if (!p.isMarkedCached()) {
         // Helps to differentiate partitions that have 0B cached versus partitions
@@ -2058,7 +2066,7 @@ public class HdfsTable extends Table implements FeFsTable {
         // Extract cache replication factor from the parameters of the table
         // if the table is not partitioned or directly from the partition.
         Short rep = HdfsCachingUtil.getCachedCacheReplication(
-            numClusteringCols_ == 0 ?
+            table.getNumClusteringCols() == 0 ?
             p.getTable().getMetaStoreTable().getParameters() :
             p.getParameters());
         rowBuilder.add(rep.toString());
@@ -2071,9 +2079,9 @@ public class HdfsTable extends Table implements FeFsTable {
     }
 
     // For partitioned tables add a summary row at the bottom.
-    if (numClusteringCols_ > 0) {
+    if (table.getNumClusteringCols() > 0) {
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
-      int numEmptyCells = numClusteringCols_ - 1;
+      int numEmptyCells = table.getNumClusteringCols() - 1;
       rowBuilder.add("Total");
       for (int i = 0; i < numEmptyCells; ++i) {
         rowBuilder.add("");
@@ -2081,15 +2089,15 @@ public class HdfsTable extends Table implements FeFsTable {
 
       // Total rows, extrapolated rows, files, bytes, cache stats.
       // Leave format empty.
-      rowBuilder.add(getNumRows());
+      rowBuilder.add(table.getNumRows());
       // Compute and report the extrapolated row count because the set of files could
       // have changed since we last computed stats for this partition. We also follow
       // this policy during scan-cardinality estimation.
       if (statsExtrap) {
-        rowBuilder.add(getExtrapolatedNumRows(fileMetadataStats_.totalFileBytes));
+        rowBuilder.add(table.getExtrapolatedNumRows(table.getTotalHdfsBytes()));
       }
-      rowBuilder.add(fileMetadataStats_.numFiles)
-          .addBytes(fileMetadataStats_.totalFileBytes)
+      rowBuilder.add(table.getTotalNumFiles())
+          .addBytes(table.getTotalHdfsBytes())
           .addBytes(totalCachedBytes).add("").add("").add("").add("");
       result.addToRows(rowBuilder.get());
     }
@@ -2279,7 +2287,8 @@ public class HdfsTable extends Table implements FeFsTable {
     HiveConf hiveConf = new HiveConf(HdfsTable.class);
     // set nullPartitionKeyValue from the hive conf.
     tmpTable.nullPartitionKeyValue_ = hiveConf.get(
-        "hive.exec.default.partition.name", "__HIVE_DEFAULT_PARTITION__");
+        MetaStoreUtil.NULL_PARTITION_KEY_VALUE_CONF_KEY,
+        MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE);
     tmpTable.loadSchema(msTbl);
     tmpTable.initializePartitionMetadata(msTbl);
     tmpTable.setTableStats(msTbl);

@@ -26,6 +26,7 @@ import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
 
 import com.google.common.collect.ImmutableList;
@@ -78,6 +79,13 @@ class DirectMetaProvider implements MetaProvider {
       throws MetaException, NoSuchObjectException, TException {
     try (MetaStoreClient c = msClientPool_.getClient()) {
       return c.getHiveClient().getTable(dbName, tableName);
+    }
+  }
+
+  @Override
+  public String loadNullPartitionKeyValue() throws MetaException, TException {
+    try (MetaStoreClient c = msClientPool_.getClient()) {
+      return MetaStoreUtil.getNullPartitionKeyValue(c.getHiveClient());
     }
   }
 }

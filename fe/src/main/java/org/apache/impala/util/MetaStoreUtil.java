@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.impala.catalog.HdfsTable;
@@ -31,8 +32,6 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
-import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TColumn;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -72,6 +71,13 @@ public class MetaStoreUtil {
   // Hive configuration.
   private static short maxPartitionsPerRpc_ = DEFAULT_MAX_PARTITIONS_PER_RPC;
 
+  // The configuration key that Hive uses to set the null partition key value.
+  public static final String NULL_PARTITION_KEY_VALUE_CONF_KEY =
+      "hive.exec.default.partition.name";
+  // The default value for the above configuration key.
+  public static final String DEFAULT_NULL_PARTITION_KEY_VALUE =
+      "__HIVE_DEFAULT_PARTITION__";
+
   static {
     // Get the value from the Hive configuration, if present.
     HiveConf hiveConf = new HiveConf(HdfsTable.class);
@@ -89,6 +95,15 @@ public class MetaStoreUtil {
           "default: %d", maxPartitionsPerRpc_, DEFAULT_MAX_PARTITIONS_PER_RPC));
       maxPartitionsPerRpc_ = DEFAULT_MAX_PARTITIONS_PER_RPC;
     }
+  }
+
+  /**
+   * Return the value that Hive is configured to use for NULL partition key values.
+   */
+  public static String getNullPartitionKeyValue(IMetaStoreClient client)
+      throws ConfigValSecurityException, TException {
+    return client.getConfigValue(
+        NULL_PARTITION_KEY_VALUE_CONF_KEY, DEFAULT_NULL_PARTITION_KEY_VALUE);
   }
 
   /**
