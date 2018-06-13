@@ -42,7 +42,7 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.fb.FbCompression;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.fb.FbFileDesc;
-import org.apache.impala.thrift.ImpalaInternalServiceConstants;
+import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
@@ -67,7 +67,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.primitives.Ints;
 import com.google.flatbuffers.FlatBufferBuilder;
 
 /**
@@ -444,11 +443,6 @@ public class HdfsPartition implements FeFsPartition {
   }
 
   @Override // FeFsPartition
-  public boolean isDefaultPartition() {
-    return id_ == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID;
-  }
-
-  @Override // FeFsPartition
   public boolean isCacheable() {
     return FileSystemUtil.isPathCacheable(new Path(getLocation()));
   }
@@ -755,13 +749,13 @@ public class HdfsPartition implements FeFsPartition {
         accessLevel);
   }
 
-  public static HdfsPartition defaultPartition(
+  public static HdfsPartition prototypePartition(
       HdfsTable table, HdfsStorageDescriptor storageDescriptor) {
     List<LiteralExpr> emptyExprList = Lists.newArrayList();
     List<FileDescriptor> emptyFileDescriptorList = Lists.newArrayList();
     return new HdfsPartition(table, null, emptyExprList,
         storageDescriptor, emptyFileDescriptorList,
-        ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID, null,
+        CatalogObjectsConstants.PROTOTYPE_PARTITION_ID, null,
         TAccessLevel.READ_WRITE);
   }
 
@@ -810,7 +804,7 @@ public class HdfsPartition implements FeFsPartition {
         thriftPartition.blockSize);
 
     List<LiteralExpr> literalExpr = Lists.newArrayList();
-    if (id != ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
+    if (id != CatalogObjectsConstants.PROTOTYPE_PARTITION_ID) {
       List<Column> clusterCols = Lists.newArrayList();
       for (int i = 0; i < table.getNumClusteringCols(); ++i) {
         clusterCols.add(table.getColumns().get(i));

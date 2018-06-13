@@ -181,7 +181,7 @@ public class FrontendTestBase {
       }
       try {
         HdfsTable hdfsTable = (HdfsTable) dummyTable;
-        hdfsTable.addDefaultPartition(msTbl.getSd());
+        hdfsTable.setPrototypePartition(msTbl.getSd());
       } catch (CatalogException e) {
         e.printStackTrace();
         fail("Failed to add test table:\n" + createTableSql);

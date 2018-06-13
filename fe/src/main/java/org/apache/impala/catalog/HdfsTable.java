@@ -65,7 +65,7 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.thrift.ImpalaInternalServiceConstants;
+import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
@@ -93,9 +93,11 @@ import org.slf4j.LoggerFactory;
 
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -186,6 +188,12 @@ public class HdfsTable extends Table implements FeFsTable {
 
   // Store all the partition ids of an HdfsTable.
   private final HashSet<Long> partitionIds_ = Sets.newHashSet();
+
+  // The partition used as a prototype when creating new partitions during
+  // insertion. New partitions inherit file format and other settings from
+  // the prototype.
+  @VisibleForTesting
+  HdfsPartition prototypePartition_;
 
   // Estimate (in bytes) of the incremental stats size per column per partition
   public static final long STATS_SIZE_PER_COLUMN_BYTES = 400;
@@ -359,9 +367,6 @@ public class HdfsTable extends Table implements FeFsTable {
     if (!isLocationCacheable()) return false;
     if (!isMarkedCached() && numClusteringCols_ > 0) {
       for (FeFsPartition partition: getPartitions()) {
-        if (partition.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
-          continue;
-        }
         if (!partition.isCacheable()) {
           return false;
         }
@@ -663,7 +668,6 @@ public class HdfsTable extends Table implements FeFsTable {
     // Search through all the partitions and check if their partition key values
     // match the values being searched for.
     for (HdfsPartition partition: partitionMap_.values()) {
-      if (partition.isDefaultPartition()) continue;
       List<LiteralExpr> partitionValues = partition.getPartitionValues();
       Preconditions.checkState(partitionValues.size() == targetValues.size());
       boolean matchFound = true;
@@ -747,7 +751,7 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * Resets any partition metadata, creates the default partition and sets the base
+   * Resets any partition metadata, creates the prototype partition and sets the base
    * table directory path as well as the caching info from the HMS table.
    */
   private void initializePartitionMetadata(
@@ -755,10 +759,7 @@ public class HdfsTable extends Table implements FeFsTable {
     Preconditions.checkNotNull(msTbl);
     resetPartitions();
     hdfsBaseDir_ = msTbl.getSd().getLocation();
-    // INSERT statements need to refer to this if they try to write to new partitions
-    // Scans don't refer to this because by definition all partitions they refer to
-    // exist.
-    addDefaultPartition(msTbl.getSd());
+    setPrototypePartition(msTbl.getSd());
 
     // We silently ignore cache directives that no longer exist in HDFS, and remove
     // non-existing cache directives from the parameters.
@@ -1187,16 +1188,15 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * Adds or replaces the default partition.
+   * Update the prototype partition used when creating new partitions for
+   * this table. New partitions will inherit storage properties from the
+   * provided descriptor.
    */
-  public void addDefaultPartition(StorageDescriptor storageDescriptor)
+  public void setPrototypePartition(StorageDescriptor storageDescriptor)
       throws CatalogException {
-    // Default partition has no files and is not referred to by scan nodes. Data sinks
-    // refer to this to understand how to create new partitions.
     HdfsStorageDescriptor hdfsStorageDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
-    HdfsPartition partition = HdfsPartition.defaultPartition(this, hdfsStorageDescriptor);
-    partitionMap_.put(partition.getId(), partition);
+    prototypePartition_ = HdfsPartition.prototypePartition(this, hdfsStorageDescriptor);
   }
 
   @Override
@@ -1304,14 +1304,15 @@ public class HdfsTable extends Table implements FeFsTable {
   /**
    * Updates the file metadata of an unpartitioned HdfsTable.
    */
-  private void updateUnpartitionedTableFileMd() throws Exception {
+  private void updateUnpartitionedTableFileMd() throws CatalogException {
+    Preconditions.checkState(getNumClusteringCols() == 0);
     if (LOG.isTraceEnabled()) {
       LOG.trace("update unpartitioned table: " + getFullName());
     }
     resetPartitions();
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
-    addDefaultPartition(msTbl.getSd());
+    setPrototypePartition(msTbl.getSd());
     HdfsPartition part = createPartition(msTbl.getSd(), null);
     addPartition(part);
     if (isMarkedCached_) part.markCached();
@@ -1354,8 +1355,6 @@ public class HdfsTable extends Table implements FeFsTable {
     // Identify dirty partitions that need to be loaded from the Hive Metastore and
     // partitions that no longer exist in the Hive Metastore.
     for (HdfsPartition partition: partitionMap_.values()) {
-      // Ignore the default partition
-      if (partition.isDefaultPartition()) continue;
       // Remove partitions that don't exist in the Hive Metastore. These are partitions
       // that were removed from HMS using some external process, e.g. Hive.
       if (!msPartitionNames.contains(partition.getPartitionName())) {
@@ -1439,12 +1438,11 @@ public class HdfsTable extends Table implements FeFsTable {
   @Override
   public void setTableStats(org.apache.hadoop.hive.metastore.api.Table msTbl) {
     super.setTableStats(msTbl);
-    // For unpartitioned tables set the numRows in its partitions
+    // For unpartitioned tables set the numRows in its single partition
     // to the table's numRows.
     if (numClusteringCols_ == 0 && !partitionMap_.isEmpty()) {
-      // Unpartitioned tables have a 'dummy' partition and a default partition.
-      // Temp tables used in CTAS statements have one partition.
-      Preconditions.checkState(partitionMap_.size() == 2 || partitionMap_.size() == 1);
+      // Unpartitioned tables have a default partition.
+      Preconditions.checkState(partitionMap_.size() == 1);
       for (HdfsPartition p: partitionMap_.values()) {
         p.setNumRows(getNumRows());
       }
@@ -1663,6 +1661,9 @@ public class HdfsTable extends Table implements FeFsTable {
             HdfsPartition.fromThrift(this, part.getKey(), part.getValue());
         addPartition(hdfsPart);
       }
+      prototypePartition_ = HdfsPartition.fromThrift(this,
+          CatalogObjectsConstants.PROTOTYPE_PARTITION_ID,
+          hdfsTable.prototype_partition);
     } catch (CatalogException e) {
       throw new TableLoadingException(e.getMessage());
     }
@@ -1739,11 +1740,13 @@ public class HdfsTable extends Table implements FeFsTable {
     }
     if (includeFileDesc) fileMetadataStats_.set(stats);
 
+    THdfsPartition prototypePartition = prototypePartition_.toThrift(false, false);
+
     memUsageEstimate += fileMetadataStats_.numFiles * PER_FD_MEM_USAGE_BYTES +
         fileMetadataStats_.numBlocks * PER_BLOCK_MEM_USAGE_BYTES;
     setEstimatedMetadataSize(memUsageEstimate);
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
-        nullPartitionKeyValue_, nullColumnValue_, idToPartition);
+        nullPartitionKeyValue_, nullColumnValue_, idToPartition, prototypePartition);
     hdfsTable.setAvroSchema(avroSchema_);
     hdfsTable.setMultiple_filesystems(multipleFileSystems_);
     if (includeFileDesc) {
@@ -1771,8 +1774,12 @@ public class HdfsTable extends Table implements FeFsTable {
    * Returns the file format that the majority of partitions are stored in.
    */
   public HdfsFileFormat getMajorityFormat() {
+    // In the case that we have no partitions added to the table yet, it's
+    // important to add the "prototype" partition as a fallback.
+    Iterable<HdfsPartition> partitionsToConsider = Iterables.concat(
+        partitionMap_.values(), Collections.singleton(prototypePartition_));
     Map<HdfsFileFormat, Integer> numPartitionsByFormat = Maps.newHashMap();
-    for (HdfsPartition partition: partitionMap_.values()) {
+    for (HdfsPartition partition: partitionsToConsider) {
       HdfsFileFormat format = partition.getInputFormatDescriptor().getFileFormat();
       Integer numPartitions = numPartitionsByFormat.get(format);
       if (numPartitions == null) {
@@ -1804,7 +1811,6 @@ public class HdfsTable extends Table implements FeFsTable {
     HashSet<List<LiteralExpr>> existingPartitions = new HashSet<List<LiteralExpr>>();
     // Get the list of partition values of existing partitions in Hive Metastore.
     for (HdfsPartition partition: partitionMap_.values()) {
-      if (partition.isDefaultPartition()) continue;
       existingPartitions.add(partition.getPartitionValues());
     }
 
@@ -2001,8 +2007,6 @@ public class HdfsTable extends Table implements FeFsTable {
 
     long totalCachedBytes = 0L;
     for (HdfsPartition p: orderedPartitions) {
-      // Ignore dummy default partition.
-      if (p.isDefaultPartition()) continue;
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
 
       // Add the partition-key values (as strings for simplicity).

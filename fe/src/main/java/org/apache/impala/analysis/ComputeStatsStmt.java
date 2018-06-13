@@ -440,7 +440,6 @@ public class ComputeStatsStmt extends StatementBase {
         Collection<? extends FeFsPartition> allPartitions =
             hdfsTable.getPartitions();
         for (FeFsPartition p: allPartitions) {
-          if (p.isDefaultPartition()) continue;
           TPartitionStats partStats = p.getPartitionStats();
           if (!p.hasIncrementalStats() || tableIsMissingColStats) {
             if (partStats == null) {
@@ -458,7 +457,7 @@ public class ComputeStatsStmt extends StatementBase {
             validPartStats_.add(partStats);
           }
         }
-        if (expectedPartitions_.size() == hdfsTable.getPartitions().size() - 1) {
+        if (expectedPartitions_.size() == hdfsTable.getPartitions().size()) {
           expectedPartitions_.clear();
           expectAllPartitions_ = true;
         }
@@ -479,7 +478,6 @@ public class ComputeStatsStmt extends StatementBase {
             Sets.newHashSet(partitionSet_.getPartitions());
         Collection<? extends FeFsPartition> allPartitions = hdfsTable.getPartitions();
         for (FeFsPartition p : allPartitions) {
-          if (p.isDefaultPartition()) continue;
           if (targetPartitions.contains(p)) continue;
           TPartitionStats partStats = p.getPartitionStats();
           if (partStats != null) validPartStats_.add(partStats);
