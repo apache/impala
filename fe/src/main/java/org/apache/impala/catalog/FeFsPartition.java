@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.thrift.TAccessLevel;
+import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.TPartitionStats;
 
 /**
@@ -66,6 +67,11 @@ public interface FeFsPartition {
    * @return the location of this partition
    */
   String getLocation();
+
+  /**
+   * Return the location of this partition, serialized in Thrift.
+   */
+  THdfsPartitionLocation getLocationAsThrift();
 
   /**
    * @return the location of this partition as a Path
@@ -146,4 +152,14 @@ public interface FeFsPartition {
    * @return the HMS parameters stored for this partition
    */
   Map<String, String> getParameters();
+
+  /**
+   * Returns the HMS partition parameters after filtering out all the partition
+   * incremental stats information.
+   *
+   * TODO(todd): consider _always_ filtering the parameters to remove incremental
+   * stats, and having a different getter which returns the already-decoded stats
+   * which are more memory-efficient anyway.
+   */
+  Map<String, String> getFilteredHmsParameters();
 }
