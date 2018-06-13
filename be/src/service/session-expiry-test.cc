@@ -48,9 +48,11 @@ TEST(SessionTest, TestExpiry) {
   FLAGS_idle_session_timeout = 1;
   // Skip validation checks for in-process backend.
   FLAGS_abort_on_config_error = false;
-  InProcessStatestore* ips = InProcessStatestore::StartWithEphemeralPorts();
-  InProcessImpalaServer* impala =
-      InProcessImpalaServer::StartWithEphemeralPorts("localhost", ips->port());
+  InProcessStatestore* ips;
+  ASSERT_OK(InProcessStatestore::StartWithEphemeralPorts(&ips));
+  InProcessImpalaServer* impala;
+  ASSERT_OK(InProcessImpalaServer::StartWithEphemeralPorts(
+      "localhost", ips->port(), &impala));
   IntCounter* expired_metric =
       impala->metrics()->FindMetricForTesting<IntCounter>(
           ImpaladMetricKeys::NUM_SESSIONS_EXPIRED);

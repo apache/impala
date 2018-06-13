@@ -42,8 +42,8 @@ DECLARE_int32(krpc_port);
 using namespace apache::thrift;
 using namespace impala;
 
-InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
-    const string& statestore_host, int statestore_port) {
+Status InProcessImpalaServer::StartWithEphemeralPorts(const string& statestore_host,
+    int statestore_port, InProcessImpalaServer** server) {
   for (int tries = 0; tries < 10; ++tries) {
     vector<int> used_ports;
     int backend_port = FindUnusedEphemeralPort(&used_ports);
@@ -68,19 +68,14 @@ InProcessImpalaServer* InProcessImpalaServer::StartWithEphemeralPorts(
     int hs2_port = FindUnusedEphemeralPort(&used_ports);
     if (hs2_port == -1) continue;
 
-    InProcessImpalaServer* impala = new InProcessImpalaServer(FLAGS_hostname,
+    *server = new InProcessImpalaServer(FLAGS_hostname,
         backend_port, krpc_port, subscriber_port, webserver_port, statestore_host,
         statestore_port);
     // Start the daemon and check if it works, if not delete the current server object and
     // pick a new set of ports
-    Status started = impala->StartWithClientServers(beeswax_port, hs2_port);
-    if (started.ok()) return impala;
-    LOG(WARNING) << started.GetDetail();
-
-    delete impala;
+    return (*server)->StartWithClientServers(beeswax_port, hs2_port);
   }
-  DCHECK(false) << "Could not find port to start Impalad.";
-  return NULL;
+  return Status("Could not find ports to start server");
 }
 
 InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int backend_port,
@@ -118,7 +113,7 @@ Status InProcessImpalaServer::Join() {
   return Status::OK();
 }
 
-InProcessStatestore* InProcessStatestore::StartWithEphemeralPorts() {
+Status InProcessStatestore::StartWithEphemeralPorts(InProcessStatestore** statestore) {
   for (int tries = 0; tries < 10; ++tries) {
     vector<int> used_ports;
     int statestore_port = FindUnusedEphemeralPort(&used_ports);
@@ -127,12 +122,10 @@ InProcessStatestore* InProcessStatestore::StartWithEphemeralPorts() {
     int webserver_port = FindUnusedEphemeralPort(&used_ports);
     if (webserver_port == -1) continue;
 
-    InProcessStatestore* ips = new InProcessStatestore(statestore_port, webserver_port);
-    if (ips->Start().ok()) return ips;
-    delete ips;
+    *statestore = new InProcessStatestore(statestore_port, webserver_port);
+    return (*statestore)->Start();
   }
-  DCHECK(false) << "Could not find port to start Statestore.";
-  return NULL;
+  return Status("Could not find port to start Statestore.");
 }
 
 InProcessStatestore::InProcessStatestore(int statestore_port, int webserver_port)
