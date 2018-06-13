@@ -23,8 +23,11 @@ import java.util.Set;
 
 import org.apache.impala.catalog.CatalogTest;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.PatternMatcher;
 import org.junit.Before;
 import org.junit.Test;
@@ -91,5 +94,12 @@ public class LocalCatalogTest {
            Type.TIMESTAMP});
     FeTable t = functionalDb.getTable("alltypes");
     assertEquals(7300, t.getNumRows());
+
+    assertTrue(t instanceof LocalFsTable);
+    FeFsTable fsTable = (FeFsTable) t;
+    assertEquals(MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE,
+        fsTable.getNullPartitionKeyValue());
+    TResultSet stats = fsTable.getTableStats();
+    assertEquals(1, stats.getRowsSize());
   }
 }

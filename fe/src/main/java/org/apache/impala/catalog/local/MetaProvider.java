@@ -45,4 +45,7 @@ interface MetaProvider {
 
   Table loadTable(String dbName, String tableName)
       throws NoSuchObjectException, MetaException, TException;
+
+  String loadNullPartitionKeyValue()
+      throws MetaException, TException;
 }

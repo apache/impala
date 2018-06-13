@@ -34,4 +34,8 @@ public class LocalCatalogException extends RuntimeException {
   public LocalCatalogException(Throwable cause) {
     super(cause);
   }
+
+  public LocalCatalogException(String msg) {
+    super(msg);
+  }
 }

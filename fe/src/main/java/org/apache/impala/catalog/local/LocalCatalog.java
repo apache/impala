@@ -66,6 +66,7 @@ import com.google.common.collect.Maps;
 public class LocalCatalog implements FeCatalog {
   private final MetaProvider metaProvider_;
   private Map<String, FeDb> dbs_ = Maps.newHashMap();
+  private String nullPartitionKeyValue_;
   private static final Db builtinsDb_ = new BuiltinsDb(ImpaladCatalog.BUILTINS_DB);
 
   public static FeCatalog create(String defaultKuduMasterHosts) {
@@ -198,6 +199,19 @@ public class LocalCatalog implements FeCatalog {
   @Override
   public String getDefaultKuduMasterHosts() {
     throw new UnsupportedOperationException("TODO");
+  }
+
+  public String getNullPartitionKeyValue() {
+    if (nullPartitionKeyValue_ == null) {
+      try {
+        nullPartitionKeyValue_ =
+            metaProvider_.loadNullPartitionKeyValue();
+      } catch (TException e) {
+        throw new LocalCatalogException(
+            "Could not load null partition key value", e);
+      }
+    }
+    return nullPartitionKeyValue_;
   }
 
   @Override

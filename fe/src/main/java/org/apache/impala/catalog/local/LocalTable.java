@@ -32,6 +32,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
@@ -53,7 +54,7 @@ import com.google.common.collect.Lists;
  * each catalog instance.
  */
 class LocalTable implements FeTable {
-  private final LocalDb db_;
+  protected final LocalDb db_;
   /** The lower-case name of the table. */
   private final String name_;
   private final SchemaInfo schemaInfo_;
@@ -62,10 +63,13 @@ class LocalTable implements FeTable {
     // In order to know which kind of table subclass to instantiate, we need
     // to eagerly grab and parse the top-level Table object from the HMS.
     SchemaInfo schemaInfo = SchemaInfo.load(db, tblName);
+    if (HdfsFileFormat.isHdfsInputFormatClass(
+        schemaInfo.msTable_.getSd().getInputFormat())) {
+      return new LocalFsTable(db, tblName, schemaInfo);
+    }
 
-    // TODO: change this function to instantiate the appropriate
-    // subclass based on the table type (eg view, hbase table, etc)
-    return new LocalTable(db, tblName, schemaInfo);
+    throw new LocalCatalogException("Unknown table type for table " +
+        db.getName() + "." + tblName);
   }
 
   public LocalTable(LocalDb db, String tblName, SchemaInfo schemaInfo) {
@@ -191,7 +195,7 @@ class LocalTable implements FeTable {
    * effort, could be refactored to avoid duplication.
    */
   @Immutable
-  private static class SchemaInfo {
+  protected static class SchemaInfo {
     private final Table msTable_;
 
     private final ArrayType type_;
