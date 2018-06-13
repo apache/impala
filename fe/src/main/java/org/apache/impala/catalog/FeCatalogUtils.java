@@ -19,18 +19,32 @@ package org.apache.impala.catalog;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.PartitionKeyValue;
+import org.apache.impala.analysis.ToSqlUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 
 /**
  * Static utility functions shared between FeCatalog implementations.
  */
 public abstract class FeCatalogUtils {
+  private final static Logger LOG = LoggerFactory.getLogger(FeCatalogUtils.class);
+
   /**
    * Gets the ColumnType from the given FieldSchema by using Impala's SqlParser.
    *
@@ -147,5 +161,91 @@ public abstract class FeCatalogUtils {
   public static Collection<? extends FeFsPartition> loadAllPartitions(
       FeFsTable table) {
     return table.loadPartitions(table.getPartitionIds());
+  }
+
+  /**
+   * Parse the partition key values out of their stringified format used by HMS.
+   */
+  public static List<LiteralExpr> parsePartitionKeyValues(FeFsTable table,
+      List<String> hmsPartitionValues) throws CatalogException {
+    Preconditions.checkArgument(
+        hmsPartitionValues.size() == table.getNumClusteringCols(),
+        "Cannot parse partition values %s for table %s: " +
+        "expected %s values but got %s",
+        hmsPartitionValues, table.getFullName(),
+        table.getNumClusteringCols(), hmsPartitionValues.size());
+    List<LiteralExpr> keyValues = Lists.newArrayList();
+    for (String partitionKey: hmsPartitionValues) {
+      Type type = table.getColumns().get(keyValues.size()).getType();
+      // Deal with Hive's special NULL partition key.
+      if (partitionKey.equals(table.getNullPartitionKeyValue())) {
+        keyValues.add(NullLiteral.create(type));
+      } else {
+        try {
+          keyValues.add(LiteralExpr.create(partitionKey, type));
+        } catch (Exception ex) {
+          LOG.warn("Failed to create literal expression of type: " + type, ex);
+          throw new CatalogException("Invalid partition key value of type: " + type,
+              ex);
+        }
+      }
+    }
+    for (Expr v: keyValues) v.analyzeNoThrow(null);
+    return keyValues;
+  }
+
+  /**
+   * Return a partition name formed by concatenating partition keys and their values,
+   * compatible with the way Hive names partitions. Reuses Hive's
+   * org.apache.hadoop.hive.common.FileUtils.makePartName() function to build the name
+   * string because there are a number of special cases for how partition names are URL
+   * escaped.
+   *
+   * TODO: this could be a default method in FeFsPartition in Java 8.
+   */
+  public static String getPartitionName(FeFsPartition partition) {
+    FeFsTable table = partition.getTable();
+    List<String> partitionCols = Lists.newArrayList();
+    for (int i = 0; i < table.getNumClusteringCols(); ++i) {
+      partitionCols.add(table.getColumns().get(i).getName());
+    }
+
+    return FileUtils.makePartName(
+        partitionCols, getPartitionValuesAsStrings(partition, true));
+  }
+
+  // TODO: this could be a default method in FeFsPartition in Java 8.
+  public static List<String> getPartitionValuesAsStrings(
+      FeFsPartition partition, boolean mapNullsToHiveKey) {
+    List<String> ret = Lists.newArrayList();
+    for (LiteralExpr partValue: partition.getPartitionValues()) {
+      if (mapNullsToHiveKey) {
+        ret.add(PartitionKeyValue.getPartitionKeyValueString(
+                partValue, partition.getTable().getNullPartitionKeyValue()));
+      } else {
+        ret.add(partValue.getStringValue());
+      }
+    }
+    return ret;
+  }
+
+  // TODO: this could be a default method in FeFsPartition in Java 8.
+  public static String getConjunctSqlForPartition(FeFsPartition part) {
+    List<String> partColSql = Lists.newArrayList();
+    for (Column partCol: part.getTable().getClusteringColumns()) {
+      partColSql.add(ToSqlUtils.getIdentSql(partCol.getName()));
+    }
+
+    List<String> conjuncts = Lists.newArrayList();
+    for (int i = 0; i < partColSql.size(); ++i) {
+      LiteralExpr partVal = part.getPartitionValues().get(i);
+      String partValSql = partVal.toSql();
+      if (partVal instanceof NullLiteral || partValSql.isEmpty()) {
+        conjuncts.add(partColSql.get(i) + " IS NULL");
+      } else {
+        conjuncts.add(partColSql.get(i) + "=" + partValSql);
+      }
+    }
+    return "(" + Joiner.on(" AND " ).join(conjuncts) + ")";
   }
 }

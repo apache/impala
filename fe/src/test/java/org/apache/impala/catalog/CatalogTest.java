@@ -287,6 +287,13 @@ public class CatalogTest {
   public void TestPartitions() throws CatalogException {
     HdfsTable table =
         (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypes");
+    checkAllTypesPartitioning(table, true);
+  }
+
+  public static void checkAllTypesPartitioning(FeFsTable table,
+      boolean checkFileDescriptors) {
+    assertEquals(24, table.getPartitionIds().size());
+    assertEquals(24, table.getPartitions().size());
     Collection<? extends FeFsPartition> partitions =
         FeCatalogUtils.loadAllPartitions(table);
 
@@ -309,7 +316,11 @@ public class CatalogTest {
 
       months.add(key1 * 100 + key2);
 
-      assertEquals(p.getFileDescriptors().size(), 1);
+      if (checkFileDescriptors) {
+        // TODO(todd): once LocalCatalog supports file descriptors,
+        // no need for this boolean anymore.
+        assertEquals(p.getFileDescriptors().size(), 1);
+      }
     }
     assertEquals(months.size(), 24);
   }

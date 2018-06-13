@@ -50,11 +50,28 @@ public class PartitionStatsUtil {
   private final static Logger LOG = LoggerFactory.getLogger(PartitionStatsUtil.class);
 
   /**
+   * Get the partition stats from the given partition, or null if no stats
+   * are available. If stats are present but cannot be parsed, logs a warning
+   * and returns null.
+   */
+  public static TPartitionStats getPartStatsOrWarn(FeFsPartition part) {
+    try {
+      return partStatsFromParameters(part.getParameters());
+    } catch (ImpalaException e) {
+      LOG.warn("Could not deserialise incremental stats state for " +
+          part.getPartitionName() +
+          ", consider DROP INCREMENTAL STATS ... PARTITION ... and recomputing " +
+          "incremental stats for this table.");
+      return null;
+    }
+  }
+
+  /**
    * Reconstructs a TPartitionStats object from its serialised form in the given parameter
    * map. Returns null if no stats are serialised, and throws an exception if there was an
    * error during deserialisation.
    */
-  public static TPartitionStats partStatsFromParameters(
+  private static TPartitionStats partStatsFromParameters(
       Map<String, String> hmsParameters) throws ImpalaException {
     if (hmsParameters == null) return null;
     String numChunksStr = hmsParameters.get(INCREMENTAL_STATS_NUM_CHUNKS);

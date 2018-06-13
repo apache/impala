@@ -52,7 +52,6 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.ColumnDef;
-import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
@@ -1047,27 +1046,12 @@ public class HdfsTable extends Table implements FeFsTable {
       throws CatalogException {
     HdfsStorageDescriptor fileFormatDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
-    List<LiteralExpr> keyValues = Lists.newArrayList();
+    List<LiteralExpr> keyValues;
     if (msPartition != null) {
-      // Load key values
-      for (String partitionKey: msPartition.getValues()) {
-        Type type = getColumns().get(keyValues.size()).getType();
-        // Deal with Hive's special NULL partition key.
-        if (partitionKey.equals(nullPartitionKeyValue_)) {
-          keyValues.add(NullLiteral.create(type));
-        } else {
-          try {
-            keyValues.add(LiteralExpr.create(partitionKey, type));
-          } catch (Exception ex) {
-            LOG.warn("Failed to create literal expression of type: " + type, ex);
-            throw new CatalogException("Invalid partition key value of type: " + type,
-                ex);
-          }
-        }
-      }
-      for (Expr v: keyValues) v.analyzeNoThrow(null);
+      keyValues = FeCatalogUtils.parsePartitionKeyValues(this, msPartition.getValues());
+    } else {
+      keyValues = Collections.emptyList();
     }
-
     Path partDirPath = new Path(storageDescriptor.getLocation());
     try {
       FileSystem fs = partDirPath.getFileSystem(CONF);

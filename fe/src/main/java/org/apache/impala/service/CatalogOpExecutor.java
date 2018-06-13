@@ -23,7 +23,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,7 +44,6 @@ import org.apache.hadoop.hive.metastore.api.DecimalColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
@@ -3338,7 +3336,7 @@ public class CatalogOpExecutor {
 
               partition.setDbName(tblName.getDb());
               partition.setTableName(tblName.getTbl());
-              partition.setValues(getPartValsFromName(msTbl, partName));
+              partition.setValues(MetaStoreUtil.getPartValsFromName(msTbl, partName));
               partition.setParameters(new HashMap<String, String>());
               partition.setSd(msTbl.getSd().deepCopy());
               partition.getSd().setSerdeInfo(msTbl.getSd().getSerdeInfo().deepCopy());
@@ -3436,23 +3434,6 @@ public class CatalogOpExecutor {
           catalog_.waitForSyncDdlVersion(response.getResult()));
     }
     return response;
-  }
-
-  private List<String> getPartValsFromName(org.apache.hadoop.hive.metastore.api.Table
-      msTbl, String partName) throws MetaException, CatalogException {
-    Preconditions.checkNotNull(msTbl);
-    LinkedHashMap<String, String> hm =
-        org.apache.hadoop.hive.metastore.Warehouse.makeSpecFromName(partName);
-    List<String> partVals = Lists.newArrayList();
-    for (FieldSchema field: msTbl.getPartitionKeys()) {
-      String key = field.getName();
-      String val = hm.get(key);
-      if (val == null) {
-        throw new CatalogException("Incomplete partition name - missing " + key);
-      }
-      partVals.add(val);
-    }
-    return partVals;
   }
 
   /**

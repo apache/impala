@@ -56,8 +56,8 @@ import com.google.common.collect.Lists;
 class LocalTable implements FeTable {
   protected final LocalDb db_;
   /** The lower-case name of the table. */
-  private final String name_;
-  private final SchemaInfo schemaInfo_;
+  protected final String name_;
+  protected final SchemaInfo schemaInfo_;
 
   public static LocalTable load(LocalDb db, String tblName) {
     // In order to know which kind of table subclass to instantiate, we need
