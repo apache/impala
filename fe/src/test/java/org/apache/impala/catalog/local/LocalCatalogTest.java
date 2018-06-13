@@ -22,7 +22,9 @@ import static org.junit.Assert.*;
 import java.util.Set;
 
 import org.apache.impala.catalog.CatalogTest;
+import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Type;
@@ -33,6 +35,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 
 public class LocalCatalogTest {
 
@@ -99,7 +102,33 @@ public class LocalCatalogTest {
     FeFsTable fsTable = (FeFsTable) t;
     assertEquals(MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE,
         fsTable.getNullPartitionKeyValue());
+
+    // Stats should have one row per partition, plus a "total" row.
     TResultSet stats = fsTable.getTableStats();
-    assertEquals(1, stats.getRowsSize());
+    assertEquals(25, stats.getRowsSize());
+  }
+
+  @Test
+  public void testPartitioning() throws Exception {
+    FeFsTable t = (FeFsTable) catalog_.getTable("functional",  "alltypes");
+    // TODO(todd): once we support file descriptors in LocalCatalog,
+    // run the full test.
+    CatalogTest.checkAllTypesPartitioning(t, /*checkFileDescriptors=*/false);
+  }
+
+  /**
+   * Test that partitions with a NULL value can be properly loaded.
+   */
+  @Test
+  public void testEmptyPartitionValue() throws Exception {
+    FeFsTable t = (FeFsTable) catalog_.getTable("functional",  "alltypesagg");
+    // This table has one partition with a NULL value for the 'day'
+    // clustering column.
+    int dayCol = t.getColumn("day").getPosition();
+    Set<Long> ids = t.getNullPartitionIds(dayCol);
+    assertEquals(1,  ids.size());
+    FeFsPartition partition = FeCatalogUtils.loadPartition(
+        t, Iterables.getOnlyElement(ids));
+    assertTrue(partition.getPartitionValue(dayCol).isNullLiteral());
   }
 }

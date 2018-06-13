@@ -36,7 +36,6 @@ import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.common.FileSystemUtil;
-import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.fb.FbCompression;
@@ -456,60 +455,23 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     return FileSystemUtil.isPathCacheable(new Path(getLocation()));
   }
 
-  /**
-   * Return a partition name formed by concatenating partition keys and their values,
-   * compatible with the way Hive names partitions. Reuses Hive's
-   * org.apache.hadoop.hive.common.FileUtils.makePartName() function to build the name
-   * string because there are a number of special cases for how partition names are URL
-   * escaped.
-   * TODO: Consider storing the PartitionKeyValue in HdfsPartition. It would simplify
-   * this code would be useful in other places, such as fromThrift().
-   */
   @Override // FeFsPartition
   public String getPartitionName() {
-    List<String> partitionCols = Lists.newArrayList();
-    for (int i = 0; i < getTable().getNumClusteringCols(); ++i) {
-      partitionCols.add(getTable().getColumns().get(i).getName());
-    }
-
-    return org.apache.hadoop.hive.common.FileUtils.makePartName(
-        partitionCols, getPartitionValuesAsStrings(true));
+    // TODO: Consider storing the PartitionKeyValue in HdfsPartition. It would simplify
+    // this code would be useful in other places, such as fromThrift().
+    return FeCatalogUtils.getPartitionName(this);
   }
 
   @Override
   public List<String> getPartitionValuesAsStrings(boolean mapNullsToHiveKey) {
-    List<String> ret = Lists.newArrayList();
-    for (LiteralExpr partValue: getPartitionValues()) {
-      if (mapNullsToHiveKey) {
-        ret.add(PartitionKeyValue.getPartitionKeyValueString(
-                partValue, getTable().getNullPartitionKeyValue()));
-      } else {
-        ret.add(partValue.getStringValue());
-      }
-    }
-    return ret;
+    return FeCatalogUtils.getPartitionValuesAsStrings(this, mapNullsToHiveKey);
   }
 
   @Override // FeFsPartition
   public String getConjunctSql() {
     // TODO: Remove this when the TODO elsewhere in this file to save and expose the
     // list of TPartitionKeyValues has been resolved.
-    List<String> partColSql = Lists.newArrayList();
-    for (Column partCol: getTable().getClusteringColumns()) {
-      partColSql.add(ToSqlUtils.getIdentSql(partCol.getName()));
-    }
-
-    List<String> conjuncts = Lists.newArrayList();
-    for (int i = 0; i < partColSql.size(); ++i) {
-      LiteralExpr partVal = getPartitionValues().get(i);
-      String partValSql = partVal.toSql();
-      if (partVal instanceof NullLiteral || partValSql.isEmpty()) {
-        conjuncts.add(partColSql.get(i) + " IS NULL");
-      } else {
-        conjuncts.add(partColSql.get(i) + "=" + partValSql);
-      }
-    }
-    return "(" + Joiner.on(" AND " ).join(conjuncts) + ")";
+    return FeCatalogUtils.getConjunctSqlForPartition(this);
   }
 
   /**
@@ -574,18 +536,14 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
 
   @Override // FeFsPartition
   public TPartitionStats getPartitionStats() {
-    try {
-      return PartitionStatsUtil.partStatsFromParameters(hmsParameters_);
-    } catch (ImpalaException e) {
-      LOG.warn("Could not deserialise incremental stats state for " + getPartitionName() +
-          ", consider DROP INCREMENTAL STATS ... PARTITION ... and recomputing " +
-          "incremental stats for this table.");
-      return null;
-    }
+    return PartitionStatsUtil.getPartStatsOrWarn(this);
   }
 
   @Override // FeFsPartition
   public boolean hasIncrementalStats() {
+    // TODO: performance of this could improve substantially, since
+    // getPartitionStats() performs a bunch of expensive deserialization,
+    // only to end up throwing away the result.
     TPartitionStats partStats = getPartitionStats();
     return partStats != null && partStats.intermediate_col_stats != null;
   }

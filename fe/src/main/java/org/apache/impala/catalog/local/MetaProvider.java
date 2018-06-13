@@ -17,9 +17,13 @@
 
 package org.apache.impala.catalog.local;
 
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.thrift.TException;
@@ -47,5 +51,18 @@ interface MetaProvider {
       throws NoSuchObjectException, MetaException, TException;
 
   String loadNullPartitionKeyValue()
+      throws MetaException, TException;
+
+  List<String> loadPartitionNames(String dbName, String tableName)
+      throws MetaException, TException;
+
+  /**
+   * Load the given partitions from the specified table.
+   *
+   * If a requested partition does not exist, no exception will be thrown.
+   * Instead, the resulting map will contain no entry for that partition.
+   */
+  Map<String, Partition> loadPartitionsByNames(String dbName, String tableName,
+      List<String> partitionColumnNames, List<String> partitionNames)
       throws MetaException, TException;
 }

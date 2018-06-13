@@ -18,14 +18,19 @@
 package org.apache.impala.util;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
@@ -259,5 +264,21 @@ public class MetaStoreUtil {
       if (rightColNames.contains(leftCol.toLowerCase())) outputList.add(leftCol);
     }
     return Joiner.on(",").join(outputList);
+  }
+
+  public static List<String> getPartValsFromName(Table msTbl, String partName)
+      throws MetaException, CatalogException {
+    Preconditions.checkNotNull(msTbl);
+    LinkedHashMap<String, String> hm = Warehouse.makeSpecFromName(partName);
+    List<String> partVals = Lists.newArrayList();
+    for (FieldSchema field: msTbl.getPartitionKeys()) {
+      String key = field.getName();
+      String val = hm.get(key);
+      if (val == null) {
+        throw new CatalogException("Incomplete partition name - missing " + key);
+      }
+      partVals.add(val);
+    }
+    return partVals;
   }
 }
