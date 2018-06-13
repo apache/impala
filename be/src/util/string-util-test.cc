@@ -79,6 +79,37 @@ TEST(TruncateUpTest, Basic) {
   EvalTruncation(a, b, 2, UP);
 }
 
+TEST(CommaSeparatedContainsTest, Basic) {
+  // Basic tests with string present.
+  EXPECT_TRUE(CommaSeparatedContains("LZO", "LZO"));
+  EXPECT_TRUE(CommaSeparatedContains("foo,LZO", "LZO"));
+  EXPECT_TRUE(CommaSeparatedContains("LZO,bar", "LZO"));
+  EXPECT_TRUE(CommaSeparatedContains("foo,LZO,bar", "LZO"));
+
+  // Handles zero-length entries.
+  EXPECT_FALSE(CommaSeparatedContains("", "LZO"));
+  EXPECT_FALSE(CommaSeparatedContains(",", "LZO"));
+  EXPECT_FALSE(CommaSeparatedContains(",,", "LZO"));
+  EXPECT_TRUE(CommaSeparatedContains("foo,LZO,", "LZO"));
+  EXPECT_TRUE(CommaSeparatedContains(",foo,LZO,", "LZO"));
+  EXPECT_TRUE(CommaSeparatedContains(",foo,,LZO,", "LZO"));
+
+  // Basic tests with string absent.
+  EXPECT_FALSE(CommaSeparatedContains("foo,bar", "LZO"));
+  EXPECT_FALSE(CommaSeparatedContains("foo", "LZO"));
+  EXPECT_FALSE(CommaSeparatedContains("foo,", "LZO"));
+  EXPECT_FALSE(CommaSeparatedContains("foo,bar,baz", "LZO"));
+  EXPECT_FALSE(CommaSeparatedContains(",foo,LzO,", "LZO"));
+
+  // Pattern is longer than token.
+  EXPECT_FALSE(CommaSeparatedContains(",foo,LzO,", "ZZZZZ"));
+  // Pattern is longer than string.
+  EXPECT_FALSE(CommaSeparatedContains("foo", "ZZZZZ"));
+
+  // Whitespace is included in tokens alone.
+  EXPECT_FALSE(CommaSeparatedContains("foo , foo, foo,\nfoo,\tfoo", "foo"));
+}
+
 }
 
 IMPALA_TEST_MAIN();

@@ -27,8 +27,9 @@
 #include "runtime/runtime-state.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "util/debug-util.h"
-#include "util/hdfs-util.h"
 #include "util/dynamic-util.h"
+#include "util/hdfs-util.h"
+#include "util/string-util.h"
 
 #include "common/names.h"
 
@@ -103,11 +104,7 @@ Status HdfsPluginTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
 }
 
 Status HdfsPluginTextScanner::CheckPluginEnabled(const string& plugin_name) {
-  vector<string> enabled_plugins;
-  boost::split(enabled_plugins, FLAGS_enabled_hdfs_text_scanner_plugins,
-      boost::is_any_of(","));
-  if (find(enabled_plugins.begin(), enabled_plugins.end(), plugin_name)
-      == enabled_plugins.end()) {
+  if (!CommaSeparatedContains(FLAGS_enabled_hdfs_text_scanner_plugins, plugin_name)) {
     return Status(Substitute("Scanner plugin '$0' is not one of the enabled plugins: '$1'",
           plugin_name, FLAGS_enabled_hdfs_text_scanner_plugins));
   }
