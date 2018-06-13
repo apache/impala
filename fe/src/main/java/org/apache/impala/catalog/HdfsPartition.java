@@ -32,9 +32,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
-import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
@@ -47,9 +45,9 @@ import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionStats;
-import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.ListMap;
 import org.slf4j.Logger;
@@ -485,9 +483,16 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
    * Returns the storage location (HDFS path) of this partition. Should only be called
    * for partitioned tables.
    */
+  @Override
   public String getLocation() {
     return (location_ != null) ? location_.toString() : null;
   }
+
+  @Override
+  public THdfsPartitionLocation getLocationAsThrift() {
+    return location_ != null ? location_.toThrift() : null;
+  }
+
   @Override // FeFsPartition
   public Path getLocationPath() { return new Path(getLocation()); }
   @Override // FeFsPartition
@@ -733,20 +738,18 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       .toString();
   }
 
-  private static Predicate<String> isIncrementalStatsKey = new Predicate<String>() {
-    @Override
-    public boolean apply(String key) {
-      return !(key.startsWith(PartitionStatsUtil.INCREMENTAL_STATS_NUM_CHUNKS)
-          || key.startsWith(PartitionStatsUtil.INCREMENTAL_STATS_CHUNK_PREFIX));
-    }
-  };
+  public static Predicate<String> IS_NOT_INCREMENTAL_STATS_KEY =
+      new Predicate<String>() {
+        @Override
+        public boolean apply(String key) {
+          return !(key.startsWith(PartitionStatsUtil.INCREMENTAL_STATS_NUM_CHUNKS)
+              || key.startsWith(PartitionStatsUtil.INCREMENTAL_STATS_CHUNK_PREFIX));
+        }
+      };
 
-  /**
-   * Returns hmsParameters_ after filtering out all the partition
-   * incremental stats information.
-   */
-  private Map<String, String> getFilteredHmsParameters() {
-    return Maps.filterKeys(hmsParameters_, isIncrementalStatsKey);
+  @Override
+  public Map<String, String> getFilteredHmsParameters() {
+    return Maps.filterKeys(hmsParameters_, IS_NOT_INCREMENTAL_STATS_KEY);
   }
 
   public static HdfsPartition fromThrift(HdfsTable table,
@@ -829,44 +832,6 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       throw new CatalogException("Partition (" + getPartitionName() +
           ") has invalid partition column values: ", e);
     }
-  }
-
-  public THdfsPartition toThrift(boolean includeFileDesc,
-      boolean includeIncrementalStats) {
-    List<TExpr> thriftExprs = Expr.treesToThrift(getPartitionValues());
-
-    THdfsPartition thriftHdfsPart = new THdfsPartition(
-        fileFormatDescriptor_.getLineDelim(),
-        fileFormatDescriptor_.getFieldDelim(),
-        fileFormatDescriptor_.getCollectionDelim(),
-        fileFormatDescriptor_.getMapKeyDelim(),
-        fileFormatDescriptor_.getEscapeChar(),
-        fileFormatDescriptor_.getFileFormat().toThrift(), thriftExprs,
-        fileFormatDescriptor_.getBlockSize());
-    if (location_ != null) thriftHdfsPart.setLocation(location_.toThrift());
-    thriftHdfsPart.setStats(new TTableStats(numRows_));
-    thriftHdfsPart.setAccess_level(accessLevel_);
-    thriftHdfsPart.setIs_marked_cached(isMarkedCached_);
-    thriftHdfsPart.setId(getId());
-    thriftHdfsPart.setHas_incremental_stats(hasIncrementalStats());
-    // IMPALA-4902: Shallow-clone the map to avoid concurrent modifications. One thread
-    // may try to serialize the returned THdfsPartition after releasing the table's lock,
-    // and another thread doing DDL may modify the map.
-    thriftHdfsPart.setHms_parameters(Maps.newHashMap(
-        includeIncrementalStats ? hmsParameters_ : getFilteredHmsParameters()));
-    if (includeFileDesc) {
-      // Add block location information
-      long numBlocks = 0;
-      long totalFileBytes = 0;
-      for (FileDescriptor fd: fileDescriptors_) {
-        thriftHdfsPart.addToFile_desc(fd.toThrift());
-        numBlocks += fd.getNumFileBlocks();
-        totalFileBytes += fd.getFileLength();
-      }
-      thriftHdfsPart.setNum_blocks(numBlocks);
-      thriftHdfsPart.setTotal_file_size_bytes(totalFileBytes);
-    }
-    return thriftHdfsPart;
   }
 
   /**

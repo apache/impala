@@ -420,11 +420,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * Returns a list of thrift column descriptors ordered by position.
    */
   public List<TColumnDescriptor> getTColumnDescriptors() {
-    List<TColumnDescriptor> colDescs = Lists.<TColumnDescriptor>newArrayList();
-    for (Column col: colsByPos_) {
-      colDescs.add(new TColumnDescriptor(col.getName(), col.getType().toThrift()));
-    }
-    return colDescs;
+    return FeCatalogUtils.getTColumnDescriptors(this);
   }
 
   /**

@@ -1716,8 +1716,8 @@ public class HdfsTable extends Table implements FeFsTable {
     for (HdfsPartition partition: partitionMap_.values()) {
       long id = partition.getId();
       if (refPartitions == null || refPartitions.contains(id)) {
-        THdfsPartition tHdfsPartition =
-            partition.toThrift(includeFileDesc, includeIncrementalStats);
+        THdfsPartition tHdfsPartition = FeCatalogUtils.fsPartitionToThrift(
+            partition, includeFileDesc, includeIncrementalStats);
         if (tHdfsPartition.isSetHas_incremental_stats() &&
             tHdfsPartition.isHas_incremental_stats()) {
           memUsageEstimate += getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
@@ -1736,7 +1736,8 @@ public class HdfsTable extends Table implements FeFsTable {
     }
     if (includeFileDesc) fileMetadataStats_.set(stats);
 
-    THdfsPartition prototypePartition = prototypePartition_.toThrift(false, false);
+    THdfsPartition prototypePartition = FeCatalogUtils.fsPartitionToThrift(
+        prototypePartition_, false, false);
 
     memUsageEstimate += fileMetadataStats_.numFiles * PER_FD_MEM_USAGE_BYTES +
         fileMetadataStats_.numBlocks * PER_BLOCK_MEM_USAGE_BYTES;
@@ -1777,28 +1778,7 @@ public class HdfsTable extends Table implements FeFsTable {
     // important to add the "prototype" partition as a fallback.
     Iterable<HdfsPartition> partitionsToConsider = Iterables.concat(
         partitionMap_.values(), Collections.singleton(prototypePartition_));
-    Map<HdfsFileFormat, Integer> numPartitionsByFormat = Maps.newHashMap();
-    for (HdfsPartition partition: partitionsToConsider) {
-      HdfsFileFormat format = partition.getInputFormatDescriptor().getFileFormat();
-      Integer numPartitions = numPartitionsByFormat.get(format);
-      if (numPartitions == null) {
-        numPartitions = Integer.valueOf(1);
-      } else {
-        numPartitions = Integer.valueOf(numPartitions.intValue() + 1);
-      }
-      numPartitionsByFormat.put(format, numPartitions);
-    }
-
-    int maxNumPartitions = Integer.MIN_VALUE;
-    HdfsFileFormat majorityFormat = null;
-    for (Map.Entry<HdfsFileFormat, Integer> entry: numPartitionsByFormat.entrySet()) {
-      if (entry.getValue().intValue() > maxNumPartitions) {
-        majorityFormat = entry.getKey();
-        maxNumPartitions = entry.getValue().intValue();
-      }
-    }
-    Preconditions.checkNotNull(majorityFormat);
-    return majorityFormat;
+    return FeCatalogUtils.getMajorityFormat(partitionsToConsider);
   }
 
   /**

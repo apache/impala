@@ -100,6 +100,14 @@ public interface FeFsTable extends FeTable {
   boolean isAvroTable();
 
   /**
+   * @return the format that the majority of partitions in this table use
+   *
+   * TODO(todd): this API needs to be removed, since it depends on loading all
+   * partitions even when scanning few.
+   */
+  public HdfsFileFormat getMajorityFormat();
+
+  /**
    * @param totalBytes_ the known number of bytes in the table
    * @return Returns an estimated row count for the given number of file bytes
    */

@@ -28,14 +28,17 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import org.apache.impala.catalog.PartitionStatsUtil;
 import org.apache.impala.thrift.TAccessLevel;
+import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.TPartitionStats;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 
 public class LocalFsPartition implements FeFsPartition {
   private final LocalFsTable table_;
@@ -72,8 +75,10 @@ public class LocalFsPartition implements FeFsPartition {
 
   @Override
   public boolean hasFileDescriptors() {
-    // TODO Auto-generated method stub
-    return false;
+    // TODO(todd): implement file fetching. Return true for now
+    // so that partition pruning can be tested -- if we return false
+    // then all partitions would be pruned.
+    return true;
   }
 
   @Override
@@ -85,6 +90,13 @@ public class LocalFsPartition implements FeFsPartition {
   @Override
   public String getLocation() {
     return msPartition_.getSd().getLocation();
+  }
+
+  @Override
+  public THdfsPartitionLocation getLocationAsThrift() {
+    // TODO(todd): support prefix-compressed partition locations. For now,
+    // using -1 indicates that the location is a full path string.
+    return new THdfsPartitionLocation(/*prefix_index=*/-1, getLocation());
   }
 
   @Override
@@ -181,5 +193,14 @@ public class LocalFsPartition implements FeFsPartition {
   @Override
   public Map<String, String> getParameters() {
     return msPartition_.getParameters();
+  }
+
+  @Override
+  public Map<String, String> getFilteredHmsParameters() {
+    // TODO(todd): for now, copied from HdfsPartition. Eventually we would want to
+    // lazy-fetch these parameters separately for only the cases that require them,
+    // since they are quite large.
+    return Maps.filterKeys(getParameters(),
+        HdfsPartition.IS_NOT_INCREMENTAL_STATS_KEY);
   }
 }

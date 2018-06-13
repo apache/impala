@@ -30,6 +30,10 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.analysis.ToSqlUtils;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.thrift.TColumnDescriptor;
+import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.TTableStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +42,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Static utility functions shared between FeCatalog implementations.
@@ -112,6 +117,15 @@ public abstract class FeCatalogUtils {
                 tableName, type.toString(), c.getName()));
       }
     }
+  }
+
+  // TODO(todd): move to a default method in FeTable in Java8
+  public static List<TColumnDescriptor> getTColumnDescriptors(FeTable table) {
+    List<TColumnDescriptor> colDescs = Lists.<TColumnDescriptor>newArrayList();
+    for (Column col: table.getColumns()) {
+      colDescs.add(new TColumnDescriptor(col.getName(), col.getType().toThrift()));
+    }
+    return colDescs;
   }
 
   /**
@@ -247,5 +261,73 @@ public abstract class FeCatalogUtils {
       }
     }
     return "(" + Joiner.on(" AND " ).join(conjuncts) + ")";
+  }
+
+  /**
+   * Return the most commonly-used file format within a set of partitions.
+   */
+  public static HdfsFileFormat getMajorityFormat(
+      Iterable<? extends FeFsPartition> partitions) {
+    Map<HdfsFileFormat, Integer> numPartitionsByFormat = Maps.newHashMap();
+    for (FeFsPartition partition: partitions) {
+      HdfsFileFormat format = partition.getInputFormatDescriptor().getFileFormat();
+      Integer numPartitions = numPartitionsByFormat.get(format);
+      if (numPartitions == null) {
+        numPartitions = Integer.valueOf(1);
+      } else {
+        numPartitions = Integer.valueOf(numPartitions.intValue() + 1);
+      }
+      numPartitionsByFormat.put(format, numPartitions);
+    }
+
+    int maxNumPartitions = Integer.MIN_VALUE;
+    HdfsFileFormat majorityFormat = null;
+    for (Map.Entry<HdfsFileFormat, Integer> entry: numPartitionsByFormat.entrySet()) {
+      if (entry.getValue().intValue() > maxNumPartitions) {
+        majorityFormat = entry.getKey();
+        maxNumPartitions = entry.getValue().intValue();
+      }
+    }
+    Preconditions.checkNotNull(majorityFormat);
+    return majorityFormat;
+  }
+
+  public static THdfsPartition fsPartitionToThrift(FeFsPartition part,
+      boolean includeFileDesc, boolean includeIncrementalStats) {
+    HdfsStorageDescriptor sd = part.getInputFormatDescriptor();
+    THdfsPartition thriftHdfsPart = new THdfsPartition(
+        sd.getLineDelim(),
+        sd.getFieldDelim(),
+        sd.getCollectionDelim(),
+        sd.getMapKeyDelim(),
+        sd.getEscapeChar(),
+        sd.getFileFormat().toThrift(),
+        Expr.treesToThrift(part.getPartitionValues()),
+        sd.getBlockSize());
+    thriftHdfsPart.setLocation(part.getLocationAsThrift());
+    thriftHdfsPart.setStats(new TTableStats(part.getNumRows()));
+    thriftHdfsPart.setAccess_level(part.getAccessLevel());
+    thriftHdfsPart.setIs_marked_cached(part.isMarkedCached());
+    thriftHdfsPart.setId(part.getId());
+    thriftHdfsPart.setHas_incremental_stats(part.hasIncrementalStats());
+    // IMPALA-4902: Shallow-clone the map to avoid concurrent modifications. One thread
+    // may try to serialize the returned THdfsPartition after releasing the table's lock,
+    // and another thread doing DDL may modify the map.
+    thriftHdfsPart.setHms_parameters(Maps.newHashMap(
+        includeIncrementalStats ? part.getParameters() :
+          part.getFilteredHmsParameters()));
+    if (includeFileDesc) {
+      // Add block location information
+      long numBlocks = 0;
+      long totalFileBytes = 0;
+      for (FileDescriptor fd: part.getFileDescriptors()) {
+        thriftHdfsPart.addToFile_desc(fd.toThrift());
+        numBlocks += fd.getNumFileBlocks();
+        totalFileBytes += fd.getFileLength();
+      }
+      thriftHdfsPart.setNum_blocks(numBlocks);
+      thriftHdfsPart.setTotal_file_size_bytes(totalFileBytes);
+    }
+    return thriftHdfsPart;
   }
 }

@@ -31,20 +31,28 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.PrunablePartition;
+import org.apache.impala.thrift.CatalogObjectsConstants;
+import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TTableDescriptor;
+import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.ListMap;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 public class LocalFsTable extends LocalTable implements FeFsTable {
   /**
@@ -134,6 +142,12 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   }
 
   @Override
+  public HdfsFileFormat getMajorityFormat() {
+    // Needed by HdfsTableSink.
+    throw new UnsupportedOperationException("TODO: implement me");
+  }
+
+  @Override
   public long getExtrapolatedNumRows(long totalBytes) {
     // TODO Auto-generated method stub
     return 0;
@@ -148,6 +162,47 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   @Override
   public TResultSet getTableStats() {
     return HdfsTable.getTableStats(this);
+  }
+
+  @Override
+  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
+    Preconditions.checkNotNull(referencedPartitions);
+    Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
+    List<? extends FeFsPartition> partitions = loadPartitions(referencedPartitions);
+    for (FeFsPartition partition : partitions) {
+      idToPartition.put(partition.getId(),
+          FeCatalogUtils.fsPartitionToThrift(partition,
+              /*includeFileDesc=*/false,
+              /*includeIncrementalStats=*/false));
+    }
+
+    THdfsPartition tPrototypePartition = FeCatalogUtils.fsPartitionToThrift(
+        createPrototypePartition(),
+        /*includeFileDesc=*/false,
+        /*includeIncrementalStats=*/false);
+
+    // TODO(todd): implement avro schema support
+    // TODO(todd): set multiple_filesystems member?
+    THdfsTable hdfsTable = new THdfsTable(getHdfsBaseDir(), getColumnNames(),
+        getNullPartitionKeyValue(), schemaInfo_.getNullColumnValue(), idToPartition,
+        tPrototypePartition);
+
+    TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
+        FeCatalogUtils.getTColumnDescriptors(this),
+        getNumClusteringCols(), name_, db_.getName());
+    tableDesc.setHdfsTable(hdfsTable);
+    return tableDesc;
+  }
+
+  private LocalFsPartition createPrototypePartition() {
+    Partition protoMsPartition = new Partition();
+    protoMsPartition.setSd(getMetaStoreTable().getSd());
+    protoMsPartition.setParameters(Collections.<String, String>emptyMap());
+    LocalPartitionSpec spec = new LocalPartitionSpec(
+        this, "", CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
+    LocalFsPartition prototypePartition = new LocalFsPartition(
+        this, spec, protoMsPartition);
+    return prototypePartition;
   }
 
   @Override
@@ -258,7 +313,8 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     if (partitionValueMap_ != null) return;
 
     loadPartitionSpecs();
-    ArrayList<TreeMap<LiteralExpr, HashSet<Long>>> valMapByCol = new ArrayList<>();
+    ArrayList<TreeMap<LiteralExpr, HashSet<Long>>> valMapByCol =
+        new ArrayList<>();
     ArrayList<HashSet<Long>> nullParts = new ArrayList<>();
 
     for (int i = 0; i < getNumClusteringCols(); i++) {

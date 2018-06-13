@@ -239,6 +239,7 @@ struct THdfsPartitionLocation {
 }
 
 // Represents an HDFS partition
+// TODO(vercegovac): rename to TFsPartition
 struct THdfsPartition {
   1: required byte lineDelim
   2: required byte fieldDelim

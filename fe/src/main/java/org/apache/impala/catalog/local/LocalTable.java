@@ -19,7 +19,6 @@ package org.apache.impala.catalog.local;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -37,7 +36,6 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.thrift.TCatalogObjectType;
-import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.thrift.TException;
 
@@ -53,7 +51,7 @@ import com.google.common.collect.Lists;
  * This class is not thread-safe. A new instance is created for
  * each catalog instance.
  */
-class LocalTable implements FeTable {
+abstract class LocalTable implements FeTable {
   protected final LocalDb db_;
   /** The lower-case name of the table. */
   protected final String name_;
@@ -181,11 +179,6 @@ class LocalTable implements FeTable {
     return schemaInfo_.tableStats_;
   }
 
-  @Override
-  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
-    throw new UnsupportedOperationException("TODO");
-  }
-
   /**
    * The table schema, loaded from the HMS Table object. This is common
    * to all Table implementations and includes the column definitions and
@@ -274,6 +267,10 @@ class LocalTable implements FeTable {
     private boolean isClusteringColumn(Column c) {
       Preconditions.checkArgument(colsByPos_.get(c.getPosition()) == c);
       return c.getPosition() < numClusteringCols_;
+    }
+
+    protected String getNullColumnValue() {
+      return nullColumnValue_;
     }
   }
 }
