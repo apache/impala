@@ -43,12 +43,6 @@ public interface FeFsPartition {
   long getId();
 
   /**
-   * @return true if this partition represents the "default partition" of an
-   * unpartitioned tabe
-   */
-  boolean isDefaultPartition();
-
-  /**
    * @return the table that contains this partition
    */
   FeFsTable getTable();

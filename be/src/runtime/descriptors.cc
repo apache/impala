@@ -226,6 +226,8 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
         pool->Add(new HdfsPartitionDescriptor(tdesc.hdfsTable, entry.second));
     partition_descriptors_[entry.first] = partition;
   }
+  prototype_partition_descriptor_ = pool->Add(new HdfsPartitionDescriptor(
+    tdesc.hdfsTable, tdesc.hdfsTable.prototype_partition));
   avro_schema_ = tdesc.hdfsTable.__isset.avroSchema ? tdesc.hdfsTable.avroSchema : "";
 }
 

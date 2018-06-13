@@ -17,7 +17,6 @@
 
 package org.apache.impala.catalog;
 
-import static org.apache.impala.thrift.ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -291,14 +290,10 @@ public class CatalogTest {
     Collection<? extends FeFsPartition> partitions = table.getPartitions();
 
     // check that partition keys cover the date range 1/1/2009-12/31/2010
-    // and that we have one file per partition, plus the default partition
-    assertEquals(25, partitions.size());
+    // and that we have one file per partition.
+    assertEquals(24, partitions.size());
     Set<Long> months = Sets.newHashSet();
     for (FeFsPartition p: partitions) {
-      if (p.getId() == DEFAULT_PARTITION_ID) {
-        continue;
-      }
-
       assertEquals(2, p.getPartitionValues().size());
 
       LiteralExpr key1Expr = p.getPartitionValues().get(0);

@@ -328,6 +328,10 @@ class HdfsTableDescriptor : public TableDescriptor {
     return partition_descriptors_;
   }
 
+  const HdfsPartitionDescriptor* prototype_partition_descriptor() const {
+    return prototype_partition_descriptor_;
+  }
+
   virtual std::string DebugString() const;
 
  protected:
@@ -336,6 +340,7 @@ class HdfsTableDescriptor : public TableDescriptor {
   /// Special string to indicate NULL values in text-encoded columns.
   std::string null_column_value_;
   PartitionIdToDescriptorMap partition_descriptors_;
+  HdfsPartitionDescriptor* prototype_partition_descriptor_;
   /// Set to the table's Avro schema if this is an Avro table, empty string otherwise
   std::string avro_schema_;
 };

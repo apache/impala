@@ -90,7 +90,6 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.MetastoreShim;
-import org.apache.impala.thrift.ImpalaInternalServiceConstants;
 import org.apache.impala.thrift.JniCatalogConstants;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TAlterDbSetOwnerParams;
@@ -822,7 +821,6 @@ public class CatalogOpExecutor {
     for (FeFsPartition fePartition: table.getPartitions()) {
       // TODO(todd): avoid downcast to implementation class
       HdfsPartition partition = (HdfsPartition)fePartition;
-      if (partition.isDefaultPartition()) continue;
 
       // NULL keys are returned as 'NULL' in the partition_stats map, so don't substitute
       // this partition's keys with Hive's replacement value.
@@ -1271,11 +1269,6 @@ public class CatalogOpExecutor {
       // TODO(todd): avoid downcast
       HdfsPartition part = (HdfsPartition) fePart;
       boolean isModified = false;
-      // The default partition is an Impala-internal abstraction and is not
-      // represented in the Hive Metastore.
-      if (part.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
-        continue;
-      }
       if (part.getPartitionStats() != null) {
         PartitionStatsUtil.deletePartStats(part);
         isModified = true;
@@ -1538,7 +1531,6 @@ public class CatalogOpExecutor {
       try {
         HdfsTable hdfsTable = (HdfsTable)table;
         for (FeFsPartition part: hdfsTable.getPartitions()) {
-          if (part.isDefaultPartition()) continue;
           FileSystemUtil.deleteAllVisibleFiles(new Path(part.getLocation()));
         }
 
@@ -2355,9 +2347,9 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           tbl.getMetaStoreTable().deepCopy();
       setStorageDescriptorFileFormat(msTbl.getSd(), fileFormat);
-      // The default partition must be updated if the file format is changed so that new
+      // The prototype partition must be updated if the file format is changed so that new
       // partitions are created with the new file format.
-      if (tbl instanceof HdfsTable) ((HdfsTable) tbl).addDefaultPartition(msTbl.getSd());
+      if (tbl instanceof HdfsTable) ((HdfsTable) tbl).setPrototypePartition(msTbl.getSd());
       applyAlterTable(msTbl, true);
       reloadFileMetadata = true;
     } else {
@@ -2394,9 +2386,9 @@ public class CatalogOpExecutor {
           tbl.getMetaStoreTable().deepCopy();
       StorageDescriptor sd = msTbl.getSd();
       HiveStorageDescriptorFactory.setSerdeInfo(rowFormat, sd.getSerdeInfo());
-      // The default partition must be updated if the row format is changed so that new
+      // The prototype partition must be updated if the row format is changed so that new
       // partitions are created with the new file format.
-      ((HdfsTable) tbl).addDefaultPartition(msTbl.getSd());
+      ((HdfsTable) tbl).setPrototypePartition(msTbl.getSd());
       applyAlterTable(msTbl, true);
       reloadFileMetadata = true;
     } else {
@@ -2580,11 +2572,6 @@ public class CatalogOpExecutor {
         for (FeFsPartition fePartition: hdfsTable.getPartitions()) {
           // TODO(todd): avoid downcast
           HdfsPartition partition = (HdfsPartition) fePartition;
-          // No need to cache the default partition because it contains no files and is
-          // not referred to by scan nodes.
-          if (partition.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
-            continue;
-          }
           // Only issue cache directives if the data is uncached or the cache directive
           // needs to be updated
           if (!partition.isMarkedCached() ||
@@ -2637,9 +2624,6 @@ public class CatalogOpExecutor {
         for (FeFsPartition fePartition: hdfsTable.getPartitions()) {
           // TODO(todd): avoid downcast
           HdfsPartition partition = (HdfsPartition) fePartition;
-          if (partition.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
-            continue;
-          }
           if (partition.isMarkedCached()) {
             HdfsCachingUtil.removePartitionCacheDirective(partition);
             try {
@@ -3304,11 +3288,6 @@ public class CatalogOpExecutor {
             Sets.newHashSet(update.getCreated_partitions());
         partsToLoadMetadata = Sets.newHashSet(partsToCreate);
         for (FeFsPartition partition: ((HdfsTable) table).getPartitions()) {
-          // Skip dummy default partition.
-          long partitionId = partition.getId();
-          if (partitionId == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
-            continue;
-          }
           // TODO: In the BE we build partition names without a trailing char. In FE
           // we build partition name with a trailing char. We should make this
           // consistent.

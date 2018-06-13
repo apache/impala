@@ -242,8 +242,9 @@ class HdfsTableSink : public DataSink {
   /// Descriptor of target table. Set in Prepare().
   const HdfsTableDescriptor* table_desc_;
 
-  /// Currently this is the default partition since we don't support multi-format sinks.
-  const HdfsPartitionDescriptor* default_partition_;
+  /// The partition descriptor used when creating new partitions from this sink.
+  /// Currently we don't support multi-format sinks.
+  const HdfsPartitionDescriptor* prototype_partition_;
 
   /// Table id resolved in Prepare() to set tuple_desc_;
   TableId table_id_;

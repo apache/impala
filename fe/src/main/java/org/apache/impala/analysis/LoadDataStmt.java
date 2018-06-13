@@ -32,6 +32,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
@@ -205,24 +206,20 @@ public class LoadDataStmt extends StatementBase {
           "target table (%s) because Impala does not have WRITE access to HDFS " +
           "location: ", hdfsTable.getFullName());
 
-      FeFsPartition partition;
-      String location;
       if (partitionSpec_ != null) {
-        partition = hdfsTable.getPartition(partitionSpec_.getPartitionSpecKeyValues());
-        location = partition.getLocation();
+        HdfsPartition partition = hdfsTable.getPartition(
+            partitionSpec_.getPartitionSpecKeyValues());
+        String location = partition.getLocation();
         if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
           throw new AnalysisException(noWriteAccessErrorMsg + location);
         }
       } else {
-        // "default" partition
-        partition = hdfsTable.getPartitionMap().get(
-            ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID);
-        location = hdfsTable.getLocation();
+        // No specific partition specified, so we need to check write access
+        // on the table as a whole.
         if (!hdfsTable.hasWriteAccess()) {
           throw new AnalysisException(noWriteAccessErrorMsg + hdfsTable.getLocation());
         }
       }
-      Preconditions.checkNotNull(partition);
     } catch (FileNotFoundException e) {
       throw new AnalysisException("File not found: " + e.getMessage(), e);
     } catch (IOException e) {

@@ -73,11 +73,6 @@ public class BlockIdGenerator {
           // Write the output as <tablename>: <blockid1> <blockid2> <etc>
           writer.write(tableName + ":");
           for (FeFsPartition partition: hdfsTable.getPartitions()) {
-            // Ignore the default partition.
-            if (partition.getId() ==
-                    ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
-              continue;
-            }
             List<FileDescriptor> fileDescriptors = partition.getFileDescriptors();
             for (FileDescriptor fd : fileDescriptors) {
               Path p = new Path(partition.getLocation(), fd.getFileName());

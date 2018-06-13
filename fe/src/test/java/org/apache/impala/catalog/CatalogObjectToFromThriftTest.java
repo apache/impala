@@ -25,7 +25,7 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
-import org.apache.impala.thrift.ImpalaInternalServiceConstants;
+import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.THBaseTable;
 import org.apache.impala.thrift.THdfsPartition;
@@ -37,6 +37,7 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 /**
@@ -59,6 +60,9 @@ public class CatalogObjectToFromThriftTest {
                         "functional_seq"};
     for (String dbName: dbNames) {
       Table table = catalog_.getOrLoadTable(dbName, "alltypes");
+      Assert.assertEquals(24, ((HdfsTable)table).getPartitions().size());
+      Assert.assertEquals(24, ((HdfsTable)table).getPartitionIds().size());
+
       TTable thriftTable = getThriftTable(table);
       Assert.assertEquals(thriftTable.tbl_name, "alltypes");
       Assert.assertEquals(thriftTable.db_name, dbName);
@@ -68,17 +72,17 @@ public class CatalogObjectToFromThriftTest {
       THdfsTable hdfsTable = thriftTable.getHdfs_table();
       Assert.assertTrue(hdfsTable.hdfsBaseDir != null);
 
-      // The table has 24 partitions + the default partition
-      Assert.assertEquals(hdfsTable.getPartitions().size(), 25);
-      Assert.assertTrue(hdfsTable.getPartitions().containsKey(
-          new Long(ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID)));
-
+      // The table has 24 partitions.
+      Assert.assertEquals(24, hdfsTable.getPartitions().size());
+      Assert.assertFalse(hdfsTable.getPartitions().containsKey(
+          CatalogObjectsConstants.PROTOTYPE_PARTITION_ID));
+      // The prototype partition should be included and set properly.
+      Assert.assertTrue(hdfsTable.isSetPrototype_partition());
+      Assert.assertEquals(CatalogObjectsConstants.PROTOTYPE_PARTITION_ID,
+          hdfsTable.getPrototype_partition().id);
+      Assert.assertNull(hdfsTable.getPrototype_partition().location);
       for (Map.Entry<Long, THdfsPartition> kv: hdfsTable.getPartitions().entrySet()) {
-        if (kv.getKey() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
-          Assert.assertEquals(kv.getValue().getPartitionKeyExprs().size(), 0);
-        } else {
-          Assert.assertEquals(kv.getValue().getPartitionKeyExprs().size(), 2);
-        }
+        Assert.assertEquals(kv.getValue().getPartitionKeyExprs().size(), 2);
       }
 
       // Now try to load the thrift struct.
@@ -90,29 +94,26 @@ public class CatalogObjectToFromThriftTest {
       if (dbName.equals("functional")) Assert.assertEquals(7300, newTable.getNumRows());
 
       HdfsTable newHdfsTable = (HdfsTable) newTable;
-      Assert.assertEquals(newHdfsTable.getPartitions().size(), 25);
-      boolean foundDefaultPartition = false;
+      Assert.assertEquals(newHdfsTable.getPartitions().size(), 24);
+      Assert.assertEquals(newHdfsTable.getPartitionIds().size(), 24);
       for (FeFsPartition hdfsPart: newHdfsTable.getPartitions()) {
-        if (hdfsPart.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
-          Assert.assertEquals(foundDefaultPartition, false);
-          foundDefaultPartition = true;
-        } else {
-          Assert.assertEquals(hdfsPart.getFileDescriptors().size(), 1);
-          Assert.assertTrue(
-              hdfsPart.getFileDescriptors().get(0).getNumFileBlocks() > 0);
+        Assert.assertEquals(hdfsPart.getFileDescriptors().size(), 1);
+        Assert.assertTrue(
+            hdfsPart.getFileDescriptors().get(0).getNumFileBlocks() > 0);
 
-          // Verify the partition access level is getting set properly. The alltypes_seq
-          // table has two partitions that are read_only.
-          if (dbName.equals("functional_seq") && (
-              hdfsPart.getPartitionName().equals("year=2009/month=1") ||
-              hdfsPart.getPartitionName().equals("year=2009/month=3"))) {
-            Assert.assertEquals(TAccessLevel.READ_ONLY, hdfsPart.getAccessLevel());
-          } else {
-            Assert.assertEquals(TAccessLevel.READ_WRITE, hdfsPart.getAccessLevel());
-          }
+        // Verify the partition access level is getting set properly. The alltypes_seq
+        // table has two partitions that are read_only.
+        if (dbName.equals("functional_seq") && (
+            hdfsPart.getPartitionName().equals("year=2009/month=1") ||
+            hdfsPart.getPartitionName().equals("year=2009/month=3"))) {
+          Assert.assertEquals(TAccessLevel.READ_ONLY, hdfsPart.getAccessLevel());
+        } else {
+          Assert.assertEquals(TAccessLevel.READ_WRITE, hdfsPart.getAccessLevel());
         }
       }
-      Assert.assertEquals(foundDefaultPartition, true);
+      Assert.assertNotNull(newHdfsTable.prototypePartition_);
+      Assert.assertEquals(((HdfsTable)table).prototypePartition_.getParameters(),
+          newHdfsTable.prototypePartition_.getParameters());
     }
   }
 
@@ -214,13 +215,9 @@ public class CatalogObjectToFromThriftTest {
     HdfsTable hdfsTable = (HdfsTable) table;
     // Get any partition with valid HMS parameters to create a
     // dummy partition.
-    HdfsPartition part = null;
-    for (FeFsPartition partition: hdfsTable.getPartitions()) {
-      if (!partition.isDefaultPartition()) {
-        part = (HdfsPartition) partition;
-        break;
-      }
-    }
+    HdfsPartition part = (HdfsPartition)Iterables.getFirst(
+        hdfsTable.getPartitions(), null);
+    Assert.assertNotNull(part);
     // Create a dummy partition with an invalid decimal type.
     try {
       HdfsPartition dummyPart = new HdfsPartition(hdfsTable, part.toHmsPartition(),

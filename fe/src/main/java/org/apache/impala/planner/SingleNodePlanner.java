@@ -1231,9 +1231,7 @@ public class SingleNodePlanner {
 
       for (FeFsPartition partition: partitions) {
         // Ignore empty partitions to match the behavior of the scan based approach.
-        if (partition.isDefaultPartition() || partition.getSize() == 0) {
-          continue;
-        }
+        if (partition.getSize() == 0) continue;
         List<Expr> exprs = Lists.newArrayList();
         for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
           // UnionNode.init() will go through all the slots in the tuple descriptor so
