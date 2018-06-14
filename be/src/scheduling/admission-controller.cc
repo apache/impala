@@ -41,10 +41,8 @@ DEFINE_int64(queue_wait_timeout_ms, 60 * 1000, "Maximum amount of time (in "
 
 namespace impala {
 
-#ifndef NDEBUG
 // Available 'sleep_label' string that can be used in the debug_action query option.
 static const string SLEEP_AFTER_ADMISSION_OUTCOME_MS = "SLEEP_AFTER_ADMISSION_OUTCOME_MS";
-#endif
 
 /// Convenience method.
 std::string PrintBytes(int64_t value) {
@@ -626,9 +624,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule,
   schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_QUEUE_DETAIL,
       Substitute(PROFILE_INFO_VAL_QUEUE_DETAIL, wait_time_ms, not_admitted_reason));
 
-#ifndef NDEBUG
   SleepIfSetInDebugOptions(schedule->query_options(), SLEEP_AFTER_ADMISSION_OUTCOME_MS);
-#endif
 
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);

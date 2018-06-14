@@ -64,12 +64,10 @@ static const string TABLES_MISSING_STATS_KEY = "Tables Missing Stats";
 static const string TABLES_WITH_CORRUPT_STATS_KEY = "Tables With Corrupt Table Stats";
 static const string TABLES_WITH_MISSING_DISK_IDS_KEY = "Tables With Missing Disk Ids";
 
-#ifndef NDEBUG
 // Available 'sleep_label' strings that can be used in the debug_action query option.
 static const string SLEEP_BEFORE_ADMISSION_MS = "SLEEP_BEFORE_ADMISSION_MS";
 static const string SLEEP_AFTER_COORDINATOR_STARTS_MS =
     "SLEEP_AFTER_COORDINATOR_STARTS_MS";
-#endif
 
 ClientRequestState::ClientRequestState(
     const TQueryCtx& query_ctx, ExecEnv* exec_env, Frontend* frontend,
@@ -491,9 +489,7 @@ Status ClientRequestState::ExecAsyncQueryOrDmlRequest(
 }
 
 void ClientRequestState::FinishExecQueryOrDmlRequest() {
-#ifndef NDEBUG
   SleepIfSetInDebugOptions(schedule_->query_options(), SLEEP_BEFORE_ADMISSION_MS);
-#endif
   DCHECK(exec_env_->admission_controller() != nullptr);
   Status admit_status = ExecEnv::GetInstance()->admission_controller()->AdmitQuery(
       schedule_.get(), &admit_outcome_);
@@ -504,9 +500,7 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
   coord_.reset(new Coordinator(*schedule_, query_events_));
   Status exec_status = coord_->Exec();
 
-#ifndef NDEBUG
   SleepIfSetInDebugOptions(schedule_->query_options(), SLEEP_AFTER_COORDINATOR_STARTS_MS);
-#endif
 
   bool cancelled = false;
   Status cancellation_status;

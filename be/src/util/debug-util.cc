@@ -285,8 +285,7 @@ string GetBackendString() {
   return Substitute("$0:$1", FLAGS_hostname, FLAGS_be_port);
 }
 
-#ifndef NDEBUG
-void SleepIfSetInDebugOptions(
+void SleepIfSetInDebugOptionsImpl(
     const TQueryOptions& query_options, const string& sleep_label) {
   vector<string> components;
   boost::split(components, query_options.debug_action, boost::is_any_of(":"));
@@ -294,6 +293,5 @@ void SleepIfSetInDebugOptions(
     SleepForMs(atoi(components[1].c_str()));
   }
 }
-#endif
 
 }

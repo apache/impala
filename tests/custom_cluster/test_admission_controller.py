@@ -546,10 +546,6 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       client.close_query(handle)
       queued_profile = client.get_runtime_profile(queued_query_handle)
       assert "Admission result: Cancelled (queued)" in queued_profile
-    except Exception as e:
-      print e.args
-    finally:
-      client.close()
       for i in self.cluster.impalads:
         i.service.wait_for_metric_value("impala-server.num-fragments-in-flight", 0)
       assert self.cluster.impalads[0].service.get_metric_value(
@@ -558,6 +554,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         "admission-controller.total-admitted.default-pool") == 3
       assert self.cluster.impalads[0].service.get_metric_value(
         "admission-controller.total-queued.default-pool") == 2
+    finally:
+      client.close()
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions
