@@ -1880,9 +1880,8 @@ INSERT INTO yy2 VALUES ('1999', 1999), ('2000', 2000), ('2001', 2001);
 COMPUTE STATS yy2;
 
 -- The following query reads an unknown number of partitions, whose key values
--- are only known at run time. The 'runtime filters' lines show how the
--- information about the partitions is calculated in query fragment 02, and then
--- used in query fragment 00 to decide which partitions to skip.
+-- are only known at run time. The <b>runtime filters</b> line shows the
+-- information used in query fragment 02 to decide which partitions to skip.
 
 EXPLAIN SELECT s FROM yy WHERE year IN (SELECT year FROM yy2);
 +--------------------------------------------------------------------------+
@@ -1892,7 +1891,7 @@ EXPLAIN SELECT s FROM yy WHERE year IN (SELECT year FROM yy2);
 | |                                                                        |
 | 02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]                                 |
 | |  hash predicates: year = year                                          |
-| |  <b>runtime filters: RF000 &lt;- year</b>                              |
+| |  <b>runtime filters: RF000 &lt;- year</b>                                   |
 | |                                                                        |
 | |--03:EXCHANGE [BROADCAST]                                               |
 | |  |                                                                     |
@@ -1900,7 +1899,7 @@ EXPLAIN SELECT s FROM yy WHERE year IN (SELECT year FROM yy2);
 | |     partitions=1/1 files=1 size=620B                                   |
 | |                                                                        |
 | 00:SCAN HDFS [default.yy]                                                |
-|    <b>partitions=5/5</b> files=5 size=1.71KB                             |
+|    <b>partitions=5/5</b> files=5 size=1.71KB                               |
 |    runtime filters: RF000 -> year                                        |
 +--------------------------------------------------------------------------+
 
