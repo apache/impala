@@ -107,15 +107,22 @@ std::string GetStackTrace();
 /// Returns the backend name in "host:port" form suitable for human consumption.
 std::string GetBackendString();
 
-#ifndef NDEBUG
+/// Slow path implementing SleepIfSetInDebugOptions() for the case where 'query_options'
+/// is non-empty.
+void SleepIfSetInDebugOptionsImpl(
+    const TQueryOptions& query_options, const string& sleep_label);
+
 /// If sleep time is specified in the debug_action query option in the format
 /// <sleep_label>:<sleep_time_ms>, where <sleep_label> is a string and <sleep_time_ms>
 /// is an integer, and 'sleep_label' matches the one specified in the query option, then
 /// this methods extracts the corresponding <sleep_time_ms> and initiates a sleep for that
 /// many milliseconds.
-void SleepIfSetInDebugOptions(
-    const TQueryOptions& query_options, const string& sleep_label);
-#endif
+static inline void SleepIfSetInDebugOptions(
+    const TQueryOptions& query_options, const string& sleep_label) {
+  // Make sure this is very cheap if debug actions are not in use.
+  if (LIKELY(query_options.debug_action.empty())) return;
+  return SleepIfSetInDebugOptionsImpl(query_options, sleep_label);
+}
 
 // FILE_CHECKs are conditions that we expect to be true but could fail due to a malformed
 // input file. They differentiate these cases from DCHECKs, which indicate conditions that
