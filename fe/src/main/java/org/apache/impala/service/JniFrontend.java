@@ -95,7 +95,7 @@ import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
-import org.apache.impala.thrift.TUpdateMembershipRequest;
+import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TSessionStateUtil;
@@ -186,12 +186,13 @@ public class JniFrontend {
 
   /**
    * Jni wrapper for Frontend.updateMembership(). Accepts a serialized
-   * TUpdateMembershipRequest.
+   * TUpdateExecutorMembershipRequest.
    */
-  public void updateMembership(byte[] thriftMembershipUpdate) throws ImpalaException {
-    TUpdateMembershipRequest req = new TUpdateMembershipRequest();
+  public void updateExecutorMembership(byte[] thriftMembershipUpdate)
+      throws ImpalaException {
+    TUpdateExecutorMembershipRequest req = new TUpdateExecutorMembershipRequest();
     JniUtil.deserializeThrift(protocolFactory_, req, thriftMembershipUpdate);
-    frontend_.updateMembership(req);
+    frontend_.updateExecutorMembership(req);
   }
 
   /**

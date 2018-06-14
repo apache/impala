@@ -53,7 +53,7 @@ import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TScanRangeSpec;
-import org.apache.impala.util.MembershipSnapshot;
+import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -218,11 +218,10 @@ public class HBaseScanNode extends ScanNode {
       LOG.trace("computeStats HbaseScan: cardinality=" + Long.toString(cardinality_));
     }
 
-    // Assume that each node in the cluster gets a scan range, unless there are fewer
+    // Assume that each executor in the cluster gets a scan range, unless there are fewer
     // scan ranges than nodes.
-    numNodes_ = Math.max(1,
-        Math.min(scanRangeSpecs_.getConcrete_rangesSize(),
-            MembershipSnapshot.getCluster().numNodes()));
+    numNodes_ = Math.max(1, Math.min(scanRangeSpecs_.getConcrete_rangesSize(),
+                                ExecutorMembershipSnapshot.getCluster().numExecutors()));
     if (LOG.isTraceEnabled()) {
       LOG.trace("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes_));
     }
