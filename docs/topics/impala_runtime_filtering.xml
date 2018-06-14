@@ -345,9 +345,8 @@ under the License.
 
       <p>
         The following example shows a query that uses a single runtime filter,
-        labeled <codeph>RF000</codeph>, to prune the partitions that are scanned
-        in one stage of the query, based on evaluating the result set of a
-        subquery:
+        labeled <codeph>RF000</codeph>, to prune the partitions based on
+        evaluating the result set of a subquery at runtime:
       </p>
 
 <codeblock conref="../shared/impala_common.xml#common/simple_dpp_example"/>

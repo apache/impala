@@ -440,9 +440,11 @@ SELECT COUNT(*) FROM sales_table WHERE year IN (2005, 2010, 2015);
           indicating that static partition pruning will not happen.
         </p>
 
-        <p>The Filter summary in the <codeph>PROFILE</codeph> output shows that
+        <p>
+          The Filter summary in the <codeph>PROFILE</codeph> output shows that
           the scan node filtered out based on a runtime filter of dynamic
-          partition pruning. </p>
+          partition pruning.
+        </p>
 
 <codeblock>Filter 0 (1.00 MB):
  - Files processed: 3
