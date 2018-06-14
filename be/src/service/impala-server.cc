@@ -1699,7 +1699,7 @@ void ImpalaServer::MembershipCallback(
           cancellation_entry != queries_to_cancel.end();
           ++cancellation_entry) {
         stringstream cause_msg;
-        cause_msg << "Cancelled due to unreachable impalad(s): ";
+        cause_msg << "Failed due to unreachable impalad(s): ";
         for (int i = 0; i < cancellation_entry->second.size(); ++i) {
           cause_msg << TNetworkAddressToString(cancellation_entry->second[i]);
           if (i + 1 != cancellation_entry->second.size()) cause_msg << ", ";
