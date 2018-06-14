@@ -711,12 +711,18 @@ struct TUpdateCatalogCacheResponse {
   3: required i64 new_catalog_version
 }
 
-// Sent from the impalad BE to FE with the latest cluster membership snapshot resulting
-// from the Membership heartbeat.
-struct TUpdateMembershipRequest {
+// Sent from the impalad BE to FE with the latest membership snapshot of the
+// executors on the cluster resulting from the Membership heartbeat.
+struct TUpdateExecutorMembershipRequest {
+  // The hostnames of the executor nodes.
   1: required set<string> hostnames
+
+  // The ip addresses of the executor nodes.
   2: required set<string> ip_addresses
-  3: i32 num_nodes
+
+  // The number of executors on a cluster, needed since there can be multiple
+  // impalads running on the same host.
+  3: i32 num_executors
 }
 
 // Contains all interesting statistics from a single 'memory pool' in the JVM.

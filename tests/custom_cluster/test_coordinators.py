@@ -245,3 +245,39 @@ class TestCoordinators(CustomClusterTestSuite):
       if client is not None:
         client.close()
       self._stop_impala_cluster()
+
+  @pytest.mark.execute_serially
+  def test_exclusive_coordinator_plan(self):
+    """Checks that a distributed plan does not assign scan fragments to a coordinator
+    only node. """
+
+    self._start_impala_cluster([], num_coordinators=1, cluster_size=3,
+        use_exclusive_coordinators=True)
+
+    assert len(self.cluster.impalads) == 3
+
+    coordinator = self.cluster.impalads[0]
+    worker1 = self.cluster.impalads[1]
+    worker2 = self.cluster.impalads[2]
+
+    client = None
+    try:
+      client = coordinator.service.create_beeswax_client()
+      assert client is not None
+      self.client = client
+
+      client.execute("SET EXPLAIN_LEVEL=2")
+
+      # Ensure that the plan generated always uses only the executor nodes for scanning
+      # Multi-partition table
+      result = client.execute("explain select count(*) from functional.alltypes "
+              "where id NOT IN (0,1,2) and string_col IN ('aaaa', 'bbbb', 'cccc', NULL) "
+              "and mod(int_col,50) IN (0,1) and id IN (int_col);").data
+      assert 'F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2' in result
+      # Single partition table
+      result = client.execute("explain select * from tpch.lineitem "
+              "union all select * from tpch.lineitem").data
+      assert 'F02:PLAN FRAGMENT [RANDOM] hosts=2 instances=2' in result
+    finally:
+      assert client is not None
+      self._stop_impala_cluster()

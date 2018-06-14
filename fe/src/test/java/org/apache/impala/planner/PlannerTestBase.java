@@ -70,8 +70,8 @@ import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTupleDescriptor;
-import org.apache.impala.thrift.TUpdateMembershipRequest;
-import org.apache.impala.util.MembershipSnapshot;
+import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
+import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduScanToken;
 import org.junit.AfterClass;
@@ -104,11 +104,11 @@ public class PlannerTestBase extends FrontendTestBase {
   @BeforeClass
   public static void setUp() throws Exception {
     // Mimic the 3 node test mini-cluster.
-    TUpdateMembershipRequest updateReq = new TUpdateMembershipRequest();
+    TUpdateExecutorMembershipRequest updateReq = new TUpdateExecutorMembershipRequest();
     updateReq.setIp_addresses(Sets.newHashSet("127.0.0.1"));
     updateReq.setHostnames(Sets.newHashSet("localhost"));
-    updateReq.setNum_nodes(3);
-    MembershipSnapshot.update(updateReq);
+    updateReq.setNum_executors(3);
+    ExecutorMembershipSnapshot.update(updateReq);
 
     if (RuntimeEnv.INSTANCE.isKuduSupported()) {
       kuduClient_ = new KuduClient.KuduClientBuilder("127.0.0.1:7051").build();

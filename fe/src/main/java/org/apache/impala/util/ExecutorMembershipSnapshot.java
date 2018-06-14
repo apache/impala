@@ -21,20 +21,19 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.impala.thrift.TNetworkAddress;
-import org.apache.impala.thrift.TUpdateMembershipRequest;
+import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
 import com.google.common.collect.Sets;
 
 /**
- * Singleton class that represents a snapshot of the Impalad cluster membership.  Host
+ * Singleton class that represents a snapshot of the Impalad executor membership. Host
  * membership is determined by both IP address and hostname (to mimic the backend's
- * Scheduler).  A new snapshot is created whenever the cluster membership changes
+ * Scheduler). A new snapshot is created whenever the cluster membership changes
  * so that clients don't need to hold a lock while examining a snapshot.
  */
-public class MembershipSnapshot {
-
-  // The latest instance of the MembershipSnapshot.
-  private static AtomicReference<MembershipSnapshot> cluster_ =
-      new AtomicReference<MembershipSnapshot>(new MembershipSnapshot());
+public class ExecutorMembershipSnapshot {
+  // The latest instance of the ExecutorMembershipSnapshot.
+  private static AtomicReference<ExecutorMembershipSnapshot> cluster_ =
+      new AtomicReference<ExecutorMembershipSnapshot>(new ExecutorMembershipSnapshot());
 
   // The set of hosts that are members of the cluster given by hostname.
   private final Set<String> hostnames_;
@@ -42,24 +41,24 @@ public class MembershipSnapshot {
   // The set of hosts that are members of the cluster given by IP address.
   private final Set<String> ipAddresses_;
 
-  // The number of nodes of the cluster.  Normally, this will be equal to
+  // The number of executor nodes of the cluster.  Normally, this will be equal to
   // hostnames_.size(), except in the test minicluster where there are multiple
   // impalad's running on a single host.
-  private final int numNodes_;
+  private final int numExecutors_;
 
-  // Used only to construct the initial MembershipSnapshot.  Before we get the first
-  // snapshot, assume one node (the localhost) to mimic Scheduler.
-  private MembershipSnapshot() {
+  // Used only to construct the initial ExecutorMembershipSnapshot. Before we get the
+  // first snapshot, assume one node (the localhost) to mimic Scheduler.
+  private ExecutorMembershipSnapshot() {
     hostnames_ = Sets.newHashSet();
     ipAddresses_ = Sets.newHashSet();
-    numNodes_ = 1;
+    numExecutors_ = 1;
   }
 
-  // Construct a new snapshot based on the TUpdateMembershipRequest.
-  private MembershipSnapshot(TUpdateMembershipRequest request) {
+  // Construct a new snapshot based on the TUpdateExecutorMembershipRequest.
+  private ExecutorMembershipSnapshot(TUpdateExecutorMembershipRequest request) {
     hostnames_ = request.getHostnames();
     ipAddresses_ = request.getIp_addresses();
-    numNodes_ = request.getNum_nodes();
+    numExecutors_ = request.getNum_executors();
   }
 
   // Determine whether a host, given either by IP address or hostname, is a member of
@@ -70,15 +69,14 @@ public class MembershipSnapshot {
   }
 
   // The number of nodes in this snapshot.
-  public int numNodes() { return numNodes_; }
+  public int numExecutors() { return numExecutors_; }
 
   // Atomically update the singleton snapshot instance.  After the update completes,
   // all calls to getCluster() will return the new snapshot.
-  public static void update(TUpdateMembershipRequest request) {
-    cluster_.set(new MembershipSnapshot(request));
+  public static void update(TUpdateExecutorMembershipRequest request) {
+    cluster_.set(new ExecutorMembershipSnapshot(request));
   }
 
   // Return the current singleton snapshot instance.
-  public static MembershipSnapshot getCluster() { return cluster_.get(); }
-
+  public static ExecutorMembershipSnapshot getCluster() { return cluster_.get(); }
 }

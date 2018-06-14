@@ -1667,18 +1667,19 @@ void ImpalaServer::MembershipCallback(
     // membership by network address.
     set<TNetworkAddress> current_membership;
     // Also reflect changes to the frontend. Initialized only if any_changes is true.
-    TUpdateMembershipRequest update_req;
+    // Only send the hostname and ip_address of the executors to the frontend.
+    TUpdateExecutorMembershipRequest update_req;
     bool any_changes = !delta.topic_entries.empty() || !delta.is_delta;
     for (const BackendDescriptorMap::value_type& backend: known_backends_) {
       current_membership.insert(backend.second.address);
-      if (any_changes) {
+      if (any_changes && backend.second.is_executor) {
         update_req.hostnames.insert(backend.second.address.hostname);
         update_req.ip_addresses.insert(backend.second.ip_address);
+        update_req.num_executors++;
       }
     }
     if (any_changes) {
-      update_req.num_nodes = known_backends_.size();
-      Status status = exec_env_->frontend()->UpdateMembership(update_req);
+      Status status = exec_env_->frontend()->UpdateExecutorMembership(update_req);
       if (!status.ok()) {
         LOG(WARNING) << "Error updating frontend membership snapshot: "
                      << status.GetDetail();

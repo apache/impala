@@ -83,7 +83,7 @@ import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.BitUtil;
-import org.apache.impala.util.MembershipSnapshot;
+import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1100,7 +1100,7 @@ public class HdfsScanNode extends ScanNode {
    */
   protected void computeNumNodes(Analyzer analyzer, long cardinality) {
     Preconditions.checkNotNull(scanRangeSpecs_);
-    MembershipSnapshot cluster = MembershipSnapshot.getCluster();
+    ExecutorMembershipSnapshot cluster = ExecutorMembershipSnapshot.getCluster();
     HashSet<TNetworkAddress> localHostSet = Sets.newHashSet();
     int totalNodes = 0;
     int numLocalRanges = 0;
@@ -1135,21 +1135,21 @@ public class HdfsScanNode extends ScanNode {
         // hosts that hold block replica for those ranges.
         int numLocalNodes = Math.min(numLocalRanges, localHostSet.size());
         // The remote ranges are round-robined across all the impalads.
-        int numRemoteNodes = Math.min(numRemoteRanges, cluster.numNodes());
+        int numRemoteNodes = Math.min(numRemoteRanges, cluster.numExecutors());
         // The local and remote assignments may overlap, but we don't know by how much so
         // conservatively assume no overlap.
-        totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numNodes());
+        totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numExecutors());
         // Exit early if all hosts have a scan range assignment, to avoid extraneous work
         // in case the number of scan ranges dominates the number of nodes.
-        if (totalNodes == cluster.numNodes()) break;
+        if (totalNodes == cluster.numExecutors()) break;
       }
     }
     // Handle the generated range specifications.
-    if (totalNodes < cluster.numNodes() && scanRangeSpecs_.isSetSplit_specs()) {
+    if (totalNodes < cluster.numExecutors() && scanRangeSpecs_.isSetSplit_specs()) {
       Preconditions.checkState(
           generatedScanRangeCount_ >= scanRangeSpecs_.getSplit_specsSize());
       numRemoteRanges += generatedScanRangeCount_;
-      totalNodes = Math.min(numRemoteRanges, cluster.numNodes());
+      totalNodes = Math.min(numRemoteRanges, cluster.numExecutors());
     }
     // Tables can reside on 0 nodes (empty table), but a plan node must always be
     // executed on at least one node.
@@ -1159,7 +1159,7 @@ public class HdfsScanNode extends ScanNode {
           + (scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_)
           + " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges
           + " localHostSet.size=" + localHostSet.size()
-          + " clusterNodes=" + cluster.numNodes());
+          + " executorNodes=" + cluster.numExecutors());
     }
   }
 

@@ -136,9 +136,9 @@ import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
-import org.apache.impala.thrift.TUpdateMembershipRequest;
+import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
 import org.apache.impala.util.EventSequence;
-import org.apache.impala.util.MembershipSnapshot;
+import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.impala.util.TSessionStateUtil;
@@ -252,8 +252,8 @@ public class Frontend {
   /**
    * Update the cluster membership snapshot with the latest snapshot from the backend.
    */
-  public void updateMembership(TUpdateMembershipRequest req) {
-    MembershipSnapshot.update(req);
+  public void updateExecutorMembership(TUpdateExecutorMembershipRequest req) {
+    ExecutorMembershipSnapshot.update(req);
   }
 
   /**
