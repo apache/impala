@@ -138,8 +138,13 @@ class ImpalaServer : public ImpalaServiceIf,
   ~ImpalaServer();
 
   /// Initializes and starts RPC services and other subsystems (like audit logging).
-  /// Returns an error if starting any services failed. If the port is <= 0, their
-  ///respective service will not be started.
+  /// Returns an error if starting any services failed.
+  ///
+  /// Different port values have special behaviour. A port > 0 explicitly specifies
+  /// the port the server run on. A port value of 0 means to choose an arbitrary
+  /// ephemeral port in tests and to not start the service in a daemon. A port < 0
+  /// always means to not start the service. The port values can be obtained after
+  /// Start() by calling GetThriftBackendPort(), GetBeeswaxPort() or GetHS2Port().
   Status Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t hs2_port);
 
   /// Blocks until the server shuts down (by calling Shutdown()).
@@ -277,7 +282,10 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Prepares the given query context by populating fields required for evaluating
   /// certain expressions, such as now(), pid(), etc. Should be called before handing
   /// the query context to the frontend for query compilation.
-  static void PrepareQueryContext(TQueryCtx* query_ctx);
+  void PrepareQueryContext(TQueryCtx* query_ctx);
+
+  /// Static helper for PrepareQueryContext() that is used from expr-benchmark.
+  static void PrepareQueryContext(const TNetworkAddress& backend_addr, TQueryCtx* query_ctx);
 
   /// SessionHandlerIf methods
 
@@ -348,6 +356,22 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Returns true if this is an executor, false otherwise.
   bool IsExecutor();
+
+  /// Returns the port that the thrift backend server is listening on. Valid to call after
+  /// the server has started successfully.
+  int GetThriftBackendPort();
+
+  /// Returns the network address that the thrift backend server is listening on. Valid
+  /// to call after the server has started successfully.
+  TNetworkAddress GetThriftBackendAddress();
+
+  /// Returns the port that the Beeswax server is listening on. Valid to call after
+  /// the server has started successfully.
+  int GetBeeswaxPort();
+
+  /// Returns the port that the Beeswax server is listening on. Valid to call after
+  /// the server has started successfully.
+  int GetHS2Port();
 
   typedef boost::unordered_map<std::string, TBackendDescriptor> BackendDescriptorMap;
   const BackendDescriptorMap& GetKnownBackends();

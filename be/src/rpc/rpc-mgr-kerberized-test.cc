@@ -65,7 +65,7 @@ TEST_P(RpcMgrKerberizedTest, MultipleServicesTls) {
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
-  int32_t tls_service_port = FindUnusedEphemeralPort(nullptr);
+  int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   // Enable TLS.
@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
   kdc_principal = Substitute("impala-test/$0", ip);
   kdc_realm = "KRBTEST.COM";
 
-  int port = impala::FindUnusedEphemeralPort(nullptr);
+  int port = impala::FindUnusedEphemeralPort();
   std::unique_ptr<impala::MiniKdcWrapper> kdc;
   status = impala::MiniKdcWrapper::SetupAndStartMiniKDC(
       kdc_principal, kdc_realm, "24h", "7d", port, &kdc);

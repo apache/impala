@@ -121,14 +121,14 @@ class StatestoreSubscriber {
   /// Returns OK unless some error occurred, like a failure to connect.
   Status Start();
 
+  /// Return the port that the subscriber is listening on.
+  int heartbeat_port() const { return heartbeat_address_.port; }
+
   const std::string& id() const { return subscriber_id_; }
 
  private:
   /// Unique, but opaque, identifier for this subscriber.
   const std::string subscriber_id_;
-
-  /// Address that the heartbeat service should be started on.
-  TNetworkAddress heartbeat_address_;
 
   /// Address of the statestore
   TNetworkAddress statestore_address_;
@@ -186,6 +186,10 @@ class StatestoreSubscriber {
   /// private methods must be called holding this lock; this is noted in the method
   /// comments.
   boost::shared_mutex lock_;
+
+  /// Address that the heartbeat service should be started on. Initialised in constructor,
+  /// updated in Start() with the actual port if the wildcard port 0 was specified.
+  TNetworkAddress heartbeat_address_;
 
   /// Set to true after Register(...) is successful, after which no
   /// more topics may be subscribed to.

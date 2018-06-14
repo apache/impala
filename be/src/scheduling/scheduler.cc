@@ -120,6 +120,10 @@ Status Scheduler::Init(const TNetworkAddress& backend_address,
   return Status::OK();
 }
 
+void Scheduler::UpdateLocalBackendAddrForBeTest() {
+  local_backend_descriptor_.address = ExecEnv::GetInstance()->GetThriftBackendAddress();
+}
+
 void Scheduler::UpdateMembership(
     const StatestoreSubscriber::TopicDeltaMap& incoming_topic_deltas,
     vector<TTopicDelta>* subscriber_topic_updates) {

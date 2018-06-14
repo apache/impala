@@ -51,7 +51,7 @@ TEST_F(RpcMgrTest, MultipleServicesTls) {
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
-  int32_t tls_service_port = FindUnusedEphemeralPort(nullptr);
+  int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT);
@@ -74,7 +74,7 @@ TEST_F(RpcMgrTest, BadCertificateTls) {
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
-  int32_t tls_service_port = FindUnusedEphemeralPort(nullptr);
+  int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ASSERT_FALSE(tls_rpc_mgr.Init().ok());
@@ -91,7 +91,7 @@ TEST_F(RpcMgrTest, BadPasswordTls) {
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
-  int32_t tls_service_port = FindUnusedEphemeralPort(nullptr);
+  int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ASSERT_FALSE(tls_rpc_mgr.Init().ok());
@@ -108,7 +108,7 @@ TEST_F(RpcMgrTest, CorrectPasswordTls) {
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
-  int32_t tls_service_port = FindUnusedEphemeralPort(nullptr);
+  int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ASSERT_OK(tls_rpc_mgr.Init());
@@ -125,7 +125,7 @@ TEST_F(RpcMgrTest, BadCiphersTls) {
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
-  int32_t tls_service_port = FindUnusedEphemeralPort(nullptr);
+  int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ASSERT_FALSE(tls_rpc_mgr.Init().ok());
@@ -142,7 +142,7 @@ TEST_F(RpcMgrTest, ValidCiphersTls) {
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
-  int32_t tls_service_port = FindUnusedEphemeralPort(nullptr);
+  int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ASSERT_OK(tls_rpc_mgr.Init());
@@ -161,7 +161,7 @@ TEST_F(RpcMgrTest, ValidMultiCiphersTls) {
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
-  int32_t tls_service_port = FindUnusedEphemeralPort(nullptr);
+  int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ASSERT_OK(tls_rpc_mgr.Init());
@@ -245,7 +245,7 @@ TEST_F(RpcMgrTest, NegotiationTimeout) {
   IpAddr ip;
   ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
 
-  int32_t secondary_service_port = FindUnusedEphemeralPort(nullptr);
+  int32_t secondary_service_port = FindUnusedEphemeralPort();
   secondary_krpc_address = MakeNetworkAddress(ip, secondary_service_port);
 
   ASSERT_OK(secondary_rpc_mgr.Init());

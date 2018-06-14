@@ -115,7 +115,7 @@ ClientRequestState::ClientRequestState(
   summary_profile_->AddInfoStringRedacted(
       "Sql Statement", query_ctx_.client_request.stmt);
   summary_profile_->AddInfoString("Coordinator",
-      TNetworkAddressToString(exec_env->backend_address()));
+      TNetworkAddressToString(exec_env->GetThriftBackendAddress()));
 }
 
 ClientRequestState::~ClientRequestState() {

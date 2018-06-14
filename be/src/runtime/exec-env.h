@@ -79,7 +79,7 @@ class ExecEnv {
  public:
   ExecEnv();
 
-  ExecEnv(const std::string& hostname, int backend_port, int krpc_port,
+  ExecEnv(int backend_port, int krpc_port,
       int subscriber_port, int webserver_port, const std::string& statestore_host,
       int statestore_port);
 
@@ -104,6 +104,10 @@ class ExecEnv {
 
   /// TODO: Should ExecEnv own the ImpalaServer as well?
   void SetImpalaServer(ImpalaServer* server) { impala_server_ = server; }
+
+  /// Get the address of the thrift backend service. Only valid to call if
+  /// StartServices() was successful.
+  TNetworkAddress GetThriftBackendAddress() const;
 
   DataStreamMgrBase* stream_mgr() { return stream_mgr_.get(); }
 
@@ -145,8 +149,6 @@ class ExecEnv {
   Scheduler* scheduler() { return scheduler_.get(); }
   AdmissionController* admission_controller() { return admission_controller_.get(); }
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
-
-  const TNetworkAddress& backend_address() const { return backend_address_; }
 
   const IpAddr& ip_address() const { return ip_address_; }
 
@@ -222,8 +224,9 @@ class ExecEnv {
   static ExecEnv* exec_env_;
   bool is_fe_tests_ = false;
 
-  /// Address of the thrift based ImpalaInternalService
-  TNetworkAddress backend_address_;
+  /// Address of the thrift based ImpalaInternalService. In backend tests we allow
+  /// wildcard port 0, so this may not be the actual backend address.
+  TNetworkAddress configured_backend_address_;
 
   /// Resolved IP address of the host name.
   IpAddr ip_address_;

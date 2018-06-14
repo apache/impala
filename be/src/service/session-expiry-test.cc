@@ -73,11 +73,11 @@ TEST(SessionTest, TestExpiry) {
     // Create five Beeswax clients and five HS2 clients (each HS2 gets one session each)
     for (int i = 0; i < NUM_SESSIONS; ++i) {
       beeswax_clients[i].reset(new ThriftClient<ImpalaServiceClient>(
-              "localhost", impala->beeswax_port()));
+              "localhost", impala->GetBeeswaxPort()));
       EXPECT_OK(beeswax_clients[i]->Open());
 
       hs2_clients[i].reset(new ThriftClient<ImpalaHiveServer2ServiceClient>(
-              "localhost", impala->hs2_port()));
+              "localhost", impala->GetHS2Port()));
       EXPECT_OK(hs2_clients[i]->Open());
       TOpenSessionResp response;
       TOpenSessionReq request;

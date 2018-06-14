@@ -8696,8 +8696,7 @@ int main(int argc, char** argv) {
   InProcessImpalaServer* impala_server;
   ABORT_IF_ERROR(InProcessImpalaServer::StartWithEphemeralPorts(
       FLAGS_hostname, ips->port(), &impala_server));
-  executor_ = new ImpaladQueryExecutor(impala_server->hostname(),
-      impala_server->beeswax_port());
+  executor_ = new ImpaladQueryExecutor(FLAGS_hostname, impala_server->GetBeeswaxPort());
   ABORT_IF_ERROR(executor_->Setup());
 
   // Disable FE expr rewrites to make sure the Exprs get executed exactly as specified

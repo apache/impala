@@ -73,15 +73,13 @@ class InProcessImpalaServer {
   /// start up a catalogd, then there is no one to initialize it otherwise.
   void SetCatalogIsReady();
 
-  uint32_t beeswax_port() const { return beeswax_port_; }
+  /// Get the beeswax port of the running server.
+  int GetBeeswaxPort() const;
 
-  uint32_t hs2_port() const { return hs2_port_; }
-
-  const std::string& hostname() const { return hostname_; }
+  /// Get the HS2 port of the running server.
+  int GetHS2Port() const;
 
  private:
-  std::string hostname_;
-
   uint32_t backend_port_;
 
   uint32_t beeswax_port_;

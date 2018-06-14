@@ -160,13 +160,14 @@ class ThriftServer {
 
   /// Creates the server socket on which this server listens. May be SSL enabled. Returns
   /// OK unless there was a Thrift error.
-  Status CreateSocket(
-      boost::shared_ptr<apache::thrift::transport::TServerTransport>* socket);
+  Status CreateSocket(boost::shared_ptr<apache::thrift::transport::TServerSocket>* socket);
 
   /// True if the server has been successfully started, for internal use only
   bool started_;
 
-  /// The port on which the server interface is exposed
+  /// The port on which the server interface is exposed. Usually the port that was
+  /// passed to the constructor, but if this was the wildcard port 0, then this is
+  /// replaced with whatever port number the server is listening on.
   int port_;
 
   /// True if the server socket only accepts SSL connections

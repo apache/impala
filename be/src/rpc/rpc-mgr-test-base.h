@@ -65,7 +65,7 @@ static string CURRENT_EXECUTABLE_PATH;
 
 namespace impala {
 
-static int32_t SERVICE_PORT = FindUnusedEphemeralPort(nullptr);
+static int32_t SERVICE_PORT = FindUnusedEphemeralPort();
 
 const static string IMPALA_HOME(getenv("IMPALA_HOME"));
 const string& SERVER_CERT =

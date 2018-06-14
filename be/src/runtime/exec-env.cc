@@ -50,6 +50,7 @@
 #include "scheduling/scheduler.h"
 #include "service/data-stream-service.h"
 #include "service/frontend.h"
+#include "service/impala-server.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/debug-util.h"
 #include "util/default-path-handlers.h"
@@ -128,11 +129,11 @@ struct ExecEnv::KuduClientPtr {
 ExecEnv* ExecEnv::exec_env_ = nullptr;
 
 ExecEnv::ExecEnv()
-  : ExecEnv(FLAGS_hostname, FLAGS_be_port, FLAGS_krpc_port,
+  : ExecEnv(FLAGS_be_port, FLAGS_krpc_port,
         FLAGS_state_store_subscriber_port, FLAGS_webserver_port,
         FLAGS_state_store_host, FLAGS_state_store_port) {}
 
-ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
+ExecEnv::ExecEnv(int backend_port, int krpc_port,
     int subscriber_port, int webserver_port, const string& statestore_host,
     int statestore_port)
   : obj_pool_(new ObjectPool),
@@ -156,7 +157,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
     query_exec_mgr_(new QueryExecMgr()),
     rpc_metrics_(metrics_->GetOrCreateChildGroup("rpc")),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
-    backend_address_(MakeNetworkAddress(hostname, backend_port)) {
+    configured_backend_address_(MakeNetworkAddress(FLAGS_hostname, backend_port)) {
 
   if (FLAGS_use_krpc) {
     VLOG_QUERY << "Using KRPC.";
@@ -170,12 +171,13 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
 
   request_pool_service_.reset(new RequestPoolService(metrics_.get()));
 
-  TNetworkAddress subscriber_address = MakeNetworkAddress(hostname, subscriber_port);
+  TNetworkAddress subscriber_address =
+      MakeNetworkAddress(FLAGS_hostname, subscriber_port);
   TNetworkAddress statestore_address =
       MakeNetworkAddress(statestore_host, statestore_port);
 
   statestore_subscriber_.reset(new StatestoreSubscriber(
-      Substitute("impalad@$0", TNetworkAddressToString(backend_address_)),
+      Substitute("impalad@$0", TNetworkAddressToString(configured_backend_address_)),
       subscriber_address, statestore_address, metrics_.get()));
 
   if (FLAGS_is_coordinator) {
@@ -189,7 +191,7 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int krpc_port,
   }
 
   admission_controller_.reset(new AdmissionController(statestore_subscriber_.get(),
-      request_pool_service_.get(), metrics_.get(), backend_address_));
+      request_pool_service_.get(), metrics_.get(), configured_backend_address_));
   exec_env_ = this;
 }
 
@@ -276,7 +278,7 @@ Status ExecEnv::Init() {
       metrics_.get(), true, buffer_reservation_.get(), buffer_pool_.get()));
 
   // Resolve hostname to IP address.
-  RETURN_IF_ERROR(HostnameToIpAddr(backend_address_.hostname, &ip_address_));
+  RETURN_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address_));
 
   mem_tracker_.reset(
       new MemTracker(AggregateMemoryMetrics::TOTAL_USED, bytes_limit, "Process"));
@@ -359,7 +361,8 @@ Status ExecEnv::Init() {
   }
 
   if (scheduler_ != nullptr) {
-    RETURN_IF_ERROR(scheduler_->Init(backend_address_, krpc_address_, ip_address_));
+    RETURN_IF_ERROR(scheduler_->Init(
+          configured_backend_address_, krpc_address_, ip_address_));
   }
   RETURN_IF_ERROR(admission_controller_->Init());
 
@@ -412,6 +415,11 @@ void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,
   buffer_pool_.reset(new BufferPool(min_buffer_size, capacity, clean_pages_limit));
   buffer_reservation_.reset(new ReservationTracker());
   buffer_reservation_->InitRootTracker(nullptr, capacity);
+}
+
+TNetworkAddress ExecEnv::GetThriftBackendAddress() const {
+  DCHECK(impala_server_ != nullptr);
+  return impala_server_->GetThriftBackendAddress();
 }
 
 Status ExecEnv::GetKuduClient(

@@ -121,8 +121,10 @@ DECLARE_bool(disk_spill_encryption);
 DECLARE_bool(use_krpc);
 DECLARE_bool(use_local_catalog);
 
-DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served");
-DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served");
+DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served."
+    "If 0 or less, the Beeswax server is not started.");
+DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served."
+    "If 0 or less, the HiveServer2 server is not started.");
 
 DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
@@ -460,6 +462,25 @@ Status ImpalaServer::LogLineageRecord(const ClientRequestState& client_request_s
 
 bool ImpalaServer::IsCoordinator() { return is_coordinator_; }
 bool ImpalaServer::IsExecutor() { return is_executor_; }
+
+int ImpalaServer::GetThriftBackendPort() {
+  DCHECK(thrift_be_server_ != nullptr);
+  return thrift_be_server_->port();
+}
+
+TNetworkAddress ImpalaServer::GetThriftBackendAddress() {
+  return MakeNetworkAddress(FLAGS_hostname, GetThriftBackendPort());
+}
+
+int ImpalaServer::GetBeeswaxPort() {
+  DCHECK(beeswax_server_ != nullptr);
+  return beeswax_server_->port();
+}
+
+int ImpalaServer::GetHS2Port() {
+  DCHECK(hs2_server_ != nullptr);
+  return hs2_server_->port();
+}
 
 const ImpalaServer::BackendDescriptorMap& ImpalaServer::GetKnownBackends() {
   return known_backends_;
@@ -948,12 +969,17 @@ Status ImpalaServer::ExecuteInternal(
 }
 
 void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
+  PrepareQueryContext(GetThriftBackendAddress(), query_ctx);
+}
+
+void ImpalaServer::PrepareQueryContext(
+    const TNetworkAddress& backend_addr, TQueryCtx* query_ctx) {
   query_ctx->__set_pid(getpid());
   int64_t now_us = UnixMicros();
   query_ctx->__set_utc_timestamp_string(ToUtcStringFromUnixMicros(now_us));
   query_ctx->__set_now_string(ToStringFromUnixMicros(now_us));
   query_ctx->__set_start_unix_millis(now_us / MICROS_PER_MILLI);
-  query_ctx->__set_coord_address(ExecEnv::GetInstance()->backend_address());
+  query_ctx->__set_coord_address(backend_addr);
 
   // Creating a random_generator every time is not free, but
   // benchmarks show it to be slightly cheaper than contending for a
@@ -1717,7 +1743,7 @@ void ImpalaServer::AddLocalBackendToStatestore(
   TBackendDescriptor local_backend_descriptor;
   local_backend_descriptor.__set_is_coordinator(FLAGS_is_coordinator);
   local_backend_descriptor.__set_is_executor(FLAGS_is_executor);
-  local_backend_descriptor.__set_address(exec_env_->backend_address());
+  local_backend_descriptor.__set_address(exec_env_->GetThriftBackendAddress());
   local_backend_descriptor.ip_address = exec_env_->ip_address();
   local_backend_descriptor.__set_proc_mem_limit(
       exec_env_->process_mem_tracker()->limit());
@@ -2075,7 +2101,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
   }
 
   // Start the internal service.
-  if (thrift_be_port > 0) {
+  if (thrift_be_port > 0 || (TestInfo::is_test() && thrift_be_port == 0)) {
     boost::shared_ptr<ImpalaInternalService> thrift_if(new ImpalaInternalService());
     boost::shared_ptr<TProcessor> be_processor(
         new ImpalaInternalServiceProcessor(thrift_if));
@@ -2099,11 +2125,11 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
 
   if (!FLAGS_is_coordinator) {
     LOG(INFO) << "Initialized executor Impala server on "
-              << TNetworkAddressToString(ExecEnv::GetInstance()->backend_address());
+              << TNetworkAddressToString(GetThriftBackendAddress());
   } else {
     // Initialize the client servers.
     boost::shared_ptr<ImpalaServer> handler = shared_from_this();
-    if (beeswax_port > 0) {
+    if (beeswax_port > 0 || (TestInfo::is_test() && beeswax_port == 0)) {
       boost::shared_ptr<TProcessor> beeswax_processor(
           new ImpalaServiceProcessor(handler));
       boost::shared_ptr<TProcessorEventHandler> event_handler(
@@ -2129,7 +2155,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
       beeswax_server_->SetConnectionHandler(this);
     }
 
-    if (hs2_port > 0) {
+    if (hs2_port > 0 || (TestInfo::is_test() && hs2_port == 0)) {
       boost::shared_ptr<TProcessor> hs2_fe_processor(
           new ImpalaHiveServer2ServiceProcessor(handler));
       boost::shared_ptr<TProcessorEventHandler> event_handler(
@@ -2157,7 +2183,7 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
     }
   }
   LOG(INFO) << "Initialized coordinator/executor Impala server on "
-      << TNetworkAddressToString(ExecEnv::GetInstance()->backend_address());
+      << TNetworkAddressToString(GetThriftBackendAddress());
 
   // Start the RPC services.
   RETURN_IF_ERROR(exec_env_->StartKrpcService());

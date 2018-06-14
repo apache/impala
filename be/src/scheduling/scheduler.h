@@ -89,6 +89,12 @@ class Scheduler {
   Status Init(const TNetworkAddress& backend_address,
       const TNetworkAddress& krpc_address, const IpAddr& ip);
 
+  /// Test helper that updates the local backend address to reflect whatever
+  /// ephemeral port was assigned during server startup. Should only be called
+  /// from backend tests. Not safe to call concurrently while queries are being
+  /// scheduled.
+  void UpdateLocalBackendAddrForBeTest();
+
   /// Populates given query schedule and assigns fragments to hosts based on scan
   /// ranges in the query exec request.
   Status Schedule(QuerySchedule* schedule);

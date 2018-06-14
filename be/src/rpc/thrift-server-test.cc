@@ -84,7 +84,7 @@ boost::shared_ptr<TProcessor> MakeProcessor() {
 }
 
 int GetServerPort() {
-  int port = FindUnusedEphemeralPort(nullptr);
+  int port = FindUnusedEphemeralPort();
   EXPECT_FALSE(port == -1);
   return port;
 }
@@ -559,7 +559,7 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
 
-  int port = impala::FindUnusedEphemeralPort(nullptr);
+  int port = impala::FindUnusedEphemeralPort();
   std::unique_ptr<impala::MiniKdcWrapper> kdc;
   Status status = impala::MiniKdcWrapper::SetupAndStartMiniKDC(
       kdc_principal, kdc_realm, "24h", "7d", port, &kdc);

@@ -363,7 +363,7 @@ class ImpalaSslSocketFactory : public TSSLSocketFactory {
   const string password_;
 };
 }
-Status ThriftServer::CreateSocket(boost::shared_ptr<TServerTransport>* socket) {
+Status ThriftServer::CreateSocket(boost::shared_ptr<TServerSocket>* socket) {
   if (ssl_enabled()) {
     if (!SSLProtoVersions::IsSupported(version_)) {
       return Status(TErrorCode::SSL_SOCKET_CREATION_FAILED,
@@ -433,7 +433,7 @@ Status ThriftServer::Start() {
 
   // Note - if you change the transport types here, you must check that the
   // logic in createContext is still accurate.
-  boost::shared_ptr<TServerTransport> server_socket;
+  boost::shared_ptr<TServerSocket> server_socket;
   boost::shared_ptr<TTransportFactory> transport_factory;
   RETURN_IF_ERROR(CreateSocket(&server_socket));
   RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(&transport_factory));
@@ -449,6 +449,8 @@ Status ThriftServer::Start() {
 
   RETURN_IF_ERROR(event_processor->StartAndWaitForServer());
 
+  // If port_ was 0, figure out which port the server is listening on after starting.
+  port_ = server_socket->getPort();
   LOG(INFO) << "ThriftServer '" << name_ << "' started on port: " << port_
             << (ssl_enabled() ? "s" : "");
   DCHECK(started_);

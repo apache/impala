@@ -108,7 +108,7 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
 StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
     const TNetworkAddress& heartbeat_address, const TNetworkAddress& statestore_address,
     MetricGroup* metrics)
-    : subscriber_id_(subscriber_id), heartbeat_address_(heartbeat_address),
+    : subscriber_id_(subscriber_id),
       statestore_address_(statestore_address),
       thrift_iface_(new StatestoreSubscriberThriftIf(this)),
       failure_detector_(new TimeoutFailureDetector(
@@ -118,6 +118,7 @@ StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
                 FLAGS_statestore_subscriber_cnxn_retry_interval_ms, 0, 0, "",
                 !FLAGS_ssl_client_ca_certificate.empty())),
       metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")),
+      heartbeat_address_(heartbeat_address),
       is_registered_(false) {
   connected_to_statestore_metric_ =
       metrics_->AddProperty("statestore-subscriber.connected", false);
@@ -219,6 +220,7 @@ Status StatestoreSubscriber::Start() {
     RETURN_IF_ERROR(builder.Build(&server));
     heartbeat_server_.reset(server);
     RETURN_IF_ERROR(heartbeat_server_->Start());
+    heartbeat_address_.port = heartbeat_server_->port();
 
     LOG(INFO) << "Registering with statestore";
     status = Register();
