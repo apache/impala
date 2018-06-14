@@ -1657,6 +1657,8 @@ public class AuthorizationTest extends FrontendTestBase {
   public void TestAlterView() throws ImpalaException {
     AuthzOk("ALTER VIEW functional_seq_snap.alltypes_view rename to " +
         "functional_seq_snap.v1");
+    AuthzOk("ALTER VIEW functional.alltypes_view (a, b, c) as " +
+        "select int_col, string_col, timestamp_col from functional.alltypesagg");
 
     // ALTER privilege on view only. RENAME also requires CREATE privileges on the DB.
     AuthzOk("ALTER VIEW functional.alltypes_view rename to functional_seq_snap.view_view_1");
@@ -1683,6 +1685,10 @@ public class AuthorizationTest extends FrontendTestBase {
         "functional_seq_snap.new_view",
         "User '%s' does not have privileges to execute 'ALTER' on: " +
         "functional.alltypes");
+    AuthzError("ALTER VIEW functional.alltypes (a, b, c) as " +
+        "select int_col, string_col, timestamp_col from functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'ALTER' on: " +
+        "functional.alltypes");
 
     // Rename view that does not exist (no permissions).
     AuthzError("ALTER VIEW functional.notbl rename to functional_seq_snap.newtbl",
@@ -1695,13 +1701,22 @@ public class AuthorizationTest extends FrontendTestBase {
     // Alter view that does not exist (no permissions).
     AuthzError("ALTER VIEW functional.notbl rename to functional_seq_snap.new_view",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.notbl");
+    AuthzError("ALTER VIEW functional.notbl (a, b, c) as " +
+        "select int_col, string_col, timestamp_col from functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.notbl");
 
     // Alter view in db that does not exist (no permissions).
     AuthzError("ALTER VIEW nodb.alltypes rename to functional_seq_snap.new_view",
         "User '%s' does not have privileges to execute 'ALTER' on: nodb.alltypes");
+    AuthzError("ALTER VIEW nodb.alltypes (a, b, c) as " +
+        "select int_col, string_col, timestamp_col from functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'ALTER' on: nodb.alltypes");
 
     // Unqualified view name.
     AuthzError("ALTER VIEW alltypes rename to functional_seq_snap.new_view",
+        "User '%s' does not have privileges to execute 'ALTER' on: default.alltypes");
+    AuthzError("ALTER VIEW alltypes (a, b, c) as " +
+        "select int_col, string_col, timestamp_col from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'ALTER' on: default.alltypes");
 
     // No permissions on target view.
@@ -1709,10 +1724,18 @@ public class AuthorizationTest extends FrontendTestBase {
         "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'ALTER' on: " +
         "functional.alltypes_view");
+    AuthzError("alter view functional.alltypes_view_sub (a, b, c) as " +
+        "select int_col, string_col, timestamp_col from functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'ALTER' on: " +
+        "functional.alltypes_view");
 
     // No permissions on source view.
     AuthzError("alter view functional_seq_snap.alltypes_view " +
         "as select * from functional.alltypes_view",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypes_view");
+    AuthzError("alter view functional_seq_snap.alltypes_view (a, b, c) " +
+        "as select int_col, string_col, timestamp_col from functional.alltypes_view",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypes_view");
   }

@@ -230,6 +230,60 @@ show tables in $DATABASE
 'view_on_view'
 ====
 ---- QUERY
+# Alter a view with predicates, joins, aggregates and order by
+alter view $DATABASE.complex_view (aaa comment 'abc', bbb comment 'xyz') as
+select count(a.bigint_col), b.string_col from
+functional.alltypesagg a inner join functional.alltypestiny b
+on a.id = b.id where a.bigint_col < 50
+group by b.string_col having count(a.bigint_col) > 1
+order by b.string_col limit 100
+---- RESULTS
+'View has been altered.'
+====
+---- QUERY
+# Test verifying the description of the altered view
+describe $DATABASE.complex_view
+---- RESULTS
+'aaa','bigint','abc'
+'bbb','string','xyz'
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Test querying the altered view
+select * from $DATABASE.complex_view;
+---- RESULTS
+2,'0'
+2,'1'
+---- TYPES
+bigint,string
+====
+---- QUERY
+# Alter a view on a view
+alter view $DATABASE.view_on_view (foo, bar) as
+select * from $DATABASE.complex_view
+---- RESULTS
+'View has been altered.'
+====
+---- QUERY
+# Test describing the description of the altered view
+describe $DATABASE.view_on_view
+---- RESULTS
+'foo','bigint',''
+'bar','string',''
+---- TYPES
+string,string,string
+====
+---- QUERY
+# Test querying the altered view
+select foo, bar from $DATABASE.view_on_view;
+---- RESULTS
+2,'0'
+2,'1'
+---- TYPES
+bigint,string
+====
+---- QUERY
 # Test altering a with a new definition
 alter view $DATABASE.new_parquet_view as
 select bigint_col, string_col from functional_parquet.alltypesagg

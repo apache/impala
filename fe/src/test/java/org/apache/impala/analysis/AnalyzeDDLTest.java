@@ -1087,10 +1087,29 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // View-definition references a view.
     AnalyzesOk("alter view functional.alltypes_view as " +
         "select * from functional.alltypes_view");
+    // Change column definitions.
+    AnalyzesOk("alter view functional.alltypes_view (a, b) as " +
+        "select int_col, string_col from functional.alltypes");
+    // Change column definitions after renaming columns in select.
+    AnalyzesOk("alter view functional.alltypes_view (a, b) as " +
+        "select int_col x, string_col y from functional.alltypes");
 
     // View-definition resulting in Hive-style auto-generated column names.
     AnalyzesOk("alter view functional.alltypes_view as " +
         "select trim('abc'), 17 * 7");
+
+    // Altering a view on a view is ok (alltypes_view is a view on alltypes).
+    AnalyzesOk("alter view functional.alltypes_view (aaa, bbb) as " +
+        "select * from functional.complex_view");
+
+    // Altering a view with same column as existing one.
+    AnalyzesOk("alter view functional.complex_view (abc, xyz) as " +
+        "select year, month from functional.alltypes_view");
+
+    // Alter view with joins and aggregates.
+    AnalyzesOk("alter view functional.alltypes_view (cnt) as " +
+        "select count(distinct x.int_col) from functional.alltypessmall x " +
+        "inner join functional.alltypessmall y on (x.id = y.id) group by x.bigint_col");
 
     // Cannot ALTER VIEW a table.
     AnalysisError("alter view functional.alltypes as " +
@@ -1127,6 +1146,24 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter view functional.alltypes_view as " +
         "select * from functional.alltypestiny where id in " +
         "(select id from functional.alltypessmall where int_col = 1)");
+    // Mismatching number of columns in column definition and view-alteration statement.
+    AnalysisError("alter view functional.alltypes_view (a) as " +
+        "select int_col, string_col from functional.alltypes",
+        "Column-definition list has fewer columns (1) than the " +
+        "view-definition query statement returns (2).");
+    AnalysisError("alter view functional.alltypes_view (a, b, c) as " +
+        "select int_col from functional.alltypes",
+        "Column-definition list has more columns (3) than the " +
+        "view-definition query statement returns (1).");
+    // Duplicate columns in the view-alteration statement.
+    AnalysisError("alter view functional.alltypes_view as " +
+        "select * from functional.alltypessmall a " +
+        "inner join functional.alltypessmall b on a.id = b.id",
+        "Duplicate column name: id");
+    // Duplicate columns in the column definition.
+    AnalysisError("alter view functional.alltypes_view (a, b, a) as " +
+        "select int_col, int_col, int_col from functional.alltypes",
+        "Duplicate column name: a");
   }
 
   @Test
