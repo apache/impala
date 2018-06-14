@@ -17,7 +17,7 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
@@ -33,9 +33,8 @@ import com.google.common.base.Preconditions;
  * Represents a CREATE VIEW statement.
  */
 public class CreateViewStmt extends CreateOrAlterViewStmtBase {
-
   public CreateViewStmt(boolean ifNotExists, TableName tableName,
-      ArrayList<ColumnDef> columnDefs, String comment, QueryStmt viewDefStmt) {
+      List<ColumnDef> columnDefs, String comment, QueryStmt viewDefStmt) {
     super(ifNotExists, tableName, columnDefs, comment, viewDefStmt);
   }
 

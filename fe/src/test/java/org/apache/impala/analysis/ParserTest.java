@@ -2906,12 +2906,19 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("ALTER VIEW Bar AS SELECT a, b, c FROM t");
     ParsesOk("ALTER VIEW Bar AS VALUES(1, 2, 3)");
     ParsesOk("ALTER VIEW Bar AS SELECT 1, 2, 3 UNION ALL select 4, 5, 6");
+    ParsesOk("ALTER VIEW Bar (x, y, z) AS SELECT a, b, c from t");
+    ParsesOk("ALTER VIEW Bar (x, y COMMENT 'foo', z) AS SELECT a, b, c from t");
 
     ParsesOk("ALTER VIEW Foo.Bar AS SELECT 1, 2, 3");
     ParsesOk("ALTER VIEW Foo.Bar AS SELECT a, b, c FROM t");
     ParsesOk("ALTER VIEW Foo.Bar AS VALUES(1, 2, 3)");
     ParsesOk("ALTER VIEW Foo.Bar AS SELECT 1, 2, 3 UNION ALL select 4, 5, 6");
     ParsesOk("ALTER VIEW Foo.Bar AS WITH t AS (SELECT 1, 2, 3) SELECT * FROM t");
+    ParsesOk("ALTER VIEW Foo.Bar (x, y, z) AS SELECT a, b, c from t");
+    ParsesOk("ALTER VIEW Foo.Bar (x, y, z COMMENT 'foo') AS SELECT a, b, c from t");
+
+    // Mismatched number of columns in column definition and view definition parses ok.
+    ParsesOk("ALTER VIEW Bar (x, y) AS SELECT 1, 2, 3");
 
     // Must be ALTER VIEW not ALTER TABLE.
     ParserError("ALTER TABLE Foo.Bar AS SELECT 1, 2, 3");
@@ -2921,6 +2928,14 @@ public class ParserTest extends FrontendTestBase {
     ParserError("ALTER VIEW Foo.Bar SELECT 1, 2, 3");
     // Missing view definition.
     ParserError("ALTER VIEW Foo.Bar AS");
+    // Empty column definition not allowed.
+    ParserError("ALTER VIEW Foo.Bar () AS SELECT c FROM t");
+    // Column definitions cannot include types.
+    ParserError("ALTER VIEW Foo.Bar (x int) AS SELECT c FROM t");
+    ParserError("ALTER VIEW Foo.Bar (x int COMMENT 'x') AS SELECT c FROM t");
+    // A type does not parse as an identifier.
+    ParserError("ALTER VIEW Foo.Bar (int COMMENT 'x') AS SELECT c FROM t");
+
     // Invalid view definitions. A view definition must be a query statement.
     ParserError("ALTER VIEW Foo.Bar AS INSERT INTO t select * from t");
     ParserError("ALTER VIEW Foo.Bar AS UPSERT INTO t select * from t");

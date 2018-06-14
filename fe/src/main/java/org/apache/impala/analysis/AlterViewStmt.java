@@ -17,22 +17,27 @@
 
 package org.apache.impala.analysis;
 
+import java.util.List;
+
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.thrift.TAccessEvent;
+import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.service.BackendConfig;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
 /**
  * Represents an ALTER VIEW AS statement.
  */
 public class AlterViewStmt extends CreateOrAlterViewStmtBase {
-
-  public AlterViewStmt(TableName tableName, QueryStmt viewDefStmt) {
-    super(false, tableName, null, null, viewDefStmt);
+  public AlterViewStmt(
+      TableName tableName, List<ColumnDef> columnDefs, QueryStmt viewDefStmt) {
+    super(false, tableName, columnDefs, null, viewDefStmt);
   }
 
   @Override
@@ -51,6 +56,8 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
       throw new AnalysisException(String.format(
           "ALTER VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
     }
+    analyzer.addAccessEvent(new TAccessEvent(dbName_ + "." + tableName_.getTbl(),
+        TCatalogObjectType.VIEW, Privilege.ALTER.toString()));
 
     createColumnAndViewDefs(analyzer);
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
@@ -66,6 +73,7 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
       sb.append(tableName_.getDb() + ".");
     }
     sb.append(tableName_.getTbl());
+    if (columnDefs_ != null) sb.append("(" + Joiner.on(", ").join(columnDefs_) + ")");
     sb.append(" AS " + viewDefStmt_.toSql());
     return sb.toString();
   }

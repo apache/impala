@@ -1869,8 +1869,9 @@ view_column_def ::=
   ;
 
 alter_view_stmt ::=
-  KW_ALTER KW_VIEW table_name:table KW_AS query_stmt:view_def
-  {: RESULT = new AlterViewStmt(table, view_def); :}
+  KW_ALTER KW_VIEW table_name:table view_column_defs:col_defs KW_AS
+  query_stmt:view_def
+  {: RESULT = new AlterViewStmt(table, col_defs, view_def); :}
   | KW_ALTER KW_VIEW table_name:before_table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableOrViewRenameStmt(before_table, new_table, false); :}
   ;
