@@ -563,7 +563,8 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule,
       if (outcome != AdmissionOutcome::REJECTED_OR_TIMED_OUT) {
         DCHECK_ENUM_EQ(outcome, AdmissionOutcome::CANCELLED);
         VLOG_QUERY << "Ready to be " << PROFILE_INFO_VAL_REJECTED
-                   << " but already cancelled, query id=" << schedule->query_id();
+                   << " but already cancelled, query id="
+                   << PrintId(schedule->query_id());
         return Status::CANCELLED;
       }
       schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
@@ -582,7 +583,8 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule,
       if (outcome != AdmissionOutcome::ADMITTED) {
         DCHECK_ENUM_EQ(outcome, AdmissionOutcome::CANCELLED);
         VLOG_QUERY << "Ready to be " << PROFILE_INFO_VAL_ADMIT_IMMEDIATELY
-                   << " but already cancelled, query id=" << schedule->query_id();
+                   << " but already cancelled, query id="
+                   << PrintId(schedule->query_id());
         return Status::CANCELLED;
       }
       VLOG_QUERY << "Admitted query id=" << PrintId(schedule->query_id());
@@ -654,7 +656,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule,
       schedule->summary_profile()->AddInfoString(
           PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_CANCELLED_IN_QUEUE);
       VLOG_QUERY << PROFILE_INFO_VAL_CANCELLED_IN_QUEUE
-                 << ", query id=" << schedule->query_id();
+                 << ", query id=" << PrintId(schedule->query_id());
       return Status::CANCELLED;
     }
     // The dequeue thread updates the stats (to avoid a race condition) so we do
@@ -951,7 +953,7 @@ void AdmissionController::DequeueLoop() {
         AdmissionOutcome outcome =
             queue_node->admit_outcome->Set(AdmissionOutcome::ADMITTED);
         if (outcome == AdmissionOutcome::CANCELLED) {
-          VLOG_QUERY << "Dequeued cancelled query=" << schedule.query_id();
+          VLOG_QUERY << "Dequeued cancelled query=" << PrintId(schedule.query_id());
           continue;
         }
         DCHECK_ENUM_EQ(outcome, AdmissionOutcome::ADMITTED);

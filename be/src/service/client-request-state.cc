@@ -521,7 +521,7 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
       coord_exec_called_.Store(true);
     } else {
       VLOG_QUERY << "Cancelled right after starting the coordinator query id="
-                 << schedule_->query_id();
+                 << PrintId(schedule_->query_id());
       discard_result(UpdateQueryStatus(Status::CANCELLED));
     }
   }
