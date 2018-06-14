@@ -41,8 +41,8 @@ under the License.
       as a <q>small</q> query, turning off optimizations such as parallel execution and native code generation. The
       overhead for these optimizations is applicable for queries involving substantial amounts of data, but it
       makes sense to skip them for queries involving tiny amounts of data. Reducing the overhead for small queries
-      allows Impala to complete them more quickly, keeping YARN resources, admission control slots, and so on
-      available for data-intensive queries.
+      allows Impala to complete them more quickly, keeping admission control slots, CPU, memory, and so on
+      available for resource-intensive queries.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
@@ -69,9 +69,10 @@ under the License.
     <p conref="../shared/impala_common.xml#common/internals_blurb"/>
 
     <p>
-      This setting applies to query fragments where the amount of data to scan can be accurately determined, either
-      through table and column statistics, or by the presence of a <codeph>LIMIT</codeph> clause. If Impala cannot
-      accurately estimate the size of the input data, this setting does not apply.
+      This setting applies to queries where the number of rows processed can be accurately
+      determined, either through table and column statistics, or by the presence of a
+      <codeph>LIMIT</codeph> clause. If Impala cannot accurately estimate the number of rows,
+      then this setting does not apply.
     </p>
 
     <p rev="2.3.0">
