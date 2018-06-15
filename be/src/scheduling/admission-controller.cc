@@ -107,8 +107,9 @@ const string PROFILE_INFO_VAL_CANCELLED_IN_QUEUE= "Cancelled (queued)";
 const string PROFILE_INFO_VAL_ADMIT_QUEUED = "Admitted (queued)";
 const string PROFILE_INFO_VAL_REJECTED = "Rejected";
 const string PROFILE_INFO_VAL_TIME_OUT = "Timed out (queued)";
-const string PROFILE_INFO_KEY_QUEUE_DETAIL = "Admission queue details";
-const string PROFILE_INFO_VAL_QUEUE_DETAIL = "waited $0 ms, reason: $1";
+const string PROFILE_INFO_KEY_INITIAL_QUEUE_REASON = "Initial admission queue reason";
+const string PROFILE_INFO_VAL_INITIAL_QUEUE_REASON = "waited $0 ms, reason: $1";
+const string PROFILE_INFO_KEY_LAST_QUEUED_REASON = "Latest admission queue reason";
 
 // Error status string details
 const string REASON_MEM_LIMIT_TOO_LOW_FOR_RESERVATION =
@@ -147,7 +148,7 @@ const string REASON_THREAD_RESERVATION_AGG_LIMIT_EXCEEDED =
 
 // Queue decision details
 // $0 = num running queries, $1 = num queries limit
-const string QUEUED_NUM_RUNNING = "number of running queries $0 is over limit $1";
+const string QUEUED_NUM_RUNNING = "number of running queries $0 is at or over limit $1";
 // $0 = queue size
 const string QUEUED_QUEUE_NOT_EMPTY = "queue is not empty (size $0); queued queries are "
     "executed first";
@@ -536,7 +537,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule,
   const int64_t max_mem = pool_cfg.max_mem_resources;
 
   // Note the queue_node will not exist in the queue when this method returns.
-  QueueNode queue_node(*schedule, admit_outcome);
+  QueueNode queue_node(*schedule, admit_outcome, schedule->summary_profile());
   string not_admitted_reason;
 
   schedule->query_events()->MarkEvent(QUERY_EVENT_SUBMIT_FOR_ADMISSION);
@@ -603,10 +604,12 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule,
 
   // Update the profile info before waiting. These properties will be updated with
   // their final state after being dequeued.
-  schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_ADMISSION_RESULT,
-      PROFILE_INFO_VAL_QUEUED);
-  schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_QUEUE_DETAIL,
-      not_admitted_reason);
+  schedule->summary_profile()->AddInfoString(
+      PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_QUEUED);
+  schedule->summary_profile()->AddInfoString(
+      PROFILE_INFO_KEY_INITIAL_QUEUE_REASON, not_admitted_reason);
+  schedule->summary_profile()->AddInfoString(
+      PROFILE_INFO_KEY_LAST_QUEUED_REASON, not_admitted_reason);
   schedule->query_events()->MarkEvent(QUERY_EVENT_QUEUED);
 
   int64_t queue_wait_timeout_ms = FLAGS_queue_wait_timeout_ms;
@@ -621,8 +624,9 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule,
   bool timed_out;
   admit_outcome->Get(queue_wait_timeout_ms, &timed_out);
   int64_t wait_time_ms = MonotonicMillis() - wait_start_ms;
-  schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_QUEUE_DETAIL,
-      Substitute(PROFILE_INFO_VAL_QUEUE_DETAIL, wait_time_ms, not_admitted_reason));
+  schedule->summary_profile()->AddInfoString(PROFILE_INFO_KEY_INITIAL_QUEUE_REASON,
+      Substitute(
+          PROFILE_INFO_VAL_INITIAL_QUEUE_REASON, wait_time_ms, not_admitted_reason));
 
   SleepIfSetInDebugOptions(schedule->query_options(), SLEEP_AFTER_ADMISSION_OUTCOME_MS);
 
@@ -888,6 +892,7 @@ void AdmissionController::DequeueLoop() {
       PoolStatsMap::iterator it = pool_stats_.find(pool_name);
       DCHECK(it != pool_stats_.end());
       PoolStats* stats = &it->second;
+      RequestQueue& queue = request_queue_map_[pool_name];
 
       if (stats->local_stats().num_queued == 0) continue; // Nothing to dequeue
 
@@ -906,7 +911,13 @@ void AdmissionController::DequeueLoop() {
       int64_t max_to_dequeue = 0;
       if (max_requests > 0) {
         const int64_t total_available = max_requests - stats->agg_num_running();
-        if (total_available <= 0) continue;
+        if (total_available <= 0) {
+          if (!queue.empty()) {
+            LogDequeueFailed(queue.head(),
+                Substitute(QUEUED_NUM_RUNNING, stats->agg_num_running(), max_requests));
+          }
+          continue;
+        }
         // Use the ratio of locally queued requests to agg queued so that each impalad
         // can dequeue a proportional amount total_available. Note, this offers no
         // fairness between impalads.
@@ -920,8 +931,6 @@ void AdmissionController::DequeueLoop() {
       } else {
         max_to_dequeue = stats->agg_num_queued(); // No limit on num running requests
       }
-
-      RequestQueue& queue = request_queue_map_[pool_name];
       VLOG_RPC << "Dequeue thread will try to admit " << max_to_dequeue << " requests"
                << ", pool=" << pool_name << ", num_queued="
                << stats->local_stats().num_queued;
@@ -937,8 +946,7 @@ void AdmissionController::DequeueLoop() {
         // better policy once we have better test scenarios.
         if (!is_cancelled
             && !CanAdmitRequest(schedule, pool_config, true, &not_admitted_reason)) {
-          VLOG_QUERY << "Could not dequeue query id=" << PrintId(schedule.query_id())
-                     << " reason: " << not_admitted_reason;
+          LogDequeueFailed(queue_node, not_admitted_reason);
           break;
         }
         VLOG_RPC << "Dequeuing query=" << PrintId(schedule.query_id());
@@ -959,6 +967,15 @@ void AdmissionController::DequeueLoop() {
       pools_for_updates_.insert(pool_name);
     }
   }
+}
+
+void AdmissionController::LogDequeueFailed(QueueNode* node,
+    const string& not_admitted_reason) {
+  VLOG_QUERY << "Could not dequeue query id="
+             << PrintId(node->schedule.query_id())
+             << " reason: " << not_admitted_reason;
+  node->profile->AddInfoString(PROFILE_INFO_KEY_LAST_QUEUED_REASON,
+      not_admitted_reason);
 }
 
 AdmissionController::PoolStats*

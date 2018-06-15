@@ -144,6 +144,11 @@ QUERY_END_BEHAVIORS = ['EOS', 'CLIENT_CANCEL', 'QUERY_TIMEOUT', 'CLIENT_CLOSE']
 # The timeout used for the QUERY_TIMEOUT end behaviour
 QUERY_END_TIMEOUT_S = 1
 
+# Regex that matches the first part of the profile info string added when a query is
+# queued.
+INITIAL_QUEUE_REASON_REGEX = \
+    "Initial admission queue reason: waited [0-9]* ms, reason: .*"
+
 def impalad_admission_ctrl_flags(max_requests, max_queued, pool_max_mem,
     proc_mem_limit = None, queue_wait_timeout_ms=None):
   extra_flags = ""
@@ -246,6 +251,35 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
     HS2TestSuite.check_response(get_profile_resp)
     self.__check_query_options(get_profile_resp.profile, expected_options)
+
+  def _execute_and_collect_profiles(self, queries, timeout_s, config_options={}):
+    """Submit the query statements in 'queries' in parallel to the first impalad in
+    the cluster. After submission, the results are fetched from the queries in
+    sequence and their profiles are collected. Wait for up to timeout_s for
+    each query to finish. Returns the profile strings."""
+    client = self.cluster.impalads[0].service.create_beeswax_client()
+    try:
+      handles = []
+      profiles = []
+      client.set_configuration(config_options)
+      for query in queries:
+        handles.append(client.execute_async(query))
+      for query, handle in zip(queries, handles):
+        self._wait_for_state(client, handle, client.QUERY_STATES['FINISHED'], timeout_s)
+        results = self.client.fetch(query, handle)
+        profiles.append(self.client.get_runtime_profile(handle))
+      return profiles
+    finally:
+      client.close()
+
+  def _wait_for_state(self, client, handle, expected_state, timeout):
+    """Try to fetch 'expected_state' from 'client' within 'timeout' seconds.
+    Fail if unable."""
+    start_time = time()
+    actual_state = client.get_state(handle)
+    while (actual_state != expected_state and time() - start_time < timeout):
+      actual_state = client.get_state(handle)
+    assert expected_state == actual_state
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -556,6 +590,77 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         "admission-controller.total-queued.default-pool") == 2
     finally:
       client.close()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=10,
+          pool_max_mem=1024 * 1024 * 1024),
+      statestored_args=_STATESTORED_ARGS)
+  def test_queue_reasons_num_queries(self):
+    """Test that queue details appear in the profile when queued based on num_queries."""
+    # Run a bunch of queries - one should get admitted immediately, the rest should
+    # be dequeued one-by-one.
+    STMT = "select sleep(100)"
+    TIMEOUT_S = 60
+    EXPECTED_REASON = \
+        "Latest admission queue reason: number of running queries 1 is at or over limit 1"
+    NUM_QUERIES = 5
+    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+        TIMEOUT_S)
+
+    num_reasons = len([profile for profile in profiles if EXPECTED_REASON in profile])
+    assert num_reasons == NUM_QUERIES - 1, \
+        "All queries except first should have been queued: " + '\n===\n'.join(profiles)
+    init_queue_reasons = self.__extract_init_queue_reasons(profiles)
+    assert len(init_queue_reasons) == NUM_QUERIES - 1, \
+        "All queries except first should have been queued: " + '\n===\n'.join(profiles)
+    over_limit_details = [detail
+        for detail in init_queue_reasons if 'number of running queries' in detail]
+    assert len(over_limit_details) == 1, \
+        "One query initially queued because of num_queries: " + '\n===\n'.join(profiles)
+    queue_not_empty_details = [detail
+        for detail in init_queue_reasons if 'queue is not empty' in detail]
+    assert len(queue_not_empty_details) == NUM_QUERIES - 2, \
+        "Others queued because of non-empty queue: " + '\n===\n'.join(profiles)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=10, max_queued=10,
+          pool_max_mem=10 * 1024 * 1024),
+      statestored_args=_STATESTORED_ARGS)
+  def test_queue_reasons_memory(self):
+    """Test that queue details appear in the profile when queued based on memory."""
+    # Run a bunch of queries with mem_limit set so that only one can be admitted at a
+    # time- one should get admitted immediately, the rest should be dequeued one-by-one.
+    STMT = "select sleep(100)"
+    TIMEOUT_S = 60
+    EXPECTED_REASON = "Latest admission queue reason: Not enough aggregate memory " +\
+        "available in pool default-pool with max mem resources 10.00 MB. Needed " +\
+        "9.00 MB but only 1.00 MB was available."
+    NUM_QUERIES = 5
+    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+        TIMEOUT_S, {'mem_limit':'9mb'})
+
+    num_reasons = len([profile for profile in profiles if EXPECTED_REASON in profile])
+    assert num_reasons == NUM_QUERIES - 1, \
+        "All queries except first should have been queued: " + '\n===\n'.join(profiles)
+    init_queue_reasons = self.__extract_init_queue_reasons(profiles)
+    assert len(init_queue_reasons) == NUM_QUERIES - 1, \
+        "All queries except first should have been queued: " + '\n===\n'.join(profiles)
+    over_limit_details = [detail for detail in init_queue_reasons
+        if 'Not enough aggregate memory available' in detail]
+    assert len(over_limit_details) == 1, \
+        "One query initially queued because of memory: " + '\n===\n'.join(profiles)
+    queue_not_empty_details = [detail
+        for detail in init_queue_reasons if 'queue is not empty' in detail]
+    assert len(queue_not_empty_details) == NUM_QUERIES - 2, \
+        "Others queued because of non-empty queue: " + '\n===\n'.join(profiles)
+
+  def __extract_init_queue_reasons(self, profiles):
+    """Return a list of the 'Admission Queue details' strings found in 'profiles'"""
+    matches = [re.search(INITIAL_QUEUE_REASON_REGEX, profile) for profile in profiles]
+    return [match.group(0) for match in matches if match is not None]
+
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions
