@@ -391,14 +391,18 @@ class AdmissionController {
   /// ClientRequestState object associated with them.
   struct QueueNode : public InternalQueue<QueueNode>::Node {
     QueueNode(const QuerySchedule& query_schedule,
-        Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admission_outcome)
-      : schedule(query_schedule), admit_outcome(admission_outcome) {}
+        Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admission_outcome,
+        RuntimeProfile* profile)
+      : schedule(query_schedule), admit_outcome(admission_outcome), profile(profile) {}
 
     /// The query schedule of the queued request.
     const QuerySchedule& schedule;
 
     /// The Admission outcome of the queued request.
-    Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admit_outcome;
+    Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* const admit_outcome;
+
+    /// Profile to be updated with information about admission.
+    RuntimeProfile* const profile;
   };
 
   /// Queue for the queries waiting to be admitted for execution. Once the
@@ -477,6 +481,10 @@ class AdmissionController {
 
   /// Gets or creates the PoolStats for pool_name. Must hold admission_ctrl_lock_.
   PoolStats* GetPoolStats(const std::string& pool_name);
+
+  /// Log the reason for dequeueing of 'node' failing and add the reason to the query's
+  /// profile. Must hold admission_ctrl_lock_.
+  void LogDequeueFailed(QueueNode* node, const std::string& not_admitted_reason);
 };
 
 }
