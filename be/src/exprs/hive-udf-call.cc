@@ -198,7 +198,10 @@ Status HiveUdfCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
   JNIEnv* env = getJNIEnv();
   if (env == NULL) return Status("Failed to get/create JVM");
 
+  // Add a scoped cleanup jni reference object. This cleans up local refs made below.
+  JniLocalFrame jni_frame;
   {
+    // Scoped handle for libCache entry.
     LibCacheEntryHandle handle;
     string local_location;
     RETURN_IF_ERROR(LibCache::instance()->GetLocalPath(fn_.hdfs_location,
@@ -219,12 +222,13 @@ Status HiveUdfCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
 
     jbyteArray ctor_params_bytes;
 
-    // Add a scoped cleanup jni reference object. This cleans up local refs made below.
-    JniLocalFrame jni_frame;
+    // Pushed frame will be popped when jni_frame goes out-of-scope.
     RETURN_IF_ERROR(jni_frame.push(env));
 
     RETURN_IF_ERROR(SerializeThriftMsg(env, &ctor_params, &ctor_params_bytes));
-    // Create the java executor object
+    // Create the java executor object. The jar referenced by the libCache handle
+    // is not needed after the next call, so it is safe for the handle to go
+    // out-of-scope after the java object is instantiated.
     jni_ctx->executor = env->NewObject(executor_cl_, executor_ctor_id_, ctor_params_bytes);
   }
   RETURN_ERROR_IF_EXC(env);
