@@ -17,10 +17,16 @@
 
 package org.apache.impala.catalog.local;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -46,6 +52,7 @@ import com.google.common.collect.Maps;
  */
 class DirectMetaProvider implements MetaProvider {
   private static MetaStoreClientPool msClientPool_;
+  private static Configuration CONF = new Configuration();
 
   DirectMetaProvider() {
     initMsClientPool();
@@ -151,5 +158,17 @@ class DirectMetaProvider implements MetaProvider {
     }
 
     return ret;
+  }
+
+  @Override
+  public List<LocatedFileStatus> loadFileMetadata(Path dir) throws IOException {
+    Preconditions.checkNotNull(dir);
+    Preconditions.checkArgument(dir.isAbsolute(),
+        "Must pass absolute path: %s", dir);
+    FileSystem fs = dir.getFileSystem(CONF);
+    RemoteIterator<LocatedFileStatus> it = fs.listFiles(dir, /*recursive=*/false);
+    ImmutableList.Builder<LocatedFileStatus> b = new ImmutableList.Builder<>();
+    while (it.hasNext()) b.add(it.next());
+    return b.build();
   }
 }

@@ -90,11 +90,6 @@ public interface FeFsTable extends FeTable {
   long getTotalHdfsBytes();
 
   /**
-   * @return the total number of files stored on HDFS for this table
-   */
-  long getTotalNumFiles();
-
-  /**
    * @return true if this table is backed by the Avro file format
    */
   boolean isAvroTable();

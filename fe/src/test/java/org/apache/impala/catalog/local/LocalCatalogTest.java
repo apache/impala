@@ -19,6 +19,7 @@ package org.apache.impala.catalog.local;
 
 import static org.junit.Assert.*;
 
+import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.catalog.CatalogTest;
@@ -27,6 +28,7 @@ import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.util.MetaStoreUtil;
@@ -130,5 +132,21 @@ public class LocalCatalogTest {
     FeFsPartition partition = FeCatalogUtils.loadPartition(
         t, Iterables.getOnlyElement(ids));
     assertTrue(partition.getPartitionValue(dayCol).isNullLiteral());
+  }
+
+  @Test
+  public void testLoadFileDescriptors() throws Exception {
+    FeFsTable t = (FeFsTable) catalog_.getTable("functional",  "alltypes");
+    int totalFds = 0;
+    for (FeFsPartition p: FeCatalogUtils.loadAllPartitions(t)) {
+      List<FileDescriptor> fds = p.getFileDescriptors();
+      totalFds += fds.size();
+      for (FileDescriptor fd : fds) {
+        assertTrue(fd.getFileLength() > 0);
+        assertEquals(fd.getNumFileBlocks(), 1);
+        assertEquals(3, fd.getFbFileBlock(0).diskIdsLength());
+      }
+    }
+    assertEquals(24, totalFds);
   }
 }

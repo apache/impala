@@ -17,11 +17,17 @@
 
 package org.apache.impala.catalog.local;
 
-import java.util.Collections;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.catalog.FeCatalogUtils;
@@ -32,18 +38,22 @@ import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PartitionStatsUtil;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.TPartitionStats;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 
 public class LocalFsPartition implements FeFsPartition {
+  private static final Configuration CONF = new Configuration();
   private final LocalFsTable table_;
   private final LocalPartitionSpec spec_;
   private final Partition msPartition_;
+  private ImmutableList<FileDescriptor> fileDescriptors_;
 
   public LocalFsPartition(LocalFsTable table, LocalPartitionSpec spec,
       Partition msPartition) {
@@ -69,22 +79,20 @@ public class LocalFsPartition implements FeFsPartition {
 
   @Override
   public List<FileDescriptor> getFileDescriptors() {
-    // TODO(todd): implement me
-    return Collections.emptyList();
+    loadFileDescriptors();
+    return fileDescriptors_;
   }
 
   @Override
   public boolean hasFileDescriptors() {
-    // TODO(todd): implement file fetching. Return true for now
-    // so that partition pruning can be tested -- if we return false
-    // then all partitions would be pruned.
-    return true;
+    loadFileDescriptors();
+    return !fileDescriptors_.isEmpty();
   }
 
   @Override
   public int getNumFileDescriptors() {
-    // TODO Auto-generated method stub
-    return 0;
+    loadFileDescriptors();
+    return fileDescriptors_.size();
   }
 
   @Override
@@ -161,8 +169,12 @@ public class LocalFsPartition implements FeFsPartition {
 
   @Override
   public long getSize() {
-    // TODO Auto-generated method stub
-    return 0;
+    loadFileDescriptors();
+    long size = 0;
+    for (FileDescriptor fd : fileDescriptors_) {
+      size += fd.getFileLength();
+    }
+    return size;
   }
 
   @Override
@@ -202,5 +214,61 @@ public class LocalFsPartition implements FeFsPartition {
     // since they are quite large.
     return Maps.filterKeys(getParameters(),
         HdfsPartition.IS_NOT_INCREMENTAL_STATS_KEY);
+  }
+
+
+  private void loadFileDescriptors() {
+    if (fileDescriptors_ != null) return;
+    Path partDir = getLocationPath();
+    List<LocatedFileStatus> stats;
+    try {
+      stats = table_.db_.getCatalog().getMetaProvider().loadFileMetadata(partDir);
+    } catch (FileNotFoundException fnf) {
+      // If the partition directory isn't found, this is treated as having no
+      // files.
+      fileDescriptors_ = ImmutableList.of();
+      return;
+    } catch (IOException ioe) {
+      throw new LocalCatalogException(String.format(
+          "Could not load files for partition %s of table %s",
+          spec_.getName(), table_.getFullName()), ioe);
+    }
+
+    HdfsTable.FileMetadataLoadStats loadStats =
+        new HdfsTable.FileMetadataLoadStats(partDir);
+
+    try {
+      FileSystem fs = partDir.getFileSystem(CONF);
+      fileDescriptors_ = ImmutableList.copyOf(
+          HdfsTable.createFileDescriptors(fs, new FakeRemoteIterator<>(stats),
+              table_.getHostIndex(), loadStats));
+    } catch (IOException e) {
+        throw new LocalCatalogException(String.format(
+            "Could not convert files to descriptors for partition %s of table %s",
+            spec_.getName(), table_.getFullName()), e);
+    }
+  }
+
+  /**
+   * Wrapper for a normal Iterable<T> to appear like a Hadoop RemoteIterator<T>.
+   * This is necessary because the existing code to convert file statuses to
+   * descriptors consumes the remote iterator directly and thus avoids materializing
+   * all of the LocatedFileStatus objects in memory at the same time.
+   */
+  private static class FakeRemoteIterator<T> implements RemoteIterator<T> {
+    private final Iterator<T> it_;
+
+    FakeRemoteIterator(Iterable<T> it) {
+      this.it_ = it.iterator();
+    }
+    @Override
+    public boolean hasNext() throws IOException {
+      return it_.hasNext();
+    }
+
+    @Override
+    public T next() throws IOException {
+      return it_.next();
+    }
   }
 }

@@ -78,6 +78,12 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
    */
   private ArrayList<HashSet<Long>> nullPartitionIds_;
 
+  /**
+   * Map assigning integer indexes for the hosts containing blocks for this table.
+   * This is updated as a side effect of LocalFsPartition.loadFileDescriptors().
+   */
+  private final ListMap<TNetworkAddress> hostIndex_ = new ListMap<>();
+
   public LocalFsTable(LocalDb db, String tblName, SchemaInfo schemaInfo) {
     super(db, tblName, schemaInfo);
   }
@@ -113,7 +119,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   @Override
   public TResultSet getFiles(List<List<TPartitionKeyValue>> partitionSet)
       throws CatalogException {
-    // TODO(todd): implement fetching files from HDFS
+    // TODO(todd): implement for SHOW FILES.
     return null;
   }
 
@@ -125,14 +131,12 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
   @Override
   public long getTotalHdfsBytes() {
-    // TODO Auto-generated method stub
-    return 0;
-  }
-
-  @Override
-  public long getTotalNumFiles() {
-    // TODO Auto-generated method stub
-    return 0;
+    // TODO(todd): this is slow because it requires loading all partitions. Remove if possible.
+    long size = 0;
+    for (FeFsPartition p: loadPartitions(getPartitionIds())) {
+      size += p.getSize();
+    }
+    return size;
   }
 
   @Override
@@ -387,7 +391,6 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
   @Override
   public ListMap<TNetworkAddress> getHostIndex() {
-    // TODO(todd): implement me
-    return new ListMap<>();
+    return hostIndex_;
   }
 }
