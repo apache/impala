@@ -42,7 +42,7 @@ DEFINE_bool(disk_spill_encryption, true,
     "Set this to encrypt and perform an integrity "
     "check on all data spilled to disk during a query");
 DEFINE_string(scratch_dirs, "/tmp", "Writable scratch directories");
-DEFINE_bool(allow_multiple_scratch_dirs_per_device, false,
+DEFINE_bool(allow_multiple_scratch_dirs_per_device, true,
     "If false and --scratch_dirs contains multiple directories on the same device, "
     "then only the first writable directory is used");
 
