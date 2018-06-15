@@ -127,10 +127,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     /**
      * Creates the file descriptor of a file represented by 'fileStatus' that
      * resides in a filesystem that doesn't support the BlockLocation API (e.g. S3).
-     * 'fileFormat' is the file format of the partition where this file resides.
      */
-    public static FileDescriptor createWithNoBlocks(
-        FileStatus fileStatus, HdfsFileFormat fileFormat) {
+    public static FileDescriptor createWithNoBlocks(FileStatus fileStatus) {
       FlatBufferBuilder fbb = new FlatBufferBuilder(1);
       return new FileDescriptor(createFbFileDesc(fbb, fileStatus, null, false));
     }

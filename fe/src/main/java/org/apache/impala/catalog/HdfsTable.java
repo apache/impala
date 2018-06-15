@@ -285,7 +285,7 @@ public class HdfsTable extends Table implements FeFsTable {
       BackendConfig.INSTANCE.maxNonHdfsPartsParallelLoad();
 
   // File/Block metadata loading stats for a single HDFS path.
-  private class FileMetadataLoadStats {
+  public static class FileMetadataLoadStats {
     // Path corresponding to this metadata load request.
     private final Path hdfsPath;
 
@@ -410,10 +410,40 @@ public class HdfsTable extends Table implements FeFsTable {
     }
 
     FileSystem fs = partDir.getFileSystem(CONF);
-    boolean supportsBlocks = FileSystemUtil.supportsStorageIds(fs);
+
     RemoteIterator<LocatedFileStatus> fileStatusIter =
         FileSystemUtil.listFiles(fs, partDir, false);
     if (fileStatusIter == null) return loadStats;
+
+    List<FileDescriptor> newFileDescs = createFileDescriptors(
+        fs, fileStatusIter, hostIndex_, loadStats);
+    for (HdfsPartition partition: partitions) {
+      partition.setFileDescriptors(newFileDescs);
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Loaded file metadata for " + getFullName() + " " +
+          loadStats.debugString());
+    }
+    return loadStats;
+  }
+
+  /**
+   * Convert LocatedFileStatuses to FileDescriptors.
+   *
+   * If 'fs' is a FileSystem that supports block locations, the resulting
+   * descriptors include location information, and 'hostIndex' is updated
+   * to include all of the hosts referred to by the locations.
+   *
+   * 'loadStats' is updated to reflect this loading operation.
+   *
+   * May throw IOException if the provided RemoteIterator throws.
+   */
+  public static List<FileDescriptor> createFileDescriptors(
+      FileSystem fs,
+      RemoteIterator<LocatedFileStatus> fileStatusIter,
+      ListMap<TNetworkAddress> hostIndex,
+      FileMetadataLoadStats loadStats) throws IOException {
+    boolean supportsBlocks = FileSystemUtil.supportsStorageIds(fs);
     Reference<Long> numUnknownDiskIds = new Reference<Long>(Long.valueOf(0));
     List<FileDescriptor> newFileDescs = Lists.newArrayList();
     while (fileStatusIter.hasNext()) {
@@ -425,21 +455,15 @@ public class HdfsTable extends Table implements FeFsTable {
       FileDescriptor fd;
       if (supportsBlocks) {
         fd = FileDescriptor.create(fileStatus, fileStatus.getBlockLocations(), fs,
-            hostIndex_, HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds);
+            hostIndex, HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds);
       } else {
-        fd = FileDescriptor.createWithNoBlocks(
-            fileStatus, partitions.get(0).getFileFormat());
+        fd = FileDescriptor.createWithNoBlocks(fileStatus);
       }
       newFileDescs.add(fd);
       ++loadStats.loadedFiles;
     }
-    for (HdfsPartition partition: partitions) partition.setFileDescriptors(newFileDescs);
     loadStats.unknownDiskIds += numUnknownDiskIds.getRef();
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Loaded file metadata for " + getFullName() + " " +
-          loadStats.debugString());
-    }
-    return loadStats;
+    return newFileDescs;
   }
 
   /**
@@ -499,8 +523,7 @@ public class HdfsTable extends Table implements FeFsTable {
           fd = FileDescriptor.create(fileStatus, locations, fs, hostIndex_,
               HdfsShim.isErasureCoded(fileStatus), numUnknownDiskIds);
         } else {
-          fd = FileDescriptor.createWithNoBlocks(
-              fileStatus, partitions.get(0).getFileFormat());
+          fd = FileDescriptor.createWithNoBlocks(fileStatus);
         }
         ++loadStats.loadedFiles;
       } else {
@@ -1756,9 +1779,6 @@ public class HdfsTable extends Table implements FeFsTable {
   public long getTotalHdfsBytes() { return fileMetadataStats_.totalFileBytes; }
 
   @Override // FeFsTable
-  public long getTotalNumFiles() { return fileMetadataStats_.numFiles; }
-
-  @Override // FeFsTable
   public String getHdfsBaseDir() { return hdfsBaseDir_; }
   public Path getHdfsBaseDirPath() { return new Path(hdfsBaseDir_); }
   @Override // FeFsTable
@@ -1988,7 +2008,14 @@ public class HdfsTable extends Table implements FeFsTable {
     Collections.sort(orderedPartitions, HdfsPartition.KV_COMPARATOR);
 
     long totalCachedBytes = 0L;
+    long totalBytes = 0L;
+    long totalNumFiles = 0L;
     for (FeFsPartition p: orderedPartitions) {
+      int numFiles = p.getFileDescriptors().size();
+      long size = p.getSize();
+      totalNumFiles += numFiles;
+      totalBytes += size;
+
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
 
       // Add the partition-key values (as strings for simplicity).
@@ -2001,8 +2028,9 @@ public class HdfsTable extends Table implements FeFsTable {
       // Compute and report the extrapolated row count because the set of files could
       // have changed since we last computed stats for this partition. We also follow
       // this policy during scan-cardinality estimation.
-      if (statsExtrap) rowBuilder.add(table.getExtrapolatedNumRows(p.getSize()));
-      rowBuilder.add(p.getFileDescriptors().size()).addBytes(p.getSize());
+      if (statsExtrap) rowBuilder.add(table.getExtrapolatedNumRows(size));
+
+      rowBuilder.add(numFiles).addBytes(size);
       if (!p.isMarkedCached()) {
         // Helps to differentiate partitions that have 0B cached versus partitions
         // that are not marked as cached.
@@ -2056,8 +2084,8 @@ public class HdfsTable extends Table implements FeFsTable {
       if (statsExtrap) {
         rowBuilder.add(table.getExtrapolatedNumRows(table.getTotalHdfsBytes()));
       }
-      rowBuilder.add(table.getTotalNumFiles())
-          .addBytes(table.getTotalHdfsBytes())
+      rowBuilder.add(totalNumFiles)
+          .addBytes(totalBytes)
           .addBytes(totalCachedBytes).add("").add("").add("").add("");
       result.addToRows(rowBuilder.get());
     }

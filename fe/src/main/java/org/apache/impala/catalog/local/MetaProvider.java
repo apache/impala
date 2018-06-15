@@ -17,9 +17,12 @@
 
 package org.apache.impala.catalog.local;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -65,4 +68,10 @@ interface MetaProvider {
   Map<String, Partition> loadPartitionsByNames(String dbName, String tableName,
       List<String> partitionColumnNames, List<String> partitionNames)
       throws MetaException, TException;
+
+  /**
+   * Load file metadata and block locations for the files in the given
+   * partition directory.
+   */
+  List<LocatedFileStatus> loadFileMetadata(Path dir) throws IOException;
 }
