@@ -18,7 +18,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
-<concept rev="2.0.0" id="exec_single_node_rows_threshold">
+<concept rev="2.10.0" id="disable_codegen_rows_threshold">
 
   <title>DISABLE_CODEGEN_ROWS_THRESHOLD Query Option (<keyword keyref="impala210_full"/> or higher only)</title>
   <titlealts audience="PDF"><navtitle>DISABLE_CODEGEN_ROWS_THRESHOLD</navtitle></titlealts>
@@ -35,16 +35,14 @@ under the License.
 
   <conbody>
 
-    <p rev="2.0.0">
-      <indexterm audience="hidden">DISABLE_CODEGEN_ROWS_THRESHOLD query option</indexterm>
-      This setting controls the cutoff point (in terms of number of rows processed per Impala daemon) below which
-      Impala disables native code generation for the whole query.
-
-      Native code generation is very beneficial for queries that process many rows because
-      it reduces the time taken to process of each row. However, generating the native code
-      adds latency to query startup. Therefore, automatically disabling codegen for
-      queries that process relatively small amounts of data can improve query response time.
-    </p>
+    <p rev="2.0.0"> This setting controls the cutoff point (in terms of number
+      of rows processed per Impala daemon) below which Impala disables native
+      code generation for the whole query. Native code generation is very
+      beneficial for queries that process many rows because it reduces the time
+      taken to process of each row. However, generating the native code adds
+      latency to query startup. Therefore, automatically disabling codegen for
+      queries that process relatively small amounts of data can improve query
+      response time. </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
