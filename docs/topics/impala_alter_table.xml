@@ -462,26 +462,22 @@ ALTER TABLE <varname>table_name</varname> SET SERDEPROPERTIES ('<varname>key1</v
     </p>
 
     <p>
-      The <codeph>SERDEPROPERTIES</codeph> clause sets up metadata defining how tables are read or written, needed
-      in some cases by Hive but not used extensively by Impala. You would use this clause primarily to change the
-      delimiter in an existing text table or partition, by setting the <codeph>'serialization.format'</codeph> and
-      <codeph>'field.delim'</codeph> property values to the new delimiter character:
+      The <codeph>SERDEPROPERTIES</codeph> clause sets up metadata defining
+      how tables are read or written, needed in some cases by Hive but not used
+      extensively by Impala. You would use this clause primarily to change the
+      delimiter in an existing text table or partition, by setting the
+        <codeph>'serialization.format'</codeph> and
+        <codeph>'field.delim'</codeph> property values to the new delimiter
+      character: The <codeph>SERDEPROPERTIES</codeph> clause does not change the
+      existing data in the table. The change only affects the future insert into
+      the table.
     </p>
 
-<codeblock>-- This table begins life as pipe-separated text format.
-create table change_to_csv (s1 string, s2 string) row format delimited fields terminated by '|';
--- Then we change it to a CSV table.
-alter table change_to_csv set SERDEPROPERTIES ('serialization.format'=',', 'field.delim'=',');
-insert overwrite change_to_csv values ('stop','go'), ('yes','no');
-!hdfs dfs -cat 'hdfs://<varname>hostname</varname>:8020/<varname>data_directory</varname>/<varname>dbname</varname>.db/change_to_csv/<varname>data_file</varname>';
-stop,go
-yes,no</codeblock>
-
     <p>
-      Use the <codeph>DESCRIBE FORMATTED</codeph> statement to see the current values of these properties for an
-      existing table. See <xref href="impala_create_table.xml#create_table"/> for more details about these clauses.
-      See <xref href="impala_perf_stats.xml#perf_table_stats_manual"/> for an example of using table properties to
-      fine-tune the performance-related table statistics.
+      Use the <codeph>DESCRIBE FORMATTED</codeph> statement to see the current
+      values of these properties for an existing table. See <xref
+        href="impala_create_table.xml#create_table"/> for more details about
+      these clauses.
     </p>
 
     <p>
