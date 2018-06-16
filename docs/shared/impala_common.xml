@@ -3651,11 +3651,14 @@ sudo pip-python install ssl</codeblock>
       </p>
 
       <note type="warning" id="impala_kerberos_ssl_caveat">
-        Prior to <keyword keyref="impala232"/>, you could enable Kerberos authentication between Impala internal components,
-        or SSL encryption between Impala internal components, but not both at the same time.
-        This restriction has now been lifted.
-        See <xref keyref="IMPALA-2598">IMPALA-2598</xref>
-        to see the maintenance releases for different levels of Impala where the fix has been published.
+        In <keyword
+          keyref="impala231"> </keyword> and lower versions, you could enable
+        Kerberos authentication between Impala internal components, or SSL
+        encryption between Impala internal components, but not both at the same
+        time. This restriction has now been lifted. See <xref
+          keyref="IMPALA-2598">IMPALA-2598</xref> to see the maintenance
+        releases for different levels of Impala where the fix has been
+        published.
       </note>
 
       <p id="hive_jdbc_ssl_kerberos_caveat">
@@ -4076,6 +4079,25 @@ CREATE EXTERNAL TABLE impala_name STORED AS KUDU
             </p>
           </li>
         </ul>
+      </p>
+      <p id="kudu_hints">
+        Starting from <keyword keyref="impala29_full"/>, the
+          <codeph>INSERT</codeph> or <codeph>UPSERT</codeph> operations into
+        Kudu tables automatically add an exchange and a sort node to the plan
+        that partitions and sorts the rows according to the partitioning/primary
+        key scheme of the target table (unless the number of rows to be inserted
+        is small enough to trigger single node execution). Since Kudu partitions
+        and sorts rows on write, pre-partitioning and sorting takes some of the
+        load off of Kudu and helps large <codeph>INSERT</codeph> operations to
+        complete without timing out. However, this default behavior may slow
+        down the end-to-end performance of the <codeph>INSERT</codeph> or
+          <codeph>UPSERT</codeph> operations. Starting from<keyword
+          keyref="impala210_full"/>, you can use the<codeph> /* +NOCLUSTERED
+          */</codeph> and <codeph>/* +NOSHUFFLE */</codeph> hints together to
+        disable partitioning and sorting before the rows are sent to Kudu.
+        Additionally, since sorting may consume a large amount of memory,
+        consider setting the <codeph>MEM_LIMIT</codeph> query option for those
+        queries.
       </p>
 
     </section>

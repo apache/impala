@@ -1260,6 +1260,8 @@ kudu.table_name  | impala::some_database.table_name_demo
         </p>
       </note>
 
+      <p conref="../shared/impala_common.xml#common/kudu_hints"/>
+
     </conbody>
 
   </concept>
