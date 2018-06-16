@@ -355,16 +355,8 @@ UPSERT [{ /* +SHUFFLE */ | /* +NOSHUFFLE */ }]
         </ul>
       </li>
     </ul>
-
-    <p>
-      Starting from <keyword keyref="impala29_full"/>, <codeph>INSERT</codeph> or
-      <codeph>UPSERT</codeph> operations into Kudu tables automatically have an exchange and
-      sort node added to the plan that partitions and sorts the rows according to the
-      partitioning/primary key scheme of the target table (unless the number of rows to be
-      inserted is small enough to trigger single node execution). Use the<codeph> /*
-      +NOCLUSTERED */</codeph> and <codeph>/* +NOSHUFFLE */</codeph> hints together to disable
-      partitioning and sorting before the rows are sent to Kudu.
-    </p>
+    <p><b>Kudu consideration:</b></p>
+    <p conref="../shared/impala_common.xml#common/kudu_hints"/>
 
     <p rev="IMPALA-2924">
       <b>Hints for scheduling of HDFS blocks:</b>
