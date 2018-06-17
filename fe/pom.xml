@@ -35,6 +35,14 @@ under the License.
   <name>Apache Impala Query Engine Frontend</name>
 
   <dependencies>
+    <!-- Force json-smart dependency.
+         See https://issues.apache.org/jira/browse/HADOOP-14903 -->
+    <dependency>
+      <groupId>net.minidev</groupId>
+      <artifactId>json-smart</artifactId>
+      <version>2.3</version>
+    </dependency>
+
     <dependency>
       <groupId>org.apache.impala</groupId>
       <artifactId>impala-data-source-api</artifactId>
@@ -50,12 +58,26 @@ under the License.
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <version>${hadoop.version}</version>
+      <exclusions>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-auth</artifactId>
       <version>${hadoop.version}</version>
+      <exclusions>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -68,6 +90,13 @@ under the License.
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-azure-datalake</artifactId>
       <version>${hadoop.version}</version>
+      <exclusions>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -86,6 +115,13 @@ under the License.
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-core-model-db</artifactId>
       <version>${sentry.version}</version>
+      <exclusions>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -104,6 +140,13 @@ under the License.
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-provider-cache</artifactId>
       <version>${sentry.version}</version>
+      <exclusions>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -121,25 +164,51 @@ under the License.
           <groupId>org.apache.sentry</groupId>
           <artifactId>sentry-provider-db</artifactId>
         </exclusion>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-provider-db</artifactId>
       <version>${sentry.version}</version>
-      <classifier>sh</classifier>
+       <exclusions>
+         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+         <exclusion>
+           <groupId>net.minidev</groupId>
+           <artifactId>json-smart</artifactId>
+         </exclusion>
+      </exclusions>
+     <classifier>sh</classifier>
     </dependency>
 
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-client</artifactId>
       <version>${hbase.version}</version>
+       <exclusions>
+         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+         <exclusion>
+           <groupId>net.minidev</groupId>
+           <artifactId>json-smart</artifactId>
+         </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-common</artifactId>
       <version>${hbase.version}</version>
+       <exclusions>
+         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+         <exclusion>
+           <groupId>net.minidev</groupId>
+           <artifactId>json-smart</artifactId>
+         </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -182,12 +251,24 @@ under the License.
           <groupId>org.apache.hive</groupId>
           <artifactId>hive-llap-server</artifactId>
         </exclusion>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-serde</artifactId>
       <version>${hive.version}</version>
+       <exclusions>
+         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+         <exclusion>
+           <groupId>net.minidev</groupId>
+           <artifactId>json-smart</artifactId>
+         </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -673,6 +754,13 @@ under the License.
           <groupId>org.apache.hive</groupId>
           <artifactId>hive-exec</artifactId>
           <version>${hive.version}</version>
+          <exclusions>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
         <dependency>
           <groupId>org.apache.hive</groupId>
@@ -758,6 +846,11 @@ under the License.
               <groupId>org.apache.logging.log4j</groupId>
               <artifactId>log4j-slf4j-impl</artifactId>
             </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
         <dependency>
@@ -769,6 +862,11 @@ under the License.
             <exclusion>
               <groupId>org.apache.logging.log4j</groupId>
               <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
             </exclusion>
           </exclusions>
         </dependency>
@@ -783,6 +881,10 @@ under the License.
               <groupId>org.apache.logging.log4j</groupId>
               <artifactId>log4j-slf4j-impl</artifactId>
             </exclusion>
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
         <dependency>
@@ -795,6 +897,11 @@ under the License.
               <groupId>org.apache.logging.log4j</groupId>
               <artifactId>log4j-slf4j-impl</artifactId>
             </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
         <dependency>
@@ -806,6 +913,11 @@ under the License.
             <exclusion>
               <groupId>org.apache.logging.log4j</groupId>
               <artifactId>log4j-slf4j-impl</artifactId>
+            </exclusion>
+            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
             </exclusion>
           </exclusions>
         </dependency>
