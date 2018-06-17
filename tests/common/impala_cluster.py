@@ -94,6 +94,20 @@ class ImpalaCluster(object):
     LOG.info("Cluster: " + str(self.impalads))
     return choice([impalad for impalad in self.impalads if impalad != other_impalad])
 
+  def num_responsive_coordinators(self):
+    """Find the number of impalad coordinators that can evaluate a test query."""
+    n = 0
+    for impalad in self.impalads:
+      try:
+        client = impalad.service.create_beeswax_client()
+        result = client.execute("select 1")
+        assert result.success
+        ++n
+      except Exception as e: print e
+      finally:
+        client.close()
+    return n
+
   def __build_impala_process_lists(self):
     """
     Gets all the running Impala procs (with start arguments) on the machine.
