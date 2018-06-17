@@ -321,8 +321,9 @@ class TestUdfExecution(TestUdfBase):
     udf_path = get_fs_path('/test-warehouse/libTestUdfs.so')
 
     # Tracks number of impalads prior to tests to check that none have crashed.
+    # All impalads are assumed to be coordinators.
     cluster = ImpalaCluster()
-    exp_num_impalads = len(cluster.impalads)
+    exp_num_coordinators = cluster.num_responsive_coordinators()
 
     setup_client = self.create_impala_client()
     setup_query = create_fn_to_use.format(unique_database, udf_path)
@@ -375,8 +376,7 @@ class TestUdfExecution(TestUdfBase):
     for e in errors: print e
 
     # Checks that no impalad has crashed.
-    cluster.refresh()
-    assert len(cluster.impalads) == exp_num_impalads
+    assert cluster.num_responsive_coordinators() == exp_num_coordinators
 
   def test_ir_functions(self, vector, unique_database):
     if vector.get_value('exec_option')['disable_codegen']:
