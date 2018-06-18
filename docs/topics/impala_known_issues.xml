@@ -301,7 +301,41 @@ under the License.
 
   </concept>
 
-<!--<concept id="known_issues_security"><title id="ki_security">Impala Known Issues: Security</title><conbody><p> These issues relate to security features, such as Kerberos authentication, Sentry authorization, encryption, auditing, and redaction. </p></conbody></concept>-->
+<concept id="known_issues_security">
+  <title id="ki_security">Impala Known Issues: Security</title>
+  <conbody>
+    <p>
+      These issues are related to security features, such as Kerberos
+        authentication, Sentry authorization, encryption, auditing, and
+        redaction.
+    </p>
+  </conbody>
+
+  <concept id="id_p1n_tbx_22b">
+    <title>Impala does not allow the use of insecure clusters with public IPs</title>
+
+    <conbody>
+      <p>
+          Starting in <keyword keyref="impala212_full"/>, Impala, by default,
+          will only allow unencrypted or unauthenticated connections from
+          trusted subnets: <codeph>127.0.0.0/8</codeph>,
+            <codeph>10.0.0.0/8</codeph>, <codeph>172.16.0.0/12</codeph>,
+            <codeph>192.168.0.0/16</codeph>, <codeph>169.254.0.0/16</codeph>.
+          Unencrypted or unauthenticated connections from publicly routable IPs
+          will be rejected.
+      </p>
+
+      <p>
+          The trusted subnets can be configured using the
+            <codeph>--trusted_subnets</codeph> flag. Set it to
+            '<codeph>0.0.0.0/0</codeph>' to allow unauthenticated connections
+          from all remote IP addresses. However, if network access is not
+          otherwise restricted by a firewall, malicious users may be able to
+          gain unauthorized access.
+      </p>
+      </conbody>
+    </concept>
+</concept>
 
   <concept id="known_issues_resources">
 
