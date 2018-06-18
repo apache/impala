@@ -100,8 +100,7 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1",
       catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE +
-                    " --sentry_catalog_polling_frequency_s=1",
-      statestored_args="--statestore_update_frequency_ms=300")
+                    " --sentry_catalog_polling_frequency_s=1")
   def test_role_privilege_case(self, vector):
     """IMPALA-5582: Store sentry privileges in lower case. This
     test grants select privileges to roles assgined to tables/db
@@ -165,9 +164,7 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1",
-      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
-      statestored_args=("--statestore_heartbeat_frequency_ms=300 "
-                        "--statestore_update_frequency_ms=300"))
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE)
   def test_role_update(self, vector):
     """IMPALA-5355: The initial update from the statestore has the privileges and roles in
     reverse order if a role was modified, but not the associated privilege. Verify that
