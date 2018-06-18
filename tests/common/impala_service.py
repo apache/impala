@@ -35,7 +35,8 @@ from RuntimeProfile.ttypes import TRuntimeProfileTree
 import base64
 import zlib
 
-logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s %(threadName)s: %(message)s',
+    datefmt='%H:%M:%S')
 LOG = logging.getLogger('impala_service')
 LOG.setLevel(level=logging.DEBUG)
 
