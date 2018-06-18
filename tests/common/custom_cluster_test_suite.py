@@ -39,6 +39,11 @@ CATALOGD_ARGS = 'catalogd_args'
 # Additional args passed to the start-impala-cluster script.
 START_ARGS = 'start_args'
 
+# Run with fast topic updates by default to reduce time to first query running.
+DEFAULT_STATESTORE_ARGS = '--statestore_update_frequency_ms=50 \
+    --statestore_priority_update_frequency_ms=50 \
+    --statestore_heartbeat_frequency_ms=50'
+
 class CustomClusterTestSuite(ImpalaTestSuite):
   """Every test in a test suite deriving from this class gets its own Impala cluster.
   Custom arguments may be passed to the cluster by using the @with_args decorator."""
@@ -88,8 +93,11 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     def decorate(func):
       if impalad_args is not None:
         func.func_dict[IMPALAD_ARGS] = impalad_args
-      if statestored_args is not None:
-        func.func_dict[STATESTORED_ARGS] = statestored_args
+      if statestored_args is None:
+        func.func_dict[STATESTORED_ARGS] = DEFAULT_STATESTORE_ARGS
+      else:
+        func.func_dict[STATESTORED_ARGS] = \
+            DEFAULT_STATESTORE_ARGS + " " + statestored_args
       if catalogd_args is not None:
         func.func_dict[CATALOGD_ARGS] = catalogd_args
       if start_args is not None:
