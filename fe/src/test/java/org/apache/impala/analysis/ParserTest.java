@@ -3776,6 +3776,15 @@ public class ParserTest extends FrontendTestBase {
 
     ParserError("COMMENT ON VIEW IS 'comment'");
     ParserError("COMMENT ON VIEW tbl IS");
+
+    for (String col : new String[]{"db.tbl.col", "tbl.col"}) {
+      ParsesOk(String.format("COMMENT ON COLUMN %s IS 'comment'", col));
+      ParsesOk(String.format("COMMENT ON COLUMN %s IS ''", col));
+      ParsesOk(String.format("COMMENT ON COLUMN %s IS NULL", col));
+    }
+    ParserError("COMMENT on col IS 'comment'");
+    ParserError("COMMENT on db.tbl.col IS");
+    ParserError("COMMENT on tbl.col IS");
   }
 
   @Test

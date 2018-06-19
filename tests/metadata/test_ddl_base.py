@@ -101,3 +101,12 @@ class TestDdlBase(ImpalaTestSuite):
   def _get_table_or_view_comment(self, table_name):
     props = self._get_tbl_properties(table_name)
     return props["comment"] if "comment" in props else None
+
+  def _get_column_comment(self, table_or_view_name, col_name):
+    result = self.client.execute("describe {0}".format(table_or_view_name))
+    comments = dict()
+    for row in result.data:
+      cols = row.split('\t')
+      if len(cols) == 3:
+        comments[cols[0].rstrip()] = cols[2].rstrip()
+    return comments.get(col_name)

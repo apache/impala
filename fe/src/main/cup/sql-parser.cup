@@ -356,6 +356,7 @@ nonterminal String alias_clause;
 nonterminal ArrayList<String> ident_list, primary_keys;
 nonterminal ArrayList<String> opt_ident_list, opt_sort_cols;
 nonterminal TableName table_name;
+nonterminal ColumnName column_name;
 nonterminal FunctionName function_name;
 nonterminal Expr where_clause;
 nonterminal Expr predicate, bool_test_expr;
@@ -1034,6 +1035,8 @@ comment_on_stmt ::=
   {: RESULT = new CommentOnTableStmt(table, comment); :}
   | KW_COMMENT KW_ON KW_VIEW table_name:table KW_IS nullable_comment_val:comment
   {: RESULT = new CommentOnViewStmt(table, comment); :}
+  | KW_COMMENT KW_ON KW_COLUMN column_name:column KW_IS nullable_comment_val:comment
+  {: RESULT = new CommentOnColumnStmt(column, comment); :}
   ;
 
 // Introducing OWNER and USER keywords has a potential to be a breaking change,
@@ -2512,6 +2515,13 @@ table_name ::=
   {: RESULT = new TableName(null, tbl); :}
   | ident_or_default:db DOT ident_or_default:tbl
   {: RESULT = new TableName(db, tbl); :}
+  ;
+
+column_name ::=
+  | ident_or_default:tbl DOT ident_or_default:col
+  {: RESULT = new ColumnName(new TableName(null, tbl), col); :}
+  | ident_or_default:db DOT ident_or_default:tbl DOT ident_or_default:col
+  {: RESULT = new ColumnName(new TableName(db, tbl), col); :}
   ;
 
 function_name ::=

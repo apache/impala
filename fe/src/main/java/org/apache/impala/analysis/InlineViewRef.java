@@ -307,6 +307,8 @@ public class InlineViewRef extends TableRef {
     return queryStmt_.getColLabels();
   }
 
+  public FeView getView() { return view_; }
+
   @Override
   protected TableRef clone() { return new InlineViewRef(this); }
 

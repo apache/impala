@@ -4014,7 +4014,26 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Could not resolve table reference: 'default.doesntexist'");
     AnalysisError("comment on view functional.alltypes is 'comment'",
         "COMMENT ON VIEW not allowed on a table: functional.alltypes");
-    AnalysisError(String.format("comment on table functional.alltypes_view is '%s'",
+    AnalysisError(String.format("comment on view functional.alltypes_view is '%s'",
+        buildLongComment()), "Comment exceeds maximum length of 256 characters. " +
+        "The given comment has 261 characters.");
+  }
+
+  @Test
+  public void TestCommentOnColumn() {
+    for (Pair<String, AnalysisContext> pair : new Pair[]{
+        new Pair<>("functional.alltypes.id", createAnalysisCtx()),
+        new Pair<>("alltypes.id", createAnalysisCtx("functional")),
+        new Pair<>("functional.alltypes_view.id", createAnalysisCtx()),
+        new Pair<>("alltypes_view.id", createAnalysisCtx("functional"))}) {
+      AnalyzesOk(String.format("comment on column %s is 'comment'", pair.first),
+          pair.second);
+      AnalyzesOk(String.format("comment on column %s is ''", pair.first), pair.second);
+      AnalyzesOk(String.format("comment on column %s is null", pair.first), pair.second);
+    }
+    AnalysisError("comment on column functional.alltypes.doesntexist is 'comment'",
+        "Column 'doesntexist' does not exist in table: functional.alltypes");
+    AnalysisError(String.format("comment on column functional.alltypes.id is '%s'",
         buildLongComment()), "Comment exceeds maximum length of 256 characters. " +
         "The given comment has 261 characters.");
   }
