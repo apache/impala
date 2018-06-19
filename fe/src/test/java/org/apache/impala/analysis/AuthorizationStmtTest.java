@@ -2000,6 +2000,38 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
         .error(alterError("functional.alltypes_view"), onTable("functional",
             "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)));
+
+    // Comment on table column.
+    authorize("comment on column functional.alltypes.id is 'comment'")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.ALTER))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALTER))
+        .error(alterError("functional.alltypes"))
+        .error(alterError("functional.alltypes"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
+        .error(alterError("functional.alltypes"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
+        .error(alterError("functional.alltypes"), onTable("functional", "alltypes",
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)));
+
+    // Comment on view column.
+    authorize("comment on column functional.alltypes_view.id is 'comment'")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.ALTER))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
+        .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.ALTER))
+        .error(alterError("functional.alltypes_view"))
+        .error(alterError("functional.alltypes_view"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
+        .error(alterError("functional.alltypes_view"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
+        .error(alterError("functional.alltypes_view"), onTable("functional",
+            "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)));
   }
 
   @Test

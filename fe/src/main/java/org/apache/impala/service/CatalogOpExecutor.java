@@ -51,6 +51,7 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.apache.impala.analysis.AlterTableSortByStmt;
+import org.apache.impala.analysis.ColumnName;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
@@ -111,6 +112,7 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogUpdateResult;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TColumnName;
 import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TColumnValue;
@@ -388,11 +390,7 @@ public class CatalogOpExecutor {
 
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
-
-    if (!catalog_.tryLockTable(tbl)) {
-      throw new InternalException(String.format("Error altering table %s due to lock " +
-          "contention.", tbl.getFullName()));
-    }
+    tryLock(tbl);
     final Timer.Context context
         = tbl.getMetrics().getTimer(Table.ALTER_DURATION_METRIC).time();
     try {
@@ -694,11 +692,7 @@ public class CatalogOpExecutor {
           "Null or empty column list given as argument to DdlExecutor.alterView");
     Table tbl = catalog_.getTable(tableName.getDb(), tableName.getTbl());
     Preconditions.checkState(tbl instanceof View);
-
-    if (!catalog_.tryLockTable(tbl)) {
-      throw new InternalException(String.format("Error altering view %s due to lock " +
-          "contention", tbl.getFullName()));
-    }
+    tryLock(tbl);
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
@@ -3479,12 +3473,18 @@ public class CatalogOpExecutor {
   private void alterCommentOn(TCommentOnParams params, TDdlExecResponse response)
       throws ImpalaRuntimeException, CatalogException, InternalException {
     if (params.getDb() != null) {
-      Preconditions.checkArgument(!params.isSetTable_name());
+      Preconditions.checkArgument(!params.isSetTable_name() &&
+          !params.isSetColumn_name());
       alterCommentOnDb(params.getDb(), params.getComment(), response);
     } else if (params.getTable_name() != null) {
-      Preconditions.checkArgument(!params.isSetDb());
+      Preconditions.checkArgument(!params.isSetDb() && !params.isSetColumn_name());
       alterCommentOnTableOrView(TableName.fromThrift(params.getTable_name()),
           params.getComment(), response);
+    } else if (params.getColumn_name() != null) {
+      Preconditions.checkArgument(!params.isSetDb() && !params.isSetTable_name());
+      TColumnName columnName = params.getColumn_name();
+      alterCommentOnColumn(TableName.fromThrift(columnName.getTable_name()),
+          columnName.getColumn_name(), params.getComment(), response);
     } else {
       throw new UnsupportedOperationException("Unsupported COMMENT ON operation");
     }
@@ -3571,14 +3571,12 @@ public class CatalogOpExecutor {
       TDdlExecResponse response) throws CatalogException, InternalException,
       ImpalaRuntimeException {
     Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
-    if (!catalog_.tryLockTable(tbl)) {
-      throw new InternalException(String.format("Error altering table/view %s due to " +
-          "lock contention.", tbl.getFullName()));
-    }
+    tryLock(tbl);
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
-      org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
+      org.apache.hadoop.hive.metastore.api.Table msTbl =
+          tbl.getMetaStoreTable().deepCopy();
       boolean isView = msTbl.getTableType().equalsIgnoreCase(
           TableType.VIRTUAL_VIEW.toString());
       if (comment == null) {
@@ -3592,6 +3590,59 @@ public class CatalogOpExecutor {
       addSummary(response, String.format("Updated %s.", (isView) ? "view" : "table"));
     } finally {
       tbl.getLock().unlock();
+    }
+  }
+
+  private void alterCommentOnColumn(TableName tableName, String columnName,
+      String comment, TDdlExecResponse response) throws CatalogException,
+      InternalException, ImpalaRuntimeException {
+    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
+    tryLock(tbl);
+    try {
+      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+      catalog_.getLock().writeLock().unlock();
+      org.apache.hadoop.hive.metastore.api.Table msTbl =
+          tbl.getMetaStoreTable().deepCopy();
+      if (!updateColumnComment(msTbl.getSd().getColsIterator(), columnName, comment)) {
+        if (!updateColumnComment(msTbl.getPartitionKeysIterator(), columnName, comment)) {
+          throw new ColumnNotFoundException(String.format(
+              "Column name %s not found in table %s.", columnName, tbl.getFullName()));
+        }
+      }
+      applyAlterTable(msTbl, true);
+      loadTableMetadata(tbl, newCatalogVersion, false, true, null);
+      addTableToCatalogUpdate(tbl, response.result);
+      addSummary(response, "Column has been altered.");
+    } finally {
+      tbl.getLock().unlock();
+    }
+  }
+
+  /**
+   * Find the matching column name in the iterator and update its comment. Return
+   * true if found; false otherwise.
+   */
+  private static boolean updateColumnComment(Iterator<FieldSchema> iterator,
+      String columnName, String comment) {
+    while (iterator.hasNext()) {
+      FieldSchema fs = iterator.next();
+      if (fs.getName().equalsIgnoreCase(columnName)) {
+        fs.setComment(comment);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Try to lock a table in the catalog. Throw an InternalException if the catalog is
+   * unable to lock the given table.
+   */
+  private void tryLock(Table tbl) throws InternalException {
+    String type = tbl instanceof View ? "view" : "table";
+    if (!catalog_.tryLockTable(tbl)) {
+      throw new InternalException(String.format("Error altering %s %s due to " +
+          "lock contention.", type, tbl.getFullName()));
     }
   }
 }
