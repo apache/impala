@@ -36,9 +36,6 @@ from tests.util.filesystem_utils import WAREHOUSE
 
 AUTH_POLICY_FILE = "%s/authz-policy.ini" % WAREHOUSE
 
-def get_groups():
-  return [grp.getgrgid(group).gr_name for group in os.getgroups()]
-
 class TestAuthorization(CustomClusterTestSuite):
   AUDIT_LOG_DIR = tempfile.mkdtemp(dir=os.getenv('LOG_DIR'))
 
@@ -192,7 +189,7 @@ class TestAuthorization(CustomClusterTestSuite):
         --authorized_proxy_group_config=foo=bar;hue=%s\
         --abort_on_failed_audit_event=false\
         --audit_event_log_dir=%s" % (AUTH_POLICY_FILE,
-                                     ','.join(get_groups()),
+                                     grp.getgrgid(os.getgid()).gr_name,
                                      AUDIT_LOG_DIR))
   def test_group_impersonation(self):
     """End-to-end group impersonation + authorization test"""
