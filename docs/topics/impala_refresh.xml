@@ -86,13 +86,10 @@ under the License.
     </p>
 
     <ul>
-      <li>
-        Deleting or adding files.
-        <p>
-          For example, after loading new data files into the HDFS data directory for the table,
-          including inserting data from Hive via <codeph>INSERT</codeph> or <codeph>LOAD
-          DATA</codeph>.
-        </p>
+      <li> Deleting, adding, or modifying files. <p> For example, after loading
+          new data files into the HDFS data directory for the table, appending
+          to an existing HDFS file, inserting data from Hive via
+            <codeph>INSERT</codeph> or <codeph>LOAD DATA</codeph>. </p>
       </li>
 
       <li>
