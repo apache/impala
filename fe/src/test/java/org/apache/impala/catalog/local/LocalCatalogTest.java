@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.catalog.CatalogTest;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
@@ -148,5 +149,20 @@ public class LocalCatalogTest {
       }
     }
     assertEquals(24, totalFds);
+  }
+
+  @Test
+  public void testColumnStats() throws Exception {
+    FeFsTable t = (FeFsTable) catalog_.getTable("functional",  "alltypesagg");
+    // Verify expected stats for a partitioning column.
+    // 'days' has 10 non-NULL plus one NULL partition
+    ColumnStats stats = t.getColumn("day").getStats();
+    assertEquals(11, stats.getNumDistinctValues());
+    assertEquals(1, stats.getNumNulls());
+
+    // Verify expected stats for timestamp.
+    stats = t.getColumn("timestamp_col").getStats();
+    assertEquals(10210, stats.getNumDistinctValues());
+    assertEquals(-1, stats.getNumNulls());
   }
 }

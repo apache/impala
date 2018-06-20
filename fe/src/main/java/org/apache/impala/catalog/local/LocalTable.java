@@ -22,6 +22,7 @@ import java.util.List;
 
 import javax.annotation.concurrent.Immutable;
 
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.TableName;
@@ -37,6 +38,7 @@ import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
@@ -52,6 +54,8 @@ import com.google.common.collect.Lists;
  * each catalog instance.
  */
 abstract class LocalTable implements FeTable {
+  private static final Logger LOG = Logger.getLogger(LocalTable.class);
+
   protected final LocalDb db_;
   /** The lower-case name of the table. */
   protected final String name_;
@@ -61,15 +65,22 @@ abstract class LocalTable implements FeTable {
     // In order to know which kind of table subclass to instantiate, we need
     // to eagerly grab and parse the top-level Table object from the HMS.
     SchemaInfo schemaInfo = SchemaInfo.load(db, tblName);
+    LocalTable t;
     if (HdfsFileFormat.isHdfsInputFormatClass(
         schemaInfo.msTable_.getSd().getInputFormat())) {
-      return new LocalFsTable(db, tblName, schemaInfo);
+      t = new LocalFsTable(db, tblName, schemaInfo);
+    } else {
+      throw new LocalCatalogException("Unknown table type for table " +
+          db.getName() + "." + tblName);
     }
 
-    throw new LocalCatalogException("Unknown table type for table " +
-        db.getName() + "." + tblName);
+    // TODO(todd): it would be preferable to only load stats for those columns
+    // referenced in a query, but there doesn't seem to be a convenient spot
+    // in between slot reference resolution and where the stats are needed.
+    // So, for now, we'll just load all the column stats up front.
+    t.loadColumnStats();
+    return t;
   }
-
   public LocalTable(LocalDb db, String tblName, SchemaInfo schemaInfo) {
     this.db_ = Preconditions.checkNotNull(db);
     this.name_ = Preconditions.checkNotNull(tblName);
@@ -177,6 +188,16 @@ abstract class LocalTable implements FeTable {
   @Override
   public TTableStats getTTableStats() {
     return schemaInfo_.tableStats_;
+  }
+
+  protected void loadColumnStats() {
+    try {
+      List<ColumnStatisticsObj> stats = db_.getCatalog().getMetaProvider()
+          .loadTableColumnStatistics(db_.getName(), getName(), getColumnNames());
+      FeCatalogUtils.injectColumnStats(stats, this);
+    } catch (TException e) {
+      LOG.warn("Could not load column statistics for: " + getFullName(), e);
+    }
   }
 
   /**

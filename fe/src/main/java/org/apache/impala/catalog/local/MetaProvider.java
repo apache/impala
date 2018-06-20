@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -68,6 +69,12 @@ interface MetaProvider {
   Map<String, Partition> loadPartitionsByNames(String dbName, String tableName,
       List<String> partitionColumnNames, List<String> partitionNames)
       throws MetaException, TException;
+
+  /**
+   * Load statistics for the given columns from the given table.
+   */
+  List<ColumnStatisticsObj> loadTableColumnStatistics(String dbName,
+      String tblName, List<String> colNames) throws TException;
 
   /**
    * Load file metadata and block locations for the files in the given

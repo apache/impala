@@ -214,6 +214,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
     // We need to only query those columns which may have stats; asking HMS for other
     // columns causes loadAllColumnStats() to return nothing.
+    // TODO(todd): this no longer seems to be true - asking for a non-existent column
+    // is just ignored, and the columns that do exist are returned.
     List<String> colNames = getColumnNamesWithHmsStats();
 
     try {
@@ -223,22 +225,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       return;
     }
 
-    for (ColumnStatisticsObj stats: colStats) {
-      Column col = getColumn(stats.getColName());
-      Preconditions.checkNotNull(col);
-      if (!ColumnStats.isSupportedColType(col.getType())) {
-        LOG.warn(String.format("Statistics for %s, column %s are not supported as " +
-                "column has type %s", getFullName(), col.getName(), col.getType()));
-        continue;
-      }
-
-      if (!col.updateStats(stats.getStatsData())) {
-        LOG.warn(String.format("Failed to load column stats for %s, column %s. Stats " +
-            "may be incompatible with column type %s. Consider regenerating statistics " +
-            "for %s.", getFullName(), col.getName(), col.getType(), getFullName()));
-        continue;
-      }
-    }
+    FeCatalogUtils.injectColumnStats(colStats, this);
   }
 
   /**

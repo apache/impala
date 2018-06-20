@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
@@ -126,6 +127,34 @@ public abstract class FeCatalogUtils {
       colDescs.add(new TColumnDescriptor(col.getName(), col.getType().toThrift()));
     }
     return colDescs;
+  }
+
+  /**
+   * Given the list of column stats returned from the metastore, inject those
+   * stats into matching columns in 'table'.
+   */
+  public static void injectColumnStats(List<ColumnStatisticsObj> colStats,
+      FeTable table) {
+    for (ColumnStatisticsObj stats: colStats) {
+      Column col = table.getColumn(stats.getColName());
+      Preconditions.checkNotNull(col, "Unable to find column %s in table %s",
+          stats.getColName(), table.getFullName());
+      if (!ColumnStats.isSupportedColType(col.getType())) {
+        LOG.warn(String.format(
+            "Statistics for %s, column %s are not supported as column " +
+            "has type %s", table.getFullName(), col.getName(), col.getType()));
+        continue;
+      }
+
+      if (!col.updateStats(stats.getStatsData())) {
+        LOG.warn(String.format(
+            "Failed to load column stats for %s, column %s. Stats may be " +
+            "incompatible with column type %s. Consider regenerating statistics " +
+            "for %s.", table.getFullName(), col.getName(), col.getType(),
+            table.getFullName()));
+        continue;
+      }
+    }
   }
 
   /**
