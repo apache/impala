@@ -45,8 +45,6 @@ int32_t FaultInjectionUtil::GetTargetRPCType() {
 }
 
 void FaultInjectionUtil::InjectRpcDelay(RpcCallType my_type) {
-  std::random_device rd;
-  srand(rd());
   int32_t delay_ms = FLAGS_fault_injection_rpc_delay_ms;
   if (delay_ms == 0) return;
   int32_t target_rpc_type = GetTargetRPCType();

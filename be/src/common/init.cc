@@ -172,6 +172,8 @@ static void PauseMonitorLoop() {
 
 void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     TestInfo::Mode test_mode) {
+  srand(time(NULL));
+
   CpuInfo::Init();
   DiskInfo::Init();
   MemInfo::Init();
