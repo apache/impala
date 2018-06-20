@@ -408,6 +408,8 @@ Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* s
   if (debug_options_.action == TDebugAction::FAIL) {
     return Status(TErrorCode::INTERNAL_ERROR, "Debug Action: FAIL");
   } else if (debug_options_.action == TDebugAction::WAIT) {
+    // See DebugOptions::DebugOptions().
+    DCHECK(phase != TExecNodePhase::PREPARE && phase != TExecNodePhase::CLOSE);
     while (!state->is_cancelled()) {
       sleep(1);
     }
