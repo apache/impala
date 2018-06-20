@@ -361,7 +361,6 @@ DataStreamSender::DataStreamSender(int sender_id, const RowDescriptor* row_desc,
   if (partition_type_ == TPartitionType::UNPARTITIONED
       || partition_type_ == TPartitionType::RANDOM) {
     // Randomize the order we open/transmit to channels to avoid thundering herd problems.
-    srand(reinterpret_cast<uint64_t>(this));
     random_shuffle(channels_.begin(), channels_.end());
   }
 }

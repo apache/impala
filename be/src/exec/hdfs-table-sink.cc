@@ -99,13 +99,6 @@ Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
       state->obj_pool(), expr_perm_pool_.get(), expr_results_pool_.get(),
       &partition_key_expr_evals_));
 
-  // TODO: Consider a system-wide random number generator, initialised in a single place.
-  ptime now = microsec_clock::local_time();
-  long seed = (now.time_of_day().seconds() * 1000)
-    + (now.time_of_day().total_microseconds() / 1000);
-  VLOG_QUERY << "Random seed: " << seed;
-  srand(seed);
-
   // Resolve table id and set input tuple descriptor.
   table_desc_ = static_cast<const HdfsTableDescriptor*>(
       state->desc_tbl().GetTableDescriptor(table_id_));
