@@ -17,11 +17,10 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
-import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.ScalarType;
@@ -259,19 +258,19 @@ public class CastExpr extends Expr {
     noOp_ = childType.equals(type_);
     if (noOp_) return;
 
-    FunctionName fnName = new FunctionName(ImpaladCatalog.BUILTINS_DB, getFnName(type_));
+    FunctionName fnName = new FunctionName(BuiltinsDb.NAME, getFnName(type_));
     Type[] args = { childType };
     Function searchDesc = new Function(fnName, args, Type.INVALID, false);
     if (isImplicit_) {
-      fn_ = ImpaladCatalog.getBuiltinsDb().getFunction(searchDesc,
+      fn_ = BuiltinsDb.getInstance().getFunction(searchDesc,
           CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
       Preconditions.checkState(fn_ != null);
     } else {
-      fn_ = ImpaladCatalog.getBuiltinsDb().getFunction(searchDesc,
+      fn_ = BuiltinsDb.getInstance().getFunction(searchDesc,
           CompareMode.IS_IDENTICAL);
       if (fn_ == null) {
         // allow for promotion from CHAR to STRING; only if no exact match is found
-        fn_ =  ImpaladCatalog.getBuiltinsDb().getFunction(
+        fn_ =  BuiltinsDb.getInstance().getFunction(
             searchDesc.promoteCharsToStrings(), CompareMode.IS_IDENTICAL);
       }
     }

@@ -155,7 +155,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   @Override
   public long getExtrapolatedNumRows(long totalBytes) {
     // TODO Auto-generated method stub
-    return 0;
+    return -1;
   }
 
   @Override
@@ -245,6 +245,10 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     Preconditions.checkState(partitionSpecs_ != null,
         "Cannot load partitions without having fetched partition IDs " +
         "from the same LocalFsTable instance");
+
+    // Possible in the case that all partitions were pruned.
+    if (ids.isEmpty()) return Collections.emptyList();
+
     List<String> names = Lists.newArrayList();
     for (Long id : ids) {
       LocalPartitionSpec spec = partitionSpecs_.get(id);

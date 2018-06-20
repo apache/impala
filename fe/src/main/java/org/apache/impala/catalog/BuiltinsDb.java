@@ -56,8 +56,19 @@ public class BuiltinsDb extends Db {
   // Size in bytes of RankState used for rank() and dense_rank().
   private static final int RANK_INTERMEDIATE_SIZE = 16;
 
-  public BuiltinsDb(String name) {
-    super(name, createMetastoreDb(name));
+  private static BuiltinsDb INSTANCE;
+
+  public static final String NAME = "_impala_builtins";
+
+  public static synchronized Db getInstance() {
+    if (INSTANCE == null) {
+      INSTANCE = new BuiltinsDb();
+    }
+    return INSTANCE;
+  }
+
+  private BuiltinsDb() {
+    super(NAME, createMetastoreDb(NAME));
     setIsSystemDb(true);
     initBuiltins();
   }

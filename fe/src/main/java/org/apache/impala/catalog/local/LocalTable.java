@@ -22,20 +22,25 @@ import java.util.List;
 
 import javax.annotation.concurrent.Immutable;
 
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.View;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.log4j.Logger;
@@ -65,11 +70,22 @@ abstract class LocalTable implements FeTable {
     // In order to know which kind of table subclass to instantiate, we need
     // to eagerly grab and parse the top-level Table object from the HMS.
     SchemaInfo schemaInfo = SchemaInfo.load(db, tblName);
-    LocalTable t;
-    if (HdfsFileFormat.isHdfsInputFormatClass(
+    LocalTable t = null;
+    Table msTbl = schemaInfo.msTable_;
+    if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
+      // TODO(todd) support View
+    } else if (HBaseTable.isHBaseTable(msTbl)) {
+      // TODO(todd) support HBase table
+    } else if (KuduTable.isKuduTable(msTbl)) {
+      // TODO(todd) support kudu table
+    } else if (DataSourceTable.isDataSourceTable(msTbl)) {
+      // TODO(todd) support datasource table
+    } else if (HdfsFileFormat.isHdfsInputFormatClass(
         schemaInfo.msTable_.getSd().getInputFormat())) {
       t = new LocalFsTable(db, tblName, schemaInfo);
-    } else {
+    }
+
+    if (t == null) {
       throw new LocalCatalogException("Unknown table type for table " +
           db.getName() + "." + tblName);
     }

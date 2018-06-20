@@ -26,9 +26,9 @@ import java.util.ListIterator;
 import java.util.Set;
 
 import org.apache.impala.analysis.BinaryPredicate.Operator;
+import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
-import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
@@ -417,7 +417,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   protected Function getBuiltinFunction(Analyzer analyzer, String name,
       Type[] argTypes, CompareMode mode) throws AnalysisException {
-    FunctionName fnName = new FunctionName(ImpaladCatalog.BUILTINS_DB, name);
+    FunctionName fnName = new FunctionName(BuiltinsDb.NAME, name);
     Function searchDesc = new Function(fnName, argTypes, Type.INVALID, false);
     return analyzer.getCatalog().getFunction(searchDesc, mode);
   }

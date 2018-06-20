@@ -38,7 +38,6 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.HdfsCachePool;
-import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TUniqueId;
@@ -67,7 +66,6 @@ public class LocalCatalog implements FeCatalog {
   private final MetaProvider metaProvider_;
   private Map<String, FeDb> dbs_ = Maps.newHashMap();
   private String nullPartitionKeyValue_;
-  private static final Db builtinsDb_ = new BuiltinsDb(ImpaladCatalog.BUILTINS_DB);
 
   public static FeCatalog create(String defaultKuduMasterHosts) {
     // TODO(todd): store the kudu master hosts
@@ -101,7 +99,9 @@ public class LocalCatalog implements FeCatalog {
         dbs.put(dbName, new LocalDb(this, dbName));
       }
     }
-    dbs.put(builtinsDb_.getName(), builtinsDb_);
+
+    Db bdb = BuiltinsDb.getInstance();
+    dbs.put(bdb.getName(), bdb);
     dbs_ = dbs;
   }
 
