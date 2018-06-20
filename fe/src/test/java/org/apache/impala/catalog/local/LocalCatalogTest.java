@@ -31,6 +31,7 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.PatternMatcher;
@@ -46,6 +47,7 @@ public class LocalCatalogTest {
 
   @Before
   public void setupCatalog() {
+    FeSupport.loadLibrary();
     catalog_ = new LocalCatalog(new DirectMetaProvider());
   }
 

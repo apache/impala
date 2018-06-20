@@ -73,7 +73,7 @@ public class ScalarFunction extends Function {
       String prepareFnSymbol, String closeFnSymbol, boolean userVisible) {
     Preconditions.checkNotNull(symbol);
     ScalarFunction fn = new ScalarFunction(
-        new FunctionName(ImpaladCatalog.BUILTINS_DB, name), argTypes, retType, hasVarArgs);
+        new FunctionName(BuiltinsDb.NAME, name), argTypes, retType, hasVarArgs);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     fn.setUserVisible(userVisible);
     fn.setIsPersistent(true);
@@ -222,7 +222,7 @@ public class ScalarFunction extends Function {
       ArrayList<Type> argTypes, boolean hasVarArgs, Type retType,
       boolean userVisible) {
     ScalarFunction fn = new ScalarFunction(
-        new FunctionName(ImpaladCatalog.BUILTINS_DB, name), argTypes, retType, hasVarArgs);
+        new FunctionName(BuiltinsDb.NAME, name), argTypes, retType, hasVarArgs);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     fn.setUserVisible(userVisible);
     fn.setIsPersistent(true);
