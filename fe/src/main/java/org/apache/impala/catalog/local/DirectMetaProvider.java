@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -158,6 +159,15 @@ class DirectMetaProvider implements MetaProvider {
     }
 
     return ret;
+  }
+
+
+  @Override
+  public List<ColumnStatisticsObj> loadTableColumnStatistics(String dbName,
+      String tblName, List<String> colNames) throws TException {
+    try (MetaStoreClient c = msClientPool_.getClient()) {
+      return c.getHiveClient().getTableColumnStatistics(dbName, tblName, colNames);
+    }
   }
 
   @Override

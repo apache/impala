@@ -31,6 +31,7 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
@@ -373,6 +374,29 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
       id++;
     }
     partitionSpecs_ = b.build();
+  }
+
+  /**
+   * Override base implementation to populate column stats for
+   * clustering columns based on the partition map.
+   */
+  @Override
+  protected void loadColumnStats() {
+    super.loadColumnStats();
+    // TODO(todd): this is called for all tables even if not necessary,
+    // which means we need to load all partition names, even if not
+    // necessary.
+    loadPartitionValueMap();
+    for (int i = 0; i < getNumClusteringCols(); i++) {
+      ColumnStats stats = getColumns().get(i).getStats();
+      int nonNullParts = partitionValueMap_.get(i).size();
+      int nullParts = nullPartitionIds_.get(i).size();
+      stats.setNumDistinctValues(nonNullParts + nullParts);
+      // TODO(todd): this calculation ends up setting the num_nulls stat
+      // to the number of partitions with null rows, not the number of rows.
+      // However, it maintains the existing behavior from HdfsTable.
+      stats.setNumNulls(nullParts);
+    }
   }
 
   @Override
