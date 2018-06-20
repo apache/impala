@@ -65,9 +65,14 @@ DebugOptions::DebugOptions(const TQueryOptions& query_options)
       phase_ = TExecNodePhase::INVALID;
       return;
     }
-    if (phase_ == TExecNodePhase::CLOSE && action_ == TDebugAction::WAIT) {
-      LOG(WARNING) << "Do not use CLOSE:WAIT debug actions because nodes cannot be "
-          "cancelled in Close()";
+    if ((phase_ == TExecNodePhase::PREPARE || phase_ == TExecNodePhase::CLOSE) &&
+        action_ == TDebugAction::WAIT) {
+      // Cancellation is not allowed before PREPARE phase completes (to keep FIS
+      // startup simpler - it will be checked immediately after when execution begins).
+      // Close() must always run to completion to free resources, so cancellation does
+      // not make sense for the CLOSE phase and is not checked. So we disallow these.
+      LOG(WARNING) << Substitute("Do not use $0:$1 debug actions because nodes cannot "
+          "be cancelled in that phase.", *phase_str, *action_str);
       phase_ = TExecNodePhase::INVALID;
       return;
     }
