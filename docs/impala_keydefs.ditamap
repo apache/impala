@@ -10583,6 +10583,7 @@ under the License.
 
 <!-- Long form of mapping from Impala release to vendor-specific releases, for use in running text. -->
   <keydef keys="impala30_full"><topicmeta><keywords><keyword>Impala 3.0</keyword></keywords></topicmeta></keydef>
+  <keydef keys="impala213_full"><topicmeta><keywords><keyword>Impala 2.13</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala212_full"><topicmeta><keywords><keyword>Impala 2.12</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala211_full"><topicmeta><keywords><keyword>Impala 2.11</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala210_full"><topicmeta><keywords><keyword>Impala 2.10</keyword></keywords></topicmeta></keydef>

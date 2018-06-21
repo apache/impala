@@ -115,451 +115,388 @@ under the License.
         nested topics at the end of this file.
       </p>
 
-      <table id="sentry_privileges_objects">
-        <title>Valid privilege types and objects they apply to</title>
-        <tgroup cols="2">
-          <colspec colnum="1" colname="col1" colwidth="1*"/>
-          <colspec colnum="2" colname="col2" colwidth="2*"/>
-          <thead>
-            <row>
-              <entry><b>Privilege</b></entry>
-              <entry><b>Object</b></entry>
-            </row>
-          </thead>
-          <tbody>
-            <row>
-              <entry>INSERT</entry>
-              <entry>DB, TABLE</entry>
-            </row>
-            <row>
-              <entry>SELECT</entry>
-              <entry>DB, TABLE, COLUMN</entry>
-            </row>
-            <row>
-              <entry>ALL</entry>
-              <entry>SERVER, TABLE, DB, URI</entry>
-            </row>
-          </tbody>
-        </tgroup>
-      </table>
-
-      <table id="privileges_sql">
-        <title>Privilege table for Hive &amp; Impala operations</title>
-        <tgroup cols="4">
-          <colspec colnum="1" colname="col1" colwidth="1.31*"/>
-          <colspec colnum="2" colname="col2" colwidth="1.17*"/>
-          <colspec colnum="3" colname="col3" colwidth="1*"/>
-          <colspec colname="newCol4" colnum="4" colwidth="1*"/>
-          <thead>
-            <row>
-              <entry>Operation</entry>
-              <entry>Scope</entry>
-              <entry>Privileges Required</entry>
-              <entry>URI</entry>
-            </row>
-          </thead>
-          <tbody>
-            <row id="create_database_privs">
-              <entry>CREATE DATABASE</entry>
-              <entry>SERVER</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="drop_database_privs">
-              <entry>DROP DATABASE</entry>
-              <entry>DATABASE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="create_table_privs">
-              <entry>CREATE TABLE</entry>
-              <entry>DATABASE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="drop_table_privs">
-              <entry>DROP TABLE</entry>
-              <entry>TABLE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="create_view_privs">
-              <entry>CREATE VIEW<p>-This operation is allowed if you have
-                  column-level <codeph>SELECT</codeph> access to the columns
-                  being used.</p></entry>
-              <entry>DATABASE; SELECT on TABLE; </entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row>
-              <entry>ALTER VIEW<p>-This operation is allowed if you have
-                  column-level <codeph>SELECT</codeph> access to the columns
-                  being used.</p></entry>
-              <entry>VIEW/TABLE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="drop_view_privs">
-              <entry>DROP VIEW</entry>
-              <entry>VIEW/TABLE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_add_columns_privs">
-              <entry>ALTER TABLE .. ADD COLUMNS</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_replace_columns_privs">
-              <entry>ALTER TABLE .. REPLACE COLUMNS</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_change_column_privs">
-              <entry>ALTER TABLE .. CHANGE column</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_rename_privs">
-              <entry>ALTER TABLE .. RENAME</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_set_tblproperties_privs">
-              <entry>ALTER TABLE .. SET TBLPROPERTIES</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_set_fileformat_privs">
-              <entry>ALTER TABLE .. SET FILEFORMAT</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_set_location_privs">
-              <entry>ALTER TABLE .. SET LOCATION</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry>URI</entry>
-            </row>
-            <row id="alter_table_add_partition_privs">
-              <entry>ALTER TABLE .. ADD PARTITION</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_add_partition_location_privs">
-              <entry>ALTER TABLE .. ADD PARTITION location</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry>URI</entry>
-            </row>
-            <row id="alter_table_drop_partition_privs">
-              <entry>ALTER TABLE .. DROP PARTITION</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_partition_set_fileformat_privs">
-              <entry>ALTER TABLE .. PARTITION SET FILEFORMAT</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="show_create_table_privs">
-              <entry>SHOW CREATE TABLE</entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row id="show_partitions_privs">
-              <entry>SHOW PARTITIONS</entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row>
-              <entry>SHOW TABLES<p>-Output includes all the tables for which
-                  the user has table-level privileges and all the tables for
-                  which the user has some column-level privileges.</p></entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row>
-              <entry>SHOW GRANT ROLE<p>-Output includes an additional field
-                  for any column-level privileges.</p></entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row id="describe_table_privs">
-              <entry>DESCRIBE TABLE<p>-Output shows <i>all</i> columns if the
-                  user has table level-privileges or <codeph>SELECT</codeph>
-                  privilege on at least one table column</p></entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row id="load_data_privs">
-              <entry>LOAD DATA</entry>
-              <entry>TABLE</entry>
-              <entry>INSERT</entry>
-              <entry>URI</entry>
-            </row>
-            <row id="select_privs">
-              <entry>SELECT<p>-You can grant the SELECT privilege on a view to
-                  give users access to specific columns of a table they do not
-                  otherwise have access to.</p><p>-See
-                  <xref keyref="sg_hive_sql"/>
-                  for details on allowed column-level
-                operations.</p></entry>
-              <entry>VIEW/TABLE; COLUMN</entry>
-              <entry>SELECT</entry>
-              <entry/>
-            </row>
-            <row id="insert_overwrite_table_privs">
-              <entry>INSERT OVERWRITE TABLE</entry>
-              <entry>TABLE</entry>
-              <entry>INSERT</entry>
-              <entry/>
-            </row>
-            <row id="create_table_as_select_privs">
-              <entry>CREATE TABLE .. AS SELECT<p>-This operation is allowed if
-                  you have column-level <codeph>SELECT</codeph> access to the
-                  columns being used.</p></entry>
-              <entry>DATABASE; SELECT on TABLE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="use_privs">
-              <entry>USE &lt;dbName&gt;</entry>
-              <entry>Any</entry>
-              <entry/>
-              <entry/>
-            </row>
-            <row id="create_function_privs">
-              <entry>CREATE FUNCTION</entry>
-              <entry>SERVER</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_set_serdeproperties_privs">
-              <entry>ALTER TABLE .. SET SERDEPROPERTIES</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row>
-              <entry>ALTER TABLE .. PARTITION SET SERDEPROPERTIES</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="_privs">
-              <entry namest="col1" nameend="newCol4"><b>Hive-Only
-                  Operations</b></entry>
-            </row>
-            <row id="insert_overwrite_directory_privs">
-              <entry>INSERT OVERWRITE DIRECTORY</entry>
-              <entry>TABLE</entry>
-              <entry>INSERT</entry>
-              <entry>URI</entry>
-            </row>
-            <row id="analyze_table_privs">
-              <entry>Analyze TABLE</entry>
-              <entry>TABLE</entry>
-              <entry>SELECT + INSERT</entry>
-              <entry/>
-            </row>
-            <row id="import_table_privs">
-              <entry>IMPORT TABLE</entry>
-              <entry>DATABASE</entry>
-              <entry>ALL</entry>
-              <entry>URI</entry>
-            </row>
-            <row id="export_table_privs">
-              <entry>EXPORT TABLE</entry>
-              <entry>TABLE</entry>
-              <entry>SELECT</entry>
-              <entry>URI</entry>
-            </row>
-            <row id="alter_table_touch_privs">
-              <entry>ALTER TABLE TOUCH</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_touch_partition_privs">
-              <entry>ALTER TABLE TOUCH PARTITION</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_clustered_by_privs">
-              <entry>ALTER TABLE .. CLUSTERED BY SORTED BY</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_enable_privs">
-              <entry>ALTER TABLE .. ENABLE/DISABLE</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_partition_enable_privs">
-              <entry>ALTER TABLE .. PARTITION ENABLE/DISABLE</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row id="alter_table_partition_rename_privs">
-              <entry>ALTER TABLE .. PARTITION.. RENAME TO PARTITION</entry>
-              <entry>TABLE</entry>
-              <entry>ALL on DATABASE</entry>
-              <entry/>
-            </row>
-            <row>
-              <entry>MSCK REPAIR TABLE</entry>
-              <entry>TABLE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="alter_database_privs">
-              <entry>ALTER DATABASE</entry>
-              <entry>DATABASE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="describe_database_privs">
-              <entry>DESCRIBE DATABASE</entry>
-              <entry>DATABASE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row id="show_columns_privs">
-              <entry>SHOW COLUMNS<p>-Output for this operation filters columns
-                  to which the user does not have explicit
-                    <codeph>SELECT</codeph> access </p></entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row id="create_index_privs">
-              <entry>CREATE INDEX</entry>
-              <entry>TABLE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="drop_index_privs">
-              <entry>DROP INDEX</entry>
-              <entry>TABLE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="show_indexes_privs">
-              <entry>SHOW INDEXES</entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row id="grant_privs">
-              <entry>GRANT PRIVILEGE</entry>
-              <entry>Allowed only for Sentry admin users</entry>
-              <entry/>
-              <entry/>
-            </row>
-            <row id="revoke_privs">
-              <entry>REVOKE PRIVILEGE</entry>
-              <entry>Allowed only for Sentry admin users</entry>
-              <entry/>
-              <entry/>
-            </row>
-            <row id="show_grants_privs">
-              <entry>SHOW GRANTS</entry>
-              <entry>Allowed only for Sentry admin users</entry>
-              <entry/>
-              <entry/>
-            </row>
-            <row id="show_tblproperties_privs">
-              <entry>SHOW TBLPROPERTIES</entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row id="describe_table_partition_privs">
-              <entry>DESCRIBE TABLE .. PARTITION</entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row id="add_jar_privs">
-              <entry>ADD JAR</entry>
-              <entry>Not Allowed</entry>
-              <entry/>
-              <entry/>
-            </row>
-            <row id="add_file_privs">
-              <entry>ADD FILE</entry>
-              <entry>Not Allowed</entry>
-              <entry/>
-              <entry/>
-            </row>
-            <row id="dfs_privs">
-              <entry>DFS</entry>
-              <entry>Not Allowed</entry>
-              <entry/>
-              <entry/>
-            </row>
-            <row>
-              <entry namest="col1" nameend="newCol4"><b>Impala-Only
-                  Operations</b></entry>
-            </row>
-            <row id="explain_privs">
-              <entry>EXPLAIN</entry>
-              <entry>TABLE; COLUMN</entry>
-              <entry>SELECT</entry>
-              <entry/>
-            </row>
-            <row id="invalidate_metadata_privs">
-              <entry>INVALIDATE METADATA</entry>
-              <entry>SERVER</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="invalidate_metadata_table_privs">
-              <entry>INVALIDATE METADATA &lt;table name&gt;</entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row id="refresh_privs">
-              <entry>REFRESH &lt;table name&gt; or REFRESH &lt;table name&gt; PARTITION (&lt;partition_spec&gt;)</entry>
-              <entry>TABLE</entry>
-              <entry>SELECT/INSERT</entry>
-              <entry/>
-            </row>
-            <row id="drop_function_privs">
-              <entry>DROP FUNCTION</entry>
-              <entry>SERVER</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-            <row id="compute_stats_privs">
-              <entry>COMPUTE STATS</entry>
-              <entry>TABLE</entry>
-              <entry>ALL</entry>
-              <entry/>
-            </row>
-          </tbody>
-        </tgroup>
-      </table>
+      <p id="sentry_privileges_objects">The table below lists the minimum level
+        of privileges and the scope required to execute SQL statements in
+          <keyword keyref="impala213_full"/> and higher. The following notations
+        are used:<ul>
+          <li><b>ANY</b> denotes the <codeph>SELECT</codeph>,
+              <codeph>INSERT</codeph>, <codeph>CREATE</codeph>,
+              <codeph>ALTER</codeph>, <codeph>DROP</codeph>, <b><i>or</i></b>
+            <codeph>REFRESH</codeph> privilege.</li>
+          <li><b>ALL</b> privilege denotes the <codeph>SELECT</codeph>,
+              <codeph>INSERT</codeph>, <codeph>CREATE</codeph>,
+              <codeph>ALTER</codeph>, <codeph>DROP</codeph>, <b><i>and</i></b>
+            <codeph>REFRESH</codeph> privileges.</li>
+          <li>The parent levels of the specified scope are implicitly supported.
+            For example, if a privilege is listed with the
+              <codeph>TABLE</codeph> scope, the same privilege granted on
+              <codeph>DATABASE</codeph> and <codeph>SERVER</codeph> will allow
+            the user to execute the specified SQL statement.</li>
+        </ul><table id="sentry_privileges_objects_tab" frame="all" colsep="1"
+          rowsep="1">
+          <tgroup cols="3">
+            <colspec colnum="1" colname="col1"/>
+            <colspec colnum="2" colname="col2"/>
+            <colspec colnum="3" colname="col3"/>
+            <tbody>
+              <row>
+                <entry><b>SQL Statement</b></entry>
+                <entry><b>Privileges</b></entry>
+                <entry><b>Scope</b></entry>
+              </row>
+              <row>
+                <entry>SELECT</entry>
+                <entry>SELECT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>WITH SELECT</entry>
+                <entry>SELECT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>EXPLAIN SELECT</entry>
+                <entry>SELECT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>INSERT</entry>
+                <entry>INSERT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>EXPLAIN INSERT</entry>
+                <entry>INSERT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>TRUNCATE</entry>
+                <entry>INSERT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>LOAD</entry>
+                <entry>INSERT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>ALL</entry>
+                <entry>URI</entry>
+              </row>
+              <row>
+                <entry>CREATE DATABASE</entry>
+                <entry>CREATE</entry>
+                <entry>SERVER</entry>
+              </row>
+              <row>
+                <entry>CREATE DATABASE LOCATION</entry>
+                <entry>CREATE</entry>
+                <entry>SERVER</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>ALL</entry>
+                <entry>URI</entry>
+              </row>
+              <row>
+                <entry>CREATE TABLE</entry>
+                <entry>CREATE</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry>CREATE TABLE LIKE</entry>
+                <entry>CREATE</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>CREATE TABLE AS SELECT</entry>
+                <entry>CREATE</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>INSERT</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>SELECT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>EXPLAIN CREATE TABLE AS SELECT</entry>
+                <entry>CREATE</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>INSERT</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>SELECT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>CREATE TABLE LOCATION</entry>
+                <entry>CREATE</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>ALL</entry>
+                <entry>URI</entry>
+              </row>
+              <row>
+                <entry>CREATE VIEW</entry>
+                <entry>CREATE</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>SELECT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>ALTER DATABASE</entry>
+                <entry>ALTER</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry>ALTER TABLE</entry>
+                <entry>ALTER</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>ALTER TABLE SET LOCATION</entry>
+                <entry>ALTER</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>ALL</entry>
+                <entry>URI</entry>
+              </row>
+              <row>
+                <entry>ALTER TABLE RENAME</entry>
+                <entry>CREATE</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>ALTER</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>ALTER VIEW</entry>
+                <entry>ALTER</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>SELECT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>ALTER VIEW RENAME</entry>
+                <entry>CREATE</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>ALTER</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>DROP DATABASE</entry>
+                <entry>DROP</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry>DROP TABLE</entry>
+                <entry>DROP</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>DROP VIEW</entry>
+                <entry>DROP</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>CREATE FUNCTION</entry>
+                <entry>CREATE</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry/>
+                <entry>ALL</entry>
+                <entry>URI</entry>
+              </row>
+              <row>
+                <entry>DROP FUNCTION</entry>
+                <entry>DROP</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry>COMPUTE STATS</entry>
+                <entry>ALTER and SELECT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>DROP STATS</entry>
+                <entry>ALTER</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>INVALIDATE METADATA</entry>
+                <entry>REFRESH</entry>
+                <entry>SERVER</entry>
+              </row>
+              <row>
+                <entry>INVALIDATE METADATA &lt;table></entry>
+                <entry>REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>REFRESH &lt;table></entry>
+                <entry>REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>REFRESH FUNCTIONS</entry>
+                <entry>REFRESH</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry>COMMENT ON DATABASE</entry>
+                <entry>ALTER</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry>COMMENT ON TABLE</entry>
+                <entry>ALTER</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>COMMENT ON VIEW</entry>
+                <entry>ALTER</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>DESCRIBE DATABASE</entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry>DESCRIBE &lt;table/view></entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>USE</entry>
+                <entry>ANY</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>SHOW DATABASES</entry>
+                <entry>ANY</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>SHOW TABLES</entry>
+                <entry>ANY</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>SHOW FUNCTIONS</entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry>SHOW PARTITIONS</entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>SHOW TABLE STATS</entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>SHOW COLUMN STATS</entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>SHOW FILES</entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>SHOW CREATE TABLE</entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>SHOW CREATE VIEW</entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>SHOW CREATE FUNCTION</entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>DATABASE</entry>
+              </row>
+              <row>
+                <entry>SHOW RANGE PARTITIONS (Kudu only)</entry>
+                <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>UPDATE (Kudu only)</entry>
+                <entry>ALL</entry>
+                <entry>SERVER</entry>
+              </row>
+              <row>
+                <entry>EXPLAIN UPDATE (Kudu only)</entry>
+                <entry>ALL</entry>
+                <entry>SERVER</entry>
+              </row>
+              <row>
+                <entry>UPSERT (Kudu only)</entry>
+                <entry>ALL</entry>
+                <entry>SERVER</entry>
+              </row>
+              <row>
+                <entry>WITH UPSERT (Kudu only)</entry>
+                <entry>ALL</entry>
+                <entry>SERVER</entry>
+              </row>
+              <row>
+                <entry>EXPLAIN UPSERT (Kudu only)</entry>
+                <entry>ALL</entry>
+                <entry>SERVER</entry>
+              </row>
+              <row>
+                <entry>DELETE (Kudu only)</entry>
+                <entry>ALL</entry>
+                <entry>SERVER</entry>
+              </row>
+              <row>
+                <entry>EXPLAIN DELETE (Kudu only)</entry>
+                <entry>ALL</entry>
+                <entry>SERVER</entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table></p>
 
     <p rev="IMPALA-2660" id="auth_to_local_instructions">
       In <keyword keyref="impala26_full"/> and higher, Impala recognizes the <codeph>auth_to_local</codeph> setting,
@@ -590,29 +527,23 @@ under the License.
       <b><ph id="title_sentry_debug">Debugging Failed Sentry Authorization Requests</ph></b>
     </p>
 
-    <p id="sentry_debug">
-      Sentry logs all facts that lead up to authorization decisions at the debug level. If you do not understand
-      why Sentry is denying access, the best way to debug is to temporarily turn on debug logging:
-      <ul>
-        <li>
-          Add <codeph>log4j.logger.org.apache.sentry=DEBUG</codeph> to the <filepath>log4j.properties</filepath>
-          file on each host in the cluster, in the appropriate configuration directory for each service.
-        </li>
-      </ul>
-      Specifically, look for exceptions and messages such as:
-<codeblock xml:space="preserve">FilePermission server..., RequestPermission server...., result [true|false]</codeblock>
-      which indicate each evaluation Sentry makes. The <codeph>FilePermission</codeph> is from the policy file,
-      while <codeph>RequestPermission</codeph> is the privilege required for the query. A
-      <codeph>RequestPermission</codeph> will iterate over all appropriate <codeph>FilePermission</codeph>
-      settings until a match is found. If no matching privilege is found, Sentry returns <codeph>false</codeph>
-      indicating <q>Access Denied</q> .
-<!--
-[1]
-Impala: Impala Daemon -> Advanced -> Impala Daemon Logging Safety Valve
-Hive: Hive Server 2 -> Advanced -> HiveServer2 Logging Safety Valve
-Search: Solr Server -> Advanced -> HiveServer2 Logging Safety Valve
--->
-    </p>
+    <p id="sentry_debug"> Sentry logs all facts that lead up to authorization
+        decisions at the debug level. If you do not understand why Sentry is
+        denying access, the best way to debug is to temporarily turn on debug
+        logging: <ul>
+          <li> Add <codeph>log4j.logger.org.apache.sentry=DEBUG</codeph> to the
+              <filepath>log4j.properties</filepath> file on each host in the
+            cluster, in the appropriate configuration directory for each
+            service. </li>
+        </ul> Specifically, look for exceptions and messages such as:
+        <codeblock xml:space="preserve">FilePermission server..., RequestPermission server...., result [true|false]</codeblock>
+        which indicate each evaluation Sentry makes. The
+          <codeph>FilePermission</codeph> is from the policy file, while
+          <codeph>RequestPermission</codeph> is the privilege required for the
+        query. A <codeph>RequestPermission</codeph> will iterate over all
+        appropriate <codeph>FilePermission</codeph> settings until a match is
+        found. If no matching privilege is found, Sentry returns
+          <codeph>false</codeph> indicating <q>Access Denied</q>.</p>
 
   </section>
 

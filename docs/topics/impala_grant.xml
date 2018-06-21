@@ -66,37 +66,38 @@ object_type ::= TABLE | DATABASE | SERVER | URI
 
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
 
-    <p>
-<!-- To do: The wording here can be fluid, and it's reused in several statements. Turn into a conref. -->
-      Only administrative users (initially, a predefined set of users specified in the Sentry service configuration
-      file) can use this statement.
-    </p>
+    <p>Only Sentry administrative users can grant roles to a group. </p>
 
-    <p>
-      The <codeph>WITH GRANT OPTION</codeph> clause allows members of the specified role to issue
-      <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements for those same privileges
-<!-- Copied from Sentry docs. Turn into conref. I did some rewording for clarity. -->
-      Hence, if a role has the <codeph>ALL</codeph> privilege on a database and the <codeph>WITH GRANT
-      OPTION</codeph> set, users granted that role can execute <codeph>GRANT</codeph>/<codeph>REVOKE</codeph>
-      statements only for that database or child tables of the database. This means a user could revoke the
-      privileges of the user that provided them the <codeph>GRANT OPTION</codeph>.
-    </p>
+    <p> The <codeph>WITH GRANT OPTION</codeph> clause allows members of the
+      specified role to issue <codeph>GRANT</codeph> and <codeph>REVOKE</codeph>
+      statements for those same privileges. Hence, if a role has the
+        <codeph>ALL</codeph> privilege on a database and the <codeph>WITH GRANT
+        OPTION</codeph> set, users granted that role can execute
+        <codeph>GRANT</codeph>/<codeph>REVOKE</codeph> statements only for that
+      database or child tables of the database. This means a user could revoke
+      the privileges of the user that provided them the <codeph>GRANT
+        OPTION</codeph>. </p>
 
-    <p>
-<!-- Copied from Sentry docs. Turn into conref. Except I changed Hive to Impala. -->
-      Impala does not currently support revoking only the <codeph>WITH GRANT OPTION</codeph> from a privilege
-      previously granted to a role. To remove the <codeph>WITH GRANT OPTION</codeph>, revoke the privilege and
-      grant it again without the <codeph>WITH GRANT OPTION</codeph> flag.
-    </p>
+    <p> Impala does not currently support revoking only the <codeph>WITH GRANT
+        OPTION</codeph> from a privilege previously granted to a role. To remove
+      the <codeph>WITH GRANT OPTION</codeph>, revoke the privilege and grant it
+      again without the <codeph>WITH GRANT OPTION</codeph> flag. </p>
 
     <p rev="2.3.0 collevelauth">
       The ability to grant or revoke <codeph>SELECT</codeph> privilege on specific columns is available
       in <keyword keyref="impala23_full"/> and higher. See <xref keyref="sg_hive_sql"/> for details.
     </p>
+    <p>
+      <b>Usage notes:</b>
+    </p>
 
-<!-- Turn compatibility info into a conref or series of conrefs. (In both GRANT and REVOKE.) -->
+    <p>
+      You can only grant the <codeph>ALL</codeph> privilege to the
+        <codeph>URI</codeph> object. Finer-grained privileges mentioned below on
+      a <codeph>URI</codeph> are not supported.
+    </p>
 
-<!-- If they diverge during development, consider the version here in GRANT the authoritative one. -->
+    <p conref="../shared/impala_common.xml#common/sentry_privileges_objects"/>
 
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
 
