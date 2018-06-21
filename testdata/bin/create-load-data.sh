@@ -144,7 +144,7 @@ function start-impala {
   fi
   START_CLUSTER_ARGS_INT+=("${START_CLUSTER_ARGS}")
   ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_DATA_LOADING_LOGS_DIR} \
-    ${START_CLUSTER_ARGS_INT}
+    ${START_CLUSTER_ARGS_INT[@]}
 }
 
 function restart-cluster {
