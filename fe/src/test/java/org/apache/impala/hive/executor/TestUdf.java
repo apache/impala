@@ -19,6 +19,7 @@ package org.apache.impala.hive.executor;
 
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
+import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.io.TimestampWritable;
@@ -76,6 +77,10 @@ public class TestUdf extends UDF {
   public TimestampWritable evaluate(TimestampWritable a) {
     if (a == null) return a;
     return new TimestampWritable(a);
+  }
+  public DateWritable evaluate(DateWritable a) {
+    if (a == null) return a;
+    return new DateWritable(a);
   }
   public String evaluate(String a) {
     if (a == null) return a;

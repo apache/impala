@@ -24,6 +24,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/Exprs_types.h"
+#include "runtime/date-parse-util.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-parse-util.h"
@@ -130,6 +131,13 @@ Literal::Literal(const TExprNode& node)
       memcpy(&value_.timestamp_val, ts_val.data(), type_.GetSlotSize());
       break;
     }
+    case TYPE_DATE: {
+      DCHECK_EQ(node.node_type, TExprNodeType::DATE_LITERAL);
+      DCHECK(node.__isset.date_literal);
+      value_.date_val = *reinterpret_cast<const DateValue*>(
+          &node.date_literal.days_since_epoch);
+      break;
+    }
     default:
       DCHECK(false) << "Invalid type: " << TypeToString(type_.type);
   }
@@ -214,6 +222,12 @@ Literal::Literal(ColumnType type, const TimestampValue& v)
   value_.timestamp_val = v;
 }
 
+Literal::Literal(ColumnType type, const DateValue& v)
+  : ScalarExpr(type, true) {
+  DCHECK_EQ(type.type, TYPE_DATE) << type;
+  value_.date_val = v;
+}
+
 BooleanVal Literal::GetBooleanVal(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_BOOLEAN) << type_;
@@ -289,6 +303,12 @@ TimestampVal Literal::GetTimestampVal(
   return result;
 }
 
+DateVal Literal::GetDateVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK_EQ(type_.type, TYPE_DATE) << type_;
+  return value_.date_val.ToDateVal();
+}
+
 string Literal::DebugString() const {
   stringstream out;
   out << "Literal(value=";
@@ -334,6 +354,9 @@ string Literal::DebugString() const {
       break;
     case TYPE_TIMESTAMP:
       out << value_.timestamp_val;
+      break;
+    case TYPE_DATE:
+      out << value_.date_val;
       break;
     default:
       out << "[bad type! " << type_ << "]";
@@ -414,6 +437,9 @@ Status Literal::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
           *reinterpret_cast<const int64_t*>(&value_.timestamp_val.time())));
       v.SetDate(builder.getInt32(
           *reinterpret_cast<const int32_t*>(&value_.timestamp_val.date())));
+      break;
+    case TYPE_DATE:
+      v.SetVal(value_.date_val.Value());
       break;
     default:
       stringstream ss;

@@ -58,6 +58,55 @@ row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
 int, boolean, tinyint, smallint
 ====
 ---- QUERY
+select * from date_tbl_error order by id_col;
+---- ERRORS
+Error converting column: 1 to DATE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to DATE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to DATE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to DATE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to DATE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to DATE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to DATE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to DATE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to DATE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+Error converting column: 1 to DATE
+row_regex: .*Error parsing row: file: $NAMENODE/.* before offset: \d+
+---- RESULTS
+0,0001-01-01,0001-01-01
+1,NULL,0001-01-01
+2,NULL,0001-01-01
+3,NULL,0001-01-01
+4,NULL,0001-01-01
+5,NULL,0001-01-01
+6,NULL,0001-01-01
+10,NULL,1399-06-27
+11,NULL,1399-06-27
+12,2018-12-31,1399-06-27
+20,0001-06-21,2017-11-27
+21,0001-06-22,2017-11-27
+22,0001-06-23,2017-11-27
+23,NULL,2017-11-27
+24,NULL,2017-11-27
+25,0001-06-26,2017-11-27
+26,0001-06-27,2017-11-27
+27,NULL,2017-11-27
+28,0001-06-29,2017-11-27
+29,2017-11-28,2017-11-27
+30,NULL,9999-12-31
+31,9999-12-31,9999-12-31
+---- TYPES
+INT, DATE, DATE
+====
+---- QUERY
 select count(*) from functional_text_lzo.bad_text_lzo
 ---- ERRORS
 Blocksize: 536870911 is greater than LZO_MAX_BLOCK_SIZE: 67108864

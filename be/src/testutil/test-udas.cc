@@ -172,6 +172,40 @@ DecimalVal AggStringIntermediateFinalize(FunctionContext* context, const StringV
   return DecimalVal(100);
 }
 
+// Defines AggDateIntermediate(DATE, INT) returns DATE
+// intermediate DATE
+// Useful to test that type parameters are plumbed through.
+static void ValidateFunctionContext4(const FunctionContext* context) {
+  assert(context->GetNumArgs() == 2);
+  assert(context->GetArgType(0)->type == FunctionContext::TYPE_DATE);
+  assert(context->GetArgType(1)->type == FunctionContext::TYPE_INT);
+  assert(context->GetIntermediateType().type == FunctionContext::TYPE_DATE);
+  assert(context->GetReturnType().type == FunctionContext::TYPE_DATE);
+}
+
+IMPALA_UDF_EXPORT
+void AggDateIntermediateUpdate(FunctionContext* context, const DateVal&,
+    const IntVal&, DateVal*) {
+  ValidateFunctionContext4(context);
+}
+
+IMPALA_UDF_EXPORT
+void AggDateIntermediateInit(FunctionContext* context, DateVal*) {
+  ValidateFunctionContext4(context);
+}
+
+IMPALA_UDF_EXPORT
+void AggDateIntermediateMerge(FunctionContext* context, const DateVal&,
+    DateVal*) {
+  ValidateFunctionContext4(context);
+}
+
+IMPALA_UDF_EXPORT
+DateVal AggDateIntermediateFinalize(FunctionContext* context, const DateVal&) {
+  ValidateFunctionContext4(context);
+  return DateVal::null();
+}
+
 // Defines MemTest(bigint) return bigint
 // "Allocates" the specified number of bytes in the update function and frees them in the
 // serialize function. Useful for testing mem limits.

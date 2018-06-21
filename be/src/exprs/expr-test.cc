@@ -46,6 +46,7 @@
 #include "gen-cpp/hive_metastore_types.h"
 #include "rpc/thrift-client.h"
 #include "rpc/thrift-server.h"
+#include "runtime/date-value.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
@@ -214,10 +215,12 @@ class ExprTest : public testing::Test {
   string default_string_str_;
   string default_timestamp_str_;
   string default_decimal_str_;
+  string default_date_str_;
   // Corresponding default values.
   bool default_bool_val_;
   string default_string_val_;
   TimestampValue default_timestamp_val_;
+  DateValue default_date_val_;
 
   virtual void SetUp() {
     min_int_values_[TYPE_TINYINT] = 1;
@@ -236,10 +239,12 @@ class ExprTest : public testing::Test {
     default_string_str_ = "'abc'";
     default_timestamp_str_ = "cast('2011-01-01 09:01:01' as timestamp)";
     default_decimal_str_ = "1.23";
+    default_date_str_ = "cast('2011-01-01' as date)";
     default_bool_val_ = false;
     default_string_val_ = "abc";
     default_timestamp_val_ = TimestampValue::FromUnixTime(1293872461,
         TimezoneDatabase::GetUtcTimezone());
+    default_date_val_ = DateValue(2011, 1, 1);
     default_type_strs_[TYPE_TINYINT] =
         lexical_cast<string>(min_int_values_[TYPE_TINYINT]);
     default_type_strs_[TYPE_SMALLINT] =
@@ -262,6 +267,7 @@ class ExprTest : public testing::Test {
     default_type_strs_[TYPE_STRING] = default_string_str_;
     default_type_strs_[TYPE_TIMESTAMP] = default_timestamp_str_;
     default_type_strs_[TYPE_DECIMAL] = default_decimal_str_;
+    default_type_strs_[TYPE_DATE] = default_date_str_;
   }
 
   virtual void TearDown() { pool_.Clear(); }
@@ -761,6 +767,8 @@ class ExprTest : public testing::Test {
   void TestTimestampValue(const string& expr, const TimestampValue& expected_result);
   void TestValidTimestampValue(const string& expr);
 
+  void TestDateValue(const string& expr, const DateValue& expected_result);
+
   // Test IS DISTINCT FROM operator and its variants
   void TestDistinctFrom() {
     static const string operators[] = {"<=>", "IS DISTINCT FROM", "IS NOT DISTINCT FROM"};
@@ -1131,7 +1139,7 @@ TimestampValue ExprTest::CreateTestTimestamp(int64_t val) {
 // 'stmt' is a partial stmt that could be of any valid type.
 template<>
 void ExprTest::TestCast(const string& stmt, const char* val,
-                        bool timestamp_out_of_range) {
+    bool timestamp_out_of_range) {
   try {
     int8_t val8 = static_cast<int8_t>(lexical_cast<int16_t>(val));
 #if 0
@@ -1195,6 +1203,11 @@ TimestampValue ExprTest::ConvertValue<TimestampValue>(const string& value) {
   return TimestampValue::Parse(value.data(), value.size());
 }
 
+template <>
+DateValue ExprTest::ConvertValue<DateValue>(const string& value) {
+  return DateValue::Parse(value.data(), value.size());
+}
+
 // We can't put this into TestValue() because GTest can't resolve
 // the ambiguity in TimestampValue::operator==, even with the appropriate casts.
 void ExprTest::TestTimestampValue(const string& expr, const TimestampValue& expected_result) {
@@ -1207,6 +1220,12 @@ void ExprTest::TestTimestampValue(const string& expr, const TimestampValue& expe
 void ExprTest::TestValidTimestampValue(const string& expr) {
   EXPECT_TRUE(
       ConvertValue<TimestampValue>(GetValue(expr, TYPE_TIMESTAMP)).HasDateOrTime());
+}
+
+// We can't put this into TestValue() because GTest can't resolve
+// the ambiguity in DateValue::operator==, even with the appropriate casts.
+void ExprTest::TestDateValue(const string& expr, const DateValue& expected_result) {
+  EXPECT_EQ(expected_result, ConvertValue<DateValue>(GetValue(expr, TYPE_DATE)));
 }
 
 template<class T>
@@ -1224,6 +1243,11 @@ bool ExprTest::ParseString(const string& str, TimestampValue* val) {
   val->set_date(date);
   val->set_time(time);
   return success;
+}
+
+template<>
+bool ExprTest::ParseString(const string& str, DateValue* val) {
+  return DateParser::Parse(str.c_str(), str.length(), false, val);
 }
 
 Literal* ExprTest::CreateLiteral(const ColumnType& type, const string& str) {
@@ -1270,6 +1294,11 @@ Literal* ExprTest::CreateLiteral(const ColumnType& type, const string& str) {
     case TYPE_TIMESTAMP: {
       TimestampValue v;
       EXPECT_TRUE(ParseString<TimestampValue>(str, &v));
+      return pool_.Add(new Literal(type, v));
+    }
+    case TYPE_DATE: {
+      DateValue v;
+      EXPECT_TRUE(ParseString<DateValue>(str, &v));
       return pool_.Add(new Literal(type, v));
     }
     case TYPE_DECIMAL: {
@@ -1351,8 +1380,9 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_DOUBLE, d_val_3, "5.9e-3");
   TestSingleLiteralConstruction(TYPE_DOUBLE, d_val_3, "+5.9e-3");
   TestSingleLiteralConstruction(TYPE_STRING, str_val, "Hello");
+  TestSingleLiteralConstruction(TYPE_DATE, DateValue(2001, 11, 30), "2001-11-30");
 
-  // Min/Max Boundary value test for tiny/small/int/long
+  // Min/Max Boundary value test for tiny/small/int/long/date
   c_val = 127;
   const char c_array_max[] = {(const char)127}; // avoid implicit casting
   string c_input_max(c_array_max, 1);
@@ -1363,6 +1393,7 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_SMALLINT, s_val, "32767");
   TestSingleLiteralConstruction(TYPE_INT, i_val, "2147483647");
   TestSingleLiteralConstruction(TYPE_BIGINT, l_val, "9223372036854775807");
+  TestSingleLiteralConstruction(TYPE_DATE, DateValue(9999, 12, 31), "9999-12-31");
 
   const char c_array_min[] = {(const char)(-128)}; // avoid implicit casting
   string c_input_min(c_array_min, 1);
@@ -1374,6 +1405,7 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_SMALLINT, s_val, "-32768");
   TestSingleLiteralConstruction(TYPE_INT, i_val, "-2147483648");
   TestSingleLiteralConstruction(TYPE_BIGINT, l_val, "-9223372036854775808");
+  TestSingleLiteralConstruction(TYPE_DATE, DateValue(0, 1, 1), "0000-01-01");
 }
 
 
@@ -3351,6 +3383,133 @@ TEST_F(ExprTest, CastExprs) {
 #endif
 }
 
+// Test casting from/to Date.
+TEST_F(ExprTest, CastDateExprs) {
+  // From Date to Date
+  TestStringValue("cast(cast(cast('2012-01-01' as date) as date) as string)",
+      "2012-01-01");
+  TestStringValue("cast(cast(date '2012-01-01' as date) as string)",
+      "2012-01-01");
+
+  // Test casting of lazy date and/or time format string to Date.
+  TestDateValue("cast('2001-1-2' as date)", DateValue(2001, 1, 2));
+  TestDateValue("cast('2001-01-3' as date)", DateValue(2001, 1, 3));
+  TestDateValue("cast('2001-1-21' as date)", DateValue(2001, 1, 21));
+  TestDateValue("cast('        2001-01-9         ' as date)",
+      DateValue(2001, 1, 9));
+
+  TestError("cast('2001-6' as date)");
+  TestError("cast('01-1-21' as date)");
+  TestError("cast('10/feb/10' as date)");
+  TestError("cast('1909-foo1-2bar' as date)");
+  TestError("cast('1909/1-/2' as date)");
+
+  // Test various ways of truncating a "lazy" format to produce an invalid date.
+  TestError("cast('1909-10- ' as date)");
+  TestError("cast('1909-10-' as date)");
+  TestError("cast('1909-10' as date)");
+  TestError("cast('1909-' as date)");
+  TestError("cast('1909' as date)");
+
+  // Test missing number from format.
+  TestError("cast('1909--2' as date)");
+  TestError("cast('-10-2' as date)");
+
+  // Test duplicate separators - should fail with an error because not a valid format.
+  TestError("cast('1909--10-2' as date)");
+  TestError("cast('1909-10--2' as date)");
+
+  // Test numbers with too many digits in date - should fail with an error because not a
+  // valid date.
+  TestError("cast('19097-10-2' as date)");
+  TestError("cast('1909-107-2' as date)");
+  TestError("cast('1909-10-277' as date)");
+
+  // Test correctly formatted invalid dates
+  // Invalid month of year
+  TestError("cast('2000-13-29' as date)");
+  // Invalid day of month
+  TestError("cast('2000-04-31' as date)");
+  // 1900 is not a leap year: 1900-02-28 is valid but 1900-02-29 isn't
+  TestDateValue("cast('1900-02-28' as date)", DateValue(1900, 2, 28));
+  TestError("cast('1900-02-29' as date)");
+  // 2000 is a leap year: 2000-02-29 is valid but 2000-02-30 isn't
+  TestDateValue("cast('2000-02-29' as date)", DateValue(2000, 2, 29));
+  TestError("cast('2000-02-30' as date)");
+
+  // Test whitespace trimming mechanism when cast from string to date.
+  TestDateValue("cast('  \t\r\n      2001-01-09   \t\r\n     ' as date)",
+      DateValue(2001, 1, 9));
+  TestDateValue("cast('  \t\r\n      2001-1-9    \t\r\n    ' as date)",
+      DateValue(2001, 1, 9));
+
+  // whitespace-only strings should fail with an error.
+  TestError("cast(' ' as date)");
+  TestError("cast('\n' as date)");
+  TestError("cast('\t' as date)");
+  TestError("cast('  \t\r\n' as date)");
+
+  // Test String <-> Date boundary cases.
+  TestDateValue("cast('0000-01-01' as date)", DateValue(0, 1, 1));
+  TestStringValue("cast(date '0000-01-01' as string)", "0000-01-01");
+  TestDateValue("cast('9999-12-31' as date)", DateValue(9999, 12, 31));
+  TestStringValue("cast(date '9999-12-31' as string)", "9999-12-31");
+  TestError("cast('10000-01-01' as date)");
+  TestError("cast(date '10000-01-01' as string)");
+
+  // Decimal <-> Date conversions are not allowed.
+  TestError("cast(cast('2000-01-01' as date) as decimal(12, 4))");
+  TestError("cast(cast(16868.1230 as decimal(12,4)) as date)");
+  TestError("cast(cast(null as date) as decimal(12, 4))");
+  TestError("cast(cast(null as decimal(12, 4)) as date)");
+
+  // Date <-> Int conversions are not allowed.
+  TestError("cast(cast('2000-01-01' as date) as int)");
+  TestError("cast(10957 as date)");
+  TestError("cast(cast(null as date) as int)");
+  TestError("cast(cast(null as int) as date)");
+
+  // Date <-> Double conversions are not allowed.
+  TestError("cast(cast('2000-01-01' as date) as double)");
+  TestError("cast(123.0 as date)");
+  TestError("cast(cast(null as date) as double)");
+  TestError("cast(cast(null as double) as date)");
+
+  // Bigint <-> date conversions are not allowed.
+  TestError("cast(cast(1234567890 as bigint) as date)");
+  TestError("cast(cast('2000-01-01' as date) as bigint)");
+  TestError("cast(cast(null as bigint) as date)");
+  TestError("cast(cast(null as date) as bigint)");
+
+  // Date <-> Timestamp
+  TestDateValue("cast(cast('2000-09-27 01:12:32.546' as timestamp) as date)",
+      DateValue(2000, 9, 27));
+  TestDateValue("cast(cast('1960-01-01 23:59:59' as timestamp) as date)",
+      DateValue(1960, 1, 1));
+  TestDateValue("cast(cast('1400-01-01 00:00:00' as timestamp) as date)",
+      DateValue(1400, 1, 1));
+  TestDateValue("cast(cast('9999-12-31 23:59:59.999999999' as timestamp) as date)",
+      DateValue(9999, 12, 31));
+
+  TestTimestampValue("cast(cast('2000-09-27' as date) as timestamp)",
+      TimestampValue::Parse("2000-09-27", 10));
+  TestTimestampValue("cast(date '2000-09-27' as timestamp)",
+      TimestampValue::Parse("2000-09-27", 10));
+  TestTimestampValue("cast(cast('9999-12-31' as date) as timestamp)",
+      TimestampValue::Parse("9999-12-31", 10));
+  TestTimestampValue("cast(date '9999-12-31' as timestamp)",
+      TimestampValue::Parse("9999-12-31", 10));
+  TestTimestampValue("cast(cast('1400-01-01' as date) as timestamp)",
+      TimestampValue::Parse("1400-01-01", 10));
+  TestTimestampValue("cast(DATE '1400-01-01' as timestamp)",
+      TimestampValue::Parse("1400-01-01", 10));
+  TestError("cast(cast('1399-12-31' as date) as timestamp)");
+  TestError("cast(date '1399-12-31' as timestamp)");
+
+  TestIsNull("cast(cast(null as timestamp) as date)", TYPE_DATE);
+  TestIsNull("cast(cast(null as date) as timestamp)", TYPE_TIMESTAMP);
+}
+
 TEST_F(ExprTest, CompoundPredicates) {
   TestValue("TRUE AND TRUE", TYPE_BOOLEAN, true);
   TestValue("TRUE AND FALSE", TYPE_BOOLEAN, false);
@@ -3684,9 +3843,9 @@ TEST_F(ExprTest, InPredicate) {
       "cast('2011-11-24 09:11:12' as timestamp), " +
       default_timestamp_str_ + ")", TYPE_BOOLEAN, true);
   TestValue(default_timestamp_str_ + " "
-        "in (cast('2011-11-22 09:10:11' as timestamp), "
-        "cast('2011-11-23 09:11:12' as timestamp), "
-        "cast('2011-11-24 09:12:13' as timestamp))", TYPE_BOOLEAN, false);
+      "in (cast('2011-11-22 09:10:11' as timestamp), "
+      "cast('2011-11-23 09:11:12' as timestamp), "
+      "cast('2011-11-24 09:12:13' as timestamp))", TYPE_BOOLEAN, false);
   TestValue(default_timestamp_str_ + " "
       "not in (cast('2011-11-22 09:10:11' as timestamp), "
       "cast('2011-11-23 09:11:12' as timestamp), " +
@@ -3695,6 +3854,16 @@ TEST_F(ExprTest, InPredicate) {
       "not in (cast('2011-11-22 09:10:11' as timestamp), "
       "cast('2011-11-23 09:11:12' as timestamp), "
       "cast('2011-11-24 09:12:13' as timestamp))", TYPE_BOOLEAN, true);
+
+  // Test dates
+  TestValue(default_date_str_ + " in (cast('2011-01-02' as date), "
+      "cast('2011-01-03' as date), " + default_date_str_ + ")", TYPE_BOOLEAN, true);
+  TestValue(default_date_str_ + " in (cast('2011-01-02' as date), "
+      "cast('2011-01-03' as date), cast('2011-01-04' as date))", TYPE_BOOLEAN, false);
+  TestValue(default_date_str_ + " not in (cast('2011-01-02' as date), "
+      "cast('2011-01-03' as date), " + default_date_str_ + ")", TYPE_BOOLEAN, false);
+  TestValue(default_date_str_ + " not in (cast('2011-01-02' as date), "
+      "cast('2011-01-03' as date), cast('2011-01-04' as date))", TYPE_BOOLEAN, true);
 
   // Test decimals
   vector<string> dec_strs; // Decimal of every physical type
@@ -4940,6 +5109,8 @@ TEST_F(ExprTest, UtilityFunctions) {
   TestStringValue("typeOf(coordinator())", "STRING");
   TestStringValue("typeOf(now())", "TIMESTAMP");
   TestStringValue("typeOf(utc_timestamp())", "TIMESTAMP");
+  TestStringValue("typeOf(DATE '2011-01-01')", "DATE");
+  TestStringValue("typeOf(cast(now() as DATE))", "DATE");
   TestStringValue("typeOf(cast(10 as DECIMAL))", "DECIMAL(9,0)");
   TestStringValue("typeOf(0.0)", "DECIMAL(1,1)");
   TestStringValue("typeOf(3.14)", "DECIMAL(3,2)");
@@ -4985,6 +5156,10 @@ TEST_F(ExprTest, UtilityFunctions) {
 
   expected = HashUtil::FnvHash64(&default_timestamp_val_, 12, HashUtil::FNV_SEED);
   TestValue("fnv_hash(" + default_timestamp_str_ + ")", TYPE_BIGINT, expected);
+
+  expected = HashUtil::FnvHash64(&default_date_val_, sizeof(DateValue),
+      HashUtil::FNV_SEED);
+  TestValue("fnv_hash(" + default_date_str_ + ")", TYPE_BIGINT, expected);
 
   bool bool_val = false;
   expected = HashUtil::FnvHash64(&bool_val, 1, HashUtil::FNV_SEED);
@@ -5051,6 +5226,10 @@ TEST_F(ExprTest, MurmurHashFunction) {
   expected = HashUtil::MurmurHash2_64(&default_timestamp_val_, 12,
       HashUtil::MURMUR_DEFAULT_SEED);
   TestValue("murmur_hash(" + default_timestamp_str_ + ")", TYPE_BIGINT, expected);
+
+  expected = HashUtil::MurmurHash2_64(&default_date_val_, sizeof(DateValue),
+      HashUtil::MURMUR_DEFAULT_SEED);
+  TestValue("murmur_hash(" + default_date_str_ + ")", TYPE_BIGINT, expected);
 
   bool bool_val = false;
   expected = HashUtil::MurmurHash2_64(&bool_val, 1, HashUtil::MURMUR_DEFAULT_SEED);
@@ -5629,6 +5808,9 @@ TEST_F(ExprTest, MathFunctions) {
   // Test timestamp param
   TestStringValue("cast(least(cast('2014-09-26 12:00:00' as timestamp), "
       "cast('2013-09-26 12:00:00' as timestamp)) as string)", "2013-09-26 12:00:00");
+  // Test date param
+  TestStringValue("cast(least(cast('2014-09-26' as date), "
+      "cast('2013-09-26' as date)) as string)", "2013-09-26");
   // Test string param.
   TestStringValue("least('2', '5', '12', '3')", "12");
   TestStringValue("least('apples', 'oranges', 'bananas')", "apples");
@@ -5686,6 +5868,9 @@ TEST_F(ExprTest, MathFunctions) {
   // Test timestamp param
   TestStringValue("cast(greatest(cast('2014-09-26 12:00:00' as timestamp), "
       "cast('2013-09-26 12:00:00' as timestamp)) as string)", "2014-09-26 12:00:00");
+  // Test date param
+  TestStringValue("cast(greatest(cast('2014-09-26' as date), "
+      "cast('2013-09-26' as date)) as string)", "2014-09-26");
   // Test string param
   TestStringValue("greatest('2', '5', '12', '3')", "5");
   TestStringValue("greatest('apples', 'oranges', 'bananas')", "oranges");
@@ -5752,6 +5937,7 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("least(cast(NULL as float))", TYPE_FLOAT);
   TestIsNull("least(cast(NULL as double))", TYPE_DOUBLE);
   TestIsNull("least(cast(NULL as timestamp))", TYPE_TIMESTAMP);
+  TestIsNull("least(cast(NULL as date))", TYPE_DATE);
   TestIsNull("greatest(NULL)", TYPE_TINYINT);
   TestIsNull("greatest(cast(NULL as tinyint))", TYPE_TINYINT);
   TestIsNull("greatest(cast(NULL as smallint))", TYPE_SMALLINT);
@@ -5760,6 +5946,7 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("greatest(cast(NULL as float))", TYPE_FLOAT);
   TestIsNull("greatest(cast(NULL as double))", TYPE_DOUBLE);
   TestIsNull("greatest(cast(NULL as timestamp))", TYPE_TIMESTAMP);
+  TestIsNull("greatest(cast(NULL as date))", TYPE_DATE);
 }
 
 TEST_F(ExprTest, MathRoundingFunctions) {
@@ -7189,6 +7376,10 @@ TEST_F(ExprTest, ConditionalFunctions) {
       "cast('1999-06-14 19:07:25' as timestamp))", then_val);
   TestTimestampValue("if(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", else_val);
+  TestDateValue("if(TRUE, cast('2011-01-01' as date), cast('1999-06-14' as date))",
+      DateValue(2011, 1, 1));
+  TestDateValue("if(FALSE, cast('2011-01-01' as date), cast('1999-06-14' as date))",
+      DateValue(1999, 6, 14));
 
   // Test nvl2(), which is rewritten to if() before analysis.
   // Returns 2nd arg if 1st arg is not NULL, otherwise it returns 3rd arg.
@@ -7209,6 +7400,10 @@ TEST_F(ExprTest, ConditionalFunctions) {
       "cast('1999-06-14 19:07:25' as timestamp))", first_val);
   TestTimestampValue("nvl2(NULL, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", second_val);
+  TestDateValue("nvl2(FALSE, cast('2011-01-01' as date), cast('1999-06-14' as date))",
+      DateValue(2011, 1, 1));
+  TestDateValue("nvl2(NULL, cast('2011-01-01' as date), cast('1999-06-14' as date))",
+      DateValue(1999, 6, 14));
 
   // Test nullif(). Return NULL if lhs equals rhs, lhs otherwise.
   TestIsNull("nullif(NULL, NULL)", TYPE_BOOLEAN);
@@ -7238,6 +7433,8 @@ TEST_F(ExprTest, ConditionalFunctions) {
       "cast('2011-01-01 09:01:01' as timestamp))", TYPE_TIMESTAMP);
   TestTimestampValue("nullif(cast('2011-01-01 09:01:01' as timestamp), "
       "NULL)", testlhs);
+  TestIsNull("nullif(NULL, cast('2011-01-01' as date))", TYPE_DATE);
+  TestDateValue("nullif(cast('2011-01-01' as date), NULL)", DateValue(2011, 1, 1));
 
   // Test IsNull() function and its aliases on all applicable types and NULL.
   string isnull_aliases[] = {"IsNull", "IfNull", "Nvl"};
@@ -7253,6 +7450,7 @@ TEST_F(ExprTest, ConditionalFunctions) {
     TestStringValue(f + "('abc', NULL)", "abc");
     TestTimestampValue(f + "(" + default_timestamp_str_ + ", NULL)",
         default_timestamp_val_);
+    TestDateValue(f + "(" + default_date_str_ + ", NULL)", default_date_val_);
     // Test first argument is NULL.
     TestValue(f + "(NULL, true)", TYPE_BOOLEAN, true);
     TestValue(f + "(NULL, 1)", TYPE_TINYINT, 1);
@@ -7264,6 +7462,7 @@ TEST_F(ExprTest, ConditionalFunctions) {
     TestStringValue(f + "(NULL, 'abc')", "abc");
     TestTimestampValue(f + "(NULL, " + default_timestamp_str_ + ")",
         default_timestamp_val_);
+    TestDateValue(f + "(NULL, " + default_date_str_ + ")", default_date_val_);
     // Test NULL. The return type is boolean to avoid a special NULL function signature.
     TestIsNull(f + "(NULL, NULL)", TYPE_BOOLEAN);
   }
@@ -7305,6 +7504,11 @@ TEST_F(ExprTest, ConditionalFunctions) {
       "cast('2011-01-01 09:01:01' as timestamp), NULL)", bts);
   TestTimestampValue("coalesce(NULL, NULL, NULL,"
       "cast('2011-01-01 09:01:01' as timestamp), NULL, NULL)", ats);
+  TestDateValue("coalesce(cast('2011-01-01' as date))", DateValue(2011, 1, 1));
+  TestDateValue("coalesce(NULL, cast('2011-01-01' as date))", DateValue(2011, 1, 1));
+  TestDateValue("coalesce(cast('1999-06-14' as date), NULL)", DateValue(1999, 6, 14));
+  TestDateValue("coalesce(NULL, NULL, NULL, cast('2011-01-01' as date))",
+      DateValue(2011, 1, 1));
 
   // Test logic of case expr using int types.
   // The different types and casting are tested below.
@@ -7434,6 +7638,10 @@ TEST_F(ExprTest, ConditionalFunctions) {
       default_timestamp_val_);
   TestTimestampValue("case when false then cast('1999-06-14 19:07:25' as timestamp) "
       "else " + default_timestamp_str_ + " end", default_timestamp_val_);
+  // Date type.
+  TestDateValue("case when true then " + default_date_str_ + " end", default_date_val_);
+  TestDateValue("case when false then cast('1999-06-14' as date) else " +
+      default_date_str_ + " end", default_date_val_);
 
   // Test Decode. This function is internalized as a CaseExpr so no
   // extra testing should be needed. To be safe, a sanity test will be done.
@@ -7607,6 +7815,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   types.push_back(TYPE_FLOAT);
   types.push_back(TYPE_DOUBLE);
   types.push_back(TYPE_TIMESTAMP);
+  types.push_back(TYPE_DATE);
   types.push_back(TYPE_STRING);
 
   types.push_back(ColumnType::CreateDecimalType(1,0));
@@ -7630,7 +7839,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
     expected_offsets.clear();
     // With one expr, all offsets should be 0.
     expected_offsets[t.GetByteSize()] = set<int>({0});
-    if (t.type != TYPE_TIMESTAMP) {
+    if (t.type != TYPE_TIMESTAMP && t.type != TYPE_DATE) {
       exprs.push_back(CreateLiteral(t, "0"));
     } else {
       exprs.push_back(CreateLiteral(t, "2016-11-09"));
@@ -7668,12 +7877,16 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   exprs.push_back(CreateLiteral(TYPE_INT, "0"));
   exprs.push_back(CreateLiteral(TYPE_FLOAT, "0"));
   exprs.push_back(CreateLiteral(TYPE_FLOAT, "0"));
+  exprs.push_back(CreateLiteral(TYPE_DATE, "2018-11-10"));
+  exprs.push_back(CreateLiteral(TYPE_DATE, "2018-11-10"));
   exprs.push_back(CreateLiteral(ColumnType::CreateDecimalType(9, 0), "0"));
   expected_offsets[4].insert(expected_byte_size);
   expected_offsets[4].insert(expected_byte_size + 4);
   expected_offsets[4].insert(expected_byte_size + 8);
   expected_offsets[4].insert(expected_byte_size + 12);
-  expected_byte_size += 4 * 4;
+  expected_offsets[4].insert(expected_byte_size + 16);
+  expected_offsets[4].insert(expected_byte_size + 20);
+  expected_byte_size += 6 * 4;
 
   exprs.push_back(CreateLiteral(TYPE_BIGINT, "0"));
   exprs.push_back(CreateLiteral(TYPE_BIGINT, "0"));

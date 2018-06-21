@@ -703,6 +703,23 @@ template <bool ISLEAST> DecimalVal MathFunctions::LeastGreatest(
   return result_val;
 }
 
+template <bool ISLEAST> DateVal MathFunctions::LeastGreatest(
+    FunctionContext* ctx, int num_args, const DateVal* args) {
+  DCHECK_GT(num_args, 0);
+  if (args[0].is_null) return DateVal::null();
+  DateValue result_val = DateValue::FromDateVal(args[0]);
+  for (int i = 1; i < num_args; ++i) {
+    if (args[i].is_null) return DateVal::null();
+    DateValue val = DateValue::FromDateVal(args[i]);
+    if (ISLEAST) {
+      if (val < result_val) result_val = val;
+    } else {
+      if (val > result_val) result_val = val;
+    }
+  }
+  return result_val.ToDateVal();
+}
+
 template TinyIntVal MathFunctions::Positive<TinyIntVal>(
     FunctionContext* ctx, const TinyIntVal& val);
 template SmallIntVal MathFunctions::Positive<SmallIntVal>(
@@ -771,5 +788,10 @@ template DecimalVal MathFunctions::LeastGreatest<true>(
     FunctionContext* ctx, int num_args, const DecimalVal* args);
 template DecimalVal MathFunctions::LeastGreatest<false>(
     FunctionContext* ctx, int num_args, const DecimalVal* args);
+
+template DateVal MathFunctions::LeastGreatest<true>(
+    FunctionContext* ctx, int num_args, const DateVal* args);
+template DateVal MathFunctions::LeastGreatest<false>(
+    FunctionContext* ctx, int num_args, const DateVal* args);
 
 }

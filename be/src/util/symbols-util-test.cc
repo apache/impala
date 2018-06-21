@@ -266,37 +266,43 @@ TEST(SymbolsUtil, Mangling) {
   args.push_back(TYPE_FLOAT);
   args.push_back(TYPE_DOUBLE);
   args.push_back(TYPE_TIMESTAMP);
+  args.push_back(TYPE_DATE);
   args.push_back(ColumnType::CreateCharType(10));
   TestMangling("AllTypes", false, args, NULL,
-      "_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10"
-          "BooleanValERKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntVal"
-          "ERKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKNS_9StringValE",
+      "_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10BooleanValE"
+          "RKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntValE"
+          "RKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKNS_7DateValE"
+          "RKNS_9StringValE",
       "AllTypes(impala_udf::FunctionContext*, impala_udf::StringVal const&, "
           "impala_udf::BooleanVal const&, impala_udf::TinyIntVal const&, "
           "impala_udf::SmallIntVal const&, impala_udf::IntVal const&, "
           "impala_udf::BigIntVal const&, impala_udf::FloatVal const&, "
           "impala_udf::DoubleVal const&, impala_udf::TimestampVal const&, "
-          "impala_udf::StringVal const&)");
+          "impala_udf::DateVal const&, impala_udf::StringVal const&)");
   TestMangling("AllTypes", false, args, &int_ret_type,
       "_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10BooleanValE"
           "RKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntValE"
-          "RKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKNS_9StringValEPSE_",
+          "RKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKNS_7DateValE"
+          "RKNS_9StringValEPSE_",
       "AllTypes(impala_udf::FunctionContext*, impala_udf::StringVal const&, "
           "impala_udf::BooleanVal const&, impala_udf::TinyIntVal const&, "
           "impala_udf::SmallIntVal const&, impala_udf::IntVal const&, "
           "impala_udf::BigIntVal const&, impala_udf::FloatVal const&, "
           "impala_udf::DoubleVal const&, impala_udf::TimestampVal const&, "
-          "impala_udf::StringVal const&, impala_udf::IntVal*)");
+          "impala_udf::DateVal const&, impala_udf::StringVal const&, "
+          "impala_udf::IntVal*)");
   TestMangling("AllTypes", false, args, &double_ret_type,
       "_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10BooleanValE"
           "RKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntValE"
-          "RKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKNS_9StringValEPSN_",
+          "RKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKNS_7DateValE"
+          "RKNS_9StringValEPSN_",
       "AllTypes(impala_udf::FunctionContext*, impala_udf::StringVal const&, "
           "impala_udf::BooleanVal const&, impala_udf::TinyIntVal const&, "
           "impala_udf::SmallIntVal const&, impala_udf::IntVal const&, "
           "impala_udf::BigIntVal const&, impala_udf::FloatVal const&, "
           "impala_udf::DoubleVal const&, impala_udf::TimestampVal const&, "
-          "impala_udf::StringVal const&, impala_udf::DoubleVal*)");
+          "impala_udf::DateVal const&, impala_udf::StringVal const&, "
+          "impala_udf::DoubleVal*)");
 
   // CHAR(N) type. This has restricted use. It can only be an intermediate type.
   args.clear();

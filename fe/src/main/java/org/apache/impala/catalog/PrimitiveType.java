@@ -34,10 +34,10 @@ public enum PrimitiveType {
   BIGINT("BIGINT", 8, TPrimitiveType.BIGINT),
   FLOAT("FLOAT", 4, TPrimitiveType.FLOAT),
   DOUBLE("DOUBLE", 8, TPrimitiveType.DOUBLE),
-  DATE("DATE", 4, TPrimitiveType.DATE),
   DATETIME("DATETIME", 8, TPrimitiveType.DATETIME),
   // The timestamp structure is 12 bytes, Aligning to 8 bytes makes it 16.
   TIMESTAMP("TIMESTAMP", 16, TPrimitiveType.TIMESTAMP),
+  DATE("DATE", 4, TPrimitiveType.DATE),
   // 8-byte pointer and 4-byte length indicator (12 bytes total).
   STRING("STRING", 12, TPrimitiveType.STRING),
   VARCHAR("VARCHAR", 12, TPrimitiveType.VARCHAR),

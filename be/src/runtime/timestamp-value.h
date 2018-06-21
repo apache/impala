@@ -93,6 +93,14 @@ class TimestampValue {
   static TimestampValue Parse(const char* str, int len,
       const datetime_parse_util::DateTimeFormatContext& dt_ctx);
 
+  /// 'days' represents the number of days since 1970-01-01.
+  /// The returned timestamp's date component is set so that it would correspond to
+  /// 'days', the time-of-day component is set to 00:00:00.
+  static TimestampValue FromDaysSinceUnixEpoch(int64_t days);
+
+  // Returns the number of days since 1970-01-01. Expects date_ to be valid.
+  int64_t DaysSinceUnixEpoch() const;
+
   /// Unix time (seconds since 1970-01-01 UTC by definition) constructors.
   /// Return the corresponding timestamp in the 'local_tz' time zone if
   /// FLAGS_use_local_tz_for_unix_timestamp_conversions is true. Otherwise, return the
@@ -374,9 +382,6 @@ class TimestampValue {
   /// Converts 'unix_time_ticks'/TICKS_PER_SEC seconds to TimestampValue.
   template <int32_t TICKS_PER_SEC>
   static TimestampValue UtcFromUnixTimeTicks(int64_t unix_time_ticks);
-
-  // Returns the number of days since 1970-01-01. Expects date_ to be valid.
-  int64_t DaysSinceUnixEpoch() const;
 };
 
 /// This function must be called 'hash_value' to be picked up by boost.

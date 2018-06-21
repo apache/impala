@@ -611,6 +611,7 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen, LlvmBuilder* builder,
       case TYPE_INT:
       case TYPE_BIGINT:
       case TYPE_DECIMAL:
+      case TYPE_DATE:
         null_value = codegen->GetIntConstant(byte_size, fnv_seed, fnv_seed);
         break;
       case TYPE_FLOAT: {

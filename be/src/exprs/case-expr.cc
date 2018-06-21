@@ -317,6 +317,9 @@ void CaseExpr::GetChildVal(int child_idx, ScalarExprEvaluator* eval,
     case TYPE_DECIMAL:
       *reinterpret_cast<DecimalVal*>(dst) = child->GetDecimalVal(eval, row);
       break;
+    case TYPE_DATE:
+      *reinterpret_cast<DateVal*>(dst) = child->GetDateVal(eval, row);
+      break;
     default:
       DCHECK(false) << child->type();
   }
@@ -355,6 +358,9 @@ bool CaseExpr::AnyValEq(
     case TYPE_DECIMAL:
       return AnyValUtil::Equals(type, *reinterpret_cast<const DecimalVal*>(v1),
                                 *reinterpret_cast<const DecimalVal*>(v2));
+    case TYPE_DATE:
+      return AnyValUtil::Equals(type, *reinterpret_cast<const DateVal*>(v1),
+                                *reinterpret_cast<const DateVal*>(v2));
     default:
       DCHECK(false) << type;
       return false;
@@ -414,5 +420,6 @@ CASE_COMPUTE_FN(DoubleVal)
 CASE_COMPUTE_FN(StringVal)
 CASE_COMPUTE_FN(TimestampVal)
 CASE_COMPUTE_FN(DecimalVal)
+CASE_COMPUTE_FN(DateVal)
 
 }

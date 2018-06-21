@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -31,6 +32,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TPartitionKeyValue;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
@@ -38,17 +40,23 @@ import com.google.common.collect.Lists;
  * Represents a partition spec - a collection of partition key/values.
  */
 public class PartitionSpec extends PartitionSpecBase {
-  private final ImmutableList<PartitionKeyValue> partitionSpec_;
+  private List<PartitionKeyValue> partitionSpec_;
 
   // Flag to determine if the partition already exists in the target table.
   // Set during analysis.
   private Boolean partitionExists_;
 
+  // Flag to determine if 'this' has already been analyzed.
+  private Boolean analyzed_ = false;
+
   public PartitionSpec(List<PartitionKeyValue> partitionSpec) {
-    this.partitionSpec_ = ImmutableList.copyOf(partitionSpec);
+    this.partitionSpec_ = partitionSpec;
   }
 
-  public List<PartitionKeyValue> getPartitionSpecKeyValues() { return partitionSpec_; }
+  public List<PartitionKeyValue> getPartitionSpecKeyValues() {
+    Preconditions.checkState(analyzed_);
+    return partitionSpec_;
+  }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
@@ -72,11 +80,24 @@ public class PartitionSpec extends PartitionSpecBase {
           tableName_, partitionSpec_.size(), targetPartitionKeys.size()));
     }
 
+    // 1. Validates each partition key/value specified, ensuring a matching partition
+    //    column exists in the target table.
+    // 2. Checks that no duplicate keys were specified.
+    // 3. Checks that all the column types are compatible.
+    // 4. DATE_COLUMN=STRING_LITERAL key/value pairs are treated specially:
+    //    a) Checks whether casting STRING_LITERAL to a DATE value is possible. If not, an
+    //       exception is thrown.
+    //    b) If the cast is possible, replace STRING_LITERAL value with the corresponding
+    //       DateLiteral object.
+    //       This is done to disambiguate different STRING_LITERALs that represent the
+    //       same DATE value (and thus refer to the same DATE_COLUMN partition).
+    //       E.g. '1999-01-01' and '1999-1-1' STRING_LITERALs are different strings but
+    //       represent the same DATE value).
     Set<String> keyNames = new HashSet<>();
-    // Validate each partition key/value specified, ensuring a matching partition column
-    // exists in the target table, no duplicate keys were specified, and that all the
-    // column types are compatible.
-    for (PartitionKeyValue pk: partitionSpec_) {
+    ListIterator<PartitionKeyValue> partitionIterator = partitionSpec_.listIterator();
+    while (partitionIterator.hasNext()) {
+      PartitionKeyValue pk = partitionIterator.next();
+
       if (!keyNames.add(pk.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate partition key name: " + pk.getColName());
       }
@@ -103,6 +124,7 @@ public class PartitionSpec extends PartitionSpecBase {
             + "has incompatible type: '%s'. Expected type: '%s'.",
             pk.getColName(), literalType, colType));
       }
+
       // Check for loss of precision with the partition value
       if (!compatibleType.equals(colType)) {
         throw new AnalysisException(
@@ -110,23 +132,39 @@ public class PartitionSpec extends PartitionSpecBase {
             "Would need to cast '%s' to '%s' for partition column: %s",
             pk.getValue().toSql(), colType.toString(), pk.getColName()));
       }
+
+      // Handle DATE_COLUMN=STRING_LITERAL key/value pairs.
+      if (pk.isStatic() && colType.isDate() && literalType.isStringType()) {
+        pk = new PartitionKeyValue(pk.getColName(),
+            new DateLiteral(pk.getLiteralValue().getStringValue()));
+        pk.analyze(analyzer);
+        partitionIterator.set(pk);
+      }
     }
+
+    // Make 'partitionSpec_' immutable. From now on it won't be changed.
+    partitionSpec_ = ImmutableList.copyOf(partitionSpec_);
+
     partitionExists_ = HdfsTable.getPartition(table_, partitionSpec_) != null;
     if (partitionShouldExist_ != null) {
       if (partitionShouldExist_ && !partitionExists_) {
-          throw new AnalysisException("Partition spec does not exist: (" +
-              Joiner.on(", ").join(partitionSpec_) + ").");
+        throw new AnalysisException("Partition spec does not exist: (" +
+            Joiner.on(", ").join(partitionSpec_) + ").");
       } else if (!partitionShouldExist_ && partitionExists_) {
-          throw new AnalysisException("Partition spec already exists: (" +
-              Joiner.on(", ").join(partitionSpec_) + ").");
+        throw new AnalysisException("Partition spec already exists: (" +
+            Joiner.on(", ").join(partitionSpec_) + ").");
       }
     }
+
+    analyzed_ = true;
   }
 
   /*
    * Returns the Thrift representation of this PartitionSpec.
    */
   public List<TPartitionKeyValue> toThrift() {
+    Preconditions.checkState(analyzed_);
+
     List<TPartitionKeyValue> thriftPartitionSpec = new ArrayList<>();
     for (PartitionKeyValue kv: partitionSpec_) {
       String value = PartitionKeyValue.getPartitionKeyValueString(
@@ -138,6 +176,8 @@ public class PartitionSpec extends PartitionSpecBase {
 
   @Override
   public String toSql(ToSqlOptions options) {
+    Preconditions.checkState(analyzed_);
+
     List<String> partitionSpecStr = new ArrayList<>();
     for (PartitionKeyValue kv: partitionSpec_) {
       partitionSpecStr.add(kv.getColName() + "=" + kv.getValue().toSql(options));
@@ -151,6 +191,8 @@ public class PartitionSpec extends PartitionSpecBase {
    * this method provides a uniquely comparable string representation for this object.
    */
   public String toCanonicalString() {
+    Preconditions.checkState(analyzed_);
+
     List<PartitionKeyValue> sortedPartitionSpec = Lists.newArrayList(partitionSpec_);
     Collections.sort(sortedPartitionSpec, PartitionKeyValue.getColNameComparator());
     return Joiner.on(",").join(sortedPartitionSpec);

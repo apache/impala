@@ -346,6 +346,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("1 + 1", rule, "2");
     RewritesOk("1 + 1 + 1 + 1 + 1", rule, "5");
     RewritesOk("10 - 5 - 2 - 1 - 8", rule, "-6");
+    RewritesOk("cast('2016-11-09' as date)", rule, "DATE '2016-11-09'");
     RewritesOk("cast('2016-11-09' as timestamp)", rule,
         "TIMESTAMP '2016-11-09 00:00:00'");
     RewritesOk("cast('2016-11-09' as timestamp) + interval 1 year", rule,

@@ -53,6 +53,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 using impala_udf::CollectionVal;
 
 struct LibCacheEntry;
@@ -244,6 +245,7 @@ class ScalarExpr : public Expr {
   virtual CollectionVal GetCollectionVal(ScalarExprEvaluator*, const TupleRow*) const;
   virtual TimestampVal GetTimestampVal(ScalarExprEvaluator*, const TupleRow*) const;
   virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const;
+  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const;
 
   /// Initializes all nodes in the expr tree. Subclasses overriding this function should
   /// call ScalarExpr::Init() to recursively call Init() on the expr tree.
@@ -329,6 +331,7 @@ class ScalarExpr : public Expr {
   static StringVal GetStringVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
   static TimestampVal GetTimestampVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
   static DecimalVal GetDecimalVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
+  static DateVal GetDateVal(ScalarExpr*, ScalarExprEvaluator*, const TupleRow*);
 };
 
 }

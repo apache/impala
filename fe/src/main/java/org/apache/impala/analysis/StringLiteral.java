@@ -144,7 +144,7 @@ public class StringLiteral extends LiteralExpr {
 
   @Override
   protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
-    Preconditions.checkState(targetType.isNumericType() || targetType.isDateType()
+    Preconditions.checkState(targetType.isNumericType() || targetType.isDateOrTimeType()
         || targetType.equals(this.type_) || targetType.isStringType());
     if (targetType.equals(this.type_)) {
       return this;
@@ -152,8 +152,10 @@ public class StringLiteral extends LiteralExpr {
       type_ = targetType;
     } else if (targetType.isNumericType()) {
       return convertToNumber();
-    } else if (targetType.isDateType()) {
-      // Let the BE do the cast so it is in Boost format
+    } else if (targetType.isDateOrTimeType()) {
+      // Let the BE do the cast
+      // - it is in Boost format in case target type is TIMESTAMP
+      // - CCTZ is used for conversion in case target type is DATE.
       return new CastExpr(targetType, this);
     }
     return this;

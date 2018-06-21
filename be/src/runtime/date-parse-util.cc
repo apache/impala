@@ -43,6 +43,7 @@ using datetime_parse_util::DateTimeParseResult;
 using datetime_parse_util::IsParseCtxInitialized;
 using datetime_parse_util::ParseDateTime;
 using datetime_parse_util::ParseFormatTokensByStr;
+using datetime_parse_util::ParseDefaultFormatTokensByStr;
 
 using datetime_parse_util::YEAR;
 using datetime_parse_util::MONTH_IN_YEAR;
@@ -54,7 +55,8 @@ bool DateParser::Parse(const char* str, int len, const DateTimeFormatContext& dt
     DateValue* date) {
   DCHECK(IsParseCtxInitialized());
   DCHECK(dt_ctx.toks.size() > 0);
-  DCHECK(dt_ctx.has_date_toks && !dt_ctx.has_time_toks);
+  // 'dt_ctx' must have date tokens. Time tokens are accepted but ignored.
+  DCHECK(dt_ctx.has_date_toks);
   DCHECK(date != nullptr);
 
   DateTimeParseResult dt_result;
@@ -99,7 +101,7 @@ int DateParser::RealignYear(const DateTimeParseResult& dt_result,
   return year;
 }
 
-bool DateParser::Parse(const char* str, int len, DateValue* date) {
+bool DateParser::Parse(const char* str, int len, bool accept_time_toks, DateValue* date) {
   DCHECK(IsParseCtxInitialized());
   DCHECK(date != nullptr);
   if (UNLIKELY(str == nullptr)) {
@@ -121,15 +123,16 @@ bool DateParser::Parse(const char* str, int len, DateValue* date) {
     return false;
   }
 
-  // Determine if input is a default date string. If it is, use the default date context.
-  if (LIKELY(trimmed_len == DEFAULT_DATE_FMT_LEN && str[4] == '-' && str[7] == '-')) {
-    return Parse(str, DEFAULT_DATE_FMT_LEN, DEFAULT_DATE_CTX, date);
-  }
+  // Determine the default formatting context that's required for parsing.
+  const DateTimeFormatContext* dt_ctx = ParseDefaultFormatTokensByStr(str, trimmed_len,
+      accept_time_toks, false);
+
+  if (dt_ctx != nullptr) return Parse(str, trimmed_len, *dt_ctx, date);
 
   // Generating context lazily as a fall back if default formats fail.
   // ParseFormatTokenByStr() does not require a template format string.
   DateTimeFormatContext lazy_ctx(str, trimmed_len);
-  if (!ParseFormatTokensByStr(&lazy_ctx, false)) {
+  if (!ParseFormatTokensByStr(&lazy_ctx, accept_time_toks, false)) {
     *date = DateValue();
     return false;
   }

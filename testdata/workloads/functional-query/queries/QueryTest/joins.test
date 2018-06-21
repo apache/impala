@@ -731,6 +731,15 @@ t1.timestamp_col = cast(t2.d4 as TIMESTAMP);
 BIGINT
 ====
 ---- QUERY
+# Exercise HashTableCtx::AssignNullValue() for DateValue.
+select count(*) from functional.date_tbl t1 right outer join functional.alltypestiny t2 on
+t1.date_col >= DATE '1400-01-01' and t1.date_col = t2.timestamp_col;
+---- RESULTS
+8
+---- TYPES
+BIGINT
+====
+---- QUERY
 # IMPALA-5850: Tests that the sender partition exprs of a series of partitioned hash
 # joins are cast to compatible types even when the containing fragment is RANDOM
 # partitioned due a union. This test borrows ideas from existing tests for IMPALA-1123.

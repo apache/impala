@@ -18,6 +18,7 @@
 package org.apache.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.lang.NotImplementedException;
@@ -187,46 +188,71 @@ public class Function extends CatalogObjectImpl {
     return compare((Function)o, CompareMode.IS_IDENTICAL);
   }
 
-  // Compares this to 'other' for mode.
+  // Compares this to 'other' for 'mode'.
   public boolean compare(Function other, CompareMode mode) {
+    return calcMatchScore(other, mode) >= 0;
+  }
+
+  /* Compares this to 'other' for 'mode' and calculates the matching score.
+   * If comparison was not successful, returns -1.
+   * Otherwise returns the number of arguments whose types are an exact match or a
+   * wildcard variant.
+   */
+  public int calcMatchScore(Function other, CompareMode mode) {
     switch (mode) {
-      case IS_IDENTICAL: return isIdentical(other);
-      case IS_INDISTINGUISHABLE: return isIndistinguishable(other);
-      case IS_SUPERTYPE_OF: return isSuperTypeOf(other, true);
-      case IS_NONSTRICT_SUPERTYPE_OF: return isSuperTypeOf(other, false);
+      case IS_IDENTICAL: return calcIdenticalMatchScore(other);
+      case IS_INDISTINGUISHABLE: return calcIndistinguishableMatchScore(other);
+      case IS_SUPERTYPE_OF: return calcSuperTypeOfMatchScore(other, true);
+      case IS_NONSTRICT_SUPERTYPE_OF: return calcSuperTypeOfMatchScore(other, false);
       default:
         Preconditions.checkState(false);
-        return false;
+        return -1;
     }
   }
+
   /**
-   * Returns true if 'this' is a supertype of 'other'. Each argument in other must
-   * be implicitly castable to the matching argument in this. If strict is true,
-   * only consider conversions where there is no loss of precision.
+   * If this function has variable arguments and the number of its formal arguments is
+   * less than 'length', return an array of 'length' size that contains all the argument
+   * types to this function with the last argument type extended over the remaining part
+   * of the array.
+   * Otherwise, return the original array of argument types.
    */
-  private boolean isSuperTypeOf(Function other, boolean strict) {
-    if (!other.name_.equals(name_)) return false;
+  private Type[] tryExtendArgTypesToLength(int length) {
+    if (!hasVarArgs_ || argTypes_.length >= length) return argTypes_;
+
+    Type[] ret = Arrays.copyOf(argTypes_, length);
+    Arrays.fill(ret, argTypes_.length, length, getVarArgsType());
+    return ret;
+  }
+
+  /**
+   * Checks if 'this' is a supertype of 'other'. Each argument in other must be implicitly
+   * castable to the matching argument in this. If strict is true, only consider
+   * conversions where there is no loss of precision.
+   * If 'this' is not a supertype of 'other' returns -1.
+   * Otherwise returns the number of arguments whose types are an exact match or a
+   * wildcard variant.
+   */
+  private int calcSuperTypeOfMatchScore(Function other, boolean strict) {
+    if (!other.name_.equals(name_)) return -1;
     if (!this.hasVarArgs_ && other.argTypes_.length != this.argTypes_.length) {
-      return false;
+      return -1;
     }
-    if (this.hasVarArgs_ && other.argTypes_.length < this.argTypes_.length) return false;
-    for (int i = 0; i < this.argTypes_.length; ++i) {
+    if (this.hasVarArgs_ && other.argTypes_.length < this.argTypes_.length) return -1;
+
+    Type[] extendedArgTypes = tryExtendArgTypesToLength(other.argTypes_.length);
+    int num_matches = 0;
+    for (int i = 0; i < extendedArgTypes.length; ++i) {
+      if (other.argTypes_[i].matchesType(extendedArgTypes[i])) {
+        num_matches++;
+        continue;
+      }
       if (!Type.isImplicitlyCastable(
-          other.argTypes_[i], this.argTypes_[i], strict, strict)) {
-        return false;
+          other.argTypes_[i], extendedArgTypes[i], strict, strict)) {
+        return -1;
       }
     }
-    // Check trailing varargs.
-    if (this.hasVarArgs_) {
-      for (int i = this.argTypes_.length; i < other.argTypes_.length; ++i) {
-        if (other.argTypes_[i].matchesType(this.getVarArgsType())) continue;
-        if (!Type.isImplicitlyCastable(other.argTypes_[i], this.getVarArgsType(),
-              strict, strict)) {
-          return false;
-        }
-      }
-    }
-    return true;
+    return num_matches;
   }
 
   /**
@@ -240,59 +266,65 @@ public class Function extends CatalogObjectImpl {
     return new Function(name_, promoted, retType_, hasVarArgs_);
   }
 
-  private boolean isIdentical(Function o) {
-    if (!o.name_.equals(name_)) return false;
-    if (o.argTypes_.length != this.argTypes_.length) return false;
-    if (o.hasVarArgs_ != this.hasVarArgs_) return false;
+  private int calcIdenticalMatchScore(Function o) {
+    if (!o.name_.equals(name_)) return -1;
+    if (o.argTypes_.length != this.argTypes_.length) return -1;
+    if (o.hasVarArgs_ != this.hasVarArgs_) return -1;
     for (int i = 0; i < this.argTypes_.length; ++i) {
-      if (!o.argTypes_[i].matchesType(this.argTypes_[i])) return false;
+      if (!o.argTypes_[i].matchesType(this.argTypes_[i])) return -1;
     }
-    return true;
+    return this.argTypes_.length;
   }
 
-  private boolean isIndistinguishable(Function o) {
-    if (!o.name_.equals(name_)) return false;
+  private int calcIndistinguishableMatchScore(Function o) {
+    if (!o.name_.equals(name_)) return -1;
     int minArgs = Math.min(o.argTypes_.length, this.argTypes_.length);
     // The first fully specified args must be identical.
+    int num_matches = 0;
     for (int i = 0; i < minArgs; ++i) {
       if (o.argTypes_[i].isNull() || this.argTypes_[i].isNull()) continue;
-      if (!o.argTypes_[i].matchesType(this.argTypes_[i])) return false;
+      if (!o.argTypes_[i].matchesType(this.argTypes_[i])) return -1;
+      num_matches++;
     }
-    if (o.argTypes_.length == this.argTypes_.length) return true;
+    if (o.argTypes_.length == this.argTypes_.length) return num_matches;
 
     if (o.hasVarArgs_ && this.hasVarArgs_) {
-      if (!o.getVarArgsType().matchesType(this.getVarArgsType())) return false;
+      if (!o.getVarArgsType().matchesType(this.getVarArgsType())) return -1;
       if (this.getNumArgs() > o.getNumArgs()) {
         for (int i = minArgs; i < this.getNumArgs(); ++i) {
           if (this.argTypes_[i].isNull()) continue;
-          if (!this.argTypes_[i].matchesType(o.getVarArgsType())) return false;
+          if (!this.argTypes_[i].matchesType(o.getVarArgsType())) return -1;
+          num_matches++;
         }
       } else {
         for (int i = minArgs; i < o.getNumArgs(); ++i) {
           if (o.argTypes_[i].isNull()) continue;
-          if (!o.argTypes_[i].matchesType(this.getVarArgsType())) return false;
+          if (!o.argTypes_[i].matchesType(this.getVarArgsType())) return -1;
+          num_matches++;
         }
       }
-      return true;
+      return num_matches;
     } else if (o.hasVarArgs_) {
       // o has var args so check the remaining arguments from this
-      if (o.getNumArgs() > minArgs) return false;
+      if (o.getNumArgs() > minArgs) return -1;
       for (int i = minArgs; i < this.getNumArgs(); ++i) {
         if (this.argTypes_[i].isNull()) continue;
-        if (!this.argTypes_[i].matchesType(o.getVarArgsType())) return false;
+        if (!this.argTypes_[i].matchesType(o.getVarArgsType())) return -1;
+        num_matches++;
       }
-      return true;
+      return num_matches;
     } else if (this.hasVarArgs_) {
       // this has var args so check the remaining arguments from s
-      if (this.getNumArgs() > minArgs) return false;
+      if (this.getNumArgs() > minArgs) return -1;
       for (int i = minArgs; i < o.getNumArgs(); ++i) {
         if (o.argTypes_[i].isNull()) continue;
-        if (!o.argTypes_[i].matchesType(this.getVarArgsType())) return false;
+        if (!o.argTypes_[i].matchesType(this.getVarArgsType())) return -1;
+        num_matches++;
       }
-      return true;
+      return num_matches;
     } else {
       // Neither has var args and the lengths don't match
-      return false;
+      return -1;
     }
   }
 
@@ -477,6 +509,8 @@ public class Function extends CatalogObjectImpl {
       return "FloatVal";
     case DOUBLE:
       return "DoubleVal";
+    case DATE:
+      return "DateVal";
     case STRING:
     case VARCHAR:
     case CHAR:

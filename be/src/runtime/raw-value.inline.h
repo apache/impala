@@ -26,6 +26,7 @@
 #include <boost/functional/hash.hpp>
 
 #include "common/logging.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
@@ -78,6 +79,9 @@ inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type)
     case TYPE_INT:
       return *reinterpret_cast<const int32_t*>(v1)
           == *reinterpret_cast<const int32_t*>(v2);
+    case TYPE_DATE:
+      return *reinterpret_cast<const DateValue*>(v1)
+          == *reinterpret_cast<const DateValue*>(v2);
     case TYPE_BIGINT:
       return *reinterpret_cast<const int64_t*>(v1)
           == *reinterpret_cast<const int64_t*>(v2);
@@ -204,6 +208,14 @@ inline uint32_t RawValue::GetHashValueNonNull<TimestampValue>(
   DCHECK_EQ(type.type, TYPE_TIMESTAMP);
   DCHECK(v != NULL);
   return HashUtil::MurmurHash2_64(v, 12, seed);
+}
+
+template<>
+inline uint32_t RawValue::GetHashValueNonNull<DateValue>(const DateValue* v,
+    const ColumnType& type, uint32_t seed) {
+  DCHECK_EQ(type.type, TYPE_DATE);
+  DCHECK(v != NULL);
+  return HashUtil::MurmurHash2_64(v, 4, seed);
 }
 
 template<>

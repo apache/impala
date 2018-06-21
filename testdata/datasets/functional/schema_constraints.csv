@@ -225,3 +225,18 @@ table_name:table_with_header_insert, constraint:restrict_to, table_format:text/g
 # Inserting into parquet tables should not be affected by the 'skip.header.line.count'
 # property, so we test parquet format as well.
 table_name:table_with_header_insert, constraint:restrict_to, table_format:parquet/none/none
+
+# IMPALA-7368 adds DATE support for text file-format only.
+# Other file-formats will be introduced later.
+table_name:date_tbl, constraint:restrict_to, table_format:hbase/none/none
+table_name:date_tbl, constraint:restrict_to, table_format:text/none/none
+table_name:date_tbl, constraint:restrict_to, table_format:text/lzo/block
+table_name:date_tbl, constraint:restrict_to, table_format:text/bzip/block
+table_name:date_tbl, constraint:restrict_to, table_format:text/gzip/block
+table_name:date_tbl, constraint:restrict_to, table_format:text/snap/block
+table_name:date_tbl_error, constraint:restrict_to, table_format:text/none/none
+table_name:date_tbl_error, constraint:restrict_to, table_format:text/lzo/block
+table_name:date_tbl_error, constraint:restrict_to, table_format:text/bzip/block
+table_name:date_tbl_error, constraint:restrict_to, table_format:text/gzip/block
+table_name:date_tbl_error, constraint:restrict_to, table_format:text/snap/block
+table_name:insert_date_tbl, constraint:restrict_to, table_format:hbase/none/none

@@ -131,6 +131,7 @@ Status ScalarExpr::CreateNode(
     case TExprNodeType::STRING_LITERAL:
     case TExprNodeType::DECIMAL_LITERAL:
     case TExprNodeType::TIMESTAMP_LITERAL:
+    case TExprNodeType::DATE_LITERAL:
       *expr = pool->Add(new Literal(texpr_node));
       return Status::OK();
     case TExprNodeType::CASE_EXPR:
@@ -335,6 +336,8 @@ llvm::Function* ScalarExpr::GetStaticGetValWrapper(
       return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_TIMESTAMP_VAL, false);
     case TYPE_DECIMAL:
       return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_DECIMAL_VAL, false);
+    case TYPE_DATE:
+      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_DATE_VAL, false);
     default:
       DCHECK(false) << "Invalid type: " << type.DebugString();
       return NULL;
@@ -448,6 +451,12 @@ DecimalVal ScalarExpr::GetDecimalVal(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK(false) << DebugString();
   return DecimalVal::null();
+}
+
+DateVal ScalarExpr::GetDateVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK(false) << DebugString();
+  return DateVal::null();
 }
 
 string ScalarExpr::DebugString(const string& expr_name) const {

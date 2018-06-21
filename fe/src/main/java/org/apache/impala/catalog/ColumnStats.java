@@ -22,6 +22,7 @@ import java.util.Set;
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
+import org.apache.hadoop.hive.metastore.api.DateColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.DecimalColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
@@ -42,10 +43,10 @@ public class ColumnStats {
   // Set of the currently supported column stats column types.
   private final static Set<PrimitiveType> SUPPORTED_COL_TYPES = Sets.newHashSet(
       PrimitiveType.BIGINT, PrimitiveType.BINARY, PrimitiveType.BOOLEAN,
-      PrimitiveType.DOUBLE, PrimitiveType.FLOAT, PrimitiveType.INT,
-      PrimitiveType.SMALLINT, PrimitiveType.CHAR, PrimitiveType.VARCHAR,
-      PrimitiveType.STRING, PrimitiveType.TIMESTAMP, PrimitiveType.TINYINT,
-      PrimitiveType.DECIMAL);
+      PrimitiveType.DATE, PrimitiveType.DOUBLE, PrimitiveType.FLOAT,
+      PrimitiveType.INT, PrimitiveType.SMALLINT, PrimitiveType.CHAR,
+      PrimitiveType.VARCHAR, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
+      PrimitiveType.TINYINT, PrimitiveType.DECIMAL);
 
   public enum StatsKey {
     NUM_DISTINCT_VALUES("numDVs"),
@@ -201,6 +202,14 @@ public class ColumnStats {
           numNulls_ = longStats.getNumNulls();
         }
         break;
+      case DATE:
+        isCompatible = statsData.isSetDateStats();
+        if (isCompatible) {
+          DateColumnStatsData dateStats = statsData.getDateStats();
+          numDistinctValues_ = dateStats.getNumDVs();
+          numNulls_ = dateStats.getNumNulls();
+        }
+        break;
       case FLOAT:
       case DOUBLE:
         isCompatible = statsData.isSetDoubleStats();
@@ -279,6 +288,12 @@ public class ColumnStats {
       case INT:
         ndv = Math.min(ndv, LongMath.pow(2, Integer.SIZE));
         colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        break;
+      case DATE:
+        // Number of distinct dates in the 0000-01-01..9999-12-31 inclusive range is
+        // 3652425.
+        ndv = Math.min(ndv, 3652425);
+        colStatsData.setDateStats(new DateColumnStatsData(numNulls, ndv));
         break;
       case BIGINT:
       case TIMESTAMP: // Hive and Impala use LongColumnStatsData for timestamps.

@@ -20,6 +20,7 @@
 
 #include <algorithm>
 
+#include "runtime/date-value.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
@@ -41,6 +42,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 class ObjectPool;
 
@@ -60,6 +62,10 @@ class AnyValUtil {
   }
 
   static uint32_t Hash(const IntVal& v, const FunctionContext::TypeDesc&, int seed) {
+    return HashUtil::Hash(&v.val, 4, seed);
+  }
+
+  static uint32_t Hash(const DateVal& v, const FunctionContext::TypeDesc&, int seed) {
     return HashUtil::Hash(&v.val, 4, seed);
   }
 
@@ -114,6 +120,11 @@ class AnyValUtil {
   }
 
   static uint64_t Hash64(const IntVal& v, const FunctionContext::TypeDesc&,
+      int64_t seed) {
+    return HashUtil::MurmurHash2_64(&v.val, 4, seed);
+  }
+
+  static uint64_t Hash64(const DateVal& v, const FunctionContext::TypeDesc&,
       int64_t seed) {
     return HashUtil::MurmurHash2_64(&v.val, 4, seed);
   }
@@ -192,6 +203,7 @@ class AnyValUtil {
         return sizeof(StringVal);
       case TYPE_TIMESTAMP: return sizeof(TimestampVal);
       case TYPE_DECIMAL: return sizeof(DecimalVal);
+      case TYPE_DATE: return sizeof(DateVal);
       default:
         DCHECK(false) << t;
         return 0;
@@ -215,6 +227,7 @@ class AnyValUtil {
         return alignof(StringVal);
       case TYPE_TIMESTAMP: return alignof(TimestampVal);
       case TYPE_DECIMAL: return alignof(DecimalVal);
+      case TYPE_DATE: return alignof(DateVal);
       default:
         DCHECK(false) << t;
         return 0;
@@ -320,6 +333,10 @@ class AnyValUtil {
           default:
             break;
         }
+      case TYPE_DATE:
+        *reinterpret_cast<DateVal*>(dst) =
+            reinterpret_cast<const DateValue*>(slot)->ToDateVal();
+        return;
       default:
         DCHECK(false) << "NYI: " << type;
     }

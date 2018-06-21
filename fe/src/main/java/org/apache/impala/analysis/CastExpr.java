@@ -110,8 +110,16 @@ public class CastExpr extends Expr {
         if (toType.isNull()) continue;
         // Disable casting from string to boolean
         if (fromType.isStringType() && toType.isBoolean()) continue;
-        // Disable casting from boolean/timestamp to decimal
-        if ((fromType.isBoolean() || fromType.isDateType()) && toType.isDecimal()) {
+        // Casting from date is only allowed when to-type is timestamp or string.
+        if (fromType.isDate() && !toType.isTimestamp() && !toType.isStringType()) {
+          continue;
+        }
+        // Casting to date is only allowed when from-type is timestamp or string.
+        if (toType.isDate() && !fromType.isTimestamp() && !fromType.isStringType()) {
+          continue;
+        }
+        // Disable casting from boolean/timestamp/date to decimal
+        if ((fromType.isBoolean() || fromType.isDateOrTimeType()) && toType.isDecimal()) {
           continue;
         }
         if (fromType.getPrimitiveType() == PrimitiveType.STRING

@@ -35,6 +35,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 class Expr;
 struct ExprValue;
@@ -115,7 +116,8 @@ class MathFunctions {
       FunctionContext*, int num_args, const TimestampVal* args);
   template <bool ISLEAST> static DecimalVal LeastGreatest(
       FunctionContext*, int num_args, const DecimalVal* args);
-
+  template <bool ISLEAST> static DateVal LeastGreatest(
+      FunctionContext*, int num_args, const DateVal* args);
 
   static BigIntVal WidthBucket(FunctionContext* ctx, const DecimalVal& expr,
       const DecimalVal& min_range, const DecimalVal& max_range,

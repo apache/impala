@@ -102,6 +102,11 @@ returns decimal(6,5) intermediate decimal(4,3) location '{location}'
 init_fn='AggDecimalIntermediateInit' update_fn='AggDecimalIntermediateUpdate'
 merge_fn='AggDecimalIntermediateMerge' finalize_fn='AggDecimalIntermediateFinalize';
 
+create aggregate function {database}.agg_date_intermediate(date, int)
+returns date intermediate date location '{location}'
+init_fn='AggDateIntermediateInit' update_fn='AggDateIntermediateUpdate'
+merge_fn='AggDateIntermediateMerge' finalize_fn='AggDateIntermediateFinalize';
+
 create aggregate function {database}.agg_string_intermediate(decimal(20,10), bigint, string)
 returns decimal(20,0) intermediate string location '{location}'
 init_fn='AggStringIntermediateInit' update_fn='AggStringIntermediateUpdate'
@@ -144,6 +149,10 @@ create function {database}.identity(timestamp) returns timestamp
 location '{location}'
 symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_12TimestampValE';
 
+create function {database}.identity(date) returns date
+location '{location}'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_7DateValE';
+
 create function {database}.identity(decimal(9,0)) returns decimal(9,0)
 location '{location}'
 symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10DecimalValE';
@@ -157,7 +166,7 @@ location '{location}'
 symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10DecimalValE';
 
 create function {database}.all_types_fn(
-    string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0))
+    string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0), date)
 returns int
 location '{location}' symbol='AllTypes';
 
@@ -202,6 +211,9 @@ symbol='_Z7ToUpperPN10impala_udf15FunctionContextERKNS_9StringValE';
 
 create function {database}.constant_timestamp() returns timestamp
 location '{location}' symbol='ConstantTimestamp';
+
+create function {database}.constant_date() returns date
+location '{location}' symbol='ConstantDate';
 
 create function {database}.validate_arg_type(string) returns boolean
 location '{location}' symbol='ValidateArgType';

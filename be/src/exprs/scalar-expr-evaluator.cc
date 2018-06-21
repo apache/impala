@@ -48,6 +48,7 @@
 #include "exprs/tuple-is-null-predicate.h"
 #include "exprs/udf-builtins.h"
 #include "exprs/utility-functions.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
@@ -334,6 +335,14 @@ void* ScalarExprEvaluator::GetValue(const ScalarExpr& expr, const TupleRow* row)
           return nullptr;
       }
     }
+    case TYPE_DATE: {
+      impala_udf::DateVal v = expr.GetDateVal(this, row);
+      if (v.is_null) return nullptr;
+      const DateValue dv = DateValue::FromDateVal(v);
+      if (UNLIKELY(!dv.IsValid())) return nullptr;
+      result_.date_val = dv;
+      return &result_.date_val;
+    }
     case TYPE_ARRAY:
     case TYPE_MAP: {
       impala_udf::CollectionVal v = expr.GetCollectionVal(this, row);
@@ -406,6 +415,10 @@ TimestampVal ScalarExprEvaluator::GetTimestampVal(const TupleRow* row) {
 
 DecimalVal ScalarExprEvaluator::GetDecimalVal(const TupleRow* row) {
   return root_.GetDecimalVal(this, row);
+}
+
+DateVal ScalarExprEvaluator::GetDateVal(const TupleRow* row) {
+  return root_.GetDateVal(this, row);
 }
 
 void ScalarExprEvaluator::InitBuiltinsDummy() {

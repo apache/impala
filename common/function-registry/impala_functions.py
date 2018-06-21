@@ -370,6 +370,8 @@ visible_functions = [
    '_ZN6impala13MathFunctions13LeastGreatestILb1EEEN10impala_udf9StringValEPNS2_15FunctionContextEiPKS3_'],
   [['least'], 'DECIMAL', ['DECIMAL', '...'],
    '_ZN6impala13MathFunctions13LeastGreatestILb1EEEN10impala_udf10DecimalValEPNS2_15FunctionContextEiPKS3_'],
+  [['least'], 'DATE', ['DATE', '...'],
+   '_ZN6impala13MathFunctions13LeastGreatestILb1EEEN10impala_udf7DateValEPNS2_15FunctionContextEiPKS3_'],
   [['greatest'], 'TINYINT', ['TINYINT', '...'],
    '_ZN6impala13MathFunctions13LeastGreatestIN10impala_udf10TinyIntValELb0EEET_PNS2_15FunctionContextEiPKS4_'],
   [['greatest'], 'SMALLINT', ['SMALLINT', '...'],
@@ -388,8 +390,11 @@ visible_functions = [
    '_ZN6impala13MathFunctions13LeastGreatestILb0EEEN10impala_udf9StringValEPNS2_15FunctionContextEiPKS3_'],
   [['greatest'], 'DECIMAL', ['DECIMAL', '...'],
    '_ZN6impala13MathFunctions13LeastGreatestILb0EEEN10impala_udf10DecimalValEPNS2_15FunctionContextEiPKS3_'],
+  [['greatest'], 'DATE', ['DATE', '...'],
+   '_ZN6impala13MathFunctions13LeastGreatestILb0EEEN10impala_udf7DateValEPNS2_15FunctionContextEiPKS3_'],
   [['width_bucket'], 'BIGINT', ['DECIMAL', 'DECIMAL', 'DECIMAL', 'INT'],
     '_ZN6impala13MathFunctions11WidthBucketEPN10impala_udf15FunctionContextERKNS1_10DecimalValES6_S6_RKNS1_6IntValE'],
+
   # Decimal Functions
   # TODO: oracle has decimal support for transcendental functions (e.g. sin()) to very
   # high precisions. Do we need them? It's unclear if other databases do the same.
@@ -529,6 +534,7 @@ visible_functions = [
   [['if'], 'STRING', ['BOOLEAN', 'STRING', 'STRING'], ''],
   [['if'], 'TIMESTAMP', ['BOOLEAN', 'TIMESTAMP', 'TIMESTAMP'], ''],
   [['if'], 'DECIMAL', ['BOOLEAN', 'DECIMAL', 'DECIMAL'], ''],
+  [['if'], 'DATE', ['BOOLEAN', 'DATE', 'DATE'], ''],
 
   [['zeroifnull'], 'TINYINT', ['TINYINT'], 'impala::ConditionalFunctions::ZeroIfNull'],
   [['zeroifnull'], 'SMALLINT', ['SMALLINT'], 'impala::ConditionalFunctions::ZeroIfNull'],
@@ -556,6 +562,7 @@ visible_functions = [
   [['isnull', 'ifnull', 'nvl'], 'STRING', ['STRING', 'STRING'], ''],
   [['isnull', 'ifnull', 'nvl'], 'TIMESTAMP', ['TIMESTAMP', 'TIMESTAMP'], ''],
   [['isnull', 'ifnull', 'nvl'], 'DECIMAL', ['DECIMAL', 'DECIMAL'], ''],
+  [['isnull', 'ifnull', 'nvl'], 'DATE', ['DATE', 'DATE'], ''],
 
   [['coalesce'], 'BOOLEAN', ['BOOLEAN', '...'], ''],
   [['coalesce'], 'TINYINT', ['TINYINT', '...'], ''],
@@ -567,6 +574,7 @@ visible_functions = [
   [['coalesce'], 'STRING', ['STRING', '...'], ''],
   [['coalesce'], 'TIMESTAMP', ['TIMESTAMP', '...'], ''],
   [['coalesce'], 'DECIMAL', ['DECIMAL', '...'], ''],
+  [['coalesce'], 'DATE', ['DATE', '...'], ''],
 
   [['istrue'], 'BOOLEAN', ['BOOLEAN'], 'impala::ConditionalFunctions::IsTrue'],
   [['isnottrue'], 'BOOLEAN', ['BOOLEAN'], 'impala::ConditionalFunctions::IsNotTrue'],
@@ -599,6 +607,7 @@ visible_functions = [
   [['typeOf'], 'STRING', ['STRING'], '_ZN6impala16UtilityFunctions6TypeOfIN10impala_udf9StringValEEES3_PNS2_15FunctionContextERKT_'],
   [['typeOf'], 'STRING', ['TIMESTAMP'], '_ZN6impala16UtilityFunctions6TypeOfIN10impala_udf12TimestampValEEENS2_9StringValEPNS2_15FunctionContextERKT_'],
   [['typeOf'], 'STRING', ['DECIMAL'], '_ZN6impala16UtilityFunctions6TypeOfIN10impala_udf10DecimalValEEENS2_9StringValEPNS2_15FunctionContextERKT_'],
+  [['typeOf'], 'STRING', ['DATE'], '_ZN6impala16UtilityFunctions6TypeOfIN10impala_udf7DateValEEENS2_9StringValEPNS2_15FunctionContextERKT_'],
   [['fnv_hash'], 'BIGINT', ['TINYINT'],
    '_ZN6impala16UtilityFunctions7FnvHashIN10impala_udf10TinyIntValEEENS2_9BigIntValEPNS2_15FunctionContextERKT_'],
   [['fnv_hash'], 'BIGINT', ['SMALLINT'],
@@ -611,6 +620,8 @@ visible_functions = [
    '_ZN6impala16UtilityFunctions7FnvHashIN10impala_udf8FloatValEEENS2_9BigIntValEPNS2_15FunctionContextERKT_'],
   [['fnv_hash'], 'BIGINT', ['DOUBLE'],
    '_ZN6impala16UtilityFunctions7FnvHashIN10impala_udf9DoubleValEEENS2_9BigIntValEPNS2_15FunctionContextERKT_'],
+  [['fnv_hash'], 'BIGINT', ['DATE'],
+   '_ZN6impala16UtilityFunctions7FnvHashIN10impala_udf7DateValEEENS2_9BigIntValEPNS2_15FunctionContextERKT_'],
   [['fnv_hash'], 'BIGINT', ['STRING'],
    '_ZN6impala16UtilityFunctions13FnvHashStringEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
   [['fnv_hash'], 'BIGINT', ['TIMESTAMP'],
@@ -629,6 +640,8 @@ visible_functions = [
    '_ZN6impala16UtilityFunctions10MurmurHashIN10impala_udf8FloatValEEENS2_9BigIntValEPNS2_15FunctionContextERKT_'],
   [['murmur_hash'], 'BIGINT', ['DOUBLE'],
    '_ZN6impala16UtilityFunctions10MurmurHashIN10impala_udf9DoubleValEEENS2_9BigIntValEPNS2_15FunctionContextERKT_'],
+  [['murmur_hash'], 'BIGINT', ['DATE'],
+   '_ZN6impala16UtilityFunctions10MurmurHashIN10impala_udf7DateValEEENS2_9BigIntValEPNS2_15FunctionContextERKT_'],
   [['murmur_hash'], 'BIGINT', ['STRING'],
    '_ZN6impala16UtilityFunctions16MurmurHashStringEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
   [['murmur_hash'], 'BIGINT', ['TIMESTAMP'],
@@ -736,6 +749,7 @@ invisible_functions = [
   [['distinctfrom'], 'BOOLEAN', ['TIMESTAMP', 'TIMESTAMP'], 'impala::Operators::DistinctFrom_TimestampVal_TimestampVal'],
   [['distinctfrom'], 'BOOLEAN', ['CHAR', 'CHAR'], 'impala::Operators::DistinctFrom_Char_Char'],
   [['distinctfrom'], 'BOOLEAN', ['DECIMAL', 'DECIMAL'], 'impala::DecimalOperators::DistinctFrom_DecimalVal_DecimalVal'],
+  [['distinctfrom'], 'BOOLEAN', ['DATE', 'DATE'], 'impala::Operators::DistinctFrom_DateVal_DateVal'],
 
   [['notdistinct'], 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], 'impala::Operators::NotDistinct_BooleanVal_BooleanVal'],
   [['notdistinct'], 'BOOLEAN', ['TINYINT', 'TINYINT'], 'impala::Operators::NotDistinct_TinyIntVal_TinyIntVal'],
@@ -748,4 +762,5 @@ invisible_functions = [
   [['notdistinct'], 'BOOLEAN', ['TIMESTAMP', 'TIMESTAMP'], 'impala::Operators::NotDistinct_TimestampVal_TimestampVal'],
   [['notdistinct'], 'BOOLEAN', ['CHAR', 'CHAR'], 'impala::Operators::NotDistinct_Char_Char'],
   [['notdistinct'], 'BOOLEAN', ['DECIMAL', 'DECIMAL'], 'impala::DecimalOperators::NotDistinct_DecimalVal_DecimalVal'],
+  [['notdistinct'], 'BOOLEAN', ['DATE', 'DATE'], 'impala::Operators::NotDistinct_DateVal_DateVal'],
 ]

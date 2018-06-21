@@ -205,6 +205,24 @@ public class PartialCatalogInfoTest {
   }
 
   @Test
+  public void testDateTableStats() throws Exception {
+    TGetPartialCatalogObjectRequest req = new TGetPartialCatalogObjectRequest();
+    req.object_desc = new TCatalogObject();
+    req.object_desc.setType(TCatalogObjectType.TABLE);
+    req.object_desc.table = new TTable("functional", "date_tbl");
+    req.table_info_selector = new TTableInfoSelector();
+    req.table_info_selector.want_stats_for_column_names = ImmutableList.of(
+        "date_col", "date_part");
+    TGetPartialCatalogObjectResponse resp = sendRequest(req);
+    List<ColumnStatisticsObj> stats = resp.table_info.column_stats;
+    // We have 2 columns, but 1 is the clustering column which doesn't have stats.
+    assertEquals(1, stats.size());
+    assertEquals("ColumnStatisticsObj(colName:date_col, colType:DATE, " +
+        "statsData:<ColumnStatisticsData dateStats:DateColumnStatsData(" +
+        "numNulls:2, numDVs:16)>)", stats.get(0).toString());
+  }
+
+  @Test
   public void testFetchErrorTable() throws Exception {
     TGetPartialCatalogObjectRequest req = new TGetPartialCatalogObjectRequest();
     req.object_desc = new TCatalogObject();

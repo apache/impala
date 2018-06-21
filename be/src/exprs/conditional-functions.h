@@ -38,6 +38,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 class ScalarExprEvaluator;
 class TupleRow;
@@ -97,6 +98,7 @@ class IsNullExpr : public ScalarExpr {
   virtual TimestampVal GetTimestampVal(
       ScalarExprEvaluator*, const TupleRow*) const override;
   virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
 };
 
 class IfExpr : public ScalarExpr {
@@ -124,6 +126,7 @@ class IfExpr : public ScalarExpr {
   virtual TimestampVal GetTimestampVal(
       ScalarExprEvaluator*, const TupleRow*) const override;
   virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
 };
 
 class CoalesceExpr : public ScalarExpr {
@@ -151,6 +154,7 @@ class CoalesceExpr : public ScalarExpr {
   virtual TimestampVal GetTimestampVal(
       ScalarExprEvaluator*, const TupleRow*) const override;
   virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
 };
 
 }

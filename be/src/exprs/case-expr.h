@@ -36,6 +36,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 class ScalarExprEvaluator;
 class TExprNode;
@@ -72,6 +73,7 @@ class CaseExpr: public ScalarExpr {
   virtual TimestampVal GetTimestampVal(
       ScalarExprEvaluator*, const TupleRow*) const override;
   virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
 
   bool has_case_expr() const { return has_case_expr_; }
   bool has_else_expr() const { return has_else_expr_; }

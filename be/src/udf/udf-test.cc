@@ -19,6 +19,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "common/logging.h"
+#include "runtime/date-value.h"
 #include "runtime/multi-precision.h"
 #include "testutil/test-udfs.h"
 #include "testutil/gtest-util.h"
@@ -147,6 +148,14 @@ StringVal TimeToString(FunctionContext* context, const TimestampVal& time) {
   return result;
 }
 
+StringVal DateToString(FunctionContext* context, const DateVal& date_val) {
+  DateValue date_value = DateValue::FromDateVal(date_val);
+  const string s = date_value.ToString();
+  StringVal result(context, s.size());
+  memcpy(result.ptr, s.data(), result.len);
+  return result;
+}
+
 void ValidateSharedStatePrepare(
     FunctionContext* context, FunctionContext::FunctionStateScope scope) {
   if (scope == FunctionContext::THREAD_LOCAL) {
@@ -217,6 +226,27 @@ TEST(UdfTest, TestTimestampVal) {
   TimestampVal t2(*(int32_t*)&d, 1000L * 1000L * 5000L);
   EXPECT_TRUE((UdfTestHarness::ValidateUdf<StringVal, TimestampVal>(
     TimeToString, t2, "2003-03-15 00:00:05")));
+}
+
+TEST(UdfTest, TestDateVal) {
+  DateVal date_val1 = DateValue(2003, 3, 15).ToDateVal();
+  EXPECT_FALSE(date_val1.is_null);
+  EXPECT_TRUE((UdfTestHarness::ValidateUdf<StringVal, DateVal>(
+    DateToString, date_val1, "2003-03-15")));
+
+  // Test == and != operators
+  DateVal date_val2 = DateValue(2003, 3, 15).ToDateVal();
+  EXPECT_EQ(date_val1, date_val2);
+  EXPECT_NE(date_val1, DateVal(date_val2.val + 1));
+
+  // Test == and != operators with nulls
+  DateVal null = DateVal::null();
+  EXPECT_TRUE(null.is_null);
+  EXPECT_NE(null, date_val1);
+
+  date_val1.is_null = true;
+  EXPECT_EQ(null, date_val1);
+  EXPECT_NE(date_val1, date_val2);
 }
 
 TEST(UdfTest, TestDecimalVal) {

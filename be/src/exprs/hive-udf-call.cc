@@ -110,6 +110,7 @@ AnyVal* HiveUdfCall::Evaluate(ScalarExprEvaluator* eval, const TupleRow* row) co
           break;
         case TYPE_INT:
         case TYPE_FLOAT:
+        case TYPE_DATE:
           memcpy(input_ptr, v, 4);
           break;
         case TYPE_BIGINT:
@@ -353,6 +354,12 @@ DecimalVal HiveUdfCall::GetDecimalVal(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DECIMAL);
   return *reinterpret_cast<DecimalVal*>(Evaluate(eval, row));
+}
+
+DateVal HiveUdfCall::GetDateVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK_EQ(type_.type, TYPE_DATE);
+  return *reinterpret_cast<DateVal*>(Evaluate(eval, row));
 }
 
 }

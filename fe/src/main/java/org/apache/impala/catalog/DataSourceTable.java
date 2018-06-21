@@ -124,10 +124,10 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
       case STRING:
       case TIMESTAMP:
       case DECIMAL:
+      case DATE:
         return true;
       case BINARY:
       case CHAR:
-      case DATE:
       case DATETIME:
       case INVALID_TYPE:
       case NULL_TYPE:

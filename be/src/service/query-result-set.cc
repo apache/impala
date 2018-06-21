@@ -369,6 +369,7 @@ int HS2ColumnarResultSet::AddRows(
             from->doubleVal.values.begin() + start_idx + rows_added);
         break;
       case TPrimitiveType::TIMESTAMP:
+      case TPrimitiveType::DATE:
       case TPrimitiveType::DECIMAL:
       case TPrimitiveType::STRING:
       case TPrimitiveType::VARCHAR:
@@ -427,6 +428,7 @@ void HS2ColumnarResultSet::InitColumns() {
         column.__isset.doubleVal = true;
         break;
       case TPrimitiveType::TIMESTAMP:
+      case TPrimitiveType::DATE:
       case TPrimitiveType::DECIMAL:
       case TPrimitiveType::VARCHAR:
       case TPrimitiveType::CHAR:

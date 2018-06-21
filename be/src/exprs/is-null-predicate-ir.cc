@@ -37,6 +37,7 @@ template BooleanVal IsNullPredicate::IsNull(FunctionContext*, const TinyIntVal&)
 template BooleanVal IsNullPredicate::IsNull(FunctionContext*, const SmallIntVal&);
 template BooleanVal IsNullPredicate::IsNull(FunctionContext*, const IntVal&);
 template BooleanVal IsNullPredicate::IsNull(FunctionContext*, const BigIntVal&);
+template BooleanVal IsNullPredicate::IsNull(FunctionContext*, const DateVal&);
 template BooleanVal IsNullPredicate::IsNull(FunctionContext*, const FloatVal&);
 template BooleanVal IsNullPredicate::IsNull(FunctionContext*, const DoubleVal&);
 template BooleanVal IsNullPredicate::IsNull(FunctionContext*, const StringVal&);
@@ -48,6 +49,7 @@ template BooleanVal IsNullPredicate::IsNotNull(FunctionContext*, const TinyIntVa
 template BooleanVal IsNullPredicate::IsNotNull(FunctionContext*, const SmallIntVal&);
 template BooleanVal IsNullPredicate::IsNotNull(FunctionContext*, const IntVal&);
 template BooleanVal IsNullPredicate::IsNotNull(FunctionContext*, const BigIntVal&);
+template BooleanVal IsNullPredicate::IsNotNull(FunctionContext*, const DateVal&);
 template BooleanVal IsNullPredicate::IsNotNull(FunctionContext*, const FloatVal&);
 template BooleanVal IsNullPredicate::IsNotNull(FunctionContext*, const DoubleVal&);
 template BooleanVal IsNullPredicate::IsNotNull(FunctionContext*, const StringVal&);

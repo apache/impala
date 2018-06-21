@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.util.FunctionUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -54,6 +56,7 @@ public class AnalyzerTest extends FrontendTestBase {
         "cast(" + (Float.MAX_VALUE + 1) + " as double)");
     typeToLiteralValue_.put(Type.TIMESTAMP,
         "cast('2012-12-21 00:00:00.000' as timestamp)");
+    typeToLiteralValue_.put(Type.DATE, "cast('2012-12-21' as date)");
     typeToLiteralValue_.put(Type.STRING, "'Hello, World!'");
     typeToLiteralValue_.put(Type.NULL, "NULL");
   }
@@ -112,11 +115,14 @@ public class AnalyzerTest extends FrontendTestBase {
   }
 
   private void testSelectStar() throws AnalysisException {
-    SelectStmt stmt = (SelectStmt) AnalyzesOk("select * from functional.AllTypes");
+    SelectStmt stmt = (SelectStmt) AnalyzesOk(
+        "select * from functional.AllTypes, functional.date_tbl");
     Analyzer analyzer = stmt.getAnalyzer();
     DescriptorTable descTbl = analyzer.getDescTbl();
     TupleDescriptor tupleDesc = descTbl.getTupleDesc(new TupleId(0));
     tupleDesc.materializeSlots();
+    TupleDescriptor dateTblTupleDesc = descTbl.getTupleDesc(new TupleId(1));
+    dateTblTupleDesc.materializeSlots();
     descTbl.computeMemLayout();
 
     assertEquals(89.0f, tupleDesc.getAvgSerializedSize(), 0.0);
@@ -133,6 +139,11 @@ public class AnalyzerTest extends FrontendTestBase {
     checkLayoutParams("functional.alltypes.smallint_col", 2, 76, 81, 2, analyzer);
     checkLayoutParams("functional.alltypes.bool_col", 1, 78, 81, 3, analyzer);
     checkLayoutParams("functional.alltypes.tinyint_col", 1, 79, 81, 4, analyzer);
+
+    Assert.assertEquals(12, dateTblTupleDesc.getAvgSerializedSize(), 0.0);
+    checkLayoutParams("functional.date_tbl.id_col", 4, 0, 12, 0, analyzer);
+    checkLayoutParams("functional.date_tbl.date_col", 4, 4, 12, 1, analyzer);
+    checkLayoutParams("functional.date_tbl.date_part", 4, 8, 12, 2, analyzer);
   }
 
   private void testNonNullable() throws AnalysisException {
@@ -174,7 +185,8 @@ public class AnalyzerTest extends FrontendTestBase {
    * Tests that computeMemLayout() ignores non-materialized slots.
    */
   private void testNonMaterializedSlots() throws AnalysisException {
-    SelectStmt stmt = (SelectStmt) AnalyzesOk("select * from functional.alltypes");
+    SelectStmt stmt = (SelectStmt) AnalyzesOk(
+        "select * from functional.alltypes, functional.date_tbl");
     Analyzer analyzer = stmt.getAnalyzer();
     DescriptorTable descTbl = analyzer.getDescTbl();
     TupleDescriptor tupleDesc = descTbl.getTupleDesc(new TupleId(0));
@@ -184,6 +196,14 @@ public class AnalyzerTest extends FrontendTestBase {
     slots.get(0).setIsMaterialized(false);
     slots.get(7).setIsMaterialized(false);
     slots.get(9).setIsMaterialized(false);
+
+    TupleDescriptor dateTblTupleDesc = descTbl.getTupleDesc(new TupleId(1));
+    dateTblTupleDesc.materializeSlots();
+    // Mark slots 0 and 1 (id_col and date_col) non-materialized.
+    slots = dateTblTupleDesc.getSlots();
+    slots.get(0).setIsMaterialized(false);
+    slots.get(1).setIsMaterialized(false);
+
     descTbl.computeMemLayout();
 
     assertEquals(64.0f, tupleDesc.getAvgSerializedSize(), 0.0);
@@ -202,6 +222,13 @@ public class AnalyzerTest extends FrontendTestBase {
     checkLayoutParams("functional.alltypes.smallint_col", 2, 52, 56, 7, analyzer);
     checkLayoutParams("functional.alltypes.bool_col", 1, 54, 57, 0, analyzer);
     checkLayoutParams("functional.alltypes.tinyint_col", 1, 55, 57, 1, analyzer);
+
+    Assert.assertEquals(4, dateTblTupleDesc.getAvgSerializedSize(), 0.0);
+    // Non-materialized slots.
+    checkLayoutParams("functional.date_tbl.id_col", 0, -1, 0, 0, analyzer);
+    checkLayoutParams("functional.date_tbl.date_col", 0, -1, 0, 0, analyzer);
+    // Materialized slot.
+    checkLayoutParams("functional.date_tbl.date_part", 4, 0, 4, 0, analyzer);
   }
 
   private void checkLayoutParams(SlotDescriptor d, int byteSize, int byteOffset,
@@ -239,28 +266,26 @@ public class AnalyzerTest extends FrontendTestBase {
   @Test
   public void TestUnsupportedTypes() {
     // Select supported types from a table with mixed supported/unsupported types.
-    AnalyzesOk("select int_col, str_col, bigint_col from functional.unsupported_types");
-
-    // Select supported types from a table with mixed supported/unsupported types.
-    AnalyzesOk("select int_col, str_col, bigint_col from functional.unsupported_types");
+    AnalyzesOk("select int_col, date_col, str_col, bigint_col " +
+        "from functional.unsupported_types");
 
     // Unsupported type binary.
     AnalysisError("select bin_col from functional.unsupported_types",
         "Unsupported type 'BINARY' in 'bin_col'.");
-    // Unsupported type date in a star expansion.
+    // Unsupported type binary in a star expansion.
     AnalysisError("select * from functional.unsupported_types",
-        "Unsupported type 'DATE' in 'functional.unsupported_types.date_col'.");
+        "Unsupported type 'BINARY' in 'functional.unsupported_types.bin_col'.");
     // Mixed supported/unsupported types.
     AnalysisError("select int_col, str_col, bin_col " +
         "from functional.unsupported_types",
         "Unsupported type 'BINARY' in 'bin_col'.");
     AnalysisError("create table tmp as select * from functional.unsupported_types",
-        "Unsupported type 'DATE' in 'functional.unsupported_types.date_col'.");
+        "Unsupported type 'BINARY' in 'functional.unsupported_types.bin_col'.");
     // Unsupported type in the target insert table.
     AnalysisError("insert into functional.unsupported_types " +
         "values(null, null, null, null, null, null)",
         "Unable to INSERT into target table (functional.unsupported_types) because " +
-        "the column 'date_col' has an unsupported type 'DATE'");
+        "the column 'bin_col' has an unsupported type 'BINARY'");
     // Unsupported partition-column type.
     AnalysisError("select * from functional.unsupported_partition_types",
         "Failed to load metadata for table: 'functional.unsupported_partition_types'");
@@ -512,7 +537,7 @@ public class AnalyzerTest extends FrontendTestBase {
   @Test
   // Test matching function signatures.
   public void TestFunctionMatching() {
-    Function[] fns = new Function[14];
+    Function[] fns = new Function[18];
     // test()
     fns[0] = createFunction(false);
 
@@ -557,6 +582,15 @@ public class AnalyzerTest extends FrontendTestBase {
     fns[13] = createFunction(false, Type.TINYINT, Type.STRING, Type.BIGINT, Type.INT,
         Type.TINYINT);
 
+    // test(date, string, date)
+    fns[14] = createFunction(false, Type.DATE, Type.STRING, Type.DATE);
+    // test(timestamp...)
+    fns[15] = createFunction(true, Type.TIMESTAMP);
+    // test(date...)
+    fns[16] = createFunction(true, Type.DATE);
+    // test(string...)
+    fns[17] = createFunction(true, Type.STRING);
+
     Assert.assertFalse(fns[1].compare(fns[0], Function.CompareMode.IS_SUPERTYPE_OF));
     Assert.assertTrue(fns[1].compare(fns[2], Function.CompareMode.IS_SUPERTYPE_OF));
     Assert.assertTrue(fns[1].compare(fns[3], Function.CompareMode.IS_SUPERTYPE_OF));
@@ -586,6 +620,35 @@ public class AnalyzerTest extends FrontendTestBase {
     Assert.assertTrue(fns[11].compare(fns[12], Function.CompareMode.IS_SUPERTYPE_OF));
     Assert.assertFalse(fns[11].compare(fns[13], Function.CompareMode.IS_SUPERTYPE_OF));
 
+    Assert.assertFalse(fns[15].compare(fns[14], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(fns[15].compare(fns[14],
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+    Assert.assertFalse(fns[15].compare(fns[16],
+        Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(fns[15].compare(fns[16],
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+    Assert.assertFalse(fns[15].compare(fns[17],
+        Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(fns[15].compare(fns[17],
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+
+    Assert.assertFalse(fns[16].compare(fns[14], Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(fns[16].compare(fns[14],
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+    Assert.assertFalse(fns[16].compare(fns[15],
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+    Assert.assertFalse(fns[16].compare(fns[17],
+        Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(fns[16].compare(fns[17],
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+
+    Assert.assertFalse(fns[17].compare(fns[14],
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+    Assert.assertFalse(fns[17].compare(fns[15],
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+    Assert.assertFalse(fns[17].compare(fns[16],
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+
     for (int i = 0; i < fns.length; ++i) {
       for (int j = 0; j < fns.length; ++j) {
         if (i == j) {
@@ -603,13 +666,111 @@ public class AnalyzerTest extends FrontendTestBase {
             Assert.assertTrue(
                 fns[i].compare(fns[j], Function.CompareMode.IS_SUPERTYPE_OF) ||
                 fns[j].compare(fns[i], Function.CompareMode.IS_SUPERTYPE_OF));
-          } else if (fns[i].compare(fns[j], Function.CompareMode.IS_INDISTINGUISHABLE)) {
             // This is reflexive
             Assert.assertTrue(
                 fns[j].compare(fns[i], Function.CompareMode.IS_INDISTINGUISHABLE));
+          } else if (fns[i].compare(fns[j], Function.CompareMode.IS_INDISTINGUISHABLE)) {
           }
         }
       }
     }
+  }
+
+  @Test
+  public void testFunctionMatchScore() {
+    // test(date, date, int)
+    Function fnDate = createFunction(false, Type.DATE, Type.DATE, Type.INT);
+    // test(timestamp, timestamp, int)
+    Function fnTimestamp = createFunction(false, Type.TIMESTAMP, Type.TIMESTAMP,
+        Type.INT);
+
+    // test(string, date, tinyint)
+    Function fn = createFunction(false, Type.STRING, Type.DATE, Type.TINYINT);
+    Assert.assertEquals(-1,
+        fnDate.calcMatchScore(fn, Function.CompareMode.IS_SUPERTYPE_OF));
+    int fnDateScore = fnDate.calcMatchScore(fn,
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+    Assert.assertTrue(fnDateScore >= 0);
+
+    Assert.assertEquals(-1,
+        fnTimestamp.calcMatchScore(fn, Function.CompareMode.IS_SUPERTYPE_OF));
+    int fnTimestampScore = fnTimestamp.calcMatchScore(fn,
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+    Assert.assertTrue(fnTimestampScore >= 0);
+
+    Assert.assertTrue(fnDateScore > fnTimestampScore);
+
+    // test(string, timestamp, tinyint)
+    fn = createFunction(false, Type.STRING, Type.TIMESTAMP, Type.TINYINT);
+    Assert.assertEquals(-1,
+        fnDate.calcMatchScore(fn, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+
+    Assert.assertEquals(-1,
+        fnTimestamp.calcMatchScore(fn, Function.CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(
+        fnTimestamp.calcMatchScore(fn, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF)
+        >= 0);
+
+    // test(string, string, tinyint)
+    fn = createFunction(false, Type.STRING, Type.STRING, Type.TINYINT);
+    Assert.assertEquals(-1,
+        fnDate.calcMatchScore(fn, Function.CompareMode.IS_SUPERTYPE_OF));
+    fnDateScore = fnDate.calcMatchScore(fn,
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+    Assert.assertTrue(fnDateScore >= 0);
+
+    Assert.assertEquals(-1,
+        fnTimestamp.calcMatchScore(fn, Function.CompareMode.IS_SUPERTYPE_OF));
+    fnTimestampScore = fnTimestamp.calcMatchScore(fn,
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+    Assert.assertTrue(fnTimestampScore >= 0);
+
+    Assert.assertTrue(fnDateScore == fnTimestampScore);
+  }
+
+  @Test
+  public void testResolveFunction() {
+    Function[] fns = new Function[] {
+        createFunction(false, Type.TIMESTAMP, Type.TIMESTAMP, Type.INT),
+        createFunction(false, Type.DATE, Type.DATE, Type.INT)};
+
+    // fns[0] and fns[1] has the same match score, so fns[0] will be chosen.
+    Function fnStr = createFunction(false, Type.STRING, Type.STRING, Type.TINYINT);
+    Assert.assertEquals(fns[0],
+        FunctionUtils.resolveFunction(Arrays.asList(fns), fnStr,
+            Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+
+    // fns[0] is a better match. First argument is an exact match.
+    Function fnTimestamp = createFunction(false, Type.TIMESTAMP, Type.STRING,
+        Type.TINYINT);
+    Assert.assertEquals(fns[0],
+        FunctionUtils.resolveFunction(Arrays.asList(fns), fnTimestamp,
+            Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+
+    // fns[0] is a better match. First argument is an exact match.
+    fnTimestamp = createFunction(false, Type.TIMESTAMP, Type.DATE,
+        Type.TINYINT);
+    Assert.assertEquals(fns[0],
+        FunctionUtils.resolveFunction(Arrays.asList(fns), fnTimestamp,
+            Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+
+    // fns[0] is a better match. Second argument is an exact match.
+    fnTimestamp = createFunction(false, Type.DATE, Type.TIMESTAMP,
+        Type.TINYINT);
+    Assert.assertEquals(fns[0],
+        FunctionUtils.resolveFunction(Arrays.asList(fns), fnTimestamp,
+            Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+
+    // fns[1] is a better match. First argument is an exact match.
+    Function fnDate = createFunction(false, Type.DATE, Type.STRING, Type.TINYINT);
+    Assert.assertEquals(fns[1],
+        FunctionUtils.resolveFunction(Arrays.asList(fns), fnDate,
+            Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+
+    // fns[1] is a better match. Second argument is an exact match.
+    fnDate = createFunction(false, Type.STRING, Type.DATE, Type.TINYINT);
+    Assert.assertEquals(fns[1],
+        FunctionUtils.resolveFunction(Arrays.asList(fns), fnDate,
+            Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
   }
 }

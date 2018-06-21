@@ -89,6 +89,8 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         e = new StringLiteral(value);
         break;
       case DATE:
+        e = new DateLiteral(value);
+        break;
       case DATETIME:
       case TIMESTAMP:
         // TODO: we support TIMESTAMP but no way to specify it in SQL.
@@ -131,6 +133,10 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
           // We store the decimal as the unscaled bytes. Need to adjust for the scale.
           val = val.movePointLeft(decimalType.decimalScale());
           result = new NumericLiteral(val, colType);
+          break;
+        case DATE_LITERAL:
+          result = new DateLiteral(exprNode.date_literal.days_since_epoch,
+              exprNode.date_literal.date_string);
           break;
         case INT_LITERAL:
           result = LiteralExpr.create(
@@ -270,6 +276,12 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         }
         break;
       case DATE:
+        // Expects both the int and string fields to be set, so we get the raw
+        // representation and the string representation.
+        if (val.isSetInt_val() && val.isSetString_val()) {
+          result = new DateLiteral(val.int_val, val.getString_val());
+        }
+        break;
       case DATETIME:
         return null;
       default:

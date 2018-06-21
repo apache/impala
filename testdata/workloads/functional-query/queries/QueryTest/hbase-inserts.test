@@ -190,3 +190,46 @@ select id, string_col from insertalltypesagg where string_col = "Other\"s"
 ---- TYPES
 INT, STRING
 ====
+---- QUERY
+insert into table insert_date_tbl
+select id_col, date_col, date_part
+from functional.date_tbl
+---- RESULTS
+: 22
+====
+---- QUERY
+select id_col, date_col from insert_date_tbl
+WHERE id_col > 20
+ORDER BY id_col
+LIMIT 2
+---- RESULTS
+21,0001-06-22
+22,0001-06-23
+---- TYPES
+INT, DATE
+====
+---- QUERY
+insert into table insert_date_tbl
+select 9999999, date_col, '1521-12-13'
+from functional.date_tbl
+---- RESULTS
+: 22
+====
+---- QUERY
+select id_col, date_part from insert_date_tbl
+WHERE id_col = 9999999
+ORDER BY id_col
+LIMIT 2
+---- RESULTS
+9999999,1521-12-13
+---- TYPES
+INT, DATE
+====
+---- QUERY
+# test insert into ... select *
+# using limit 1 to reduce execution time
+insert into table insert_date_tbl
+select * from insert_date_tbl limit 1
+---- RESULTS
+: 1
+====

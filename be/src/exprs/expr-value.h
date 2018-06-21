@@ -19,6 +19,7 @@
 #define IMPALA_EXPRS_EXPR_VALUE_H
 
 #include "runtime/collection-value.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
@@ -41,6 +42,7 @@ struct ExprValue {
   Decimal8Value decimal8_val;
   Decimal16Value decimal16_val;
   CollectionValue collection_val;
+  DateValue date_val;
 
   ExprValue()
     : bool_val(false),
@@ -55,7 +57,8 @@ struct ExprValue {
       decimal4_val(),
       decimal8_val(),
       decimal16_val(),
-      collection_val() {
+      collection_val(),
+      date_val(0) {
   }
 
   ExprValue(bool v) : bool_val(v) {}
@@ -98,6 +101,9 @@ struct ExprValue {
       case TYPE_DOUBLE:
         double_val = 0;
         return &double_val;
+      case TYPE_DATE:
+        date_val = DateValue(0);
+        return &date_val;
       default:
         DCHECK(false);
         return NULL;
@@ -144,6 +150,9 @@ struct ExprValue {
       case TYPE_DOUBLE:
         double_val = -std::numeric_limits<double>::infinity();
         return &double_val;
+      case TYPE_DATE:
+        date_val = DateValue::MIN_DATE;
+        return &date_val;
       default:
         DCHECK(false);
         return NULL;
@@ -188,6 +197,9 @@ struct ExprValue {
       case TYPE_DOUBLE:
         double_val = std::numeric_limits<double>::infinity();
         return &double_val;
+      case TYPE_DATE:
+        date_val = DateValue::MAX_DATE;
+        return &date_val;
       default:
         DCHECK(false);
         return NULL;

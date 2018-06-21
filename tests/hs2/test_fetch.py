@@ -110,6 +110,22 @@ class TestFetch(HS2TestSuite):
     self.__verify_char_max_len(column_types[2], 32)
     self.close(execute_statement_resp.operationHandle)
 
+    # Verify the result metadata for the DATE type.
+    execute_statement_req.statement =\
+        "SELECT * FROM functional.date_tbl ORDER BY date_col LIMIT 1"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    HS2TestSuite.check_response(execute_statement_resp)
+    results = self.fetch_at_most(execute_statement_resp.operationHandle,
+                                 TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
+    assert len(results.results.rows) == 1
+    metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
+    column_types = metadata_resp.schema.columns
+    assert len(column_types) == 3
+    self.__verify_primitive_type(TTypeId.INT_TYPE, column_types[0])
+    self.__verify_primitive_type(TTypeId.DATE_TYPE, column_types[1])
+    self.__verify_primitive_type(TTypeId.DATE_TYPE, column_types[2])
+    self.close(execute_statement_resp.operationHandle)
+
   def __query_and_fetch(self, query):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
@@ -157,6 +173,12 @@ class TestFetch(HS2TestSuite):
     fetch_results_resp = self.__query_and_fetch("SELECT CAST('car' AS CHAR(5))")
     num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
     assert result == "car  \n"
+
+    # Date
+    fetch_results_resp = self.__query_and_fetch(
+      "SELECT * from functional.date_tbl ORDER BY date_col LIMIT 1")
+    num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
+    assert result == ("0, 0001-01-01, 0001-01-01\n")
 
   @needs_session()
   def test_show_partitions(self):

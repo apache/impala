@@ -527,6 +527,7 @@ typedef DoubleVal (*DoubleWrapper)(ScalarExprEvaluator*, const TupleRow*);
 typedef StringVal (*StringWrapper)(ScalarExprEvaluator*, const TupleRow*);
 typedef TimestampVal (*TimestampWrapper)(ScalarExprEvaluator*, const TupleRow*);
 typedef DecimalVal (*DecimalWrapper)(ScalarExprEvaluator*, const TupleRow*);
+typedef DateVal (*DateWrapper)(ScalarExprEvaluator*, const TupleRow*);
 
 // TODO: macroify this?
 BooleanVal ScalarFnCall::GetBooleanVal(
@@ -616,6 +617,14 @@ DecimalVal ScalarFnCall::GetDecimalVal(
   DCHECK(eval != NULL);
   if (scalar_fn_wrapper_ == NULL) return InterpretEval<DecimalVal>(eval, row);
   DecimalWrapper fn = reinterpret_cast<DecimalWrapper>(scalar_fn_wrapper_);
+  return fn(eval, row);
+}
+
+DateVal ScalarFnCall::GetDateVal(ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK_EQ(type_.type, TYPE_DATE);
+  DCHECK(eval != NULL);
+  if (scalar_fn_wrapper_ == NULL) return InterpretEval<DateVal>(eval, row);
+  DateWrapper fn = reinterpret_cast<DateWrapper>(scalar_fn_wrapper_);
   return fn(eval, row);
 }
 

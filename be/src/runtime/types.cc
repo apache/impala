@@ -266,6 +266,9 @@ TTypeEntry ColumnType::ToHs2Type() const {
     case TYPE_DOUBLE:
       type_entry.__set_type(TTypeId::DOUBLE_TYPE);
       break;
+    case TYPE_DATE:
+      type_entry.__set_type(TTypeId::DATE_TYPE);
+      break;
     case TYPE_TIMESTAMP:
       type_entry.__set_type(TTypeId::TIMESTAMP_TYPE);
       break;

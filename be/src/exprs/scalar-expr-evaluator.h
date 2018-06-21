@@ -41,6 +41,7 @@ using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
 using impala_udf::CollectionVal;
+using impala_udf::DateVal;
 
 class MemPool;
 class RuntimeState;
@@ -162,6 +163,7 @@ class ScalarExprEvaluator {
   CollectionVal GetCollectionVal(const TupleRow* row);
   TimestampVal GetTimestampVal(const TupleRow* row);
   DecimalVal GetDecimalVal(const TupleRow* row);
+  DateVal GetDateVal(const TupleRow* row);
 
   /// Returns an error status if there was any error in evaluating the expression
   /// or its sub-expressions. 'start_idx' and 'end_idx' correspond to the range

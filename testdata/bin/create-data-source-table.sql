@@ -42,5 +42,6 @@ CREATE TABLE alltypes_datasource (
   dec_col2 DECIMAL(10,0),
   dec_col3 DECIMAL(20,10),
   dec_col4 DECIMAL(38,37),
-  dec_col5 DECIMAL(10,5))
+  dec_col5 DECIMAL(10,5),
+  date_col DATE)
 PRODUCED BY DATA SOURCE AllTypesDataSource("TestInitString");

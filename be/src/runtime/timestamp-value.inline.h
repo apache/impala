@@ -82,6 +82,12 @@ inline TimestampValue TimestampValue::FromUnixTimeNanos(time_t unix_time, int64_
   return result;
 }
 
+inline TimestampValue TimestampValue::FromDaysSinceUnixEpoch(int64_t days) {
+  static const boost::gregorian::date EPOCH(1970, 1, 1);
+  static const boost::posix_time::time_duration t(0, 0, 0);
+  return TimestampValue(EPOCH + boost::gregorian::date_duration(days), t);
+}
+
 inline int64_t TimestampValue::DaysSinceUnixEpoch() const {
   DCHECK(HasDate());
   static const boost::gregorian::date epoch(1970,1,1);

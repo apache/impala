@@ -233,7 +233,6 @@ class TimestampFunctions {
       const StringVal& format, bool is_error);
 
  private:
-
   /// Static result values for DayName(), ShortDayName() and LongMonthName() functions.
   static const std::string DAY_ARRAY[7];
   static const std::string DAYNAME_ARRAY[7];

@@ -170,7 +170,7 @@ void PrintTColumnValue(std::ostream& out, const TColumnValue& colval) {
   } else if (colval.__isset.long_val) {
     out << colval.long_val;
   } else if (colval.__isset.string_val) {
-    out << colval.string_val;
+    out << colval.string_val; // 'string_val' is set for TIMESTAMP and DATE column values.
   } else if (colval.__isset.binary_val) {
     out << colval.binary_val; // Stored as a std::string
   } else {

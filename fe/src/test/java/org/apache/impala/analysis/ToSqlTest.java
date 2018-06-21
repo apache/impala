@@ -866,6 +866,12 @@ public class ToSqlTest extends FrontendTestBase {
         "values(1, true, 1, 1, 10, 10, 10.0, 10.0, 'a', 'a', cast (0 as timestamp))",
         "INSERT INTO TABLE functional.alltypessmall PARTITION (`year`=2009, `month`=4) " +
         "VALUES(1, TRUE, 1, 1, 10, 10, 10.0, 10.0, 'a', 'a', CAST(0 AS TIMESTAMP))");
+    testToSql("insert into table functional.date_tbl " +
+        "partition (date_part='9999-12-31') " +
+        "values(112, DATE '1970-01-01')",
+        "INSERT INTO TABLE functional.date_tbl " +
+        "PARTITION (date_part='9999-12-31') " +
+        "VALUES(112, DATE '1970-01-01')");
     testToSql("upsert into table functional_kudu.testtbl values(1, 'a', 1)",
         "UPSERT INTO TABLE functional_kudu.testtbl VALUES(1, 'a', 1)");
   }
@@ -1177,6 +1183,12 @@ public class ToSqlTest extends FrontendTestBase {
         "bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, " +
         "double_col, date_string_col, string_col, timestamp_col " +
         "FROM functional.alltypes");
+    testToSql("insert into table functional.date_tbl " +
+        "partition (date_part='2009-10-30') " +
+        "select id, cast(timestamp_col as date) from functional.alltypes",
+        "INSERT INTO TABLE functional.date_tbl " +
+        "PARTITION (date_part='2009-10-30') " +
+        "SELECT id, CAST(timestamp_col AS DATE) FROM functional.alltypes");
     // Fully dynamic partitions.
     testToSql("insert into table functional.alltypessmall " +
         "partition (year, month)" +
@@ -1187,6 +1199,16 @@ public class ToSqlTest extends FrontendTestBase {
         "PARTITION (`year`, `month`) SELECT id, bool_col, " +
         "tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, " +
         "date_string_col, string_col, timestamp_col, `year`, `month` " +
+        "FROM functional.alltypes");
+    testToSql("insert into table functional.date_tbl " +
+        "partition (date_part) " +
+        "select id, cast(timestamp_col as date) date_col, " +
+        "cast(timestamp_col as date) date_part " +
+        "from functional.alltypes",
+        "INSERT INTO TABLE functional.date_tbl " +
+        "PARTITION (date_part) " +
+        "SELECT id, CAST(timestamp_col AS DATE) date_col, " +
+        "CAST(timestamp_col AS DATE) date_part " +
         "FROM functional.alltypes");
     // Partially dynamic partitions.
     testToSql("insert into table functional.alltypessmall " +
@@ -1411,6 +1433,7 @@ public class ToSqlTest extends FrontendTestBase {
         "SELECT bool_col, (bool_col), int_col, (int_col) " +
          "string_col, (string_col), timestamp_col, (timestamp_col) " +
         "FROM functional.alltypes");
+
 
     // TimestampArithmeticExpr.
     // Non-function-call like version.

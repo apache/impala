@@ -46,7 +46,7 @@ enum PrimitiveType {
   TYPE_DOUBLE,
   TYPE_TIMESTAMP,
   TYPE_STRING,
-  TYPE_DATE,        // Not implemented
+  TYPE_DATE,
   TYPE_DATETIME,    // Not implemented
   TYPE_BINARY,      // Not implemented
   TYPE_DECIMAL,
@@ -203,6 +203,8 @@ struct ColumnType {
 
   inline bool IsTimestampType() const { return type == TYPE_TIMESTAMP; }
 
+  inline bool IsDateType() const { return type == TYPE_DATE; }
+
   inline bool IsVarLenStringType() const {
     return type == TYPE_STRING || type == TYPE_VARCHAR;
   }
@@ -237,6 +239,7 @@ struct ColumnType {
       case TYPE_SMALLINT:
         return 2;
       case TYPE_INT:
+      case TYPE_DATE:
       case TYPE_FLOAT:
         return 4;
       case TYPE_BIGINT:
@@ -247,7 +250,6 @@ struct ColumnType {
         return 16;
       case TYPE_DECIMAL:
         return GetDecimalByteSize(precision);
-      case TYPE_DATE:
       case INVALID_TYPE:
       default:
         DCHECK(false) << "NYI: " << type;

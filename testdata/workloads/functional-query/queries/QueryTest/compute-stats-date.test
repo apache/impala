@@ -1,0 +1,83 @@
+====
+---- QUERY
+# test compute stats on a partitioned date text table
+create table date_tbl_copy like functional.date_tbl;
+insert into date_tbl_copy partition(date_part)
+select * from functional.date_tbl;
+alter table date_tbl_copy add column d DATE;
+====
+---- QUERY
+compute stats date_tbl_copy;
+---- RESULTS
+'Updated 4 partition(s) and 3 column(s).'
+====
+---- QUERY
+show table stats date_tbl_copy;
+---- LABELS
+date_part, #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats, Location
+---- RESULTS
+'0001-01-01',7,1,'83B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'1399-06-27',3,1,'34B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2017-11-27',10,1,'140B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'9999-12-31',2,1,'28B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'Total',22,4,'285B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats date_tbl_copy;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'d','DATE',0,22,4,4
+'date_part','DATE',4,0,4,4
+'date_col','DATE',16,2,4,4
+'id_col','INT',22,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+====
+---- QUERY
+# Removing a column shouldn't cause the stats to be dropped.
+alter table date_tbl_copy drop column date_col;
+---- RESULTS
+'Column has been dropped.'
+====
+---- QUERY
+show column stats date_tbl_copy;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'d','DATE',0,22,4,4
+'id_col','INT',22,0,4,4
+'date_part','DATE',4,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+====
+---- QUERY
+# drop stats from this table
+drop stats date_tbl_copy;
+====
+---- QUERY
+show table stats date_tbl_copy;
+---- LABELS
+date_part, #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats, Location
+---- RESULTS
+'0001-01-01',-1,1,'83B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'1399-06-27',-1,1,'34B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2017-11-27',-1,1,'140B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'9999-12-31',-1,1,'28B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'Total',-1,4,'285B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats date_tbl_copy;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'d','DATE',-1,-1,4,4
+'id_col','INT',-1,-1,4,4
+'date_part','DATE',4,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+====

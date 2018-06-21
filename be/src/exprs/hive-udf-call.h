@@ -39,6 +39,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 class RuntimeState;
 class ScalarExprEvaluator;
@@ -109,6 +110,7 @@ class HiveUdfCall : public ScalarExpr {
   virtual TimestampVal GetTimestampVal(
       ScalarExprEvaluator*, const TupleRow*) const override;
   virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
 
  private:
   /// Evalutes the UDF over row. Returns the result as an AnyVal. This function

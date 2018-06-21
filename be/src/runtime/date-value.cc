@@ -46,6 +46,9 @@ const int32_t DateValue::MIN_DAYS_SINCE_EPOCH = CalcDaysSinceEpoch(
 const int32_t DateValue::MAX_DAYS_SINCE_EPOCH = CalcDaysSinceEpoch(
     cctz::civil_day(MAX_YEAR, 12, 31));
 
+const DateValue DateValue::MIN_DATE(MIN_DAYS_SINCE_EPOCH);
+const DateValue DateValue::MAX_DATE(MAX_DAYS_SINCE_EPOCH);
+
 DateValue::DateValue(int year, int month, int day)
     : days_since_epoch_(INVALID_DAYS_SINCE_EPOCH) {
   DCHECK(!IsValid());
@@ -60,20 +63,20 @@ DateValue::DateValue(int year, int month, int day)
   }
 }
 
-DateValue DateValue::Parse(const char* str, int len) {
+DateValue DateValue::Parse(const char* str, int len, bool accept_time_toks) {
   DateValue dv;
-  DateParser::Parse(str, len, &dv);
+  discard_result(DateParser::Parse(str, len, accept_time_toks, &dv));
   return dv;
 }
 
-DateValue DateValue::Parse(const string& str) {
-  return Parse(str.c_str(), str.size());
+DateValue DateValue::Parse(const string& str, bool accept_time_toks) {
+  return Parse(str.c_str(), str.size(), accept_time_toks);
 }
 
 DateValue DateValue::Parse(const char* str, int len,
     const DateTimeFormatContext& dt_ctx) {
   DateValue dv;
-  DateParser::Parse(str, len, dt_ctx, &dv);
+  discard_result(DateParser::Parse(str, len, dt_ctx, &dv));
   return dv;
 }
 

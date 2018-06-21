@@ -91,6 +91,12 @@ DecimalVal NullLiteral::GetDecimalVal(
   return DecimalVal::null();
 }
 
+DateVal NullLiteral::GetDateVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK_EQ(type_.type, TYPE_DATE) << type_;
+  return DateVal::null();
+}
+
 // Generated IR for a bigint NULL literal:
 //
 // define { i8, i64 } @NullLiteral(

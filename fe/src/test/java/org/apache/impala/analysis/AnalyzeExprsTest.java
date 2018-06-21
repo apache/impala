@@ -183,6 +183,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select cast (0 as timestamp)");
     AnalyzesOk("select cast (0.1 as timestamp)");
     AnalyzesOk("select cast ('1970-10-10 10:00:00.123' as timestamp)");
+    AnalyzesOk("select cast (cast ('1970-10-10' as date) as timestamp)");
+    AnalyzesOk("select cast (date '1970-10-10' as timestamp)");
+  }
+
+  @Test
+  public void testDateValueExprs() throws AnalysisException {
+    AnalyzesOk("select DATE '1970-10-10'");
+    AnalyzesOk("select cast ('1970-10-10' as date)");
+    AnalyzesOk("select cast (cast ('1970-10-10 10:00:00.123' as timestamp) as date)");
   }
 
   @Test
@@ -244,6 +253,23 @@ public class AnalyzeExprsTest extends AnalyzerTest {
             "select * from functional.alltypes where NULL " + operator + " " + operand);
       }
 
+      // Operator can compare date columns
+      AnalyzesOk("select * from functional.date_tbl where date_col " + operator
+          + " date_col");
+      AnalyzesOk("select * from functional.date_tbl where date_col " + operator
+          + " NULL");
+      AnalyzesOk("select * from functional.date_tbl where NULL " + operator
+          + " date_col");
+      // Operator can compare date column and timestamp column
+      AnalyzesOk("select * from functional.date_tbl, functional.alltypes where date_col "
+          + operator + " timestamp_col");
+      AnalyzesOk("select * from functional.date_tbl, functional.alltypes where "
+          + "timestamp_col " + operator + " date_col");
+      // Operator can compare date column and string literals. This works beacuse the
+      // string literal is implicitly converted to date.
+      AnalyzesOk("select * from functional.date_tbl where date_col " + operator
+          + " '1993-01-21'");
+
       // Operator can compare string column and literals
       AnalyzesOk(
           "select * from functional.alltypes where string_col " + operator + " 'hi'");
@@ -287,7 +313,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       // Binary operators do not operate on expression with incompatible types
       for (String numeric_type: new String[]{"BOOLEAN", "TINYINT", "SMALLINT", "INT",
           "BIGINT", "FLOAT", "DOUBLE", "DECIMAL(9,0)"}) {
-        for (String string_type: new String[]{"STRING", "TIMESTAMP"}) {
+        for (String string_type: new String[]{"STRING", "TIMESTAMP", "DATE"}) {
           AnalysisError("select cast(NULL as " + numeric_type + ") "
               + operator + " cast(NULL as " + string_type + ")",
               "operands of type " + numeric_type + " and " + string_type +
@@ -320,9 +346,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "where int_map_col = int_map_col",
         "operands of type MAP<STRING,INT> and MAP<STRING,INT> are not comparable: " +
         "int_map_col = int_map_col");
-    // TODO: Enable once date and datetime are implemented.
-    // AnalysisError("select * from functional.alltypes where date_col = 15",
-    // "operands are not comparable: date_col = 15");
+    AnalysisError("select * from functional.date_tbl where date_col = 15",
+        "operands of type DATE and TINYINT are not comparable: date_col = 15");
+    // TODO: Enable once datetime is implemented.
     // AnalysisError("select * from functional.alltypes where datetime_col = 1.0",
     // "operands are not comparable: datetime_col = 1.0");
   }
@@ -333,13 +359,17 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select cast(1.1 as boolean)");
     AnalyzesOk("select cast(1.1 as timestamp)");
 
+    AnalysisError("select cast(1.1 as date)",
+        "Invalid type cast of 1.1 from DECIMAL(2,1) to DATE");
     AnalysisError("select cast(true as decimal)",
         "Invalid type cast of TRUE from BOOLEAN to DECIMAL(9,0)");
     AnalysisError("select cast(cast(1 as timestamp) as decimal)",
         "Invalid type cast of CAST(1 AS TIMESTAMP) from TIMESTAMP to DECIMAL(9,0)");
+    AnalysisError("select cast(date '1970-01-01' as decimal)",
+        "Invalid type cast of DATE '1970-01-01' from DATE to DECIMAL(9,0)");
 
     for (Type type: Type.getSupportedTypes()) {
-      if (type.isNull() || type.isDecimal() || type.isBoolean() || type.isDateType()
+      if (type.isNull() || type.isDecimal() || type.isBoolean() || type.isDateOrTimeType()
           || type.getPrimitiveType() == PrimitiveType.VARCHAR
           || type.getPrimitiveType() == PrimitiveType.CHAR) {
         continue;
@@ -458,6 +488,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select now() = cast('hi' as CHAR(3))",
         "operands of type TIMESTAMP and CHAR(3) are not comparable: " +
         "now() = CAST('hi' AS CHAR(3))");
+    AnalysisError("select cast(now() as DATE) = cast('hi' as CHAR(3))",
+        "operands of type DATE and CHAR(3) are not comparable: " +
+        "CAST(now() AS DATE) = CAST('hi' AS CHAR(3))");
     testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createVarcharType(7));
     testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createVarcharType(3));
 
@@ -705,9 +738,13 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Lower and upper bounds require implicit casts.
     AnalyzesOk("select * from functional.alltypes " +
         "where double_col between smallint_col and int_col");
+    AnalyzesOk("select * from functional.alltypes, functional.date_tbl " +
+        "where timestamp_col between date_part and date_col");
     // Comparison expr requires implicit cast.
     AnalyzesOk("select * from functional.alltypes " +
         "where smallint_col between float_col and double_col");
+    AnalyzesOk("select * from functional.date_tbl, functional.alltypes " +
+        "where date_col between timestamp_col and timestamp_col + interval 1 day");
     // Test NULLs.
     AnalyzesOk("select * from functional.alltypes " +
         "where NULL between float_col and double_col");
@@ -726,6 +763,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "where timestamp_col between int_col and double_col",
         "Incompatible return types 'TIMESTAMP' and 'INT' " +
         "of exprs 'timestamp_col' and 'int_col'.");
+    AnalysisError("select * from functional.date_tbl, functional.alltypes " +
+        "where date_col between int_col and double_col",
+        "Incompatible return types 'DATE' and 'INT' " +
+        "of exprs 'date_col' and 'int_col'.");
     AnalysisError("select 1 from functional.allcomplextypes " +
         "where int_struct_col between 10 and 20",
         "Incompatible return types 'STRUCT<f1:INT,f2:INT>' and 'TINYINT' " +
@@ -767,9 +808,13 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // In list requires implicit casts.
     AnalyzesOk("select * from functional.alltypes where " +
         "double_col in (int_col, bigint_col)");
+    AnalyzesOk("select * from functional.alltypes, functional.date_tbl where " +
+        "timestamp_col in (date_col, date_part)");
     // Comparison expr requires implicit cast.
     AnalyzesOk("select * from functional.alltypes where " +
         "int_col in (double_col, bigint_col)");
+    AnalyzesOk("select * from functional.alltypes, functional.date_tbl where " +
+        "date_col in (timestamp_col, timestamp_col + interval 1 day)");
     // Test predicates.
     AnalyzesOk("select * from functional.alltypes where " +
         "!true in (false or true, true and false)");
@@ -795,6 +840,14 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "timestamp_col in (NULL, int_col)",
         "Incompatible return types 'TIMESTAMP' and 'INT' " +
         "of exprs 'timestamp_col' and 'int_col'.");
+    AnalysisError("select * from functional.date_tbl, functional.alltypes where " +
+        "date_col in (int_col, double_col)",
+        "Incompatible return types 'DATE' and 'INT' " +
+        "of exprs 'date_col' and 'int_col'.");
+    AnalysisError("select * from functional.date_tbl, functional.alltypes where " +
+        "date_col in (NULL, int_col)",
+        "Incompatible return types 'DATE' and 'INT' " +
+        "of exprs 'date_col' and 'int_col'.");
     AnalysisError("select 1 from functional.allcomplextypes where " +
         "int_array_col in (id, NULL)",
         "Incompatible return types 'ARRAY<INT>' and 'INT' " +
@@ -1926,6 +1979,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Requires casting then exprs.
     AnalyzesOk("select case when 20 > 10 then 20 when 1 > 2 then 1.0 " +
         "when 4 < 5 then 2 else 15 end");
+    AnalyzesOk("select case when 20 > 10 then date '2001-01-01' else " +
+        "cast('2001-01-01' as timestamp) end");
     // First when expr doesn't return boolean.
     AnalysisError("select case when 20 then 20 when 1 > 2 then timestamp_col " +
         "when 4 < 5 then 2 else 15 end from functional.alltypes",
@@ -1939,6 +1994,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "when 4 < 5 then 2 else 15 end from functional.alltypes",
         "Incompatible return types 'TINYINT' and 'TIMESTAMP' " +
          "of exprs '20' and 'timestamp_col'.");
+    AnalysisError("select case when 20 > 10 then 20 when 1 > 2 then date_col " +
+        "when 4 < 5 then 2 else 15 end from functional.date_tbl",
+        "Incompatible return types 'TINYINT' and 'DATE' " +
+         "of exprs '20' and 'date_col'.");
     AnalysisError("select case when 20 > 10 then 20 when 1 > 2 then int_map_col " +
         "else 15 end from functional.allcomplextypes",
         "Incompatible return types 'TINYINT' and 'MAP<STRING,INT>' of exprs " +
@@ -1953,9 +2012,13 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Requires casting case expr.
     AnalyzesOk("select case int_col when bigint_col then 30 else 15 end " +
         "from functional.alltypes");
+    AnalyzesOk("select case date_col when timestamp_col then 30 else " +
+        "15 end from functional.date_tbl, functional.alltypes");
     // Requires casting when expr.
     AnalyzesOk("select case bigint_col when int_col then 30 else 15 end " +
         "from functional.alltypes");
+    AnalyzesOk("select case timestamp_col when date_col then 30 else 15 end " +
+        "from functional.alltypes, functional.date_tbl");
     // Requires multiple casts.
     AnalyzesOk("select case bigint_col when int_col then 30 " +
         "when double_col then 1.0 else 15 end from functional.alltypes");
@@ -1964,11 +2027,21 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "when double_col then 1.0 else 15 end from functional.alltypes",
         "Incompatible return types 'BIGINT' and 'TIMESTAMP' " +
         "of exprs 'bigint_col' and 'timestamp_col'.");
+    AnalysisError("select case bigint_col when date_col then 30 " +
+        "when double_col then 1.0 else 15 end from functional.alltypes, " +
+        "functional.date_tbl",
+        "Incompatible return types 'BIGINT' and 'DATE' " +
+        "of exprs 'bigint_col' and 'date_col'.");
     // Then exprs return incompatible types.
     AnalysisError("select case bigint_col when int_col then 30 " +
         "when double_col then timestamp_col else 15 end from functional.alltypes",
         "Incompatible return types 'TINYINT' and 'TIMESTAMP' " +
          "of exprs '30' and 'timestamp_col'.");
+    AnalysisError("select case bigint_col when int_col then 30 " +
+        "when double_col then date_col else 15 end from functional.alltypes, " +
+        "functional.date_tbl",
+        "Incompatible return types 'TINYINT' and 'DATE' " +
+         "of exprs '30' and 'date_col'.");
 
     // Test different type classes (all types are tested in BE tests).
     AnalyzesOk("select case when true then 1 end");
@@ -1976,6 +2049,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select case when true then 'abc' end");
     AnalyzesOk("select case when true then cast('2011-01-01 09:01:01' " +
         "as timestamp) end");
+    AnalyzesOk("select case when true then date '2011-01-01' end");
     // Test NULLs.
     AnalyzesOk("select case NULL when 1 then 2 else 3 end");
     AnalyzesOk("select case 1 when NULL then 2 else 3 end");
@@ -2487,6 +2561,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select " + decimal_5_5 + " + 'cast(1 as timestamp)'",
         "Arithmetic operation requires numeric operands: "
         + "CAST(1 AS DECIMAL(5,5)) + 'cast(1 as timestamp)'");
+    AnalysisError("select " + decimal_5_5 + " + \"DATE '1970-01-01'\"",
+        "Arithmetic operation requires numeric operands: "
+        + "CAST(1 AS DECIMAL(5,5)) + 'DATE \\\'1970-01-01\\\''");
 
     AnalysisError("select " + decimal_5_5 + " = 'abcd'",
         "operands of type DECIMAL(5,5) and STRING are not comparable: " +
@@ -2494,6 +2571,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select " + decimal_5_5 + " > 'cast(1 as timestamp)'",
         "operands of type DECIMAL(5,5) and STRING are not comparable: "
         + "CAST(1 AS DECIMAL(5,5)) > 'cast(1 as timestamp)'");
+    AnalysisError("select " + decimal_5_5 + " > date '1899-12-23'",
+        "operands of type DECIMAL(5,5) and DATE are not comparable: "
+        + "CAST(1 AS DECIMAL(5,5)) > DATE '1899-12-23'");
 
     // IMPALA-7254: Inconsistent decimal behavior when finding a compatible type.
     // for casting.
@@ -2770,7 +2850,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
           "avg(float_col), min(%s) " +
           "from functional.alltypes",
           countDistinctFn, colName), createAnalysisCtx(queryOptions));
-      validateSingleColAppxCountDistinctRewrite(stmt, colName);
+      validateSingleColAppxCountDistinctRewrite(stmt, colName, 4, 1, 1);
       countDistinctFns.add(countDistinctFn);
     }
     // Test a single query with a count(distinct) on all columns of alltypesTbl.
@@ -2791,7 +2871,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
           "from functional.decimal_tbl",
           colName, colName), createAnalysisCtx(queryOptions));
       countDistinctFns.add(String.format("count(distinct %s)", colName));
-      validateSingleColAppxCountDistinctRewrite(stmt, colName);
+      validateSingleColAppxCountDistinctRewrite(stmt, colName, 4, 1, 1);
     }
     // Test a single query with a count(distinct) on all columns of decimalTbl.
     SelectStmt decimalTblStmt = (SelectStmt) AnalyzesOk(String.format(
@@ -2800,14 +2880,34 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     assertAllNdvAggExprs(decimalTblStmt, decimalTbl.getColumns().size());
 
     allCountDistinctFns.addAll(countDistinctFns);
+    countDistinctFns.clear();
+    Table dateTbl = catalog_.getOrLoadTable("functional", "date_tbl");
+    for (Column col: dateTbl.getColumns()) {
+      String colName = col.getName();
+      // Test a single count(distinct) with some other aggs.
+      String countDistinctFn = String.format("count(distinct %s)", colName);
+      SelectStmt stmt = (SelectStmt) AnalyzesOk(String.format(
+          "select %s, avg(%s), min(%s) from functional.date_tbl",
+          countDistinctFn, colName, colName), createAnalysisCtx(queryOptions));
+      validateSingleColAppxCountDistinctRewrite(stmt, colName, 3, 0, 1);
+      countDistinctFns.add(countDistinctFn);
+    }
+    // Test a single query with a count(distinct) on all columns of dateTbl.
+    SelectStmt dateStmt = (SelectStmt) AnalyzesOk(String.format(
+        "select %s from functional.date_tbl",
+        Joiner.on(",").join(countDistinctFns)), createAnalysisCtx(queryOptions));
+    assertAllNdvAggExprs(dateStmt, dateTbl.getColumns().size());
 
-    // Test a single query with a count(distinct) on all columns of both
-    // alltypes/decimalTbl.
+    allCountDistinctFns.addAll(countDistinctFns);
+
+    // Test a single query with a count(distinct) on all columns of alltypes, decimalTbl
+    // and dateTbl.
     SelectStmt comboStmt = (SelectStmt) AnalyzesOk(String.format(
-        "select %s from functional.alltypes cross join functional.decimal_tbl",
+        "select %s from functional.alltypes cross join functional.decimal_tbl " +
+        "cross join functional.date_tbl",
         Joiner.on(",").join(allCountDistinctFns)), createAnalysisCtx(queryOptions));
     assertAllNdvAggExprs(comboStmt, alltypesTbl.getColumns().size() +
-        decimalTbl.getColumns().size());
+        decimalTbl.getColumns().size() + dateTbl.getColumns().size());
 
     // The rewrite does not work for multiple count() arguments.
     SelectStmt noRewriteStmt = (SelectStmt) AnalyzesOk(
@@ -2824,10 +2924,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   // Checks that 'stmt' has two aggregate exprs - DISTINCT 'sum' and non-DISTINCT 'ndv'.
   private void validateSingleColAppxCountDistinctRewrite(
-      SelectStmt stmt, String rewrittenColName) {
+      SelectStmt stmt, String rewrittenColName, int expNumAggExprs,
+      int expNumDistinctExprs, int expNumNdvExprs) {
     MultiAggregateInfo multiAggInfo = stmt.getMultiAggInfo();
     List<FunctionCallExpr> aggExprs = multiAggInfo.getAggExprs();
-    assertEquals(4, aggExprs.size());
+    assertEquals(expNumAggExprs, aggExprs.size());
     int numDistinctExprs = 0;
     int numNdvExprs = 0;
     for (FunctionCallExpr aggExpr : aggExprs) {
@@ -2841,8 +2942,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         ++numNdvExprs;
       }
     }
-    assertEquals(1, numDistinctExprs);
-    assertEquals(1, numNdvExprs);
+    assertEquals(expNumDistinctExprs, numDistinctExprs);
+    assertEquals(expNumNdvExprs, numNdvExprs);
   }
 
   // Checks that all aggregate exprs in 'stmt' are non-DISTINCT 'ndv'.
@@ -2914,11 +3015,45 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     Assert.assertEquals(Type.DOUBLE, foundFn.getArgs()[0]);
 
     FunctionName lagFnName = new FunctionName(BuiltinsDb.NAME, "lag");
-    // Timestamp should not be converted to string if string overload available.
+    // String should not be converted to timestamp or date if string overload available.
     Function lagStringFn = new Function(lagFnName,
         new Type[] {ScalarType.STRING, Type.TINYINT}, Type.INVALID, false);
     foundFn = db.getFunction(lagStringFn, CompareMode.IS_SUPERTYPE_OF);
     Assert.assertNotNull(foundFn);
     Assert.assertEquals(Type.STRING, foundFn.getArgs()[0]);
+
+    // Date should not be converted to timestamp if date overload is available.
+    Function lagDateFn = new Function(lagFnName,
+        new Type[] {ScalarType.DATE, Type.TINYINT}, Type.INVALID, false);
+    foundFn = db.getFunction(lagDateFn, CompareMode.IS_INDISTINGUISHABLE);
+    Assert.assertNull(foundFn);
+    foundFn = db.getFunction(lagDateFn, CompareMode.IS_SUPERTYPE_OF);
+    Assert.assertNotNull(foundFn);
+    Assert.assertEquals(Type.DATE, foundFn.getArgs()[0]);
+
+    // String is matched non-strictly to date, instead of converting both string and date
+    // arguments to timestamp.
+    FunctionName ifFnName = new FunctionName(BuiltinsDb.NAME, "if");
+    Function ifStringDateFn = new Function(ifFnName,
+        new Type[] {ScalarType.BOOLEAN, ScalarType.STRING, ScalarType.DATE}, Type.INVALID,
+            false);
+    foundFn = db.getFunction(ifStringDateFn, CompareMode.IS_SUPERTYPE_OF);
+    Assert.assertNull(foundFn);
+    foundFn = db.getFunction(ifStringDateFn, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+    Assert.assertNotNull(foundFn);
+    Assert.assertEquals(Type.DATE, foundFn.getArgs()[1]);
+    Assert.assertEquals(Type.DATE, foundFn.getArgs()[2]);
+
+    // Date is matched non-strictly to timestamp
+    ifStringDateFn = new Function(ifFnName,
+        new Type[] {ScalarType.BOOLEAN, ScalarType.TIMESTAMP, ScalarType.DATE},
+            Type.INVALID, false);
+    foundFn = db.getFunction(ifStringDateFn, CompareMode.IS_SUPERTYPE_OF);
+    Assert.assertNull(foundFn);
+    foundFn = db.getFunction(ifStringDateFn, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+    Assert.assertNotNull(foundFn);
+    Assert.assertEquals(Type.TIMESTAMP, foundFn.getArgs()[1]);
+    Assert.assertEquals(Type.TIMESTAMP, foundFn.getArgs()[2]);
+
   }
 }

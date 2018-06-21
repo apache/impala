@@ -259,6 +259,7 @@ public class AllTypesDataSource implements ExternalDataSource {
           colData.addToShort_vals((short) (currRow_ % 100));
           break;
         case INT:
+        case DATE:
           colData.addToIs_null(false);
           colData.addToInt_vals(currRow_);
           break;
@@ -301,7 +302,6 @@ public class AllTypesDataSource implements ExternalDataSource {
           break;
         case BINARY:
         case CHAR:
-        case DATE:
         case DATETIME:
         case INVALID_TYPE:
         case NULL_TYPE:

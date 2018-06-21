@@ -123,6 +123,25 @@ public class LocalCatalogTest {
   }
 
   @Test
+  public void testLoadDateTableBasics() throws Exception {
+    FeDb functionalDb = catalog_.getDb("functional");
+    CatalogTest.checkTableCols(functionalDb, "date_tbl", 1,
+        new String[] {"date_part", "id_col", "date_col"},
+        new Type[] {Type.DATE, Type.INT, Type.DATE});
+    FeTable t = functionalDb.getTable("date_tbl");
+    assertEquals(22, t.getNumRows());
+
+    assertTrue(t instanceof LocalFsTable);
+    FeFsTable fsTable = (FeFsTable) t;
+    assertEquals(MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE,
+        fsTable.getNullPartitionKeyValue());
+
+    // Stats should have one row per partition, plus a "total" row.
+    TResultSet stats = fsTable.getTableStats();
+    assertEquals(5, stats.getRowsSize());
+  }
+
+  @Test
   public void testPartitioning() throws Exception {
     FeFsTable t = (FeFsTable) catalog_.getTable("functional",  "alltypes");
     // TODO(todd): once we support file descriptors in LocalCatalog,
@@ -196,6 +215,21 @@ public class LocalCatalogTest {
   }
 
   @Test
+  public void testDateColumnStats() throws Exception {
+    FeFsTable t = (FeFsTable) catalog_.getTable("functional",  "date_tbl");
+    // Verify expected stats for a partitioning column.
+    // 'date_part' has 4 non-NULL partitions
+    ColumnStats stats = t.getColumn("date_part").getStats();
+    assertEquals(4, stats.getNumDistinctValues());
+    assertEquals(0, stats.getNumNulls());
+
+    // Verify expected stats for date_col.
+    stats = t.getColumn("date_col").getStats();
+    assertEquals(16, stats.getNumDistinctValues());
+    assertEquals(2, stats.getNumNulls());
+  }
+
+  @Test
   public void testView() throws Exception {
     FeView v = (FeView) catalog_.getTable("functional",  "alltypes_view");
     assertEquals(TCatalogObjectType.VIEW, v.getCatalogObjectType());
@@ -257,6 +291,18 @@ public class LocalCatalogTest {
         "WITH SERDEPROPERTIES ('hbase.columns.mapping'=':key,d:bool_col,d:tinyint_col," +
         "d:smallint_col,d:int_col,d:bigint_col,d:float_col,d:double_col," +
         "d:date_string_col,d:string_col,d:timestamp_col,d:year,d:month', " +
+        "'serialization.format'='1')"
+    ));
+
+    t = (LocalHbaseTable) catalog_.getTable("functional_hbase", "date_tbl");
+    Assert.assertThat(ToSqlUtils.getCreateTableSql(t), CoreMatchers.startsWith(
+        "CREATE EXTERNAL TABLE functional_hbase.date_tbl (\n" +
+        "  id_col INT,\n" +
+        "  date_col DATE,\n" +
+        "  date_part DATE\n" +
+        ")\n" +
+        "STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'\n" +
+        "WITH SERDEPROPERTIES ('hbase.columns.mapping'=':key,d:date_col,d:date_part', " +
         "'serialization.format'='1')"
     ));
   }

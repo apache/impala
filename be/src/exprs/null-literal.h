@@ -34,6 +34,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 class TExprNode;
 
@@ -69,6 +70,7 @@ class NullLiteral: public ScalarExpr {
   virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
   virtual CollectionVal GetCollectionVal(
       ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
 };
 
 }

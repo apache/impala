@@ -35,6 +35,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 /// Collection of builtin aggregate functions. Aggregate functions implement
 /// the various phases of the aggregation: Init(), Update(), Serialize(), Merge(),

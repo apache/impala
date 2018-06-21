@@ -79,72 +79,8 @@ bool TimestampParser::Parse(const char* str, int len, boost::gregorian::date* d,
   // Determine the length of relevant input, if we're using one of the default formats.
   int default_fmt_len = min(trimmed_len, DEFAULT_DATE_TIME_FMT_LEN);
   // Determine the default formatting context that's required for parsing.
-  DateTimeFormatContext* dt_ctx = NULL;
-  if (LIKELY(default_fmt_len >= DEFAULT_TIME_FMT_LEN)) {
-    // This string starts with a date component
-    if (str[4] == '-' && str[7] == '-') {
-      switch (default_fmt_len) {
-        case DEFAULT_DATE_FMT_LEN: {
-          dt_ctx = &DEFAULT_DATE_CTX;
-          break;
-        }
-        case DEFAULT_SHORT_DATE_TIME_FMT_LEN: {
-          if (LIKELY(str[13] == ':')) {
-            switch (str[10]) {
-              case ' ':
-                dt_ctx = &DEFAULT_SHORT_DATE_TIME_CTX;
-                break;
-              case 'T':
-                dt_ctx = &DEFAULT_SHORT_ISO_DATE_TIME_CTX;
-                break;
-            }
-          }
-          break;
-        }
-        case DEFAULT_DATE_TIME_FMT_LEN: {
-          if (LIKELY(str[13] == ':')) {
-            switch (str[10]) {
-              case ' ':
-                dt_ctx = &DEFAULT_DATE_TIME_CTX[9];
-                break;
-              case 'T':
-                dt_ctx = &DEFAULT_ISO_DATE_TIME_CTX[9];
-                break;
-            }
-          }
-          break;
-        }
-        default: {
-          // There is likely a fractional component that's below the expected 9 chars.
-          // We will need to work out which default context to use that corresponds to
-          // the fractional length in the string.
-          if (LIKELY(default_fmt_len > DEFAULT_SHORT_DATE_TIME_FMT_LEN)
-              && LIKELY(str[19] == '.') && LIKELY(str[13] == ':')) {
-            switch (str[10]) {
-              case ' ': {
-                dt_ctx = &DEFAULT_DATE_TIME_CTX
-                    [default_fmt_len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
-                break;
-              }
-              case 'T': {
-                dt_ctx = &DEFAULT_ISO_DATE_TIME_CTX
-                    [default_fmt_len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
-                break;
-              }
-            }
-          }
-          break;
-        }
-      }
-    } else if (str[2] == ':' && str[5] == ':' && isdigit(str[7])) {
-      default_fmt_len = min(default_fmt_len, DEFAULT_TIME_FRAC_FMT_LEN);
-      if (default_fmt_len > DEFAULT_TIME_FMT_LEN && str[8] == '.') {
-        dt_ctx = &DEFAULT_TIME_FRAC_CTX[default_fmt_len - DEFAULT_TIME_FMT_LEN - 1];
-      } else {
-        dt_ctx = &DEFAULT_TIME_CTX;
-      }
-    }
-  }
+  const DateTimeFormatContext* dt_ctx = ParseDefaultFormatTokensByStr(str,
+      default_fmt_len, true, true);
 
   if (dt_ctx != nullptr) return Parse(str, default_fmt_len, *dt_ctx, d, t);
   // Generating context lazily as a fall back if default formats fail.

@@ -90,6 +90,9 @@ FunctionContext::TypeDesc AnyValUtil::ColumnTypeToTypeDesc(const ColumnType& typ
       out.precision = type.precision;
       out.scale = type.scale;
       break;
+    case TYPE_DATE:
+      out.type = FunctionContext::TYPE_DATE;
+      break;
     default:
       DCHECK(false) << "Unknown type: " << type;
   }
@@ -131,6 +134,8 @@ ColumnType AnyValUtil::TypeDescToColumnType(const FunctionContext::TypeDesc& typ
       return ColumnType::CreateFixedUdaIntermediateType(type.len);
     case FunctionContext::TYPE_VARCHAR:
       return ColumnType::CreateVarcharType(type.len);
+    case FunctionContext::TYPE_DATE:
+      return ColumnType(TYPE_DATE);
     default:
       DCHECK(false) << "Unknown type: " << type.type;
       return ColumnType(INVALID_TYPE);

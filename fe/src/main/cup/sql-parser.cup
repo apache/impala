@@ -3185,6 +3185,8 @@ literal ::=
   {: RESULT = l; :}
   | STRING_LITERAL:l
   {: RESULT = new StringLiteral(l); :}
+  | KW_DATE STRING_LITERAL:l
+  {: RESULT = new DateLiteral(l); :}
   | KW_TRUE
   {: RESULT = new BoolLiteral(true); :}
   | KW_FALSE

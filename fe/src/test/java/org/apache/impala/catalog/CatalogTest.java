@@ -146,6 +146,7 @@ public class CatalogTest {
     assertNotNull(catalog_.getOrLoadTable("functional", "rankingssmall"));
     assertNotNull(catalog_.getOrLoadTable("functional", "uservisitssmall"));
     assertNotNull(catalog_.getOrLoadTable("functional", "view_view"));
+    assertNotNull(catalog_.getOrLoadTable("functional", "date_tbl"));
     // IMP-163 - table with string partition column does not load if there are partitions
     assertNotNull(catalog_.getOrLoadTable("functional", "StringPartitionKey"));
     // Test non-existent table
@@ -313,6 +314,10 @@ public class CatalogTest {
           {Type.STRING, Type.STRING, Type.STRING,
            Type.FLOAT, Type.STRING, Type.STRING,
            Type.STRING, Type.STRING, Type.INT});
+
+    checkTableCols(functionalDb, "date_tbl", 1,
+        new String[] {"date_part", "id_col", "date_col"},
+        new Type[] {Type.DATE, Type.INT, Type.DATE});
 
     // case-insensitive lookup
     assertEquals(catalog_.getOrLoadTable("functional", "alltypes"),

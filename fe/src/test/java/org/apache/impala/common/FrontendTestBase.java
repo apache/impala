@@ -148,7 +148,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
       "bigint_col bigint, float_col float, double_col double, dec1 decimal(9,0), " +
       "d2 decimal(10, 0), d3 decimal(20, 10), d4 decimal(38, 38), d5 decimal(10, 5), " +
       "timestamp_col timestamp, string_col string, varchar_col varchar(50), " +
-      "char_col char (30))");
+      "char_col char (30), date_col date)");
   }
 
   /**

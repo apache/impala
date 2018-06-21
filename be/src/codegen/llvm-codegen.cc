@@ -544,6 +544,8 @@ llvm::Type* LlvmCodeGen::GetSlotType(const ColumnType& type) {
       return timestamp_value_type_;
     case TYPE_DECIMAL:
       return llvm::Type::getIntNTy(context(), type.GetByteSize() * 8);
+    case TYPE_DATE:
+      return i32_type();
     default:
       DCHECK(false) << "Invalid type: " << type;
       return NULL;
@@ -1369,6 +1371,7 @@ void LlvmCodeGen::CodegenMinMax(LlvmBuilder* builder, const ColumnType& type,
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
     case TYPE_INT:
+    case TYPE_DATE:
     case TYPE_BIGINT:
     case TYPE_DECIMAL:
       if (min) {

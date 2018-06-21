@@ -2134,6 +2134,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // wrong type
     AnalysisError("select sum(timestamp_col) from functional.alltypes",
         "SUM requires a numeric parameter: sum(timestamp_col)");
+    AnalysisError("select sum(date_col) from functional.date_tbl",
+        "SUM requires a numeric parameter: sum(date_col)");
     AnalysisError("select sum(string_col) from functional.alltypes",
         "SUM requires a numeric parameter: sum(string_col)");
     AnalysisError("select avg(string_col) from functional.alltypes",
@@ -2156,6 +2158,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select ndv(d1), distinctpc(d2), distinctpcsa(d3), count(distinct d4) "
         + "from functional.decimal_tbl");
     AnalyzesOk("select avg(d5) from functional.decimal_tbl");
+
+    // Date
+    AnalyzesOk("select min(date_col), max(date_col), count(date_col) "
+        + "from functional.date_tbl");
+    AnalyzesOk("select ndv(date_col), distinctpc(date_col), distinctpcsa(date_col), "
+        + "count(distinct date_col) from functional.date_tbl");
 
     // Test select stmt avg smap.
     AnalyzesOk("select cast(avg(c1) as decimal(10,4)) as c from " +
@@ -2420,6 +2428,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "group by zip");
     AnalyzesOk("select d1, d2, count(*) from functional.decimal_tbl " +
         "group by 1, 2");
+    AnalyzesOk("select date_part, date_col, count(*) from functional.date_tbl " +
+        "group by 1, 2");
 
     // doesn't group by all non-agg select list items
     AnalysisError("select zip, count(*) from functional.testtbl",
@@ -2518,6 +2528,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select zip, id from functional.testtbl " +
         "order by true asc, false desc, NULL asc");
     AnalyzesOk("select d1, d2 from functional.decimal_tbl order by d1");
+    AnalyzesOk("select date_col, date_part from functional.date_tbl order by date_col");
 
     // resolves ordinals
     AnalyzesOk("select zip, id from functional.testtbl order by 1");

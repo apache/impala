@@ -751,6 +751,16 @@ struct TPublishFilterParams {
 struct TPublishFilterResult {
 }
 
+struct TParseDateStringResult {
+  // True iff date string was successfully parsed
+  1: required bool valid
+  // Number of days since 1970-01-01. Used only if 'valid' is true.
+  2: optional i32 days_since_epoch
+  // Canonical date string (formed as 'yyyy-MM-dd'). Used only if 'valid' is true and the
+  // parsed date string was not in a canonical form.
+  3: optional string canonical_date_string
+}
+
 service ImpalaInternalService {
   // Called by coord to start asynchronous execution of a query's fragment instances in
   // backend.

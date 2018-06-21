@@ -480,6 +480,19 @@ cast(cast(12333333333 as decimal(38, 0)) as timestamp);
 TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP, TIMESTAMP
 ====
 ---- QUERY
+# Check that converting from decimal to date is not allowed
+set decimal_v2=false;
+select cast(cast(0.499 as decimal(9, 3)) as date);
+---- CATCH
+AnalysisException: Invalid type cast of CAST(0.499 AS DECIMAL(9,3)) from DECIMAL(9,3) to DATE
+====
+---- QUERY
+set decimal_v2=true;
+select cast(cast(0.499 as decimal(9, 3)) as date);
+---- CATCH
+AnalysisException: Invalid type cast of CAST(0.499 AS DECIMAL(9,3)) from DECIMAL(9,3) to DATE
+====
+---- QUERY
 # IMPALA-6405: String to Decimal conversion errors
 set decimal_v2=false;
 select cast("abc" as decimal(5, 2));

@@ -18,7 +18,11 @@
 #include "exprs/cast-functions.h"
 
 #include <cmath>
+#include <sstream>
+#include <string>
 
+#include <boost/date_time/gregorian/gregorian.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
 
 #include "exprs/anyval-util.h"
@@ -168,6 +172,15 @@ StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TimestampVa
   return sv;
 }
 
+StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const DateVal& val) {
+  if (val.is_null) return StringVal::null();
+  DateValue dv = DateValue::FromDateVal(val);
+  if (UNLIKELY(!dv.IsValid())) return StringVal::null();
+  StringVal sv = AnyValUtil::FromString(ctx, dv.ToString());
+  AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv);
+  return sv;
+}
+
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const StringVal& val) {
   if (val.is_null) return StringVal::null();
   StringVal sv;
@@ -273,4 +286,45 @@ TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx,
   TimestampVal result;
   tv.ToTimestampVal(&result);
   return result;
+}
+
+TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx, const DateVal& val) {
+  if (val.is_null) return TimestampVal::null();
+  const DateValue dv = DateValue::FromDateVal(val);
+
+  int32_t days = 0;
+  if (!dv.ToDaysSinceEpoch(&days)) return TimestampVal::null();
+
+  TimestampValue tv = TimestampValue::FromDaysSinceUnixEpoch(days);
+  if (UNLIKELY(!tv.HasDate())) {
+    ctx->SetError("Date to Timestamp conversion failed. "
+        "The valid date range for the Timestamp type is 1400-01-01..9999-12-31.");
+    return TimestampVal::null();
+  }
+  TimestampVal result;
+  tv.ToTimestampVal(&result);
+  return result;
+}
+
+DateVal CastFunctions::CastToDateVal(FunctionContext* ctx, const StringVal& val) {
+  if (val.is_null) return DateVal::null();
+  DateValue dv = DateValue::Parse(reinterpret_cast<char*>(val.ptr), val.len, true);
+  if (UNLIKELY(!dv.IsValid())) {
+    ctx->SetError("String to Date parse failed.");
+    return DateVal::null();
+  }
+  return dv.ToDateVal();
+}
+
+DateVal CastFunctions::CastToDateVal(FunctionContext* ctx, const TimestampVal& val) {
+  if (val.is_null) return DateVal::null();
+  TimestampValue tv = TimestampValue::FromTimestampVal(val);
+  if (UNLIKELY(!tv.HasDate())) {
+    ctx->SetError("Timestamp to Date conversion failed. "
+        "Timestamp has no date component.");
+    return DateVal::null();
+  }
+
+  DateValue dv(tv.DaysSinceUnixEpoch());
+  return dv.ToDateVal();
 }

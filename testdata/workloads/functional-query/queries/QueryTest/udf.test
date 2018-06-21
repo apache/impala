@@ -62,6 +62,13 @@ select identity(now());
 timestamp
 ====
 ---- QUERY
+select identity(date '2019-02-20');
+---- TYPES
+date
+---- RESULTS
+2019-02-20
+====
+---- QUERY
 select identity(cast(1 as decimal(9,0)));
 ---- TYPES
 decimal
@@ -97,6 +104,13 @@ timestamp
 2013-10-09 00:00:00.000000001
 ====
 ---- QUERY
+select constant_date();
+---- TYPES
+date
+---- RESULTS
+2013-10-09
+====
+---- QUERY
 select from_utc_timestamp(constant_timestamp(), "UTC");
 ---- TYPES
 timestamp
@@ -105,11 +119,12 @@ timestamp
 ====
 ---- QUERY
 # Test UDFs with different arguments
-select all_types_fn("1", true, 2, 3, 4, 5, 6.0, 7.0, cast(8 as decimal(2,0)));
+select all_types_fn("1", true, 2, 3, 4, 5, 6.0, 7.0, cast(8 as decimal(2,0)),
+    date '1970-01-10');
 ---- TYPES
 int
 ---- RESULTS
-37
+46
 ====
 ---- QUERY
 select no_args();
@@ -149,6 +164,35 @@ decimal,decimal,decimal
 132842,12345.6789000000,0.7788900000
 ====
 ---- QUERY
+select identity(date_part), identity(date_col)
+from functional.date_tbl;
+---- TYPES
+DATE, DATE
+---- RESULTS
+0001-01-01,0001-01-01
+0001-01-01,0001-12-31
+0001-01-01,0002-01-01
+0001-01-01,1399-12-31
+0001-01-01,2017-11-28
+0001-01-01,9999-12-31
+0001-01-01,NULL
+1399-06-27,2017-11-28
+1399-06-27,2018-12-31
+1399-06-27,NULL
+2017-11-27,0001-06-21
+2017-11-27,0001-06-22
+2017-11-27,0001-06-23
+2017-11-27,0001-06-24
+2017-11-27,0001-06-25
+2017-11-27,0001-06-26
+2017-11-27,0001-06-27
+2017-11-27,0001-06-28
+2017-11-27,0001-06-29
+2017-11-27,2017-11-28
+9999-12-31,9999-12-01
+9999-12-31,9999-12-31
+====
+---- QUERY
 select identity(bool_col), identity(tinyint_col),
        identity(smallint_col), identity(int_col),
        identity(bigint_col), identity(float_col),
@@ -170,7 +214,8 @@ false,1,1,1,10,1.100000023841858,10.1,'1',2009-03-01 00:01:00,2009
 ---- QUERY
 select sum(all_types_fn(
     string_col, bool_col, tinyint_col, smallint_col,
-    int_col, bigint_col, float_col, double_col, cast(tinyint_col as decimal(2,0))))
+    int_col, bigint_col, float_col, double_col, cast(tinyint_col as decimal(2,0)),
+    cast(adddate('1970-01-01', tinyint_col) as date)))
 from functional.alltypes;
 ---- TYPES
 bigint
@@ -178,8 +223,9 @@ bigint
 # Verify with 'select sum(length(string_col)) + sum(cast(bool_col as int))
 #  + sum(tinyint_col) + sum(smallint_col) + sum(int_col) + sum(bigint_col)
 #  + sum(cast(float_col as bigint)) + sum(cast(double_col as bigint)) + sum(tinyint_col)
+#  + sum(tinyint_col)
 #  from functional.alltypes;'
-832200
+865050
 ====
 ---- QUERY
 select no_args() from functional.alltypes limit 1;

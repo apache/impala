@@ -19,6 +19,7 @@
 #include <boost/functional/hash.hpp>
 
 #include "runtime/collection-value.h"
+#include "runtime/date-value.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple.h"
@@ -50,6 +51,9 @@ void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
       break;
     case TYPE_INT:
       stream->write(chars, sizeof(int32_t));
+      break;
+    case TYPE_DATE:
+      stream->write(chars, sizeof(DateValue));
       break;
     case TYPE_BIGINT:
       stream->write(chars, sizeof(int64_t));
@@ -137,6 +141,9 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
       break;
     case TYPE_INT:
       *reinterpret_cast<int32_t*>(dst) = *reinterpret_cast<const int32_t*>(value);
+      break;
+    case TYPE_DATE:
+      *reinterpret_cast<DateValue*>(dst) = *reinterpret_cast<const DateValue*>(value);
       break;
     case TYPE_BIGINT:
       *reinterpret_cast<int64_t*>(dst) = *reinterpret_cast<const int64_t*>(value);
@@ -277,6 +284,10 @@ void RawValue::PrintValue(
           *stream << reinterpret_cast<const Decimal16Value*>(value)->ToString(type);
           break;
         default: DCHECK(false) << type;
+      }
+      break;
+    case TYPE_DATE: {
+        *stream << *reinterpret_cast<const DateValue*>(value);
       }
       break;
     default: DCHECK(false) << "Unknown type: " << type;

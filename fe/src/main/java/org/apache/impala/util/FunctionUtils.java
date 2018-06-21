@@ -214,28 +214,33 @@ public abstract class FunctionUtils {
     Preconditions.checkNotNull(mode);
 
     // First check for identical
-    for (Function f: fns) {
-      if (f.compare(desc, Function.CompareMode.IS_IDENTICAL)) return f;
-    }
-    if (mode == Function.CompareMode.IS_IDENTICAL) return null;
+    Function f = getBestFitFunction(fns, desc, Function.CompareMode.IS_IDENTICAL);
+    if (f != null || mode == Function.CompareMode.IS_IDENTICAL) return f;
 
     // Next check for indistinguishable
-    for (Function f: fns) {
-      if (f.compare(desc, Function.CompareMode.IS_INDISTINGUISHABLE)) return f;
-    }
-    if (mode == Function.CompareMode.IS_INDISTINGUISHABLE) return null;
+    f = getBestFitFunction(fns, desc, Function.CompareMode.IS_INDISTINGUISHABLE);
+    if (f != null || mode == Function.CompareMode.IS_INDISTINGUISHABLE) return f;
 
     // Next check for strict supertypes
-    for (Function f: fns) {
-      if (f.compare(desc, Function.CompareMode.IS_SUPERTYPE_OF)) return f;
-    }
-    if (mode == Function.CompareMode.IS_SUPERTYPE_OF) return null;
+    f = getBestFitFunction(fns, desc, Function.CompareMode.IS_SUPERTYPE_OF);
+    if (f != null || mode == Function.CompareMode.IS_SUPERTYPE_OF) return f;
 
     // Finally check for non-strict supertypes
+    return getBestFitFunction(fns, desc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+  }
+
+  private static Function getBestFitFunction(Iterable<Function> fns, Function desc,
+      CompareMode mode) {
+    int maxScore = -1;
+    Function maxFunc = null;
     for (Function f: fns) {
-      if (f.compare(desc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF)) return f;
+      int score = f.calcMatchScore(desc, mode);
+      if (score >= 0 && score > maxScore) {
+        maxScore = score;
+        maxFunc = f;
+      }
     }
-    return null;
+    return maxFunc;
   }
 
   public static List<Function> getVisibleFunctionsInCategory(

@@ -154,6 +154,11 @@ void IrStringToTimestamp(TimestampValue* out, const char* s, int len,
 }
 
 extern "C"
+DateValue IrStringToDate(const char* s, int len, ParseResult* result) {
+  return StringParser::StringToDate(s, len, result);
+}
+
+extern "C"
 Decimal4Value IrStringToDecimal4(const char* s, int len, int type_precision,
     int type_scale, ParseResult* result)  {
   auto ret = StringToDecimal4(s, len, type_precision, type_scale, false, result);

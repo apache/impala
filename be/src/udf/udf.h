@@ -60,6 +60,7 @@ struct IntVal;
 struct BigIntVal;
 struct StringVal;
 struct TimestampVal;
+struct DateVal;
 
 /// A FunctionContext is passed to every UDF/UDA and is the interface for the UDF to the
 /// rest of the system. It contains APIs to examine the system state, report errors and
@@ -83,6 +84,7 @@ class FunctionContext {
     TYPE_DOUBLE,
     TYPE_TIMESTAMP,
     TYPE_STRING,
+    TYPE_DATE,
     // Not used - maps to CHAR(N), which is not supported for UDFs and UDAs.
     TYPE_FIXED_BUFFER,
     TYPE_DECIMAL,
@@ -579,6 +581,35 @@ struct TimestampVal : public AnyVal {
     return date == other.date && time_of_day == other.time_of_day;
   }
   bool operator!=(const TimestampVal& other) const { return !(*this == other); }
+};
+
+/// Represents a DATE value.
+/// - The minimum and maximum dates are 0000-01-01 and 9999-12-31. Valid dates must fall
+///   in this range.
+/// - Internally represents DATE values as number of days since 1970-01-01.
+/// - This representation was chosen to be the same (bit-by-bit) as Parquet's date type.
+///   (https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#date)
+/// - Proleptic Gregorian calendar is used to calculate the number of days since epoch,
+///   which can lead to different representation of historical dates compared to Hive.
+///   (https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar).
+struct DateVal : public AnyVal {
+  typedef int32_t underlying_type_t;
+  underlying_type_t val;
+
+  explicit DateVal(underlying_type_t val = 0) : val(val) { }
+
+  static DateVal null() {
+    DateVal result;
+    result.is_null = true;
+    return result;
+  }
+
+  bool operator==(const DateVal& other) const {
+    if (is_null && other.is_null) return true;
+    if (is_null || other.is_null) return false;
+    return val == other.val;
+  }
+  bool operator!=(const DateVal& other) const { return !(*this == other); }
 };
 
 /// A String value represented as a buffer + length.

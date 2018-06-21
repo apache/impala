@@ -33,6 +33,8 @@ int IR_ALWAYS_INLINE RawValue::Compare(
   const StringValue* string_value2;
   const TimestampValue* ts_value1;
   const TimestampValue* ts_value2;
+  const DateValue* date_value1;
+  const DateValue* date_value2;
   float f1, f2;
   double d1, d2;
   int32_t i1, i2;
@@ -51,6 +53,10 @@ int IR_ALWAYS_INLINE RawValue::Compare(
       i1 = *reinterpret_cast<const int32_t*>(v1);
       i2 = *reinterpret_cast<const int32_t*>(v2);
       return i1 > i2 ? 1 : (i1 < i2 ? -1 : 0);
+    case TYPE_DATE:
+      date_value1 = reinterpret_cast<const DateValue*>(v1);
+      date_value2 = reinterpret_cast<const DateValue*>(v2);
+      return *date_value1 > *date_value2 ? 1 : (*date_value1 < *date_value2 ? -1 : 0);
     case TYPE_BIGINT:
       b1 = *reinterpret_cast<const int64_t*>(v1);
       b2 = *reinterpret_cast<const int64_t*>(v2);
@@ -133,6 +139,9 @@ uint32_t IR_ALWAYS_INLINE RawValue::GetHashValue(
     case TYPE_INT:
       return RawValue::GetHashValueNonNull<int32_t>(
         reinterpret_cast<const int32_t*>(v), type, seed);
+    case TYPE_DATE:
+      return RawValue::GetHashValueNonNull<DateValue>(
+        reinterpret_cast<const DateValue*>(v), type, seed);
     case TYPE_BIGINT:
       return RawValue::GetHashValueNonNull<int64_t>(
         reinterpret_cast<const int64_t*>(v), type, seed);
@@ -187,6 +196,7 @@ uint64_t IR_ALWAYS_INLINE RawValue::GetHashValueFastHash(const void* v,
     case TYPE_TIMESTAMP: return HashUtil::FastHash64(v, 12, seed);
     case TYPE_CHAR: return HashUtil::FastHash64(v, type.len, seed);
     case TYPE_DECIMAL: return HashUtil::FastHash64(v, type.GetByteSize(), seed);
+    case TYPE_DATE: return HashUtil::FastHash64(v, 4, seed);
     default: DCHECK(false); return 0;
   }
 }

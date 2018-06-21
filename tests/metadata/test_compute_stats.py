@@ -50,6 +50,8 @@ class TestComputeStats(ImpalaTestSuite):
     # Test compute stats on decimal columns separately so we can vary between platforms
     # with and without write support for decimals (Hive < 0.11 and >= 0.11).
     self.run_test_case('QueryTest/compute-stats-decimal', vector, unique_database)
+    # Test compute stats on date columns separately.
+    self.run_test_case('QueryTest/compute-stats-date', vector, unique_database)
 
   @SkipIfS3.eventually_consistent
   def test_compute_stats_incremental(self, vector, unique_database):

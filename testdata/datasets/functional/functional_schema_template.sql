@@ -2475,9 +2475,95 @@ varchar_col varchar(3)
 ---- DEPENDENT_LOAD
 insert overwrite table {db_name}{db_suffix}.{table_name}
 select id, date_char_col, char_col, date_varchar_col, varchar_col
-from {db_name}.{table_name}
+from {db_name}.{table_name};
 ---- LOAD
 insert overwrite table {db_name}{db_suffix}.{table_name}
 select id, date_string_col, case when id % 3 in (0, 1) then string_col end, date_string_col, case when id % 3 = 0 then string_col end
-from functional.alltypesagg
+from functional.alltypesagg;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+date_tbl
+---- PARTITION_COLUMNS
+date_part DATE
+---- COLUMNS
+id_col INT
+date_col DATE
+---- ALTER
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(date_part='0001-01-01');
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(date_part='1399-06-27');
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(date_part='2017-11-27');
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(date_part='9999-12-31');
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- HBASE_REGION_SPLITS
+'1','3','5','7','9'
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl/0000.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='0001-01-01');
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl/0001.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='1399-06-27');
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl/0002.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='2017-11-27');
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl/0003.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='9999-12-31');
+---- DEPENDENT_LOAD
+insert overwrite table {db_name}{db_suffix}.{table_name} partition(date_part)
+select id_col, date_col, date_part from functional.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+date_tbl_error
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  id_col int,
+  date_col date)
+partitioned by (date_part date)
+row format delimited fields terminated by ','  escaped by '\\'
+stored as {file_format}
+LOCATION '{hdfs_location}';
+USE {db_name}{db_suffix};
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(date_part='0001-01-01');
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(date_part='1399-06-27');
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(date_part='2017-11-27');
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(date_part='9999-12-31');
+
+-- Create external temp table with desired file format with same data file location
+-- Tmp tables must not specify an escape character we don't want any
+-- data transformation to happen when inserting it into tmp tables.
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_tmp (
+  id_col STRING,
+  date_col STRING)
+PARTITIONED BY (date_part DATE)
+ROW FORMAT DELIMITED
+  FIELDS TERMINATED BY ','
+STORED AS {file_format}
+LOCATION '{hdfs_location}';
+
+-- Make metastore aware of the partition directories for the temp table
+ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION(date_part='0001-01-01');
+ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION(date_part='1399-06-27');
+ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION(date_part='2017-11-27');
+ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION(date_part='9999-12-31');
+---- DEPENDENT_LOAD
+USE {db_name}{db_suffix};
+-- Step 4: Stream the data from tmp text table to desired format tmp table
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}_tmp PARTITION (date_part)
+SELECT * FROM {db_name}.{table_name}_tmp;
+
+-- Cleanup the temp table
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_tmp;
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl_error/0000.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='0001-01-01');
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl_error/0001.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='1399-06-27');
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl_error/0002.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='2017-11-27');
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl_error/0003.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(date_part='9999-12-31');
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+insert_date_tbl
+---- PARTITION_COLUMNS
+date_part DATE
+---- COLUMNS
+id_col INT
+date_col DATE
 ====

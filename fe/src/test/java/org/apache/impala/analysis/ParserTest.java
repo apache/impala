@@ -1202,6 +1202,19 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("select true from t where true", BoolLiteral.class);
     ParsesOk("select false from t where false", BoolLiteral.class);
 
+    // Date literals
+    ParsesOk("select date '2011-01-01'", DateLiteral.class);
+    ParsesOk("select date '2011-1-01'", DateLiteral.class);
+    ParsesOk("select date '2011-1-1'", DateLiteral.class);
+    ParserError("select date '2011-001-1'");
+    ParserError("select date '2011-01-001'");
+    ParserError("select date '2011-oct-01'");
+    ParserError("select date '2011-01-0'");
+    ParserError("select date '2011-01-40'");
+    ParserError("select date '2011-01-'");
+    ParserError("select date '2011--01'");
+    ParserError("select date '2001-02-31'");
+
     // Null literal
     ParsesOk("select NULL from t where NULL", NullLiteral.class);
 
@@ -3172,6 +3185,7 @@ public class ParserTest extends FrontendTestBase {
     TypeDefsParseOk("BINARY");
     TypeDefsParseOk("DECIMAL");
     TypeDefsParseOk("TIMESTAMP");
+    TypeDefsParseOk("DATE");
 
     // Test decimal.
     TypeDefsParseOk("DECIMAL");
@@ -3294,8 +3308,9 @@ public class ParserTest extends FrontendTestBase {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: ALL, CASE, CAST, DEFAULT, DISTINCT, EXISTS, FALSE, IF, INTERVAL, " +
-        "LEFT, NOT, NULL, REPLACE, RIGHT, STRAIGHT_JOIN, TRUNCATE, TRUE, IDENTIFIER");
+        "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, IF, " +
+        "INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, STRAIGHT_JOIN, TRUNCATE, TRUE, " +
+        "IDENTIFIER");
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -3320,8 +3335,8 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from t where\n" +
         "                           ^\n" +
         "Encountered: EOF\n" +
-        "Expected: CASE, CAST, DEFAULT, EXISTS, FALSE, IF, INTERVAL, LEFT, NOT, NULL, " +
-        "REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
+        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, IF, INTERVAL, LEFT, NOT, " +
+        "NULL, REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -3329,8 +3344,8 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from t where group by a, b\n" +
         "                            ^\n" +
         "Encountered: GROUP\n" +
-        "Expected: CASE, CAST, DEFAULT, EXISTS, FALSE, IF, INTERVAL, LEFT, NOT, NULL, " +
-        "REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
+        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, IF, INTERVAL, LEFT, NOT, " +
+        "NULL, REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
@@ -3390,8 +3405,8 @@ public class ParserTest extends FrontendTestBase {
         "...c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t\n" +
         "                             ^\n" +
         "Encountered: COMMA\n" +
-        "Expected: CASE, CAST, DEFAULT, EXISTS, FALSE, IF, INTERVAL, LEFT, NOT, NULL, " +
-        "REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
+        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, IF, INTERVAL, LEFT, NOT, " +
+        "NULL, REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
 
     // Parsing identifiers that have different names printed as EXPECTED
     ParserError("DROP DATA SRC foo",

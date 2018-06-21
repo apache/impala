@@ -107,10 +107,10 @@ public abstract class Type {
     supportedTypes.add(CHAR);
     supportedTypes.add(TIMESTAMP);
     supportedTypes.add(DECIMAL);
+    supportedTypes.add(DATE);
 
     unsupportedTypes = new ArrayList<>();
     unsupportedTypes.add(BINARY);
-    unsupportedTypes.add(DATE);
     unsupportedTypes.add(DATETIME);
   }
 
@@ -155,6 +155,7 @@ public abstract class Type {
   public boolean isNull() { return isScalarType(PrimitiveType.NULL_TYPE); }
   public boolean isBoolean() { return isScalarType(PrimitiveType.BOOLEAN); }
   public boolean isTimestamp() { return isScalarType(PrimitiveType.TIMESTAMP); }
+  public boolean isDate() { return isScalarType(PrimitiveType.DATE); }
   public boolean isDecimal() { return isScalarType(PrimitiveType.DECIMAL); }
   public boolean isFullySpecifiedDecimal() { return false; }
   public boolean isWildcardDecimal() { return false; }
@@ -193,7 +194,7 @@ public abstract class Type {
     return isFixedPointType() || isFloatingPointType() || isDecimal();
   }
 
-  public boolean isDateType() {
+  public boolean isDateOrTimeType() {
     return isScalarType(PrimitiveType.DATE) || isScalarType(PrimitiveType.DATETIME)
         || isScalarType(PrimitiveType.TIMESTAMP);
   }
@@ -467,6 +468,8 @@ public abstract class Type {
         return Integer.MAX_VALUE;
       case TIMESTAMP:
         return 29;
+      case DATE:
+        return 10;
       case CHAR:
       case VARCHAR:
       case FIXED_UDA_INTERMEDIATE:
@@ -519,6 +522,7 @@ public abstract class Type {
       case SMALLINT:
       case INT:
       case BIGINT:
+      case DATE:
         return 0;
       case FLOAT:
         return 7;
@@ -585,6 +589,7 @@ public abstract class Type {
       case FLOAT: return java.sql.Types.FLOAT;
       case DOUBLE: return java.sql.Types.DOUBLE;
       case TIMESTAMP: return java.sql.Types.TIMESTAMP;
+      case DATE: return java.sql.Types.DATE;
       case STRING: return java.sql.Types.VARCHAR;
       case CHAR: return java.sql.Types.CHAR;
       case VARCHAR: return java.sql.Types.VARCHAR;
@@ -745,14 +750,16 @@ public abstract class Type {
     compatibilityMatrix[DOUBLE.ordinal()][VARCHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
     compatibilityMatrix[DOUBLE.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
 
-    compatibilityMatrix[DATE.ordinal()][DATETIME.ordinal()] = PrimitiveType.DATETIME;
-    compatibilityMatrix[DATE.ordinal()][TIMESTAMP.ordinal()] = PrimitiveType.TIMESTAMP;
-    compatibilityMatrix[DATE.ordinal()][STRING.ordinal()] = PrimitiveType.INVALID_TYPE;
+    // We can convert some but not all string values to date.
+    compatibilityMatrix[DATE.ordinal()][STRING.ordinal()] = PrimitiveType.DATE;
+    strictCompatibilityMatrix[DATE.ordinal()][STRING.ordinal()] =
+        PrimitiveType.INVALID_TYPE;
     compatibilityMatrix[DATE.ordinal()][VARCHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
     compatibilityMatrix[DATE.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
 
     compatibilityMatrix[DATETIME.ordinal()][TIMESTAMP.ordinal()] =
         PrimitiveType.TIMESTAMP;
+    compatibilityMatrix[DATETIME.ordinal()][DATE.ordinal()] = PrimitiveType.DATETIME;
     compatibilityMatrix[DATETIME.ordinal()][STRING.ordinal()] =
         PrimitiveType.INVALID_TYPE;
     compatibilityMatrix[DATETIME.ordinal()][VARCHAR.ordinal()] =
@@ -760,6 +767,10 @@ public abstract class Type {
     compatibilityMatrix[DATETIME.ordinal()][CHAR.ordinal()] =
         PrimitiveType.INVALID_TYPE;
 
+    // We can convert some but not all date values to timestamps.
+    compatibilityMatrix[TIMESTAMP.ordinal()][DATE.ordinal()] = PrimitiveType.TIMESTAMP;
+    strictCompatibilityMatrix[TIMESTAMP.ordinal()][DATE.ordinal()] =
+        PrimitiveType.INVALID_TYPE;
     // We can convert some but not all string values to timestamps.
     compatibilityMatrix[TIMESTAMP.ordinal()][STRING.ordinal()] =
         PrimitiveType.TIMESTAMP;

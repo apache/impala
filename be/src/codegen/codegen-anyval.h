@@ -53,6 +53,7 @@ namespace impala {
 /// TYPE_TIMESTAMP/TimestampVal: { i64, i64 }
 /// TYPE_DECIMAL/DecimalVal (isn't lowered):
 /// %"struct.impala_udf::DecimalVal" { {i8}, [15 x i8], {i128} }
+/// TYPE_DATE/DateVal: i64
 //
 /// TODO:
 /// - unit tests
@@ -68,6 +69,7 @@ class CodegenAnyVal {
   static const char* LLVM_STRINGVAL_NAME;
   static const char* LLVM_TIMESTAMPVAL_NAME;
   static const char* LLVM_DECIMALVAL_NAME;
+  static const char* LLVM_DATEVAL_NAME;
 
   /// Creates a call to 'fn', which should return a (lowered) *Val, and returns the result.
   /// This abstracts over the x64 calling convention, in particular for functions returning

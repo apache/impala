@@ -1,0 +1,593 @@
+====
+---- QUERY
+# TODO: Once DATE type is supported across all fileformats, move this test to
+# hdfs-scan-node.test.
+select id_col, date_part, date_col from date_tbl;
+---- RESULTS
+0,0001-01-01,0001-01-01
+1,0001-01-01,0001-12-31
+2,0001-01-01,0002-01-01
+3,0001-01-01,1399-12-31
+4,0001-01-01,2017-11-28
+5,0001-01-01,9999-12-31
+6,0001-01-01,NULL
+10,1399-06-27,2017-11-28
+11,1399-06-27,NULL
+12,1399-06-27,2018-12-31
+20,2017-11-27,0001-06-21
+21,2017-11-27,0001-06-22
+22,2017-11-27,0001-06-23
+23,2017-11-27,0001-06-24
+24,2017-11-27,0001-06-25
+25,2017-11-27,0001-06-26
+26,2017-11-27,0001-06-27
+27,2017-11-27,0001-06-28
+28,2017-11-27,0001-06-29
+29,2017-11-27,2017-11-28
+30,9999-12-31,9999-12-01
+31,9999-12-31,9999-12-31
+---- TYPES
+INT,DATE,DATE
+====
+---- QUERY
+# TODO: Once DATE type is supported across all fileformats, move these tests to
+# exprs.test.
+select count(*) from date_tbl
+where '2017-11-28' in (date_col)
+---- RESULTS
+3
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from date_tbl
+where date_col in ('2017-11-28', '0001-1-1', DATE '9999-12-31', '0001-06-25',
+DATE '0001-6-23', '2018-12-31', '0000-01-01', '2018-12-31')
+---- RESULTS
+9
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from date_tbl
+where '2017-11-28' not in (date_col)
+---- RESULTS
+17
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from date_tbl
+where date_col not in ('2017-11-28', '0001-1-1', DATE '9999-12-31', '0001-06-25',
+DATE '0001-6-23', '2018-12-31', '0000-01-01', '2018-12-31')
+---- RESULTS
+11
+---- TYPES
+bigint
+====
+---- QUERY
+select date_col, count(*) from date_tbl where case date_col
+when '2017-11-28' then "true"
+else "false" end = "true" group by 1
+---- RESULTS
+2017-11-28,3
+---- TYPES
+DATE, BIGINT
+====
+---- QUERY
+select count(*) from date_tbl where date_col
+between '2017-11-28' and '2017-11-28'
+---- RESULTS
+3
+---- TYPES
+bigint
+====
+---- QUERY
+select count(*) from date_tbl where date_col
+not between '2017-11-28' and '2017-11-28'
+---- RESULTS
+17
+---- TYPES
+bigint
+====
+---- QUERY
+# Test 0000-01-01 date handling during string to date conversion.
+select CAST("0000-01-01" AS DATE);
+---- RESULTS
+0000-01-01
+---- TYPES
+DATE
+====
+---- QUERY
+# Test <1400 date handling during string to date conversion.
+select CAST("1399-12-31" AS DATE);
+---- RESULTS
+1399-12-31
+---- TYPES
+DATE
+====
+---- QUERY
+# Test >=10000 date handling during string to date conversion.
+select CAST("10000-01-01" AS DATE);
+---- CATCH
+UDF ERROR: String to Date parse failed.
+====
+---- QUERY
+# Test leap year checking during string to date conversion.
+select CAST("1900-02-29" AS DATE);
+---- CATCH
+UDF ERROR: String to Date parse failed.
+====
+---- QUERY
+# Test invalid format handling during string to date conversion.
+select CAST("not a date" AS DATE);
+---- CATCH
+UDF ERROR: String to Date parse failed.
+====
+---- QUERY
+# Test 0000-01-01 and 9999-12-31 date literal
+select DATE "0000-01-01", DATE '9999-12-31';
+---- RESULTS
+0000-01-01,9999-12-31
+---- TYPES
+DATE,DATE
+====
+---- QUERY
+# Test >=10000 date literal.
+select DATE "10000-01-01";
+---- CATCH
+AnalysisException: Invalid date literal: '10000-01-01'
+====
+---- QUERY
+# Test invalid dare literal
+select DATE "not a date";
+---- CATCH
+AnalysisException: Invalid date literal: 'not a date'
+====
+---- QUERY
+# Test leap year checking in date literal
+select DATE "1900-02-29";
+---- CATCH
+AnalysisException: Invalid date literal: '1900-02-29'
+---- TYPES
+DATE
+====
+---- QUERY
+select murmur_hash(date_col), murmur_hash(date_part) from date_tbl;
+---- RESULTS
+-232951748055606586,7040505807414357930
+-3732010091053269412,7040505807414357930
+-3974699570613064843,-603226120891050888
+-7063415310100391105,1363129737749198513
+-7676893653355904113,-603226120891050888
+1274392552456687587,-603226120891050888
+232326618821724181,-603226120891050888
+2388222541326638441,6952609697003645459
+2741588585509081281,-603226120891050888
+335637154849784215,-603226120891050888
+335637154849784215,1363129737749198513
+335637154849784215,7040505807414357930
+4285738516310795057,-603226120891050888
+5184255335234340452,-603226120891050888
+5446911420184118521,-603226120891050888
+6701568911426106324,-603226120891050888
+6952609697003645459,6952609697003645459
+6952609697003645459,7040505807414357930
+7040505807414357930,7040505807414357930
+7846901255014371649,7040505807414357930
+NULL,1363129737749198513
+NULL,7040505807414357930
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+# Test support for non zero-padded date strings cast as date
+select cast('2001-1-21' as date), cast('2001-1-2' as date)
+---- RESULTS
+2001-01-21,2001-01-02
+---- TYPES
+DATE,DATE
+====
+---- QUERY
+# Test support for non zero-padded date literals
+select date '2001-1-21', date '2001-1-2'
+---- RESULTS
+2001-01-21,2001-01-02
+---- TYPES
+DATE,DATE
+====
+---- QUERY
+# Test that casts are not allowed between DATE and numerical types
+select cast(date '2000-12-21' as int);
+---- CATCH
+AnalysisException: Invalid type cast of DATE '2000-12-21' from DATE to INT
+====
+---- QUERY
+select cast(123.45 as date);
+---- CATCH
+AnalysisException: Invalid type cast of 123.45 from DECIMAL(5,2) to DATE
+====
+---- QUERY
+select count(*) from date_tbl where date_col <= '1399-12-31';
+---- RESULTS
+13
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*), count(date_part), count(date_col),
+count(distinct date_part), count(distinct date_col)
+from date_tbl;
+---- RESULTS
+22,22,20,4,17
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+select date_part, count(date_col) from date_tbl group by date_part;
+---- RESULTS
+2017-11-27,10
+1399-06-27,2
+9999-12-31,2
+0001-01-01,6
+---- TYPES
+DATE, BIGINT
+====
+---- QUERY
+select id_col, date_part, date_col from date_tbl where date_col = '1399-12-31';
+---- RESULTS
+3,0001-01-01,1399-12-31
+---- TYPES
+INT,DATE,DATE
+====
+---- QUERY
+select count(*) from date_tbl where date_col != '1399-12-31';
+---- RESULTS
+19
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from date_tbl where date_col = date_part;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+select min(date_part), max(date_part), min(date_col), max(date_col) from date_tbl;
+---- RESULTS
+0001-01-01,9999-12-31,0001-01-01,9999-12-31
+---- TYPES
+DATE, DATE, DATE, DATE
+====
+---- QUERY
+select date_part, min(date_col), max(date_col) from date_tbl group by date_part;
+---- RESULTS
+2017-11-27,0001-06-21,2017-11-28
+1399-06-27,2017-11-28,2018-12-31
+9999-12-31,9999-12-01,9999-12-31
+0001-01-01,0001-01-01,9999-12-31
+---- TYPES
+DATE, DATE, DATE
+====
+---- QUERY
+select date_part, count(*) from date_tbl group by date_part;
+---- RESULTS
+2017-11-27,10
+1399-06-27,3
+9999-12-31,2
+0001-01-01,7
+---- TYPES
+DATE, BIGINT
+====
+---- QUERY
+select date_col, count(date_part) from date_tbl group by date_col;
+---- RESULTS
+0001-06-29,1
+0002-01-01,1
+0001-06-27,1
+0001-06-25,1
+1399-12-31,1
+0001-06-23,1
+9999-12-31,2
+0001-12-31,1
+0001-06-21,1
+9999-12-01,1
+2018-12-31,1
+0001-06-26,1
+2017-11-28,3
+0001-06-28,1
+0001-06-22,1
+0001-01-01,1
+0001-06-24,1
+NULL,2
+---- TYPES
+DATE, BIGINT
+====
+---- QUERY
+select date_part, max(date_col) from date_tbl group by date_part
+having max(date_col) > '2017-11-29';
+---- RESULTS
+1399-06-27,2018-12-31
+9999-12-31,9999-12-31
+0001-01-01,9999-12-31
+---- TYPES
+DATE,DATE
+====
+---- QUERY
+select ndv(date_col), distinctpc(date_col),
+distinctpcsa(date_col), count(distinct date_col)
+from date_tbl;
+---- RESULTS
+16,13,14,17
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+select ndv(date_part), ndv(date_col) from date_tbl;
+---- RESULTS
+4,16
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+select date_part, ndv(date_col) from date_tbl group by date_part;
+---- RESULTS
+2017-11-27,9
+1399-06-27,2
+9999-12-31,2
+0001-01-01,6
+---- TYPES
+DATE, BIGINT
+====
+---- QUERY
+select date_col, date_part from date_tbl order by 1, 2 limit 5;
+---- RESULTS
+0001-01-01,0001-01-01
+0001-06-21,2017-11-27
+0001-06-22,2017-11-27
+0001-06-23,2017-11-27
+0001-06-24,2017-11-27
+---- TYPES
+DATE,DATE
+====
+---- QUERY
+select date_col, date_part from date_tbl order by 1 desc, 2 desc limit 5;
+---- RESULTS
+NULL,1399-06-27
+NULL,0001-01-01
+9999-12-31,9999-12-31
+9999-12-31,0001-01-01
+9999-12-01,9999-12-31
+---- TYPES
+DATE,DATE
+====
+---- QUERY
+select t1.*, t2.* from date_tbl t1
+join date_tbl t2
+  on t1.date_col = t2.date_col
+order by t1.date_col desc, t1.date_part desc, t2.date_part desc limit 5;
+---- RESULTS
+31,9999-12-31,9999-12-31,31,9999-12-31,9999-12-31
+31,9999-12-31,9999-12-31,5,9999-12-31,0001-01-01
+5,9999-12-31,0001-01-01,31,9999-12-31,9999-12-31
+5,9999-12-31,0001-01-01,5,9999-12-31,0001-01-01
+30,9999-12-01,9999-12-31,30,9999-12-01,9999-12-31
+---- TYPES
+INT,DATE,DATE,INT,DATE,DATE
+====
+---- QUERY
+select a.date_col from date_tbl a left semi join date_tbl b on a.date_col = b.date_part;
+---- RESULTS
+0001-01-01
+9999-12-31
+9999-12-31
+---- TYPES
+DATE
+====
+---- QUERY
+select first_value(date_col)
+over (order by date_part, date_col rows between 2 preceding and current row)
+from date_tbl;
+---- RESULTS
+0001-01-01
+0001-01-01
+0001-01-01
+0001-12-31
+0002-01-01
+1399-12-31
+2017-11-28
+9999-12-31
+NULL
+2017-11-28
+2018-12-31
+NULL
+0001-06-21
+0001-06-22
+0001-06-23
+0001-06-24
+0001-06-25
+0001-06-26
+0001-06-27
+0001-06-28
+0001-06-29
+2017-11-28
+---- TYPES
+DATE
+====
+---- QUERY
+select histogram(date_col) from date_tbl;
+---- RESULTS
+'0001-01-01, 0001-06-21, 0001-06-22, 0001-06-23, 0001-06-24, 0001-06-25, 0001-06-26, 0001-06-27, 0001-06-28, 0001-06-29, 0001-12-31, 0002-01-01, 1399-12-31, 2017-11-28, 2017-11-28, 2017-11-28, 2018-12-31, 9999-12-01, 9999-12-31, 9999-12-31'
+---- TYPES
+STRING
+====
+---- QUERY
+select appx_median(date_part), appx_median(date_col) from date_tbl;
+---- RESULTS
+2017-11-27,0001-12-31
+---- TYPES
+DATE, DATE
+====
+---- QUERY
+select sample(date_col) from date_tbl;
+---- TYPES
+# Results are unstable, just check that this doesn't crash
+STRING
+====
+---- QUERY
+select lag(date_col, 1) over (order by date_col, date_part) as d, date_col, date_part
+from date_tbl
+order by date_col, date_part;
+---- RESULTS
+NULL,0001-01-01,0001-01-01
+0001-01-01,0001-06-21,2017-11-27
+0001-06-21,0001-06-22,2017-11-27
+0001-06-22,0001-06-23,2017-11-27
+0001-06-23,0001-06-24,2017-11-27
+0001-06-24,0001-06-25,2017-11-27
+0001-06-25,0001-06-26,2017-11-27
+0001-06-26,0001-06-27,2017-11-27
+0001-06-27,0001-06-28,2017-11-27
+0001-06-28,0001-06-29,2017-11-27
+0001-06-29,0001-12-31,0001-01-01
+0001-12-31,0002-01-01,0001-01-01
+0002-01-01,1399-12-31,0001-01-01
+1399-12-31,2017-11-28,0001-01-01
+2017-11-28,2017-11-28,1399-06-27
+2017-11-28,2017-11-28,2017-11-27
+2017-11-28,2018-12-31,1399-06-27
+2018-12-31,9999-12-01,9999-12-31
+9999-12-01,9999-12-31,0001-01-01
+9999-12-31,9999-12-31,9999-12-31
+9999-12-31,NULL,0001-01-01
+NULL,NULL,1399-06-27
+---- TYPES
+DATE, DATE, DATE
+====
+---- QUERY
+# Query return mixed NULL and non-NULL date values.
+select rn,
+  case when rn % 2 = 0 then date_part end,
+  case when rn % 3 = 0 then date_col end
+from (
+  select *, row_number() over (order by date_col, date_part) rn
+  from date_tbl) v;
+---- RESULTS
+1,NULL,NULL
+2,2017-11-27,NULL
+3,NULL,0001-06-22
+4,2017-11-27,NULL
+5,NULL,NULL
+6,2017-11-27,0001-06-25
+7,NULL,NULL
+8,2017-11-27,NULL
+9,NULL,0001-06-28
+10,2017-11-27,NULL
+11,NULL,NULL
+12,0001-01-01,0002-01-01
+13,NULL,NULL
+14,0001-01-01,NULL
+15,NULL,2017-11-28
+16,2017-11-27,NULL
+17,NULL,NULL
+18,9999-12-31,9999-12-01
+19,NULL,NULL
+20,9999-12-31,NULL
+21,NULL,NULL
+22,1399-06-27,NULL
+---- TYPES
+BIGINT, DATE, DATE
+====
+---- QUERY
+# TODO: Once DATE type is supported across all fileformats move these tests to join.test.
+select a.date_col from date_tbl a inner join date_tbl b on
+(a.date_col = b.date_col)
+where a.date_part = '2017-11-27';
+---- RESULTS
+0001-06-21
+0001-06-24
+0001-06-26
+0001-06-27
+0001-06-22
+0001-06-25
+0001-06-28
+2017-11-28
+2017-11-28
+0001-06-23
+0001-06-29
+2017-11-28
+---- TYPES
+DATE
+====
+---- QUERY
+# Implicit conversion tests.
+# Impala returns the same results as Hive 3.1.
+select cast('2012-01-01' as date) in ('2012-01-01 00:00:00'),
+  cast('2012-01-01' as date) = '2012-01-01 00:00:00',
+  '2012-01-01 00:00:00' = cast('2012-01-01' as date),
+  cast('2012-01-01' as date) in ('2012-01-01 00:00:01'),
+  cast('2012-01-01' as date) = '2012-01-01 00:00:01',
+  '2012-01-01 00:00:01' = cast('2012-01-01' as date),
+  cast('2012-01-01' as date) in (cast('2012-01-01 00:00:00' as timestamp)),
+  cast('2012-01-01' as date) in (cast('2012-01-01 00:00:01' as timestamp)),
+  cast('2012-01-01 00:00:00' as timestamp) in ('2012-01-01'),
+  cast('2012-01-01 00:00:01' as timestamp) in ('2012-01-01'),
+  cast('2012-01-01 00:00:01' as string) = cast('2012-01-01' as date),
+  cast('2012-01-01 00:00:01' as timestamp) = cast('2012-01-01' as date),
+  cast('2012-01-01 00:00:00' as timestamp) = cast('2012-01-01' as date);
+---- RESULTS
+true,true,true,true,true,true,true,false,true,false,true,false,true
+---- TYPES
+BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN,BOOLEAN
+====
+---- QUERY
+# Impala returns the same results as Hive 3.1.
+select coalesce(null, cast('2012-02-02' as timestamp), cast('2012-02-02' as timestamp)),
+  coalesce(cast('2012-01-01' as date), cast('2012-02-02' as timestamp), cast('2012-02-02' as timestamp)),
+  if(false, cast('2011-01-01 01:01:01' as timestamp), DATE '1499-02-02'),
+  cast('2012-01-01 01:01:01' as date),
+  cast('2012-1-1' as date);
+---- RESULTS
+2012-02-02 00:00:00,2012-01-01 00:00:00,1499-02-02 00:00:00,2012-01-01,2012-01-01
+---- TYPES
+TIMESTAMP,TIMESTAMP,TIMESTAMP,DATE,DATE
+====
+---- QUERY
+# Impala returns the same results as PostgreSQL.
+select coalesce('2012-01-01', cast('2012-02-02' as timestamp), cast('2012-02-02' as timestamp)),
+  coalesce('2012-01-01', cast('2012-02-02' as date), cast('2012-02-02' as timestamp));
+---- RESULTS
+2012-01-01 00:00:00,2012-01-01 00:00:00
+---- TYPES
+TIMESTAMP,TIMESTAMP
+====
+---- QUERY
+# Test that conversion fails because function call resolves to YEAR(TIMESTAMP).
+select year('0009-02-15');
+---- RESULTS
+NULL
+---- TYPES
+INT
+====
+---- QUERY
+# Test that invalid casts fail with the right error.
+# DATE->TIMESTAMP conversion fails because date is out of the valid range.
+select cast(date '1399-12-31' as timestamp);
+---- CATCH
+UDF ERROR: Date to Timestamp conversion failed. The valid date range for the Timestamp type is 1400-01-01..9999-12-31.
+====
+---- QUERY
+# STRING->DATE conversion fails because date string is invalid.
+select cast('not-a-date' as date);
+---- CATCH
+UDF ERROR: String to Date parse failed.
+====
+---- QUERY
+# TIMESTAMP->DATE conversion fails because timestamp has no date component. Note that
+# time-only timestamps are technically valid but impractical.
+select cast(cast('23:59:59' as timestamp) as date);
+---- CATCH
+UDF ERROR: Timestamp to Date conversion failed. Timestamp has no date component.
+====

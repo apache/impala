@@ -49,6 +49,7 @@ public class LiteralExprTest extends FrontendTestBase {
     testLiteralExprPositive("1.0", Type.DOUBLE);
     testLiteralExprPositive("ABC", Type.STRING);
     testLiteralExprPositive("1.1", ScalarType.createDecimalType(2, 1));
+    testLiteralExprPositive("2001-02-28", Type.DATE);
 
     // INVALID_TYPE should always fail
     testLiteralExprNegative("ABC", Type.INVALID);
@@ -63,9 +64,11 @@ public class LiteralExprTest extends FrontendTestBase {
     testLiteralExprNegative("ABC", Type.DOUBLE);
     testLiteralExprNegative("ABC", Type.TIMESTAMP);
     testLiteralExprNegative("ABC", ScalarType.createDecimalType());
+    testLiteralExprNegative("ABC", Type.DATE);
+    // Invalid date test
+    testLiteralExprNegative("2001-02-31", Type.DATE);
 
-    // Date types not implemented
-    testLiteralExprNegative("2010-01-01", Type.DATE);
+    // DATETIME/TIMESTAMP types not implemented
     testLiteralExprNegative("2010-01-01", Type.DATETIME);
     testLiteralExprNegative("2010-01-01", Type.TIMESTAMP);
   }

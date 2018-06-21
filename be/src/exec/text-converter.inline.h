@@ -28,6 +28,7 @@
 #include "runtime/tuple.h"
 #include "util/string-parser.h"
 #include "runtime/string-value.h"
+#include "runtime/date-value.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.inline.h"
@@ -138,6 +139,11 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
       if (!ts_slot->HasDateOrTime()) {
         parse_result = StringParser::PARSE_FAILURE;
       }
+      break;
+    }
+    case TYPE_DATE: {
+      *reinterpret_cast<DateValue*>(slot) =
+          StringParser::StringToDate(data, len, &parse_result);
       break;
     }
     case TYPE_DECIMAL: {

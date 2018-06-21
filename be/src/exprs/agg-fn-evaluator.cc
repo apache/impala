@@ -27,6 +27,7 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-fn-call.h"
 #include "gutil/strings/substitute.h"
+#include "runtime/date-value.h"
 #include "runtime/lib-cache.h"
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
@@ -260,6 +261,10 @@ void AggFnEvaluator::SetDstSlot(const AnyVal* src, const SlotDescriptor& dst_slo
         default:
           break;
       }
+    case TYPE_DATE:
+      *reinterpret_cast<DateValue*>(slot) =
+          DateValue::FromDateVal(*reinterpret_cast<const DateVal*>(src));
+      return;
     default:
       DCHECK(false) << "NYI: " << dst_slot_desc.type();
   }
@@ -487,6 +492,13 @@ void AggFnEvaluator::SerializeOrFinalize(Tuple* src,
             "same pointer as input for $0 intermediate",
             dst_slot_desc.type().DebugString()).c_str());
       }
+      break;
+    }
+    case TYPE_DATE: {
+      typedef DateVal(*Fn)(FunctionContext*, AnyVal*);
+      DateVal v = reinterpret_cast<Fn>(fn)(
+          agg_fn_ctx_.get(), staging_intermediate_val_);
+      SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
     default:

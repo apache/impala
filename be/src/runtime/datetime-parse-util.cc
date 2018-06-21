@@ -253,7 +253,8 @@ const char* ParseSeparatorToken(const char* str, const char* str_end, const char
   return tok_end;
 }
 
-bool ParseFormatTokensByStr(DateTimeFormatContext* dt_ctx, bool accept_time_toks) {
+bool ParseFormatTokensByStr(DateTimeFormatContext* dt_ctx, bool accept_time_toks,
+    bool accept_time_toks_only) {
   DCHECK(dt_ctx != NULL);
   DCHECK(dt_ctx->fmt != NULL);
   DCHECK_GT(dt_ctx->fmt_len, 0);
@@ -322,6 +323,9 @@ bool ParseFormatTokensByStr(DateTimeFormatContext* dt_ctx, bool accept_time_toks
 
   // If time tokens are not accepted, no need to proceed.
   if (!accept_time_toks) return false;
+  // If no date tokens were found and time tokens on their own are not allowed, return
+  // false.
+  if (!dt_ctx->has_date_toks && !accept_time_toks_only) return false;
 
   // Parse the 1 or 2 digit hour
   if (tok_end - str != 1 && tok_end - str != 2) return false;
@@ -381,6 +385,85 @@ bool ParseFormatTokensByStr(DateTimeFormatContext* dt_ctx, bool accept_time_toks
     if (str < str_end) return false;
   }
   return true;
+}
+
+const DateTimeFormatContext* ParseDefaultFormatTokensByStr(const char* str, int len,
+    bool accept_time_toks, bool accept_time_toks_only) {
+  DCHECK(IsParseCtxInitialized());
+  DCHECK(str != nullptr);
+  DCHECK(len > 0);
+
+  if (LIKELY(len >= DEFAULT_TIME_FMT_LEN)) {
+    // Check if this string starts with a date component
+    if (str[4] == '-' && str[7] == '-') {
+      // Do we have a date component only?
+      if (len == DEFAULT_DATE_FMT_LEN) {
+        return &DEFAULT_DATE_CTX;
+      }
+
+      // We have a time component as well. Do we accept it?
+      if (!accept_time_toks) return nullptr;
+
+      switch (len) {
+        case DEFAULT_SHORT_DATE_TIME_FMT_LEN: {
+          if (LIKELY(str[13] == ':')) {
+            switch (str[10]) {
+              case ' ':
+                return &DEFAULT_SHORT_DATE_TIME_CTX;
+              case 'T':
+                return &DEFAULT_SHORT_ISO_DATE_TIME_CTX;
+            }
+          }
+          break;
+        }
+        case DEFAULT_DATE_TIME_FMT_LEN: {
+          if (LIKELY(str[13] == ':')) {
+            switch (str[10]) {
+              case ' ':
+                return &DEFAULT_DATE_TIME_CTX[9];
+              case 'T':
+                return &DEFAULT_ISO_DATE_TIME_CTX[9];
+            }
+          }
+          break;
+        }
+        default: {
+          // There is likely a fractional component that's below the expected 9 chars.
+          // We will need to work out which default context to use that corresponds to
+          // the fractional length in the string.
+          if (LIKELY(len > DEFAULT_SHORT_DATE_TIME_FMT_LEN)
+              && LIKELY(str[19] == '.') && LIKELY(str[13] == ':')) {
+            switch (str[10]) {
+              case ' ': {
+                return &DEFAULT_DATE_TIME_CTX[len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+              }
+              case 'T': {
+                return &DEFAULT_ISO_DATE_TIME_CTX
+                    [len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+              }
+            }
+          }
+          break;
+        }
+      }
+    } else {
+      // 'str' string does not start with a date component.
+      // Do we accept time component only?
+      if (!accept_time_toks || !accept_time_toks_only) return nullptr;
+
+      // Parse time component.
+      if (str[2] == ':' && str[5] == ':' && isdigit(str[7])) {
+        len = min(len, DEFAULT_TIME_FRAC_FMT_LEN);
+        if (len > DEFAULT_TIME_FMT_LEN && str[8] == '.') {
+          return &DEFAULT_TIME_FRAC_CTX[len - DEFAULT_TIME_FMT_LEN - 1];
+        } else {
+          return &DEFAULT_TIME_CTX;
+        }
+      }
+    }
+  }
+
+  return nullptr;
 }
 
 bool ParseDateTime(const char* str, int str_len, const DateTimeFormatContext& dt_ctx,

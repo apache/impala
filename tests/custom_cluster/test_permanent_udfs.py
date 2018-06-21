@@ -561,11 +561,13 @@ class TestUdfPersistence(CustomClusterTestSuite):
     drop function if exists {database}.identity(double);
     drop function if exists {database}.identity(string);
     drop function if exists {database}.identity(timestamp);
+    drop function if exists {database}.identity(date);
     drop function if exists {database}.identity(decimal(9,0));
     drop function if exists {database}.identity(decimal(18,1));
     drop function if exists {database}.identity(decimal(38,10));
     drop function if exists {database}.all_types_fn(
-        string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0));
+        string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0),
+        date);
     drop function if exists {database}.no_args();
     drop function if exists {database}.var_and(boolean...);
     drop function if exists {database}.var_sum(int...);
@@ -574,6 +576,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     drop function if exists {database}.var_sum(decimal(4,2)...);
     drop function if exists {database}.var_sum_multiply(double, int...);
     drop function if exists {database}.constant_timestamp();
+    drop function if exists {database}.constant_date();
     drop function if exists {database}.validate_arg_type(string);
     drop function if exists {database}.count_rows();
     drop function if exists {database}.constant_arg(int);
@@ -618,6 +621,10 @@ class TestUdfPersistence(CustomClusterTestSuite):
     location '{location}'
     symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_12TimestampValE';
 
+    create function {database}.identity(date) returns date
+    location '{location}'
+    symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_7DateValE';
+
     create function {database}.identity(decimal(9,0)) returns decimal(9,0)
     location '{location}'
     symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10DecimalValE';
@@ -631,7 +638,8 @@ class TestUdfPersistence(CustomClusterTestSuite):
     symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10DecimalValE';
 
     create function {database}.all_types_fn(
-        string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0))
+        string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0),
+        date)
     returns int
     location '{location}' symbol='AllTypes';
 
@@ -660,6 +668,9 @@ class TestUdfPersistence(CustomClusterTestSuite):
 
     create function {database}.constant_timestamp() returns timestamp
     location '{location}' symbol='ConstantTimestamp';
+
+    create function {database}.constant_date() returns date
+    location '{location}' symbol='ConstantDate';
 
     create function {database}.validate_arg_type(string) returns boolean
     location '{location}' symbol='ValidateArgType';

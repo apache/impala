@@ -1,0 +1,154 @@
+====
+---- QUERY
+# Create a table partitioned by DATE.
+create table $DATABASE.dtbl (c date) partitioned by (p date);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Partition value is an invalid DATE literal
+alter table $DATABASE.dtbl add partition (p='1300-1-');
+---- CATCH
+AnalysisException: Invalid date literal: '1300-1-'
+====
+---- QUERY
+alter table $DATABASE.dtbl add partition (p='1300-1-1');
+---- RESULTS
+'New partition has been added to the table.'
+====
+---- QUERY
+# Date formatted differently referring to the same partition.
+alter table $DATABASE.dtbl add partition (p='1300-01-1');
+---- CATCH
+AnalysisException: Partition spec already exists: (p=DATE '1300-01-01').
+====
+---- QUERY
+# Date partition formatted differently in insert
+insert into $DATABASE.dtbl partition (p='1300-1-01') values ('1300-1-1');
+---- RESULTS
+p=1300-01-01/: 1
+====
+---- QUERY
+insert into $DATABASE.dtbl partition (p='1300-01-1') values ('1300-1-02');
+---- RESULTS
+p=1300-01-01/: 1
+====
+---- QUERY
+insert into $DATABASE.dtbl partition (p=DATE '1300-1-1') values ('1300-1-03');
+---- RESULTS
+p=1300-01-01/: 1
+====
+---- QUERY
+# Insert into a new partition
+insert into $DATABASE.dtbl partition (p=DATE '1400-01-1') values ('1400-1-1');
+---- RESULTS
+p=1400-01-01/: 1
+====
+---- QUERY
+insert into $DATABASE.dtbl partition (p='1400-1-01') values ('1400-1-2');
+---- RESULTS
+p=1400-01-01/: 1
+====
+---- QUERY
+select p, c from $DATABASE.dtbl;
+---- RESULTS
+1300-01-01,1300-01-01
+1300-01-01,1300-01-02
+1300-01-01,1300-01-03
+1400-01-01,1400-01-01
+1400-01-01,1400-01-02
+---- TYPES
+DATE,DATE
+====
+---- QUERY
+# Create a table partitioned by STRING and fill up with date-like values.
+create table $DATABASE.stbl (c string) partitioned by (p string);
+insert into $DATABASE.stbl partition (p='1400-1-1') values ('1400-1-3');
+insert into $DATABASE.stbl partition (p='1400-1-01') values ('1400-01-4');
+insert into $DATABASE.stbl partition (p='1400-01-01') values ('400-01-4');
+insert into $DATABASE.stbl partition (p='1400-01-') values ('1400-01-5');
+insert into $DATABASE.stbl partition (p='1500-01-1') values ('1500-01-1');
+====
+---- QUERY
+# Use dynamic partition specification in insert.
+# When the implicit cast fails, insert fails with error
+insert into $DATABASE.dtbl partition(p) select * from $DATABASE.stbl where p='1400-01-01';
+---- CATCH
+UDF ERROR: String to Date parse failed.
+====
+---- QUERY
+insert into $DATABASE.dtbl partition(p) select * from $DATABASE.stbl where p='1400-01-';
+---- CATCH
+UDF ERROR: String to Date parse failed.
+====
+---- QUERY
+# Use dynamic partition specification in insert.
+# Test that STRING is implicitly cast to DATE.
+insert into $DATABASE.dtbl partition(p) select * from $DATABASE.stbl
+where p in ('1400-1-1', '1400-1-01', '1500-01-1');
+---- RESULTS
+p=1400-01-01/: 2
+p=1500-01-01/: 1
+====
+---- QUERY
+select p, c from $DATABASE.dtbl;
+---- RESULTS
+1300-01-01,1300-01-01
+1300-01-01,1300-01-02
+1300-01-01,1300-01-03
+1400-01-01,1400-01-01
+1400-01-01,1400-01-02
+1400-01-01,1400-01-03
+1400-01-01,1400-01-04
+1500-01-01,1500-01-01
+---- TYPES
+DATE,DATE
+====
+---- QUERY
+# Test dropping partitions
+alter table $DATABASE.dtbl drop partition(p < '1400-1-1');
+---- RESULTS
+'Dropped 1 partition(s).'
+====
+---- QUERY
+select p, c from $DATABASE.dtbl;
+---- RESULTS
+1400-01-01,1400-01-01
+1400-01-01,1400-01-02
+1400-01-01,1400-01-03
+1400-01-01,1400-01-04
+1500-01-01,1500-01-01
+---- TYPES
+DATE,DATE
+====
+---- QUERY
+# Create a parquet table partitioned by DATE. It has no non-partitioning DATE columns.
+create table $DATABASE.ptbl (v int, s string) partitioned by (p date) stored as parquet;
+insert into $DATABASE.ptbl partition (p='0000-01-01') values (0, 'zero'), (1, 'one'), (2, 'two');
+---- RESULTS
+p=0000-01-01/: 3
+====
+---- QUERY
+insert into $DATABASE.ptbl partition (p='1400-6-25') values (3, 'three'), (4, 'four');
+---- RESULTS
+p=1400-06-25/: 2
+====
+---- QUERY
+insert into $DATABASE.ptbl partition (p='9999-11-1') values (5, 'five'), (6, 'six');
+---- RESULTS
+p=9999-11-01/: 2
+====
+---- QUERY
+# Test that querying a parquet table works if it has no non-partitioning DATE columns.
+select p, v, s from $DATABASE.ptbl;
+---- RESULTS
+0000-01-01,0,'zero'
+0000-01-01,1,'one'
+0000-01-01,2,'two'
+1400-06-25,3,'three'
+1400-06-25,4,'four'
+9999-11-01,5,'five'
+9999-11-01,6,'six'
+---- TYPES
+DATE,INT,STRING
+====

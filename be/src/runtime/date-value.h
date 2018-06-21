@@ -23,6 +23,7 @@
 
 #include "common/logging.h"
 #include "common/status.h"
+#include "udf/udf.h"
 
 namespace impala {
 
@@ -33,7 +34,7 @@ struct DateTimeFormatContext;
 /// Represents a DATE value.
 /// - The minimum and maximum dates are 0000-01-01 and 9999-12-31. Valid dates must fall
 ///   in this range.
-/// - Internally represents DATE values as number of days since 1970.01.01.
+/// - Internally represents DATE values as number of days since 1970-01-01.
 /// - This representation was chosen to be the same (bit-by-bit) as Parquet's date type.
 ///   (https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#date)
 /// - Proleptic Gregorian calendar is used to calculate the number of days since epoch,
@@ -55,11 +56,12 @@ class DateValue {
     DCHECK(!IsValid());
   }
 
-  DateValue(int32_t days_since_epoch) : days_since_epoch_(INVALID_DAYS_SINCE_EPOCH) {
+  explicit DateValue(int64_t days_since_epoch)
+      : days_since_epoch_(INVALID_DAYS_SINCE_EPOCH) {
     DCHECK(!IsValid());
     if (LIKELY(days_since_epoch >= MIN_DAYS_SINCE_EPOCH
         && days_since_epoch <= MAX_DAYS_SINCE_EPOCH)) {
-      days_since_epoch_ = days_since_epoch;
+      days_since_epoch_ = static_cast<int32_t>(days_since_epoch);
       DCHECK(IsValid());
     }
   }
@@ -85,10 +87,28 @@ class DateValue {
   /// Otherwise, return false.
   bool ToDaysSinceEpoch(int32_t* days) const WARN_UNUSED_RESULT;
 
+  /// Returns a DateVal representation in the output variable.
+  /// Returns null if the DateValue instance doesn't have a valid date.
+  impala_udf::DateVal ToDateVal() const {
+    if (!IsValid()) return impala_udf::DateVal::null();
+    return impala_udf::DateVal(days_since_epoch_);
+  }
+
+  /// Returns the underlying storage. There is only one representation for any DateValue
+  /// (including the invalid DateValue) and the storage is directly comparable.
+  int32_t Value() const { return days_since_epoch_; }
+
+  /// Returns a DateValue converted from a DateVal. The caller must ensure the DateVal
+  /// does not represent a NULL.
+  static DateValue FromDateVal(const impala_udf::DateVal& udf_value) {
+    DCHECK(!udf_value.is_null);
+    return DateValue(udf_value.val);
+  }
+
   /// Constructors that parse from a date string. See DateParser for details about the
   /// date format.
-  static DateValue Parse(const char* str, int len);
-  static DateValue Parse(const std::string& str);
+  static DateValue Parse(const char* str, int len, bool accept_time_toks);
+  static DateValue Parse(const std::string& str, bool accept_time_toks);
   static DateValue Parse(const char* str, int len,
       const datetime_parse_util::DateTimeFormatContext& dt_ctx);
 
@@ -111,6 +131,9 @@ class DateValue {
   bool operator>(const DateValue& other) const { return other < *this; }
   bool operator<=(const DateValue& other) const { return !(*this > other); }
   bool operator>=(const DateValue& other) const { return !(*this < other); }
+
+  static const DateValue MIN_DATE;
+  static const DateValue MAX_DATE;
 
  private:
   /// Number of days since 1970.01.01.

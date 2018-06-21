@@ -57,14 +57,17 @@ IMPALA_UDF_EXPORT
 DecimalVal Identity(FunctionContext* context, const DecimalVal& arg) { return arg; }
 
 IMPALA_UDF_EXPORT
+DateVal Identity(FunctionContext* context, const DateVal& arg) { return arg; }
+
+IMPALA_UDF_EXPORT
 IntVal AllTypes(
     FunctionContext* context, const StringVal& string, const BooleanVal& boolean,
     const TinyIntVal& tiny_int, const SmallIntVal& small_int, const IntVal& int_val,
     const BigIntVal& big_int, const FloatVal& float_val, const DoubleVal& double_val,
-    const DecimalVal& decimal) {
+    const DecimalVal& decimal, const DateVal& date_val) {
   int result = string.len + boolean.val + tiny_int.val + small_int.val + int_val.val
                + big_int.val + static_cast<int64_t>(float_val.val)
-               + static_cast<int64_t>(double_val.val) + decimal.val4;
+               + static_cast<int64_t>(double_val.val) + decimal.val4 + date_val.val;
   return IntVal(result);
 }
 
@@ -279,6 +282,11 @@ IntVal Fn2(FunctionContext*, const IntVal&, const StringVal&) { return IntVal::n
 IMPALA_UDF_EXPORT
 TimestampVal ConstantTimestamp(FunctionContext* context) {
   return TimestampVal(2456575, 1); // 2013-10-09 00:00:00.000000001
+}
+
+IMPALA_UDF_EXPORT
+DateVal ConstantDate(FunctionContext* context) {
+  return DateVal(15987); // 2013-10-09
 }
 
 IMPALA_UDF_EXPORT

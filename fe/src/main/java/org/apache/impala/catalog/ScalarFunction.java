@@ -207,6 +207,9 @@ public class ScalarFunction extends Function {
           beFn += "_DecimalVal";
           usesDecimal = true;
           break;
+        case DATE:
+          beFn += "_DateVal";
+          break;
         default:
           Preconditions.checkState(false,
               "Argument type not supported: " + argTypes.get(i).toSql());

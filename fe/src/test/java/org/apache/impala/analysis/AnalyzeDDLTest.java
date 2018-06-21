@@ -79,6 +79,19 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           " partition(month=10, year=2050)");
       AnalyzesOk("alter table functional.insert_string_partitioned " + kw +
           " partition(s2='1234')");
+      // Add/drop date partitions
+      AnalyzesOk("alter table functional.date_tbl " + kw +
+          " partition(date_part='1874-06-04')");
+      AnalyzesOk("alter table functional.date_tbl " + kw +
+          " partition(date_part=date '1874-06-04')");
+      AnalyzesOk("alter table functional.date_tbl " + kw +
+          " partition(date_part='1874-6-04')");
+      AnalyzesOk("alter table functional.date_tbl " + kw +
+          " partition(date_part=date '1874-6-04')");
+      AnalyzesOk("alter table functional.date_tbl " + kw +
+          " partition(date_part='1874-6-4')");
+      AnalyzesOk("alter table functional.date_tbl " + kw +
+          " partition(date_part=date '1874-6-4')");
 
       // Can't add/drop partitions to/from unpartitioned tables
       AnalysisError("alter table functional.alltypesnopart " + kw + " partition (i=1)",
@@ -92,6 +105,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       // Arbitrary exprs as partition key values. Constant exprs are ok.
       AnalyzesOk("alter table functional.alltypes " + kw +
           " partition(year=-1, month=cast((10+5*4) as INT))");
+      AnalyzesOk("alter table functional.date_tbl " + kw +
+          " partition(date_part=cast('1874-6-4' as date))");
 
       // Table/Db does not exist
       AnalysisError("alter table db_does_not_exist.alltypes " + kw +
@@ -117,16 +132,23 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           " partition(year=NULL, month=NULL)");
       AnalyzesOk("alter table functional.alltypes " + kw +
           " partition(year=ascii(null), month=ascii(NULL))");
+      AnalyzesOk("alter table functional.date_tbl " + kw +
+          " partition(date_part=NULL)");
+      AnalyzesOk("alter table functional.date_tbl " + kw +
+          " partition(date_part=cast(NULL as date))");
     }
 
     // Data types don't match
-    AnalysisError("alter table functional.insert_string_partitioned add" +
-                  " partition(s2=1234)",
-                  "Value of partition spec (column=s2) has incompatible type: " +
-                  "'SMALLINT'. Expected type: 'STRING'.");
-    AnalysisError("alter table functional.insert_string_partitioned drop" +
-                  " partition(s2=1234)",
-                  "operands of type STRING and SMALLINT are not comparable: s2 = 1234");
+    AnalysisError("alter table functional.insert_string_partitioned add " +
+        "partition(s2=1234)",
+        "Value of partition spec (column=s2) has incompatible type: 'SMALLINT'. " +
+        "Expected type: 'STRING'.");
+    AnalysisError("alter table functional.insert_string_partitioned drop " +
+        "partition(s2=1234)",
+        "operands of type STRING and SMALLINT are not comparable: s2 = 1234");
+    AnalysisError("alter table functional.date_tbl add partition (date_part=123)",
+        "Value of partition spec (column=date_part) has incompatible type: 'TINYINT'. " +
+        "Expected type: 'DATE'.");
 
     // Loss of precision
     AnalysisError(
@@ -135,9 +157,41 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Partition key value may result in loss of precision.\nWould need to cast " +
         "'100000000000' to 'INT' for partition column: year");
 
+    // Invalid date literal
+    AnalysisError(
+        "alter table functional.date_tbl add partition (date_part='1874-06-')",
+        "Invalid date literal: '1874-06-'");
+    AnalysisError(
+        "alter table functional.date_tbl add partition (date_part=date '1874-06-')",
+        "Invalid date literal: '1874-06-'");
+
     // Duplicate partition key name
     AnalysisError("alter table functional.alltypes add " +
         "partition(year=2050, year=2051)", "Duplicate partition key name: year");
+
+    // Duplicate date partition key name. Date literals may have different variations.
+    AnalysisError(
+        "alter table functional.date_tbl add partition (date_part='0001-01-01')",
+        "Partition spec already exists: (date_part=DATE '0001-01-01').");
+    AnalysisError(
+        "alter table functional.date_tbl add partition (date_part=DATE '0001-01-01')",
+        "Partition spec already exists: (date_part=DATE '0001-01-01').");
+    AnalysisError(
+        "alter table functional.date_tbl add partition (date_part='0001-01-1')",
+        "Partition spec already exists: (date_part=DATE '0001-01-01').");
+    AnalysisError(
+        "alter table functional.date_tbl add partition (date_part=date '0001-01-1')",
+        "Partition spec already exists: (date_part=DATE '0001-01-01').");
+    AnalysisError(
+        "alter table functional.date_tbl add partition (date_part='0001-01-1')",
+        "Partition spec already exists: (date_part=DATE '0001-01-01').");
+    AnalysisError(
+        "alter table functional.date_tbl add partition (date_part=date '0001-1-1')",
+        "Partition spec already exists: (date_part=DATE '0001-01-01').");
+    AnalysisError(
+        "alter table functional.date_tbl add partition " +
+        "(date_part=cast('0001-1-01' as date))",
+        "Partition spec already exists: (date_part=CAST('0001-1-01' AS DATE)).");
 
     // Arbitrary exprs as partition key values. Non-constant exprs should fail.
     AnalysisError("alter table functional.alltypes add " +
@@ -192,6 +246,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional.alltypes drop " +
       "partition(year=NULL, month is NULL)",
       "No matching partition(s) found.");
+    AnalysisError("alter table functional.date_tbl drop partition(date_part=NULL)",
+      "No matching partition(s) found.");
 
     // Drop partition using predicates
     // IF EXISTS is added here
@@ -213,6 +269,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
       "partition(year>9050, month=10)");
     AnalyzesOk("alter table functional.alltypes drop if exists " +
         "partition(year>9050, month=10)");
+    AnalyzesOk("alter table functional.date_tbl drop if exists " +
+        "partition(date_part > '1874-6-2')");
+    AnalyzesOk("alter table functional.date_tbl drop if exists " +
+        "partition(date_part > date '1874-6-02')");
 
     // Not a valid column
     AnalysisError("alter table functional.alltypes add " +
@@ -276,12 +336,24 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           " partition(year=2050, month=10)" +
           " partition(year=2050, month=11)" +
           " partition(year=2050, month=12)");
+      // Add multiple DATE partitions with different formatting.
+      AnalyzesOk("alter table functional.date_tbl add " + cl +
+          " partition(date_part='1970-11-1')" +
+          " partition(date_part='1971-2-01')" +
+          " partition(date_part=DATE '1972-1-1')");
+
       // Duplicate partition specifications.
       AnalysisError("alter table functional.alltypes add " + cl +
           " partition(year=2050, month=10)" +
           " partition(year=2050, month=11)" +
           " partition(Month=10, YEAR=2050)",
           "Duplicate partition spec: (month=10, year=2050)");
+      // Duplicate DATE partition specifications with different formatting.
+      AnalysisError("alter table functional.date_tbl add " + cl +
+          " partition(date_part='1970-1-1')" +
+          " partition(date_part='1971-1-03')" +
+          " partition(date_part='1970-01-01')",
+          "Duplicate partition spec: (date_part=DATE '1970-01-01')");
 
       // Multiple partitions with locations and caching.
       AnalyzesOk("alter table functional.alltypes add " + cl +
@@ -3348,10 +3420,16 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "'/test-warehouse/hive-exec.jar' SYMBOL='a'");
 
     // Test Java UDFs for unsupported types
-    AnalysisError("create function foo() RETURNS timestamp LOCATION '/test-warehouse/hive-exec.jar' SYMBOL='a'",
+    AnalysisError("create function foo() RETURNS timestamp LOCATION " +
+        "'/test-warehouse/hive-exec.jar' SYMBOL='a'",
         "Type TIMESTAMP is not supported for Java UDFs.");
     AnalysisError("create function foo(timestamp) RETURNS int LOCATION '/a.jar'",
         "Type TIMESTAMP is not supported for Java UDFs.");
+    AnalysisError("create function foo() RETURNS date LOCATION " +
+        "'/test-warehouse/hive-exec.jar' SYMBOL='a'",
+        "Type DATE is not supported for Java UDFs.");
+    AnalysisError("create function foo(date) RETURNS int LOCATION '/a.jar'",
+        "Type DATE is not supported for Java UDFs.");
     AnalysisError("create function foo() RETURNS decimal LOCATION '/a.jar'",
         "Type DECIMAL(9,0) is not supported for Java UDFs.");
     AnalysisError("create function foo(Decimal) RETURNS int LOCATION '/a.jar'",
@@ -3509,7 +3587,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create function identity(string) RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
     AnalyzesOk("create function all_types_fn(string, boolean, tinyint, " +
-        "smallint, int, bigint, float, double, decimal) returns int " +
+        "smallint, int, bigint, float, double, decimal, date) returns int " +
         "location '/test-warehouse/libTestUdfs.so' symbol='AllTypes'");
 
     // Try creating functions with illegal function names.
@@ -3823,6 +3901,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     TypeDefsAnalyzeOk("CHAR(1)", "CHAR(20)");
     TypeDefsAnalyzeOk("DECIMAL");
     TypeDefsAnalyzeOk("TIMESTAMP");
+    TypeDefsAnalyzeOk("DATE");
 
     // Test decimal.
     TypeDefsAnalyzeOk("DECIMAL");

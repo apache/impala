@@ -38,6 +38,7 @@ import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TExprBatch;
 import org.apache.impala.thrift.TGetPartitionStatsRequest;
 import org.apache.impala.thrift.TGetPartitionStatsResponse;
+import org.apache.impala.thrift.TParseDateStringResult;
 import org.apache.impala.thrift.TPrioritizeLoadRequest;
 import org.apache.impala.thrift.TPrioritizeLoadResponse;
 import org.apache.impala.thrift.TQueryCtx;
@@ -130,6 +131,11 @@ public class FeSupport {
       byte[] queryOptions);
 
   public native static int MinLogSpaceForBloomFilter(long ndv, double fpp);
+
+  // Parses date string, verifies if it is valid and returns the resulting
+  // TParseDateStringResult object. Different date string variations are accepted.
+  // E.g.: '2011-01-01', '2011-01-1', '2011-1-01', '2011-01-01'.
+  public native static byte[] nativeParseDateString(String date);
 
   /**
    * Locally caches the jar at the specified HDFS location.
@@ -422,6 +428,35 @@ public class FeSupport {
       loadLibrary();
     }
     return NativeSentryAdminCheck(thriftReq);
+  }
+
+  private static byte[] parseDateStringUtil(String date) {
+    try {
+      return nativeParseDateString(date);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+    }
+    return nativeParseDateString(date);
+  }
+
+  /**
+   * Parses date string, verifies if it is valid and returns the resulting
+   * TParseDateStringResult object. Different date string variations are accepted.
+   * E.g.: '2011-01-01', '2011-01-1', '2011-1-01', '2011-01-01'.
+   */
+  public static TParseDateStringResult parseDateString(String date)
+      throws InternalException {
+    Preconditions.checkNotNull(date);
+    try {
+      byte[] result = parseDateStringUtil(date);
+      Preconditions.checkNotNull(result);
+      TDeserializer deserializer = new TDeserializer(new TBinaryProtocol.Factory());
+      TParseDateStringResult res = new TParseDateStringResult();
+      deserializer.deserialize(res, result);
+      return res;
+    } catch (TException e) {
+      throw new InternalException("Could not parse date string: " + e.getMessage(), e);
+    }
   }
 
   /**

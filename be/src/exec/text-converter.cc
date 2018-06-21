@@ -230,6 +230,9 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
       case TYPE_TIMESTAMP:
         parse_fn_enum = IRFunction::STRING_TO_TIMESTAMP;
         break;
+      case TYPE_DATE:
+        parse_fn_enum = IRFunction::STRING_TO_DATE;
+        break;
       case TYPE_DECIMAL:
         switch (slot_desc->slot_size()) {
           case 4:

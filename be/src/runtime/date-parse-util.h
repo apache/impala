@@ -29,19 +29,24 @@ class DateParser {
   /// Parse a default date string. The default timestamp format is: yyyy-MM-dd.
   /// str -- valid pointer to the string to parse
   /// len -- length of the string to parse (must be > 0)
+  /// accept_time_toks -- if true, time tokens are accepted as well. Otherwise, they are
+  /// rejected.
   /// date -- the date value where the results of the parsing will be placed
   /// Returns true if the date was successfully parsed.
-  static bool Parse(const char* str, int len, DateValue* date);
+  static bool Parse(const char* str, int len, bool accept_time_toks, DateValue* date)
+      WARN_UNUSED_RESULT;
 
   /// Parse a date string. The date string must adhere to the format, otherwise it will be
   /// rejected i.e. no missing tokens.
   /// str -- valid pointer to the string to parse
   /// len -- length of the string to parse (must be > 0)
-  /// dt_ctx -- date format context (must contain valid tokens)
+  /// dt_ctx -- format context (must contain valid date tokens, time tokens are accepted
+  /// and ignored)
   /// date -- the date value where the results of the parsing will be placed
   /// Returns true if the date was successfully parsed.
   static bool Parse(const char* str, int len,
-      const datetime_parse_util::DateTimeFormatContext& dt_ctx, DateValue* date);
+      const datetime_parse_util::DateTimeFormatContext& dt_ctx, DateValue* date)
+      WARN_UNUSED_RESULT;
 
   /// Format the date values using the given format context. Note that a string terminator
   /// will be appended to the string.

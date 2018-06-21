@@ -48,6 +48,10 @@ TEST_F(RawValueTest, Compare) {
   s2 = -32767;
   EXPECT_GT(RawValue::Compare(&s1, &s2, TYPE_SMALLINT), 0);
   EXPECT_LT(RawValue::Compare(&s2, &s1, TYPE_SMALLINT), 0);
+
+  DateValue d1(-719528), d2(719528);
+  EXPECT_LT(RawValue::Compare(&d1, &d2, TYPE_DATE), 0);
+  EXPECT_GT(RawValue::Compare(&d2, &d1, TYPE_DATE), 0);
 }
 
 TEST_F(RawValueTest, TypeChar) {
@@ -195,6 +199,10 @@ TEST_F(RawValueTest, TemplatizedHash) {
   Decimal16Value d16_value(123456789);
   EXPECT_EQ(RawValue::GetHashValue<impala::Decimal16Value>(&d16_value, d16_type, seed),
     RawValue::GetHashValue(&d16_value, d16_type, seed));
+
+  DateValue date_value(1234567);
+  EXPECT_EQ(RawValue::GetHashValue<impala::DateValue>(&date_value, TYPE_DATE, seed),
+    RawValue::GetHashValue(&date_value, TYPE_DATE, seed));
 }
 
 }

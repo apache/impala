@@ -1663,12 +1663,12 @@ functional.alltypes_datasource
 Analyzed query: SELECT * FROM functional.alltypes_datasource
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=662.88KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=686.41KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=662.88KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=686.41KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=0 row-size=112B cardinality=5.00K
 |  in pipelines: 00(GETNEXT)
 |
@@ -1686,12 +1686,12 @@ functional.alltypes_datasource
 Analyzed query: SELECT * FROM functional.alltypes_datasource
 
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=778.88KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=806.41KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=778.88KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=806.41KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=0 row-size=112B cardinality=5.00K
 |  in pipelines: 00(GETNEXT)
 |

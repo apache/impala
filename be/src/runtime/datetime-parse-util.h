@@ -226,8 +226,24 @@ bool ParseFormatTokens(DateTimeFormatContext* dt_ctx, bool accept_time_toks = tr
 /// dt_ctx -- date/time format context (must contain valid tokens)
 /// accept_time_toks -- if true, time tokens are accepted, otherwise time tokens are
 /// rejected.
+/// accept_time_toks_only -- if true, time tokens w/o date tokens are accepted. Otherwise,
+/// they are rejected.
 /// Return true if the date/time was successfully parsed.
-bool ParseFormatTokensByStr(DateTimeFormatContext* dt_ctx, bool accept_time_toks = true);
+bool ParseFormatTokensByStr(DateTimeFormatContext* dt_ctx, bool accept_time_toks = true,
+    bool accept_time_toks_only = true);
+
+/// Parse date/time string to find the corresponding default date/time format context. The
+/// string must adhere to a default date/time format.
+/// str -- valid pointer to the string to parse.
+/// len -- length of the string to parse (must be > 0)
+/// accept_time_toks -- if true, time tokens are accepted. Otherwise time tokens are
+/// rejected.
+/// accept_time_toks_only -- if true, time tokens without date tokens are accepted.
+/// Otherwise, they are rejected.
+/// Return the corresponding default format context if parsing succeeded, or nullptr
+/// otherwise.
+const DateTimeFormatContext* ParseDefaultFormatTokensByStr(const char* str, int len,
+    bool accept_time_toks, bool accept_time_toks_only);
 
 /// Parse a date/time string. The data must adhere to the format, otherwise it will be
 /// rejected i.e. no missing tokens.

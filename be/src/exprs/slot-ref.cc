@@ -376,61 +376,22 @@ Status SlotRef::GetCodegendComputeFn(LlvmCodeGen* codegen, llvm::Function** fn) 
   return Status::OK();
 }
 
-BooleanVal SlotRef::GetBooleanVal(
-    ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK_EQ(type_.type, TYPE_BOOLEAN);
-  Tuple* t = row->GetTuple(tuple_idx_);
-  if (t == NULL || t->IsNull(null_indicator_offset_)) return BooleanVal::null();
-  return BooleanVal(*reinterpret_cast<bool*>(t->GetSlot(slot_offset_)));
-}
+#define SLOT_REF_GET_FUNCTION(type_lit, type_val, type_c) \
+    type_val SlotRef::Get##type_val( \
+        ScalarExprEvaluator* eval, const TupleRow* row) const { \
+      DCHECK_EQ(type_.type, type_lit); \
+      Tuple* t = row->GetTuple(tuple_idx_); \
+      if (t == NULL || t->IsNull(null_indicator_offset_)) return type_val::null(); \
+      return type_val(*reinterpret_cast<type_c*>(t->GetSlot(slot_offset_))); \
+    }
 
-TinyIntVal SlotRef::GetTinyIntVal(
-   ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK_EQ(type_.type, TYPE_TINYINT);
-  Tuple* t = row->GetTuple(tuple_idx_);
-  if (t == NULL || t->IsNull(null_indicator_offset_)) return TinyIntVal::null();
-  return TinyIntVal(*reinterpret_cast<int8_t*>(t->GetSlot(slot_offset_)));
-}
-
-SmallIntVal SlotRef::GetSmallIntVal(
-    ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK_EQ(type_.type, TYPE_SMALLINT);
-  Tuple* t = row->GetTuple(tuple_idx_);
-  if (t == NULL || t->IsNull(null_indicator_offset_)) return SmallIntVal::null();
-  return SmallIntVal(*reinterpret_cast<int16_t*>(t->GetSlot(slot_offset_)));
-}
-
-IntVal SlotRef::GetIntVal(
-    ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK_EQ(type_.type, TYPE_INT);
-  Tuple* t = row->GetTuple(tuple_idx_);
-  if (t == NULL || t->IsNull(null_indicator_offset_)) return IntVal::null();
-  return IntVal(*reinterpret_cast<int32_t*>(t->GetSlot(slot_offset_)));
-}
-
-BigIntVal SlotRef::GetBigIntVal(
-    ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK_EQ(type_.type, TYPE_BIGINT);
-  Tuple* t = row->GetTuple(tuple_idx_);
-  if (t == NULL || t->IsNull(null_indicator_offset_)) return BigIntVal::null();
-  return BigIntVal(*reinterpret_cast<int64_t*>(t->GetSlot(slot_offset_)));
-}
-
-FloatVal SlotRef::GetFloatVal(
-    ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK_EQ(type_.type, TYPE_FLOAT);
-  Tuple* t = row->GetTuple(tuple_idx_);
-  if (t == NULL || t->IsNull(null_indicator_offset_)) return FloatVal::null();
-  return FloatVal(*reinterpret_cast<float*>(t->GetSlot(slot_offset_)));
-}
-
-DoubleVal SlotRef::GetDoubleVal(
-    ScalarExprEvaluator* eval, const TupleRow* row) const {
-  DCHECK_EQ(type_.type, TYPE_DOUBLE);
-  Tuple* t = row->GetTuple(tuple_idx_);
-  if (t == NULL || t->IsNull(null_indicator_offset_)) return DoubleVal::null();
-  return DoubleVal(*reinterpret_cast<double*>(t->GetSlot(slot_offset_)));
-}
+SLOT_REF_GET_FUNCTION(TYPE_BOOLEAN, BooleanVal, bool);
+SLOT_REF_GET_FUNCTION(TYPE_TINYINT, TinyIntVal, int8_t);
+SLOT_REF_GET_FUNCTION(TYPE_SMALLINT, SmallIntVal, int16_t);
+SLOT_REF_GET_FUNCTION(TYPE_INT, IntVal, int32_t);
+SLOT_REF_GET_FUNCTION(TYPE_BIGINT, BigIntVal, int64_t);
+SLOT_REF_GET_FUNCTION(TYPE_FLOAT, FloatVal, float);
+SLOT_REF_GET_FUNCTION(TYPE_DOUBLE, DoubleVal, double);
 
 StringVal SlotRef::GetStringVal(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
@@ -475,6 +436,15 @@ DecimalVal SlotRef::GetDecimalVal(
       DCHECK(false);
       return DecimalVal::null();
   }
+}
+
+DateVal SlotRef::GetDateVal(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK_EQ(type_.type, TYPE_DATE);
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == nullptr || t->IsNull(null_indicator_offset_)) return DateVal::null();
+  const DateValue dv(*reinterpret_cast<int32_t*>(t->GetSlot(slot_offset_)));
+  return dv.ToDateVal();
 }
 
 } // namespace impala

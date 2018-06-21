@@ -62,6 +62,8 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
@@ -1232,6 +1234,24 @@ public class SingleNodePlanner {
     // Mark all slots referenced by the remaining conjuncts as materialized.
     analyzer.materializeSlots(conjuncts);
 
+    // TODO: Remove this section, once DATE type is supported across all fileformats.
+    // Right now, scanning DATE values is only supported for TEXT fileformat.
+    // Check if there are any non-text partitions.
+    if (containsNonTextFsPartition(partitions)) {
+      FeFsTable table = (FeFsTable)hdfsTblRef.getTable();
+      // Throw an exception if tupleDesc contains a non-clustering, materialized
+      // DATE slot.
+      for (SlotDescriptor slotDesc: tupleDesc.getMaterializedSlots()) {
+        if (slotDesc.getColumn() != null
+            && !table.isClusteringColumn(slotDesc.getColumn())
+            && slotDesc.getType() == ScalarType.DATE) {
+          throw new NotImplementedException(
+              "Scanning DATE values in table '" + table.getFullName() +
+              "' is not supported for non-text fileformats");
+        }
+      }
+    }
+
     // For queries which contain partition columns only, we may use the metadata instead
     // of table scans. This is only feasible if all materialized aggregate expressions
     // have distinct semantics. Please see createHdfsScanPlan() for details.
@@ -1276,6 +1296,19 @@ public class SingleNodePlanner {
       scanNode.init(analyzer);
       return scanNode;
     }
+  }
+
+  /**
+   * Returns true iff, 'partitions' contains a filesystem-based partition with non-text
+   * fileformat.
+   */
+  private boolean containsNonTextFsPartition(List<? extends FeFsPartition> partitions) {
+    for (FeFsPartition part: partitions) {
+      if (part.getInputFormatDescriptor().getFileFormat() != HdfsFileFormat.TEXT) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

@@ -39,6 +39,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 class ScalarExprEvaluator;
 class TExprNode;
@@ -68,6 +69,7 @@ class Literal: public ScalarExpr {
   Literal(ColumnType type, const std::string& v);
   Literal(ColumnType type, const StringValue& v);
   Literal(ColumnType type, const TimestampValue& v);
+  Literal(ColumnType type, const DateValue& v);
 
   virtual BooleanVal GetBooleanVal(ScalarExprEvaluator*, const TupleRow*) const override;
   virtual TinyIntVal GetTinyIntVal(ScalarExprEvaluator*, const TupleRow*) const override;
@@ -81,6 +83,7 @@ class Literal: public ScalarExpr {
   virtual TimestampVal GetTimestampVal(
       ScalarExprEvaluator*, const TupleRow*) const override;
   virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
 
  private:
   ExprValue value_;

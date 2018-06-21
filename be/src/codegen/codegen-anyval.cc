@@ -34,6 +34,7 @@ const char* CodegenAnyVal::LLVM_DOUBLEVAL_NAME    = "struct.impala_udf::DoubleVa
 const char* CodegenAnyVal::LLVM_STRINGVAL_NAME    = "struct.impala_udf::StringVal";
 const char* CodegenAnyVal::LLVM_TIMESTAMPVAL_NAME = "struct.impala_udf::TimestampVal";
 const char* CodegenAnyVal::LLVM_DECIMALVAL_NAME   = "struct.impala_udf::DecimalVal";
+const char* CodegenAnyVal::LLVM_DATEVAL_NAME      = "struct.impala_udf::DateVal";
 
 llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& type) {
   switch(type.type) {
@@ -63,6 +64,8 @@ llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& typ
     case TYPE_DECIMAL: // %"struct.impala_udf::DecimalVal" (isn't lowered)
                        // = { {i8}, [15 x i8], {i128} }
       return cg->GetNamedType(LLVM_DECIMALVAL_NAME);
+    case TYPE_DATE: // i64
+      return cg->i64_type();
     default:
       DCHECK(false) << "Unsupported type: " << type;
       return NULL;
@@ -111,6 +114,9 @@ llvm::Type* CodegenAnyVal::GetUnloweredType(LlvmCodeGen* cg, const ColumnType& t
       break;
     case TYPE_DECIMAL:
       result = cg->GetNamedType(LLVM_DECIMALVAL_NAME);
+      break;
+    case TYPE_DATE:
+      result = cg->GetNamedType(LLVM_DATEVAL_NAME);
       break;
     default:
       DCHECK(false) << "Unsupported type: " << type;
@@ -215,6 +221,7 @@ llvm::Value* CodegenAnyVal::GetIsNull(const char* name) const {
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
     case TYPE_INT:
+    case TYPE_DATE:
     case TYPE_FLOAT:
       // Lowered type is an integer. Get the first byte.
       return builder_->CreateTrunc(value_, codegen_->bool_type(), name);
@@ -265,6 +272,7 @@ void CodegenAnyVal::SetIsNull(llvm::Value* is_null) {
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
     case TYPE_INT:
+    case TYPE_DATE:
     case TYPE_FLOAT: {
       // Lowered type is an integer. Set the first byte to 'is_null'.
       value_ = builder_->CreateAnd(value_, -0x100LL, "masked");
@@ -293,7 +301,8 @@ llvm::Value* CodegenAnyVal::GetVal(const char* name) {
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
-    case TYPE_INT: {
+    case TYPE_INT:
+    case TYPE_DATE: {
       // Lowered type is an integer. Get the high bytes.
       int num_bits = type_.GetByteSize() * 8;
       llvm::Value* val = GetHighBits(num_bits, value_, name);
@@ -339,7 +348,8 @@ void CodegenAnyVal::SetVal(llvm::Value* val) {
     case TYPE_BOOLEAN:
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
-    case TYPE_INT: {
+    case TYPE_INT:
+    case TYPE_DATE: {
       // Lowered type is an integer. Set the high bytes to 'val'.
       int num_bits = type_.GetByteSize() * 8;
       value_ = SetHighBits(num_bits, val, value_, name_);
@@ -385,7 +395,7 @@ void CodegenAnyVal::SetVal(int16_t val) {
 }
 
 void CodegenAnyVal::SetVal(int32_t val) {
-  DCHECK(type_.type == TYPE_INT || type_.type == TYPE_DECIMAL);
+  DCHECK(type_.type == TYPE_INT || type_.type == TYPE_DECIMAL || type_.type == TYPE_DATE);
   SetVal(builder_->getInt32(val));
 }
 
@@ -560,6 +570,7 @@ void CodegenAnyVal::LoadFromNativePtr(llvm::Value* raw_val_ptr) {
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
     case TYPE_DECIMAL:
+    case TYPE_DATE:
       SetVal(builder_->CreateLoad(raw_val_ptr, "raw_val"));
       break;
     default:
@@ -617,6 +628,7 @@ void CodegenAnyVal::StoreToNativePtr(llvm::Value* raw_val_ptr, llvm::Value* pool
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
     case TYPE_DECIMAL:
+    case TYPE_DATE:
       // The representations of the types match - just store the value.
       builder_->CreateStore(GetVal(), raw_val_ptr);
       break;
@@ -698,6 +710,7 @@ llvm::Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
     case TYPE_INT:
     case TYPE_BIGINT:
     case TYPE_DECIMAL:
+    case TYPE_DATE:
       return builder_->CreateICmpEQ(GetVal(), other->GetVal(), "eq");
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
@@ -740,6 +753,7 @@ llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr,
     case TYPE_INT:
     case TYPE_BIGINT:
     case TYPE_DECIMAL:
+    case TYPE_DATE:
       return builder_->CreateICmpEQ(GetVal(), val, "cmp_raw");
     case TYPE_FLOAT:
     case TYPE_DOUBLE:{

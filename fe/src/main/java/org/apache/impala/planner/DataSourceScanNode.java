@@ -136,7 +136,7 @@ public class DataSourceScanNode extends ScanNode {
       case DATE:
       case DATETIME:
       case TIMESTAMP:
-        // TODO: we support DECIMAL and TIMESTAMP but no way to specify it in SQL.
+        // TODO: we support DECIMAL, TIMESTAMP and DATE but no way to specify it in SQL.
         return null;
       default:
         Preconditions.checkState(false);

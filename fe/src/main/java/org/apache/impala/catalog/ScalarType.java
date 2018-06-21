@@ -368,7 +368,8 @@ public class ScalarType extends Type {
   }
 
   public Type getMaxResolutionType() {
-    if (isIntegerType()) {
+    // Dates got summed as BIGINT for AVG.
+    if (isIntegerType() || type_ == PrimitiveType.DATE) {
       return ScalarType.BIGINT;
     // Timestamps get summed as DOUBLE for AVG.
     } else if (isFloatingPointType() || type_ == PrimitiveType.TIMESTAMP) {

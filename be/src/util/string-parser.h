@@ -25,6 +25,7 @@
 
 #include "common/logging.h"
 #include "runtime/decimal-value.h"
+#include "runtime/date-parse-util.h"
 #include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
 #include "util/decimal-util.h"
@@ -104,6 +105,13 @@ class StringParser {
     boost::posix_time::time_duration t;
     *result = TimestampParser::Parse(s, len, &d, &t) ? PARSE_SUCCESS : PARSE_FAILURE;
     return {d, t};
+  }
+
+  /// Parse a DateValue from s.
+  static inline DateValue StringToDate(const char* s, int len, ParseResult* result) {
+    DateValue d;
+    *result = DateParser::Parse(s, len, false, &d) ? PARSE_SUCCESS : PARSE_FAILURE;
+    return d;
   }
 
   /// Parses a decimal from s, returning the result.

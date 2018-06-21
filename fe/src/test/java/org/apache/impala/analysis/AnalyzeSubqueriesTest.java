@@ -99,6 +99,12 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       AnalyzesOk(String.format("select * from functional.alltypes t where " +
             "t.string_col %s (select cast(a.string_col as varchar(1)) from " +
             "functional.alltypestiny a)", op));
+      // Date in the subquery predicate
+      AnalyzesOk(String.format("select * from functional.alltypes where " +
+            "timestamp_col %s (select date_col from functional.date_tbl)", op));
+      // Timestamp in the subquery predicate
+      AnalyzesOk(String.format("select * from functional.date_tbl where " +
+            "date_col %s (select timestamp_col from functional.alltypes)", op));
 
       // Subqueries with multiple predicates in the WHERE clause
       AnalyzesOk(String.format("select * from functional.alltypes t where t.id %s " +
@@ -924,6 +930,11 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
           "int_col %s (select max(timestamp_col) from functional.alltypessmall)", cmpOp),
           String.format("operands of type INT and TIMESTAMP are not comparable: " +
           "int_col %s (SELECT max(timestamp_col) FROM functional.alltypessmall)", cmpOp));
+      // Compatible comparison types
+      AnalyzesOk(String.format("select date_col from functional.date_tbl where " +
+          "date_col %s (select max(timestamp_col) from functional.alltypessmall)",
+          cmpOp));
+
       // Distinct in the outer select block
       if (cmpOp == "=") {
         AnalyzesOk(String.format("select distinct id from functional.alltypes a " +
@@ -985,6 +996,9 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "(select max(string_col) from functional.alltypesagg) = 1",
         "operands of type STRING and TINYINT are not comparable: (SELECT " +
         "max(string_col) FROM functional.alltypesagg) = 1");
+    // Comparison between valid types
+    AnalyzesOk("select * from functional.alltypes where " +
+        "(select max(date_col) from functional.date_tbl) = '2011-01-01'");
 
     // Aggregate subquery with a LIMIT 1 clause
     AnalyzesOk("select id from functional.alltypestiny t where int_col = " +

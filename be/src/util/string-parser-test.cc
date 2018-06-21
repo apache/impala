@@ -79,6 +79,20 @@ void TestBoolValue(const char* s, bool exp_val, StringParser::ParseResult exp_re
   }
 }
 
+void TestDateValue(const char* s, DateValue exp_val,
+    StringParser::ParseResult exp_result) {
+  for (int i = 0; i < space_len; ++i) {
+    for (int j = 0; j < space_len; ++j) {
+      // All combinations of leading and/or trailing whitespace.
+      string str = space[i] + s + space[j];
+      StringParser::ParseResult result;
+      DateValue val = StringParser::StringToDate(str.data(), str.length(), &result);
+      EXPECT_EQ(exp_val, val) << s;
+      EXPECT_EQ(result, exp_result);
+    }
+  }
+}
+
 // Compare Impala's float conversion function against strtod.
 template<typename T>
 void TestFloatValue(const string& s, StringParser::ParseResult exp_result) {
@@ -501,6 +515,44 @@ TEST(StringToBool, Basic) {
   TestBoolValue("true xdfsd", false, StringParser::PARSE_FAILURE);
   TestBoolValue("ffffalse xdfsd", false, StringParser::PARSE_FAILURE);
   TestBoolValue("tttfalse xdfsd", false, StringParser::PARSE_FAILURE);
+}
+
+TEST(StringToDate, Basic) {
+  TestDateValue("2018-11-10", DateValue(2018, 11, 10), StringParser::PARSE_SUCCESS);
+  TestDateValue("2018-1-10", DateValue(2018, 1, 10), StringParser::PARSE_SUCCESS);
+  TestDateValue("2018-11-1", DateValue(2018, 11, 1), StringParser::PARSE_SUCCESS);
+
+  // Test min/max dates.
+  TestDateValue("0000-01-01", DateValue(0, 1, 1), StringParser::PARSE_SUCCESS);
+  TestDateValue("9999-12-31", DateValue(9999, 12, 31), StringParser::PARSE_SUCCESS);
+
+  // Test less than min and greater than max dates.
+  DateValue invalid_date;
+  TestDateValue("-0001-12-31", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("10000-01-01", invalid_date, StringParser::PARSE_FAILURE);
+
+  // Test bad formats.
+  TestDateValue("2-11-10", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("20-11-10", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("201-11-10", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("02018-11-10", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2018-100-10", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2018-10-100", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2018-10-", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2018--11", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2010-01-01 foo", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2010-01-01 12:22:22", invalid_date, StringParser::PARSE_FAILURE);
+
+  // Test invalid month/day values.
+  TestDateValue("2018-00-10", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2018-13-10", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2018-01-0", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2018-01-32", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2019-02-39", invalid_date, StringParser::PARSE_FAILURE);
+
+  // Leap year tests: 2100-02-29 doesn't exist but 2000-02-29 does.
+  TestDateValue("2100-02-29", invalid_date, StringParser::PARSE_FAILURE);
+  TestDateValue("2000-02-29", DateValue(2000, 2, 29), StringParser::PARSE_SUCCESS);
 }
 
 }

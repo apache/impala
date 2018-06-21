@@ -21,6 +21,7 @@
 #include "common/status.h"
 #include "runtime/date-value.h"
 #include "runtime/datetime-parse-util.h"
+#include "runtime/raw-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "testutil/gtest-util.h"
 
@@ -43,18 +44,23 @@ inline void ValidateDate(const DateValue& dv, int exp_year, int exp_month, int e
   EXPECT_EQ(exp_day, day);
 }
 
-inline DateValue ParseValidateDate(const char* s, int exp_year, int exp_month,
-    int exp_day) {
+inline DateValue ParseValidateDate(const char* s, bool accept_time_toks, int exp_year,
+    int exp_month, int exp_day) {
   DCHECK(s != nullptr);
-  DateValue v = DateValue::Parse(s, strlen(s));
+  DateValue v = DateValue::Parse(s, strlen(s), accept_time_toks);
   ValidateDate(v, exp_year, exp_month, exp_day, s);
   return v;
 }
 
 TEST(DateTest, ParseDefault) {
-  const DateValue v1 = ParseValidateDate("2012-01-20", 2012, 1, 20);
-  const DateValue v2 = ParseValidateDate("1990-10-20", 1990, 10, 20);
-  const DateValue v3 = ParseValidateDate("1990-10-20", 1990, 10, 20);
+  // Parse with time tokens rejected.
+  const DateValue v1 = ParseValidateDate("2012-01-20", false, 2012, 1, 20);
+  const DateValue v2 = ParseValidateDate("1990-10-20", false, 1990, 10, 20);
+  const DateValue v3 = ParseValidateDate("1990-10-20", false, 1990, 10, 20);
+  // Parse with time tokens accepted.
+  const DateValue v4 = ParseValidateDate("1990-10-20 23:59:59.999999999", true, 1990, 10,
+      20);
+  const DateValue v5 = ParseValidateDate("1990-10-20 00:01:02.9", true, 1990, 10, 20);
 
   // Test comparison operators.
   EXPECT_NE(v1, v2);
@@ -64,15 +70,47 @@ TEST(DateTest, ParseDefault) {
   EXPECT_GT(v1, v2);
   EXPECT_GE(v2, v3);
 
-  // 1-digit months and days are ok in date string.
-  ParseValidateDate("2012-1-20", 2012, 1, 20);
-  ParseValidateDate("2012-9-8", 2012, 9, 8);
+  // Time components are not part of the date value
+  EXPECT_EQ(v3, v4);
+  EXPECT_EQ(v3, v5);
 
-  // Bad formats
+  EXPECT_NE(RawValue::GetHashValue(&v1, TYPE_DATE, 0),
+      RawValue::GetHashValue(&v2, TYPE_DATE, 0));
+  EXPECT_EQ(RawValue::GetHashValue(&v3, TYPE_DATE, 0),
+      RawValue::GetHashValue(&v2, TYPE_DATE, 0));
+
+  // 1-digit months and days are ok in date string.
+  ParseValidateDate("2012-1-20", false, 2012, 1, 20);
+  ParseValidateDate("2012-9-8", false, 2012, 9, 8);
+  // 1-digit hours/minutes/seconds are ok if time components are accepted.
+  ParseValidateDate("2012-09-8 01:1:2.9", true, 2012, 9, 8);
+  ParseValidateDate("2012-9-8 1:01:02", true, 2012, 9, 8);
+  // Different fractional seconds are accepted
+  ParseValidateDate("2012-09-8 01:01:2", true, 2012, 9, 8);
+  ParseValidateDate("2012-09-8 01:01:2.9", true, 2012, 9, 8);
+  ParseValidateDate("2012-09-8 01:01:02.9", true, 2012, 9, 8);
+  ParseValidateDate("2012-09-8 01:01:2.999", true, 2012, 9, 8);
+  ParseValidateDate("2012-09-8 01:01:02.999", true, 2012, 9, 8);
+  ParseValidateDate("2012-09-8 01:01:2.999999999", true, 2012, 9, 8);
+  ParseValidateDate("2012-09-8 01:01:02.999999999", true, 2012, 9, 8);
+
+  // Bad formats: invalid date component.
   for (const char* s: {"1990-10", "1991-10-32", "1990-10-", "10:11:12 1991-10-10",
-      "2012-01-20 10:11:12", "2012-1-2 10:11:12", "02011-01-01", "999-01-01",
-      "2012-01-200", "2011-001-01"}) {
-    EXPECT_FALSE(DateValue::Parse(s, strlen(s)).IsValid()) << s;
+      "02011-01-01", "999-01-01", "2012-01-200", "2011-001-01"}) {
+    EXPECT_FALSE(DateValue::Parse(s, strlen(s), false).IsValid()) << s;
+  }
+  // Bad formats: valid date and time components but time component is rejected.
+  for (const char* s: {"2012-01-20 10:11:12", "2012-1-2 10:11:12"}) {
+    EXPECT_FALSE(DateValue::Parse(s, strlen(s), false).IsValid()) << s;
+  }
+  // Bad formats: valid date component, invalid time component.
+  for (const char* s: {"2012-01-20 10:11:", "2012-1-2 10::12", "2012-01-20 :11:12",
+      "2012-01-20 24:11:12", "2012-01-20 23:60:12"}) {
+    EXPECT_FALSE(DateValue::Parse(s, strlen(s), true).IsValid()) << s;
+  }
+  // Bad formats: missing date component, valid time component.
+  for (const char* s: {"10:11:12", "1:11:12", "10:1:12", "10:1:2.999"}) {
+    EXPECT_FALSE(DateValue::Parse(s, strlen(s), true).IsValid()) << s;
   }
 }
 
@@ -507,30 +545,37 @@ TEST(DateTest, DateValueEdgeCases) {
   // MIN_DATE_DAYS_SINCE_EPOCH was calculated using the Proleptic Gregorian calendar. This
   // is expected to be different then how Hive written Parquet files represent 0000-01-01.
   const int32_t MIN_DATE_DAYS_SINCE_EPOCH = -719528;
-  const DateValue min_date = ParseValidateDate("0000-01-01", 0, 1, 1);
+  const DateValue min_date1 = ParseValidateDate("0000-01-01", true, 0, 1, 1);
+  const DateValue min_date2 = ParseValidateDate("0000-01-01 00:00:00", true, 0, 1, 1);
+  EXPECT_EQ(min_date1, min_date2);
   int32_t min_days;
-  EXPECT_TRUE(min_date.ToDaysSinceEpoch(&min_days));
+  EXPECT_TRUE(min_date1.ToDaysSinceEpoch(&min_days));
   EXPECT_EQ(MIN_DATE_DAYS_SINCE_EPOCH, min_days);
-  EXPECT_EQ("0000-01-01", min_date.ToString());
+  EXPECT_EQ("0000-01-01", min_date1.ToString());
+  EXPECT_EQ("0000-01-01", min_date2.ToString());
 
-  const DateValue min_date2(MIN_DATE_DAYS_SINCE_EPOCH);
-  EXPECT_TRUE(min_date2.IsValid());
-  EXPECT_EQ(min_date, min_date2);
+  const DateValue min_date3(MIN_DATE_DAYS_SINCE_EPOCH);
+  EXPECT_TRUE(min_date3.IsValid());
+  EXPECT_EQ(min_date1, min_date3);
 
   const DateValue too_early(MIN_DATE_DAYS_SINCE_EPOCH - 1);
   EXPECT_FALSE(too_early.IsValid());
 
   // Test max supported date.
   const int32_t MAX_DATE_DAYS_SINCE_EPOCH = 2932896;
-  const DateValue max_date = ParseValidateDate("9999-12-31", 9999, 12, 31);
+  const DateValue max_date1 = ParseValidateDate("9999-12-31", true, 9999, 12, 31);
+  const DateValue max_date2 = ParseValidateDate("9999-12-31 23:59:59.999999999", true,
+      9999, 12, 31);
+  EXPECT_EQ(max_date1, max_date2);
   int32_t max_days;
-  EXPECT_TRUE(max_date.ToDaysSinceEpoch(&max_days));
+  EXPECT_TRUE(max_date1.ToDaysSinceEpoch(&max_days));
   EXPECT_EQ(MAX_DATE_DAYS_SINCE_EPOCH, max_days);
-  EXPECT_EQ("9999-12-31", max_date.ToString());
+  EXPECT_EQ("9999-12-31", max_date1.ToString());
+  EXPECT_EQ("9999-12-31", max_date2.ToString());
 
-  const DateValue max_date2(MAX_DATE_DAYS_SINCE_EPOCH);
-  EXPECT_TRUE(max_date2.IsValid());
-  EXPECT_EQ(max_date, max_date2);
+  const DateValue max_date3(MAX_DATE_DAYS_SINCE_EPOCH);
+  EXPECT_TRUE(max_date3.IsValid());
+  EXPECT_EQ(max_date1, max_date3);
 
   const DateValue too_late(MAX_DATE_DAYS_SINCE_EPOCH + 1);
   EXPECT_FALSE(too_late.IsValid());

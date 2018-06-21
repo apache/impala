@@ -116,7 +116,7 @@ PLAN-ROOT SINK
 data source predicates: CAST(tinyint_col AS DOUBLE) < CAST(256 AS DOUBLE), int_col < CAST(2 AS INT)
 predicates: float_col != CAST(0 AS FLOAT)
    mem-estimate=1.00GB mem-reservation=0B thread-reservation=0
-   tuple-ids=0 row-size=112B cardinality=500
+   tuple-ids=0 row-size=116B cardinality=500
    in pipelines: 00(GETNEXT)
 ====
 # Test aggregation.

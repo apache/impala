@@ -106,6 +106,7 @@ void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
       nulls = &column->doubleVal.nulls;
       break;
     case TPrimitiveType::TIMESTAMP:
+    case TPrimitiveType::DATE:
     case TPrimitiveType::STRING:
     case TPrimitiveType::CHAR:
     case TPrimitiveType::VARCHAR:
@@ -248,6 +249,24 @@ static void TimestampExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
   }
 }
 
+// Implementation for DATE.
+static void DateExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
+    RowBatch* batch, int start_idx, int num_rows, uint32_t output_row_idx,
+    apache::hive::service::cli::thrift::TColumn* column) {
+  ReserveSpace(num_rows, output_row_idx, &column->stringVal);
+  FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
+    DateVal val = expr_eval->GetDateVal(it.Get());
+    column->stringVal.values.emplace_back();
+    if (!val.is_null) {
+      DateValue value = DateValue::FromDateVal(val);
+      RawValue::PrintValue(
+          &value, TYPE_DATE, -1, &(column->stringVal.values.back()));
+    }
+    SetNullBit(output_row_idx, val.is_null, &column->stringVal.nulls);
+    ++output_row_idx;
+  }
+}
+
 // Implementation for STRING and VARCHAR.
 static void StringExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
     int start_idx, int num_rows, uint32_t output_row_idx,
@@ -354,6 +373,10 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
       DoubleExprValuesToHS2TColumn(
           expr_eval, batch, start_idx, num_rows, output_row_idx, column);
       return;
+    case TPrimitiveType::DATE:
+      DateExprValuesToHS2TColumn(
+          expr_eval, batch, start_idx, num_rows, output_row_idx, column);
+      break;
     case TPrimitiveType::TIMESTAMP:
       TimestampExprValuesToHS2TColumn(
           expr_eval, batch, start_idx, num_rows, output_row_idx, column);
@@ -420,6 +443,7 @@ void impala::TColumnValueToHS2TColumnValue(const TColumnValue& col_val,
     case TPrimitiveType::DECIMAL:
     case TPrimitiveType::STRING:
     case TPrimitiveType::TIMESTAMP:
+    case TPrimitiveType::DATE:
     case TPrimitiveType::VARCHAR:
     case TPrimitiveType::CHAR:
       // HiveServer2 requires timestamp to be presented as string. Note that the .thrift
@@ -505,6 +529,15 @@ void impala::ExprValueToHS2TColumnValue(const void* value, const TColumnType& ty
         ColumnType char_type = ColumnType::CreateCharType(type.types[0].scalar_type.len);
         hs2_col_val->stringVal.value.assign(
            reinterpret_cast<const char*>(value), char_type.len);
+      }
+      break;
+    case TPrimitiveType::DATE:
+      // HiveServer2 requires date to be presented as string.
+      hs2_col_val->__isset.stringVal = true;
+      hs2_col_val->stringVal.__isset.value = not_null;
+      if (not_null) {
+        hs2_col_val->stringVal.value =
+            reinterpret_cast<const DateValue*>(value)->ToString();
       }
       break;
     case TPrimitiveType::TIMESTAMP:

@@ -50,6 +50,39 @@ where id % 4 = 0 and month != 1;
 INT, INT, BIGINT, DOUBLE, TIMESTAMP, STRING, STRING
 ====
 ---- QUERY
+select date_part,
+count(date_col) over (partition by date_part),
+min(date_col) over (partition by date_part),
+max(date_col) over (partition by date_part)
+from functional.date_tbl
+order by date_part;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0001-01-01,6,0001-01-01,9999-12-31
+0001-01-01,6,0001-01-01,9999-12-31
+0001-01-01,6,0001-01-01,9999-12-31
+0001-01-01,6,0001-01-01,9999-12-31
+0001-01-01,6,0001-01-01,9999-12-31
+0001-01-01,6,0001-01-01,9999-12-31
+0001-01-01,6,0001-01-01,9999-12-31
+1399-06-27,2,2017-11-28,2018-12-31
+1399-06-27,2,2017-11-28,2018-12-31
+1399-06-27,2,2017-11-28,2018-12-31
+2017-11-27,10,0001-06-21,2017-11-28
+2017-11-27,10,0001-06-21,2017-11-28
+2017-11-27,10,0001-06-21,2017-11-28
+2017-11-27,10,0001-06-21,2017-11-28
+2017-11-27,10,0001-06-21,2017-11-28
+2017-11-27,10,0001-06-21,2017-11-28
+2017-11-27,10,0001-06-21,2017-11-28
+2017-11-27,10,0001-06-21,2017-11-28
+2017-11-27,10,0001-06-21,2017-11-28
+2017-11-27,10,0001-06-21,2017-11-28
+9999-12-31,2,9999-12-01,9999-12-31
+9999-12-31,2,9999-12-01,9999-12-31
+---- TYPES
+DATE, BIGINT, DATE, DATE
+====
+---- QUERY
 select int_col,
 count(int_col) over ()
 from alltypessmall
@@ -1857,7 +1890,7 @@ INT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TIN
 20,NULL,9,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
 ====
 ---- QUERY
-# Test all possible types for last_value (except decimal).
+# Test all possible types for last_value (except decimal and date).
 select id,
   last_value(bool_col ignore nulls) over (order by id),
   last_value(tinyint_col ignore nulls) over (order by id),
@@ -1922,6 +1955,37 @@ DECIMAL, DECIMAL
 12345,1234
 12345,1234
 132842,1234
+====
+---- QUERY
+select
+last_value(date_col ignore nulls) over (order by date_col),
+first_value(date_col ignore nulls) over (order by date_col)
+from functional.date_tbl
+---- TYPES
+DATE, DATE
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0001-01-01,0001-01-01
+0001-06-21,0001-01-01
+0001-06-22,0001-01-01
+0001-06-23,0001-01-01
+0001-06-24,0001-01-01
+0001-06-25,0001-01-01
+0001-06-26,0001-01-01
+0001-06-27,0001-01-01
+0001-06-28,0001-01-01
+0001-06-29,0001-01-01
+0001-12-31,0001-01-01
+0002-01-01,0001-01-01
+1399-12-31,0001-01-01
+2017-11-28,0001-01-01
+2017-11-28,0001-01-01
+2017-11-28,0001-01-01
+2018-12-31,0001-01-01
+9999-12-01,0001-01-01
+9999-12-31,0001-01-01
+9999-12-31,0001-01-01
+9999-12-31,0001-01-01
+9999-12-31,0001-01-01
 ====
 ---- QUERY
 # Regression test for IMPALA-4120: Invoke UDFs which do local allocations and verifies

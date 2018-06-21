@@ -528,6 +528,42 @@ where d3 < (select max(double_col) from functional.alltypestiny)
 DECIMAL, DECIMAL, DECIMAL
 ====
 ---- QUERY
+# Subquery returning a date
+select id, timestamp_col
+from functional.alltypestiny
+where timestamp_col <= (select max(date_col)
+  from functional.date_tbl)
+order by id;
+---- RESULTS
+0,2009-01-01 00:00:00
+1,2009-01-01 00:01:00
+2,2009-02-01 00:00:00
+3,2009-02-01 00:01:00
+4,2009-03-01 00:00:00
+5,2009-03-01 00:01:00
+6,2009-04-01 00:00:00
+7,2009-04-01 00:01:00
+---- TYPES
+INT, TIMESTAMP
+====
+---- QUERY
+# Compare a date with the result of a subquery
+select date_col
+from functional.date_tbl
+where date_col >= DATE '1400-01-01' AND date_col >= (select max(timestamp_col)
+  from functional.alltypestiny);
+---- RESULTS
+2017-11-28
+2018-12-31
+2017-11-28
+9999-12-31
+9999-12-01
+9999-12-31
+2017-11-28
+---- TYPES
+DATE
+====
+---- QUERY
 # Distinct in the outer select block
 select distinct bool_col
 from functional.alltypestiny t

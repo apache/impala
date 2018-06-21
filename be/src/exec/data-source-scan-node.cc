@@ -25,6 +25,7 @@
 #include "exec/read-write-util.h"
 #include "exprs/scalar-expr.h"
 #include "gen-cpp/parquet_types.h"
+#include "runtime/date-value.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
@@ -306,6 +307,12 @@ Status DataSourceScanNode::MaterializeNextRow(const Timezone& local_tz,
             val.size(), slot));
         break;
       }
+      case TYPE_DATE:
+        if (val_idx >= col.int_vals.size()) {
+          return Status(Substitute(ERROR_INVALID_COL_DATA, "DATE"));
+        }
+        *reinterpret_cast<DateValue*>(slot) = DateValue(col.int_vals[val_idx]);
+        break;
       default:
         DCHECK(false);
     }

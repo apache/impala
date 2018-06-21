@@ -38,6 +38,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 class ScalarExprEvaluator;
 class TExprNode;
@@ -100,6 +101,7 @@ class ScalarFnCall : public ScalarExpr {
   virtual TimestampVal GetTimestampVal(
       ScalarExprEvaluator*, const TupleRow*) const override;
   virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
 
  private:
   /// If this function has var args, children()[vararg_start_idx_] is the first vararg

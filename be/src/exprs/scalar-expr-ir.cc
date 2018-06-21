@@ -29,7 +29,8 @@
 void dummy(impala_udf::FunctionContext*, impala_udf::BooleanVal*, impala_udf::TinyIntVal*,
     impala_udf::SmallIntVal*, impala_udf::IntVal*, impala_udf::BigIntVal*,
     impala_udf::FloatVal*, impala_udf::DoubleVal*, impala_udf::StringVal*,
-    impala_udf::TimestampVal*, impala_udf::DecimalVal*, impala::ScalarExprEvaluator*) { }
+    impala_udf::TimestampVal*, impala_udf::DecimalVal*, impala_udf::DateVal*,
+    impala::ScalarExprEvaluator*) { }
 #endif
 
 /// The following are compute functions that are cross-compiled to both native and IR
@@ -90,4 +91,9 @@ TimestampVal ScalarExpr::GetTimestampVal(
 DecimalVal ScalarExpr::GetDecimalVal(
     ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
   return expr->GetDecimalVal(eval, row);
+}
+
+DateVal ScalarExpr::GetDateVal(
+    ScalarExpr* expr, ScalarExprEvaluator* eval, const TupleRow* row) {
+  return expr->GetDateVal(eval, row);
 }

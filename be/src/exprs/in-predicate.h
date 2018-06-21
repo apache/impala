@@ -138,6 +138,28 @@ class InPredicate {
       int num_args, const impala_udf::IntVal* args);
 
   static impala_udf::BooleanVal InIterate(
+      impala_udf::FunctionContext* context, const impala_udf::DateVal& val,
+      int num_args, const impala_udf::DateVal* args);
+
+  static impala_udf::BooleanVal NotInIterate(
+      impala_udf::FunctionContext* context, const impala_udf::DateVal& val,
+      int num_args, const impala_udf::DateVal* args);
+
+  static void SetLookupPrepare_date(impala_udf::FunctionContext* ctx,
+      impala_udf::FunctionContext::FunctionStateScope scope);
+
+  static void SetLookupClose_date(impala_udf::FunctionContext* ctx,
+      impala_udf::FunctionContext::FunctionStateScope scope);
+
+  static impala_udf::BooleanVal InSetLookup(
+      impala_udf::FunctionContext* context, const impala_udf::DateVal& val,
+      int num_args, const impala_udf::DateVal* args);
+
+  static impala_udf::BooleanVal NotInSetLookup(
+      impala_udf::FunctionContext* context, const impala_udf::DateVal& val,
+      int num_args, const impala_udf::DateVal* args);
+
+  static impala_udf::BooleanVal InIterate(
       impala_udf::FunctionContext* context, const impala_udf::BigIntVal& val,
       int num_args, const impala_udf::BigIntVal* args);
 

@@ -20,6 +20,7 @@
 #include <sstream>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/regex.hpp>
+#include <boost/preprocessor/stringize.hpp>
 
 #include "common/names.h"
 
@@ -113,6 +114,9 @@ static void AppendSeqId(int seq_id, stringstream* out) {
   (*out) << "_";
 }
 
+#define CASE_TYPE_APPEND_MANGLED_TOKEN(type_lit, type_val) \
+    case type_lit: AppendMangledToken(#type_val, s); break;
+
 static void AppendAnyValType(int namespace_id, const ColumnType& type, stringstream* s) {
   (*s) << "N";
   // All the AnyVal types are in the impala_udf namespace, that token
@@ -120,38 +124,20 @@ static void AppendAnyValType(int namespace_id, const ColumnType& type, stringstr
   AppendSeqId(namespace_id, s);
 
   switch (type.type) {
-    case TYPE_BOOLEAN:
-      AppendMangledToken("BooleanVal", s);
-      break;
-    case TYPE_TINYINT:
-      AppendMangledToken("TinyIntVal", s);
-      break;
-    case TYPE_SMALLINT:
-      AppendMangledToken("SmallIntVal", s);
-      break;
-    case TYPE_INT:
-      AppendMangledToken("IntVal", s);
-      break;
-    case TYPE_BIGINT:
-      AppendMangledToken("BigIntVal", s);
-      break;
-    case TYPE_FLOAT:
-      AppendMangledToken("FloatVal", s);
-      break;
-    case TYPE_DOUBLE:
-      AppendMangledToken("DoubleVal", s);
-      break;
-    case TYPE_STRING:
-    case TYPE_VARCHAR:
-    case TYPE_CHAR:
-      AppendMangledToken("StringVal", s);
-      break;
-    case TYPE_TIMESTAMP:
-      AppendMangledToken("TimestampVal", s);
-      break;
-    case TYPE_DECIMAL:
-      AppendMangledToken("DecimalVal", s);
-      break;
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_BOOLEAN, BooleanVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_TINYINT, TinyIntVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_SMALLINT, SmallIntVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_INT, IntVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_DATE, DateVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_BIGINT, BigIntVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_FLOAT, FloatVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_DOUBLE, DoubleVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_STRING, StringVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_VARCHAR, StringVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_CHAR, StringVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_TIMESTAMP, TimestampVal)
+    CASE_TYPE_APPEND_MANGLED_TOKEN(TYPE_DECIMAL, DecimalVal)
+
     default:
       DCHECK(false) << "NYI: " << type.DebugString();
   }

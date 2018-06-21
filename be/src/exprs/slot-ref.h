@@ -33,6 +33,7 @@ using impala_udf::DoubleVal;
 using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
+using impala_udf::DateVal;
 
 /// Reference to a single slot of a tuple.
 class SlotRef : public ScalarExpr {
@@ -74,6 +75,7 @@ class SlotRef : public ScalarExpr {
   virtual TimestampVal GetTimestampVal(
       ScalarExprEvaluator*, const TupleRow*) const override;
   virtual DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const override;
   virtual CollectionVal GetCollectionVal(
       ScalarExprEvaluator*, const TupleRow*) const override;
 

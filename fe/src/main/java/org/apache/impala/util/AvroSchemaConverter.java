@@ -158,11 +158,18 @@ public class AvroSchemaConverter {
       case FLOAT: return Schema.create(Schema.Type.FLOAT);
       case DOUBLE: return Schema.create(Schema.Type.DOUBLE);
       case TIMESTAMP: return Schema.create(Schema.Type.STRING);
+      case DATE: return createDateSchema();
       case DECIMAL: return createDecimalSchema(impalaScalarType);
       default:
         throw new UnsupportedOperationException(
             impalaScalarType.toSql() + " cannot be converted to an Avro type");
     }
+  }
+
+  private Schema createDateSchema() {
+    Schema dateSchema = Schema.create(Schema.Type.INT);
+    dateSchema.addProp(AVRO_LOGICAL_TYPE, "date");
+    return dateSchema;
   }
 
   private Schema createDecimalSchema(ScalarType impalaDecimalType) {

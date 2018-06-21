@@ -321,6 +321,18 @@ public class JdbcTest {
     assertEquals(13, numCols);
     rs.close();
 
+    // validate date_col
+    rs = con_.getMetaData().getColumns(null, "functional", "date_tbl",
+        "date_col");
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.DATE, rs.getInt("DATA_TYPE"));
+    assertEquals(10, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    // Use getString() to check the value is null (and not 0).
+    assertEquals(null, rs.getString("NUM_PREC_RADIX"));
+    assertFalse(rs.next());
+    rs.close();
+
     // validate DECIMAL columns
     rs = con_.getMetaData().getColumns(null, "functional", "decimal_tbl", null);
     assertTrue(rs.next());
@@ -513,6 +525,29 @@ public class JdbcTest {
     assertEquals(rs.getMetaData().getColumnType(6), Types.DECIMAL);
     assertEquals(rs.getMetaData().getPrecision(6), 9);
     assertEquals(rs.getMetaData().getScale(6), 0);
+
+    rs.close();
+  }
+
+  @Test
+  public void testDateGetColumnTypes() throws SQLException {
+    // Table has 1 int column and 2 date columns.
+    ResultSet rs = con_.createStatement().executeQuery(
+        "select * from functional.date_tbl");
+
+    assertEquals(rs.getMetaData().getColumnType(1), Types.INTEGER);
+    // Get the designated column's specified column size.
+    assertEquals(rs.getMetaData().getPrecision(1), 10);
+    // Gets the designated column's number of digits to right of the decimal point.
+    assertEquals(rs.getMetaData().getScale(1), 0);
+
+    assertEquals(rs.getMetaData().getColumnType(2), Types.DATE);
+    assertEquals(rs.getMetaData().getPrecision(2), 10);
+    assertEquals(rs.getMetaData().getScale(2), 0);
+
+    assertEquals(rs.getMetaData().getColumnType(3), Types.DATE);
+    assertEquals(rs.getMetaData().getPrecision(3), 10);
+    assertEquals(rs.getMetaData().getScale(3), 0);
 
     rs.close();
   }

@@ -75,6 +75,8 @@ template BigIntVal UtilityFunctions::FnvHash(
     FunctionContext* ctx, const FloatVal& input_val);
 template BigIntVal UtilityFunctions::FnvHash(
     FunctionContext* ctx, const DoubleVal& input_val);
+template BigIntVal UtilityFunctions::FnvHash(
+    FunctionContext* ctx, const DateVal& input_val);
 
 BigIntVal UtilityFunctions::MurmurHashString(FunctionContext* ctx,
     const StringVal& input_val) {
@@ -124,6 +126,8 @@ template BigIntVal UtilityFunctions::MurmurHash(
     FunctionContext* ctx, const FloatVal& input_val);
 template BigIntVal UtilityFunctions::MurmurHash(
     FunctionContext* ctx, const DoubleVal& input_val);
+template BigIntVal UtilityFunctions::MurmurHash(
+    FunctionContext* ctx, const DateVal& input_val);
 
 StringVal UtilityFunctions::User(FunctionContext* ctx) {
   StringVal user(ctx->user());
@@ -201,14 +205,26 @@ StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const T& /*input_val*/)
   }
 }
 
-template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const BooleanVal& input_val);
-template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const TinyIntVal& input_val);
-template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const SmallIntVal& input_val);
-template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const IntVal& input_val);
-template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const BigIntVal& input_val);
-template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const FloatVal& input_val);
-template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const DoubleVal& input_val);
-template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const StringVal& input_val);
-template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const TimestampVal& input_val);
-template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const DecimalVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const BooleanVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const TinyIntVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const SmallIntVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const IntVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const BigIntVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const FloatVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const DoubleVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const StringVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const TimestampVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const DecimalVal& input_val);
+template StringVal UtilityFunctions::TypeOf(
+    FunctionContext* ctx, const DateVal& input_val);
 }

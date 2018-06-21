@@ -361,6 +361,14 @@ public class ExprRewriterTest extends AnalyzerTest {
         "SELECT CAST(2.0000000000000000000000000000000000000 AS DECIMAL(38,37))");
     assertToSqlWithImplicitCasts(ctx, "select d1 - 1.1 from functional.decimal_tbl",
         "SELECT d1 - CAST(1.1 AS DECIMAL(2,1)) FROM functional.decimal_tbl");
+    assertToSqlWithImplicitCasts(ctx, "select * from functional.date_tbl "
+        + "where date_col = '2017-11-28'",
+        "SELECT * FROM functional.date_tbl "
+        + "WHERE date_col = DATE '2017-11-28'");
+    assertToSqlWithImplicitCasts(ctx, "select * from functional.alltypes, "
+        + "functional.date_tbl where timestamp_col = date_col",
+        "SELECT * FROM functional.alltypes, functional.date_tbl "
+        + "WHERE timestamp_col = CAST(date_col AS TIMESTAMP)");
     assertToSqlWithImplicitCasts(ctx, "select round(1.2345, 2) * pow(10, 10)",
         "SELECT CAST(12300000000 AS DOUBLE)");
     assertToSqlWithImplicitCasts(ctx,

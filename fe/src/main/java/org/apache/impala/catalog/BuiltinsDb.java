@@ -121,6 +121,8 @@ public class BuiltinsDb extends Db {
             "19ReservoirSampleInitIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextEPNS2_9StringValE")
         .put(Type.DECIMAL,
             "19ReservoirSampleInitIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextEPNS2_9StringValE")
+        .put(Type.DATE,
+            "19ReservoirSampleInitIN10impala_udf7DateValEEEvPNS2_15FunctionContextEPNS2_9StringValE")
         .build();
 
   private static final Map<Type, String> SAMPLE_SERIALIZE_SYMBOL =
@@ -145,6 +147,8 @@ public class BuiltinsDb extends Db {
              "24ReservoirSampleSerializeIN10impala_udf12TimestampValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.DECIMAL,
              "24ReservoirSampleSerializeIN10impala_udf10DecimalValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
+        .put(Type.DATE,
+             "24ReservoirSampleSerializeIN10impala_udf7DateValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .build();
 
   private static final Map<Type, String> SAMPLE_MERGE_SYMBOL =
@@ -169,6 +173,8 @@ public class BuiltinsDb extends Db {
             "20ReservoirSampleMergeIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKNS2_9StringValEPS6_")
         .put(Type.DECIMAL,
             "20ReservoirSampleMergeIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKNS2_9StringValEPS6_")
+        .put(Type.DATE,
+            "20ReservoirSampleMergeIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKNS2_9StringValEPS6_")
         .build();
 
   private static final Map<Type, String> SAMPLE_UPDATE_SYMBOL =
@@ -193,6 +199,8 @@ public class BuiltinsDb extends Db {
             "21ReservoirSampleUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.DECIMAL,
             "21ReservoirSampleUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.DATE,
+            "21ReservoirSampleUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .build();
 
   private static final Map<Type, String> SAMPLE_FINALIZE_SYMBOL =
@@ -217,12 +225,16 @@ public class BuiltinsDb extends Db {
              "23ReservoirSampleFinalizeIN10impala_udf12TimestampValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.DECIMAL,
              "23ReservoirSampleFinalizeIN10impala_udf10DecimalValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
+        .put(Type.DATE,
+             "23ReservoirSampleFinalizeIN10impala_udf7DateValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .build();
 
   private static final Map<Type, String> UPDATE_VAL_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
              "9UpdateValIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.DATE,
+             "9UpdateValIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
              "9UpdateValIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.TINYINT,
@@ -247,6 +259,8 @@ public class BuiltinsDb extends Db {
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
             "18AppxMedianFinalizeIN10impala_udf10BooleanValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.DATE,
+            "18AppxMedianFinalizeIN10impala_udf7DateValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
         .put(Type.DECIMAL,
             "18AppxMedianFinalizeIN10impala_udf10DecimalValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
         .put(Type.TINYINT,
@@ -289,6 +303,8 @@ public class BuiltinsDb extends Db {
              "17HistogramFinalizeIN10impala_udf12TimestampValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.DECIMAL,
              "17HistogramFinalizeIN10impala_udf10DecimalValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
+        .put(Type.DATE,
+             "17HistogramFinalizeIN10impala_udf7DateValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .build();
 
   private static final Map<Type, String> HLL_UPDATE_SYMBOL =
@@ -313,6 +329,8 @@ public class BuiltinsDb extends Db {
             "9HllUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.DECIMAL,
             "9HllUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.DATE,
+            "9HllUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .build();
 
   private static final Map<Type, String> SAMPLED_NDV_UPDATE_SYMBOL =
@@ -337,6 +355,8 @@ public class BuiltinsDb extends Db {
             "16SampledNdvUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
         .put(Type.DECIMAL,
             "16SampledNdvUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
+        .put(Type.DATE,
+            "16SampledNdvUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_RKNS2_9DoubleValEPNS2_9StringValE")
         .build();
 
   private static final Map<Type, String> AGGIF_UPDATE_SYMBOL =
@@ -361,6 +381,8 @@ public class BuiltinsDb extends Db {
             "11AggIfUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKNS2_10BooleanValERKT_PS9_")
         .put(Type.DECIMAL,
             "11AggIfUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKNS2_10BooleanValERKT_PS9_")
+        .put(Type.DATE,
+            "11AggIfUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKNS2_10BooleanValERKT_PS9_")
         .build();
 
   private static final Map<Type, String> AGGIF_MERGE_SYMBOL =
@@ -385,6 +407,8 @@ public class BuiltinsDb extends Db {
             "10AggIfMergeIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
             "10AggIfMergeIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.DATE,
+            "10AggIfMergeIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
   private static final Map<Type, String> AGGIF_FINALIZE_SYMBOL =
@@ -409,6 +433,8 @@ public class BuiltinsDb extends Db {
             "13AggIfFinalizeIN10impala_udf12TimestampValEEET_PNS2_15FunctionContextERKS4_")
         .put(Type.DECIMAL,
             "13AggIfFinalizeIN10impala_udf10DecimalValEEET_PNS2_15FunctionContextERKS4_")
+        .put(Type.DATE,
+            "13AggIfFinalizeIN10impala_udf7DateValEEET_PNS2_15FunctionContextERKS4_")
         .build();
 
   private static final Map<Type, String> PC_UPDATE_SYMBOL =
@@ -433,6 +459,8 @@ public class BuiltinsDb extends Db {
             "8PcUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
          .put(Type.DECIMAL,
             "8PcUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+         .put(Type.DATE,
+            "8PcUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .build();
 
     private static final Map<Type, String> PCSA_UPDATE_SYMBOL =
@@ -457,6 +485,8 @@ public class BuiltinsDb extends Db {
               "10PcsaUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
           .put(Type.DECIMAL,
               "10PcsaUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+          .put(Type.DATE,
+              "10PcsaUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
           .build();
 
   private static final Map<Type, String> MIN_UPDATE_SYMBOL =
@@ -481,6 +511,8 @@ public class BuiltinsDb extends Db {
             "3MinIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
             "3MinIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.DATE,
+            "3MinIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
   private static final Map<Type, String> MAX_UPDATE_SYMBOL =
@@ -505,6 +537,8 @@ public class BuiltinsDb extends Db {
             "3MaxIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
             "3MaxIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.DATE,
+            "3MaxIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
   private static final Map<Type, String> STDDEV_UPDATE_SYMBOL =
@@ -526,6 +560,8 @@ public class BuiltinsDb extends Db {
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
              "12OffsetFnInitIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextEPT_")
+        .put(Type.DATE,
+             "12OffsetFnInitIN10impala_udf7DateValEEEvPNS2_15FunctionContextEPT_")
         .put(Type.DECIMAL,
              "12OffsetFnInitIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextEPT_")
         .put(Type.TINYINT,
@@ -550,6 +586,8 @@ public class BuiltinsDb extends Db {
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
              "14OffsetFnUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValES8_PS6_")
+        .put(Type.DATE,
+             "14OffsetFnUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValES8_PS6_")
         .put(Type.DECIMAL,
              "14OffsetFnUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValES8_PS6_")
         .put(Type.TINYINT,
@@ -574,6 +612,8 @@ public class BuiltinsDb extends Db {
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
              "21FirstValRewriteUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
+        .put(Type.DATE,
+             "21FirstValRewriteUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
         .put(Type.DECIMAL,
              "21FirstValRewriteUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
         .put(Type.TINYINT,
@@ -598,6 +638,8 @@ public class BuiltinsDb extends Db {
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
              "13LastValRemoveIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.DATE,
+             "13LastValRemoveIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
              "13LastValRemoveIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.TINYINT,
@@ -640,12 +682,16 @@ public class BuiltinsDb extends Db {
             "22LastValIgnoreNullsInitIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextEPNS2_9StringValE")
         .put(Type.DECIMAL,
             "22LastValIgnoreNullsInitIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextEPNS2_9StringValE")
+        .put(Type.DATE,
+            "22LastValIgnoreNullsInitIN10impala_udf7DateValEEEvPNS2_15FunctionContextEPNS2_9StringValE")
         .build();
 
   private static final Map<Type, String> LAST_VALUE_IGNORE_NULLS_UPDATE_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
             "24LastValIgnoreNullsUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.DATE,
+            "24LastValIgnoreNullsUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.DECIMAL,
             "24LastValIgnoreNullsUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.TINYINT,
@@ -670,6 +716,8 @@ public class BuiltinsDb extends Db {
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
             "24LastValIgnoreNullsRemoveIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.DATE,
+            "24LastValIgnoreNullsRemoveIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.DECIMAL,
             "24LastValIgnoreNullsRemoveIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.TINYINT,
@@ -712,6 +760,8 @@ public class BuiltinsDb extends Db {
             "26LastValIgnoreNullsGetValueIN10impala_udf12TimestampValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
         .put(Type.DECIMAL,
             "26LastValIgnoreNullsGetValueIN10impala_udf10DecimalValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.DATE,
+            "26LastValIgnoreNullsGetValueIN10impala_udf7DateValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
         .build();
 
   private static final Map<Type, String> LAST_VALUE_IGNORE_NULLS_FINALIZE_SYMBOL =
@@ -736,12 +786,16 @@ public class BuiltinsDb extends Db {
             "26LastValIgnoreNullsFinalizeIN10impala_udf12TimestampValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
         .put(Type.DECIMAL,
             "26LastValIgnoreNullsFinalizeIN10impala_udf10DecimalValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.DATE,
+            "26LastValIgnoreNullsFinalizeIN10impala_udf7DateValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
         .build();
 
   private static final Map<Type, String> FIRST_VALUE_UPDATE_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
              "14FirstValUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.DATE,
+             "14FirstValUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
              "14FirstValUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.TINYINT,
@@ -766,6 +820,8 @@ public class BuiltinsDb extends Db {
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
             "25FirstValIgnoreNullsUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.DATE,
+            "25FirstValIgnoreNullsUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
             "25FirstValIgnoreNullsUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.TINYINT,

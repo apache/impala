@@ -40,6 +40,7 @@ enum TExprNodeType {
   IS_NOT_EMPTY_PRED = 16
   KUDU_PARTITION_EXPR = 17
   VALID_TUPLE_ID_EXPR = 18
+  DATE_LITERAL = 19
 }
 
 struct TBoolLiteral {
@@ -52,7 +53,10 @@ struct TCaseExpr {
 }
 
 struct TDateLiteral {
-  1: required Types.TTimestamp value
+  // Number of days since 1970-01-01.
+  1: required i32 days_since_epoch
+  // String representation
+  2: required string date_string
 }
 
 struct TDecimalLiteral {
