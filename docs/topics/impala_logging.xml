@@ -215,30 +215,49 @@ under the License.
       </p>
 
       <p>
-        Impala can automatically remove older unneeded log files, a feature known as <term>log rotation</term>.
-<!-- Another instance of the text also used in impala_new_features.xml
-             and impala_fixed_issues.xml. (Just took out the word "new"
-             and added the reference to the starting release.)
-             At this point, a conref is definitely in the cards. -->
+        Impala can automatically remove older unneeded log files, a feature
+        known as <term>log rotation</term>.
       </p>
 
       <p>
-        In Impala 2.2 and higher, the <codeph>--max_log_files</codeph> configuration option specifies how many log
-        files to keep at each severity level. You can specify an appropriate setting for each Impala-related daemon
-        (<cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>, and <cmdname>catalogd</cmdname>). The default
-        value is 10, meaning that Impala preserves the latest 10 log files for each severity level
-        (<codeph>INFO</codeph>, <codeph>WARNING</codeph>, <codeph>ERROR</codeph>, and <codeph>FATAL</codeph>).
-        Impala checks to see if any old logs need to be removed based on the interval specified in the
-        <codeph>logbufsecs</codeph> setting, every 5 seconds by default.
+        In Impala 2.2 and higher, the <codeph>--max_log_files</codeph>
+        configuration option specifies how many log files to keep at each
+        severity level (<codeph>INFO</codeph>, <codeph>WARNING</codeph>,
+          <codeph>ERROR</codeph>, and <codeph>FATAL</codeph>). You can specify
+        an appropriate setting for each Impala-related daemon
+          (<cmdname>impalad</cmdname>, <cmdname>statestored</cmdname>, and
+          <cmdname>catalogd</cmdname>).
+        <ul>
+          <li>
+            A value of 0 preserves all log files, in which case you would set
+            up set up manual log rotation using your Linux tool or technique of
+            choice.
+          </li>
+          <li>
+            A value of 1 preserves only the very latest log file.
+          </li>
+          <li>
+            The default value is 10.
+          </li>
+        </ul>
       </p>
-
-<!-- This extra detail only appears here. Consider if it's worth including it
-           in the conref so people don't need to follow a link just for a couple of
-           minor factoids. -->
-
       <p>
-        A value of 0 preserves all log files, in which case you would set up set up manual log rotation using your
-        Linux tool or technique of choice. A value of 1 preserves only the very latest log file.
+        Impala checks to see if any old logs need to be removed based on the
+        interval specified in the <codeph>--logbufsecs</codeph> setting, every 5
+        seconds by default.
+      </p>
+      <p>
+        For some log levels, Impala logs are first temporarily buffered in
+        memory and only written to disk periodically. The
+          <codeph>--logbufsecs</codeph> setting controls the maximum time that
+        log messages are buffered for. For example, with the default value of 5
+        seconds, there may be up to a 5 second delay before a logged message
+        shows up in the log file.
+      </p>
+      <p>
+        It is not recommended that you set <codeph>--logbufsecs</codeph> to 0
+        as the setting makes the Impala daemon to spin in the thread that tries
+        to delete old log files.
       </p>
 
     </conbody>
