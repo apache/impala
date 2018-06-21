@@ -74,7 +74,7 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
 
     <p> The <codeph>WITH GRANT OPTION</codeph> clause allows members of the
       specified role to issue <codeph>GRANT</codeph> and <codeph>REVOKE</codeph>
-      statements for those same privileges Hence, if a role has the
+      statements for those same privileges. Hence, if a role has the
         <codeph>ALL</codeph> privilege on a database and the <codeph>WITH GRANT
         OPTION</codeph> set, users granted that role can execute
         <codeph>GRANT</codeph>/<codeph>REVOKE</codeph> statements only for that
@@ -100,114 +100,7 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
         <codeph>URI</codeph> object. Finer-grained privileges mentioned below on
       a <codeph>URI</codeph> are not supported.
     </p>
-
-    <p>
-      Starting in <keyword keyref="impala30_full"/>, finer grained privileges
-      are enforced as below.<simpletable frame="all" relcolwidth="1* 1* 1*"
-        id="simpletable_kmb_ppn_ndb">
-        <sthead>
-          <stentry>Privilege</stentry>
-          <stentry>Scope</stentry>
-          <stentry>SQL Allowed to Execute</stentry>
-        </sthead>
-        <strow>
-          <stentry><codeph>REFRESH</codeph></stentry>
-          <stentry><codeph>SERVER</codeph></stentry>
-          <stentry><codeph>INVALIDATE METADATA</codeph> on all tables in all
-                databases<p><codeph>REFRESH</codeph> on all tables and functions
-              in all databases</p></stentry>
-        </strow>
-        <strow>
-          <stentry><codeph>REFRESH</codeph></stentry>
-          <stentry><codeph>DATABASE</codeph></stentry>
-          <stentry><codeph>INVALIDATE METADATA</codeph> on all tables in the
-            named database<p><codeph>REFRESH</codeph> on all tables and
-              functions in the named database</p></stentry>
-        </strow>
-        <strow>
-          <stentry><codeph>REFRESH</codeph></stentry>
-          <stentry><codeph>TABLE</codeph></stentry>
-          <stentry><codeph>INVALIDATE METADATA</codeph> on the named
-                table<p><codeph>REFRESH</codeph> on the named
-            table</p></stentry>
-        </strow>
-        <strow>
-          <stentry><codeph>CREATE</codeph></stentry>
-          <stentry><codeph>SERVER</codeph></stentry>
-          <stentry><codeph>CREATE DATABASE</codeph> on all
-                databases<p><codeph>CREATE TABLE</codeph> on all
-            tables</p></stentry>
-        </strow>
-        <strow>
-          <stentry><codeph>CREATE</codeph></stentry>
-          <stentry><codeph>DATABASE</codeph></stentry>
-          <stentry><codeph>CREATE TABLE</codeph> on all tables in the named
-            database</stentry>
-        </strow>
-        <strow>
-          <stentry><codeph>DROP</codeph></stentry>
-          <stentry><codeph>SERVER</codeph></stentry>
-          <stentry><codeph>DROP DATBASE</codeph> on all databases<p><codeph>DROP
-                TABLE</codeph> on all tables</p></stentry>
-        </strow>
-        <strow>
-          <stentry><codeph>DROP</codeph></stentry>
-          <stentry><codeph>DATABASE</codeph></stentry>
-          <stentry><codeph>DROP DATABASE</codeph> on the named
-                database<p><codeph>DROP TABLE</codeph> on all tables in the
-              named database</p></stentry>
-        </strow>
-        <strow>
-          <stentry><codeph>DROP</codeph></stentry>
-          <stentry><codeph>TABLE</codeph></stentry>
-          <stentry><codeph>DROP TABLE</codeph> on the named table</stentry>
-        </strow>
-        <strow>
-          <stentry><codeph>ALTER</codeph></stentry>
-          <stentry><codeph>SERVER</codeph></stentry>
-          <stentry><codeph>ALTER TABLE</codeph> on all tables</stentry>
-        </strow>
-        <strow>
-          <stentry><codeph>ALTER</codeph></stentry>
-          <stentry><codeph>DATABASE</codeph></stentry>
-          <stentry><codeph>ALTER TABLE</codeph> on the tables in the named
-            database</stentry>
-        </strow>
-        <strow>
-          <stentry><codeph>ALTER</codeph></stentry>
-          <stentry><codeph>TABLE</codeph></stentry>
-          <stentry><codeph>ALTER TABLE</codeph> on the named table</stentry>
-        </strow>
-      </simpletable>
-    </p>
-
-    <p>
-      <note>
-        <p>
-          <ul>
-            <li>
-              <codeph>ALTER TABLE RENAME</codeph> requires the
-                <codeph>ALTER</codeph> privilege at the <codeph>TABLE</codeph>
-              level and the <codeph>CREATE</codeph> privilege at the
-                <codeph>DATABASE</codeph> level.
-            </li>
-
-            <li>
-              <codeph>CREATE TABLE AS SELECT</codeph> requires the
-                <codeph>CREATE</codeph> privilege on the database that should
-              contain the new table and the <codeph>SELECT</codeph> privilege on
-              the tables referenced in the query portion of the statement.
-            </li>
-
-            <li>
-              <codeph>COMPUTE STATS</codeph> requires  the
-                <codeph>ALTER</codeph> and <codeph>SELECT</codeph> privileges on
-              the target table.
-            </li>
-          </ul>
-        </p>
-      </note>
-    </p>
+    <p conref="../shared/impala_common.xml#common/sentry_privileges_objects"/>
 
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
 

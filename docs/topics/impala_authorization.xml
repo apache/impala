@@ -65,11 +65,22 @@ under the License.
     <conbody>
 
       <p>
-        Privileges can be granted on different objects in the schema. Any privilege that can be granted is
-        associated with a level in the object hierarchy. If a privilege is granted on a container object in the
-        hierarchy, the child object automatically inherits it. This is the same privilege model as Hive and other
-        database systems such as MySQL.
+        Privileges can be granted on different objects in the schema. Any privilege that can be
+        granted is associated with a level in the object hierarchy. If a privilege is granted on
+        a parent object in the hierarchy, the child object automatically inherits it. This is
+        the same privilege model as Hive and other database systems.
       </p>
+
+      <p>
+        The objects in the Impala schema hierarchy are:
+      </p>
+
+<codeblock>Server
+    URI
+    Database
+        Table
+            Column
+</codeblock>
 
       <p rev="2.3.0 collevelauth">
         The object hierarchy for Impala covers Server, URI, Database, Table, and Column. (The Table privileges apply to views as well;
@@ -81,69 +92,37 @@ under the License.
         in a table.
       </p>
 
-      <p>
-        A restricted set of privileges determines what you can do with each object:
-      </p>
-
-      <dl>
-        <dlentry id="select_priv">
-
-          <dt>
-            SELECT privilege
-          </dt>
-
-          <dd>
-            Lets you read data from a table or view, for example with the <codeph>SELECT</codeph> statement, the
-            <codeph>INSERT...SELECT</codeph> syntax, or <codeph>CREATE TABLE...LIKE</codeph>. Also required to
-            issue the <codeph>DESCRIBE</codeph> statement or the <codeph>EXPLAIN</codeph> statement for a query
-            against a particular table. Only objects for which a user has this privilege are shown in the output
-            for <codeph>SHOW DATABASES</codeph> and <codeph>SHOW TABLES</codeph> statements. The
-            <codeph>REFRESH</codeph> statement and <codeph>INVALIDATE METADATA</codeph> statements only access
-            metadata for tables for which the user has this privilege.
-          </dd>
-
-        </dlentry>
-
-        <dlentry id="insert_priv">
-
-          <dt>
-            INSERT privilege
-          </dt>
-
-          <dd>
-            Lets you write data to a table. Applies to the <codeph>INSERT</codeph> and <codeph>LOAD DATA</codeph>
-            statements.
-          </dd>
-
-        </dlentry>
-
-        <dlentry id="all_priv">
-
-          <dt>
-            ALL privilege
-          </dt>
-
-          <dd>
-            Lets you create or modify the object. Required to run DDL statements such as <codeph>CREATE
-            TABLE</codeph>, <codeph>ALTER TABLE</codeph>, or <codeph>DROP TABLE</codeph> for a table,
-            <codeph>CREATE DATABASE</codeph> or <codeph>DROP DATABASE</codeph> for a database, or <codeph>CREATE
-            VIEW</codeph>, <codeph>ALTER VIEW</codeph>, or <codeph>DROP VIEW</codeph> for a view. Also required for
-            the URI of the <q>location</q> parameter for the <codeph>CREATE EXTERNAL TABLE</codeph> and
-            <codeph>LOAD DATA</codeph> statements.
-<!-- Have to think about the best wording, how often to repeat, how best to conref this caveat.
-          You do not actually code the keyword <codeph>ALL</codeph> in the policy file; instead you use
-          <codeph>action=*</codeph> or shorten the right-hand portion of the rule.
-          -->
-          </dd>
-
-        </dlentry>
-      </dl>
+      <p conref="../shared/impala_common.xml#common/sentry_privileges_objects"/>
 
       <p>
         Privileges can be specified for a table or view before that object actually exists. If you do not have
         sufficient privilege to perform an operation, the error message does not disclose if the object exists or
         not.
       </p>
+
+      <note>
+        <p>
+          Although this document refers to the <codeph>ALL</codeph> privilege, currently if you
+          use the policy file mode, you do not use the actual keyword <codeph>ALL</codeph> in
+          the policy file. When you code role entries in the policy file:
+        </p>
+        <ul>
+          <li>
+            To specify the <codeph>ALL</codeph> privilege for a server, use a role like
+            <codeph>server=<varname>server_name</varname></codeph>.
+          </li>
+
+          <li>
+            To specify the <codeph>ALL</codeph> privilege for a database, use a role like
+            <codeph>server=<varname>server_name</varname>-&gt;db=<varname>database_name</varname></codeph>.
+          </li>
+
+          <li>
+            To specify the <codeph>ALL</codeph> privilege for a table, use a role like
+            <codeph>server=<varname>server_name</varname>-&gt;db=<varname>database_name</varname>-&gt;table=<varname>table_name</varname>-&gt;action=*</codeph>.
+          </li>
+        </ul>
+      </note>
 
       <p>
         Originally, privileges were encoded in a policy file, stored in HDFS. This mode of operation is still an
@@ -176,17 +155,21 @@ under the License.
 
       <ul>
         <li>
-          The <codeph>-server_name</codeph> option turns on Sentry authorization for Impala. The authorization
-          rules refer to a symbolic server name, and you specify the name to use as the argument to the
-          <codeph>-server_name</codeph> option.
+          <codeph>-server_name</codeph>: Turns on Sentry authorization for Impala. The
+          authorization rules refer to a symbolic server name, and you specify the same name to
+          use as the argument to the <codeph>-server_name</codeph> option for all
+          <cmdname>impalad</cmdname> nodes in the cluster.
+          <p>
+            Starting in Impala 1.4.0 and higher, if you specify just
+            <codeph>-server_name</codeph> without <codeph>-authorization_policy_file</codeph>,
+            Impala uses the Sentry service for authorization.
+          </p>
         </li>
 
-        <li rev="1.4.0">
-          If you specify just <codeph>-server_name</codeph>, Impala uses the Sentry service for authorization,
-          relying on the results of <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements issued through
-          Hive. (This mode of operation is available in Impala 1.4.0 and higher.) Prior to Impala 1.4.0, or if you
-          want to continue storing privilege rules in the policy file, also specify the
-          <codeph>-authorization_policy_file</codeph> option as in the following item.
+        <li>
+          <codeph>-sentry_config</codeph>: Specifies the local path to the
+          <codeph>sentry-site.xml</codeph> configuration file. This setting is required to
+          enable authorization.
         </li>
 
         <li>
@@ -216,6 +199,14 @@ under the License.
 -server_name=server1 \
 ...
 </codeblock>
+
+      <p>
+        The preceding examples set up a symbolic name of <codeph>server1</codeph> to refer to
+        the current instance of Impala. Specify the symbolic name for the
+        <codeph>sentry.hive.server</codeph> property in the <filepath>sentry-site.xml</filepath>
+        configuration file for Hive, as well as in the <codeph>-server_name</codeph> option for
+        <cmdname>impalad</cmdname>.
+      </p>
 
       <p>
         The preceding examples set up a symbolic name of <codeph>server1</codeph> to refer to the current instance
@@ -307,7 +298,44 @@ report_generator = server=server1-&gt;db=reporting_db-&gt;table=*-&gt;action=SEL
         to security policies, restart all Impala daemons to pick up the changes immediately.
       </p>
 
-      <p outputclass="toc inpage"/>
+      <p>
+        URIs represent the file paths you specify as part of statements such as <codeph>CREATE
+        EXTERNAL TABLE</codeph> and <codeph>LOAD DATA</codeph>. Typically, you specify what look
+        like UNIX paths, but these locations can also be prefixed with <codeph>hdfs://</codeph>
+        to make clear that they are really URIs. To set privileges for a URI, specify the name
+        of a directory, and the privilege applies to all the files in that directory and any
+        directories underneath it.
+      </p>
+
+      <p>
+        URIs must start with <codeph>hdfs://</codeph>, <codeph>s3a://</codeph>,
+        <codeph>adl://</codeph>, or <codeph>file://</codeph>. If a URI starts with an absolute
+        path, the path will be appended to the default filesystem prefix. For example, if you
+        specify:
+<codeblock>
+GRANT ALL ON URI '/tmp';
+</codeblock>
+        The above statement effectively becomes the following where the default filesystem is
+        HDFS.
+<codeblock>
+GRANT ALL ON URI 'hdfs://localhost:20500/tmp';
+</codeblock>
+      </p>
+
+      <p>
+        When defining URIs for HDFS, you must also specify the NameNode. For example:
+<codeblock>GRANT ALL ON URI file:///path/to/dir TO &lt;role>
+GRANT ALL ON URI hdfs://namenode:port/path/to/dir TO &lt;role></codeblock>
+        <note type="warning">
+          <p>
+            Because the NameNode host and port must be specified, it is strongly recommended
+            that you use High Availability (HA). This ensures that the URI will remain constant
+            even if the NameNode changes. For example:
+          </p>
+<codeblock>GRANT ALL ON URI hdfs://ha-nn-uri/path/to/dir TO &lt;role></codeblock>
+        </note>
+      </p>
+
     </conbody>
 
     <concept id="security_policy_file_details">
@@ -520,14 +548,15 @@ student = server=server1-&gt;db=training-&gt;table=lesson_*-&gt;action=SELECT
 
 <codeblock></codeblock>
 
-</example>
-
-<example id="sec_ex_superuser_single_table">
-<title>A User with Full Privileges for a Specific Table</title>
-    <p>
-      If a user has <codeph>SELECT</codeph> privilege for a table, they can query, describe, or explain queries for
-      that table.
-    </p>
+            <li>
+              The <codeph>staging_dir</codeph> role can specify the HDFS path
+              <filepath>/user/impala-user/external_data</filepath> with the <codeph>LOAD
+              DATA</codeph> statement. When Impala queries or loads data files, it operates on
+              all the files in that directory, not just a single file, so any Impala
+              <codeph>LOCATION</codeph> parameters refer to a directory rather than an
+              individual file.
+            </li>
+          </ul>
 
 <codeblock></codeblock>
 </example>
@@ -564,33 +593,10 @@ student = server=server1-&gt;db=training-&gt;table=lesson_*-&gt;action=SELECT
             </li>
 
             <li>
-              The <codeph>staging_dir</codeph> role lets us specify the HDFS path
-              <filepath>/user/username/external_data</filepath> with the <codeph>LOAD DATA</codeph> statement.
-              Remember, when Impala queries or loads data files, it operates on all the files in that directory,
-              not just a single file, so any Impala <codeph>LOCATION</codeph> parameters refer to a directory
-              rather than an individual file.
-            </li>
-
-            <li>
-              We included the IP address and port of the Hadoop name node in the HDFS URI of the
-              <codeph>staging_dir</codeph> rule. We found those details in
-              <filepath>/etc/hadoop/conf/core-site.xml</filepath>, under the <codeph>fs.default.name</codeph>
-              element. That is what we use in any roles that specify URIs (that is, the locations of directories in
-              HDFS).
-            </li>
-
-            <li>
-              We start this example after the table <codeph>external_table.sample</codeph> is already created. In
-              the policy file for the example, we have already taken away the <codeph>external_table_admin</codeph>
-              role from the <codeph>username</codeph> group, and replaced it with the lesser-privileged
-              <codeph>external_table</codeph> role.
-            </li>
-
-            <li>
-              We assign privileges to a subdirectory underneath <filepath>/user/username</filepath> in HDFS,
-              because such privileges also apply to any subdirectories underneath. If we had assigned privileges to
-              the parent directory <filepath>/user/username</filepath>, it would be too likely to mess up other
-              files by specifying a wrong location by mistake.
+              Members of the <codeph>impala_users</codeph> group have the
+              <codeph>instructor</codeph> role and so can create, insert into, and query any
+              tables in the <codeph>training</codeph> database, but cannot create or drop the
+              database itself.
             </li>
 
             <li>
@@ -705,15 +711,14 @@ ERROR: AuthorizationException: User 'username' does not have privileges to acces
             with sensitive information, then create a view that only exposes the non-confidential columns.
           </p>
 
-<codeblock>[localhost:21000] &gt; create table sensitive_info
-                &gt; (
-                &gt;   name string,
-                &gt;   address string,
-                &gt;   credit_card string,
-                &gt;   taxpayer_id string
-                &gt; );
-[localhost:21000] &gt; create view name_address_view as select name, address from sensitive_info;
-</codeblock>
+      <note rev="1.4.0">
+        In <ph rev="upstream">CDH 5</ph> and higher, <ph
+          rev="upstream">Cloudera</ph>
+        recommends managing privileges through SQL statements, as described in
+        <xref
+          href="impala_authorization.xml#sentry_service"/>. If you are still using
+        policy files, plan to migrate to the new approach some time in the future.
+      </note>
 
           <p>
             Then the following policy file specifies read-only privilege for that view, without authorizing access
@@ -771,15 +776,28 @@ view_only_privs = server=server1-&gt;db=reports-&gt;table=name_address_view-&gt;
             </li>
           </ul>
 
-<codeblock>[groups]
-supergroup = training_sysadmin
-employee = instructor
-visitor = student
-
-[roles]
-training_sysadmin = server=server1-&gt;db=training
-instructor = server=server1-&gt;db=training-&gt;table=*-&gt;action=*
-student = server=server1-&gt;db=training-&gt;table=*-&gt;action=SELECT
+        <p>
+          In the <codeph>[roles]</codeph> section, you a set of roles. For each role, you
+          specify precisely the set of privileges is available. That is, which objects users
+          with that role can access, and what operations they can perform on those objects. This
+          is the lowest-level category of security information; the other sections in the policy
+          file map the privileges to higher-level divisions of groups and users. In the
+          <codeph>[groups]</codeph> section, you specify which roles are associated with which
+          groups. The group and usernames correspond to Linux groups and users on the server
+          where the <cmdname>impalad</cmdname> daemon runs. The privileges are specified using
+          patterns like:
+<codeblock>server=<varname>server_name</varname>-&gt;db=<varname>database_name</varname>-&gt;table=<varname>table_name</varname>-&gt;action=SELECT
+server=<varname>server_name</varname>->db=<varname>database_name</varname>->table=t<varname>able_name</varname>->action=CREATE
+server=<varname>server_name</varname>-&gt;db=<varname>database_name</varname>-&gt;table=<varname>table_name</varname>-&gt;action=ALL
+</codeblock>
+          For the <varname>server_name</varname> value, substitute the same symbolic name you
+          specify with the <cmdname>impalad</cmdname> <codeph>-server_name</codeph> option. You
+          can use <codeph>*</codeph> wildcard characters at each level of the privilege
+          specification to allow access to all such objects. For example:
+<codeblock>server=impala-host.example.com-&gt;db=default-&gt;table=t1-&gt;action=SELECT
+server=impala-host.example.com->db=*->table=*->action=CREATE
+server=impala-host.example.com-&gt;db=*-&gt;table=audit_log-&gt;action=SELECT
+server=impala-host.example.com-&gt;db=default-&gt;table=t1-&gt;action=*
 </codeblock>
 
         </example>
