@@ -144,14 +144,13 @@ Status Coordinator::Exec() {
     if (coord_instance_ == nullptr) {
       // at this point, the query is done with the Prepare phase, and we expect
       // to have a coordinator instance, but coord_instance_ == nullptr,
-      // which means we failed Prepare
-      Status prepare_status = query_state_->WaitForPrepare();
-      DCHECK(!prepare_status.ok());
-      return UpdateExecState(prepare_status, nullptr, FLAGS_hostname);
+      // which means we failed before or during Prepare().
+      Status query_status = query_state_->WaitForPrepare();
+      DCHECK(!query_status.ok());
+      return UpdateExecState(query_status, nullptr, FLAGS_hostname);
     }
     // When GetFInstanceState() returns the coordinator instance, the Prepare phase is
     // done and the FragmentInstanceState's root sink will be set up.
-    DCHECK(coord_instance_->IsPrepared() && coord_instance_->WaitForPrepare().ok());
     coord_sink_ = coord_instance_->root_sink();
     DCHECK(coord_sink_ != nullptr);
   }

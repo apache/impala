@@ -76,8 +76,6 @@ class RuntimeState;
 ///
 /// TODO:
 /// - absorb RuntimeState?
-/// - should WaitForPrepare/Open() return the overall execution status, if there
-///   was a failure?
 class FragmentInstanceState {
  public:
   FragmentInstanceState(QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
@@ -90,12 +88,6 @@ class FragmentInstanceState {
 
   /// Cancels execution and sends a final status report. Idempotent.
   void Cancel();
-
-  /// Blocks until the Prepare phase of Exec() is finished and returns the status.
-  Status WaitForPrepare();
-
-  /// Returns true if the Prepare phase of Exec() is finished.
-  bool IsPrepared();
 
   /// Blocks until the Prepare phase of Exec() is finished and the exec tree is
   /// opened, and returns that status. If the preparation phase encountered an error,

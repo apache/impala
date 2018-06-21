@@ -146,6 +146,32 @@ class TestFailpoints(ImpalaTestSuite):
     self.execute_query_expect_failure(self.client, query,
         query_options={'debug_action':debug_action})
 
+    # Fail the Open() phase of all fragment instances.
+    debug_action = 'FIS_IN_OPEN:FAIL@1.0'
+    self.execute_query_expect_failure(self.client, query,
+        query_options={'debug_action': debug_action})
+
+    # Fail the ExecInternal() phase of all fragment instances.
+    debug_action = 'FIS_IN_EXEC_INTERNAL:FAIL@1.0'
+    self.execute_query_expect_failure(self.client, query,
+        query_options={'debug_action': debug_action})
+
+    # Fail the fragment instance thread creation with a 0.5 probability.
+    debug_action = 'FIS_FAIL_THREAD_CREATION:FAIL@0.5'
+
+    # We want to test the behavior when only some fragment instance threads fail to be
+    # created, so we set the probability of fragment instance thread creation failure to
+    # 0.5. Since there's only a 50% chance of fragment instance thread creation failure,
+    # we attempt to catch a query failure up to a very conservative maximum of 50 tries.
+    for i in range(50):
+      try:
+        self.execute_query(query,
+            query_options={'debug_action': debug_action})
+      except ImpalaBeeswaxException as e:
+        assert 'Query aborted:Debug Action: FIS_FAIL_THREAD_CREATION:FAIL@0.5' \
+            in str(e), str(e)
+        break
+
   def __execute_fail_action(self, query, vector):
     try:
       self.execute_query(query, vector.get_value('exec_option'),

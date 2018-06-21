@@ -138,6 +138,11 @@ Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
   rpc_params_.fragment_instance_ctxs.swap(non_const_params.fragment_instance_ctxs);
   rpc_params_.__isset.fragment_instance_ctxs = true;
 
+  instances_prepared_barrier_.reset(
+      new CountingBarrier(rpc_params_.fragment_instance_ctxs.size()));
+  instances_finished_barrier_.reset(
+      new CountingBarrier(rpc_params_.fragment_instance_ctxs.size()));
+
   // Claim the query-wide minimum reservation. Do this last so that we don't need
   // to handle releasing it if a later step fails.
   initial_reservations_ = obj_pool_.Add(new InitialReservations(&obj_pool_,
@@ -193,9 +198,49 @@ Status QueryState::InitBufferPoolState() {
   return Status::OK();
 }
 
+const char* QueryState::BackendExecStateToString(const BackendExecState& state) {
+  static const unordered_map<BackendExecState, const char*> exec_state_to_str{
+      {BackendExecState::PREPARING, "PREPARING"},
+      {BackendExecState::EXECUTING, "EXECUTING"},
+      {BackendExecState::FINISHED, "FINISHED"},
+      {BackendExecState::CANCELLED, "CANCELLED"},
+      {BackendExecState::ERROR, "ERROR"}};
+
+  return exec_state_to_str.at(state);
+}
+
+inline bool QueryState::IsTerminalState(const BackendExecState& state) {
+  return state == BackendExecState::FINISHED
+      || state == BackendExecState::CANCELLED
+      || state == BackendExecState::ERROR;
+}
+
+Status QueryState::UpdateBackendExecState() {
+  BackendExecState old_state = backend_exec_state_;
+
+  unique_lock<SpinLock> l(status_lock_);
+  // We shouldn't call this function if we're already in a terminal state.
+  DCHECK(!IsTerminalState(backend_exec_state_))
+      << " Current State: " << BackendExecStateToString(backend_exec_state_)
+      << " | Current Status: " << query_status_.GetDetail();
+
+  if (query_status_.IsCancelled()) {
+    // Received cancellation - go to CANCELLED state.
+    backend_exec_state_ = BackendExecState::CANCELLED;
+  } else if (!query_status_.ok()) {
+    // Error while executing - go to ERROR state.
+    backend_exec_state_ = BackendExecState::ERROR;
+  } else {
+    // Transition to the next state in the lifecycle.
+    backend_exec_state_ = old_state == BackendExecState::PREPARING ?
+        BackendExecState::EXECUTING : BackendExecState::FINISHED;
+  }
+  return query_status_;
+}
+
 FragmentInstanceState* QueryState::GetFInstanceState(const TUniqueId& instance_id) {
   VLOG_FILE << "GetFInstanceState(): instance_id=" << PrintId(instance_id);
-  if (!instances_prepared_promise_.Get().ok()) return nullptr;
+  if (!WaitForPrepare().ok()) return nullptr;
   auto it = fis_map_.find(instance_id);
   return it != fis_map_.end() ? it->second : nullptr;
 }
@@ -211,7 +256,6 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
   DCHECK(status.ok() || done);
   // if this is not for a specific fragment instance, we're reporting an error
   DCHECK(fis != nullptr || !status.ok());
-  DCHECK(fis == nullptr || fis->IsPrepared());
 
   // This will send a report even if we are cancelled.  If the query completed correctly
   // but fragments still need to be cancelled (e.g. limit reached), the coordinator will
@@ -293,7 +337,17 @@ void QueryState::ReportExecStatusAux(bool done, const Status& status,
 }
 
 Status QueryState::WaitForPrepare() {
-  return instances_prepared_promise_.Get();
+  instances_prepared_barrier_->Wait();
+
+  unique_lock<SpinLock> l(status_lock_);
+  return query_status_;
+}
+
+Status QueryState::WaitForFinish() {
+  instances_finished_barrier_->Wait();
+
+  unique_lock<SpinLock> l(status_lock_);
+  return query_status_;
 }
 
 void QueryState::StartFInstances() {
@@ -306,7 +360,12 @@ void QueryState::StartFInstances() {
   DCHECK(query_ctx().__isset.desc_tbl);
   Status status = DescriptorTbl::Create(&obj_pool_, query_ctx().desc_tbl, &desc_tbl_);
   if (!status.ok()) {
-    discard_result(instances_prepared_promise_.Set(status));
+    ErrorDuringPrepare(status, TUniqueId());
+    Status updated_query_status = UpdateBackendExecState();
+    instances_prepared_barrier_->NotifyRemaining();
+    DCHECK(!updated_query_status.ok());
+    // TODO (IMPALA-4063): This call to ReportExecStatusAux() should internally be handled
+    // by UpdateBackendExecState().
     ReportExecStatusAux(true, status, nullptr, false);
     return;
   }
@@ -317,6 +376,7 @@ void QueryState::StartFInstances() {
   DCHECK_GT(rpc_params_.fragment_ctxs.size(), 0);
   TPlanFragmentCtx* fragment_ctx = &rpc_params_.fragment_ctxs[0];
   int fragment_ctx_idx = 0;
+  int num_unstarted_instances = rpc_params_.fragment_instance_ctxs.size();
   fragment_events_start_time_ = MonotonicStopWatch::Now();
   for (const TPlanFragmentInstanceCtx& instance_ctx: rpc_params_.fragment_instance_ctxs) {
     // determine corresponding TPlanFragmentCtx
@@ -333,13 +393,23 @@ void QueryState::StartFInstances() {
     // start new thread to execute instance
     refcnt_.Add(1); // decremented in ExecFInstance()
     AcquireExecResourceRefcount(); // decremented in ExecFInstance()
+
+    // Add the fragment instance ID to the 'fis_map_'.
+    fis_map_.emplace(fis->instance_id(), fis);
+
     string thread_name = Substitute("$0 (finst:$1)",
         FragmentInstanceState::FINST_THREAD_NAME_PREFIX,
         PrintId(instance_ctx.fragment_instance_id));
     unique_ptr<Thread> t;
-    thread_create_status = Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME,
-        thread_name, [this, fis]() { this->ExecFInstance(fis); }, &t, true);
+
+    // Inject thread creation failures through debug actions if enabled.
+    Status debug_action_status = DebugAction(query_options(), "FIS_FAIL_THREAD_CREATION");
+    thread_create_status = debug_action_status.ok() ?
+        Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
+            [this, fis]() { this->ExecFInstance(fis); }, &t, true) :
+        debug_action_status;
     if (!thread_create_status.ok()) {
+      fis_map_.erase(fis->instance_id());
       // Undo refcnt increments done immediately prior to Thread::Create(). The
       // reference counts were both greater than zero before the increments, so
       // neither of these decrements will free any structures.
@@ -347,33 +417,45 @@ void QueryState::StartFInstances() {
       ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
       break;
     }
-    // Fragment instance successfully started
-    fis_map_.emplace(fis->instance_id(), fis);
     // update fragment_map_
     vector<FragmentInstanceState*>& fis_list = fragment_map_[instance_ctx.fragment_idx];
     fis_list.push_back(fis);
     t->Detach();
+    --num_unstarted_instances;
   }
 
-  // don't return until every instance is prepared and record the first non-OK
-  // (non-CANCELLED if available) status (including any error from thread creation
-  // above).
-  Status prepare_status = thread_create_status;
-  for (auto entry: fis_map_) {
-    Status instance_status = entry.second->WaitForPrepare();
-    // don't wipe out an error in one instance with the resulting CANCELLED from
-    // the remaining instances
-    if (!instance_status.ok() && (prepare_status.ok() || prepare_status.IsCancelled())) {
-      prepare_status = instance_status;
-    }
-  }
-  discard_result(instances_prepared_promise_.Set(prepare_status));
-  // If this is aborting due to failure in thread creation, report status to the
-  // coordinator to start query cancellation. (Other errors are reported by the
-  // fragment instance itself.)
   if (!thread_create_status.ok()) {
+    // We failed to start 'num_unstarted_instances', so make sure to notify
+    // 'instances_prepared_barrier_' 'num_unstarted_instances - 1' times, to unblock
+    // WaitForPrepare(). The last remaining notification will be set by the call to
+    // ErrorDuringPrepare() below.
+    while (num_unstarted_instances > 1) {
+      DonePreparing();
+      --num_unstarted_instances;
+    }
+
+    // We prioritize thread creation failure as a query killing error, even over an error
+    // during Prepare() for a FIS.
+    // We have to notify anyone waiting on WaitForPrepare() that this query has failed.
+    ErrorDuringPrepare(thread_create_status, TUniqueId());
+    Status updated_query_status = UpdateBackendExecState();
+    DCHECK(!updated_query_status.ok());
+    // Block until all the already started fragment instances finish Prepare()-ing to
+    // to report an error.
+    discard_result(WaitForPrepare());
     ReportExecStatusAux(true, thread_create_status, nullptr, true);
+    return;
   }
+
+  discard_result(WaitForPrepare());
+  if (!UpdateBackendExecState().ok()) return;
+  DCHECK(backend_exec_state_ == BackendExecState::EXECUTING)
+      << BackendExecStateToString(backend_exec_state_);
+
+  discard_result(WaitForFinish());
+  if (!UpdateBackendExecState().ok()) return;
+  DCHECK(backend_exec_state_ == BackendExecState::FINISHED)
+      << BackendExecStateToString(backend_exec_state_);
 }
 
 void QueryState::AcquireExecResourceRefcount() {
@@ -414,13 +496,13 @@ void QueryState::ExecFInstance(FragmentInstanceState* fis) {
 
 void QueryState::Cancel() {
   VLOG_QUERY << "Cancel: query_id=" << PrintId(query_id());
-  (void) instances_prepared_promise_.Get();
+  discard_result(WaitForPrepare());
   if (!is_cancelled_.CompareAndSwap(0, 1)) return;
   for (auto entry: fis_map_) entry.second->Cancel();
 }
 
 void QueryState::PublishFilter(const TPublishFilterParams& params) {
-  if (!instances_prepared_promise_.Get().ok()) return;
+  if (!WaitForPrepare().ok()) return;
   DCHECK_EQ(fragment_map_.count(params.dst_fragment_idx), 1);
   for (FragmentInstanceState* fis : fragment_map_[params.dst_fragment_idx]) {
     fis->PublishFilter(params);

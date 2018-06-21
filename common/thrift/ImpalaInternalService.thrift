@@ -624,10 +624,12 @@ struct TErrorLogEntry {
 // Represents the states that a fragment instance goes through during its execution. The
 // current state gets sent back to the coordinator and will be presented to users through
 // the debug webpages.
+// The states are listed in order and one state will only strictly be reached after all
+// the previous states.
 enum TFInstanceExecState {
   WAITING_FOR_EXEC,
-  WAITING_FOR_CODEGEN,
   WAITING_FOR_PREPARE,
+  WAITING_FOR_CODEGEN,
   WAITING_FOR_OPEN,
   WAITING_FOR_FIRST_BATCH,
   FIRST_BATCH_PRODUCED,

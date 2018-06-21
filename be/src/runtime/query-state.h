@@ -19,6 +19,7 @@
 #define IMPALA_RUNTIME_QUERY_STATE_H
 
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <boost/scoped_ptr.hpp>
 
@@ -27,8 +28,9 @@
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
 #include "runtime/tmp-file-mgr.h"
-#include "util/uid-util.h"
+#include "util/counting-barrier.h"
 #include "util/promise.h"
+#include "util/uid-util.h"
 
 namespace impala {
 
@@ -60,6 +62,19 @@ class RuntimeState;
 ///
 /// When any fragment instance execution returns with an error status, all
 /// fragment instances are automatically cancelled.
+///
+/// We maintain a state denoted by BackendExecState. We transition from one non-error
+/// state to the next only if *all* underlying fragment instances have done so.
+/// Eg: We transition from the PREPARING state to the EXECUTING state only if *all* the
+/// underlying fragment instances have finished Prepare().
+/// However, the behavior for transitioning from a non-error state to an error state is
+/// different for different states. If any fragment instance hits an error or cancellation
+/// during the EXECUTING state, then we immediately change the state of the query to the
+/// ERROR or CANCELLED state accordingly.
+/// However, if a fragment instance hits an error during Prepare(), we still wait for
+/// *all* fragment instances to complete preparing before transitioning to the ERROR
+/// state. This is to simplify the query lifecycle so that Prepare() is always completed
+/// before it can handle either a Cancel() RPC or a PublishFilter() RPC.
 ///
 /// Status reporting: all instances currently report their status independently.
 /// Each instance sends at least one final status report with its overall execution
@@ -130,14 +145,9 @@ class QueryState {
 
   /// Performs the runtime-intensive parts of initial setup and starts all fragment
   /// instances belonging to this query. Each instance receives its own execution
-  /// thread. Blocks until all fragment instances have finished their Prepare phase.
-  /// Not idempotent, not thread-safe.
+  /// thread. Blocks until a terminal state has been reached.
+  /// Not idempotent, not thread-safe. Must only be called by the QueryState thread.
   void StartFInstances();
-
-  /// Return overall status of Prepare phases of fragment instances. A failure
-  /// in any instance's Prepare will cause this function to return an error status.
-  /// Blocks until all fragment instances have finished their Prepare phase.
-  Status WaitForPrepare();
 
   /// Blocks until all fragment instances have finished their Prepare phase.
   FragmentInstanceState* GetFInstanceState(const TUniqueId& instance_id);
@@ -176,6 +186,48 @@ class QueryState {
 
   ~QueryState();
 
+  /// Return overall status of Prepare() phases of fragment instances. A failure
+  /// in any instance's Prepare() will cause this function to return an error status.
+  /// Blocks until all fragment instances have finished their Prepare() phase.
+  Status WaitForPrepare();
+
+  /// Called by a FragmentInstanceState thread to notify that it's done preparing.
+  void DonePreparing() { discard_result(instances_prepared_barrier_->Notify()); }
+
+  /// Called by a FragmentInstanceState thread to notify that it's done executing.
+  void DoneExecuting() { discard_result(instances_finished_barrier_->Notify()); }
+
+  /// Called by a fragment instance thread to notify that it hit an error during Prepare()
+  /// Updates the query status and the failed instance ID if it's not set already.
+  /// Also notifies anyone waiting on WaitForPrepare() if this is called by the last
+  /// fragment instance to complete Prepare().
+  void ErrorDuringPrepare(const Status& status, const TUniqueId& finst_id) {
+    // Do a racy check to avoid getting the lock if an error is already set.
+    if (query_status_.ok()) {
+      std::unique_lock<SpinLock> l(status_lock_);
+      if (query_status_.ok()) {
+        query_status_ = status;
+        failed_finstance_id_ = finst_id;
+      }
+    }
+    discard_result(instances_prepared_barrier_->Notify());
+  }
+
+  /// Called by a fragment instance thread to notify that it hit an error during Execute()
+  /// Updates the query status and records the failed instance ID if they're not set
+  /// already. Also notifies anyone waiting on WaitForFinish().
+  void ErrorDuringExecute(const Status& status, const TUniqueId& finst_id) {
+    // Do a racy check to avoid getting the lock if an error is already set.
+    if (query_status_.ok()) {
+      std::unique_lock<SpinLock> l(status_lock_);
+      if (query_status_.ok()) {
+        query_status_ = status;
+        failed_finstance_id_ = finst_id;
+      }
+    }
+    instances_finished_barrier_->NotifyRemaining();
+  }
+
  private:
   friend class QueryExecMgr;
 
@@ -184,6 +236,60 @@ class QueryState {
   friend class TestEnv;
 
   static const int DEFAULT_BATCH_SIZE = 1024;
+
+  /// Return overall status of all fragment instances during execution. A failure
+  /// in any instance's execution (after Prepare()) will cause this function
+  /// to return an error status. Blocks until all fragment instances have finished
+  /// executing or until one of them hits an error.
+  Status WaitForFinish();
+
+  /// States that a query goes through during its lifecycle.
+  enum class BackendExecState {
+    /// PREPARING: The inital state on receiving an ExecQueryFInstances() RPC from the
+    /// coordinator. Implies that the fragment instances are being started.
+    PREPARING,
+    /// EXECUTING: All fragment instances managed by this QueryState have successfully
+    /// completed Prepare(). Implies that the query is executing.
+    EXECUTING,
+    /// FINISHED: All fragment instances managed by this QueryState have successfully
+    /// completed executing.
+    FINISHED,
+    /// CANCELLED: This query received a CancelQueryFInstances() RPC or was directed by
+    /// the coordinator to cancel itself from a response to a ReportExecStatus() RPC.
+    /// Does not imply that all the fragment instances have realized cancellation however.
+    CANCELLED,
+    /// ERROR: received an error from a fragment instance.
+    ERROR
+  };
+
+  /// Current state of this query in this executor.
+  /// Thread-safety: Only updated by the QueryState thread.
+  BackendExecState backend_exec_state_ = BackendExecState::PREPARING;
+
+  /// Updates the BackendExecState based on 'query_status_'. A state transition happens
+  /// if the current state is a non-terminal state; the transition can either be to the
+  /// next legal state or ERROR if 'query_status_' is an error. Thread safe. This is a
+  /// helper function to StartFInstances() which executes on the QueryState thread.
+  Status UpdateBackendExecState();
+
+  /// A string representation of 'state'.
+  const char* BackendExecStateToString(const BackendExecState& state);
+
+  /// Returns 'true' if 'state' is a terminal state (FINISHED, CANCELLED, ERROR).
+  inline bool IsTerminalState(const BackendExecState& state);
+
+  /// Protects 'query_status_' and 'failed_finstance_id_'.
+  SpinLock status_lock_;
+
+  /// The overall status of this QueryState.
+  /// Status::OK if all the fragment instances managed by this QS are also Status::OK;
+  /// Otherwise, it will reflect the first non-OK status of a FIS.
+  /// Protected by 'status_lock_'.
+  Status query_status_;
+
+  /// ID of first fragment instance to hit an error.
+  /// Protected by 'status_lock_'.
+  TUniqueId failed_finstance_id_;
 
   /// set in c'tor
   const TQueryCtx query_ctx_;
@@ -216,9 +322,17 @@ class QueryState {
   /// created in StartFInstances(), owned by obj_pool_
   DescriptorTbl* desc_tbl_ = nullptr;
 
-  /// Barrier for the completion of the Prepare phases of all fragment instances,
-  /// set in StartFInstances().
-  Promise<Status> instances_prepared_promise_;
+  /// Barrier for the completion of the Prepare() phases of all fragment instances. This
+  /// just blocks until ALL fragment instances have finished preparing, regardless of
+  /// whether they hit an error or not.
+  std::unique_ptr<CountingBarrier> instances_prepared_barrier_;
+
+  /// Barrier for the completion of all the fragment instances.
+  /// If the 'Status' is not OK due to an error during fragment instance execution, this
+  /// barrier is unblocked immediately.
+  /// 'query_status_' will be set once this is unblocked and so will 'failed_instance_id_'
+  /// if an error is hit.
+  std::unique_ptr<CountingBarrier> instances_finished_barrier_;
 
   /// map from instance id to its state (owned by obj_pool_), populated in
   /// StartFInstances(); not valid to read from until instances_prepare_promise_
