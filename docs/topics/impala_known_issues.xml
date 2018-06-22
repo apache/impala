@@ -187,10 +187,19 @@ under the License.
         </p>
 
         <p>
-          <b>Workaround:</b> If the <codeph>TIMESTAMP</codeph> values stored in the table
-          represent dates only, with no time portion, consider storing them as strings in
-          <codeph>yyyy-MM-dd</codeph> format. Impala implicitly converts such string values to
-          <codeph>TIMESTAMP</codeph> in calls to date/time functions.
+          <b>Workaround:</b>Store the <codeph>TIMESTAMP</codeph> values as
+          strings in one of the following formats:
+          <ul>
+            <li><codeph>yyyy-MM-dd</codeph></li>
+            <li><codeph>yyyy-MM-dd HH:mm:ss</codeph></li>
+            <li><codeph>yyyy-MM-dd HH:mm:ss.SSSSSSSSS</codeph>
+              <p>The date can
+                have the 1-9 digits in the fractional part.
+              </p>
+            </li>
+          </ul>
+          Impala implicitly converts such string values to
+            <codeph>TIMESTAMP</codeph> in calls to date/time functions.
         </p>
 
       </conbody>
@@ -349,33 +358,26 @@ under the License.
       </p>
 
     </conbody>
+    <!--AR: The workaround topic does not exist. Not sure if this was ever fully documented upstream.-->
 
-    <concept id="IMPALA-6028">
-
+    <concept id="IMPALA-6028" audience="hidden">
       <title>Handling large rows during upgrade to <keyword
           keyref="impala210_full"/> or higher</title>
-
       <conbody>
-
+        <p> After an upgrade to <keyword keyref="impala210_full"/> or higher,
+          users who process very large column values (long strings), or have
+          increased the <codeph>--read_size</codeph> configuration setting from
+          its default of 8 MB, might encounter capacity errors for some queries
+          that previously worked. </p>
         <p>
-          After an upgrade to <keyword keyref="impala210_full"/> or higher, users who process
-          very large column values (long strings), or have increased the
-          <codeph>--read_size</codeph> configuration setting from its default of 8 MB, might
-          encounter capacity errors for some queries that previously worked.
-        </p>
-
+          <b>Resolution:</b> After the upgrade, follow the instructions in <xref
+            keyref="convert_read_size"/> to check if your queries are affected
+          by these changes and to modify your configuration settings if so. </p>
         <p>
-          <b>Resolution:</b> After the upgrade, follow the instructions in
-          <xref keyref="convert_read_size"/> to check if your queries are affected by these
-          changes and to modify your configuration settings if so.
+          <b>Apache Issue:</b>
+          <xref keyref="IMPALA-6028">IMPALA-6028</xref>
         </p>
-
-        <p>
-          <b>Apache Issue:</b> <xref keyref="IMPALA-6028">IMPALA-6028</xref>
-        </p>
-
       </conbody>
-
     </concept>
 
     <concept id="IMPALA-5605">
