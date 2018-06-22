@@ -22,6 +22,7 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.local.LocalCatalog;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.thrift.TException;
@@ -127,8 +128,10 @@ public abstract class FeCatalogManager {
 
     @Override
     TUpdateCatalogCacheResponse updateCatalogCache(TUpdateCatalogCacheRequest req) {
-      throw new IllegalStateException(
-          "Unexpected call to updateCatalogCache() with local catalog enabled");
+      // TODO(todd) upon implementing caching, probably want to invalidate appropriate
+      // pieces of cached info. For now, this fake response seems enough to make
+      // the backend call site happy.
+      return new TUpdateCatalogCacheResponse(new TUniqueId(), -1, -1);
     }
   }
 

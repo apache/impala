@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.local;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -136,34 +137,40 @@ class LocalDb implements FeDb {
 
   @Override
   public Function getFunction(Function desc, CompareMode mode) {
-    throw new UnsupportedOperationException("TODO");
+    // TODO(todd): implement functions
+    return null;
   }
 
   @Override
   public List<Function> getFunctions(String functionName) {
-    throw new UnsupportedOperationException("TODO");
+    // TODO(todd): implement functions
+    return Collections.emptyList();
   }
 
   @Override
   public List<Function> getFunctions(
       TFunctionCategory category, String function) {
-    throw new UnsupportedOperationException("TODO");
+    // TODO(todd): implement functions
+    return Collections.emptyList();
   }
 
   @Override
   public List<Function> getFunctions(
       TFunctionCategory category, PatternMatcher patternMatcher) {
-    throw new UnsupportedOperationException("TODO");
+    // TODO(todd): implement functions
+    return Collections.emptyList();
   }
 
   @Override
   public int numFunctions() {
-    throw new UnsupportedOperationException("TODO");
+    // TODO(todd): implement functions
+    return 0;
   }
 
   @Override
   public boolean containsFunction(String function) {
-    throw new UnsupportedOperationException("TODO");
+    // TODO(todd): implement functions
+    return false;
   }
 
   @Override

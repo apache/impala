@@ -696,8 +696,9 @@ public class CatalogOpExecutor {
     Preconditions.checkState(params.getColumns() != null &&
         params.getColumns().size() > 0,
           "Null or empty column list given as argument to DdlExecutor.alterView");
-    Table tbl = catalog_.getTable(tableName.getDb(), tableName.getTbl());
-    Preconditions.checkState(tbl instanceof View);
+    Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl());
+    Preconditions.checkState(tbl instanceof View, "Expected view: %s",
+        tableName);
     tryLock(tbl);
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
@@ -1389,6 +1390,23 @@ public class CatalogOpExecutor {
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
     LOG.trace(String.format("Dropping table/view %s", tableName));
+
+    // If the table exists, ensure that it is loaded before we try to operate on it.
+    // We do this up here rather than down below to avoid doing too much table-loading
+    // work while holding the DDL lock. We can't simply use 'getExistingTable' because
+    // we rely on more granular checks to provide the correct summary message for
+    // the 'IF EXISTS' case.
+    //
+    // In the standard catalogd implementation, the table will most likely already
+    // be loaded because the planning phase on the impalad side triggered the loading.
+    // In the LocalCatalog configuration, however, this is often necessary.
+    try {
+      catalog_.getOrLoadTable(params.getTable_name().db_name,
+          params.getTable_name().table_name);
+    } catch (CatalogException e) {
+      // Ignore exceptions -- the above was just to trigger loading. Failure to load
+      // or non-existence of the database will be handled down below.
+    }
 
     TCatalogObject removedObject = new TCatalogObject();
     synchronized (metastoreDdlLock_) {
