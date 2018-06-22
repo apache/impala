@@ -34,32 +34,10 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="hidden">defaults file</indexterm>
-
-      <indexterm audience="hidden">configuration file</indexterm>
-
-      <indexterm audience="hidden">options</indexterm>
-
-      <indexterm audience="hidden">IMPALA_STATE_STORE_PORT</indexterm>
-
-      <indexterm audience="hidden">IMPALA_BACKEND_PORT</indexterm>
-
-      <indexterm audience="hidden">IMPALA_LOG_DIR</indexterm>
-
-      <indexterm audience="hidden">IMPALA_STATE_STORE_ARGS</indexterm>
-
-      <indexterm audience="hidden">IMPALA_SERVER_ARGS</indexterm>
-
-      <indexterm audience="hidden">ENABLE_CORE_DUMPS</indexterm>
-
-      <indexterm audience="hidden">core dumps</indexterm>
-
-      <indexterm audience="hidden">restarting services</indexterm>
-
-      <indexterm audience="hidden">services</indexterm>
-      The configuration options for the Impala-related daemons let you choose which hosts and
-      ports to use for the services that run on a single host, specify directories for logging,
-      control resource usage and security, and specify other aspects of the Impala software.
+      The configuration options for the Impala daemons let you choose which
+      hosts and ports to use for the services that run on a single host, specify
+      directories for logging, control resource usage and security, and specify
+      other aspects of the Impala software.
     </p>
 
     <p outputclass="toc inpage"/>
@@ -72,8 +50,10 @@ under the License.
 
     <conbody>
 
-      <p> The Impala server, statestore, and catalog services start up using values provided in a
-        defaults file, <filepath>/etc/default/impala</filepath>. </p>
+      <p>
+        The Impala server, statestore, and catalog services start up using values provided in a
+        defaults file, <filepath>/etc/default/impala</filepath>.
+      </p>
 
       <p>
         This file includes information about many resources used by Impala. Most of the defaults
@@ -260,22 +240,6 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
           </p>
         </li>
 
-<!-- Removing this reference now that the options are de-emphasized / desupported in Impala 2.3 and up.
-        <li rev="1.2">
-          <p>
-          Options for resource management, in conjunction with the YARN component. These options include
-          <codeph>-enable_rm</codeph> and <codeph>-cgroup_hierarchy_path</codeph>.
-          <ph rev="1.4.0">Additional options to help fine-tune the resource estimates are
-          <codeph>-—rm_always_use_defaults</codeph>,
-          <codeph>-—rm_default_memory=<varname>size</varname></codeph>, and
-          <codeph>-—rm_default_cpu_cores</codeph>.</ph> For details about these options, see
-          <xref href="impala_resource_management.xml#rm_options"/>. See
-          <xref href="impala_resource_management.xml#resource_management"/> for information about resource
-          management in general.
-          </p>
-        </li>
--->
-
         <li>
           <p>
             During troubleshooting, <keyword keyref="support_org"/> might direct you to change other values,
@@ -284,10 +248,6 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
           </p>
         </li>
       </ul>
-
-<!-- Removing this reference now that the options are de-emphasized / desupported in Impala 2.3 and up.
-      <p conref="impala_resource_management.xml#rm_options/resource_management_impalad_options"/>
--->
 
       <note>
         <p>
@@ -298,176 +258,9 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
         </p>
       </note>
 
-      <p audience="hidden" outputclass="toc inpage"/>
+      <p outputclass="toc inpage"/>
 
     </conbody>
-
-    <concept audience="hidden" id="config_options_impalad_details">
-
-      <title>Configuration Options for impalad Daemon</title>
-
-      <conbody>
-
-        <p>
-          Some common settings to change include:
-        </p>
-
-        <ul>
-          <li>
-            <p>
-              Statestore address. Where practical, put the statestore on a separate host not
-              running the <cmdname>impalad</cmdname> daemon. In that recommended configuration,
-              the <cmdname>impalad</cmdname> daemon cannot refer to the statestore server using
-              the loopback address. If the statestore is hosted on a machine with an IP address
-              of 192.168.0.27, change:
-            </p>
-<codeblock>IMPALA_STATE_STORE_HOST=127.0.0.1</codeblock>
-            <p>
-              to:
-            </p>
-<codeblock>IMPALA_STATE_STORE_HOST=192.168.0.27</codeblock>
-          </li>
-
-          <li rev="1.2">
-            <p>
-              Catalog server address. Update the <codeph>IMPALA_CATALOG_SERVICE_HOST</codeph>
-              variable, including both the hostname and the port number in the value. Where
-              practical, run the catalog server on the same host as the statestore. In that
-              recommended configuration, the <cmdname>impalad</cmdname> daemon cannot refer to
-              the catalog server using the loopback address. If the catalog service is hosted on
-              a machine with an IP address of 192.168.0.27, add the following line:
-            </p>
-<codeblock>IMPALA_CATALOG_SERVICE_HOST=192.168.0.27:26000</codeblock>
-            <p>
-              The <filepath>/etc/default/impala</filepath> defaults file currently does not
-              define an <codeph>IMPALA_CATALOG_ARGS</codeph> environment variable, but if you
-              add one it will be recognized by the service startup/shutdown script. Add a
-              definition for this variable to <filepath>/etc/default/impala</filepath> and add
-              the option <codeph>-catalog_service_host=<varname>hostname</varname></codeph>. If
-              the port is different than the default 26000, also add the option
-              <codeph>-catalog_service_port=<varname>port</varname></codeph>.
-            </p>
-          </li>
-
-          <li id="mem_limit">
-            Memory limits. You can limit the amount of memory available to Impala. For example,
-            to allow Impala to use no more than 70% of system memory, change:
-<!-- Note: also needs to be updated for each release to reflect latest /etc/default/impala. -->
-<codeblock>export IMPALA_SERVER_ARGS=${IMPALA_SERVER_ARGS:- \
-    -log_dir=${IMPALA_LOG_DIR} \
-    -state_store_port=${IMPALA_STATE_STORE_PORT} \
-    -state_store_host=${IMPALA_STATE_STORE_HOST} \
-    -be_port=${IMPALA_BACKEND_PORT}}</codeblock>
-            <p>
-              to:
-            </p>
-<codeblock>export IMPALA_SERVER_ARGS=${IMPALA_SERVER_ARGS:- \
-    -log_dir=${IMPALA_LOG_DIR} -state_store_port=${IMPALA_STATE_STORE_PORT} \
-    -state_store_host=${IMPALA_STATE_STORE_HOST} \
-    -be_port=${IMPALA_BACKEND_PORT} -mem_limit=70%}</codeblock>
-            <p>
-              You can specify the memory limit using absolute notation such as
-              <codeph>500m</codeph> or <codeph>2G</codeph>, or as a percentage of physical
-              memory such as <codeph>60%</codeph>.
-            </p>
-
-            <note>
-              Queries that exceed the specified memory limit are aborted. Percentage limits are
-              based on the physical memory of the machine and do not consider cgroups.
-            </note>
-          </li>
-
-          <li>
-            Core dump enablement. To enable core dumps, change:
-<codeblock>export ENABLE_CORE_DUMPS=${ENABLE_COREDUMPS:-false}</codeblock>
-            <p>
-              to:
-            </p>
-<codeblock>export ENABLE_CORE_DUMPS=${ENABLE_COREDUMPS:-true}</codeblock>
-            <note>
-              The location of core dump files may vary according to your operating system
-              configuration. Other security settings may prevent Impala from writing core dumps
-              even when this option is enabled.
-            </note>
-          </li>
-
-          <li>
-            Authorization using the open source Sentry plugin. Specify the
-            <codeph>-server_name</codeph> and <codeph>-authorization_policy_file</codeph>
-            options as part of the <codeph>IMPALA_SERVER_ARGS</codeph> and
-            <codeph>IMPALA_STATE_STORE_ARGS</codeph> settings to enable the core Impala support
-            for authentication. See <xref href="impala_authorization.xml#secure_startup"/> for
-            details.
-          </li>
-
-          <li>
-            Auditing for successful or blocked Impala queries, another aspect of security.
-            Specify the <codeph>-audit_event_log_dir=<varname>directory_path</varname></codeph>
-            option and optionally the
-            <codeph>-max_audit_event_log_file_size=<varname>number_of_queries</varname></codeph>
-            and <codeph>-abort_on_failed_audit_event</codeph> options as part of the
-            <codeph>IMPALA_SERVER_ARGS</codeph> settings, for each Impala node, to enable and
-            customize auditing. See <xref href="impala_auditing.xml#auditing"/> for details.
-          </li>
-
-          <li>
-            Password protection for the Impala web UI, which listens on port 25000 by default.
-            This feature involves adding some or all of the
-            <codeph>--webserver_password_file</codeph>,
-            <codeph>--webserver_authentication_domain</codeph>, and
-            <codeph>--webserver_certificate_file</codeph> options to the
-            <codeph>IMPALA_SERVER_ARGS</codeph> and <codeph>IMPALA_STATE_STORE_ARGS</codeph>
-            settings. See <xref href="impala_security_webui.xml"/> for details.
-          </li>
-
-          <li id="default_query_options">
-            Another setting you might add to <codeph>IMPALA_SERVER_ARGS</codeph> is:
-<codeblock>-default_query_options='<varname>option</varname>=<varname>value</varname>,<varname>option</varname>=<varname>value</varname>,...'
-</codeblock>
-            These options control the behavior of queries performed by this
-            <cmdname>impalad</cmdname> instance. The option values you specify here override the
-            default values for <xref href="impala_query_options.xml#query_options">Impala query
-            options</xref>, as shown by the <codeph>SET</codeph> statement in
-            <cmdname>impala-shell</cmdname>.
-          </li>
-
-<!-- Removing this reference now that the options are de-emphasized / desupported in Impala 2.3 and up.
-          <li rev="1.2">
-            Options for resource management, in conjunction with the YARN component. These options
-            include <codeph>-enable_rm</codeph> and <codeph>-cgroup_hierarchy_path</codeph>.
-            <ph rev="1.4.0">Additional options to help fine-tune the resource estimates are
-            <codeph>-—rm_always_use_defaults</codeph>,
-            <codeph>-—rm_default_memory=<varname>size</varname></codeph>, and
-            <codeph>-—rm_default_cpu_cores</codeph>.</ph> For details about these options, see
-            <xref href="impala_resource_management.xml#rm_options"/>. See
-            <xref href="impala_resource_management.xml#resource_management"/> for information about resource
-            management in general.
-          </li>
--->
-
-          <li>
-            During troubleshooting, <keyword keyref="support_org"/> might direct you to change other values,
-            particularly for <codeph>IMPALA_SERVER_ARGS</codeph>, to work around issues or
-            gather debugging information.
-          </li>
-        </ul>
-
-<!-- Removing this reference now that the options are de-emphasized / desupported in Impala 2.3 and up.
-        <p conref="impala_resource_management.xml#rm_options/resource_management_impalad_options"/>
--->
-
-        <note>
-          <p>
-            These startup options for the <cmdname>impalad</cmdname> daemon are different from
-            the command-line options for the <cmdname>impala-shell</cmdname> command. For the
-            <cmdname>impala-shell</cmdname> options, see
-            <xref href="impala_shell_options.xml#shell_options"/>.
-          </p>
-        </note>
-
-      </conbody>
-
-    </concept>
 
     <concept audience="hidden" id="config_options_statestored_details">
 
@@ -523,9 +316,27 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
     <conbody>
 
       <p>
-        The <codeph>impalad</codeph> daemon implements the main Impala service, which performs
-        query processing and reads and writes the data files.
-      </p>
+        The <codeph>impalad</codeph> daemon implements the main Impala
+        service, which performs query processing and reads from and writes to the data
+        files. Some of the noteworthy options are:
+        <ul>
+          <li>
+            The <codeph>fe_service_threads</codeph> option specifies the
+            maximum number of concurrent client connections allowed. The
+            default value is 64 with which 64 queries can run
+              simultaneously.
+            <p>
+              If you have more clients trying to connect to
+              Impala than the value of this setting, the later arriving clients
+              have to wait until previous clients disconnect. You can increase
+              this value to allow more client connections. However, a large value
+              means more threads to be maintained even if most of the connections
+              are idle, and it could negatively impact query latency. Client
+              applications should use the connection pool to avoid need for
+              large number of sessions.
+            </p>
+          </li>
+        </ul></p>
 
     </conbody>
 
