@@ -485,7 +485,8 @@ function custom-post-load-steps {
     ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_one_row_group_parquet
 
   # IMPALA-3307: Upload test time-zone database
-  hadoop fs -Ddfs.block.size=1048576 -put -f ${IMPALA_HOME}/testdata/tzdb /test-warehouse/
+  hadoop fs -Ddfs.block.size=1048576 -put -f ${IMPALA_HOME}/testdata/tzdb \
+    ${FILESYSTEM_PREFIX}/test-warehouse/
 }
 
 function copy-and-load-ext-data-source {
