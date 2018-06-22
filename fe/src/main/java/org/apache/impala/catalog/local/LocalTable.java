@@ -40,7 +40,6 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
-import org.apache.impala.catalog.View;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.log4j.Logger;
@@ -73,7 +72,7 @@ abstract class LocalTable implements FeTable {
     LocalTable t = null;
     Table msTbl = schemaInfo.msTable_;
     if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
-      // TODO(todd) support View
+      t = new LocalView(db, tblName, schemaInfo);
     } else if (HBaseTable.isHBaseTable(msTbl)) {
       // TODO(todd) support HBase table
     } else if (KuduTable.isKuduTable(msTbl)) {
