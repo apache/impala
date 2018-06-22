@@ -29,9 +29,11 @@ import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.PatternMatcher;
@@ -166,5 +168,12 @@ public class LocalCatalogTest {
     stats = t.getColumn("timestamp_col").getStats();
     assertEquals(10210, stats.getNumDistinctValues());
     assertEquals(-1, stats.getNumNulls());
+  }
+
+  @Test
+  public void testView() throws Exception {
+    FeView v = (FeView) catalog_.getTable("functional",  "alltypes_view");
+    assertEquals(TCatalogObjectType.VIEW, v.getCatalogObjectType());
+    assertEquals("SELECT * FROM functional.alltypes", v.getQueryStmt().toSql());
   }
 }
