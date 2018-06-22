@@ -157,11 +157,11 @@ CREATE -- +SHUFFLE|NOSHUFFLE
   <varname>table_clauses</varname>
   AS SELECT <varname>remainder_of_query</varname>;
 
-CREATE /* +CLUSTER|NOCLUSTER */
+CREATE /* +CLUSTERED|NOCLUSTERED */
   <varname>table_clauses</varname>
   AS SELECT <varname>remainder_of_query</varname>;
 
-CREATE -- +CLUSTER|NOCLUSTER
+CREATE -- +CLUSTERED|NOCLUSTERED
   <varname>table_clauses</varname>
   AS SELECT <varname>remainder_of_query</varname>;
 </codeblock>
