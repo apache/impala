@@ -508,10 +508,19 @@ select * from tab_separated; -- 20 second delay before getting "Cancelled due to
         </p>
 
         <p>
-          <b>Workaround:</b> If the <codeph>TIMESTAMP</codeph> values stored in the table
-          represent dates only, with no time portion, consider storing them as strings in
-          <codeph>yyyy-MM-dd</codeph> format. Impala implicitly converts such string values to
-          <codeph>TIMESTAMP</codeph> in calls to date/time functions.
+          <b>Workaround:</b>Store the <codeph>TIMESTAMP</codeph> values as
+          strings in one of the following formats:
+          <ul>
+            <li><codeph>yyyy-MM-dd</codeph></li>
+            <li><codeph>yyyy-MM-dd HH:mm:ss</codeph></li>
+            <li><codeph>yyyy-MM-dd HH:mm:ss.SSSSSSSSS</codeph>
+              <p>The date can
+                have the 1-9 digits in the fractional part.
+              </p>
+            </li>
+          </ul>
+          Impala implicitly converts such string values to
+            <codeph>TIMESTAMP</codeph> in calls to date/time functions.
         </p>
 
       </conbody>
