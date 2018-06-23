@@ -138,8 +138,8 @@ class SkipIfNotHdfsMinicluster:
   plans = pytest.mark.skipif(not IS_HDFS or pytest.config.option.testing_remote_cluster,
       reason="Test assumes plans from local HDFS mini-cluster")
   tuned_for_minicluster = pytest.mark.skipif(
-      not IS_HDFS or pytest.config.option.testing_remote_cluster,
-      reason="Test is tuned for 3-node HDFS minicluster")
+      not IS_HDFS or IS_EC or pytest.config.option.testing_remote_cluster,
+      reason="Test is tuned for 3-node HDFS minicluster with no EC")
 
 class SkipIfBuildType:
   not_dev_build = pytest.mark.skipif(not IMPALAD_BUILD.is_dev(),
