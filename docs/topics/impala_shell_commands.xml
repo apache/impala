@@ -291,29 +291,28 @@ under the License.
             </entry>
             <entry>
               <p>
-                Manages query options for an <cmdname>impala-shell</cmdname> session. The available options are the
-                ones listed in <xref href="impala_query_options.xml#query_options"/>. These options are used for
-                query tuning and troubleshooting. Issue <codeph>SET</codeph> with no arguments to see the current
-                query options, either based on the <cmdname>impalad</cmdname> defaults, as specified by you at
-                <cmdname>impalad</cmdname> startup, or based on earlier <codeph>SET</codeph> statements in the same
-                session. To modify option values, issue commands with the syntax <codeph>set
-                <varname>option</varname>=<varname>value</varname></codeph>. To restore an option to its default,
-                use the <codeph>unset</codeph> command. Some options take Boolean values of <codeph>true</codeph>
-                and <codeph>false</codeph>. Others take numeric arguments, or quoted string values.
+                Manages query options for an <cmdname>impala-shell</cmdname>
+                session. The available options are the ones listed in <xref
+                  href="impala_query_options.xml#query_options"/>. These options
+                are used for query tuning and troubleshooting. Issue
+                  <codeph>SET</codeph> with no arguments to see the current
+                query options, either based on the <cmdname>impalad</cmdname>
+                defaults, as specified by you at <cmdname>impalad</cmdname>
+                startup, or based on earlier <codeph>SET</codeph> statements in
+                the same session. To modify option values, issue commands with
+                the syntax <codeph>set
+                    <varname>option</varname>=<varname>value</varname></codeph>.
+                To restore an option to its default, use the
+                  <codeph>unset</codeph> command.
               </p>
 
               <p conref="../shared/impala_common.xml#common/set_vs_connect"/>
 
               <p rev="2.0.0">
-                In Impala 2.0 and later, <codeph>SET</codeph> is available as a SQL statement for any kind of
-                application, not only through <cmdname>impala-shell</cmdname>. See
-                <xref href="impala_set.xml#set"/> for details.
-              </p>
-
-              <p rev="2.5.0 IMPALA-2180">
-                In Impala 2.5 and later, you can use <codeph>SET</codeph> to define your own substitution variables
-                within an <cmdname>impala-shell</cmdname> session.
-                Within a SQL statement, you substitute the value by using the notation <codeph>${var:<varname>variable_name</varname>}</codeph>.
+                In Impala 2.0 and later, <codeph>SET</codeph> is
+                available as a SQL statement for any kind of application as well
+                as in <cmdname>impala-shell</cmdname>. See <xref
+                  href="impala_set.xml#set"/> for details.
               </p>
             </entry>
           </row>

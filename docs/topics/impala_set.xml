@@ -21,7 +21,13 @@ under the License.
 <concept rev="2.0.0" id="set">
 
   <title>SET Statement</title>
-  <titlealts audience="PDF"><navtitle>SET</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>SET</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -36,255 +42,130 @@ under the License.
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="hidden">SET statement</indexterm>
-      Specifies values for query options that control the runtime behavior of other statements within the same
-      session.
+      The <codeph>SET</codeph> statement specifies values for query options that control the
+      runtime behavior of other statements within the same session.
     </p>
 
-    <p rev="2.5.0 IMPALA-2180">
-      In <keyword keyref="impala25_full"/> and higher, <codeph>SET</codeph> also defines user-specified substitution variables for
-      the <cmdname>impala-shell</cmdname> interpreter. This feature uses the <codeph>SET</codeph> command
-      built into <cmdname>impala-shell</cmdname> instead of the SQL <codeph>SET</codeph> statement.
-      Therefore the substitution mechanism only works with queries processed by <cmdname>impala-shell</cmdname>,
-      not with queries submitted through JDBC or ODBC.
+    <p>
+      When issued in <codeph>impala-shell</codeph>, the <codeph>SET</codeph> command is
+      interpreted as an <codeph>impala-shell</codeph> command that has differences from the SQL
+      <codeph>SET</codeph> statement. See
+      <xref
+        href="impala_shell_commands.xml#shell_commands/set_cmd"/> for the
+      information about the <codeph>SET</codeph> command in <codeph>impala-shell</codeph>.
     </p>
-
-    <note type="important" rev="2.11.0 IMPALA-2181">
-      <p>
-        In <keyword keyref="impala211_full"/> and higher, the output of the <codeph>SET</codeph>
-        statement changes in some important ways:
-      </p>
-      <ul>
-        <li>
-          <p>
-            The options are divided into groups: <codeph>Regular Query Options</codeph>,
-            <codeph>Advanced Query Options</codeph>, <codeph>Development Query Options</codeph>, and
-            <codeph>Deprecated Query Options</codeph>.
-          </p>
-        </li>
-        <li>
-          <p>
-            The advanced options are intended for use in specific
-            kinds of performance tuning and debugging scenarios. The development options are
-            related to internal development of Impala or features that are not yet finalized;
-            these options might be changed or removed without notice.
-            The deprecated options are related to features that are removed or changed so that
-            the options no longer have any purpose; these options might be removed in future
-            versions.
-          </p>
-        </li>
-        <li>
-          <p>
-            By default, only the first two groups (regular and advanced) are
-            displayed by the <codeph>SET</codeph> command. Use the syntax <codeph>SET ALL</codeph>
-            to see all groups of options.
-          </p>
-        </li>
-        <li>
-          <p>
-            <cmdname>impala-shell</cmdname> options and user-specified variables are always displayed
-            at the end of the list of query options, after all appropriate option groups.
-          </p>
-        </li>
-        <li>
-          <p>
-            When the <codeph>SET</codeph> command is run through the JDBC or ODBC interfaces,
-            the result set has a new third column, <codeph>level</codeph>, indicating which
-            group each option belongs to. The same distinction of <codeph>SET</codeph>
-            returning the regular and advanced options, and <codeph>SET ALL</codeph>
-            returning all option groups, applies to JDBC and ODBC also.
-          </p>
-        </li>
-      </ul>
-    </note>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
-<codeblock>SET [<varname>query_option</varname>=<varname>option_value</varname>]
+<codeblock>SET
 <ph rev="2.11.0 IMPALA-2181">SET ALL</ph>
+SET <varname>query_option</varname>=<varname>option_value</varname>
+SET <varname>query_option</varname>=""
 </codeblock>
 
     <p rev="2.11.0 IMPALA-2181">
-      <codeph>SET</codeph> and <codeph>SET ALL</codeph> with no arguments return a
-      result set consisting of all the applicable query options and their current values.
+      <codeph>SET</codeph> and <codeph>SET ALL</codeph> with no arguments return a result set
+      consisting of all the applicable query options and their current values.
     </p>
 
     <p>
-      The query option name and any string argument values are case-insensitive.
+      The <varname>query_option</varname> and <varname>option_value</varname> are
+      case-insensitive.
     </p>
 
     <p>
-      Each query option has a specific allowed notation for its arguments. Boolean options can be enabled and
-      disabled by assigning values of either <codeph>true</codeph> and <codeph>false</codeph>, or
-      <codeph>1</codeph> and <codeph>0</codeph>. Some numeric options accept a final character signifying the unit,
-      such as <codeph>2g</codeph> for 2 gigabytes or <codeph>100m</codeph> for 100 megabytes. See
-      <xref href="impala_query_options.xml#query_options"/> for the details of each query option.
+      Unlike the <codeph>impala-shell</codeph> command version of <codeph>SET</codeph>, when
+      used as a SQL statement, the string values for <varname>option_value</varname> need to be
+      quoted, e.g. <codeph>SET option="new_value"</codeph>.
     </p>
 
     <p>
-      <b>Setting query options during impala-shell invocation:</b>
-    </p>
-
-    <p rev="2.11.0 IMPALA-5736">
-      In <keyword keyref="impala211_full"/> and higher, you can use one or more command-line options
-      of the form <codeph>--query_option=<varname>option</varname>=<varname>value</varname></codeph>
-      when running the <cmdname>impala-shell</cmdname> command. The corresponding query option settings
-      take effect for that <cmdname>impala-shell</cmdname> session.
+      The <codeph>SET <varname>query_option</varname> = ""</codeph> statement unsets the value
+      of the <varname>query_option</varname> in the current session, reverting it to the default
+      state. In <codeph>impala-shell</codeph>, use the <codeph>UNSET</codeph> command to set a
+      query option to it default.
     </p>
 
     <p>
-      <b>User-specified substitution variables:</b>
-    </p>
-
-    <p rev="2.5.0 IMPALA-2180">
-      In <keyword keyref="impala25_full"/> and higher, you can specify your own names and string substitution values
-      within the <cmdname>impala-shell</cmdname> interpreter. Once a substitution variable is set up,
-      its value is inserted into any SQL statement in that same <cmdname>impala-shell</cmdname> session
-      that contains the notation <codeph>${var:<varname>varname</varname>}</codeph>.
-      Using <codeph>SET</codeph> in an interactive <cmdname>impala-shell</cmdname> session overrides
-      any value for that same variable passed in through the <codeph>--var=<varname>varname</varname>=<varname>value</varname></codeph>
-      command-line option.
-    </p>
-
-    <p rev="2.5.0 IMPALA-2180">
-      For example, to set up some default parameters for report queries, but then override those default
-      within an <cmdname>impala-shell</cmdname> session, you might issue commands and statements such as
-      the following:
-    </p>
-
-<codeblock rev="2.5.0 IMPALA-2180">
--- Initial setup for this example.
-create table staging_table (s string);
-insert into staging_table values ('foo'), ('bar'), ('bletch');
-
-create table production_table (s string);
-insert into production_table values ('North America'), ('EMEA'), ('Asia');
-quit;
-
--- Start impala-shell with user-specified substitution variables,
--- run a query, then override the variables with SET and run the query again.
-$ impala-shell --var=table_name=staging_table --var=cutoff=2
-... <varname>banner message</varname> ...
-[localhost:21000] > select s from ${var:table_name} order by s limit ${var:cutoff};
-Query: select s from staging_table order by s limit 2
-+--------+
-| s      |
-+--------+
-| bar    |
-| bletch |
-+--------+
-Fetched 2 row(s) in 1.06s
-
-[localhost:21000] > set var:table_name=production_table;
-Variable TABLE_NAME set to production_table
-[localhost:21000] > set var:cutoff=3;
-Variable CUTOFF set to 3
-
-[localhost:21000] > select s from ${var:table_name} order by s limit ${var:cutoff};
-Query: select s from production_table order by s limit 3
-+---------------+
-| s             |
-+---------------+
-| Asia          |
-| EMEA          |
-| North America |
-+---------------+
-</codeblock>
-
-    <p rev="2.5.0 IMPALA-2180">
-      The following example shows how <codeph>SET ALL</codeph> with no parameters displays
-      all user-specified substitution variables, and how <codeph>UNSET</codeph> removes
-      the substitution variable entirely:
-    </p>
-
-<codeblock rev="2.11.0 IMPALA-2181">
-[localhost:21000] > set all;
-Query options (defaults shown in []):
-ABORT_ON_ERROR: [0]
-COMPRESSION_CODEC: []
-DISABLE_CODEGEN: [0]
-...
-
-Advanced Query Options:
-APPX_COUNT_DISTINCT: [0]
-BUFFER_POOL_LIMIT: []
-DEFAULT_JOIN_DISTRIBUTION_MODE: [0]
-...
-
-Development Query Options:
-BATCH_SIZE: [0]
-DEBUG_ACTION: []
-DECIMAL_V2: [0]
-...
-
-Deprecated Query Options:
-ABORT_ON_DEFAULT_LIMIT_EXCEEDED: [0]
-ALLOW_UNSUPPORTED_FORMATS: [0]
-DEFAULT_ORDER_BY_LIMIT: [-1]
-...
-
-Shell Options
-  LIVE_PROGRESS: False
-  LIVE_SUMMARY: False
-
-Variables:
-  CUTOFF: 3
-  TABLE_NAME: staging_table
-
-[localhost:21000] > unset var:cutoff;
-Unsetting variable CUTOFF
-[localhost:21000] > select s from ${var:table_name} order by s limit ${var:cutoff};
-Error: Unknown variable CUTOFF
-</codeblock>
-
-    <p rev="2.5.0 IMPALA-2180">
-      See <xref href="impala_shell_running_commands.xml"/> for more examples of using the
-      <codeph>--var</codeph>, <codeph>SET</codeph>, and <codeph>${var:<varname>varname</varname>}</codeph>
-      substitution technique in <cmdname>impala-shell</cmdname>.
+      Each query option has a specific allowed notation for its arguments. See
+      <xref href="impala_query_options.xml#query_options"/> for the details of each query
+      option.
     </p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
     <p>
-      <codeph>MEM_LIMIT</codeph> is probably the most commonly used query option. You can specify a high value to
-      allow a resource-intensive query to complete. For testing how queries would work on memory-constrained
-      systems, you might specify an artificially low value.
+      In <keyword keyref="impala211_full"/> and higher, the outputs of the <codeph>SET</codeph>
+      and <codeph>SET ALL</codeph> statements were reorganized as below:
     </p>
 
-    <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
+    <ul>
+      <li>
+        <p>
+          The options are divided into groups: <codeph>Regular Query Options</codeph>,
+          <codeph>Advanced Query Options</codeph>, <codeph>Development Query Options</codeph>,
+          and <codeph>Deprecated Query Options</codeph>.
+        </p>
+        <ul>
+          <li>
+            <p>
+              The advanced options are intended for use in specific kinds of performance tuning
+              and debugging scenarios.
+            </p>
+          </li>
 
-    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <li>
+            <p>
+              The development options are related to internal development of Impala or features
+              that are not yet finalized. These options might be changed or removed without
+              notice.
+            </p>
+          </li>
 
-    <p>
-      The following example sets some numeric and some Boolean query options to control usage of memory, disk
-      space, and timeout periods, then runs a query whose success could depend on the options in effect:
-    </p>
+          <li>
+            <p>
+              The deprecated options are related to features that are removed or changed so that
+              the options no longer have any purpose. These options might be removed in future
+              versions.
+            </p>
+          </li>
+        </ul>
+      </li>
 
-<codeblock>set mem_limit=64g;
-set DISABLE_UNSAFE_SPILLS=true;
-set parquet_file_size=400m;
-set RESERVATION_REQUEST_TIMEOUT=900000;
-insert overwrite parquet_table select c1, c2, count(c3) from text_table group by c1, c2, c3;
-</codeblock>
+      <li>
+        <p>
+          By default, only the first two groups, regular and advanced, are displayed by the
+          <codeph>SET</codeph> command. Use <codeph>SET ALL</codeph> to see all groups of
+          options.
+        </p>
+      </li>
+
+      <li>
+        <p>
+          <cmdname>impala-shell</cmdname> options and user-specified variables are always
+          displayed at the end of the list of query options, after all appropriate option
+          groups.
+        </p>
+      </li>
+    </ul>
 
     <p conref="../shared/impala_common.xml#common/added_in_20"/>
 
     <p>
-      <codeph>SET</codeph> has always been available as an <cmdname>impala-shell</cmdname> command. Promoting it to
-      a SQL statement lets you use this feature in client applications through the JDBC and ODBC APIs.
+      <codeph>SET</codeph> has always been available as an <cmdname>impala-shell</cmdname>
+      command. Promoting it to a SQL statement lets you use this feature in client applications
+      through the JDBC and ODBC APIs.
     </p>
-
-<!-- <p conref="../shared/impala_common.xml#common/jdbc_blurb"/> -->
-
-    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
-      See <xref href="impala_query_options.xml#query_options"/> for the query options you can adjust using this
-      statement.
+      See <xref href="impala_query_options.xml#query_options"/> for the query options you can
+      adjust using this statement.
     </p>
+
   </conbody>
+
 </concept>
