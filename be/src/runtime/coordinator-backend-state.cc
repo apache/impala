@@ -40,8 +40,8 @@ using namespace rapidjson;
 namespace accumulators = boost::accumulators;
 
 Coordinator::BackendState::BackendState(
-    const TUniqueId& query_id, int state_idx, TRuntimeFilterMode::type filter_mode)
-  : query_id_(query_id),
+    const Coordinator& coord, int state_idx, TRuntimeFilterMode::type filter_mode)
+  : coord_(coord),
     state_idx_(state_idx),
     filter_mode_(filter_mode) {
 }
@@ -150,16 +150,16 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
 }
 
 void Coordinator::BackendState::Exec(
-    const TQueryCtx& query_ctx, const DebugOptions& debug_options,
+    const DebugOptions& debug_options,
     const FilterRoutingTable& filter_routing_table,
     CountingBarrier* exec_complete_barrier) {
   NotifyBarrierOnExit notifier(exec_complete_barrier);
   TExecQueryFInstancesParams rpc_params;
-  rpc_params.__set_query_ctx(query_ctx);
+  rpc_params.__set_query_ctx(query_ctx());
   SetRpcParams(debug_options, filter_routing_table, &rpc_params);
   VLOG_FILE << "making rpc: ExecQueryFInstances"
       << " host=" << TNetworkAddressToString(impalad_address()) << " query_id="
-      << PrintId(query_id_);
+      << PrintId(query_id());
 
   // guard against concurrent UpdateBackendExecStatus() that may arrive after RPC returns
   lock_guard<mutex> l(lock_);
@@ -180,7 +180,7 @@ void Coordinator::BackendState::Exec(
 
   if (!rpc_status.ok()) {
     const string& err_msg =
-        Substitute(ERR_TEMPLATE, PrintId(query_id_), rpc_status.msg().msg());
+        Substitute(ERR_TEMPLATE, PrintId(query_id()), rpc_status.msg().msg());
     VLOG_QUERY << err_msg;
     status_ = Status::Expected(err_msg);
     return;
@@ -188,7 +188,7 @@ void Coordinator::BackendState::Exec(
 
   Status exec_status = Status(thrift_result.status);
   if (!exec_status.ok()) {
-    const string& err_msg = Substitute(ERR_TEMPLATE, PrintId(query_id_),
+    const string& err_msg = Substitute(ERR_TEMPLATE, PrintId(query_id()),
         exec_status.msg().GetFullMessageDetails());
     VLOG_QUERY << err_msg;
     status_ = Status::Expected(err_msg);
@@ -196,7 +196,7 @@ void Coordinator::BackendState::Exec(
   }
 
   for (const auto& entry: instance_stats_map_) entry.second->stopwatch_.Start();
-  VLOG_FILE << "rpc succeeded: ExecQueryFInstances query_id=" << PrintId(query_id_);
+  VLOG_FILE << "rpc succeeded: ExecQueryFInstances query_id=" << PrintId(query_id());
 }
 
 Status Coordinator::BackendState::GetStatus(bool* is_fragment_failure,
@@ -225,7 +225,7 @@ void Coordinator::BackendState::LogFirstInProgress(
   for (Coordinator::BackendState* backend_state : backend_states) {
     lock_guard<mutex> l(backend_state->lock_);
     if (!backend_state->IsDone()) {
-      VLOG_QUERY << "query_id=" << PrintId(backend_state->query_id_)
+      VLOG_QUERY << "query_id=" << PrintId(backend_state->query_id())
                  << ": first in-progress backend: "
                  << TNetworkAddressToString(backend_state->impalad_address());
       break;
@@ -351,9 +351,9 @@ bool Coordinator::BackendState::Cancel() {
 
   TCancelQueryFInstancesParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
-  params.__set_query_id(query_id_);
+  params.__set_query_id(query_id());
   TCancelQueryFInstancesResult dummy;
-  VLOG_QUERY << "sending CancelQueryFInstances rpc for query_id=" << PrintId(query_id_) <<
+  VLOG_QUERY << "sending CancelQueryFInstances rpc for query_id=" << PrintId(query_id()) <<
       " backend=" << TNetworkAddressToString(impalad_address());
 
   Status rpc_status;
@@ -362,26 +362,30 @@ bool Coordinator::BackendState::Cancel() {
   for (int i = 0; i < 3; ++i) {
     ImpalaBackendConnection backend_client(ExecEnv::GetInstance()->impalad_client_cache(),
         impalad_address(), &client_status);
-    if (client_status.ok()) {
-      // The return value 'dummy' is ignored as it's only set if the fragment instance
-      // cannot be found in the backend. The fragment instances of a query can all be
-      // cancelled locally in a backend due to RPC failure to coordinator. In which case,
-      // the query state can be gone already.
-      rpc_status = backend_client.DoRpc(
-          &ImpalaBackendClient::CancelQueryFInstances, params, &dummy);
-      if (rpc_status.ok()) break;
-    }
+    if (!client_status.ok()) continue;
+
+    rpc_status = DebugAction(query_ctx().client_request.query_options,
+        "COORD_CANCEL_QUERY_FINSTANCES_RPC");
+    if (!rpc_status.ok()) continue;
+
+    // The return value 'dummy' is ignored as it's only set if the fragment
+    // instance cannot be found in the backend. The fragment instances of a query
+    // can all be cancelled locally in a backend due to RPC failure to
+    // coordinator. In which case, the query state can be gone already.
+    rpc_status = backend_client.DoRpc(
+        &ImpalaBackendClient::CancelQueryFInstances, params, &dummy);
+    if (rpc_status.ok()) break;
   }
   if (!client_status.ok()) {
     status_.MergeStatus(client_status);
-    VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id_)
+    VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id())
                << " failed to connect to " << TNetworkAddressToString(impalad_address())
                << " :" << client_status.msg().msg();
     return true;
   }
   if (!rpc_status.ok()) {
     status_.MergeStatus(rpc_status);
-    VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id_)
+    VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id())
                << " rpc to " << TNetworkAddressToString(impalad_address())
                << " failed: " << rpc_status.msg().msg();
     return true;
@@ -390,7 +394,7 @@ bool Coordinator::BackendState::Cancel() {
 }
 
 void Coordinator::BackendState::PublishFilter(const TPublishFilterParams& rpc_params) {
-  DCHECK(rpc_params.dst_query_id == query_id_);
+  DCHECK(rpc_params.dst_query_id == query_id());
   {
     // If the backend is already done, it's not waiting for this filter, so we skip
     // sending it in this case.
