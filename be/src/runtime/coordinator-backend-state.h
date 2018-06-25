@@ -54,7 +54,7 @@ struct FInstanceExecParams;
 /// Thread-safe unless pointed out otherwise.
 class Coordinator::BackendState {
  public:
-  BackendState(const TUniqueId& query_id, int state_idx,
+  BackendState(const Coordinator& coord, int state_idx,
       TRuntimeFilterMode::type filter_mode);
 
   /// Creates InstanceStats for all instance in backend_exec_params in obj_pool
@@ -70,7 +70,7 @@ class Coordinator::BackendState {
   /// that weren't selected during its construction.
   /// The debug_options are applied to the appropriate TPlanFragmentInstanceCtxs, based
   /// on their node_id/instance_idx.
-  void Exec(const TQueryCtx& query_ctx, const DebugOptions& debug_options,
+  void Exec(const DebugOptions& debug_options,
       const FilterRoutingTable& filter_routing_table,
       CountingBarrier* rpc_complete_barrier);
 
@@ -202,7 +202,8 @@ class Coordinator::BackendState {
     void InitCounters();
   };
 
-  const TUniqueId query_id_;
+  const Coordinator& coord_; /// Coordinator object that owns this BackendState
+
   const int state_idx_;  /// index of 'this' in Coordinator::backend_states_
   const TRuntimeFilterMode::type filter_mode_;
 
@@ -255,6 +256,9 @@ class Coordinator::BackendState {
 
   /// Set in ApplyExecStatusReport(). Uses MonotonicMillis().
   int64_t last_report_time_ms_ = 0;
+
+  const TQueryCtx& query_ctx() const { return coord_.query_ctx(); }
+  const TUniqueId& query_id() const { return coord_.query_id(); }
 
   /// Fill in rpc_params based on state. Uses filter_routing_table to remove filters
   /// that weren't selected during its construction.

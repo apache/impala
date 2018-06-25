@@ -205,7 +205,7 @@ void Coordinator::InitBackendStates() {
   int backend_idx = 0;
   for (const auto& entry: schedule_.per_backend_exec_params()) {
     BackendState* backend_state = obj_pool()->Add(
-        new BackendState(query_id(), backend_idx, filter_mode_));
+        new BackendState(*this, backend_idx, filter_mode_));
     backend_state->Init(entry.second, fragment_stats_, obj_pool());
     backend_states_[backend_idx++] = backend_state;
   }
@@ -335,7 +335,7 @@ void Coordinator::StartBackendExec() {
     ExecEnv::GetInstance()->exec_rpc_thread_pool()->Offer(
         [backend_state, this, &debug_options]() {
           DebugActionNoFail(schedule_.query_options(), "COORD_BEFORE_EXEC_RPC");
-          backend_state->Exec(query_ctx(), debug_options, filter_routing_table_,
+          backend_state->Exec(debug_options, filter_routing_table_,
               exec_rpcs_complete_barrier_.get());
         });
   }
@@ -708,10 +708,9 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
     // We've applied all changes from the final status report - notify waiting threads.
     backend_exec_complete_barrier_->Notify();
   }
-  // If all results have been returned, return a cancelled status to force the fragment
+  // If query execution has terminated, return a cancelled status to force the fragment
   // instance to stop executing.
-  // TODO: Make returning CANCELLED unnecessary with IMPALA-6984.
-  return ReturnedAllResults() ? Status::CANCELLED : Status::OK();
+  return exec_state_.Load() == ExecState::EXECUTING ? Status::OK() : Status::CANCELLED;
 }
 
 // TODO: add histogram/percentile
