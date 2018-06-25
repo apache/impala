@@ -20,6 +20,7 @@
 #include <iomanip>
 #include <random>
 #include <sstream>
+#include <boost/algorithm/string.hpp>
 #include <boost/tokenizer.hpp>
 
 #include "common/version.h"
@@ -42,6 +43,7 @@ extern void DumpStackTraceToString(std::string* s);
 
 #include "common/names.h"
 
+using boost::algorithm::iequals;
 using boost::char_separator;
 using boost::is_any_of;
 using boost::split;
@@ -330,20 +332,21 @@ Status DebugActionImpl(
       query_options.debug_action);
   static const char ERROR_MSG[] = "Invalid debug_action $0:$1 ($2)";
   for (const vector<string>& components : action_list) {
-    if (components.size() != 2 || components[0].compare(label) != 0) continue;
+    // size() != 2 check filters out ExecNode debug actions.
+    if (components.size() != 2 || !iequals(components[0], label)) continue;
     // 'tokens' becomes {command, param0, param1, ... }
     vector<string> tokens = TokenizeDebugActionParams(components[1]);
     DCHECK_GE(tokens.size(), 1);
     const string& cmd = tokens[0];
     int sleep_millis = 0;
-    if (cmd.compare("SLEEP") == 0) {
+    if (iequals(cmd, "SLEEP")) {
       // SLEEP@<millis>
       if (tokens.size() != 2) {
         return Status(Substitute(ERROR_MSG, components[0], components[1],
                 "expected SLEEP@<ms>"));
       }
       sleep_millis = atoi(tokens[1].c_str());
-    } else if (cmd.compare("JITTER") == 0) {
+    } else if (iequals(cmd, "JITTER")) {
       // JITTER@<millis>[@<probability>}
       if (tokens.size() < 2 || tokens.size() > 3) {
         return Status(Substitute(ERROR_MSG, components[0], components[1],
@@ -359,7 +362,7 @@ Status DebugActionImpl(
         if (!should_execute) continue;
       }
       sleep_millis = rand() % (max_millis + 1);
-    } else if (cmd.compare("FAIL") == 0) {
+    } else if (iequals(cmd, "FAIL")) {
       // FAIL[@<probability>]
       if (tokens.size() > 2) {
         return Status(Substitute(ERROR_MSG, components[0], components[1],
