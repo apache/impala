@@ -29,7 +29,6 @@
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
 #include "runtime/dml-exec-state.h"
-#include "util/condition-variable.h"
 #include "util/progress-updater.h"
 #include "util/runtime-profile-counters.h"
 #include "util/spinlock.h"
@@ -276,7 +275,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// cancellation. Initialized in StartBackendExec().
   boost::scoped_ptr<CountingBarrier> backend_exec_complete_barrier_;
 
-  SpinLock exec_state_lock_; // protects exec-state_ and exec_status_
+  // Protects exec_state_ and exec_status_. exec_state_ can be read independently via
+  // the atomic, but the lock is held when writing either field and when reading both
+  // fields together.
+  SpinLock exec_state_lock_;
 
   /// EXECUTING: in-flight; the only non-terminal state
   /// RETURNED_RESULTS: GetNext() set eos to true, or for DML, the request is complete
@@ -285,7 +287,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   enum class ExecState {
     EXECUTING, RETURNED_RESULTS, CANCELLED, ERROR
   };
-  ExecState exec_state_ = ExecState::EXECUTING;
+  AtomicEnum<ExecState> exec_state_{ExecState::EXECUTING};
 
   /// Overall execution status; only set on exec_state_ transitions:
   /// - EXECUTING: OK
@@ -357,7 +359,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Return true if 'exec_state_' is RETURNED_RESULTS.
   /// TODO: remove with IMPALA-6984.
-  bool ReturnedAllResults() WARN_UNUSED_RESULT;
+  bool ReturnedAllResults() WARN_UNUSED_RESULT {
+    return exec_state_.Load() == ExecState::RETURNED_RESULTS;
+  }
 
   /// Return the string representation of 'state'.
   static const char* ExecStateToString(const ExecState state);

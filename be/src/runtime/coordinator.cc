@@ -76,7 +76,7 @@ Coordinator::Coordinator(
 
 Coordinator::~Coordinator() {
   // Must have entered a terminal exec state guaranteeing resources were released.
-  DCHECK_NE(exec_state_, ExecState::EXECUTING);
+  DCHECK_NE(exec_state_.Load(), ExecState::EXECUTING);
   DCHECK_LE(backend_exec_complete_barrier_->pending(), 0);
   // Release the coordinator's reference to the query control structures.
   if (query_state_ != nullptr) {
@@ -450,9 +450,9 @@ Status Coordinator::SetNonErrorTerminalState(const ExecState state) {
   {
     lock_guard<SpinLock> l(exec_state_lock_);
     // May have already entered a terminal state, in which case nothing to do.
-    if (exec_state_ != ExecState::EXECUTING) return exec_status_;
+    if (exec_state_.Load() != ExecState::EXECUTING) return exec_status_;
     DCHECK(exec_status_.ok()) << exec_status_;
-    exec_state_ = state;
+    exec_state_.Store(state);
     if (state == ExecState::CANCELLED) exec_status_ = Status::CANCELLED;
     ret_status = exec_status_;
   }
@@ -468,13 +468,13 @@ Status Coordinator::UpdateExecState(const Status& status,
   ExecState old_state, new_state;
   {
     lock_guard<SpinLock> l(exec_state_lock_);
-    old_state = exec_state_;
+    old_state = exec_state_.Load();
     if (old_state == ExecState::EXECUTING) {
       DCHECK(exec_status_.ok()) << exec_status_;
       if (!status.ok()) {
         // Error while executing - go to ERROR state.
         exec_status_ = status;
-        exec_state_ = ExecState::ERROR;
+        exec_state_.Store(ExecState::ERROR);
       }
     } else if (old_state == ExecState::RETURNED_RESULTS) {
       // Already returned all results. Leave exec status as ok, stay in this state.
@@ -492,7 +492,7 @@ Status Coordinator::UpdateExecState(const Status& status,
         exec_status_ = status;
       }
     }
-    new_state = exec_state_;
+    new_state = exec_state_.Load();
     ret_status = exec_status_;
   }
   // Log interesting status: a non-cancelled error or a cancellation if was executing.
@@ -506,11 +506,6 @@ Status Coordinator::UpdateExecState(const Status& status,
   // After dropping the lock, apply the state transition (if any) side-effects.
   HandleExecStateTransition(old_state, new_state);
   return ret_status;
-}
-
-bool Coordinator::ReturnedAllResults() {
-  lock_guard<SpinLock> l(exec_state_lock_);
-  return exec_state_ == ExecState::RETURNED_RESULTS;
 }
 
 void Coordinator::HandleExecStateTransition(
@@ -623,9 +618,7 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
   DCHECK(has_called_wait_);
   SCOPED_TIMER(query_profile_->total_time_counter());
 
-  // exec_state_lock_ not needed here though since this path won't execute concurrently
-  // with itself or DML finalization.
-  if (exec_state_ == ExecState::RETURNED_RESULTS) {
+  if (ReturnedAllResults()) {
     // Nothing left to do: already in a terminal state and no more results.
     *eos = true;
     return Status::OK();

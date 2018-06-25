@@ -153,11 +153,12 @@ class AtomicEnum {
       "Underlying enum type must fit into 4 bytes");
 
  public:
+  AtomicEnum(T initial) : enum_(static_cast<int32_t>(initial)) {}
   /// Atomic load with "acquire" memory-ordering semantic.
   ALWAYS_INLINE T Load() const { return static_cast<T>(enum_.Load()); }
 
   /// Atomic store with "release" memory-ordering semantic.
-  ALWAYS_INLINE void Store(T val) { enum_.Store(val); }
+  ALWAYS_INLINE void Store(T val) { enum_.Store(static_cast<int32_t>(val)); }
 
  private:
   internal::AtomicInt<int32_t> enum_;

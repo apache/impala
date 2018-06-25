@@ -204,7 +204,8 @@ class FragmentInstanceState {
 
   /// The current state of this fragment instance's execution. Only updated by the
   /// fragment instance thread in UpdateState() and read by the profile reporting threads.
-  AtomicEnum<TFInstanceExecState::type> current_state_;
+  AtomicEnum<TFInstanceExecState::type> current_state_{
+    TFInstanceExecState::WAITING_FOR_EXEC};
 
   /// Output sink for rows sent to this fragment. Created in Prepare(), lives in
   /// obj_pool().
