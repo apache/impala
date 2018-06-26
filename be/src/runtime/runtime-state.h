@@ -36,6 +36,7 @@ class BufferPool;
 class DataStreamRecvr;
 class DescriptorTbl;
 class Expr;
+class KrpcDataStreamMgr;
 class LlvmCodeGen;
 class MemTracker;
 class ObjectPool;
@@ -47,7 +48,6 @@ class TimestampValue;
 class ThreadResourcePool;
 class TUniqueId;
 class ExecEnv;
-class DataStreamMgrBase;
 class HBaseTableFactory;
 class TPlanFragmentCtx;
 class TPlanFragmentInstanceCtx;
@@ -107,7 +107,7 @@ class RuntimeState {
         : no_instance_id_;
   }
   ExecEnv* exec_env() { return exec_env_; }
-  DataStreamMgrBase* stream_mgr();
+  KrpcDataStreamMgr* stream_mgr();
   HBaseTableFactory* htable_factory();
   ImpalaBackendClientCache* impalad_client_cache();
   CatalogServiceClientCache* catalogd_client_cache();

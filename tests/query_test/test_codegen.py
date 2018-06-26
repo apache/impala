@@ -52,7 +52,6 @@ class TestCodegen(ImpalaTestSuite):
     assert len(exec_options) > 0
     assert_codegen_enabled(result.runtime_profile, [1])
 
-  @SkipIf.not_krpc
   def test_datastream_sender_codegen(self, vector):
     """Test the KrpcDataStreamSender's codegen logic"""
     self.run_test_case('QueryTest/datastream-sender-codegen', vector)

@@ -31,14 +31,12 @@
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/strings/substitute.h"
-#include "runtime/data-stream-sender.h"
 #include "runtime/krpc-data-stream-sender.h"
 #include "runtime/mem-tracker.h"
 #include "util/container-util.h"
 
 #include "common/names.h"
 
-DECLARE_bool(use_krpc);
 DEFINE_int64(data_stream_sender_buffer_size, 16 * 1024,
     "(Advanced) Max size in bytes which a row batch in a data stream sender's channel "
     "can accumulate before the row batch is sent over the wire.");
@@ -66,16 +64,10 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
     case TDataSinkType::DATA_STREAM_SINK:
       if (!thrift_sink.__isset.stream_sink) return Status("Missing data stream sink.");
 
-      if (FLAGS_use_krpc) {
-        *sink = pool->Add(new KrpcDataStreamSender(fragment_instance_ctx.sender_id,
-            row_desc, thrift_sink.stream_sink, fragment_ctx.destinations,
-            FLAGS_data_stream_sender_buffer_size, state));
-      } else {
-        // TODO: figure out good buffer size based on size of output row
-        *sink = pool->Add(new DataStreamSender(fragment_instance_ctx.sender_id, row_desc,
-            thrift_sink.stream_sink, fragment_ctx.destinations,
-            FLAGS_data_stream_sender_buffer_size, state));
-      }
+      // TODO: figure out good buffer size based on size of output row
+      *sink = pool->Add(new KrpcDataStreamSender(fragment_instance_ctx.sender_id,
+          row_desc, thrift_sink.stream_sink, fragment_ctx.destinations,
+          FLAGS_data_stream_sender_buffer_size, state));
       break;
     case TDataSinkType::TABLE_SINK:
       if (!thrift_sink.__isset.table_sink) return Status("Missing table sink.");

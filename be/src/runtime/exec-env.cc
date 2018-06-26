@@ -35,7 +35,6 @@
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/client-cache.h"
 #include "runtime/coordinator.h"
-#include "runtime/data-stream-mgr.h"
 #include "runtime/hbase-table-factory.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/io/disk-io-mgr.h"
@@ -80,8 +79,6 @@ DEFINE_int32(state_store_subscriber_port, 23000,
     "port where StatestoreSubscriberService should be exported");
 DEFINE_int32(num_hdfs_worker_threads, 16,
     "(Advanced) The number of threads in the global HDFS operation pool");
-DEFINE_bool(use_krpc, true, "If true, use KRPC for the DataStream subsystem. "
-    "Otherwise use Thrift RPC.");
 
 DEFINE_bool_hidden(use_local_catalog, false,
   "Use experimental implementation of a local catalog. If this is set, "
@@ -159,15 +156,10 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     configured_backend_address_(MakeNetworkAddress(FLAGS_hostname, backend_port)) {
 
-  if (FLAGS_use_krpc) {
-    VLOG_QUERY << "Using KRPC.";
-    // KRPC relies on resolved IP address. It's set in Init().
-    krpc_address_.__set_port(krpc_port);
-    rpc_mgr_.reset(new RpcMgr(IsInternalTlsConfigured()));
-    stream_mgr_.reset(new KrpcDataStreamMgr(metrics_.get()));
-  } else {
-    stream_mgr_.reset(new DataStreamMgr(metrics_.get()));
-  }
+  // KRPC relies on resolved IP address. It's set in Init().
+  krpc_address_.__set_port(krpc_port);
+  rpc_mgr_.reset(new RpcMgr(IsInternalTlsConfigured()));
+  stream_mgr_.reset(new KrpcDataStreamMgr(metrics_.get()));
 
   request_pool_service_.reset(new RequestPoolService(metrics_.get()));
 
@@ -298,19 +290,17 @@ Status ExecEnv::Init() {
       "Buffer Pool: Unused Reservation", mem_tracker_.get()));
 
   // Initializes the RPCMgr and DataStreamServices.
-  if (FLAGS_use_krpc) {
-    krpc_address_.__set_hostname(ip_address_);
-    // Initialization needs to happen in the following order due to dependencies:
-    // - RPC manager, DataStreamService and DataStreamManager.
-    RETURN_IF_ERROR(rpc_mgr_->Init());
-    data_svc_.reset(new DataStreamService(rpc_metrics_));
-    RETURN_IF_ERROR(data_svc_->Init());
-    RETURN_IF_ERROR(KrpcStreamMgr()->Init(data_svc_->mem_tracker()));
-    // Bump thread cache to 1GB to reduce contention for TCMalloc central
-    // list's spinlock.
-    if (FLAGS_tcmalloc_max_total_thread_cache_bytes == 0) {
-      FLAGS_tcmalloc_max_total_thread_cache_bytes = 1 << 30;
-    }
+  krpc_address_.__set_hostname(ip_address_);
+  // Initialization needs to happen in the following order due to dependencies:
+  // - RPC manager, DataStreamService and DataStreamManager.
+  RETURN_IF_ERROR(rpc_mgr_->Init());
+  data_svc_.reset(new DataStreamService(rpc_metrics_));
+  RETURN_IF_ERROR(data_svc_->Init());
+  RETURN_IF_ERROR(stream_mgr_->Init(data_svc_->mem_tracker()));
+  // Bump thread cache to 1GB to reduce contention for TCMalloc central
+  // list's spinlock.
+  if (FLAGS_tcmalloc_max_total_thread_cache_bytes == 0) {
+    FLAGS_tcmalloc_max_total_thread_cache_bytes = 1 << 30;
   }
 
 #if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
@@ -396,10 +386,8 @@ Status ExecEnv::StartStatestoreSubscriberService() {
 }
 
 Status ExecEnv::StartKrpcService() {
-  if (FLAGS_use_krpc) {
-    LOG(INFO) << "Starting KRPC service";
-    RETURN_IF_ERROR(rpc_mgr_->StartServices(krpc_address_));
-  }
+  LOG(INFO) << "Starting KRPC service";
+  RETURN_IF_ERROR(rpc_mgr_->StartServices(krpc_address_));
   return Status::OK();
 }
 
@@ -438,16 +426,6 @@ Status ExecEnv::GetKuduClient(
     *client = kudu_client_map_it->second->kudu_client.get();
   }
   return Status::OK();
-}
-
-DataStreamMgr* ExecEnv::ThriftStreamMgr() {
-  DCHECK(!FLAGS_use_krpc);
-  return dynamic_cast<DataStreamMgr*>(stream_mgr_.get());
-}
-
-KrpcDataStreamMgr* ExecEnv::KrpcStreamMgr() {
-  DCHECK(FLAGS_use_krpc);
-  return dynamic_cast<KrpcDataStreamMgr*>(stream_mgr_.get());
 }
 
 } // namespace impala

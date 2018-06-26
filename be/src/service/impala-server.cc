@@ -52,7 +52,6 @@
 #include "rpc/thrift-util.h"
 #include "runtime/client-cache.h"
 #include "runtime/coordinator.h"
-#include "runtime/data-stream-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/lib-cache.h"
 #include "runtime/mem-tracker.h"
@@ -119,7 +118,6 @@ DECLARE_string(authorized_proxy_group_config);
 DECLARE_string(authorized_proxy_group_config_delimiter);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disk_spill_encryption);
-DECLARE_bool(use_krpc);
 DECLARE_bool(use_local_catalog);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served."
@@ -1268,33 +1266,6 @@ void ImpalaServer::ReportExecStatus(
   request_state->UpdateBackendExecStatus(params).SetTStatus(&return_val);
 }
 
-void ImpalaServer::TransmitData(
-    TTransmitDataResult& return_val, const TTransmitDataParams& params) {
-  VLOG_ROW << "TransmitData(): instance_id=" << PrintId(params.dest_fragment_instance_id)
-           << " node_id=" << params.dest_node_id
-           << " #rows=" << params.row_batch.num_rows
-           << " sender_id=" << params.sender_id
-           << " eos=" << (params.eos ? "true" : "false");
-  // TODO: fix Thrift so we can simply take ownership of thrift_batch instead
-  // of having to copy its data
-  if (params.row_batch.num_rows > 0) {
-    Status status = exec_env_->ThriftStreamMgr()->AddData(
-        params.dest_fragment_instance_id, params.dest_node_id, params.row_batch,
-        params.sender_id);
-    status.SetTStatus(&return_val);
-    if (!status.ok()) {
-      // should we close the channel here as well?
-      return;
-    }
-  }
-
-  if (params.eos) {
-    exec_env_->ThriftStreamMgr()->CloseSender(
-        params.dest_fragment_instance_id, params.dest_node_id,
-        params.sender_id).SetTStatus(&return_val);
-  }
-}
-
 void ImpalaServer::InitializeConfigVariables() {
   // Set idle_session_timeout here to let the SET command return the value of
   // the command line option FLAGS_idle_session_timeout
@@ -1755,11 +1726,10 @@ void ImpalaServer::AddLocalBackendToStatestore(
   local_backend_descriptor.ip_address = exec_env_->ip_address();
   local_backend_descriptor.__set_proc_mem_limit(
       exec_env_->process_mem_tracker()->limit());
-  if (FLAGS_use_krpc) {
-    const TNetworkAddress& krpc_address = exec_env_->krpc_address();
-    DCHECK(IsResolvedAddress(krpc_address));
-    local_backend_descriptor.__set_krpc_address(krpc_address);
-  }
+  const TNetworkAddress& krpc_address = exec_env_->krpc_address();
+  DCHECK(IsResolvedAddress(krpc_address));
+  local_backend_descriptor.__set_krpc_address(krpc_address);
+
   subscriber_topic_updates->emplace_back(TTopicDelta());
   TTopicDelta& update = subscriber_topic_updates->back();
   update.topic_name = Statestore::IMPALA_MEMBERSHIP_TOPIC;

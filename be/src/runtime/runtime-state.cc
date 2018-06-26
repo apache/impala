@@ -34,10 +34,10 @@
 #include "exprs/timezone_db.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
-#include "runtime/data-stream-mgr-base.h"
-#include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
+#include "runtime/krpc-data-stream-mgr.h"
+#include "runtime/krpc-data-stream-recvr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
 #include "runtime/runtime-filter-bank.h"
@@ -302,7 +302,7 @@ io::DiskIoMgr* RuntimeState::io_mgr() {
   return exec_env_->disk_io_mgr();
 }
 
-DataStreamMgrBase* RuntimeState::stream_mgr() {
+KrpcDataStreamMgr* RuntimeState::stream_mgr() {
   return exec_env_->stream_mgr();
 }
 

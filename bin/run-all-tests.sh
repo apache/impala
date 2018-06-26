@@ -39,8 +39,6 @@ if "${CLUSTER_DIR}/admin" is_kerberized; then
 fi
 
 # Parametrized Test Options
-# Disable KRPC for test cluster and test execution
-: ${DISABLE_KRPC:=false}
 # Run FE Tests
 : ${FE_TEST:=true}
 # Run Backend Tests
@@ -75,11 +73,6 @@ if [[ "${ERASURE_CODING}" = true ]]; then
   FE_TEST=false
   TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} \
     --impalad_args=--default_query_options=allow_erasure_coded_files=true"
-fi
-
-# If KRPC tests are disabled, pass the flag to disable KRPC during cluster start.
-if [[ "${DISABLE_KRPC}" == "true" ]]; then
-  TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} --disable_krpc"
 fi
 
 # Indicates whether code coverage reports should be generated.
@@ -128,12 +121,6 @@ COMMON_PYTEST_ARGS="--maxfail=${MAX_PYTEST_FAILURES} --exploration_strategy=core
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # Only one impalad is supported when running against local filesystem.
   COMMON_PYTEST_ARGS+=" --impalad=localhost:21000"
-fi
-
-# If KRPC tests are disabled, pass test_no_krpc flag to pytest.
-# This includes the end-to-end tests and the custom cluster tests.
-if [[ "${DISABLE_KRPC}" == "true" ]]; then
-  COMMON_PYTEST_ARGS+=" --test_no_krpc"
 fi
 
 # For logging when using run-step.

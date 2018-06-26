@@ -43,7 +43,6 @@
 
 #include "common/names.h"
 
-DECLARE_bool(use_krpc);
 DECLARE_int32(datastream_service_num_deserialization_threads);
 
 using kudu::MonoDelta;

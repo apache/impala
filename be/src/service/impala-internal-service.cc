@@ -80,15 +80,6 @@ void ImpalaInternalService::ReportExecStatus(TReportExecStatusResult& return_val
   impala_server_->ReportExecStatus(return_val, params);
 }
 
-void ImpalaInternalService::TransmitData(TTransmitDataResult& return_val,
-    const TTransmitDataParams& params) {
-  FAULT_INJECTION_RPC_DELAY(RPC_TRANSMITDATA);
-  DCHECK(params.__isset.dest_fragment_instance_id);
-  DCHECK(params.__isset.sender_id);
-  DCHECK(params.__isset.dest_node_id);
-  impala_server_->TransmitData(return_val, params);
-}
-
 void ImpalaInternalService::UpdateFilter(TUpdateFilterResult& return_val,
     const TUpdateFilterParams& params) {
   FAULT_INJECTION_RPC_DELAY(RPC_UPDATEFILTER);

@@ -41,8 +41,6 @@ namespace impala {
 class AdmissionController;
 class BufferPool;
 class CallableThreadPool;
-class DataStreamMgrBase;
-class DataStreamMgr;
 class DataStreamService;
 class QueryExecMgr;
 class Frontend;
@@ -109,13 +107,7 @@ class ExecEnv {
   /// StartServices() was successful.
   TNetworkAddress GetThriftBackendAddress() const;
 
-  DataStreamMgrBase* stream_mgr() { return stream_mgr_.get(); }
-
-  /// TODO: Remove once a single DataStreamMgrBase implementation is standardized on.
-  /// Clients of DataStreamMgrBase should use stream_mgr() unless they need to access
-  /// members that are not a part of the DataStreamMgrBase interface.
-  DataStreamMgr* ThriftStreamMgr();
-  KrpcDataStreamMgr* KrpcStreamMgr();
+  KrpcDataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
 
   ImpalaBackendClientCache* impalad_client_cache() {
     return impalad_client_cache_.get();
@@ -175,7 +167,7 @@ class ExecEnv {
  private:
   boost::scoped_ptr<ObjectPool> obj_pool_;
   boost::scoped_ptr<MetricGroup> metrics_;
-  boost::scoped_ptr<DataStreamMgrBase> stream_mgr_;
+  boost::scoped_ptr<KrpcDataStreamMgr> stream_mgr_;
   boost::scoped_ptr<Scheduler> scheduler_;
   boost::scoped_ptr<AdmissionController> admission_controller_;
   boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;

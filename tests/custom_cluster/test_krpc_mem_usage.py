@@ -26,7 +26,6 @@ DATA_STREAM_MGR_METRIC = "Data Stream Manager Early RPCs"
 DATA_STREAM_SVC_METRIC = "Data Stream Service Queue"
 ALL_METRICS = [ DATA_STREAM_MGR_METRIC, DATA_STREAM_SVC_METRIC ]
 
-@SkipIf.not_krpc
 class TestKrpcMemUsage(CustomClusterTestSuite):
   """Test for memory usage tracking when using KRPC."""
   TEST_QUERY = "select count(c2.string_col) from \

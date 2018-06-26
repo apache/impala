@@ -249,7 +249,6 @@ class TestWebPage(ImpalaTestSuite):
       assert any(pattern in t for t in thread_names), \
            "Could not find thread matching '%s'" % pattern
 
-  @SkipIf.not_krpc
   def test_krpc_rpcz(self):
     """Test that KRPC metrics are exposed in /rpcz and that they are updated when
     executing a query."""

@@ -52,8 +52,8 @@
 /// TODO: We don't need millisecond precision here.
 const int32_t STREAM_EXPIRATION_TIME_MS = 300 * 1000;
 
-DECLARE_bool(use_krpc);
-DECLARE_int32(datastream_sender_timeout_ms);
+DEFINE_int32(datastream_sender_timeout_ms, 120000, "(Advanced) The time, in ms, that can "
+    "elapse  before a plan fragment will time-out trying to send the initial row batch.");
 DEFINE_int32(datastream_service_num_deserialization_threads, 16,
     "Number of threads for deserializing RPC requests deferred due to the receiver "
     "not ready or the soft limit of the receiver is reached.");
@@ -98,7 +98,7 @@ inline uint32_t KrpcDataStreamMgr::GetHashValue(
   return value;
 }
 
-shared_ptr<DataStreamRecvrBase> KrpcDataStreamMgr::CreateRecvr(
+shared_ptr<KrpcDataStreamRecvr> KrpcDataStreamMgr::CreateRecvr(
     const RowDescriptor* row_desc, const TUniqueId& finst_id, PlanNodeId dest_node_id,
     int num_senders, int64_t buffer_size, bool is_merging, RuntimeProfile* profile,
     MemTracker* parent_tracker, BufferPool::ClientHandle* client) {

@@ -59,8 +59,6 @@ class TPlanExecParams;
 class TInsertResult;
 class TReportExecStatusArgs;
 class TReportExecStatusResult;
-class TTransmitDataArgs;
-class TTransmitDataResult;
 class TNetworkAddress;
 class TClientRequest;
 class TExecRequest;
@@ -273,8 +271,6 @@ class ImpalaServer : public ImpalaServiceIf,
   /// ImpalaInternalService rpcs
   void ReportExecStatus(TReportExecStatusResult& return_val,
       const TReportExecStatusParams& params);
-  void TransmitData(TTransmitDataResult& return_val,
-      const TTransmitDataParams& params);
   void UpdateFilter(TUpdateFilterResult& return_val,
       const TUpdateFilterParams& params);
 

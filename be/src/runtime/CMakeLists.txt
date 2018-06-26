@@ -32,9 +32,6 @@ add_library(Runtime
   client-cache.cc
   coordinator.cc
   coordinator-backend-state.cc
-  data-stream-mgr.cc
-  data-stream-recvr.cc
-  data-stream-sender.cc
   debug-options.cc
   descriptors.cc
   dml-exec-state.cc

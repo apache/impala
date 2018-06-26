@@ -46,8 +46,6 @@ using namespace apache::thrift;
 using namespace org::apache::impala::fb;
 using namespace strings;
 
-DECLARE_bool(use_krpc);
-
 namespace impala {
 
 static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.total");
@@ -75,12 +73,10 @@ Status Scheduler::Init(const TNetworkAddress& backend_address,
   // requests.
   local_backend_descriptor_.ip_address = ip;
   LOG(INFO) << "Scheduler using " << ip << " as IP address";
-  if (FLAGS_use_krpc) {
-    // KRPC relies on resolved IP address.
-    DCHECK(IsResolvedAddress(krpc_address));
-    DCHECK_EQ(krpc_address.hostname, ip);
-    local_backend_descriptor_.__set_krpc_address(krpc_address);
-  }
+  // KRPC relies on resolved IP address.
+  DCHECK(IsResolvedAddress(krpc_address));
+  DCHECK_EQ(krpc_address.hostname, ip);
+  local_backend_descriptor_.__set_krpc_address(krpc_address);
 
   coord_only_backend_config_.AddBackend(local_backend_descriptor_);
 
@@ -346,12 +342,10 @@ void Scheduler::ComputeFragmentExecParams(
         dest.__set_fragment_instance_id(dest_params->instance_exec_params[i].instance_id);
         const TNetworkAddress& host = dest_params->instance_exec_params[i].host;
         dest.__set_thrift_backend(host);
-        if (FLAGS_use_krpc) {
-          const TBackendDescriptor& desc = LookUpBackendDesc(executor_config, host);
-          DCHECK(desc.__isset.krpc_address);
-          DCHECK(IsResolvedAddress(desc.krpc_address));
-          dest.__set_krpc_backend(desc.krpc_address);
-        }
+        const TBackendDescriptor& desc = LookUpBackendDesc(executor_config, host);
+        DCHECK(desc.__isset.krpc_address);
+        DCHECK(IsResolvedAddress(desc.krpc_address));
+        dest.__set_krpc_backend(desc.krpc_address);
       }
 
       // enumerate senders consecutively;

@@ -24,7 +24,6 @@ from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIf, SkipIfBuildType
 from tests.verifiers.mem_usage_verifier import MemUsageVerifier
 
-@SkipIf.not_krpc
 class TestKrpcMetrics(CustomClusterTestSuite):
   """Test for KRPC metrics that require special arguments during cluster startup."""
   RPCZ_URL = 'http://localhost:25000/rpcz?json'

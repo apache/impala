@@ -704,34 +704,6 @@ struct TCancelQueryFInstancesResult {
   1: optional Status.TStatus status
 }
 
-
-// TransmitData
-
-struct TTransmitDataParams {
-  1: required ImpalaInternalServiceVersion protocol_version
-
-  // required in V1
-  2: optional Types.TUniqueId dest_fragment_instance_id
-
-  // Id of this fragment in its role as a sender.
-  3: optional i32 sender_id
-
-  // required in V1
-  4: optional Types.TPlanNodeId dest_node_id
-
-  // optional in V1
-  5: optional Results.TRowBatch row_batch
-
-  // if set to true, indicates that no more row batches will be sent
-  // for this dest_node_id
-  6: optional bool eos
-}
-
-struct TTransmitDataResult {
-  // required in V1
-  1: optional Status.TStatus status
-}
-
 // Parameters for RequestPoolService.resolveRequestPool()
 // TODO: why is this here?
 struct TResolveRequestPoolParams {
@@ -880,10 +852,6 @@ service ImpalaInternalService {
   // Cancellation is asynchronous.
   TCancelQueryFInstancesResult CancelQueryFInstances(
       1:TCancelQueryFInstancesParams params);
-
-  // Called by sender to transmit single row batch. Returns error indication
-  // if params.fragmentId or params.destNodeId are unknown or if data couldn't be read.
-  TTransmitDataResult TransmitData(1:TTransmitDataParams params);
 
   // Called by fragment instances that produce local runtime filters to deliver them to
   // the coordinator for aggregation and broadcast.

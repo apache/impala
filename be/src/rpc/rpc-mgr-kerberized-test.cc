@@ -18,8 +18,6 @@
 #include "rpc/rpc-mgr-test-base.h"
 #include "service/fe-support.h"
 
-DECLARE_bool(use_krpc);
-
 DECLARE_string(be_principal);
 DECLARE_string(hostname);
 DECLARE_string(principal);
@@ -38,7 +36,6 @@ class RpcMgrKerberizedTest :
     public RpcMgrTestBase<testing::TestWithParam<KerberosSwitch> > {
 
   virtual void SetUp() override {
-    FLAGS_use_krpc = true;
     FLAGS_principal = "dummy-service/host@realm";
     FLAGS_be_principal = strings::Substitute("$0@$1", kdc_principal, kdc_realm);
     ASSERT_OK(InitAuth(CURRENT_EXECUTABLE_PATH));

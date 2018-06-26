@@ -18,8 +18,6 @@
 #ifndef IMPALA_RUNTIME_KRPC_DATA_STREAM_MGR_H
 #define IMPALA_RUNTIME_KRPC_DATA_STREAM_MGR_H
 
-#include "runtime/data-stream-mgr-base.h"
-
 #include <list>
 #include <queue>
 #include <set>
@@ -30,7 +28,6 @@
 
 #include "common/status.h"
 #include "common/object-pool.h"
-#include "runtime/data-stream-mgr-base.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
 #include "runtime/row-batch.h"
 #include "util/metrics.h"
@@ -225,7 +222,7 @@ struct EndDataStreamCtx {
 ///  time.
 ///  'total-senders-timedout-waiting-for-recvr-creation' - total number of senders that
 ///  timed-out while waiting for a receiver.
-class KrpcDataStreamMgr : public DataStreamMgrBase {
+class KrpcDataStreamMgr : public CacheLineAligned {
  public:
   KrpcDataStreamMgr(MetricGroup* metrics);
 
@@ -243,10 +240,10 @@ class KrpcDataStreamMgr : public DataStreamMgrBase {
   /// Ownership of the receiver is shared between this DataStream mgr instance and the
   /// caller. 'client' is the BufferPool's client handle for allocating buffers.
   /// It's owned by the parent exchange node.
-  std::shared_ptr<DataStreamRecvrBase> CreateRecvr(const RowDescriptor* row_desc,
+  std::shared_ptr<KrpcDataStreamRecvr> CreateRecvr(const RowDescriptor* row_desc,
       const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int num_senders,
       int64_t buffer_size, bool is_merging, RuntimeProfile* profile,
-      MemTracker* parent_tracker, BufferPool::ClientHandle* client) override;
+      MemTracker* parent_tracker, BufferPool::ClientHandle* client);
 
   /// Handler for TransmitData() RPC.
   ///
@@ -286,7 +283,7 @@ class KrpcDataStreamMgr : public DataStreamMgrBase {
   /// Cancels all receivers registered for fragment_instance_id immediately. The
   /// receivers will not accept any row batches after being cancelled. Any buffered
   /// row batches will not be freed until Close() is called on the receivers.
-  void Cancel(const TUniqueId& fragment_instance_id) override;
+  void Cancel(const TUniqueId& fragment_instance_id);
 
   /// Waits for maintenance thread and sender response thread pool to finish.
   ~KrpcDataStreamMgr();

@@ -35,8 +35,6 @@ using namespace strings;
 using namespace apache::thrift;
 using apache::thrift::transport::SSLProtocol;
 
-DECLARE_bool(use_krpc);
-
 DECLARE_string(principal);
 DECLARE_string(be_principal);
 DECLARE_string(ssl_client_ca_certificate);
@@ -104,7 +102,6 @@ class ThriftKerberizedParamsTest :
 
   virtual void SetUp() override {
     KerberosSwitch k = GetParam();
-    FLAGS_use_krpc = false;
     if (k == KERBEROS_OFF) {
       FLAGS_principal.clear();
       FLAGS_be_principal.clear();

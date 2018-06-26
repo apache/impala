@@ -65,7 +65,6 @@ using namespace apache::thrift;
 using namespace boost::filesystem;   // for is_regular()
 using namespace strings;
 
-DECLARE_bool(use_krpc);
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
 DECLARE_string(be_principal);

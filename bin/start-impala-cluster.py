@@ -60,8 +60,6 @@ parser.add_option("--state_store_args", dest="state_store_args", action="append"
 parser.add_option("--catalogd_args", dest="catalogd_args", action="append",
                   type="string", default=[],
                   help="Additional arguments to pass to the Catalog Service at startup")
-parser.add_option("--disable_krpc", dest="disable_krpc", action="store_true",
-                  default=False, help="Disable KRPC DataStream service during startup.")
 parser.add_option("--kill", "--kill_only", dest="kill_only", action="store_true",
                   default=False, help="Instead of starting the cluster, just kill all"
                   " the running impalads and the statestored.")
@@ -329,9 +327,6 @@ def start_impalad_instances(cluster_size, num_coordinators, use_exclusive_coordi
       args = "-stress_catalog_init_delay_ms={delay} {args}".format(
           delay=delay_list[i],
           args=args)
-
-    if options.disable_krpc:
-      args = "-use_krpc=false {args}".format(args=args)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):
