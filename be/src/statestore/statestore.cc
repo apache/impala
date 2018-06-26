@@ -28,6 +28,7 @@
 
 #include "common/status.h"
 #include "gen-cpp/StatestoreService_types.h"
+#include "rpc/rpc-trace.h"
 #include "rpc/thrift-util.h"
 #include "statestore/failure-detector.h"
 #include "statestore/statestore-subscriber-client-wrapper.h"
@@ -97,6 +98,12 @@ DEFINE_int32(statestore_update_tcp_timeout_seconds, 300, "(Advanced) The time af
     "which an update RPC to a subscriber will timeout. This setting protects against "
     "badly hung machines that are not able to respond to the update RPC in short "
     "order.");
+
+DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_private_key);
+DECLARE_string(ssl_private_key_password_cmd);
+DECLARE_string(ssl_cipher_list);
+DECLARE_string(ssl_minimum_version);
 
 // Metric keys
 // TODO: Replace 'backend' with 'subscriber' when we can coordinate a change with CM
@@ -408,6 +415,7 @@ Statestore::Statestore(MetricGroup* metrics)
         FLAGS_statestore_max_missed_heartbeats / 2)) {
 
   DCHECK(metrics != NULL);
+  metrics_ = metrics;
   num_subscribers_metric_ = metrics->AddGauge(STATESTORE_LIVE_SUBSCRIBERS, 0);
   subscriber_set_metric_ = SetMetric<string>::CreateAndRegister(metrics,
       STATESTORE_LIVE_SUBSCRIBERS_LIST, set<string>());
@@ -426,10 +434,35 @@ Statestore::Statestore(MetricGroup* metrics)
   heartbeat_client_cache_->InitMetrics(metrics, "subscriber-heartbeat");
 }
 
-Status Statestore::Init() {
+Status Statestore::Init(int32_t state_store_port) {
+  boost::shared_ptr<TProcessor> processor(new StatestoreServiceProcessor(thrift_iface()));
+  boost::shared_ptr<TProcessorEventHandler> event_handler(
+      new RpcEventHandler("statestore", metrics_));
+  processor->setEventHandler(event_handler);
+  if (state_store_port == 0) {
+    // TODO: Remove this after we upgrade to thrift-0.9.3 in branch 2.x (IMPALA-5690)
+    state_store_port = FindUnusedEphemeralPort(nullptr);
+  }
+  ThriftServerBuilder builder("StatestoreService", processor, state_store_port);
+  if (IsInternalTlsConfigured()) {
+    SSLProtocol ssl_version;
+    RETURN_IF_ERROR(
+        SSLProtoVersions::StringToProtocol(FLAGS_ssl_minimum_version, &ssl_version));
+    LOG(INFO) << "Enabling SSL for Statestore";
+    builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key)
+        .pem_password_cmd(FLAGS_ssl_private_key_password_cmd)
+        .ssl_version(ssl_version)
+        .cipher_list(FLAGS_ssl_cipher_list);
+  }
+  ThriftServer* server;
+  RETURN_IF_ERROR(builder.metrics(metrics_).Build(&server));
+  thrift_server_.reset(server);
+  RETURN_IF_ERROR(thrift_server_->Start());
+
   RETURN_IF_ERROR(subscriber_topic_update_threadpool_.Init());
   RETURN_IF_ERROR(subscriber_priority_topic_update_threadpool_.Init());
   RETURN_IF_ERROR(subscriber_heartbeat_threadpool_.Init());
+
   return Status::OK();
 }
 

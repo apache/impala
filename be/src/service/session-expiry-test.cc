@@ -21,8 +21,10 @@
 #include "rpc/thrift-client.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
+#include "statestore/statestore.h"
 #include "testutil/gtest-util.h"
 #include "testutil/in-process-servers.h"
+#include "util/asan.h"
 #include "util/impalad-metrics.h"
 #include "util/time.h"
 
@@ -48,11 +50,14 @@ TEST(SessionTest, TestExpiry) {
   FLAGS_idle_session_timeout = 1;
   // Skip validation checks for in-process backend.
   FLAGS_abort_on_config_error = false;
-  InProcessStatestore* ips;
-  ASSERT_OK(InProcessStatestore::StartWithEphemeralPorts(&ips));
+  scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
+  Statestore* statestore = new Statestore(metrics.get());
+  IGNORE_LEAKING_OBJECT(statestore);
+  // Pass in 0 to have the statestore use an ephemeral port for the service.
+  ABORT_IF_ERROR(statestore->Init(0));
   InProcessImpalaServer* impala;
   ASSERT_OK(InProcessImpalaServer::StartWithEphemeralPorts(
-      "localhost", ips->port(), &impala));
+      "localhost", statestore->port(), &impala));
   IntCounter* expired_metric =
       impala->metrics()->FindMetricForTesting<IntCounter>(
           ImpaladMetricKeys::NUM_SESSIONS_EXPIRED);

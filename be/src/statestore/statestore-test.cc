@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "testutil/gtest-util.h"
-#include "testutil/in-process-servers.h"
 #include "common/init.h"
-#include "util/metrics.h"
 #include "statestore/statestore-subscriber.h"
+#include "testutil/gtest-util.h"
+#include "util/asan.h"
+#include "util/metrics.h"
 
 #include "common/names.h"
 
@@ -37,26 +37,32 @@ namespace impala {
 TEST(StatestoreTest, SmokeTest) {
   // All allocations done by 'new' to avoid problems shutting down Thrift servers
   // gracefully.
-  InProcessStatestore* ips;
-  ASSERT_OK(InProcessStatestore::StartWithEphemeralPorts(&ips));
-  ASSERT_TRUE(ips != NULL) << "Could not start Statestore";
+  scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
+  Statestore* statestore = new Statestore(metrics.get());
+  // Thrift will internally pick an ephemeral port if we pass in 0 as the port.
+  int statestore_port = 0;
+  IGNORE_LEAKING_OBJECT(statestore);
+  ASSERT_OK(statestore->Init(statestore_port));
+
+  scoped_ptr<MetricGroup> metrics_2(new MetricGroup("statestore_2"));
   // Port already in use
-  InProcessStatestore* statestore_wont_start =
-      new InProcessStatestore(ips->port(), ips->port() + 10);
-  ASSERT_FALSE(statestore_wont_start->Start().ok());
+  Statestore* statestore_wont_start = new Statestore(metrics_2.get());
+  ASSERT_FALSE(statestore_wont_start->Init(statestore->port()).ok());
 
   int subscriber_port = FindUnusedEphemeralPort(nullptr);
   ASSERT_NE(subscriber_port, -1) << "Could not find unused port";
 
-  StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("sub1",
-      MakeNetworkAddress("localhost", subscriber_port),
-      MakeNetworkAddress("localhost", ips->port()), new MetricGroup(""));
+  StatestoreSubscriber* sub_will_start =
+      new StatestoreSubscriber("sub1", MakeNetworkAddress("localhost", subscriber_port),
+          MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
+  IGNORE_LEAKING_OBJECT(sub_will_start);
   ASSERT_OK(sub_will_start->Start());
 
   // Confirm that a subscriber trying to use an in-use port will fail to start.
-  StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("sub2",
+  StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("sub3",
       MakeNetworkAddress("localhost", subscriber_port),
-      MakeNetworkAddress("localhost", ips->port()), new MetricGroup(""));
+      MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
+  IGNORE_LEAKING_OBJECT(sub_will_not_start);
   ASSERT_FALSE(sub_will_not_start->Start().ok());
 }
 
@@ -70,9 +76,12 @@ TEST(StatestoreSslTest, SmokeTest) {
   server_key << impala_home << "/be/src/testutil/server-key.pem";
   FLAGS_ssl_private_key = server_key.str();
 
-  InProcessStatestore* statestore;
-  ASSERT_OK(InProcessStatestore::StartWithEphemeralPorts(&statestore));
-  if (statestore == NULL) FAIL() << "Unable to start Statestore";
+  // Thrift will internally pick an ephemeral port if we pass in 0 as the port.
+  int statestore_port = 0;
+  scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
+  Statestore* statestore = new Statestore(metrics.get());
+  IGNORE_LEAKING_OBJECT(statestore);
+  ASSERT_OK(statestore->Init(statestore_port));
 
   vector<int> used_ports;
   int subscriber_port = FindUnusedEphemeralPort(&used_ports);
@@ -81,6 +90,7 @@ TEST(StatestoreSslTest, SmokeTest) {
   StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("smoke_sub1",
       MakeNetworkAddress("localhost", subscriber_port),
       MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
+  IGNORE_LEAKING_OBJECT(sub_will_start);
   ASSERT_OK(sub_will_start->Start());
 
   stringstream invalid_server_cert;
@@ -92,6 +102,7 @@ TEST(StatestoreSslTest, SmokeTest) {
   StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("smoke_sub2",
       MakeNetworkAddress("localhost", another_subscriber_port),
       MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
+  IGNORE_LEAKING_OBJECT(sub_will_not_start);
   ASSERT_FALSE(sub_will_not_start->Start().ok());
 }
 
