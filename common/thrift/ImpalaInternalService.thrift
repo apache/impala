@@ -101,7 +101,6 @@ struct TQueryOptions {
   5: optional i32 num_nodes = NUM_NODES_ALL
   6: optional i64 max_scan_range_length = 0
   7: optional i32 num_scanner_threads = 0
-  9: optional bool allow_unsupported_formats = 0
   11: optional string debug_action = ""
   12: optional i64 mem_limit = 0
   14: optional CatalogObjects.THdfsCompression compression_codec
@@ -132,11 +131,6 @@ struct TQueryOptions {
   // disastrous query plans. Impala will excercise this option if a query
   // has no plan hints, and at least one table is missing relevant stats.
   29: optional bool disable_unsafe_spills = 0
-
-  // Mode for compression; RECORD, or BLOCK
-  // This field only applies for certain file types and is ignored
-  // by all other file types.
-  30: optional CatalogObjects.THdfsSeqCompressionMode seq_compression_mode
 
   // If the number of rows that are processed for a single query is below the
   // threshold, it will be executed on the coordinator only with codegen disabled

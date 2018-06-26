@@ -25,8 +25,6 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
-#include "util/codec.h"
-#include "util/compress.h"
 #include "util/hdfs-util.h"
 #include "util/runtime-profile-counters.h"
 
@@ -34,13 +32,6 @@
 #include <stdlib.h>
 
 #include "common/names.h"
-
-// Hdfs block size for compressed text.
-static const int64_t COMPRESSED_BLOCK_SIZE = 64 * 1024 * 1024;
-
-// Size to buffer before compression. We want this to be less than the block size
-// (compressed text is not splittable).
-static const int64_t COMPRESSED_BUFFERED_SIZE = 60 * 1024 * 1024;
 
 namespace impala {
 
@@ -61,41 +52,17 @@ HdfsTextTableWriter::HdfsTextTableWriter(HdfsTableSink* parent,
 }
 
 Status HdfsTextTableWriter::Init() {
-  const TQueryOptions& query_options = state_->query_options();
-  codec_ = THdfsCompression::NONE;
-  if (query_options.__isset.compression_codec) {
-    codec_ = query_options.compression_codec;
-    if (codec_ == THdfsCompression::SNAPPY) {
-      // hadoop.io.codec always means SNAPPY_BLOCKED. Alias the two.
-      codec_ = THdfsCompression::SNAPPY_BLOCKED;
-    }
-  }
-
-  if (codec_ != THdfsCompression::NONE) {
-    mem_pool_.reset(new MemPool(parent_->mem_tracker()));
-    RETURN_IF_ERROR(Codec::CreateCompressor(
-        mem_pool_.get(), true, codec_, &compressor_));
-    flush_size_ = COMPRESSED_BUFFERED_SIZE;
-  } else {
-    flush_size_ = HDFS_FLUSH_WRITE_SIZE;
-  }
   parent_->mem_tracker()->Consume(flush_size_);
   return Status::OK();
 }
 
 void HdfsTextTableWriter::Close() {
   parent_->mem_tracker()->Release(flush_size_);
-  if (mem_pool_.get() != NULL) mem_pool_->FreeAll();
 }
 
-uint64_t HdfsTextTableWriter::default_block_size() const {
-  return compressor_.get() == NULL ? 0 : COMPRESSED_BLOCK_SIZE;
-}
+uint64_t HdfsTextTableWriter::default_block_size() const { return 0; }
 
-string HdfsTextTableWriter::file_extension() const {
-  if (compressor_.get() == NULL) return "";
-  return compressor_->file_extension();
-}
+string HdfsTextTableWriter::file_extension() const { return ""; }
 
 Status HdfsTextTableWriter::AppendRows(
     RowBatch* batch, const vector<int32_t>& row_group_indices, bool* new_file) {
@@ -152,12 +119,7 @@ Status HdfsTextTableWriter::AppendRows(
   }
 
   *new_file = false;
-  if (rowbatch_stringstream_.tellp() >= flush_size_) {
-    RETURN_IF_ERROR(Flush());
-
-    // If compressed, start a new file (compressed data is not splittable).
-    *new_file = compressor_.get() != NULL;
-  }
+  if (rowbatch_stringstream_.tellp() >= flush_size_) RETURN_IF_ERROR(Flush());
 
   return Status::OK();
 }
@@ -178,22 +140,9 @@ Status HdfsTextTableWriter::InitNewFile() {
 Status HdfsTextTableWriter::Flush() {
   string rowbatch_string = rowbatch_stringstream_.str();
   rowbatch_stringstream_.str(string());
-  const uint8_t* uncompressed_data =
+  const uint8_t* data =
       reinterpret_cast<const uint8_t*>(rowbatch_string.data());
-  int64_t uncompressed_len = rowbatch_string.size();
-  const uint8_t* data = uncompressed_data;
-  int64_t len = uncompressed_len;
-
-  if (compressor_.get() != NULL) {
-    SCOPED_TIMER(parent_->compress_timer());
-    uint8_t* compressed_data;
-    int64_t compressed_len;
-    RETURN_IF_ERROR(compressor_->ProcessBlock(false,
-        uncompressed_len, uncompressed_data,
-        &compressed_len, &compressed_data));
-    data = compressed_data;
-    len = compressed_len;
-  }
+  int64_t len = rowbatch_string.size();
 
   {
     SCOPED_TIMER(parent_->hdfs_write_timer());

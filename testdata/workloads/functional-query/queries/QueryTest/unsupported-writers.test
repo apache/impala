@@ -1,0 +1,77 @@
+====
+---- QUERY
+create table __text_write (i int, s string, d double);
+====
+---- QUERY
+SET COMPRESSION_CODEC=NONE;
+insert into __text_write select 0, "a", 1.1;
+====
+---- QUERY
+SET COMPRESSION_CODEC=GZIP;
+insert into __text_write values (3, "d", 4.4);
+---- CATCH
+Writing to compressed text table is not supported.
+====
+---- QUERY
+select * from __text_write;
+---- RESULTS
+0,'a',1.1
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+create table __avro_write (i int, s string, d double)
+stored as AVRO
+TBLPROPERTIES ('avro.schema.literal'='{
+                  "name": "my_record",
+                  "type": "record",
+                  "fields": [
+                  {"name":"i", "type":["int", "null"]},
+                  {"name":"s", "type":["string", "null"]},
+                  {"name":"d", "type":["double", "null"]}]}');
+====
+---- QUERY
+insert into __avro_write select 1, "b", 2.2;
+---- CATCH
+Writing to table format AVRO is not supported.
+====
+---- QUERY
+create table __seq_write (i int, s string, d double)
+stored as SEQUENCEFILE;
+====
+---- QUERY
+insert into __seq_write values (4, "e", 5.5);
+---- CATCH
+Writing to table format SEQUENCE_FILE is not supported.
+====
+---- QUERY
+# Test writing to mixed format table containing partitions in both supported and
+# unsupported formats where writing to the partition with supported format should succeed.
+# Create a table containing both text(supported) and avro(unsupported) partitions.
+create table __mixed_format_write (id int) partitioned by (part int);
+====
+---- QUERY
+insert into __mixed_format_write partition(part=2000) values(1);
+====
+---- QUERY
+insert into __mixed_format_write partition(part=2001) values(2);
+====
+---- QUERY
+alter table __mixed_format_write partition (part=2001) set fileformat AVRO;
+====
+---- QUERY
+insert into __mixed_format_write partition(part=2000) values(3);
+====
+---- QUERY
+insert into __mixed_format_write partition(part=2001) values(4);
+---- CATCH
+Writing to table format AVRO is not supported.
+====
+---- QUERY
+select id, part from __mixed_format_write where part = 2000;
+---- RESULTS
+1,2000
+3,2000
+---- TYPES
+INT,INT
+====

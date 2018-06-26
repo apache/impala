@@ -226,25 +226,9 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::NUM_SCANNER_THREADS:
         query_options->__set_num_scanner_threads(atoi(value.c_str()));
         break;
-      case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
-        query_options->__set_allow_unsupported_formats(
-            iequals(value, "true") || iequals(value, "1"));
-        break;
       case TImpalaQueryOptions::DEBUG_ACTION:
         query_options->__set_debug_action(value.c_str());
         break;
-      case TImpalaQueryOptions::SEQ_COMPRESSION_MODE: {
-        if (iequals(value, "block")) {
-          query_options->__set_seq_compression_mode(THdfsSeqCompressionMode::BLOCK);
-        } else if (iequals(value, "record")) {
-          query_options->__set_seq_compression_mode(THdfsSeqCompressionMode::RECORD);
-        } else {
-          stringstream ss;
-          ss << "Invalid sequence file compression mode: " << value;
-          return Status(ss.str());
-        }
-        break;
-      }
       case TImpalaQueryOptions::COMPRESSION_CODEC: {
         if (iequals(value, "none")) {
           query_options->__set_compression_codec(THdfsCompression::NONE);

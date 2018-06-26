@@ -18,8 +18,6 @@
 #include "exec/hdfs-table-sink.h"
 #include "exec/hdfs-table-writer.h"
 #include "exec/hdfs-text-table-writer.h"
-#include "exec/hdfs-sequence-table-writer.h"
-#include "exec/hdfs-avro-table-writer.h"
 #include "exec/hdfs-parquet-table-writer.h"
 #include "exec/exec-node.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
@@ -469,28 +467,20 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
 
   output_partition->partition_descriptor = &partition_descriptor;
 
-  bool allow_unsupported_formats =
-      state->query_options().__isset.allow_unsupported_formats &&
-      state->query_options().allow_unsupported_formats;
-  if (!allow_unsupported_formats) {
-    if (partition_descriptor.file_format() == THdfsFileFormat::SEQUENCE_FILE ||
-        partition_descriptor.file_format() == THdfsFileFormat::AVRO) {
-      stringstream error_msg;
-      map<int, const char*>::const_iterator i =
-          _THdfsFileFormat_VALUES_TO_NAMES.find(partition_descriptor.file_format());
-      error_msg << "Writing to table format " << i->second
-          << " is not supported. Use query option ALLOW_UNSUPPORTED_FORMATS"
-          " to override.";
-      return Status(error_msg.str());
-    }
-    if (partition_descriptor.file_format() == THdfsFileFormat::TEXT &&
-        state->query_options().__isset.compression_codec &&
-        state->query_options().compression_codec != THdfsCompression::NONE) {
-      stringstream error_msg;
-      error_msg << "Writing to compressed text table is not supported. "
-          "Use query option ALLOW_UNSUPPORTED_FORMATS to override.";
-      return Status(error_msg.str());
-    }
+  if (partition_descriptor.file_format() == THdfsFileFormat::SEQUENCE_FILE ||
+      partition_descriptor.file_format() == THdfsFileFormat::AVRO) {
+    stringstream error_msg;
+    map<int, const char*>::const_iterator i =
+        _THdfsFileFormat_VALUES_TO_NAMES.find(partition_descriptor.file_format());
+    error_msg << "Writing to table format " << i->second << " is not supported.";
+    return Status(error_msg.str());
+  }
+  if (partition_descriptor.file_format() == THdfsFileFormat::TEXT &&
+      state->query_options().__isset.compression_codec &&
+      state->query_options().compression_codec != THdfsCompression::NONE) {
+    stringstream error_msg;
+    error_msg << "Writing to compressed text table is not supported. ";
+    return Status(error_msg.str());
   }
 
   // It is incorrect to initialize a writer if there are no rows to feed it. The writer
@@ -506,16 +496,6 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
     case THdfsFileFormat::PARQUET:
       output_partition->writer.reset(
           new HdfsParquetTableWriter(
-              this, state, output_partition, &partition_descriptor, table_desc_));
-      break;
-    case THdfsFileFormat::SEQUENCE_FILE:
-      output_partition->writer.reset(
-          new HdfsSequenceTableWriter(
-              this, state, output_partition, &partition_descriptor, table_desc_));
-      break;
-    case THdfsFileFormat::AVRO:
-      output_partition->writer.reset(
-          new HdfsAvroTableWriter(
               this, state, output_partition, &partition_descriptor, table_desc_));
       break;
     default:

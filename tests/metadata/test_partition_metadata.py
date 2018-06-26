@@ -45,10 +45,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
     # compression codecs.
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         (v.get_value('table_format').file_format in ('text', 'parquet') and
-         v.get_value('table_format').compression_codec == 'none') or
-        (v.get_value('table_format').file_format in ('seq', 'avro') and
-         v.get_value('table_format').compression_codec == 'snap' and
-         v.get_value('table_format').compression_type == 'block'))
+         v.get_value('table_format').compression_codec == 'none'))
 
   @SkipIfLocal.hdfs_client # TODO: this dependency might not exist anymore
   def test_multiple_partitions_same_location(self, vector, unique_database):
@@ -70,9 +67,6 @@ class TestPartitionMetadata(ImpalaTestSuite):
     self.client.execute("alter table %s add partition (j=2) location '%s/p'"
         % (FQ_TBL_NAME, TBL_LOCATION))
 
-    # Allow unsupported avro and sequence file writer.
-    self.client.execute("set allow_unsupported_formats=true")
-
     # Insert some data. This will only update partition j=1 (IMPALA-1480).
     self.client.execute("insert into table %s partition(j=1) select 1" % FQ_TBL_NAME)
     # Refresh to update file metadata of both partitions
@@ -80,31 +74,19 @@ class TestPartitionMetadata(ImpalaTestSuite):
 
     # The data will be read twice because each partition points to the same location.
     data = self.execute_scalar("select sum(i), sum(j) from %s" % FQ_TBL_NAME)
-    if file_format == 'avro':
-      # Avro writer is broken and produces nulls. Only check partition column.
-      assert data.split('\t')[1] == '3'
-    else:
-      assert data.split('\t') == ['2', '3']
+    assert data.split('\t') == ['2', '3']
 
     self.client.execute("insert into %s partition(j) select 1, 1" % FQ_TBL_NAME)
     self.client.execute("insert into %s partition(j) select 1, 2" % FQ_TBL_NAME)
     self.client.execute("refresh %s" % FQ_TBL_NAME)
     data = self.execute_scalar("select sum(i), sum(j) from %s" % FQ_TBL_NAME)
-    if file_format == 'avro':
-      # Avro writer is broken and produces nulls. Only check partition column.
-      assert data.split('\t')[1] == '9'
-    else:
-      assert data.split('\t') == ['6', '9']
+    assert data.split('\t') == ['6', '9']
 
     # Force all scan ranges to be on the same node. It should produce the same
     # result as above. See IMPALA-5412.
     self.client.execute("set num_nodes=1")
     data = self.execute_scalar("select sum(i), sum(j) from %s" % FQ_TBL_NAME)
-    if file_format == 'avro':
-      # Avro writer is broken and produces nulls. Only check partition column.
-      assert data.split('\t')[1] == '9'
-    else:
-      assert data.split('\t') == ['6', '9']
+    assert data.split('\t') == ['6', '9']
 
   @SkipIfS3.hive
   @SkipIfADLS.hive

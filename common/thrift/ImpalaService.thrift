@@ -72,8 +72,7 @@ enum TImpalaQueryOptions {
   // Number of scanner threads.
   NUM_SCANNER_THREADS,
 
-  // If true, Impala will try to execute on file formats that are not fully supported yet
-  ALLOW_UNSUPPORTED_FORMATS,
+  ALLOW_UNSUPPORTED_FORMATS, // Removed
 
   DEFAULT_ORDER_BY_LIMIT, // Removed
 
@@ -110,8 +109,7 @@ enum TImpalaQueryOptions {
   // Leave blank to use default.
   COMPRESSION_CODEC,
 
-  // Mode for compressing sequence files; either BLOCK, RECORD, or DEFAULT
-  SEQ_COMPRESSION_MODE,
+  SEQ_COMPRESSION_MODE, // Removed
 
   // HBase scan query option. If set and > 0, HBASE_CACHING is the value for
   // "hbase.client.Scan.setCaching()" when querying HBase table. Otherwise, use backend

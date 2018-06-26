@@ -87,15 +87,6 @@ class HdfsTextTableWriter : public HdfsTableWriter {
   /// Stringstream to buffer output.  The stream is cleared between HDFS
   /// Write calls to allow for the internal buffers to be reused.
   std::stringstream rowbatch_stringstream_;
-
-  /// Compression codec.
-  THdfsCompression::type codec_;
-
-  /// Compressor if compression is enabled.
-  boost::scoped_ptr<Codec> compressor_;
-
-  /// Memory pool to use with compressor_.
-  boost::scoped_ptr<MemPool> mem_pool_;
 };
 
 }

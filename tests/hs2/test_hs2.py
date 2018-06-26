@@ -89,11 +89,10 @@ class TestHS2(HS2TestSuite):
     # Should be unchanged
     assert vals2["SYNC_DDL"] == "0"
 
-    # Verify that 'DEVELOPMENT' and 'DEPRECATED' options are not returned.
     assert "MAX_ERRORS" in vals2
     assert levels["MAX_ERRORS"] == "ADVANCED"
+    # Verify that 'DEVELOPMENT' options are not returned.
     assert "DEBUG_ACTION" not in vals2
-    assert "ALLOW_UNSUPPORTED_FORMATS" not in vals2
 
     # Removed options should not be returned.
     assert "MAX_IO_BUFFERS" not in vals2
@@ -101,7 +100,8 @@ class TestHS2(HS2TestSuite):
   @needs_session()
   def test_session_option_levels_via_set_all(self):
     """
-    Tests the level of session options returned by a SET ALL query.
+    Tests the level of session options returned by a SET ALL query except DEPRECATED as we
+    currently do not have any of those left.
     """
     vals, levels = self.get_session_options("SET ALL")
 
@@ -109,12 +109,10 @@ class TestHS2(HS2TestSuite):
     assert "SYNC_DDL" in vals
     assert "MAX_ERRORS" in vals
     assert "DEBUG_ACTION" in vals
-    assert "ALLOW_UNSUPPORTED_FORMATS" in vals
     assert levels["COMPRESSION_CODEC"] == "REGULAR"
     assert levels["SYNC_DDL"] == "REGULAR"
     assert levels["MAX_ERRORS"] == "ADVANCED"
     assert levels["DEBUG_ACTION"] == "DEVELOPMENT"
-    assert levels["ALLOW_UNSUPPORTED_FORMATS"] == "DEPRECATED"
 
     # Removed options should not be returned.
     assert "MAX_IO_BUFFERS" not in vals
