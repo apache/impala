@@ -182,7 +182,7 @@ void HdfsOperationSet::AddError(const string& err, const HdfsOp* op) {
 }
 
 void HdfsOperationSet::MarkOneOpDone() {
-  ops_complete_barrier_->Notify();
+  discard_result(ops_complete_barrier_->Notify());
 }
 
 bool HdfsOperationSet::ShouldAbort() {

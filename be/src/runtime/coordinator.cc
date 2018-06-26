@@ -706,7 +706,7 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
               TNetworkAddressToString(backend_state->impalad_address())));
     }
     // We've applied all changes from the final status report - notify waiting threads.
-    backend_exec_complete_barrier_->Notify();
+    discard_result(backend_exec_complete_barrier_->Notify());
   }
   // If query execution has terminated, return a cancelled status to force the fragment
   // instance to stop executing.
