@@ -93,6 +93,18 @@ class TestDdlBase(ImpalaTestSuite):
         properties[row[1].rstrip()] = row[2].rstrip()
     return properties
 
+  def _get_property(self, property_name, name, is_db=False):
+    """Extracts a db/table property value from the output of DESCRIBE FORMATTED."""
+    result = self.client.execute("describe {0} formatted {1}".format(
+      "database" if is_db else "", name))
+    for row in result.data:
+      if property_name in row:
+        row = row.split('\t')
+        if row[1] == 'NULL':
+          break
+        return row[1].rstrip()
+    return None
+
   def _get_db_comment(self, db_name):
     """Extracts the DB comment from the output of DESCRIBE DATABASE"""
     result = self.client.execute("describe database {0}".format(db_name))
@@ -110,3 +122,10 @@ class TestDdlBase(ImpalaTestSuite):
       if len(cols) == 3:
         comments[cols[0].rstrip()] = cols[2].rstrip()
     return comments.get(col_name)
+
+
+  def _get_table_or_view_owner(self, table_name):
+    """Returns a tuple(owner, owner_type) for a given table name"""
+    owner_name = self._get_property("Owner:", table_name)
+    owner_type = self._get_property("OwnerType:", table_name)
+    return (owner_name, owner_type)

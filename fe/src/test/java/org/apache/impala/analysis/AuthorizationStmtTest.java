@@ -1651,7 +1651,9 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             "delimited fields terminated by ' '"),
         authorize("alter table functional.alltypes add partition(year=1, month=1)"),
         authorize("alter table functional.alltypes drop partition(" +
-            "year=2009, month=1)")}) {
+            "year=2009, month=1)"),
+        authorize("alter table functional.alltypes set owner user foo_owner"),
+        authorize("alter table functional.alltypes set owner role foo_owner")}) {
       test.ok(onServer(TPrivilegeLevel.ALL))
           .ok(onServer(TPrivilegeLevel.ALTER))
           .ok(onDatabase("functional", TPrivilegeLevel.ALL))
@@ -1823,6 +1825,25 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
         .error(alterError("functional.alltypes_view"), onTable("functional",
             "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)));
+
+    // Alter view set owner.
+    for (AuthzTest test: new AuthzTest[]{
+        authorize("alter view functional.alltypes_view set owner user foo_owner"),
+        authorize("alter view functional.alltypes_view set owner role foo_owner")}) {
+      test.ok(onServer(TPrivilegeLevel.ALL))
+          .ok(onServer(TPrivilegeLevel.ALTER))
+          .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+          .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
+          .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.ALL))
+          .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.ALTER))
+          .error(alterError("functional.alltypes_view"))
+          .error(alterError("functional.alltypes_view"), onServer(allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
+          .error(alterError("functional.alltypes_view"), onDatabase("functional", allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
+          .error(alterError("functional.alltypes_view"), onTable("functional",
+              "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)));
+    }
 
     // Database does not exist.
     authorize("alter view nodb.alltypes_view as select 1")

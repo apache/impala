@@ -33,7 +33,7 @@ import com.google.common.base.Preconditions;
  * Base class for all ALTER TABLE statements.
  */
 public abstract class AlterTableStmt extends StatementBase {
-  protected final TableName tableName_;
+  protected TableName tableName_;
 
   // Set during analysis.
   protected FeTable table_;
