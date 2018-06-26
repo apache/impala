@@ -123,9 +123,10 @@ class Statestore : public CacheLineAligned {
   /// The only constructor; initialises member variables only.
   Statestore(MetricGroup* metrics);
 
+  /// Initialize and start the backing ThriftServer with port 'state_store_port'.
   /// Initialize the ThreadPools used for updates and heartbeats. Returns an error if
-  /// ThreadPool initialization fails.
-  Status Init() WARN_UNUSED_RESULT;
+  /// any of the above initialization fails.
+  Status Init(int32_t state_store_port) WARN_UNUSED_RESULT;
 
   /// Registers a new subscriber with the given unique subscriber ID, running a subscriber
   /// service at the given location, with the provided list of topic subscriptions.
@@ -158,6 +159,9 @@ class Statestore : public CacheLineAligned {
   static const std::string IMPALA_MEMBERSHIP_TOPIC;
   /// Topic tracking the state of admission control on all coordinators.
   static const std::string IMPALA_REQUEST_QUEUE_TOPIC;
+
+  int32_t port() { return thrift_server_->port(); }
+
  private:
   /// A TopicEntry is a single entry in a topic, and logically is a <string, byte string>
   /// pair.
@@ -525,6 +529,12 @@ class Statestore : public CacheLineAligned {
   /// whereas they are not safe for UpdateState() RPCs which can take an unbounded amount
   /// of time.
   boost::scoped_ptr<StatestoreSubscriberClientCache> heartbeat_client_cache_;
+
+  /// Container for the internal statestore service.
+  boost::scoped_ptr<ThriftServer> thrift_server_;
+
+  /// Pointer to the MetricGroup for this statestore. Not owned.
+  MetricGroup* metrics_;
 
   /// Thrift API implementation which proxies requests onto this Statestore
   boost::shared_ptr<StatestoreServiceIf> thrift_iface_;

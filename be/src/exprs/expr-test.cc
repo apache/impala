@@ -28,7 +28,6 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 
-#include "testutil/gtest-util.h"
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "common/object-pool.h"
@@ -36,33 +35,36 @@
 #include "exprs/like-predicate.h"
 #include "exprs/literal.h"
 #include "exprs/null-literal.h"
-#include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
 #include "exprs/string-functions.h"
 #include "exprs/timestamp-functions.h"
 #include "exprs/timezone_db.h"
 #include "gen-cpp/Exprs_types.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/hive_metastore_types.h"
 #include "rpc/thrift-client.h"
 #include "rpc/thrift-server.h"
-#include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
+#include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
+#include "statestore/statestore.h"
+#include "testutil/gtest-util.h"
 #include "testutil/impalad-query-executor.h"
 #include "testutil/in-process-servers.h"
 #include "udf/udf-test-harness.h"
+#include "util/asan.h"
 #include "util/debug-util.h"
 #include "util/string-parser.h"
 #include "util/string-util.h"
 #include "util/test-info.h"
-#include "gen-cpp/ImpalaInternalService_types.h"
 
 #include "common/names.h"
 
@@ -83,6 +85,8 @@ using namespace impala;
 
 namespace impala {
 ImpaladQueryExecutor* executor_;
+scoped_ptr<MetricGroup> statestore_metrics(new MetricGroup("statestore_metrics"));
+Statestore* statestore;
 bool disable_codegen_;
 bool enable_expr_rewrites_;
 
@@ -8798,11 +8802,16 @@ int main(int argc, char** argv) {
   FLAGS_abort_on_config_error = false;
   VLOG_CONNECTION << "creating test env";
   VLOG_CONNECTION << "starting backends";
-  InProcessStatestore* ips;
-  ABORT_IF_ERROR(InProcessStatestore::StartWithEphemeralPorts(&ips));
+  statestore = new Statestore(statestore_metrics.get());
+  IGNORE_LEAKING_OBJECT(statestore);
+
+  // Pass in 0 to have the statestore use an ephemeral port for the service.
+  ABORT_IF_ERROR(statestore->Init(0));
   InProcessImpalaServer* impala_server;
   ABORT_IF_ERROR(InProcessImpalaServer::StartWithEphemeralPorts(
-      FLAGS_hostname, ips->port(), &impala_server));
+      FLAGS_hostname, statestore->port(), &impala_server));
+  IGNORE_LEAKING_OBJECT(impala_server);
+
   executor_ = new ImpaladQueryExecutor(FLAGS_hostname, impala_server->GetBeeswaxPort());
   ABORT_IF_ERROR(executor_->Setup());
 

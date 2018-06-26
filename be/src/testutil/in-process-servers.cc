@@ -105,39 +105,3 @@ int InProcessImpalaServer::GetBeeswaxPort() const {
 int InProcessImpalaServer::GetHS2Port() const {
   return impala_server_->GetHS2Port();
 }
-
-Status InProcessStatestore::StartWithEphemeralPorts(InProcessStatestore** statestore) {
-  *statestore = new InProcessStatestore(0, 0);
-  return (*statestore)->Start();
-}
-
-InProcessStatestore::InProcessStatestore(int statestore_port, int webserver_port)
-    : webserver_(new Webserver(webserver_port)),
-      metrics_(new MetricGroup("statestore")),
-      statestore_port_(statestore_port),
-      statestore_(new Statestore(metrics_.get())) {
-  AddDefaultUrlCallbacks(webserver_.get());
-  statestore_->RegisterWebpages(webserver_.get());
-}
-
-Status InProcessStatestore::Start() {
-  RETURN_IF_ERROR(statestore_->Init());
-  RETURN_IF_ERROR(webserver_->Start());
-  boost::shared_ptr<TProcessor> processor(
-      new StatestoreServiceProcessor(statestore_->thrift_iface()));
-
-  ThriftServerBuilder builder("StatestoreService", processor, statestore_port_);
-  if (IsInternalTlsConfigured()) {
-    LOG(INFO) << "Enabling SSL for Statestore";
-    builder.ssl(FLAGS_ssl_server_certificate, FLAGS_ssl_private_key);
-  }
-  ThriftServer* server;
-  ABORT_IF_ERROR(builder.metrics(metrics_.get()).Build(&server));
-  statestore_server_.reset(server);
-  RETURN_IF_ERROR(Thread::Create("statestore", "main-loop",
-      &Statestore::MainLoop, statestore_.get(), &statestore_main_loop_));
-
-  RETURN_IF_ERROR(statestore_server_->Start());
-  statestore_port_ = statestore_server_->port();
-  return WaitForServer("localhost", statestore_port_, 10, 100);
-}
