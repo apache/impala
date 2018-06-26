@@ -81,7 +81,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     RETURN_IF_ERROR(IssueInitialScanRanges(state));
 
     // Release the scanner threads
-    ranges_issued_barrier_.Notify();
+    discard_result(ranges_issued_barrier_.Notify());
 
     if (progress_.done()) SetDone();
   }

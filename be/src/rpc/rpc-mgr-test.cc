@@ -225,8 +225,10 @@ TEST_F(RpcMgrTest, AsyncCall) {
     ScanMemResponsePB response;
     SetupScanMemRequest(&request, &controller);
     CountingBarrier barrier(1);
-    scan_mem_proxy->ScanMemAsync(request, &response, &controller,
-        [barrier_ptr = &barrier]() { barrier_ptr->Notify(); });
+    scan_mem_proxy->ScanMemAsync(
+        request, &response, &controller, [barrier_ptr = &barrier]() {
+          discard_result(barrier_ptr->Notify());
+        });
     // TODO: Inject random cancellation here.
     barrier.Wait();
     ASSERT_TRUE(controller.status().ok()) << controller.status().ToString();
