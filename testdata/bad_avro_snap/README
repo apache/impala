@@ -1,6 +1,6 @@
 String Data
 -----------
-Created by modifying Impala's HdfsAvroTableWriter.
+Created by modifying Impala's HdfsAvroTableWriter(removed).
 
 These files' schemas have a single nullable string column 's'.
 
@@ -14,7 +14,7 @@ truncated_string.avro: contains one value, which is missing the last byte.
 
 Float Data
 ----------
-Created by modifying Impala's HdfsAvroTableWriter.
+Created by modifying Impala's HdfsAvroTableWriter(removed).
 
 These files' schemas have a single nullable float column 'c1'.
 

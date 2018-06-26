@@ -89,16 +89,17 @@ class TestHS2(HS2TestSuite):
     # Should be unchanged
     assert vals2["SYNC_DDL"] == "0"
 
-    # Verify that 'DEVELOPMENT' and 'DEPRECATED' options are not returned.
     assert "MAX_ERRORS" in vals2
     assert levels["MAX_ERRORS"] == "ADVANCED"
+    # Verify that 'DEVELOPMENT' options are not returned.
     assert "DEBUG_ACTION" not in vals2
     assert "SCAN_NODE_CODEGEN_THRESHOLD" not in vals2
 
   @needs_session()
   def test_session_option_levels_via_set_all(self):
     """
-    Tests the level of session options returned by a SET ALL query.
+    Tests the level of session options returned by a SET ALL query except DEPRECATED as we
+    currently do not have any of those left.
     """
     vals, levels = self.get_session_options("SET ALL")
 

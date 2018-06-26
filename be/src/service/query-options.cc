@@ -64,8 +64,10 @@ void impala::OverlayQueryOptions(const TQueryOptions& src, const QueryOptionsMas
       "Size of QueryOptionsMask must be increased.";
 #define QUERY_OPT_FN(NAME, ENUM, LEVEL)\
   if (src.__isset.NAME && mask[TImpalaQueryOptions::ENUM]) dst->__set_##NAME(src.NAME);
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
 }
 
 // Choose different print function based on the type.
@@ -95,8 +97,10 @@ void impala::TQueryOptionsToMap(const TQueryOptions& query_options,
       (*configuration)[#ENUM] = ""; \
     }\
   }
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM) (*configuration)[#ENUM] = "";
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
 }
 
 // Resets query_options->option to its default value.
@@ -108,8 +112,10 @@ static void ResetQueryOption(const int option, TQueryOptions* query_options) {
       query_options->__isset.NAME = defaults.__isset.NAME;\
       query_options->NAME = defaults.NAME;\
       break;
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
   }
 }
 
@@ -130,8 +136,10 @@ string impala::DebugQueryOptions(const TQueryOptions& query_options) {
     if (i++ > 0) ss << ",";\
     ss << #ENUM << "=" << query_options.NAME;\
   }
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)
   QUERY_OPTS_TABLE
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
   return ss.str();
 }
 
@@ -146,6 +154,19 @@ static int GetQueryOptionForKey(const string& key) {
     }
   }
   return -1;
+}
+
+// Return true if we can ignore a reference to this removed query option.
+static bool IsRemovedQueryOption(const string& key) {
+#define QUERY_OPT_FN(NAME, ENUM, LEVEL)
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM) \
+  if (iequals(key, #NAME)) { \
+    return true; \
+  }
+  QUERY_OPTS_TABLE
+#undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
+  return false;
 }
 
 // Note that we allow numerical values for boolean and enum options. This is because
@@ -208,28 +229,12 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::NUM_SCANNER_THREADS:
         query_options->__set_num_scanner_threads(atoi(value.c_str()));
         break;
-      case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
-        query_options->__set_allow_unsupported_formats(
-            iequals(value, "true") || iequals(value, "1"));
-        break;
       case TImpalaQueryOptions::DEFAULT_ORDER_BY_LIMIT:
         query_options->__set_default_order_by_limit(atoi(value.c_str()));
         break;
       case TImpalaQueryOptions::DEBUG_ACTION:
         query_options->__set_debug_action(value.c_str());
         break;
-      case TImpalaQueryOptions::SEQ_COMPRESSION_MODE: {
-        if (iequals(value, "block")) {
-          query_options->__set_seq_compression_mode(THdfsSeqCompressionMode::BLOCK);
-        } else if (iequals(value, "record")) {
-          query_options->__set_seq_compression_mode(THdfsSeqCompressionMode::RECORD);
-        } else {
-          stringstream ss;
-          ss << "Invalid sequence file compression mode: " << value;
-          return Status(ss.str());
-        }
-        break;
-      }
       case TImpalaQueryOptions::COMPRESSION_CODEC: {
         if (iequals(value, "none")) {
           query_options->__set_compression_codec(THdfsCompression::NONE);
@@ -707,6 +712,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       default:
+        if (IsRemovedQueryOption(key)) {
+          LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
+          return Status::OK();
+        }
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
         LOG(ERROR) << "Missing exec option implementation: " << key;
@@ -752,7 +761,12 @@ void impala::PopulateQueryOptionLevels(QueryOptionLevels* query_option_levels)
   {\
     (*query_option_levels)[#ENUM] = LEVEL;\
   }
+#define REMOVED_QUERY_OPT_FN(NAME, ENUM)\
+  {\
+    (*query_option_levels)[#ENUM] = TQueryOptionLevel::REMOVED;\
+  }
   QUERY_OPTS_TABLE
   QUERY_OPT_FN(support_start_over, SUPPORT_START_OVER, TQueryOptionLevel::ADVANCED)
 #undef QUERY_OPT_FN
+#undef REMOVED_QUERY_OPT_FN
 }

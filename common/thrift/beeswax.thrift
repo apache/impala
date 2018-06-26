@@ -101,7 +101,8 @@ enum TQueryOptionLevel {
   REGULAR,
   ADVANCED,
   DEVELOPMENT,
-  DEPRECATED
+  DEPRECATED,
+  REMOVED
 }
 
 /** Represents a Hadoop-style configuration variable. */

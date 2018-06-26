@@ -238,6 +238,7 @@ void ClientRequestState::PopulateResultForSet(bool is_set_all) {
   for (; itr != config.end(); ++itr) {
     const auto opt_level_id =
         parent_server_->query_option_levels_[itr->first];
+    if (opt_level_id == TQueryOptionLevel::REMOVED) continue;
     if (!is_set_all && (opt_level_id == TQueryOptionLevel::DEVELOPMENT ||
                         opt_level_id == TQueryOptionLevel::DEPRECATED)) {
       continue;

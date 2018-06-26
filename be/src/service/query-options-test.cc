@@ -209,8 +209,6 @@ TEST(QueryOptions, SetEnumOptions) {
       TParquetFallbackSchemaResolution, (POSITION, NAME)), true);
   TestEnumCase(options, CASE(parquet_array_resolution, TParquetArrayResolution,
       (THREE_LEVEL, TWO_LEVEL, TWO_LEVEL_THEN_THREE_LEVEL)), true);
-  TestEnumCase(options, CASE(seq_compression_mode, THdfsSeqCompressionMode,
-      (BLOCK, RECORD)), false);
   TestEnumCase(options, CASE(compression_codec, THdfsCompression,
       (NONE, GZIP, BZIP2, DEFAULT, SNAPPY, SNAPPY_BLOCKED)), false);
 #undef CASE

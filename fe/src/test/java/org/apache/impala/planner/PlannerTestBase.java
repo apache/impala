@@ -390,7 +390,6 @@ public class PlannerTestBase extends FrontendTestBase {
   protected TQueryOptions defaultQueryOptions() {
     TQueryOptions options = new TQueryOptions();
     options.setExplain_level(TExplainLevel.STANDARD);
-    options.setAllow_unsupported_formats(true);
     options.setExec_single_node_rows_threshold(0);
     return options;
   }

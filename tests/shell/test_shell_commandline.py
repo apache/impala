@@ -211,6 +211,12 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(args)
     assert 'WARNINGS:' not in result.stderr
 
+  def test_removed_query_option(self):
+    """Test that removed query options produce warning."""
+    result = run_impala_shell_cmd("-q 'set allow_unsupported_formats=true'",
+        expect_success=True)
+    assert "Ignoring removed query option: 'allow_unsupported_formats'" in result.stderr
+
   def test_output_format(self):
     expected_output = ['1'] * 3
     args = '-q "select 1,1,1" -B --quiet'

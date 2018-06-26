@@ -104,7 +104,6 @@ struct TQueryOptions {
 
   // TODO: IMPALA-4306: retire at compatibility-breaking version
   8: optional i32 max_io_buffers = 0              // Deprecated in 1.1
-  9: optional bool allow_unsupported_formats = 0
   // TODO: IMPALA-4306: retire at compatibility-breaking version
   10: optional i64 default_order_by_limit = -1    // Deprecated in 1.4
   11: optional string debug_action = ""
@@ -157,11 +156,6 @@ struct TQueryOptions {
   // disastrous query plans. Impala will excercise this option if a query
   // has no plan hints, and at least one table is missing relevant stats.
   29: optional bool disable_unsafe_spills = 0
-
-  // Mode for compression; RECORD, or BLOCK
-  // This field only applies for certain file types and is ignored
-  // by all other file types.
-  30: optional CatalogObjects.THdfsSeqCompressionMode seq_compression_mode
 
   // If the number of rows that are processed for a single query is below the
   // threshold, it will be executed on the coordinator only with codegen disabled

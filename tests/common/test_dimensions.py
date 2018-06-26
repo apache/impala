@@ -108,19 +108,6 @@ def create_parquet_dimension(workload):
   return ImpalaTestDimension('table_format',
       TableFormatInfo.create_from_string(dataset, 'parquet/none'))
 
-# Available Exec Options:
-#01: abort_on_error (bool)
-#02 max_errors (i32)
-#03: disable_codegen (bool)
-#04: batch_size (i32)
-#05: return_as_ascii (bool)
-#06: num_nodes (i32)
-#07: max_scan_range_length (i64)
-#08: num_scanner_threads (i32)
-#09: max_io_buffers (i32)
-#10: allow_unsupported_formats (bool)
-#11: partition_agg (bool)
-
 # Common sets of values for the exec option vectors
 ALL_BATCH_SIZES = [0]
 
