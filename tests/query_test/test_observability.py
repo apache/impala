@@ -227,6 +227,19 @@ class TestObservability(ImpalaTestSuite):
     runtime_profile = self.execute_query(query).runtime_profile
     self.__verify_profile_event_sequence(event_regexes, runtime_profile)
 
+  def test_query_profile_contains_node_events(self):
+    """Test that ExecNode events show up in a profile."""
+    event_regexes = [r'Node Lifecycle Event Timeline',
+                     r'Open Started',
+                     r'Open Finished',
+                     r'First Batch Requested',
+                     r'First Batch Returned',
+                     r'Last Batch Returned',
+                     r'Closed']
+    query = "select count(*) from functional.alltypes"
+    runtime_profile = self.execute_query(query).runtime_profile
+    self.__verify_profile_event_sequence(event_regexes, runtime_profile)
+
   def __verify_profile_event_sequence(self, event_regexes, runtime_profile):
     """Check that 'event_regexes' appear in a consecutive series of lines in
        'runtime_profile'"""

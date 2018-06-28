@@ -16,10 +16,11 @@
 // under the License.
 
 #include "exec/cardinality-check-node.h"
+#include "exec/exec-node-util.h"
+#include "gen-cpp/PlanNodes_types.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/runtime-profile-counters.h"
-#include "gen-cpp/PlanNodes_types.h"
 
 #include "common/names.h"
 
@@ -42,10 +43,10 @@ Status CardinalityCheckNode::Prepare(RuntimeState* state) {
 
 Status CardinalityCheckNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_ERROR(child(0)->Open(state));
-  row_batch_.reset(
-      new RowBatch(row_desc(), 1, mem_tracker()));
+  row_batch_.reset(new RowBatch(row_desc(), 1, mem_tracker()));
 
   // Read rows from the child, raise error if there are more rows than one
   RowBatch child_batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
@@ -73,9 +74,10 @@ Status CardinalityCheckNode::Open(RuntimeState* state) {
   return Status::OK();
 }
 
-Status CardinalityCheckNode::GetNext(RuntimeState* state, RowBatch* output_row_batch,
-    bool* eos) {
+Status CardinalityCheckNode::GetNext(
+    RuntimeState* state, RowBatch* output_row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));

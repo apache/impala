@@ -17,18 +17,25 @@
 
 #include "exec/empty-set-node.h"
 
+#include "exec/exec-node-util.h"
+
 #include "common/names.h"
 
 namespace impala {
 
-EmptySetNode::EmptySetNode(ObjectPool* pool, const TPlanNode& tnode,
-                     const DescriptorTbl& descs)
-    : ExecNode(pool, tnode, descs) {
+EmptySetNode::EmptySetNode(
+    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
+  : ExecNode(pool, tnode, descs) {}
+
+Status EmptySetNode::Open(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
+  return ExecNode::Open(state);
 }
 
 Status EmptySetNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  ScopedGetNextEventAdder ea(this, eos);
   *eos = true;
   return Status::OK();
 }
-
-}
+} // namespace impala

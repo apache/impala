@@ -20,8 +20,11 @@
 #include <sstream>
 #include <gutil/strings/substitute.h>
 
-#include "exprs/scalar-expr.h"
+#include "common/names.h"
+#include "exec/exec-node-util.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
+#include "gen-cpp/PlanNodes_types.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
@@ -29,8 +32,6 @@
 #include "util/bitmap.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
-#include "gen-cpp/PlanNodes_types.h"
-#include "common/names.h"
 
 using namespace impala;
 using namespace strings;
@@ -63,6 +64,7 @@ Status NestedLoopJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
 
 Status NestedLoopJoinNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(BlockingJoinNode::Open(state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(join_conjunct_evals_, state));
 
@@ -194,10 +196,11 @@ void NestedLoopJoinNode::ResetForProbe() {
   matched_probe_ = false;
 }
 
-Status NestedLoopJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch,
-    bool* eos) {
+Status NestedLoopJoinNode::GetNext(
+    RuntimeState* state, RowBatch* output_batch, bool* eos) {
   DCHECK(!output_batch->AtCapacity());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));

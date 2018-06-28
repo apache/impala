@@ -15,8 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "common/status.h"
 #include "exec/unnest-node.h"
+
+#include "common/status.h"
+#include "exec/exec-node-util.h"
 #include "exec/subplan-node.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/slot-ref.h"
@@ -99,6 +101,8 @@ Status UnnestNode::Prepare(RuntimeState* state) {
 }
 
 Status UnnestNode::Open(RuntimeState* state) {
+  DCHECK(IsInSubplan());
+  // Omit ScopedOpenEventAdder since this is always in a subplan.
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_ERROR(coll_expr_eval_->Open(state));

@@ -19,6 +19,7 @@
 
 #include <sstream>
 
+#include "exec/exec-node-util.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -43,6 +44,7 @@ StreamingAggregationNode::StreamingAggregationNode(
 
 Status StreamingAggregationNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   // Open the child before consuming resources in this node.
   RETURN_IF_ERROR(child(0)->Open(state));
   RETURN_IF_ERROR(ExecNode::Open(state));
@@ -56,6 +58,7 @@ Status StreamingAggregationNode::Open(RuntimeState* state) {
 Status StreamingAggregationNode::GetNext(
     RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
 

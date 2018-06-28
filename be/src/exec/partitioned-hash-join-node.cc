@@ -23,6 +23,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
+#include "exec/exec-node-util.h"
 #include "exec/hash-table.inline.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
@@ -159,6 +160,7 @@ void PartitionedHashJoinNode::Codegen(RuntimeState* state) {
 
 Status PartitionedHashJoinNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(BlockingJoinNode::Open(state));
   RETURN_IF_ERROR(ht_ctx_->Open(state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(other_join_conjunct_evals_, state));
@@ -491,9 +493,10 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
   }
 }
 
-Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch,
-    bool* eos) {
+Status PartitionedHashJoinNode::GetNext(
+    RuntimeState* state, RowBatch* out_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   DCHECK(!out_batch->AtCapacity());
 

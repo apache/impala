@@ -19,18 +19,19 @@
 
 #include <algorithm>
 
+#include "exec/exec-node-util.h"
+#include "exec/text-converter.inline.h"
+#include "gen-cpp/PlanNodes_types.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "util/jni-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
-#include "gen-cpp/PlanNodes_types.h"
-#include "exec/text-converter.inline.h"
 
 #include "common/names.h"
 using namespace impala;
@@ -118,10 +119,11 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HBaseScanNode::Open(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
   JNIEnv* env = getJNIEnv();
 
   // No need to initialize hbase_scanner_ if there are no scan ranges.
@@ -148,13 +150,11 @@ void HBaseScanNode::WriteTextSlot(
 }
 
 Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
-  // For GetNext, most of the time is spent in HBaseTableScanner::ResultScanner_next,
-  // but there's still some considerable time inside here.
-  // TODO: need to understand how the time is spent inside this function.
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   if (scan_range_vector_.empty() || ReachedLimit()) {
     *eos = true;

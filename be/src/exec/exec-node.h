@@ -30,6 +30,7 @@
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/descriptors.h" // for RowDescriptor
 #include "runtime/reservation-manager.h"
+#include "util/runtime-profile-counters.h"
 #include "util/runtime-profile.h"
 
 namespace impala {
@@ -230,6 +231,8 @@ class ExecNode {
 
  protected:
   friend class DataSink;
+  friend class ScopedGetNextEventAdder;
+  friend class ScopedOpenEventAdder;
 
   BufferPool::ClientHandle* buffer_pool_client() {
     return reservation_manager_.buffer_pool_client();
@@ -247,6 +250,16 @@ class ExecNode {
   int id_;
   TPlanNodeType::type type_;
   ObjectPool* pool_;
+
+  /// ExecNode lifecycle events for this ExecNode. Initialised for nodes outside subplan.
+  /// Within a subplan, we iterate through the lifecycle multiple times so this would
+  /// have a lot of overhead and not be particularly useful. All times are relative to
+  /// QueryState::fragment_events_start_time().
+  RuntimeProfile::EventSequence* events_ = nullptr;
+
+  /// Used to track whether the first GetNext() event was added to 'events_' so that
+  /// ScopedGetNextEventAdder can avoid adding a duplicate event.
+  bool first_getnext_added_ = false;
 
   /// Conjuncts and their evaluators in this node. 'conjuncts_' live in the
   /// query-state's object pool while the evaluators live in this exec node's

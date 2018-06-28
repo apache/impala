@@ -22,6 +22,7 @@
 
 #include "common/logging.h"
 #include "exec/base-sequence-scanner.h"
+#include "exec/exec-node-util.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/scanner-context.h"
 #include "runtime/descriptors.h"
@@ -77,6 +78,7 @@ HdfsScanNode::~HdfsScanNode() {
 
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
 
   if (!initial_ranges_issued_) {
     // We do this in GetNext() to maximise the amount of work we can do while waiting for
@@ -168,6 +170,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 // will block on ranges_issued_barrier_ until ranges are issued.
 Status HdfsScanNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(HdfsScanNodeBase::Open(state));
   thread_state_.Open(this, FLAGS_max_row_batches);
 

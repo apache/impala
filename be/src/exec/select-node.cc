@@ -16,14 +16,16 @@
 // under the License.
 
 #include "exec/select-node.h"
+
 #include "codegen/llvm-codegen.h"
-#include "exprs/scalar-expr.h"
+#include "exec/exec-node-util.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
+#include "gen-cpp/PlanNodes_types.h"
+#include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "runtime/raw-value.h"
 #include "util/runtime-profile-counters.h"
-#include "gen-cpp/PlanNodes_types.h"
 
 #include "common/names.h"
 
@@ -75,6 +77,7 @@ Status SelectNode::CodegenCopyRows(RuntimeState* state) {
 
 Status SelectNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_ERROR(child(0)->Open(state));
   child_row_batch_.reset(
@@ -84,6 +87,7 @@ Status SelectNode::Open(RuntimeState* state) {
 
 Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   // start (or continue) consuming row batches from child
   do {

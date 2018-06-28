@@ -15,16 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "codegen/llvm-codegen.h"
 #include "exec/union-node.h"
-#include "exprs/scalar-expr.h"
+
+#include "codegen/llvm-codegen.h"
+#include "exec/exec-node-util.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
+#include "gen-cpp/PlanNodes_types.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
+#include "runtime/tuple.h"
 #include "util/runtime-profile-counters.h"
-#include "gen-cpp/PlanNodes_types.h"
 
 #include "common/names.h"
 
@@ -139,6 +141,7 @@ void UnionNode::Codegen(RuntimeState* state) {
 
 Status UnionNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(ExecNode::Open(state));
   // Open const expr lists.
   for (const vector<ScalarExprEvaluator*>& evals : const_expr_evals_lists_) {
@@ -271,6 +274,7 @@ Status UnionNode::GetNextConst(RuntimeState* state, RowBatch* row_batch) {
 
 Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));

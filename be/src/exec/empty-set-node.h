@@ -28,9 +28,10 @@ namespace impala {
 class EmptySetNode : public ExecNode {
  public:
   EmptySetNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
+  virtual Status Open(RuntimeState* state) override;
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
 };
 
-}
+} // namespace impala
 
 #endif

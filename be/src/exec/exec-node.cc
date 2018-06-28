@@ -27,14 +27,13 @@
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
-#include "exprs/scalar-expr.h"
-#include "exprs/scalar-expr-evaluator.h"
 #include "exec/aggregation-node.h"
 #include "exec/analytic-eval-node.h"
 #include "exec/cardinality-check-node.h"
 #include "exec/data-source-scan-node.h"
 #include "exec/empty-set-node.h"
 #include "exec/exchange-node.h"
+#include "exec/exec-node-util.h"
 #include "exec/hbase-scan-node.h"
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/hdfs-scan-node.h"
@@ -53,6 +52,8 @@
 #include "exec/union-node.h"
 #include "exec/unnest-node.h"
 #include "exprs/expr.h"
+#include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
@@ -128,6 +129,10 @@ Status ExecNode::Prepare(RuntimeState* state) {
       Substitute("$0 id=$1 ptr=$2", PrintThriftEnum(type_), id_, this), runtime_profile_,
       state->instance_buffer_reservation(), mem_tracker_.get(), resource_profile_,
       debug_options_);
+  if (!IsInSubplan()) {
+    events_ = runtime_profile_->AddEventSequence("Node Lifecycle Event Timeline");
+    events_->Start(state->query_state()->fragment_events_start_time());
+  }
   return Status::OK();
 }
 
@@ -180,6 +185,7 @@ void ExecNode::Close(RuntimeState* state) {
     }
     mem_tracker_->Close();
   }
+  if (events_ != nullptr) events_->MarkEvent("Closed");
 }
 
 Status ExecNode::CreateTree(

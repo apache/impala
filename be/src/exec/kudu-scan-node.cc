@@ -19,6 +19,7 @@
 
 #include <thrift/protocol/TDebugProtocol.h>
 
+#include "exec/exec-node-util.h"
 #include "exec/kudu-scanner.h"
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr.h"
@@ -73,6 +74,7 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
 
 Status KuduScanNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(KuduScanNodeBase::Open(state));
   thread_state_.Open(this, FLAGS_kudu_max_row_batches);
 
@@ -85,12 +87,11 @@ Status KuduScanNode::Open(RuntimeState* state) {
 }
 
 Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
-  DCHECK(row_batch != NULL);
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
-  SCOPED_TIMER(materialize_tuple_timer());
 
   // If there are no scan tokens, nothing is ever placed in the materialized
   // row batch, so exit early for this case.

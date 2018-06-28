@@ -106,6 +106,7 @@ void KuduScanner::KeepKuduScannerAlive() {
 }
 
 Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
+  SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   int64_t tuple_buffer_size;
   uint8_t* tuple_buffer;
   RETURN_IF_ERROR(

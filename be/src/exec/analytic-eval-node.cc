@@ -19,10 +19,11 @@
 
 #include <gutil/strings/substitute.h>
 
-#include "exprs/agg-fn.h"
+#include "exec/exec-node-util.h"
 #include "exprs/agg-fn-evaluator.h"
-#include "exprs/scalar-expr.h"
+#include "exprs/agg-fn.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-tracker.h"
@@ -174,6 +175,7 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
 
 Status AnalyticEvalNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
@@ -755,6 +757,7 @@ inline int64_t AnalyticEvalNode::NumOutputRowsReady() const {
 
 Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));

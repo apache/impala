@@ -19,6 +19,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "exec/exec-node-util.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/exec-env.h"
 #include "runtime/krpc-data-stream-mgr.h"
@@ -113,6 +114,7 @@ void ExchangeNode::Codegen(RuntimeState* state) {
 
 Status ExchangeNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
   if (is_merging_) {
@@ -156,8 +158,9 @@ Status ExchangeNode::FillInputRowBatch(RuntimeState* state) {
 }
 
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   if (ReachedLimit()) {
     stream_recvr_->TransferAllResources(output_batch);
     *eos = true;

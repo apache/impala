@@ -16,6 +16,8 @@
 // under the License.
 
 #include "exec/subplan-node.h"
+
+#include "exec/exec-node-util.h"
 #include "exec/singular-row-src-node.h"
 #include "exec/subplan-node.h"
 #include "exec/unnest-node.h"
@@ -73,6 +75,7 @@ Status SubplanNode::Prepare(RuntimeState* state) {
 
 Status SubplanNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_ERROR(child(0)->Open(state));
   return Status::OK();
@@ -80,6 +83,7 @@ Status SubplanNode::Open(RuntimeState* state) {
 
 Status SubplanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
   *eos = false;
