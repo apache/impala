@@ -100,8 +100,9 @@ under the License.
     </p>
 
     <p>
-      <b>Type:</b> Enum of <codeph>ONE_LEVEL</codeph>, <codeph>TWO_LEVEL</codeph>,
-      <codeph>THREE_LEVEL</codeph>
+      <b>Type:</b> Enum of <codeph>TWO_LEVEL</codeph>,
+        <codeph>TWO_LEVEL_THEN_THREE_LEVEL</codeph>, and
+        <codeph>THREE_LEVEL</codeph>
     </p>
 
     <p>
