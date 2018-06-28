@@ -39,7 +39,7 @@ from collections import defaultdict
 from datetime import date, datetime
 from optparse import OptionParser
 from tests.util.calculation_util import (
-    calculate_tval, calculate_avg, calculate_stddev, calculate_geomean)
+    calculate_tval, calculate_avg, calculate_stddev, calculate_geomean, calculate_mwu)
 
 LOG = logging.getLogger(__name__)
 
@@ -78,6 +78,7 @@ RESULT_LIST = 'result_list'
 RSTD = 'rstd'
 RUNTIME_PROFILE = 'runtime_profile'
 SCALE_FACTOR = 'scale_factor'
+SORTED = 'sorted'
 STDDEV = 'stddev'
 STDDEV_TIME = 'stddev_time'
 TEST_VECTOR = 'test_vector'
@@ -113,19 +114,22 @@ parser.add_option("--lab_run_info", dest="lab_run_info", default='UNKNOWN',
                  "the results.")
 parser.add_option("--run_user_name", dest="run_user_name", default='anonymous',
                  help="User name that this run is associated with in the perf database")
-parser.add_option("--tval_threshold", dest="tval_threshold", default=None,
+parser.add_option("--tval_threshold", dest="tval_threshold", default=3.0,
                  type="float", help="The ttest t-value at which a performance change "\
                  "will be flagged as sigificant.")
+parser.add_option("--zval_threshold", dest="zval_threshold", default=3.0, type="float",
+                  help="The Mann-Whitney Z-value at which a performance change will be "
+                  "flagged as sigificant.")
 parser.add_option("--min_percent_change_threshold",
                  dest="min_percent_change_threshold", default=5.0,
                  type="float", help="Any performance changes below this threshold" \
                  " will not be classified as significant. If the user specifies an" \
                  " empty value, the threshold will be set to 0")
 parser.add_option("--max_percent_change_threshold",
-                 dest="max_percent_change_threshold", default=20.0,
+                 dest="max_percent_change_threshold", default=float("inf"),
                  type="float", help="Any performance changes above this threshold"\
                  " will be classified as significant. If the user specifies an" \
-                 " empty value, the threshold will be set to the system's maxint")
+                 " empty value, the threshold will be set to positive infinity")
 parser.add_option("--allowed_latency_diff_secs",
                  dest="allowed_latency_diff_secs", default=0.0, type="float",
                  help="If specified, only a timing change that differs by more than\
@@ -253,8 +257,11 @@ def get_impala_version(grouped):
   return '{0} ({1})'.format(version, commit_date)
 
 def calculate_time_stats(grouped):
-  """Adds statistics to the nested dictionary. We are calculating the average runtime
-     and Standard Deviation for each query type.
+  """
+  Add statistics to the nested dictionary.
+
+  Each query name is supplemented with the average, standard deviation, number of clients,
+  iterations, and a sorted list of the time taken to complete each run.
   """
 
   def remove_first_run(result_list):
@@ -282,6 +289,8 @@ def calculate_time_stats(grouped):
         results[STDDEV] = dev
         results[NUM_CLIENTS] = num_clients
         results[ITERATIONS] = iterations
+        results[SORTED] = [query_results[TIME_TAKEN] for query_results in result_list]
+        results[SORTED].sort()
 
 class Report(object):
 
@@ -344,58 +353,63 @@ class Report(object):
       self.iters = results[ITERATIONS]
 
       if ref_results is None:
-        self.perf_change, self.is_regression = False, False
+        self.perf_change = False
+        self.zval = 0
+        self.tval = 0
         # If reference results are not present, comparison columns will have inf in them
         self.base_avg = float('-inf')
         self.base_rsd = float('-inf')
         self.delta_avg = float('-inf')
         self.perf_change_str = ''
       else:
-        self.perf_change, self.is_regression = self.__check_perf_change_significance(
-            results, ref_results)
+        median = results[SORTED][int(len(results[SORTED]) / 2)]
+        all_diffs = [x - y for x in results[SORTED] for y in ref_results[SORTED]]
+        all_diffs.sort()
+        self.median_diff = all_diffs[int(len(all_diffs) / 2)] / median
+        self.perf_change, self.zval, self.tval = (
+          self.__check_perf_change_significance(results, ref_results))
         self.base_avg = ref_results[AVG]
         self.base_rsd = ref_results[STDDEV] / self.base_avg if self.base_avg > 0 else 0.0
         self.delta_avg = calculate_change(self.avg, self.base_avg)
         if self.perf_change:
           self.perf_change_str = self.__build_perf_change_str(
-              results, ref_results, self.is_regression)
+              results, ref_results, self.zval, self.tval)
           Report.significant_perf_change = True
         else:
           self.perf_change_str = ''
 
-    if not options.hive_results:
-      try:
-        save_runtime_diffs(results, ref_results, self.perf_change, self.is_regression)
-      except Exception as e:
-        LOG.error('Could not generate an html diff: {0}'.format(e))
+      if not options.hive_results:
+        try:
+          save_runtime_diffs(results, ref_results, self.perf_change, self.zval, self.tval)
+        except Exception as e:
+          LOG.error('Could not generate an html diff: {0}'.format(e))
 
     def __check_perf_change_significance(self, stat, ref_stat):
-      absolute_difference = abs(ref_stat[AVG] - stat[AVG])
+      zval = calculate_mwu(stat[SORTED], ref_stat[SORTED])
+      tval = calculate_tval(stat[AVG], stat[STDDEV], stat[ITERATIONS],
+                            ref_stat[AVG], ref_stat[STDDEV], ref_stat[ITERATIONS])
       try:
         percent_difference = abs(ref_stat[AVG] - stat[AVG]) * 100 / ref_stat[AVG]
       except ZeroDivisionError:
         percent_difference = 0.0
-      stddevs_are_zero = (ref_stat[STDDEV] == 0) and (stat[STDDEV] == 0)
+      absolute_difference = abs(ref_stat[AVG] - stat[AVG])
       if absolute_difference < options.allowed_latency_diff_secs:
-        return False, False
+        return False, zval, tval
       if percent_difference < options.min_percent_change_threshold:
-        return False, False
-      if percent_difference > options.max_percent_change_threshold:
-        return True, ref_stat[AVG] < stat[AVG]
-      if options.tval_threshold and not stddevs_are_zero:
-        tval = calculate_tval(stat[AVG], stat[STDDEV], stat[ITERATIONS],
-            ref_stat[AVG], ref_stat[STDDEV], ref_stat[ITERATIONS])
-        return abs(tval) > options.tval_threshold, tval > options.tval_threshold
-      return False, False
+        return False, zval, tval
+      return (abs(zval) > options.zval_threshold or abs(tval) > options.tval_threshold,
+              zval, tval)
 
-    def __build_perf_change_str(self, result, ref_result, is_regression):
+    def __build_perf_change_str(self, result, ref_result, zval, tval):
       """Build a performance change string.
 
       For example:
       Regression: TPCDS-Q52 [parquet/none/none] (1.390s -> 1.982s [+42.59%])
       """
 
-      perf_change_type = "(R) Regression" if is_regression else "(I) Improvement"
+      perf_change_type = ("(R) Regression" if zval >= 0 and tval >= 0
+                          else "(I) Improvement" if zval <= 0 and tval <= 0
+                          else "(?) Anomoly")
       query = result[RESULT_LIST][0][QUERY]
 
       workload_name = '{0}({1})'.format(
@@ -511,8 +525,8 @@ class Report(object):
     output = str()
 
     #per file format analysis overview table
-    table = prettytable.PrettyTable(['Workload', 'File Format',
-      'Avg (s)', 'Delta(Avg)', 'GeoMean(s)', 'Delta(GeoMean)'])
+    table = prettytable.PrettyTable(['Workload', 'File Format', 'Avg (s)', 'Delta(Avg)',
+                                     'GeoMean(s)', 'Delta(GeoMean)'])
     table.float_format = '.2'
     table.align = 'l'
     self.file_format_comparison_rows.sort(
@@ -532,14 +546,18 @@ class Report(object):
     #main comparison table
     detailed_performance_change_analysis_str = str()
     table = prettytable.PrettyTable(['Workload', 'Query', 'File Format', 'Avg(s)',
-      'Base Avg(s)', 'Delta(Avg)', 'StdDev(%)', 'Base StdDev(%)', 'Num Clients', 'Iters'])
+                                     'Base Avg(s)', 'Delta(Avg)', 'StdDev(%)',
+                                     'Base StdDev(%)', 'Iters', 'Median Diff(%)',
+                                     'MW Zval', 'Tval'])
     table.float_format = '.2'
     table.align = 'l'
     #Sort table from worst to best regression
-    self.query_comparison_rows.sort(key = lambda row: row.delta_avg, reverse = True)
+    self.query_comparison_rows.sort(key=lambda row: row.delta_avg + row.median_diff,
+                                    reverse=True)
     for row in self.query_comparison_rows:
       delta_avg_template = '  {0:+.2%}' if not row.perf_change else (
-          'R {0:+.2%}' if row.is_regression else 'I {0:+.2%}')
+        'R {0:+.2%}' if row.zval >= 0 and row.tval >= 0 else 'I {0:+.2%}' if row.zval <= 0
+        and row.tval <= 0 else '? {0:+.2%}')
 
       table_row = [
           row.workload_name,
@@ -552,8 +570,11 @@ class Report(object):
           ('* {0:.2%} *' if row.rsd > 0.1 else '  {0:.2%}  ').format(row.rsd),
           '  N/A' if row.base_rsd == float('-inf') else (
             '* {0:.2%} *' if row.base_rsd > 0.1 else '  {0:.2%}  ').format(row.base_rsd),
-          row.num_clients,
-          row.iters]
+          row.iters,
+          '   N/A' if row.median_diff == float('-inf') else delta_avg_template.format(
+            row.median_diff),
+          row.zval,
+          row.tval]
       table.add_row(table_row)
       detailed_performance_change_analysis_str += row.perf_change_str
 
@@ -982,7 +1003,8 @@ def prettyprint_time(time_val):
 def prettyprint_percent(percent_val):
   return '{0:+.2%}'.format(percent_val)
 
-def save_runtime_diffs(results, ref_results, change_significant, is_regression):
+
+def save_runtime_diffs(results, ref_results, change_significant, zval, tval):
   """Given results and reference results, generate and output an HTML file
   containing the Runtime Profile diff.
   """
@@ -1002,7 +1024,11 @@ def save_runtime_diffs(results, ref_results, change_significant, is_regression):
   # Neutral - no improvement or regression
   prefix = 'neu'
   if change_significant:
-    prefix = 'reg' if is_regression else 'imp'
+    prefix = '???'
+    if zval >= 0 and tval >= 0:
+      prefix = 'reg'
+    elif zval <= 0 and tval <= 0:
+      prefix = 'imp'
 
   runtime_profile_file_name = template.format(
       prefix = prefix,

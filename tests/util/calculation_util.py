@@ -67,3 +67,25 @@ def calculate_tval(avg, stddev, iters, ref_avg, ref_stddev, ref_iters):
 def get_random_id(length):
   return ''.join(
       random.choice(string.ascii_uppercase + string.digits) for _ in range(length))
+
+
+def calculate_mwu(samples, ref_samples):
+  """
+  Calculates the Mann-Whitney U Test Z value for the given samples and reference.
+  """
+  tag_a = [(s, 'A') for s in samples]
+  tab_b = [(s, 'B') for s in ref_samples]
+  ab = tag_a + tab_b
+  ab.sort()
+  # Assume no ties
+  u = 0
+  count_b = 0
+  for v in ab:
+    if v[1] == 'A':
+      u += count_b
+    else:
+      count_b += 1
+  # u is normally distributed with the following mean and standard deviation:
+  mean = len(samples) * len(ref_samples) / 2.0
+  stddev = math.sqrt(len(samples) * len(ref_samples) * (1 + len(ab)) / 12.0)
+  return (u - mean) / stddev
