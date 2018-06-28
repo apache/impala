@@ -70,6 +70,7 @@ row_regex:.*table: rows=3650 size=.*
 row_regex:.* extrapolated-rows=3650.*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3650'
+'   in pipelines: 00(GETNEXT)'
 ---- TYPES
 STRING
 ====
@@ -95,6 +96,7 @@ row_regex:.*table: rows=3650 size=.*
 row_regex:.* extrapolated-rows=904.*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=904'
+'   in pipelines: 00(GETNEXT)'
 ---- TYPES
 STRING
 ====
@@ -121,6 +123,7 @@ row_regex:.*table: rows=3650 size=.*
 row_regex:.* extrapolated-rows=7300.*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=7300'
+'   in pipelines: 00(GETNEXT)'
 ---- TYPES
 STRING
 ====
@@ -148,6 +151,7 @@ row_regex:.*table: rows=3650 size=.*
 row_regex:.* extrapolated-rows=3651.*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3651'
+'   in pipelines: 00(GETNEXT)'
 ---- TYPES
 STRING
 ====
@@ -174,6 +178,7 @@ row_regex:.*table: rows=10950 size=.*
 row_regex:.* extrapolated-rows=3651
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '   tuple-ids=0 row-size=4B cardinality=3651'
+'   in pipelines: 00(GETNEXT)'
 ---- TYPES
 STRING
 ====
@@ -188,6 +193,7 @@ explain select id from alltypes;
 '     columns: unavailable'
 row_regex:.* extrapolated-rows=unavailable.*
 '   tuple-ids=0 row-size=4B cardinality=unavailable'
+'   in pipelines: 00(GETNEXT)'
 ---- TYPES
 STRING
 ====

@@ -219,6 +219,10 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     }
   }
 
+  public void computePipelineMembership() {
+    planRoot_.computePipelineMembership();
+  }
+
   /**
    * Compute the peak resource profile for an instance of this fragment. Must
    * be called after all the plan nodes and sinks are added to the fragment and resource

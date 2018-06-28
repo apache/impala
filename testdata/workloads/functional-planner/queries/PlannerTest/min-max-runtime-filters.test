@@ -11,6 +11,7 @@ PLAN-ROOT SINK
 |  output: count(*)
 |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=8B cardinality=1
+|  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.string_col = b.string_col, a.int_col = b.tinyint_col + 1
@@ -18,15 +19,18 @@ PLAN-ROOT SINK
 |  runtime filters: RF002[min_max] <- b.string_col, RF003[min_max] <- b.tinyint_col + 1
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=39B cardinality=5840
+|  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN KUDU [functional_kudu.alltypestiny b]
 |     mem-estimate=0B mem-reservation=0B thread-reservation=1
 |     tuple-ids=1 row-size=18B cardinality=8
+|     in pipelines: 01(GETNEXT)
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
    runtime filters: RF002[min_max] -> a.string_col, RF003[min_max] -> a.int_col
    mem-estimate=0B mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=21B cardinality=7300
+   in pipelines: 00(GETNEXT)
 ====
 # Filters are not created if the target isn't a bare Kudu column or if 'is (not) distinct'
 # is used.
@@ -44,6 +48,7 @@ PLAN-ROOT SINK
 |  output: count(*)
 |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=8B cardinality=1
+|  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.tinyint_col IS NOT DISTINCT FROM b.tinyint_col, a.int_col + 1 = b.int_col
@@ -51,14 +56,17 @@ PLAN-ROOT SINK
 |  other predicates: a.string_col IS DISTINCT FROM b.string_col
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=44B cardinality=7300
+|  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN KUDU [functional_kudu.alltypestiny b]
 |     mem-estimate=0B mem-reservation=0B thread-reservation=1
 |     tuple-ids=1 row-size=22B cardinality=8
+|     in pipelines: 01(GETNEXT)
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
    mem-estimate=0B mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=22B cardinality=7300
+   in pipelines: 00(GETNEXT)
 ====
 # Filters are only assigned when the target expr is cast if its an implicit integer cast.
 select count(*) from functional_kudu.alltypes a, functional_kudu.alltypestiny b
@@ -76,6 +84,7 @@ PLAN-ROOT SINK
 |  output: count(*)
 |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=8B cardinality=1
+|  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: CAST(a.float_col AS DOUBLE) = b.double_col, CAST(a.int_col AS SMALLINT) = b.smallint_col, a.string_col = b.timestamp_col, a.tinyint_col = b.bigint_col
@@ -83,15 +92,18 @@ PLAN-ROOT SINK
 |  runtime filters: RF007[min_max] <- b.bigint_col
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=60B cardinality=1460
+|  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN KUDU [functional_kudu.alltypestiny b]
 |     mem-estimate=0B mem-reservation=0B thread-reservation=1
 |     tuple-ids=1 row-size=34B cardinality=8
+|     in pipelines: 01(GETNEXT)
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
    runtime filters: RF007[min_max] -> a.tinyint_col
    mem-estimate=0B mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=26B cardinality=7300
+   in pipelines: 00(GETNEXT)
 ====
 # Query with both Kudu and HDFS filter targets.
 select count(*) from functional_kudu.alltypes a, functional_parquet.alltypes b,
@@ -107,6 +119,7 @@ PLAN-ROOT SINK
 |  output: count(*)
 |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=8B cardinality=1
+|  in pipelines: 05(GETNEXT), 00(OPEN)
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = c.int_col
@@ -114,10 +127,12 @@ PLAN-ROOT SINK
 |  runtime filters: RF000[bloom] <- c.int_col, RF001[min_max] <- c.int_col
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1,2 row-size=12B cardinality=5329000
+|  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--02:SCAN KUDU [functional_kudu.alltypes c]
 |     mem-estimate=0B mem-reservation=0B thread-reservation=1
 |     tuple-ids=2 row-size=4B cardinality=7300
+|     in pipelines: 02(GETNEXT)
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = b.int_col
@@ -125,9 +140,10 @@ PLAN-ROOT SINK
 |  runtime filters: RF003[min_max] <- b.int_col
 |  mem-estimate=2.00GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=0,1 row-size=8B cardinality=7300
+|  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.alltypes b]
-|     partitions=24/24 files=24 size=188.29KB
+|     partitions=24/24 files=24 size=188.92KB
 |     runtime filters: RF000[bloom] -> b.int_col
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
@@ -136,9 +152,11 @@ PLAN-ROOT SINK
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
 |     tuple-ids=1 row-size=4B cardinality=unavailable
+|     in pipelines: 01(GETNEXT)
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
    runtime filters: RF001[min_max] -> a.int_col, RF003[min_max] -> a.int_col
    mem-estimate=0B mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=4B cardinality=7300
+   in pipelines: 00(GETNEXT)
 ====

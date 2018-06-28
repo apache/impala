@@ -15,6 +15,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=2449
    mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=97B cardinality=730
+   in pipelines: 00(GETNEXT)
 ====
 # Sample 50%
 select * from functional.alltypes tablesample system(50) repeatable(1234)
@@ -33,6 +34,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=621
    mem-estimate=80.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=97B cardinality=3650
+   in pipelines: 00(GETNEXT)
 ====
 # Sampling and scan predicates. Scan predicates are evaluated after sampling and
 # that is reflected in the cardinality.
@@ -54,6 +56,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=621
    mem-estimate=80.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=97B cardinality=365
+   in pipelines: 00(GETNEXT)
 ====
 # Partition pruning + sampling. Partition pruning happens before sampling.
 select * from functional.alltypes tablesample system(50) repeatable(1234)
@@ -73,6 +76,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=1241
    mem-estimate=48.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=97B cardinality=1825
+   in pipelines: 00(GETNEXT)
 ====
 # Edge case: sample 0%, no files should be selected
 select * from functional.alltypes tablesample system(0)
@@ -91,6 +95,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=0
    mem-estimate=0B mem-reservation=0B thread-reservation=0
    tuple-ids=0 row-size=97B cardinality=0
+   in pipelines: 00(GETNEXT)
 ====
 # Edge case: sample 1%, at least one file should be selected
 select * from functional.alltypes tablesample system(1) repeatable(1234)
@@ -109,6 +114,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=7300
    mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=97B cardinality=73
+   in pipelines: 00(GETNEXT)
 ====
 # Edge case: sample 1% and prune partitions, at least one file should be selected
 select * from functional.alltypes tablesample system(1) repeatable(1234)
@@ -128,6 +134,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=7300
    mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=97B cardinality=37
+   in pipelines: 00(GETNEXT)
 ====
 # Edge case: sample 100%, all files should be selected
 select * from functional.alltypes tablesample system (100)
@@ -146,6 +153,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=97B cardinality=7300
+   in pipelines: 00(GETNEXT)
 ====
 # Table that has no stats.
 select id from functional_parquet.alltypes tablesample system(10) repeatable(1234)
@@ -156,7 +164,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=3/24 files=3 size=24.23KB
+   partitions=3/24 files=3 size=24.14KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -164,6 +172,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
    tuple-ids=0 row-size=4B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
 ====
 # Sampling in a subquery.
 select id from functional.alltypes t1 where exists (
@@ -180,6 +189,7 @@ PLAN-ROOT SINK
 |  runtime filters: RF000[bloom] <- t2.id
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0 row-size=4B cardinality=10
+|  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=1/4 files=1 size=1.57KB
@@ -190,6 +200,7 @@ PLAN-ROOT SINK
 |     extrapolated-rows=disabled max-scan-range-rows=100
 |     mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
 |     tuple-ids=1 row-size=4B cardinality=10
+|     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
@@ -201,6 +212,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=4B cardinality=7300
+   in pipelines: 00(GETNEXT)
 ====
 # Sampling in WITH-clause view.
 with t as (select * from functional.alltypes tablesample system(10) repeatable(1234))
@@ -220,4 +232,5 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=2449
    mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=1
    tuple-ids=0 row-size=4B cardinality=730
+   in pipelines: 00(GETNEXT)
 ====

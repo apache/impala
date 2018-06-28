@@ -18,6 +18,7 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -33,6 +34,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
+import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlan;
@@ -117,6 +119,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // computeResourceProfile().
   protected ResourceProfile nodeResourceProfile_ = ResourceProfile.invalid();
 
+  // List of query execution pipelines that this node executes as a part of.
+  protected List<PipelineMembership> pipelines_;
+
   // sum of tupleIds_' avgSerializedSizes; set in computeStats()
   protected float avgRowSize_;
 
@@ -184,6 +189,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   public PlanNodeId getId() { return id_; }
+  public List<PipelineMembership> getPipelines() { return pipelines_; }
   public void setId(PlanNodeId id) {
     Preconditions.checkState(id_ == null);
     id_ = id;
@@ -322,6 +328,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       expBuilder.append("\n");
     }
 
+    if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      expBuilder.append(detailPrefix);
+      expBuilder.append("in pipelines: ");
+      List<String> pipelines = Lists.newArrayList();
+      for (PipelineMembership pipe: pipelines_) {
+        pipelines.add(pipe.getExplainString());
+      }
+      expBuilder.append(Joiner.on(", ").join(pipelines) + "\n");
+    }
+
+
     // Print the children. Do not traverse into the children of an Exchange node to
     // avoid crossing fragment boundaries.
     if (traverseChildren) {
@@ -410,6 +427,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     msg.setDisable_codegen(disableCodegen_);
     Preconditions.checkState(nodeResourceProfile_.isValid());
     msg.resource_profile = nodeResourceProfile_.toThrift();
+    msg.pipelines = Lists.newArrayList();
+    for (PipelineMembership pipe : pipelines_) {
+      msg.pipelines.add(pipe.toThrift());
+    }
     toThrift(msg);
     container.addToNodes(msg);
     // For the purpose of the BE consider ExchangeNodes to have no children.
@@ -614,6 +635,58 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * into pipelined units for resource estimation.
    */
   public boolean isBlockingNode() { return false; }
+
+  /**
+   * Fills in 'pipelines_' with the pipelines that this PlanNode is a member of.
+   *
+   * This is called only for nodes that are not part of the right branch of a
+   * subplan. All nodes in the right branch of a subplan belong to the same
+   * pipeline as the GETNEXT phase of the subplan.
+   */
+  public void computePipelineMembership() {
+    Preconditions.checkState(
+        children_.size() <= 1, "Plan nodes with > 1 child must override");
+    if (children_.size() == 0) {
+      // Leaf node, e.g. SCAN.
+      pipelines_ = Arrays.asList(
+          new PipelineMembership(id_, 0, TExecNodePhase.GETNEXT));
+      return;
+    }
+    children_.get(0).computePipelineMembership();
+    // Default behaviour for simple blocking or streaming nodes.
+    if (isBlockingNode()) {
+      // Executes as root of pipelines that child belongs to and leaf of another
+      // pipeline.
+      pipelines_ = Lists.newArrayList(
+          new PipelineMembership(id_, 0, TExecNodePhase.GETNEXT));
+      for (PipelineMembership childPipeline : children_.get(0).getPipelines()) {
+        if (childPipeline.getPhase() == TExecNodePhase.GETNEXT) {
+          pipelines_.add(new PipelineMembership(
+              childPipeline.getId(), childPipeline.getHeight() + 1, TExecNodePhase.OPEN));
+        }
+      }
+    } else {
+      // Streaming with child, e.g. SELECT. Executes as part of all pipelines the child
+      // belongs to.
+      pipelines_ = Lists.newArrayList();
+      for (PipelineMembership childPipeline : children_.get(0).getPipelines()) {
+        if (childPipeline.getPhase() == TExecNodePhase.GETNEXT) {
+           pipelines_.add(new PipelineMembership(
+               childPipeline.getId(), childPipeline.getHeight() + 1, TExecNodePhase.GETNEXT));
+        }
+      }
+    }
+  }
+
+  /**
+   * Called from SubplanNode to set the pipeline to 'pipelines'.
+   */
+  protected void setPipelinesRecursive(List<PipelineMembership> pipelines) {
+    pipelines_ = pipelines;
+    for (PlanNode child: children_) {
+      child.setPipelinesRecursive(pipelines);
+    }
+  }
 
   /**
    * Compute peak resources consumed when executing this PlanNode, initializing

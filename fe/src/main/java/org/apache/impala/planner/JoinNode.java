@@ -32,8 +32,8 @@ import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TJoinDistributionMode;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TQueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -689,5 +689,24 @@ public abstract class JoinNode extends PlanNode {
     ResourceProfile probePhaseProfile =
         finishedBuildProfile.sum(probeSideProfile.postOpenProfile);
     return new ExecPhaseResourceProfiles(duringOpenProfile, probePhaseProfile);
+  }
+
+  @Override
+  public void computePipelineMembership() {
+    children_.get(0).computePipelineMembership();
+    children_.get(1).computePipelineMembership();
+    pipelines_ = Lists.newArrayList();
+    for (PipelineMembership probePipeline : children_.get(0).getPipelines()) {
+      if (probePipeline.getPhase() == TExecNodePhase.GETNEXT) {
+          pipelines_.add(new PipelineMembership(
+              probePipeline.getId(), probePipeline.getHeight() + 1, TExecNodePhase.GETNEXT));
+      }
+    }
+    for (PipelineMembership buildPipeline : children_.get(1).getPipelines()) {
+      if (buildPipeline.getPhase() == TExecNodePhase.GETNEXT) {
+        pipelines_.add(new PipelineMembership(
+            buildPipeline.getId(), buildPipeline.getHeight() + 1, TExecNodePhase.OPEN));
+      }
+    }
   }
 }

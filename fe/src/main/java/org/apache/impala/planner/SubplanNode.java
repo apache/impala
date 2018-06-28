@@ -19,12 +19,14 @@ package org.apache.impala.planner;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * A SubplanNode evaluates its right child plan tree for every row from its left child,
@@ -113,6 +115,19 @@ public class SubplanNode extends PlanNode {
       result = result.sum(subplanComputePeakResources(child));
     }
     return result;
+  }
+
+  @Override
+  public void computePipelineMembership() {
+    children_.get(0).computePipelineMembership();
+    pipelines_ = Lists.newArrayList();
+    for (PipelineMembership leftPipeline : children_.get(0).getPipelines()) {
+      if (leftPipeline.getPhase() == TExecNodePhase.GETNEXT) {
+          pipelines_.add(new PipelineMembership(
+              leftPipeline.getId(), leftPipeline.getHeight() + 1, TExecNodePhase.GETNEXT));
+      }
+    }
+    children_.get(1).setPipelinesRecursive(pipelines_);
   }
 
   @Override

@@ -16,6 +16,7 @@ row_regex:.*Per-Host Resource Estimates: Memory=[0-9.]*MB.*
 '  04:EXCHANGE [UNPARTITIONED]'
 '     mem-estimate=0B mem-reservation=0B thread-reservation=0'
 '     tuple-ids=0,1 row-size=454B cardinality=5757710'
+'     in pipelines: 00(GETNEXT)'
 ''
 'F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3'
 row_regex:.*Per-Host Resources: mem-estimate=[0-9.]*MB mem-reservation=[0-9.]*MB thread-reservation=.*
@@ -27,10 +28,12 @@ row_regex:.*Per-Host Resources: mem-estimate=[0-9.]*MB mem-reservation=[0-9.]*MB
 '  |  runtime filters: RF000[bloom] <- o_orderkey'
 row_regex:.*  |  mem-estimate=[0-9.]*MB mem-reservation=[0-9.]*MB spill-buffer=[0-9.]*MB thread-reservation=.*
 '  |  tuple-ids=0,1 row-size=454B cardinality=5757710'
+'  |  in pipelines: 00(GETNEXT), 01(OPEN)'
 '  |'
 '  |--03:EXCHANGE [BROADCAST]'
 '  |     mem-estimate=0B mem-reservation=0B thread-reservation=0'
 '  |     tuple-ids=1 row-size=191B cardinality=1500000'
+'  |     in pipelines: 01(GETNEXT)'
 '  |'
 '  00:SCAN HDFS [tpch.lineitem, RANDOM]'
 row_regex:.*partitions=1/1 files=1 size=.*
@@ -41,6 +44,7 @@ row_regex:.*table: rows=6001215 size=.*
 row_regex:.*|     extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
 row_regex:.*     mem-estimate=[0-9.]*MB mem-reservation=[0-9.]*MB thread-reservation=1.*
 '     tuple-ids=0 row-size=263B cardinality=6001215'
+'     in pipelines: 00(GETNEXT)'
 ''
 'F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2'
 row_regex:.*Per-Host Resources: mem-estimate=[0-9.]*MB mem-reservation=[0-9.]*MB thread-reservation=.*
@@ -54,6 +58,7 @@ row_regex:.*table: rows=1500000 size=.*
 row_regex:.*   extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
 row_regex:.*     mem-estimate=[0-9.]*MB mem-reservation=[0-9.]*MB thread-reservation=.*
 '     tuple-ids=1 row-size=191B cardinality=1500000'
+'     in pipelines: 01(GETNEXT)'
 ====
 ---- QUERY
 # Tests the warning about missing table stats in the explain header.

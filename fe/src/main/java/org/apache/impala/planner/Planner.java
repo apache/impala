@@ -375,6 +375,7 @@ public class Planner {
       maxPerHostPeakResources = maxPerHostPeakResources.sum(
           fragment.getResourceProfile().multiply(fragment.getNumInstancesPerHost(mtDop)));
     }
+    planRoots.get(0).computePipelineMembership();
 
     Preconditions.checkState(maxPerHostPeakResources.getMemEstimateBytes() >= 0,
         maxPerHostPeakResources.getMemEstimateBytes());

@@ -26,6 +26,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TPlanNode;
@@ -320,5 +321,21 @@ public class UnionNode extends PlanNode {
       }
     }
     return output.toString();
+  }
+
+  @Override
+  public void computePipelineMembership() {
+    // The union streams each child's input through, so is part of every pipeline that
+    // its child is a part of.
+    pipelines_ = Lists.newArrayList();
+    for (PlanNode child: children_) {
+      child.computePipelineMembership();
+      for (PipelineMembership childPipeline : child.getPipelines()) {
+        if (childPipeline.getPhase() == TExecNodePhase.GETNEXT) {
+          pipelines_.add(new PipelineMembership(
+              childPipeline.getId(), childPipeline.getHeight() + 1, TExecNodePhase.GETNEXT));
+        }
+      }
+    }
   }
 }
