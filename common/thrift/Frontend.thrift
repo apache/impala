@@ -98,6 +98,12 @@ struct TGetTableMetricsResponse {
   1: required string metrics
 }
 
+// Response from a call to getCatalogMetrics.
+struct TGetCatalogMetricsResult {
+  1: required i32 num_dbs
+  2: required i32 num_tables
+}
+
 // Arguments to getDbs, which returns a list of dbs that match an optional pattern
 struct TGetDbsParams {
   // If not set, match every database

@@ -55,6 +55,9 @@ class Frontend {
   /// Call FE to get TExecRequest.
   Status GetExecRequest(const TQueryCtx& query_ctx, TExecRequest* result);
 
+  /// Get the metrics from the catalog used by this frontend.
+  Status GetCatalogMetrics(TGetCatalogMetricsResult* resp);
+
   /// Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
   /// table name returned is unqualified.
   /// If pattern is NULL, match all tables otherwise match only those tables that
@@ -194,6 +197,7 @@ class Frontend {
   jmethodID check_config_id_; // JniFrontend.checkConfiguration()
   jmethodID update_catalog_cache_id_; // JniFrontend.updateCatalogCache(byte[][])
   jmethodID update_membership_id_; // JniFrontend.updateMembership()
+  jmethodID get_catalog_metrics_id_; // JniFrontend.getCatalogMetrics()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_db_id_; // JniFrontend.describeDb
   jmethodID describe_table_id_; // JniFrontend.describeTable

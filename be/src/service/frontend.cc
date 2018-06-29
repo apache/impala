@@ -82,6 +82,7 @@ Frontend::Frontend() {
     {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
     {"updateCatalogCache", "([B)[B", &update_catalog_cache_id_},
     {"updateMembership", "([B)V", &update_membership_id_},
+    {"getCatalogMetrics", "()[B", &get_catalog_metrics_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"describeDb", "([B)[B", &describe_db_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
@@ -150,6 +151,10 @@ Status Frontend::ShowCreateTable(const TTableName& table_name, string* response)
 
 Status Frontend::ShowCreateFunction(const TGetFunctionsParams& params, string* response) {
   return JniUtil::CallJniMethod(fe_, show_create_function_id_, params, response);
+}
+
+Status Frontend::GetCatalogMetrics(TGetCatalogMetricsResult* resp) {
+  return JniUtil::CallJniMethod(fe_, get_catalog_metrics_id_, resp);
 }
 
 Status Frontend::GetTableNames(const string& db, const string* pattern,
