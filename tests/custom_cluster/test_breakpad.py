@@ -23,7 +23,7 @@ import shutil
 import tempfile
 import time
 from resource import setrlimit, RLIMIT_CORE, RLIM_INFINITY
-from signal import SIGSEGV, SIGKILL, SIGUSR1
+from signal import SIGSEGV, SIGKILL, SIGUSR1, SIGTERM
 from subprocess import CalledProcessError
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -218,6 +218,40 @@ class TestBreakpadExhaustive(TestBreakpadBase):
     assert self.get_num_processes('impalad') == cluster_size
     assert self.get_num_processes('catalogd') == 1
     assert self.get_num_processes('statestored') == 1
+
+  @pytest.mark.execute_serially
+  def test_sigterm_no_minidumps(self):
+    """Check that when a SIGTERM is caught, no minidump file is written.
+    After receiving SIGTERM there should be no impalad/catalogd/statestored
+    running.
+    """
+    assert self.count_all_minidumps() == 0
+    self.start_cluster()
+    cluster_size = self.get_num_processes('impalad')
+    assert self.count_all_minidumps() == 0
+
+    # impalad/catalogd/statestored should be running.
+    assert cluster_size > 0
+    assert self.get_num_processes('catalogd') == 1
+    assert self.get_num_processes('statestored') == 1
+    # There should be no SIGTERM message in the log
+    # when the system starts.
+    self.assert_impalad_log_contains('INFO', 'Caught signal: SIGTERM. Daemon will exit',
+        expected_count=0)
+
+    self.kill_cluster(SIGTERM)
+
+    # There should be no impalad/catalogd/statestored running.
+    # There should be no minidump generated.
+    assert self.get_num_processes('impalad') == 0
+    assert self.get_num_processes('catalogd') == 0
+    assert self.get_num_processes('statestored') == 0
+    assert self.count_all_minidumps() == 0
+    uid = os.getuid()
+    # There should be a SIGTERM message in the log now
+    # since we raised one above.
+    log_str = 'Caught signal: SIGTERM. Daemon will exit. Sender UID: ' + str(uid)
+    self.assert_impalad_log_contains('INFO', log_str, expected_count=1)
 
   @pytest.mark.execute_serially
   def test_minidump_relative_path(self):

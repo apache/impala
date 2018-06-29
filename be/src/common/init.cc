@@ -174,6 +174,13 @@ static void PauseMonitorLoop() {
   }
 }
 
+// Signal handler for SIGTERM, that prints the message before doing an exit.
+[[noreturn]] static void HandleSigTerm(int signum, siginfo_t* info, void* context) {
+  LOG(INFO) << "Caught signal: SIGTERM. Daemon will exit. Sender UID: " << info->si_uid
+            << ", PID: " << info->si_pid;
+  exit(0);
+}
+
 void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     TestInfo::Mode test_mode) {
   srand(time(NULL));
@@ -281,6 +288,18 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     HeapProfilerStart(FLAGS_heap_profile_dir.c_str());
   }
 #endif
+
+  // Signal handler for handling the SIGTERM. We want to log a message when catalogd or
+  // impalad or statestored is being shutdown using a SIGTERM.
+  struct sigaction action;
+  memset(&action, 0, sizeof(struct sigaction));
+  action.sa_sigaction = &HandleSigTerm;
+  action.sa_flags = SA_SIGINFO;
+  if (sigaction(SIGTERM, &action, nullptr) == -1) {
+    stringstream error_msg;
+    error_msg << "Failed to register action for SIGTERM: " << GetStrErrMsg();
+    CLEAN_EXIT_WITH_ERROR(error_msg.str());
+  }
 }
 
 Status impala::StartMemoryMaintenanceThread() {

@@ -25,7 +25,6 @@
 #include "common/status.h"
 #include "rpc/authentication.h"
 #include "rpc/rpc-trace.h"
-#include "rpc/thrift-util.h"
 #include "rpc/thrift-server.h"
 #include "runtime/mem-tracker.h"
 #include "service/fe-support.h"

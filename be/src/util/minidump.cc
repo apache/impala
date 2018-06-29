@@ -97,7 +97,9 @@ static bool DumpCallback(const google_breakpad::MinidumpDescriptor& descriptor,
 }
 
 /// Signal handler to write a minidump file outside of crashes.
-static void HandleSignal(int signal) {
+static void HandleSignal(int signum, siginfo_t* info, void* context) {
+  LOG(INFO) << "Caught signal: SIGUSR1. Sender UID: " << info->si_uid
+            << ", PID: " << info->si_pid;
   minidump_exception_handler->WriteMinidump(FLAGS_minidump_path, DumpCallback, NULL);
 }
 
@@ -109,11 +111,16 @@ static void SetupSigUSR1Handler(bool minidumps_enabled) {
   sigemptyset(&sig_action.sa_mask);
   if (minidumps_enabled) {
     DCHECK(minidump_exception_handler != NULL);
-    sig_action.sa_handler = &HandleSignal;
+    sig_action.sa_sigaction = &HandleSignal;
+    sig_action.sa_flags = SA_SIGINFO;
   } else {
     sig_action.sa_handler = SIG_IGN;
   }
-  sigaction(SIGUSR1, &sig_action, NULL);
+  if (sigaction(SIGUSR1, &sig_action, nullptr) == -1) {
+    stringstream error_msg;
+    error_msg << "Failed to register action for SIGUSR1: " << GetStrErrMsg();
+    CLEAN_EXIT_WITH_ERROR(error_msg.str());
+  }
 }
 
 void CheckAndRotateMinidumps(int max_minidumps) {
