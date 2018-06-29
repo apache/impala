@@ -24,13 +24,12 @@
 #include "gen-cpp/parquet_types.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "util/bit-util.h"
 #include "util/decimal-util.h"
 
 /// This file contains common elements between the parquet Writer and Scanner.
 namespace impala {
-
-class TimestampValue;
 
 const uint8_t PARQUET_VERSION_NUMBER[4] = {'P', 'A', 'R', '1'};
 const uint32_t PARQUET_CURRENT_VERSION = 1;
@@ -177,6 +176,7 @@ class ParquetPlainEncoder {
             parquet::Type::FIXED_LEN_BYTE_ARRAY>(buffer, buffer_end, fixed_len_size, v);
       default:
         DCHECK(false) << "Unexpected physical type";
+        return -1;
     }
   }
 
@@ -428,5 +428,83 @@ inline int ParquetPlainEncoder::Decode<Decimal16Value, parquet::Type::BYTE_ARRAY
   return DecodeDecimalByteArray(buffer, buffer_end, fixed_len_size, v);
 }
 
+/// Helper class that contains the parameters needed for Timestamp decoding.
+/// Can be safely passed by value.
+class ParquetTimestampDecoder {
+public:
+  ParquetTimestampDecoder() {}
+
+  ParquetTimestampDecoder( const parquet::SchemaElement& e, const Timezone* timezone,
+      bool convert_int96_timestamps);
+
+  bool NeedsConversion() const { return timezone_ != nullptr; }
+
+  /// Decodes next PARQUET_TYPE from 'buffer', reading up to the byte before 'buffer_end'
+  /// and converts it TimestampValue. 'buffer' need not be aligned.
+  template <parquet::Type::type PARQUET_TYPE>
+  int Decode(const uint8_t* buffer, const uint8_t* buffer_end, TimestampValue* v) const;
+
+  TimestampValue Int64ToTimestampValue(int64_t unix_time) const {
+    DCHECK(precision_ == MILLI || precision_ == MICRO);
+    return precision_ == MILLI
+        ? TimestampValue::UtcFromUnixTimeMillis(unix_time)
+        : TimestampValue::UtcFromUnixTimeMicros(unix_time);
+  }
+
+  void ConvertToLocalTime(TimestampValue* v) const {
+    DCHECK(timezone_ != nullptr);
+    if (v->HasDateAndTime()) v->UtcToLocal(*timezone_);
+  }
+
+  /// Timezone conversion of min/max stats need some extra logic because UTC->local
+  /// conversion can change ordering near timezone rule changes. The max value is
+  /// increased and min value is decreased to avoid incorrectly dropping column chunks
+  /// (or pages once IMPALA-5843 is ready).
+
+  /// If timestamp t >= v before conversion, then this function converts v in such a
+  /// way that the same will be true after t is converted.
+  void ConvertMinStatToLocalTime(TimestampValue* v) const;
+
+  /// If timestamp t <= v before conversion, then this function converts v in such a
+  /// way that the same will be true after t is converted.
+  void ConvertMaxStatToLocalTime(TimestampValue* v) const;
+
+private:
+  enum Precision { MILLI, MICRO, NANO };
+
+  /// Timezone used for UTC->Local conversions. If nullptr, no conversion is needed.
+  const Timezone* timezone_ = nullptr;
+
+  /// Unit of the encoded timestamp. Used to decide between milli and microseconds during
+  /// INT64 decoding. INT64 with nanosecond precision (and reduced range) is also planned
+  /// to be implemented once it is added in Parquet (PARQUET-1387).
+  Precision precision_ = NANO;
+};
+
+template <>
+inline int ParquetTimestampDecoder::Decode<parquet::Type::INT64>(
+    const uint8_t* buffer, const uint8_t* buffer_end, TimestampValue* v) const {
+  DCHECK(precision_ == MILLI || precision_ == MICRO);
+  int64_t unix_time;
+  int bytes_read = ParquetPlainEncoder::Decode<int64_t, parquet::Type::INT64>(
+      buffer, buffer_end, 0, &unix_time);
+  if (UNLIKELY(bytes_read < 0)) {
+    return bytes_read;
+  }
+  *v = Int64ToTimestampValue(unix_time);
+  // TODO: It would be more efficient to do the timezone conversion in the same step
+  //       as the int64_t -> TimestampValue conversion. This would be also needed to
+  //       move conversion/validation to dictionary construction (IMPALA-4994) and to
+  //       implement dictionary filtering for TimestampValues.
+  return bytes_read;
+}
+
+template <>
+inline int ParquetTimestampDecoder::Decode<parquet::Type::INT96>(
+    const uint8_t* buffer, const uint8_t* buffer_end, TimestampValue* v) const {
+  DCHECK_EQ(precision_, NANO);
+  return ParquetPlainEncoder::Decode<TimestampValue, parquet::Type::INT96>(
+      buffer, buffer_end, 0, v);
+}
 }
 #endif

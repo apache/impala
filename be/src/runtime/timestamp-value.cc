@@ -101,25 +101,49 @@ inline bool IsDateOutOfRange(const cctz::civil_second& cs) {
   return cs.year() < MIN_YEAR || cs.year() > MAX_YEAR;
 }
 
+TimestampValue CivilSecondsToTimestampValue(const cctz::civil_second& cs, int64_t nanos) {
+  // boost::gregorian::date() throws boost::gregorian::bad_year if year is not in the
+  // 1400..9999 range. Need to check validity before creating the date object.
+  if (UNLIKELY(IsDateOutOfRange(cs))) {
+    return TimestampValue();
+  } else {
+    return TimestampValue(
+        date(cs.year(), cs.month(), cs.day()),
+        time_duration(cs.hour(), cs.minute(), cs.second(), nanos));
+  }
 }
 
-void TimestampValue::UtcToLocal(const Timezone& local_tz) {
+}
+
+void TimestampValue::UtcToLocal(const Timezone& local_tz,
+    TimestampValue* start_of_repeated_period, TimestampValue* end_of_repeated_period) {
   DCHECK(HasDateAndTime());
   time_t unix_time;
   if (UNLIKELY(!UtcToUnixTime(&unix_time))) {
     SetToInvalidDateTime();
-  } else {
-    cctz::time_point<cctz::sys_seconds> from_tp = UnixTimeToTimePoint(unix_time);
-    cctz::civil_second to_cs = cctz::convert(from_tp, local_tz);
-    // boost::gregorian::date() throws boost::gregorian::bad_year if year is not in the
-    // 1400..9999 range. Need to check validity before creating the date object.
-    if (UNLIKELY(IsDateOutOfRange(to_cs))) {
-      SetToInvalidDateTime();
-    } else {
-      date_ = boost::gregorian::date(to_cs.year(), to_cs.month(), to_cs.day());
-      // Time-zone conversion rules don't affect fractional seconds, leave them intact.
-      time_ = boost::posix_time::time_duration(to_cs.hour(), to_cs.minute(),
-          to_cs.second(), time_.fractional_seconds());
+    return;
+  }
+
+  cctz::time_point<cctz::sys_seconds> from_tp = UnixTimeToTimePoint(unix_time);
+  cctz::civil_second to_cs = cctz::convert(from_tp, local_tz);
+
+  *this = CivilSecondsToTimestampValue(to_cs, time_.fractional_seconds());
+
+  if (start_of_repeated_period == nullptr && end_of_repeated_period == nullptr) return;
+  // Do the reverse conversion if repeated period boundaries are needed.
+  const cctz::time_zone::civil_lookup from_cl = local_tz.lookup(to_cs);
+  if (UNLIKELY(from_cl.kind == cctz::time_zone::civil_lookup::REPEATED)) {
+    if (start_of_repeated_period != nullptr) {
+      // Start of the period is simply the transition time converted to local time.
+      to_cs = cctz::convert(from_cl.trans, local_tz);
+      *start_of_repeated_period = CivilSecondsToTimestampValue(to_cs, 0);
+    }
+    if (end_of_repeated_period != nullptr) {
+      // End of the period is last nanosecond before transition time converted to
+      // local time.
+      to_cs = cctz::convert(from_cl.trans - std::chrono::seconds(1), local_tz);
+      *end_of_repeated_period =
+          CivilSecondsToTimestampValue(to_cs, NANOS_PER_SEC - 1);
     }
   }
 }

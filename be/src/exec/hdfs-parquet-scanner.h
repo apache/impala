@@ -343,9 +343,9 @@ class HdfsParquetScanner : public HdfsScanner {
       llvm::Function** process_scratch_batch_fn)
       WARN_UNUSED_RESULT;
 
-  /// Returns true if the timestamps are expected to be in UTC and need to be
-  /// converted to local time.
-  bool IsTimezoneConversionNeededForTimestamps();
+  /// Initializes a ParquetTimestampDecoder depending on writer, timezone, and the schema
+  /// of the column.
+  ParquetTimestampDecoder CreateTimestampDecoder(const parquet::SchemaElement& element);
 
   /// The rep and def levels are set to this value to indicate the end of a row group.
   static const int16_t ROW_GROUP_END = numeric_limits<int16_t>::min();

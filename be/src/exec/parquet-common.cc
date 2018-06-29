@@ -88,4 +88,45 @@ parquet::CompressionCodec::type ConvertImpalaToParquetCodec(
   DCHECK_LT(codec, IMPALA_TO_PARQUET_CODEC_SIZE);
   return IMPALA_TO_PARQUET_CODEC[codec];
 }
+
+ParquetTimestampDecoder::ParquetTimestampDecoder(const parquet::SchemaElement& e,
+    const Timezone* timezone, bool convert_int96_timestamps) {
+  bool needs_conversion = false;
+  if (e.__isset.logicalType) {
+    DCHECK(e.logicalType.__isset.TIMESTAMP);
+    needs_conversion = e.logicalType.TIMESTAMP.isAdjustedToUTC;
+    precision_ = e.logicalType.TIMESTAMP.unit.__isset.MILLIS
+        ? ParquetTimestampDecoder::MILLI : ParquetTimestampDecoder::MICRO;
+  } else {
+    if (e.__isset.converted_type) {
+      // Timestamp with converted type but without logical type are/were never written
+      // by Impala, so it is assumed that the writer is Parquet-mr and that timezone
+      // conversion is needed.
+      needs_conversion = true;
+      precision_ = e.converted_type == parquet::ConvertedType::TIMESTAMP_MILLIS
+          ? ParquetTimestampDecoder::MILLI : ParquetTimestampDecoder::MICRO;
+    } else {
+      // INT96 timestamps needs conversion depending on the writer.
+      needs_conversion = convert_int96_timestamps;
+      precision_ = ParquetTimestampDecoder::NANO;
+    }
+  }
+  if (needs_conversion) timezone_ = timezone;
+}
+
+void ParquetTimestampDecoder::ConvertMinStatToLocalTime(TimestampValue* v) const {
+  DCHECK(timezone_ != nullptr);
+  if (!v->HasDateAndTime()) return;
+  TimestampValue repeated_period_start;
+  v->UtcToLocal(*timezone_, &repeated_period_start);
+  if (repeated_period_start.HasDateAndTime()) *v = repeated_period_start;
+}
+
+void ParquetTimestampDecoder::ConvertMaxStatToLocalTime(TimestampValue* v) const {
+  DCHECK(timezone_ != nullptr);
+  if (!v->HasDateAndTime()) return;
+  TimestampValue repeated_period_end;
+  v->UtcToLocal(*timezone_, nullptr, &repeated_period_end);
+  if (repeated_period_end.HasDateAndTime()) *v = repeated_period_end;
+}
 }

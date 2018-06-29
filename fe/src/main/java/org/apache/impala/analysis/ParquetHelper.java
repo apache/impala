@@ -269,6 +269,13 @@ class ParquetHelper {
       return Type.STRING;
     }
 
+    if (prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT64 &&
+        (orig == OriginalType.TIMESTAMP_MILLIS || orig == OriginalType.TIMESTAMP_MICROS)){
+      // IMPALA-7723: nanosecond timestamps are still interpreted as BIGINT - as they have
+      // no converted type, this function will not be reached in their case.
+      return Type.TIMESTAMP;
+    }
+
     if (prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT32
         || prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT64) {
       // Map signed integer types to an supported Impala column type

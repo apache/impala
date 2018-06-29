@@ -21,6 +21,7 @@
 #include <string>
 #include <type_traits>
 
+#include "exec/parquet-common.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-buffer.h"
 #include "runtime/timestamp-value.h"
@@ -59,11 +60,6 @@ namespace impala {
 /// TODO: Populate null_count and distinct_count.
 class ColumnStatsBase {
  public:
-  /// Enum to select whether to read minimum or maximum statistics. Values do not
-  /// correspond to fields in parquet::Statistics, but instead select between retrieving
-  /// the minimum or maximum value.
-  enum class StatsField { MIN, MAX };
-
   /// min and max functions for types that are not floating point numbers
   template <typename T, typename Enable = void>
   struct MinMaxTrait {
@@ -92,20 +88,6 @@ class ColumnStatsBase {
 
   ColumnStatsBase() : has_min_max_values_(false), null_count_(0) {}
   virtual ~ColumnStatsBase() {}
-
-  /// Decodes the parquet::Statistics from 'col_chunk' and writes the value selected by
-  /// 'stats_field' into the buffer pointed to by 'slot', based on 'col_type'. Returns
-  /// true if reading statistics for columns of type 'col_type' is supported and decoding
-  /// was successful, false otherwise.
-  static bool ReadFromThrift(const parquet::ColumnChunk& col_chunk,
-      const ColumnType& col_type, const parquet::ColumnOrder* col_order,
-      StatsField stats_field, void* slot);
-
-  // Gets the null_count statistics from the given column chunk's metadata and returns
-  // it via an output parameter.
-  // Returns true if the null_count stats were read successfully, false otherwise.
-  static bool ReadNullCountStat(const parquet::ColumnChunk& col_chunk,
-      int64_t* null_count);
 
   /// Merges this statistics object with values from 'other'. If other has not been
   /// initialized, then this object will not be changed. It maintains internal state that
@@ -166,20 +148,6 @@ class ColumnStatsBase {
   // If true, min/max values are descending.
   // See description of 'ascending_boundary_order_'.
   bool descending_boundary_order_ = true;
-
- private:
-  /// Returns true if we support reading statistics stored in the fields 'min_value' and
-  /// 'max_value' in parquet::Statistics for the type 'col_type' and the column order
-  /// 'col_order'. Otherwise, returns false. If 'col_order' is nullptr, only primitive
-  /// numeric types are supported.
-  static bool CanUseStats(
-      const ColumnType& col_type, const parquet::ColumnOrder* col_order);
-
-  /// Returns true if we consider statistics stored in the deprecated fields 'min' and
-  /// 'max' in parquet::Statistics to be correct for the type 'col_type' and the column
-  /// order 'col_order'. Otherwise, returns false.
-  static bool CanUseDeprecatedStats(
-      const ColumnType& col_type, const parquet::ColumnOrder* col_order);
 };
 
 /// This class contains behavior specific to our in-memory formats for different types.
@@ -231,17 +199,17 @@ class ColumnStats : public ColumnStatsBase {
   virtual int64_t BytesNeeded() const override;
   virtual void EncodeToThrift(parquet::Statistics* out) const override;
 
- protected:
-  /// Encodes a single value using parquet's plain encoding and stores it into the binary
-  /// string 'out'. String values are stored without additional encoding. 'bytes_needed'
-  /// must be positive.
-  static void EncodePlainValue(const T& v, int64_t bytes_needed, std::string* out);
-
   /// Decodes the plain encoded stats value from 'buffer' and writes the result into the
   /// buffer pointed to by 'slot'. Returns true if decoding was successful, false
   /// otherwise. For timestamps, an additional validation will be performed.
   static bool DecodePlainValue(const std::string& buffer, void* slot,
       parquet::Type::type parquet_type);
+
+ protected:
+  /// Encodes a single value using parquet's plain encoding and stores it into the binary
+  /// string 'out'. String values are stored without additional encoding. 'bytes_needed'
+  /// must be positive.
+  static void EncodePlainValue(const T& v, int64_t bytes_needed, std::string* out);
 
   /// Returns the number of bytes needed to encode value 'v'.
   int64_t BytesNeeded(const T& v) const;
@@ -271,5 +239,61 @@ class ColumnStats : public ColumnStatsBase {
   StringBuffer prev_page_max_buffer_;
 };
 
+/// Class that handles the decoding of Parquet stats (min/max/null_count) for a given
+/// column chunk.
+class ColumnStatsReader {
+public:
+  /// Enum to select whether to read minimum or maximum statistics. Values do not
+  /// correspond to fields in parquet::Statistics, but instead select between retrieving
+  /// the minimum or maximum value.
+  enum class StatsField { MIN, MAX };
+
+  ColumnStatsReader(const parquet::ColumnChunk& col_chunk,  const ColumnType& col_type,
+      const parquet::ColumnOrder* col_order, const parquet::SchemaElement& element)
+  : col_chunk_(col_chunk),
+    col_type_(col_type),
+    col_order_(col_order),
+    element_(element) {}
+
+  /// Sets extra information that is only needed for decoding TIMESTAMP stats.
+  void SetTimestampDecoder(ParquetTimestampDecoder timestamp_decoder) {
+    timestamp_decoder_ = timestamp_decoder;
+  }
+
+  /// Decodes the parquet::Statistics from 'col_chunk_' and writes the value selected by
+  /// 'stats_field' into the buffer pointed to by 'slot', based on 'col_type_'. Returns
+  /// true if reading statistics for columns of type 'col_type_' is supported and decoding
+  /// was successful, false otherwise.
+  bool ReadFromThrift(StatsField stats_field, void* slot) const;
+
+  // Gets the null_count statistics from the column chunk's metadata and returns
+  // it via an output parameter.
+  // Returns true if the null_count stats were read successfully, false otherwise.
+  bool ReadNullCountStat(int64_t* null_count) const;
+
+private:
+  /// Returns true if we support reading statistics stored in the fields 'min_value' and
+  /// 'max_value' in parquet::Statistics for the type 'col_type_' and the column order
+  /// 'col_order_'. Otherwise, returns false. If 'col_order_' is nullptr, only primitive
+  /// numeric types are supported.
+  bool CanUseStats() const;
+
+  /// Returns true if we consider statistics stored in the deprecated fields 'min' and
+  /// 'max' in parquet::Statistics to be correct for the type 'col_type_' and the column
+  /// order 'col_order_'. Otherwise, returns false.
+  bool CanUseDeprecatedStats() const;
+
+  /// Decodes 'stat_value' and does INT64->TimestampValue and timezone conversions if
+  /// necessary. Returns true if the decoding and conversions were successful.
+  bool DecodeTimestamp(const std::string& stat_value,
+      ColumnStatsReader::StatsField stats_field,
+      TimestampValue* slot) const;
+
+  const parquet::ColumnChunk& col_chunk_;
+  const ColumnType& col_type_;
+  const parquet::ColumnOrder* col_order_;
+  const parquet::SchemaElement& element_;
+  ParquetTimestampDecoder timestamp_decoder_;
+};
 } // end ns impala
 #endif

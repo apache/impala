@@ -75,6 +75,12 @@ class TimezoneDatabase {
 
   static const Timezone& GetUtcTimezone() { return UTC_TIMEZONE_; }
 
+  /// Public proxy for LoadZoneInfo. Should be only used in BE tests.
+  static Status LoadZoneInfoBeTestOnly(
+      const std::string& zone_info_dir) WARN_UNUSED_RESULT {
+    return LoadZoneInfo(zone_info_dir);
+  }
+
  private:
   // For BE tests
   friend class TimezoneDbNamesTest;

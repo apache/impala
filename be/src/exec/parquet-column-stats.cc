@@ -25,33 +25,31 @@
 
 namespace impala {
 
-bool ColumnStatsBase::ReadFromThrift(const parquet::ColumnChunk& col_chunk,
-    const ColumnType& col_type, const parquet::ColumnOrder* col_order,
-    StatsField stats_field, void* slot) {
-  if (!(col_chunk.__isset.meta_data && col_chunk.meta_data.__isset.statistics)) {
+bool ColumnStatsReader::ReadFromThrift(StatsField stats_field, void* slot) const {
+  if (!(col_chunk_.__isset.meta_data && col_chunk_.meta_data.__isset.statistics)) {
     return false;
   }
-  const parquet::Statistics& stats = col_chunk.meta_data.statistics;
+  const parquet::Statistics& stats = col_chunk_.meta_data.statistics;
 
   // Try to read the requested stats field. If it is not set, we may fall back to reading
   // the old stats, based on the column type.
   const string* stat_value = nullptr;
   switch (stats_field) {
     case StatsField::MIN:
-      if (stats.__isset.min_value && CanUseStats(col_type, col_order)) {
+      if (stats.__isset.min_value && CanUseStats()) {
         stat_value = &stats.min_value;
         break;
       }
-      if (stats.__isset.min && CanUseDeprecatedStats(col_type, col_order)) {
+      if (stats.__isset.min && CanUseDeprecatedStats()) {
         stat_value = &stats.min;
       }
       break;
     case StatsField::MAX:
-      if (stats.__isset.max_value && CanUseStats(col_type, col_order)) {
+      if (stats.__isset.max_value && CanUseStats()) {
         stat_value = &stats.max_value;
         break;
       }
-      if (stats.__isset.max && CanUseDeprecatedStats(col_type, col_order)) {
+      if (stats.__isset.max && CanUseDeprecatedStats()) {
         stat_value = &stats.max;
       }
       break;
@@ -60,7 +58,7 @@ bool ColumnStatsBase::ReadFromThrift(const parquet::ColumnChunk& col_chunk,
   }
   if (stat_value == nullptr) return false;
 
-  switch (col_type.type) {
+  switch (col_type_.type) {
     case TYPE_BOOLEAN:
       return ColumnStats<bool>::DecodePlainValue(*stat_value, slot,
           parquet::Type::BOOLEAN);
@@ -89,55 +87,76 @@ bool ColumnStatsBase::ReadFromThrift(const parquet::ColumnChunk& col_chunk,
       return true;
     }
     case TYPE_INT:
-      return ColumnStats<int32_t>::DecodePlainValue(*stat_value, slot,
-          col_chunk.meta_data.type);
+      return ColumnStats<int32_t>::DecodePlainValue(*stat_value, slot, element_.type);
     case TYPE_BIGINT:
-      return ColumnStats<int64_t>::DecodePlainValue(*stat_value, slot,
-          col_chunk.meta_data.type);
+      return ColumnStats<int64_t>::DecodePlainValue(*stat_value, slot, element_.type);
     case TYPE_FLOAT:
       // IMPALA-6527, IMPALA-6538: ignore min/max stats if NaN
-      return ColumnStats<float>::DecodePlainValue(*stat_value, slot,
-          col_chunk.meta_data.type) && !std::isnan(*reinterpret_cast<float*>(slot));
+      return ColumnStats<float>::DecodePlainValue(*stat_value, slot, element_.type)
+          && !std::isnan(*reinterpret_cast<float*>(slot));
     case TYPE_DOUBLE:
       // IMPALA-6527, IMPALA-6538: ignore min/max stats if NaN
-      return ColumnStats<double>::DecodePlainValue(*stat_value, slot,
-          col_chunk.meta_data.type) && !std::isnan(*reinterpret_cast<double*>(slot));
+      return ColumnStats<double>::DecodePlainValue(*stat_value, slot, element_.type)
+          && !std::isnan(*reinterpret_cast<double*>(slot));
     case TYPE_TIMESTAMP:
-      return ColumnStats<TimestampValue>::DecodePlainValue(*stat_value, slot,
-          col_chunk.meta_data.type);
+      return DecodeTimestamp(*stat_value, stats_field,
+          static_cast<TimestampValue*>(slot));
     case TYPE_STRING:
     case TYPE_VARCHAR:
-      return ColumnStats<StringValue>::DecodePlainValue(*stat_value, slot,
-          col_chunk.meta_data.type);
+      return ColumnStats<StringValue>::DecodePlainValue(*stat_value, slot, element_.type);
     case TYPE_CHAR:
       /// We don't read statistics for CHAR columns, since CHAR support is broken in
       /// Impala (IMPALA-1652).
       return false;
     case TYPE_DECIMAL:
-      switch (col_type.GetByteSize()) {
+      switch (col_type_.GetByteSize()) {
         case 4:
           return ColumnStats<Decimal4Value>::DecodePlainValue(*stat_value, slot,
-              col_chunk.meta_data.type);
+              element_.type);
         case 8:
           return ColumnStats<Decimal8Value>::DecodePlainValue(*stat_value, slot,
-              col_chunk.meta_data.type);
+              element_.type);
         case 16:
           return ColumnStats<Decimal16Value>::DecodePlainValue(*stat_value, slot,
-              col_chunk.meta_data.type);
+              element_.type);
         }
-      DCHECK(false) << "Unknown decimal byte size: " << col_type.GetByteSize();
+      DCHECK(false) << "Unknown decimal byte size: " << col_type_.GetByteSize();
     default:
-      DCHECK(false) << col_type.DebugString();
+      DCHECK(false) << col_type_.DebugString();
   }
   return false;
 }
 
-bool ColumnStatsBase::ReadNullCountStat(const parquet::ColumnChunk& col_chunk,
-    int64_t* null_count) {
-  if (!(col_chunk.__isset.meta_data && col_chunk.meta_data.__isset.statistics)) {
+bool ColumnStatsReader::DecodeTimestamp(const std::string& stat_value,
+    ColumnStatsReader::StatsField stats_field, TimestampValue* slot) const {
+  bool stats_read = false;
+  if (element_.type == parquet::Type::INT96) {
+    stats_read =
+        ColumnStats<TimestampValue>::DecodePlainValue(stat_value, slot, element_.type);
+  } else if (element_.type == parquet::Type::INT64) {
+    int64_t tmp;
+    stats_read = ColumnStats<int64_t>::DecodePlainValue(stat_value, &tmp, element_.type);
+    if (stats_read) *slot = timestamp_decoder_.Int64ToTimestampValue(tmp);
+  } else {
+    DCHECK(false) << element_.name;
     return false;
   }
-  const parquet::Statistics& stats = col_chunk.meta_data.statistics;
+
+  if (stats_read && timestamp_decoder_.NeedsConversion()) {
+    if (stats_field == ColumnStatsReader::StatsField::MIN) {
+      timestamp_decoder_.ConvertMinStatToLocalTime(slot);
+    } else {
+      timestamp_decoder_.ConvertMaxStatToLocalTime(slot);
+    }
+  }
+  return stats_read && slot->HasDateAndTime();
+}
+
+bool ColumnStatsReader::ReadNullCountStat(int64_t* null_count) const {
+  if (!(col_chunk_.__isset.meta_data && col_chunk_.meta_data.__isset.statistics)) {
+    return false;
+  }
+  const parquet::Statistics& stats = col_chunk_.meta_data.statistics;
   if (stats.__isset.null_count) {
     *null_count = stats.null_count;
     return true;
@@ -153,24 +172,22 @@ Status ColumnStatsBase::CopyToBuffer(StringBuffer* buffer, StringValue* value) {
   return Status::OK();
 }
 
-bool ColumnStatsBase::CanUseStats(
-    const ColumnType& col_type, const parquet::ColumnOrder* col_order) {
+bool ColumnStatsReader::CanUseStats() const {
   // If column order is not set, only statistics for numeric types can be trusted.
-  if (col_order == nullptr) {
-    return col_type.IsBooleanType() || col_type.IsIntegerType()
-        || col_type.IsFloatingPointType();
+  if (col_order_ == nullptr) {
+    return col_type_.IsBooleanType() || col_type_.IsIntegerType()
+        || col_type_.IsFloatingPointType();
   }
   // Stats can be used if the column order is TypeDefinedOrder (see parquet.thrift).
-  return col_order->__isset.TYPE_ORDER;
+  return col_order_->__isset.TYPE_ORDER;
 }
 
-bool ColumnStatsBase::CanUseDeprecatedStats(
-    const ColumnType& col_type, const parquet::ColumnOrder* col_order) {
+bool ColumnStatsReader::CanUseDeprecatedStats() const {
   // If column order is set to something other than TypeDefinedOrder, we shall not use the
   // stats (see parquet.thrift).
-  if (col_order != nullptr && !col_order->__isset.TYPE_ORDER) return false;
-  return col_type.IsBooleanType() || col_type.IsIntegerType()
-      || col_type.IsFloatingPointType();
+  if (col_order_ != nullptr && !col_order_->__isset.TYPE_ORDER) return false;
+  return col_type_.IsBooleanType() || col_type_.IsIntegerType()
+      || col_type_.IsFloatingPointType();
 }
 
 }  // end ns impala

@@ -229,7 +229,19 @@ class TimestampValue {
 
   /// Converts from UTC to 'local_tz' time zone in-place. The caller must ensure the
   /// TimestampValue this function is called upon has both a valid date and time.
-  void UtcToLocal(const Timezone& local_tz);
+  ///
+  /// If start/end_of_repeated_period is not nullptr and timestamp falls into an interval
+  /// where LocalToUtc() is ambiguous (e.g. Summer->Winter DST change on Northern
+  /// hemisphere), then these arguments are set to the start/end of this period in local
+  /// time. This is useful to get some ordering guarantees in the case when the order of
+  /// two timestamps is different in UTC and local time (e.g CET Autumn dst change
+  /// 00:30:00 -> 02:30:00 vs 01:15:00 -> 02:15:00) - any timestamp that is earlier than
+  /// 'this' in UTC is guaranteed to be earlier than 'end_of_repeated_period' in local
+  /// time, and any timestamp later than 'this' in UTC is guaranteed to be later than
+  /// 'start_of_repeated_period' in local time.
+  void UtcToLocal(const Timezone& local_tz,
+      TimestampValue* start_of_repeated_period = nullptr,
+      TimestampValue* end_of_repeated_period = nullptr);
 
   /// Converts from 'local_tz' to UTC time zone in-place. The caller must ensure the
   /// TimestampValue this function is called upon has both a valid date and time.

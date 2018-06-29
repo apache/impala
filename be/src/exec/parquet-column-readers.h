@@ -132,10 +132,12 @@ class ParquetLevelDecoder {
 /// level pair at a time. The current def and rep level are exposed to the user, and the
 /// corresponding value (if defined) can optionally be copied into a slot via
 /// ReadValue(). Can also write position slots.
+///
+/// The constructor adds the object to the obj_pool of the parent HdfsParquetScanner.
 class ParquetColumnReader {
  public:
   /// Creates a column reader for 'node' and associates it with the given parent scanner.
-  /// Adds the new column reader to the parent's object pool.
+  /// The constructor of column readers add the new object to the parent's object pool.
   /// 'slot_desc' may be NULL, in which case the returned column reader can only be used
   /// to read def/rep levels.
   /// 'is_collection_field' should be set to true if the returned reader is reading a
@@ -153,6 +155,9 @@ class ParquetColumnReader {
   /// - int (INT32) -> bigint (INT64), double (DOUBLE)
   /// - float (FLOAT) -> double (DOUBLE)
   static ParquetColumnReader* Create(const SchemaNode& node, bool is_collection_field,
+      const SlotDescriptor* slot_desc, HdfsParquetScanner* parent);
+
+  static ParquetColumnReader* CreateTimestampColumnReader(const SchemaNode& node,
       const SlotDescriptor* slot_desc, HdfsParquetScanner* parent);
 
   virtual ~ParquetColumnReader() { }
@@ -303,6 +308,9 @@ class ParquetColumnReader {
       tuple_offset_(slot_desc == NULL ? -1 : slot_desc->tuple_offset()),
       null_indicator_offset_(slot_desc == NULL ? NullIndicatorOffset() :
           slot_desc->null_indicator_offset()) {
+    DCHECK(parent != nullptr);
+    parent->obj_pool_.Add(this);
+
     DCHECK_GE(node_.max_rep_level, 0);
     DCHECK_LE(node_.max_rep_level, std::numeric_limits<int16_t>::max());
     DCHECK_GE(node_.max_def_level, 0);

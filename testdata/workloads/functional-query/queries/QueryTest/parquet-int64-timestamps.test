@@ -1,0 +1,89 @@
+====
+---- QUERY
+# Check that int64 timestamp columns can be read as TIMESTAMP.
+set timezone=CET;
+select * from int64_timestamps_plain;
+---- TYPES
+TIMESTAMP,TIMESTAMP,TIMESTAMP,TIMESTAMP
+---- RESULTS
+1986-06-26 02:00:00,1986-06-26 00:00:00,1986-06-26 02:00:00,1986-06-26 00:00:00
+1986-12-05 01:00:00,1986-12-05 00:00:00,1986-12-05 01:00:00,1986-12-05 00:00:00
+====
+---- QUERY
+# Check that int64 timestamp columns can be read as BIGINT.
+select * from int64_bigints_plain;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+520128000000,520128000000,520128000000000,520128000000000
+534124800000,534124800000,534124800000000,534124800000000
+====
+---- QUERY
+# Check that the test tables are correctly filled with data.
+select count(*)
+from int64_timestamps_dict t join int64_bigints_dict b on t.id = b.id;
+---- TYPES
+BIGINT
+---- RESULTS
+72
+====
+---- QUERY
+# List rows where one of the int64->timestamp conversion is incorrect.
+set timezone=CET;
+select *
+from int64_timestamps_dict t join int64_bigints_dict b on t.id = b.id
+where t.new_logical_milli_local != milliseconds_add("1970-01-01", b.new_logical_milli_local)
+  or t.new_logical_milli_utc != from_utc_timestamp(milliseconds_add("1970-01-01", b.new_logical_milli_utc), "CET")
+  or t.new_logical_micro_local != microseconds_add("1970-01-01", b.new_logical_micro_local)
+  or t.new_logical_micro_utc != from_utc_timestamp(microseconds_add("1970-01-01", b.new_logical_micro_utc), "CET");
+---- TYPES
+INT,TIMESTAMP,TIMESTAMP,TIMESTAMP,TIMESTAMP,INT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+# Expect empty result.
+====
+---- QUERY
+# Test that the table is filled correctly.
+set timezone=UTC;
+select * from int64_timestamps_at_dst_changes;
+---- TYPES
+BIGINT,INT,TIMESTAMP,TIMESTAMP
+---- RESULTS
+42,1,1970-01-01 00:00:42,1970-01-01 00:00:42
+1509237900,1,2017-10-29 00:45:00,2017-10-29 00:45:00
+1509240600,1,2017-10-29 01:30:00,2017-10-29 01:30:00
+1509237000,2,2017-10-29 00:30:00,2017-10-29 00:30:00
+1509239700,2,2017-10-29 01:15:00,2017-10-29 01:15:00
+1512520200,2,2017-12-06 00:30:00,2017-12-06 00:30:00
+1509237900,3,2017-10-29 00:45:00,2017-10-29 00:45:00
+1509238800,3,2017-10-29 01:00:00,2017-10-29 01:00:00
+1509239400,3,2017-10-29 01:10:00,2017-10-29 01:10:00
+====
+---- QUERY
+# Test filtering on timestamps that fall on the DST change. Stat filtering may skip this
+# value if not implemented carefully.
+set timezone=CET;
+select count(*) from int64_timestamps_at_dst_changes
+where millisutc = "2017-10-29 02:45:00" and microsutc = "2017-10-29 02:45:00";
+---- TYPES
+BIGINT
+---- RESULTS
+2
+====
+---- QUERY
+set timezone=CET;
+select count(*) from int64_timestamps_at_dst_changes
+where millisutc = "2017-10-29 02:00:00";
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+set timezone=CET;
+select count(*) from int64_timestamps_at_dst_changes
+where microsutc = "2017-10-29 02:10:00";
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====

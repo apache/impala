@@ -148,14 +148,19 @@ inline bool ColumnStats<TimestampValue>::DecodePlainValue(
   TimestampValue* result = reinterpret_cast<TimestampValue*>(slot);
   int size = buffer.size();
   const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.data());
-  if (ParquetPlainEncoder::Decode<TimestampValue, parquet::Type::INT96>(data, data + size,
-      size, result) == -1) {
+  if (parquet_type == parquet::Type::INT96) {
+    if (ParquetPlainEncoder::Decode<TimestampValue, parquet::Type::INT96>(data,
+        data + size, size, result) == -1) {
+      return false;
+    }
+  } else {
+    DCHECK(false);
     return false;
   }
-  // We don't need to convert the value here, since we don't support reading timestamp
-  // statistics written by Hive / old versions of parquet-mr. Should Hive add support for
-  // writing new statistics for the deprecated timestamp type, we will have to add support
-  // for conversion here.
+
+  // We don't need to convert the value here, because it is done by the caller.
+  // If this function were not static, then it would be possible to store the information
+  // needed for timezone conversion in the object and do the conversion here.
   return TimestampValue::IsValidDate(result->date());
 }
 

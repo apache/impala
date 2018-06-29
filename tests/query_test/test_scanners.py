@@ -745,6 +745,54 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case("QueryTest/parquet-error-propagation-race", vector,
                        unique_database)
 
+  def test_int64_timestamps(self, vector, unique_database):
+    """IMPALA-5050: Test that Parquet columns with int64 physical type and
+       timestamp_millis/timestamp_micros logical type can be read both as
+       int64 and as timestamp.
+    """
+    # Tiny plain encoded parquet file.
+    TABLE_NAME = "int64_timestamps_plain"
+    create_table_from_parquet(self.client, unique_database, TABLE_NAME)
+
+    TABLE_NAME = "int64_bigints_plain"
+    CREATE_SQL = """CREATE TABLE {0}.{1} (
+                      new_logical_milli_utc BIGINT,
+                      new_logical_milli_local BIGINT,
+                      new_logical_micro_utc BIGINT,
+                      new_logical_micro_local BIGINT
+                     ) STORED AS PARQUET""".format(unique_database, TABLE_NAME)
+    create_table_and_copy_files(self.client, CREATE_SQL, unique_database, TABLE_NAME,
+        ["/testdata/data/int64_timestamps_plain.parquet"])
+
+    # Larger dictionary encoded parquet file.
+    TABLE_NAME = "int64_timestamps_dict"
+    CREATE_SQL = """CREATE TABLE {0}.{1} (
+                      id INT,
+                      new_logical_milli_utc TIMESTAMP,
+                      new_logical_milli_local TIMESTAMP,
+                      new_logical_micro_utc TIMESTAMP,
+                      new_logical_micro_local TIMESTAMP
+                     ) STORED AS PARQUET""".format(unique_database, TABLE_NAME)
+    create_table_and_copy_files(self.client, CREATE_SQL, unique_database, TABLE_NAME,
+        ["/testdata/data/{0}.parquet".format(TABLE_NAME)])
+
+    TABLE_NAME = "int64_bigints_dict"
+    CREATE_SQL = """CREATE TABLE {0}.{1} (
+                      id INT,
+                      new_logical_milli_utc BIGINT,
+                      new_logical_milli_local BIGINT,
+                      new_logical_micro_utc BIGINT,
+                      new_logical_micro_local BIGINT
+                     ) STORED AS PARQUET""".format(unique_database, TABLE_NAME)
+    create_table_and_copy_files(self.client, CREATE_SQL, unique_database, TABLE_NAME,
+        ["/testdata/data/int64_timestamps_dict.parquet"])
+
+    TABLE_NAME = "int64_timestamps_at_dst_changes"
+    create_table_from_parquet(self.client, unique_database, TABLE_NAME)
+
+    self.run_test_case(
+        'QueryTest/parquet-int64-timestamps', vector, unique_database)
+
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
 # 1. default scan range

@@ -896,6 +896,72 @@ TEST(TimestampTest, SubSecond) {
       TimestampValue::FromUnixTimeNanos(0, -1, tz).ToString());
 }
 
+// Convenience function to create TimestampValues from strings.
+TimestampValue StrToTs(const char * str) {
+  return TimestampValue::Parse(str);
+}
+
+TEST(TimestampTest, TimezoneConversions) {
+  const string& path = Substitute("$0/testdata/tzdb_tiny", getenv("IMPALA_HOME"));
+  Status status = TimezoneDatabase::LoadZoneInfoBeTestOnly(path);
+  ASSERT_TRUE(status.ok());
+
+  const Timezone* tz = TimezoneDatabase::FindTimezone("CET");
+  ASSERT_NE(tz, nullptr);
+
+  // Timestamp that does not fall to DST change.
+  const TimestampValue unique_utc = StrToTs("2017-01-01 00:00:00");
+  const TimestampValue unique_local = StrToTs("2017-01-01 01:00:00");
+  {
+    // UtcToLocal / LocalToUtc changes the TimestampValue, so an extra copy is needed
+    // to avoid changing the original.
+    TimestampValue tmp = unique_utc;
+    TimestampValue repeated_period_start, repeated_period_end;
+    tmp.UtcToLocal(*tz, &repeated_period_start, &repeated_period_end);
+    EXPECT_EQ(tmp, unique_local);
+    EXPECT_FALSE(repeated_period_start.HasDate());
+    EXPECT_FALSE(repeated_period_end.HasDate());
+    tmp.LocalToUtc(*tz);
+    EXPECT_EQ(tmp, unique_utc);
+  }
+
+  // Timestamps that fall to UTC+2->UTC+1 DST change:
+  // - Up to 2017-10-29 02:59:59.999999999 AM offset was UTC+02:00.
+  // - At 2017-10-29 03:00:00 AM clocks were moved backward to 2017-10-29 02:00:00 AM,
+  //   so offset became UTC+01:00.
+  const TimestampValue repeated_utc1 = StrToTs("2017-10-29 00:30:00");
+  const TimestampValue repeated_utc2 = StrToTs("2017-10-29 01:30:00");
+  const TimestampValue repeated_local = StrToTs("2017-10-29 02:30:00");
+  {
+    TimestampValue tmp = repeated_utc1;
+    TimestampValue repeated_period_start1, repeated_period_end1;
+    TimestampValue repeated_period_start2, repeated_period_end2;
+    tmp.UtcToLocal(*tz, &repeated_period_start1, &repeated_period_end1);
+    EXPECT_EQ(tmp, repeated_local);
+    tmp = repeated_utc2;
+    tmp.UtcToLocal(*tz, &repeated_period_start2, &repeated_period_end2);
+    EXPECT_EQ(tmp, repeated_local);
+    tmp.LocalToUtc(*tz);
+    EXPECT_FALSE(tmp.HasDate());
+
+    EXPECT_EQ(repeated_period_start1, repeated_period_start2);
+    EXPECT_EQ(repeated_period_end1, repeated_period_end2);
+    EXPECT_EQ(repeated_period_start1.ToString(), "2017-10-29 02:00:00");
+    EXPECT_EQ(repeated_period_end1.ToString(), "2017-10-29 02:59:59.999999999");
+
+  }
+
+  // Timestamp that falls to UTC+1->UTC+2 DST change:
+  // - Up to 2017-03-26 01:59:59.999999999 AM offset was UTC+01:00.
+  // - At 2017-03-26 02:00:00 AM Clocks were moved forward to 2017-03-26 03:00:00 AM,
+  //   so offset became UTC+02:00.
+  const TimestampValue skipped_local = StrToTs("2017-03-26 02:30:00");
+  {
+    TimestampValue tmp = skipped_local;
+    tmp.LocalToUtc(*tz);
+    EXPECT_FALSE(tmp.HasDate());
+  }
+}
 }
 
 IMPALA_TEST_MAIN();

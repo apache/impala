@@ -64,16 +64,34 @@ const map<PrimitiveType, set<parquet::Type::type>> SUPPORTED_PHYSICAL_TYPES = {
     {PrimitiveType::TYPE_VARCHAR, {parquet::Type::BYTE_ARRAY}},
 };
 
+/// Physical types that are only supported with specific converted types.
+const map<PrimitiveType, set<pair<parquet::Type::type, parquet::ConvertedType::type>>>
+    SUPPORTED_CONVERTED_TYPES = {
+    {PrimitiveType::TYPE_TIMESTAMP,
+        {{parquet::Type::INT64, parquet::ConvertedType::TIMESTAMP_MICROS},
+         {parquet::Type::INT64, parquet::ConvertedType::TIMESTAMP_MILLIS}}}};
+};
+
 /// Returns true if 'parquet_type' is a supported physical encoding for the Impala
-/// primitive type, false otherwise.
-bool IsSupportedPhysicalType(PrimitiveType impala_type,
-    parquet::Type::type parquet_type) {
+/// primitive type, false otherwise. Some physical types are accepted only for certain
+/// converted types.
+bool IsSupportedType(PrimitiveType impala_type,
+    const parquet::SchemaElement& element) {
   auto encodings = SUPPORTED_PHYSICAL_TYPES.find(impala_type);
   DCHECK(encodings != SUPPORTED_PHYSICAL_TYPES.end());
-  return encodings->second.find(parquet_type) != encodings->second.end();
+  parquet::Type::type parquet_type = element.type;
+  if (encodings->second.find(parquet_type) != encodings->second.end()) return true;
+
+  if(!element.__isset.converted_type) return false;
+  parquet::ConvertedType::type converted_type = element.converted_type;
+  auto converted_types = SUPPORTED_CONVERTED_TYPES.find(impala_type);
+  if (converted_types == SUPPORTED_CONVERTED_TYPES.end()) return false;
+  if (converted_types->second.find({parquet_type, converted_type})
+      != converted_types->second.end()) return true;
+
+  return false;
 }
 
-}
 // Needs to be in sync with the order of enum values declared in TParquetArrayResolution.
 const std::vector<ParquetSchemaResolver::ArrayEncoding>
     ParquetSchemaResolver::ORDERED_ARRAY_ENCODINGS[] =
@@ -181,7 +199,7 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
   // Following validation logic is only for non-complex types.
   if (slot_desc->type().IsComplexType()) return Status::OK();
 
-  if (UNLIKELY(!IsSupportedPhysicalType(slot_desc->type().type, schema_element.type))) {
+  if (UNLIKELY(!IsSupportedType(slot_desc->type().type, schema_element))) {
     return Status(Substitute("Unsupported Parquet type in file '$0' metadata. Logical "
         "type: $1, physical type: $2. File may be corrupt.",
         filename, slot_desc->type().type, schema_element.type));
@@ -703,7 +721,7 @@ Status ParquetSchemaResolver::ValidateScalarNode(const SchemaNode& node,
         PrintSubPath(tbl_desc_, path, idx), col_type.DebugString(), node.DebugString());
     return Status::Expected(msg);
   }
-  if (!IsSupportedPhysicalType(col_type.type, node.element->type)) {
+  if (!IsSupportedType(col_type.type, *node.element)) {
     ErrorMsg msg(TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, filename_,
         PrintSubPath(tbl_desc_, path, idx), col_type.DebugString(), node.DebugString());
     return Status::Expected(msg);

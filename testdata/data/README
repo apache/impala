@@ -233,3 +233,29 @@ valid range [0..24H). Before the fix, select * returned these values:
 
 strings_with_quotes.csv:
 Various strings with quotes in them to reproduce bugs like IMPALA-7586.
+
+int64_timestamps_plain.parq:
+Parquet file generated with Parquet-mr that contains plain encoded int64 columns with
+Timestamp logical types. Has the following columns:
+new_logical_milli_utc, new_logical_milli_local,
+new_logical_micro_utc, new_logical_micro_local
+
+int64_timestamps_dict.parq:
+Parquet file generated with Parquet-mr that contains dictionary encoded int64 columns
+with Timestamp logical types. Has the following columns:
+id,
+new_logical_milli_utc, new_logical_milli_local,
+new_logical_micro_utc, new_logical_micro_local
+
+int64_timestamps_at_dst_changes.parquet:
+Parquet file generated with Parquet-mr that contains plain encoded int64 columns with
+Timestamp logical types. The file contains 3 row groups, and all row groups contain
+3 distinct values, so there is a "min", a "max", and a "middle" value. The values were
+selected in such a way that the UTC->CET conversion changes the order of the values (this
+is possible during Summer->Winter DST change) and "middle" falls outside the "min".."max"
+range after conversion. This means that a naive stat filtering implementation could drop
+"middle" incorrectly.
+Example (all dates are 2017-10-29):
+UTC: 00:45:00, 01:00:00, 01:10:00 =>
+CET: 02:45:00, 02:00:00, 02:10:00
+Columns: rawvalue bigint, rowgroup int, millisutc timsestamp, microsutc timestamp
