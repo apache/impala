@@ -28,7 +28,7 @@ import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
 import static org.apache.impala.analysis.JoinOperator.*;
 import org.apache.impala.analysis.QueryStmt;
-import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
@@ -202,13 +202,13 @@ public class DistributedPlanner {
     if (!partitionExprs.isEmpty()
         && analyzer.setsHaveValueTransfer(inputPartition.getPartitionExprs(),
         partitionExprs, true)
-        && !(insertStmt.getTargetTable() instanceof KuduTable)) {
+        && !(insertStmt.getTargetTable() instanceof FeKuduTable)) {
       return inputFragment;
     }
 
     // Make a cost-based decision only if no user hint was supplied.
     if (!insertStmt.hasShuffleHint()) {
-      if (insertStmt.getTargetTable() instanceof KuduTable) {
+      if (insertStmt.getTargetTable() instanceof FeKuduTable) {
         // If the table is unpartitioned or all of the partition exprs are constants,
         // don't insert the exchange.
         // TODO: make a more sophisticated decision here for partitioned tables and when
@@ -246,7 +246,7 @@ public class DistributedPlanner {
     DataPartition partition;
     if (partitionExprs.isEmpty()) {
       partition = DataPartition.UNPARTITIONED;
-    } else if (insertStmt.getTargetTable() instanceof KuduTable) {
+    } else if (insertStmt.getTargetTable() instanceof FeKuduTable) {
       partition = DataPartition.kuduPartitioned(
           KuduUtil.createPartitionExpr(insertStmt, ctx_.getRootAnalyzer()));
     } else {

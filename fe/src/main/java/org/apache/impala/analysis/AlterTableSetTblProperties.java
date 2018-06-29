@@ -27,6 +27,7 @@ import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
@@ -93,7 +94,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
           hive_metastoreConstants.META_TABLE_STORAGE));
     }
 
-    if (getTargetTable() instanceof KuduTable) analyzeKuduTable(analyzer);
+    if (getTargetTable() instanceof FeKuduTable) analyzeKuduTable(analyzer);
 
     // Check avro schema when it is set in avro.schema.url or avro.schema.literal to
     // avoid potential metadata corruption (see IMPALA-2042).
@@ -211,7 +212,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     // AlterTableSetStmt::analyze().
     Preconditions.checkState(!(table instanceof HBaseTable));
 
-    if (table instanceof KuduTable) {
+    if (table instanceof FeKuduTable) {
       throw new AnalysisException(String.format("'%s' table property is not supported " +
           "for Kudu tables.", AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS));
     }

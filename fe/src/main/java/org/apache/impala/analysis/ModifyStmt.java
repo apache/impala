@@ -26,8 +26,8 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
@@ -79,7 +79,7 @@ public abstract class ModifyStmt extends StatementBase {
 
   // Target Kudu table. Since currently only Kudu tables are supported, we use a
   // concrete table class. Result of analysis.
-  protected KuduTable table_;
+  protected FeKuduTable table_;
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
@@ -153,12 +153,12 @@ public abstract class ModifyStmt extends StatementBase {
     Preconditions.checkNotNull(targetTableRef_);
     FeTable dstTbl = targetTableRef_.getTable();
     // Only Kudu tables can be updated
-    if (!(dstTbl instanceof KuduTable)) {
+    if (!(dstTbl instanceof FeKuduTable)) {
       throw new AnalysisException(
           format("Impala does not support modifying a non-Kudu table: %s",
               dstTbl.getFullName()));
     }
-    table_ = (KuduTable) dstTbl;
+    table_ = (FeKuduTable) dstTbl;
 
     // Make sure that the user is allowed to modify the target table. Use ALL because no
     // UPDATE / DELETE privilege exists yet (IMPALA-3840).
@@ -231,7 +231,7 @@ public abstract class ModifyStmt extends StatementBase {
     HashSet<SlotId> keySlots = Sets.newHashSet();
 
     // Mapping from column name to index
-    ArrayList<Column> cols = table_.getColumnsInHiveOrder();
+    List<Column> cols = table_.getColumnsInHiveOrder();
     HashMap<String, Integer> colIndexMap = Maps.newHashMap();
     for (int i = 0; i < cols.size(); i++) {
       colIndexMap.put(cols.get(i).getName(), i);

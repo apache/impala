@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Table;
@@ -362,7 +363,8 @@ public class KuduCatalogOpExecutor {
 
   private static List<Pair<PartialRow, RangePartitionBound>> getRangePartitionBounds(
       TRangePartition rangePartition, KuduTable tbl) throws ImpalaRuntimeException {
-    List<String> rangePartitioningColNames = tbl.getRangePartitioningColNames();
+    List<String> rangePartitioningColNames =
+        FeKuduTable.Utils.getRangePartitioningColNames(tbl);
     List<String> rangePartitioningKuduColNames =
       Lists.newArrayListWithCapacity(rangePartitioningColNames.size());
     for (String colName : rangePartitioningColNames) {

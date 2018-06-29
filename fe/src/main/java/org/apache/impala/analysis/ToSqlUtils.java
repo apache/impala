@@ -41,6 +41,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.parse.HiveLexer;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Function;
@@ -256,8 +257,8 @@ public class ToSqlUtils {
     String storageHandlerClassName = table.getStorageHandlerClassName();
     List<String> primaryKeySql = Lists.newArrayList();
     String kuduPartitionByParams = null;
-    if (table instanceof KuduTable) {
-      KuduTable kuduTable = (KuduTable) table;
+    if (table instanceof FeKuduTable) {
+      FeKuduTable kuduTable = (FeKuduTable) table;
       // Kudu tables don't use LOCATION syntax
       location = null;
       format = HdfsFileFormat.KUDU;

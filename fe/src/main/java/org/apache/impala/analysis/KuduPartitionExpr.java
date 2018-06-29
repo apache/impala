@@ -18,9 +18,8 @@
 package org.apache.impala.analysis;
 
 import java.util.List;
-import java.util.Set;
 
-import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
@@ -30,8 +29,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Internal expr that calls into the Kudu client to determine the partition index for
@@ -43,12 +40,12 @@ public class KuduPartitionExpr extends Expr {
 
   // The table to use the partitioning scheme from.
   private final int targetTableId_;
-  private final KuduTable targetTable_;
+  private final FeKuduTable targetTable_;
   // Maps from this Epxrs children to column positions in the table, i.e. children_[i]
   // produces the value for column partitionColPos_[i].
   private List<Integer> partitionColPos_;
 
-  public KuduPartitionExpr(int targetTableId, KuduTable targetTable,
+  public KuduPartitionExpr(int targetTableId, FeKuduTable targetTable,
       List<Expr> partitionKeyExprs, List<Integer> partitionKeyIdxs) {
     Preconditions.checkState(partitionKeyExprs.size() == partitionKeyIdxs.size());
     targetTableId_ = targetTableId;

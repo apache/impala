@@ -19,18 +19,19 @@ package org.apache.impala.analysis;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduColumn;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
@@ -440,7 +441,7 @@ public class InsertStmt extends StatementBase {
 
     // Perform operation-specific analysis.
     if (isUpsert_) {
-      if (!(table_ instanceof KuduTable)) {
+      if (!(table_ instanceof FeKuduTable)) {
         throw new AnalysisException("UPSERT is only supported for Kudu tables");
       }
     } else {
@@ -507,7 +508,7 @@ public class InsertStmt extends StatementBase {
       }
     }
 
-    if (table_ instanceof KuduTable) {
+    if (table_ instanceof FeKuduTable) {
       if (overwrite_) {
         throw new AnalysisException("INSERT OVERWRITE not supported for Kudu tables.");
       }
@@ -536,7 +537,7 @@ public class InsertStmt extends StatementBase {
       // We've already ruled out too many columns in the permutation and partition clauses
       // by checking that there are no duplicates and that every column mentioned actually
       // exists. So all columns aren't mentioned in the query.
-      if (table_ instanceof KuduTable) {
+      if (table_ instanceof FeKuduTable) {
         checkRequiredKuduColumns(mentionedColumnNames);
       } else if (table_ instanceof HBaseTable) {
         checkRequiredHBaseColumns(mentionedColumnNames);
@@ -578,8 +579,8 @@ public class InsertStmt extends StatementBase {
    */
   private void checkRequiredKuduColumns(Set<String> mentionedColumnNames)
       throws AnalysisException {
-    Preconditions.checkState(table_ instanceof KuduTable);
-    List<String> keyColumns = ((KuduTable) table_).getPrimaryKeyColumnNames();
+    Preconditions.checkState(table_ instanceof FeKuduTable);
+    List<String> keyColumns = ((FeKuduTable) table_).getPrimaryKeyColumnNames();
     List<String> missingKeyColumnNames = Lists.newArrayList();
     for (Column column : table_.getColumns()) {
       if (!mentionedColumnNames.contains(column.getName())
@@ -660,10 +661,10 @@ public class InsertStmt extends StatementBase {
     List<String> tmpPartitionKeyNames = new ArrayList<String>();
 
     int numClusteringCols = (tbl instanceof HBaseTable) ? 0 : tbl.getNumClusteringCols();
-    boolean isKuduTable = table_ instanceof KuduTable;
+    boolean isKuduTable = table_ instanceof FeKuduTable;
     Set<String> kuduPartitionColumnNames = null;
     if (isKuduTable) {
-      kuduPartitionColumnNames = ((KuduTable) table_).getPartitionColumnNames();
+      kuduPartitionColumnNames = getKuduPartitionColumnNames((FeKuduTable) table_);
     }
 
     // Check dynamic partition columns for type compatibility.
@@ -759,14 +760,14 @@ public class InsertStmt extends StatementBase {
       }
       // Store exprs for Kudu key columns.
       if (matchFound && isKuduTable) {
-        KuduTable kuduTable = (KuduTable) table_;
-        if (kuduTable.isPrimaryKeyColumn(tblColumn.getName())) {
+        FeKuduTable kuduTable = (FeKuduTable) table_;
+        if (kuduTable.getPrimaryKeyColumnNames().contains(tblColumn.getName())) {
           primaryKeyExprs_.add(Iterables.getLast(resultExprs_));
         }
       }
     }
 
-    if (table_ instanceof KuduTable) {
+    if (table_ instanceof FeKuduTable) {
       Preconditions.checkState(!primaryKeyExprs_.isEmpty());
     }
 
@@ -781,6 +782,14 @@ public class InsertStmt extends StatementBase {
       queryStmt_ = new SelectStmt(selectList, null, null, null, null, null, null);
       queryStmt_.analyze(analyzer);
     }
+  }
+
+  private static Set<String> getKuduPartitionColumnNames(FeKuduTable table) {
+    Set<String> ret = new HashSet<String>();
+    for (KuduPartitionParam partitionParam : table.getPartitionBy()) {
+      ret.addAll(partitionParam.getColumnNames());
+    }
+    return ret;
   }
 
   /**

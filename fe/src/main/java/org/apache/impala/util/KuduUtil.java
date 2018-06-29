@@ -31,7 +31,7 @@ import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.KuduPartitionExpr;
 import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -450,9 +450,9 @@ public class KuduUtil {
    */
   public static Expr createPartitionExpr(InsertStmt insertStmt, Analyzer analyzer)
       throws AnalysisException {
-    Preconditions.checkState(insertStmt.getTargetTable() instanceof KuduTable);
+    Preconditions.checkState(insertStmt.getTargetTable() instanceof FeKuduTable);
     Expr kuduPartitionExpr = new KuduPartitionExpr(DescriptorTable.TABLE_SINK_ID,
-        (KuduTable) insertStmt.getTargetTable(),
+        (FeKuduTable) insertStmt.getTargetTable(),
         Lists.newArrayList(insertStmt.getPartitionKeyExprs()),
         insertStmt.getPartitionColPos());
     kuduPartitionExpr.analyze(analyzer);

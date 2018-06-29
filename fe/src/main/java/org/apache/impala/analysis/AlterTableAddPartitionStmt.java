@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Sets;
 
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
@@ -84,7 +85,7 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     FeTable table = getTargetTable();
-    if (table instanceof KuduTable) {
+    if (table instanceof FeKuduTable) {
       throw new AnalysisException("ALTER TABLE ADD PARTITION is not supported for " +
           "Kudu tables: " + table.getTableName());
     }

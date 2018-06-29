@@ -35,8 +35,8 @@ import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TExplainLevel;
@@ -86,7 +86,7 @@ import com.google.common.collect.Sets;
 public class KuduScanNode extends ScanNode {
   private final static Logger LOG = LoggerFactory.getLogger(KuduScanNode.class);
 
-  private final KuduTable kuduTable_;
+  private final FeKuduTable kuduTable_;
 
   // True if this scan node should use the MT implementation in the backend.
   private boolean useMtScanNode_;
@@ -104,7 +104,7 @@ public class KuduScanNode extends ScanNode {
 
   public KuduScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts) {
     super(id, desc, "SCAN KUDU");
-    kuduTable_ = (KuduTable) desc_.getTable();
+    kuduTable_ = (FeKuduTable) desc_.getTable();
     conjuncts_ = conjuncts;
   }
 

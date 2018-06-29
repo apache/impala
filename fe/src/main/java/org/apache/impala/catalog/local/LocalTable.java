@@ -20,19 +20,15 @@ package org.apache.impala.catalog.local;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.annotation.concurrent.Immutable;
-
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
-import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsFileFormat;
@@ -63,25 +59,30 @@ abstract class LocalTable implements FeTable {
   protected final LocalDb db_;
   /** The lower-case name of the table. */
   protected final String name_;
-  protected final SchemaInfo schemaInfo_;
+
+  private final ColumnMap cols_;
+
+  protected final Table msTable_;
+
+  private final TTableStats tableStats_;
 
   public static LocalTable load(LocalDb db, String tblName) {
     // In order to know which kind of table subclass to instantiate, we need
     // to eagerly grab and parse the top-level Table object from the HMS.
-    SchemaInfo schemaInfo = SchemaInfo.load(db, tblName);
     LocalTable t = null;
-    Table msTbl = schemaInfo.msTable_;
+    Table msTbl = loadMsTable(db, tblName);
     if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
-      t = new LocalView(db, tblName, schemaInfo);
+      t = new LocalView(db, msTbl);
     } else if (HBaseTable.isHBaseTable(msTbl)) {
       // TODO(todd) support HBase table
     } else if (KuduTable.isKuduTable(msTbl)) {
       // TODO(todd) support kudu table
+      t = LocalKuduTable.loadFromKudu(db, msTbl);
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
       // TODO(todd) support datasource table
     } else if (HdfsFileFormat.isHdfsInputFormatClass(
-        schemaInfo.msTable_.getSd().getInputFormat())) {
-      t = new LocalFsTable(db, tblName, schemaInfo);
+        msTbl.getSd().getInputFormat())) {
+      t = new LocalFsTable(db, msTbl);
     }
 
     if (t == null) {
@@ -96,11 +97,38 @@ abstract class LocalTable implements FeTable {
     t.loadColumnStats();
     return t;
   }
-  public LocalTable(LocalDb db, String tblName, SchemaInfo schemaInfo) {
-    this.db_ = Preconditions.checkNotNull(db);
-    this.name_ = Preconditions.checkNotNull(tblName);
-    this.schemaInfo_ = Preconditions.checkNotNull(schemaInfo);
+
+
+  /**
+   * Load the Table instance from the metastore.
+   */
+  private static Table loadMsTable(LocalDb db, String tblName) {
     Preconditions.checkArgument(tblName.toLowerCase().equals(tblName));
+
+    try {
+      return db.getCatalog().getMetaProvider().loadTable(db.getName(), tblName);
+    } catch (TException e) {
+      throw new LocalCatalogException(String.format(
+          "Could not load table %s.%s from metastore",
+          db.getName(), tblName), e);
+    }
+  }
+
+  public LocalTable(LocalDb db, Table msTbl, ColumnMap cols) {
+    this.db_ = Preconditions.checkNotNull(db);
+    this.name_ = msTbl.getTableName();
+    this.cols_ = cols;
+
+    this.msTable_ = msTbl;
+
+    tableStats_ = new TTableStats(
+        FeCatalogUtils.getRowCount(msTable_.getParameters()));
+    tableStats_.setTotal_file_bytes(
+        FeCatalogUtils.getTotalSize(msTable_.getParameters()));
+  }
+
+  public LocalTable(LocalDb db, Table msTbl) {
+    this(db, msTbl, ColumnMap.fromMsTable(msTbl));
   }
 
   @Override
@@ -110,7 +138,7 @@ abstract class LocalTable implements FeTable {
 
   @Override
   public Table getMetaStoreTable() {
-    return schemaInfo_.msTable_;
+    return msTable_;
   }
 
   @Override
@@ -142,7 +170,7 @@ abstract class LocalTable implements FeTable {
   @Override
   public ArrayList<Column> getColumns() {
     // TODO(todd) why does this return ArrayList instead of List?
-    return new ArrayList<>(schemaInfo_.colsByPos_);
+    return new ArrayList<>(cols_.colsByPos_);
   }
 
   @Override
@@ -154,40 +182,37 @@ abstract class LocalTable implements FeTable {
 
   @Override
   public List<String> getColumnNames() {
-    return Column.toColumnNames(schemaInfo_.colsByPos_);
+    return cols_.getColumnNames();
   }
 
   @Override
   public List<Column> getClusteringColumns() {
-    return ImmutableList.copyOf(
-        schemaInfo_.colsByPos_.subList(0, schemaInfo_.numClusteringCols_));
+    return cols_.getClusteringColumns();
   }
 
   @Override
   public List<Column> getNonClusteringColumns() {
-    return ImmutableList.copyOf(schemaInfo_.colsByPos_.subList(
-        schemaInfo_.numClusteringCols_,
-        schemaInfo_.colsByPos_.size()));
+    return cols_.getNonClusteringColumns();
   }
 
   @Override
   public int getNumClusteringCols() {
-    return schemaInfo_.numClusteringCols_;
+    return cols_.getNumClusteringCols();
   }
 
   @Override
   public boolean isClusteringColumn(Column c) {
-    return schemaInfo_.isClusteringColumn(c);
+    return cols_.isClusteringColumn(c);
   }
 
   @Override
   public Column getColumn(String name) {
-    return schemaInfo_.colsByName_.get(name.toLowerCase());
+    return cols_.getByName(name);
   }
 
   @Override
   public ArrayType getType() {
-    return schemaInfo_.type_;
+    return cols_.getType();
   }
 
   @Override
@@ -197,12 +222,12 @@ abstract class LocalTable implements FeTable {
 
   @Override
   public long getNumRows() {
-    return schemaInfo_.tableStats_.num_rows;
+    return tableStats_.num_rows;
   }
 
   @Override
   public TTableStats getTTableStats() {
-    return schemaInfo_.tableStats_;
+    return tableStats_;
   }
 
   protected void loadColumnStats() {
@@ -215,74 +240,74 @@ abstract class LocalTable implements FeTable {
     }
   }
 
-  /**
-   * The table schema, loaded from the HMS Table object. This is common
-   * to all Table implementations and includes the column definitions and
-   * table-level stats.
-   *
-   * TODO(todd): some of this code is lifted from 'Table' and, with some
-   * effort, could be refactored to avoid duplication.
-   */
-  @Immutable
-  protected static class SchemaInfo {
-    private final Table msTable_;
-
+  protected static class ColumnMap {
     private final ArrayType type_;
     private final ImmutableList<Column> colsByPos_;
     private final ImmutableMap<String, Column> colsByName_;
 
     private final int numClusteringCols_;
-    private final String nullColumnValue_;
 
-    private final TTableStats tableStats_;
+    public static ColumnMap fromMsTable(Table msTbl) {
+      final String fullName = msTbl.getDbName() + "." + msTbl.getTableName();
 
-    /**
-     * Load the schema info from the metastore.
-     */
-    static SchemaInfo load(LocalDb db, String tblName) {
+      // The number of clustering columns is the number of partition keys.
+      int numClusteringCols = msTbl.getPartitionKeys().size();
+      // Add all columns to the table. Ordering is important: partition columns first,
+      // then all other columns.
+      List<Column> cols;
       try {
-        Table msTbl = db.getCatalog().getMetaProvider().loadTable(
-            db.getName(), tblName);
-        return new SchemaInfo(msTbl);
-      } catch (TException e) {
-        throw new LocalCatalogException(String.format(
-            "Could not load table %s.%s from metastore",
-            db.getName(), tblName), e);
+        cols = FeCatalogUtils.fieldSchemasToColumns(
+            Iterables.concat(msTbl.getPartitionKeys(),
+                             msTbl.getSd().getCols()),
+            msTbl.getTableName());
+        return new ColumnMap(cols, numClusteringCols, fullName);
       } catch (TableLoadingException e) {
-        // In this case, the exception message already has the table name
-        // in the exception message.
         throw new LocalCatalogException(e);
       }
     }
 
-    SchemaInfo(Table msTbl) throws TableLoadingException {
-      msTable_ = msTbl;
-      // set NULL indicator string from table properties
-      String tableNullFormat =
-          msTbl.getParameters().get(serdeConstants.SERIALIZATION_NULL_FORMAT);
-      nullColumnValue_ = tableNullFormat != null ? tableNullFormat :
-          FeFsTable.DEFAULT_NULL_COLUMN_VALUE;
-
-      final String fullName = msTbl.getDbName() + "." + msTbl.getTableName();
-
-      // The number of clustering columns is the number of partition keys.
-      numClusteringCols_ = msTbl.getPartitionKeys().size();
-      // Add all columns to the table. Ordering is important: partition columns first,
-      // then all other columns.
-      colsByPos_ = FeCatalogUtils.fieldSchemasToColumns(
-          Iterables.concat(msTbl.getPartitionKeys(),
-                           msTbl.getSd().getCols()),
-          fullName);
-      FeCatalogUtils.validateClusteringColumns(
-          colsByPos_.subList(0, numClusteringCols_), fullName);
+    public ColumnMap(List<Column> cols, int numClusteringCols,
+        String fullTableName) {
+      this.colsByPos_ = ImmutableList.copyOf(cols);
+      this.numClusteringCols_ = numClusteringCols;
       colsByName_ = indexColumnNames(colsByPos_);
       type_ = new ArrayType(columnsToStructType(colsByPos_));
 
-      tableStats_ = new TTableStats(
-          FeCatalogUtils.getRowCount(msTable_.getParameters()));
-      tableStats_.setTotal_file_bytes(
-          FeCatalogUtils.getTotalSize(msTable_.getParameters()));
+      try {
+        FeCatalogUtils.validateClusteringColumns(
+            colsByPos_.subList(0, numClusteringCols_),
+            fullTableName);
+      } catch (TableLoadingException e) {
+        throw new LocalCatalogException(e);
+      }
     }
+
+    public ArrayType getType() {
+      return type_;
+    }
+
+
+    public Column getByName(String name) {
+      return colsByName_.get(name.toLowerCase());
+    }
+
+    public int getNumClusteringCols() {
+      return numClusteringCols_;
+    }
+
+
+    public List<Column> getNonClusteringColumns() {
+      return colsByPos_.subList(numClusteringCols_, colsByPos_.size());
+    }
+
+    public List<Column> getClusteringColumns() {
+      return colsByPos_.subList(0, numClusteringCols_);
+    }
+
+    public List<String> getColumnNames() {
+      return Column.toColumnNames(colsByPos_);
+    }
+
 
     private static StructType columnsToStructType(List<Column> cols) {
       ArrayList<StructField> fields = Lists.newArrayListWithCapacity(cols.size());
@@ -300,13 +325,9 @@ abstract class LocalTable implements FeTable {
       return builder.build();
     }
 
-    private boolean isClusteringColumn(Column c) {
+    boolean isClusteringColumn(Column c) {
       Preconditions.checkArgument(colsByPos_.get(c.getPosition()) == c);
       return c.getPosition() < numClusteringCols_;
-    }
-
-    protected String getNullColumnValue() {
-      return nullColumnValue_;
     }
   }
 }

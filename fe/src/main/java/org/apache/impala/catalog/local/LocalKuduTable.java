@@ -1,0 +1,202 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+package org.apache.impala.catalog.local;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.annotation.concurrent.Immutable;
+
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.impala.analysis.KuduPartitionParam;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeCatalogUtils;
+import org.apache.impala.catalog.FeKuduTable;
+import org.apache.impala.catalog.KuduColumn;
+import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TKuduTable;
+import org.apache.impala.thrift.TTableDescriptor;
+import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.KuduUtil;
+import org.apache.kudu.ColumnSchema;
+import org.apache.kudu.Schema;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduException;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+
+public class LocalKuduTable extends LocalTable implements FeKuduTable {
+  private final TableParams tableParams_;
+  private final List<KuduPartitionParam> partitionBy_;
+  private final org.apache.kudu.client.KuduTable kuduTable_;
+  private final ImmutableList<String> primaryKeyColumnNames_;
+
+  /**
+   * Create a new instance based on the table metadata 'msTable' stored
+   * in the metastore.
+   */
+  static LocalTable loadFromKudu(LocalDb db, Table msTable) {
+    Preconditions.checkNotNull(db);
+    Preconditions.checkNotNull(msTable);
+    String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
+
+    TableParams params = new TableParams(msTable);
+    org.apache.kudu.client.KuduTable kuduTable = params.openTable();
+    List<Column> cols = new ArrayList<>();
+    List<FieldSchema> fieldSchemas = new ArrayList<>();
+    convertColsFromKudu(kuduTable.getSchema(), cols, fieldSchemas);
+
+    // TODO(todd): update the schema in HMS if it doesn't match? This will
+    // no longer be necessary after the Kudu-HMS integration is complete, so
+    // maybe not worth implementing here for the LocalCatalog implementation.
+
+    // Use the schema derived from Kudu, rather than the one stored in the HMS.
+    msTable.getSd().setCols(fieldSchemas);
+
+    ColumnMap cmap = new ColumnMap(cols, /*numClusteringCols=*/0, fullTableName);
+    return new LocalKuduTable(db, msTable, cmap, kuduTable);
+  }
+
+  private static void convertColsFromKudu(Schema schema, List<Column> cols,
+      List<FieldSchema> fieldSchemas) {
+    Preconditions.checkArgument(cols.isEmpty());;
+    Preconditions.checkArgument(fieldSchemas.isEmpty());;
+
+    int pos = 0;
+    for (ColumnSchema colSchema: schema.getColumns()) {
+      KuduColumn kuduCol;
+      try {
+        kuduCol = KuduColumn.fromColumnSchema(colSchema, pos++);
+      } catch (ImpalaRuntimeException e) {
+        throw new LocalCatalogException(e);
+      }
+      Preconditions.checkNotNull(kuduCol);
+      // Add the HMS column
+      fieldSchemas.add(new FieldSchema(kuduCol.getName(),
+          kuduCol.getType().toSql().toLowerCase(), /*comment=*/null));
+      cols.add(kuduCol);
+    }
+  }
+
+  private LocalKuduTable(LocalDb db, Table msTable, ColumnMap cmap,
+      org.apache.kudu.client.KuduTable kuduTable) {
+    super(db, msTable, cmap);
+    tableParams_ = new TableParams(msTable);
+    kuduTable_ = kuduTable;
+    partitionBy_ = ImmutableList.copyOf(Utils.loadPartitionByParams(
+        kuduTable));
+
+    ImmutableList.Builder<String> b = ImmutableList.builder();
+    for (ColumnSchema c: kuduTable_.getSchema().getPrimaryKeyColumns()) {
+      b.add(c.getName().toLowerCase());
+    }
+    primaryKeyColumnNames_ = b.build();
+  }
+
+  @Override
+  public String getKuduMasterHosts() {
+    return tableParams_.masters_;
+  }
+
+
+  @Override
+  public String getKuduTableName() {
+    return tableParams_.kuduTableName_;
+  }
+
+  @Override
+  public List<String> getPrimaryKeyColumnNames() {
+    return primaryKeyColumnNames_;
+  }
+
+  @Override
+  public List<KuduPartitionParam> getPartitionBy() {
+    return partitionBy_;
+  }
+
+  @Override
+  public TTableDescriptor toThriftDescriptor(int tableId,
+      Set<Long> referencedPartitions) {
+    // TODO(todd): the old implementation passes kuduTableName_ instead of name below.
+    TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.KUDU_TABLE,
+        FeCatalogUtils.getTColumnDescriptors(this),
+        getNumClusteringCols(),
+        name_, db_.getName());
+    TKuduTable tbl = new TKuduTable();
+    tbl.setKey_columns(Preconditions.checkNotNull(primaryKeyColumnNames_));
+    tbl.setMaster_addresses(tableParams_.getMastersAsList());
+    tbl.setTable_name(tableParams_.kuduTableName_);
+    Preconditions.checkNotNull(partitionBy_);
+    // IMPALA-5154: partitionBy_ may be empty if Kudu table created outside Impala,
+    // partition_by must be explicitly created because the field is required.
+    tbl.partition_by = Lists.newArrayList();
+    for (KuduPartitionParam partitionParam: partitionBy_) {
+      tbl.addToPartition_by(partitionParam.toThrift());
+    }
+    desc.setKuduTable(tbl);
+    return desc;
+  }
+
+  /**
+   * Parsed parameters from the HMS indicating the cluster and table name for
+   * a Kudu table.
+   */
+  @Immutable
+  private static class TableParams {
+    private final String kuduTableName_;
+    private final String masters_;
+
+    TableParams(Table msTable) {
+      String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
+      Map<String, String> params = msTable.getParameters();
+      kuduTableName_ = params.get(KuduTable.KEY_TABLE_NAME);
+      if (kuduTableName_ == null) {
+        throw new LocalCatalogException("No " + KuduTable.KEY_TABLE_NAME +
+            " property found for table " + fullTableName);
+      }
+      masters_ = params.get(KuduTable.KEY_MASTER_HOSTS);
+      if (masters_ == null) {
+        throw new LocalCatalogException("No " + KuduTable.KEY_MASTER_HOSTS +
+            " property found for table " + fullTableName);
+      }
+    }
+
+    public List<String> getMastersAsList() {
+      return Lists.newArrayList(masters_.split(","));
+    }
+
+    public org.apache.kudu.client.KuduTable openTable() {
+      KuduClient kuduClient = KuduUtil.getKuduClient(masters_);
+      org.apache.kudu.client.KuduTable kuduTable;
+      try {
+        kuduTable = kuduClient.openTable(kuduTableName_);
+      } catch (KuduException e) {
+        throw new LocalCatalogException(
+            String.format("Error opening Kudu table '%s', Kudu error: %s",
+                kuduTableName_, e.getMessage()));
+      }
+      return kuduTable;
+    }
+  }
+}

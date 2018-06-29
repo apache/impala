@@ -22,6 +22,7 @@ import static org.junit.Assert.*;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.catalog.CatalogTest;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeCatalogUtils;
@@ -37,9 +38,12 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.PatternMatcher;
+import org.hamcrest.CoreMatchers;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
@@ -50,7 +54,7 @@ public class LocalCatalogTest {
   @Before
   public void setupCatalog() {
     FeSupport.loadLibrary();
-    catalog_ = new LocalCatalog(new DirectMetaProvider());
+    catalog_ = LocalCatalog.create(/*defaultKuduMasterHosts=*/null);
   }
 
   @Test
@@ -175,5 +179,36 @@ public class LocalCatalogTest {
     FeView v = (FeView) catalog_.getTable("functional",  "alltypes_view");
     assertEquals(TCatalogObjectType.VIEW, v.getCatalogObjectType());
     assertEquals("SELECT * FROM functional.alltypes", v.getQueryStmt().toSql());
+  }
+
+  @Test
+  public void testKuduTable() throws Exception {
+    LocalKuduTable t = (LocalKuduTable) catalog_.getTable("functional_kudu",  "alltypes");
+    assertEquals("id,bool_col,tinyint_col,smallint_col,int_col," +
+        "bigint_col,float_col,double_col,date_string_col,string_col," +
+        "timestamp_col,year,month", Joiner.on(",").join(t.getColumnNames()));
+    // Assert on the generated SQL for the table, but not the table properties, since
+    // those might change based on whether this test runs before or after other
+    // tests which compute stats, etc.
+    Assert.assertThat(ToSqlUtils.getCreateTableSql(t), CoreMatchers.startsWith(
+        "CREATE TABLE functional_kudu.alltypes (\n" +
+        "  id INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  bool_col BOOLEAN NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  tinyint_col TINYINT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  smallint_col SMALLINT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  int_col INT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  bigint_col BIGINT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  float_col FLOAT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  double_col DOUBLE NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  date_string_col STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  string_col STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  timestamp_col TIMESTAMP NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  year INT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  month INT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
+        "  PRIMARY KEY (id)\n" +
+        ")\n" +
+        "PARTITION BY HASH (id) PARTITIONS 3\n" +
+        "STORED AS KUDU\n" +
+        "TBLPROPERTIES"));
   }
 }

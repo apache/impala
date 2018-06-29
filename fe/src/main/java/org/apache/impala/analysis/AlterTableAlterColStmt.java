@@ -20,10 +20,10 @@ package org.apache.impala.analysis;
 import java.util.Map;
 
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.KuduColumn;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableAlterColParams;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -134,7 +134,7 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
     }
     if (newColDef_.hasKuduOptions()) {
       // Disallow Kudu options on non-Kudu tables.
-      if (!(t instanceof KuduTable)) {
+      if (!(t instanceof FeKuduTable)) {
         if (isDropDefault_) {
           throw new AnalysisException(String.format(
               "Unsupported column option for non-Kudu table: DROP DEFAULT"));
@@ -153,7 +153,7 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
                 newColDef_.toString()));
       }
     }
-    if (t instanceof KuduTable) {
+    if (t instanceof FeKuduTable) {
       KuduColumn col = (KuduColumn) t.getColumn(colName_);
       if (!col.getType().equals(newColDef_.getType())) {
         throw new AnalysisException(String.format("Cannot change the type of a Kudu " +

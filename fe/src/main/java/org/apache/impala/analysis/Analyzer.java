@@ -38,17 +38,16 @@ import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Column;
-import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.IncompleteTable;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -589,7 +588,7 @@ public class Analyzer {
       if (table instanceof FeView) return new InlineViewRef((FeView) table, tableRef);
       // The table must be a base table.
       Preconditions.checkState(table instanceof FeFsTable ||
-          table instanceof KuduTable ||
+          table instanceof FeKuduTable ||
           table instanceof HBaseTable ||
           table instanceof FeDataSourceTable);
       return new BaseTableRef(tableRef, resolvedPath);

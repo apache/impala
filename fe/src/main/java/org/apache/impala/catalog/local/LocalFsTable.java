@@ -27,6 +27,8 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.catalog.CatalogException;
@@ -79,14 +81,26 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
    */
   private ArrayList<HashSet<Long>> nullPartitionIds_;
 
+
+  /**
+   * The value that will be stored in a partition name to indicate NULL.
+   */
+  private final String nullColumnValue_;
+
   /**
    * Map assigning integer indexes for the hosts containing blocks for this table.
    * This is updated as a side effect of LocalFsPartition.loadFileDescriptors().
    */
   private final ListMap<TNetworkAddress> hostIndex_ = new ListMap<>();
 
-  public LocalFsTable(LocalDb db, String tblName, SchemaInfo schemaInfo) {
-    super(db, tblName, schemaInfo);
+  public LocalFsTable(LocalDb db, Table msTbl) {
+    super(db, msTbl);
+
+    // set NULL indicator string from table properties
+    String tableNullFormat =
+        msTbl.getParameters().get(serdeConstants.SERIALIZATION_NULL_FORMAT);
+    nullColumnValue_ = tableNullFormat != null ? tableNullFormat :
+        FeFsTable.DEFAULT_NULL_COLUMN_VALUE;
   }
 
   @Override
@@ -188,7 +202,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
     // TODO(todd): implement avro schema support
     THdfsTable hdfsTable = new THdfsTable(getHdfsBaseDir(), getColumnNames(),
-        getNullPartitionKeyValue(), schemaInfo_.getNullColumnValue(), idToPartition,
+        getNullPartitionKeyValue(), nullColumnValue_, idToPartition,
         tPrototypePartition);
 
     TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,

@@ -20,10 +20,10 @@ package org.apache.impala.planner;
 import java.util.List;
 
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.thrift.TSinkAction;
 
 import com.google.common.base.Preconditions;
@@ -116,7 +116,7 @@ public abstract class TableSink extends DataSink {
       Preconditions.checkState(sortColumns.isEmpty());
       // Create the HBaseTableSink and return it.
       return new HBaseTableSink(table);
-    } else if (table instanceof KuduTable) {
+    } else if (table instanceof FeKuduTable) {
       // Kudu doesn't have a way to perform INSERT OVERWRITE.
       Preconditions.checkState(overwrite == false);
       // Sort columns are not supported for Kudu tables.

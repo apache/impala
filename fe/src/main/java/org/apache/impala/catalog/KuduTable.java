@@ -18,12 +18,8 @@
 package org.apache.impala.catalog;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import javax.xml.bind.DatatypeConverter;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -32,30 +28,18 @@ import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.service.BackendConfig;
-import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TCatalogObjectType;
-import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TKuduPartitionByHashParam;
 import org.apache.impala.thrift.TKuduPartitionByRangeParam;
 import org.apache.impala.thrift.TKuduPartitionParam;
 import org.apache.impala.thrift.TKuduTable;
-import org.apache.impala.thrift.TResultSet;
-import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.KuduUtil;
-import org.apache.impala.util.TResultRowBuilder;
 import org.apache.kudu.ColumnSchema;
-import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
-import org.apache.kudu.client.LocatedTablet;
-import org.apache.kudu.client.PartitionSchema;
-import org.apache.kudu.client.PartitionSchema.HashBucketSchema;
-import org.apache.kudu.client.PartitionSchema.RangeSchema;
-import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 import com.codahale.metrics.Timer;
@@ -67,7 +51,7 @@ import com.google.common.collect.Lists;
 /**
  * Representation of a Kudu table in the catalog cache.
  */
-public class KuduTable extends Table {
+public class KuduTable extends Table implements FeKuduTable {
 
   // Alias to the string key that identifies the storage handler for Kudu tables.
   public static final String KEY_STORAGE_HANDLER =
@@ -112,7 +96,7 @@ public class KuduTable extends Table {
 
   // Partitioning schemes of this Kudu table. Both range and hash-based partitioning are
   // supported.
-  private final List<KuduPartitionParam> partitionBy_ = Lists.newArrayList();
+  private List<KuduPartitionParam> partitionBy_;
 
   // Schema of the underlying Kudu table.
   private org.apache.kudu.Schema kuduSchema_;
@@ -140,46 +124,22 @@ public class KuduTable extends Table {
     return KUDU_STORAGE_HANDLER.equals(msTbl.getParameters().get(KEY_STORAGE_HANDLER));
   }
 
+  @Override
   public String getKuduTableName() { return kuduTableName_; }
+  @Override
   public String getKuduMasterHosts() { return kuduMasters_; }
+
   public org.apache.kudu.Schema getKuduSchema() { return kuduSchema_; }
 
+  @Override
   public List<String> getPrimaryKeyColumnNames() {
     return ImmutableList.copyOf(primaryKeyColumnNames_);
   }
 
+  @Override
   public List<KuduPartitionParam> getPartitionBy() {
+    Preconditions.checkState(partitionBy_ != null);
     return ImmutableList.copyOf(partitionBy_);
-  }
-
-  public Set<String> getPartitionColumnNames() {
-    Set<String> ret = new HashSet<String>();
-    for (KuduPartitionParam partitionParam : partitionBy_) {
-      ret.addAll(partitionParam.getColumnNames());
-    }
-    return ret;
-  }
-
-  /**
-   * Returns the range-based partitioning of this table if it exists, null otherwise.
-   */
-  private KuduPartitionParam getRangePartitioning() {
-    for (KuduPartitionParam partitionParam: partitionBy_) {
-      if (partitionParam.getType() == KuduPartitionParam.Type.RANGE) {
-        return partitionParam;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Returns the column names of the table's range-based partitioning or an empty
-   * list if the table doesn't have a range-based partitioning.
-   */
-  public List<String> getRangePartitioningColNames() {
-    KuduPartitionParam rangePartitioning = getRangePartitioning();
-    if (rangePartitioning == null) return Collections.<String>emptyList();
-    return rangePartitioning.getColumnNames();
   }
 
   /**
@@ -203,7 +163,8 @@ public class KuduTable extends Table {
     Preconditions.checkNotNull(kuduTable);
 
     loadSchema(kuduTable);
-    loadPartitionByParams(kuduTable);
+    Preconditions.checkState(!colsByPos_.isEmpty());
+    partitionBy_ = Utils.loadPartitionByParams(kuduTable);
   }
 
   /**
@@ -282,40 +243,6 @@ public class KuduTable extends Table {
     }
   }
 
-  private void loadPartitionByParams(org.apache.kudu.client.KuduTable kuduTable) {
-    Preconditions.checkNotNull(kuduTable);
-    Schema tableSchema = kuduTable.getSchema();
-    PartitionSchema partitionSchema = kuduTable.getPartitionSchema();
-    Preconditions.checkState(!colsByPos_.isEmpty());
-    partitionBy_.clear();
-    for (HashBucketSchema hashBucketSchema: partitionSchema.getHashBucketSchemas()) {
-      List<String> columnNames = Lists.newArrayList();
-      for (int colId: hashBucketSchema.getColumnIds()) {
-        columnNames.add(getColumnNameById(tableSchema, colId));
-      }
-      partitionBy_.add(KuduPartitionParam.createHashParam(columnNames,
-          hashBucketSchema.getNumBuckets()));
-    }
-    RangeSchema rangeSchema = partitionSchema.getRangeSchema();
-    List<Integer> columnIds = rangeSchema.getColumns();
-    if (columnIds.isEmpty()) return;
-    List<String> columnNames = Lists.newArrayList();
-    for (int colId: columnIds) columnNames.add(getColumnNameById(tableSchema, colId));
-    // We don't populate the split values because Kudu's API doesn't currently support
-    // retrieving the split values for range partitions.
-    // TODO: File a Kudu JIRA.
-    partitionBy_.add(KuduPartitionParam.createRangeParam(columnNames, null));
-  }
-
-  /**
-   * Returns the name of a Kudu column with id 'colId'.
-   */
-  private String getColumnNameById(Schema tableSchema, int colId) {
-    Preconditions.checkNotNull(tableSchema);
-    ColumnSchema col = tableSchema.getColumnByIndex(tableSchema.getColumnIndex(colId));
-    Preconditions.checkNotNull(col);
-    return col.getName();
-  }
 
   /**
    * Creates a temporary KuduTable object populated with the specified properties but has
@@ -333,7 +260,7 @@ public class KuduTable extends Table {
     for (ColumnDef pkColDef: primaryKeyColumnDefs) {
       tmpTable.primaryKeyColumnNames_.add(pkColDef.getColName());
     }
-    tmpTable.partitionBy_.addAll(partitionParams);
+    tmpTable.partitionBy_ = ImmutableList.copyOf(partitionParams);
     return tmpTable;
   }
 
@@ -353,23 +280,25 @@ public class KuduTable extends Table {
     kuduMasters_ = Joiner.on(',').join(tkudu.getMaster_addresses());
     primaryKeyColumnNames_.clear();
     primaryKeyColumnNames_.addAll(tkudu.getKey_columns());
-    loadPartitionByParamsFromThrift(tkudu.getPartition_by());
+    partitionBy_ = loadPartitionByParamsFromThrift(tkudu.getPartition_by());
   }
 
-  private void loadPartitionByParamsFromThrift(List<TKuduPartitionParam> params) {
-    partitionBy_.clear();
+  private static List<KuduPartitionParam> loadPartitionByParamsFromThrift(
+      List<TKuduPartitionParam> params) {
+    List<KuduPartitionParam> ret= Lists.newArrayList();
     for (TKuduPartitionParam param: params) {
       if (param.isSetBy_hash_param()) {
         TKuduPartitionByHashParam hashParam = param.getBy_hash_param();
-        partitionBy_.add(KuduPartitionParam.createHashParam(
+        ret.add(KuduPartitionParam.createHashParam(
             hashParam.getColumns(), hashParam.getNum_partitions()));
       } else {
         Preconditions.checkState(param.isSetBy_range_param());
         TKuduPartitionByRangeParam rangeParam = param.getBy_range_param();
-        partitionBy_.add(KuduPartitionParam.createRangeParam(rangeParam.getColumns(),
+        ret.add(KuduPartitionParam.createRangeParam(rangeParam.getColumns(),
             null));
       }
     }
+    return ret;
   }
 
   @Override
@@ -394,86 +323,5 @@ public class KuduTable extends Table {
       tbl.addToPartition_by(partitionParam.toThrift());
     }
     return tbl;
-  }
-
-  public boolean isPrimaryKeyColumn(String name) {
-    return primaryKeyColumnNames_.contains(name);
-  }
-
-  public TResultSet getTableStats() throws ImpalaRuntimeException {
-    TResultSet result = new TResultSet();
-    TResultSetMetadata resultSchema = new TResultSetMetadata();
-    result.setSchema(resultSchema);
-
-    resultSchema.addToColumns(new TColumn("# Rows", Type.INT.toThrift()));
-    resultSchema.addToColumns(new TColumn("Start Key", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Stop Key", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Leader Replica", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("# Replicas", Type.INT.toThrift()));
-
-    KuduClient client = KuduUtil.getKuduClient(getKuduMasterHosts());
-    try {
-      org.apache.kudu.client.KuduTable kuduTable = client.openTable(kuduTableName_);
-      List<LocatedTablet> tablets =
-          kuduTable.getTabletsLocations(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
-      if (tablets.isEmpty()) {
-        TResultRowBuilder builder = new TResultRowBuilder();
-        result.addToRows(
-            builder.add("-1").add("N/A").add("N/A").add("N/A").add("-1").get());
-        return result;
-      }
-      for (LocatedTablet tab: tablets) {
-        TResultRowBuilder builder = new TResultRowBuilder();
-        builder.add("-1");   // The Kudu client API doesn't expose tablet row counts.
-        builder.add(DatatypeConverter.printHexBinary(
-            tab.getPartition().getPartitionKeyStart()));
-        builder.add(DatatypeConverter.printHexBinary(
-            tab.getPartition().getPartitionKeyEnd()));
-        LocatedTablet.Replica leader = tab.getLeaderReplica();
-        if (leader == null) {
-          // Leader might be null, if it is not yet available (e.g. during
-          // leader election in Kudu)
-          builder.add("Leader n/a");
-        } else {
-          builder.add(leader.getRpcHost() + ":" + leader.getRpcPort().toString());
-        }
-        builder.add(tab.getReplicas().size());
-        result.addToRows(builder.get());
-      }
-
-    } catch (Exception e) {
-      throw new ImpalaRuntimeException("Error accessing Kudu for table stats.", e);
-    }
-    return result;
-  }
-
-  public TResultSet getRangePartitions() throws ImpalaRuntimeException {
-    TResultSet result = new TResultSet();
-    TResultSetMetadata resultSchema = new TResultSetMetadata();
-    result.setSchema(resultSchema);
-
-    // Build column header
-    String header = "RANGE (" + Joiner.on(',').join(getRangePartitioningColNames()) + ")";
-    resultSchema.addToColumns(new TColumn(header, Type.STRING.toThrift()));
-    KuduClient client = KuduUtil.getKuduClient(getKuduMasterHosts());
-    try {
-      org.apache.kudu.client.KuduTable kuduTable = client.openTable(kuduTableName_);
-      // The Kudu table API will return the partitions in sorted order by value.
-      List<String> partitions = kuduTable.getFormattedRangePartitions(
-          BackendConfig.INSTANCE.getKuduClientTimeoutMs());
-      if (partitions.isEmpty()) {
-        TResultRowBuilder builder = new TResultRowBuilder();
-        result.addToRows(builder.add("").get());
-        return result;
-      }
-      for (String partition: partitions) {
-        TResultRowBuilder builder = new TResultRowBuilder();
-        builder.add(partition);
-        result.addToRows(builder.get());
-      }
-    } catch (Exception e) {
-      throw new ImpalaRuntimeException("Error accessing Kudu for table partitions.", e);
-    }
-    return result;
   }
 }

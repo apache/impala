@@ -23,9 +23,9 @@ import java.util.Set;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableAddReplaceColsParams;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -80,7 +80,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
           "supported on HBase tables.");
     }
 
-    boolean isKuduTable = t instanceof KuduTable;
+    boolean isKuduTable = t instanceof FeKuduTable;
     if (isKuduTable && replaceExistingCols_) {
       throw new AnalysisException("ALTER TABLE REPLACE COLUMNS is not " +
           "supported on Kudu tables.");

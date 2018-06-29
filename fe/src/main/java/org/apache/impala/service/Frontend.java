@@ -81,11 +81,11 @@ import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.ImpaladCatalog;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
@@ -330,7 +330,7 @@ public class Frontend {
           new TColumn("name", Type.STRING.toThrift()),
           new TColumn("type", Type.STRING.toThrift()),
           new TColumn("comment", Type.STRING.toThrift()));
-      if (descStmt.getTable() instanceof KuduTable
+      if (descStmt.getTable() instanceof FeKuduTable
           && descStmt.getOutputStyle() == TDescribeOutputStyle.MINIMAL) {
         columns.add(new TColumn("primary_key", Type.STRING.toThrift()));
         columns.add(new TColumn("nullable", Type.STRING.toThrift()));
@@ -750,11 +750,11 @@ public class Frontend {
       return ((HBaseTable) table).getTableStats();
     } else if (table instanceof FeDataSourceTable) {
       return ((FeDataSourceTable) table).getTableStats();
-    } else if (table instanceof KuduTable) {
+    } else if (table instanceof FeKuduTable) {
       if (op == TShowStatsOp.RANGE_PARTITIONS) {
-        return ((KuduTable) table).getRangePartitions();
+        return FeKuduTable.Utils.getRangePartitions((FeKuduTable) table);
       } else {
-        return ((KuduTable) table).getTableStats();
+        return FeKuduTable.Utils.getTableStats((FeKuduTable) table);
       }
     } else {
       throw new InternalException("Invalid table class: " + table.getClass());
@@ -838,7 +838,7 @@ public class Frontend {
       filteredColumns = table.getColumnsInHiveOrder();
     }
     if (outputStyle == TDescribeOutputStyle.MINIMAL) {
-      if (!(table instanceof KuduTable)) {
+      if (!(table instanceof FeKuduTable)) {
         return DescribeResultFactory.buildDescribeMinimalResult(
             Column.columnsToStruct(filteredColumns));
       }

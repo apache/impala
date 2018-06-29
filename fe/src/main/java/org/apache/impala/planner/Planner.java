@@ -32,9 +32,9 @@ import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TupleId;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
@@ -184,7 +184,7 @@ public class Planner {
         List<Expr> exprs = Lists.newArrayList();
         FeTable targetTable = insertStmt.getTargetTable();
         Preconditions.checkNotNull(targetTable);
-        if (targetTable instanceof KuduTable) {
+        if (targetTable instanceof FeKuduTable) {
           if (ctx_.isInsert()) {
             // For insert statements on Kudu tables, we only need to consider
             // the labels of columns mentioned in the column list.
@@ -620,7 +620,7 @@ public class Planner {
     List<Expr> orderingExprs = Lists.newArrayList();
 
     boolean partialSort = false;
-    if (insertStmt.getTargetTable() instanceof KuduTable) {
+    if (insertStmt.getTargetTable() instanceof FeKuduTable) {
       // Always sort if the 'clustered' hint is present. Otherwise, don't sort if either
       // the 'noclustered' hint is present, or this is a single node exec, or if the
       // target table is unpartitioned.

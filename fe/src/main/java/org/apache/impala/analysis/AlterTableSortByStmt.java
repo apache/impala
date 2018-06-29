@@ -20,9 +20,9 @@ package org.apache.impala.analysis;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
@@ -71,7 +71,7 @@ public class AlterTableSortByStmt extends AlterTableStmt {
     if (targetTable instanceof HBaseTable) {
       throw new AnalysisException("ALTER TABLE SORT BY not supported on HBase tables.");
     }
-    if (targetTable instanceof KuduTable) {
+    if (targetTable instanceof FeKuduTable) {
       throw new AnalysisException("ALTER TABLE SORT BY not supported on Kudu tables.");
     }
 

@@ -25,6 +25,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
@@ -221,7 +222,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
         tmpTable = HdfsTable.createCtasTarget((Db)db, msTbl);
       }
       Preconditions.checkState(tmpTable != null &&
-          (tmpTable instanceof FeFsTable || tmpTable instanceof KuduTable));
+          (tmpTable instanceof FeFsTable || tmpTable instanceof FeKuduTable));
 
       insertStmt_.setTargetTable(tmpTable);
     } catch (Exception e) {

@@ -23,10 +23,10 @@ import java.util.List;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetLocationParams;
@@ -111,7 +111,7 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
             "uncache before changing the location using: ALTER TABLE %s SET UNCACHED",
             table.getFullName()));
       }
-    } else if (table instanceof KuduTable) {
+    } else if (table instanceof FeKuduTable) {
       throw new AnalysisException("ALTER TABLE SET LOCATION is not supported on Kudu " +
           "tables: " + table.getFullName());
     }

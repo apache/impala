@@ -66,14 +66,15 @@ public class LocalCatalog implements FeCatalog {
   private final MetaProvider metaProvider_;
   private Map<String, FeDb> dbs_ = Maps.newHashMap();
   private String nullPartitionKeyValue_;
+  private final String defaultKuduMasterHosts_;
 
-  public static FeCatalog create(String defaultKuduMasterHosts) {
-    // TODO(todd): store the kudu master hosts
-    return new LocalCatalog(new DirectMetaProvider());
+  public static LocalCatalog create(String defaultKuduMasterHosts) {
+    return new LocalCatalog(new DirectMetaProvider(), defaultKuduMasterHosts);
   }
 
-  public LocalCatalog(MetaProvider metaProvider) {
+  private LocalCatalog(MetaProvider metaProvider, String defaultKuduMasterHosts) {
     metaProvider_ = Preconditions.checkNotNull(metaProvider);
+    defaultKuduMasterHosts_ = defaultKuduMasterHosts;
   }
 
   @Override
@@ -198,7 +199,7 @@ public class LocalCatalog implements FeCatalog {
 
   @Override
   public String getDefaultKuduMasterHosts() {
-    throw new UnsupportedOperationException("TODO");
+    return defaultKuduMasterHosts_;
   }
 
   public String getNullPartitionKeyValue() {

@@ -21,9 +21,9 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
@@ -87,10 +87,10 @@ public class ShowStatsStmt extends StatementBase {
         throw new AnalysisException(getSqlPrefix() + " must target a Kudu table: " +
             table_.getFullName());
       }
-    } else if (table_ instanceof KuduTable) {
-      KuduTable kuduTable = (KuduTable) table_;
+    } else if (table_ instanceof FeKuduTable) {
+      FeKuduTable kuduTable = (FeKuduTable) table_;
       if (op_ == TShowStatsOp.RANGE_PARTITIONS &&
-          kuduTable.getRangePartitioningColNames().isEmpty()) {
+          FeKuduTable.Utils.getRangePartitioningColNames(kuduTable).isEmpty()) {
         throw new AnalysisException(getSqlPrefix() + " requested but table does not " +
             "have range partitions: " + table_.getFullName());
       }
