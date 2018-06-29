@@ -68,6 +68,7 @@ import org.apache.impala.thrift.TDescriptorTable;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.thrift.TGetAllHadoopConfigsResponse;
+import org.apache.impala.thrift.TGetCatalogMetricsResult;
 import org.apache.impala.thrift.TGetDataSrcsParams;
 import org.apache.impala.thrift.TGetDataSrcsResult;
 import org.apache.impala.thrift.TGetDbsParams;
@@ -222,6 +223,16 @@ public class JniFrontend {
     String plan = frontend_.getExplainString(queryCtx);
     if (LOG.isTraceEnabled()) LOG.trace("Explain plan: " + plan);
     return plan;
+  }
+
+  public byte[] getCatalogMetrics() throws ImpalaException {
+    TGetCatalogMetricsResult metrics = frontend_.getCatalogMetrics();
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(metrics);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
   }
 
   /**

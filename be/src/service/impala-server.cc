@@ -1154,17 +1154,10 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
 }
 
 Status ImpalaServer::UpdateCatalogMetrics() {
-  TGetDbsResult dbs;
-  RETURN_IF_ERROR(exec_env_->frontend()->GetDbs(nullptr, nullptr, &dbs));
-  ImpaladMetrics::CATALOG_NUM_DBS->SetValue(dbs.dbs.size());
-  ImpaladMetrics::CATALOG_NUM_TABLES->SetValue(0L);
-  for (const TDatabase& db: dbs.dbs) {
-    TGetTablesResult table_names;
-    RETURN_IF_ERROR(exec_env_->frontend()->GetTableNames(db.db_name, nullptr, nullptr,
-        &table_names));
-    ImpaladMetrics::CATALOG_NUM_TABLES->Increment(table_names.tables.size());
-  }
-
+  TGetCatalogMetricsResult metrics;
+  RETURN_IF_ERROR(exec_env_->frontend()->GetCatalogMetrics(&metrics));
+  ImpaladMetrics::CATALOG_NUM_DBS->SetValue(metrics.num_dbs);
+  ImpaladMetrics::CATALOG_NUM_TABLES->SetValue(metrics.num_tables);
   return Status::OK();
 }
 
