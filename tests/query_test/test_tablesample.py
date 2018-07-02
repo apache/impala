@@ -18,6 +18,7 @@
 # Tests the TABLESAMPLE clause.
 
 import pytest
+import subprocess
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension
@@ -54,8 +55,26 @@ class TestTableSample(ImpalaTestSuite):
     for perc in [5, 20, 50]:
       rep_sql = ""
       if repeatable: rep_sql = " repeatable(1)"
-      result = self.client.execute(
-        "select count(*) from alltypes tablesample system(%s)%s" % (perc, rep_sql))
+      sql_stmt = "select count(*) from alltypes tablesample system(%s)%s" \
+                 % (perc, rep_sql)
+      handle = self.client.execute_async(sql_stmt)
+      # IMPALA-6352: flaky test, possibly due to a hung thread. Wait for 500 sec before
+      # failing and logging the backtraces of all impalads.
+      is_finished = self.client.wait_for_finished_timeout(handle, 500)
+      assert is_finished, 'Query Timed out. Dumping backtrace of all threads in ' \
+                          'impalads:\nthreads in the impalad1: %s \nthreads in the ' \
+                          'impalad2: %s \nthreads in the impalad3: %s' % \
+                        (subprocess.check_output(
+                          "gdb -ex \"set pagination 0\" -ex \"thread apply all bt\"  "
+                          "--batch -p $(pgrep impalad | sed -n 1p)", shell=True),
+                         subprocess.check_output(
+                          "gdb -ex \"set pagination 0\" -ex \"thread apply all bt\"  "
+                          "--batch -p $(pgrep impalad | sed -n 2p)", shell=True),
+                         subprocess.check_output(
+                          "gdb -ex \"set pagination 0\" -ex \"thread apply all bt\"  "
+                          "--batch -p $(pgrep impalad | sed -n 3p)", shell=True))
+      result = self.client.fetch(sql_stmt, handle)
+      self.client.close_query(handle)
       count = int(result.data[0])
       assert count < baseline_count
       if prev_count and repeatable:
