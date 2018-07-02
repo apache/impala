@@ -179,6 +179,11 @@ class BeeswaxConnection(ImpalaConnection):
     LOG.info("-- getting runtime profile operation: %s" % operation_handle)
     return self.__beeswax_client.get_runtime_profile(operation_handle.get_handle())
 
+  def wait_for_finished_timeout(self, operation_handle, timeout):
+    LOG.info("-- waiting for query to reach FINISHED state: %s" % operation_handle)
+    return self.__beeswax_client.wait_for_finished_timeout(
+      operation_handle.get_handle(), timeout)
+
   def wait_for_admission_control(self, operation_handle):
     LOG.info("-- waiting for completion of the admission control processing of the "
         "query: %s" % operation_handle)
