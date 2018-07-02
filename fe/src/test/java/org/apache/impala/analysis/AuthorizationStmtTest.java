@@ -41,6 +41,7 @@ import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.SentryPolicyService;
@@ -2097,6 +2098,33 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     } finally {
       removeFunction(fn);
     }
+
+    // IMPALA-6086: Make sure use of a permanent function requires SELECT (or higher)
+    // privilege on the database, and expr rewrite/constant-folding preserves
+    // privilege requests for functions.
+    ArrayList<Type> argTypes = new ArrayList<Type>();
+    argTypes.add(Type.STRING);
+    fn = addFunction("functional", "to_lower", argTypes, Type.STRING,
+        "/test-warehouse/libTestUdf.so",
+        "_Z7ToLowerPN10impala_udf15FunctionContextERKNS_9StringValE");
+    try {
+      TQueryOptions options = new TQueryOptions();
+      options.setEnable_expr_rewrites(true);
+      for (AuthzTest test: new AuthzTest[] {
+          authorize("select functional.to_lower('ABCDEF')"),
+          // Also test with expression rewrite enabled.
+          authorize(createAnalysisCtx(options),
+              "select functional.to_lower('ABCDEF')")}) {
+        test.ok(onServer(TPrivilegeLevel.SELECT))
+            .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+            .ok(onDatabase("functional", viewMetadataPrivileges()))
+            .error(accessError("functional"))
+            .error(accessError("functional"), onDatabase("functional",
+                allExcept(viewMetadataPrivileges())));
+      }
+    } finally {
+      removeFunction(fn);
+    }
   }
 
   // Convert TDescribeResult to list of strings.
@@ -2151,12 +2179,17 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     return "User '%s' does not have privileges to DROP functions in: " + object;
   }
 
-  private ScalarFunction addFunction(String db, String fnName) {
-    ScalarFunction fn = ScalarFunction.createForTesting(db, fnName,
-        new ArrayList<Type>(), Type.INT, "/dummy", "dummy.class", null,
-        null, TFunctionBinaryType.NATIVE);
+  private ScalarFunction addFunction(String db, String fnName, ArrayList<Type> argTypes,
+      Type retType, String uriPath, String symbolName) {
+    ScalarFunction fn = ScalarFunction.createForTesting(db, fnName, argTypes, retType,
+        uriPath, symbolName, null, null, TFunctionBinaryType.NATIVE);
     authzCatalog_.addFunction(fn);
     return fn;
+  }
+
+  private ScalarFunction addFunction(String db, String fnName) {
+    return addFunction(db, fnName, new ArrayList<Type>(), Type.INT, "/dummy",
+        "dummy.class");
   }
 
   private void removeFunction(ScalarFunction fn) {

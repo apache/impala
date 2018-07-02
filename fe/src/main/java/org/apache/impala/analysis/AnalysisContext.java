@@ -51,6 +51,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.ImmutableList;
 
 /**
  * Wrapper class for parsing, analyzing and rewriting a SQL stmt.
@@ -461,6 +462,13 @@ public class AnalysisContext {
       List<String> origColLabels =
           Lists.newArrayList(analysisResult_.stmt_.getColLabels());
 
+      // Some expressions, such as function calls with constant arguments, can get
+      // folded into literals. Since literals do not require privilege requests, we
+      // must save the original privileges in order to not lose them during
+      // re-analysis.
+      ImmutableList<PrivilegeRequest> origPrivReqs =
+          analysisResult_.analyzer_.getPrivilegeReqs();
+
       // Re-analyze the stmt with a new analyzer.
       analysisResult_.analyzer_ = createAnalyzer(stmtTableCache);
       analysisResult_.stmt_.reset();
@@ -471,6 +479,11 @@ public class AnalysisContext {
       analysisResult_.stmt_.setColLabels(origColLabels);
       if (LOG.isTraceEnabled()) {
         LOG.trace("rewrittenStmt: " + analysisResult_.stmt_.toSql());
+      }
+
+      // Restore privilege requests found during the first pass
+      for (PrivilegeRequest req : origPrivReqs) {
+        analysisResult_.analyzer_.registerPrivReq(req);
       }
       if (isExplain) analysisResult_.stmt_.setIsExplain();
       Preconditions.checkState(!analysisResult_.requiresSubqueryRewrite());
