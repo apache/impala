@@ -356,7 +356,7 @@ def conn(request):
     with __unique_conn(db_name=db_name, timeout=timeout) as conn:
       yield conn
   else:
-    with __auto_closed_conn(db_name=db_name) as conn:
+    with __auto_closed_conn(db_name=db_name, timeout=timeout) as conn:
       yield conn
 
 
@@ -388,7 +388,7 @@ def __unique_conn(db_name=None, timeout=DEFAULT_CONN_TIMEOUT):
   """
   if not db_name:
     db_name = choice(ascii_lowercase) + "".join(sample(ascii_lowercase + digits, 5))
-  with __auto_closed_conn() as conn:
+  with __auto_closed_conn(timeout=timeout) as conn:
     with __auto_closed_cursor(conn) as cur:
       cur.execute("CREATE DATABASE %s" % db_name)
   with __auto_closed_conn(db_name=db_name, timeout=timeout) as conn:
