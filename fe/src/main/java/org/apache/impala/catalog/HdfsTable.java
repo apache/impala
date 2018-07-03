@@ -59,6 +59,7 @@ import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
@@ -1150,8 +1151,10 @@ public class HdfsTable extends Table implements FeFsTable {
   /**
    * Drops a partition and updates partition column statistics. Returns the
    * HdfsPartition that was dropped or null if the partition does not exist.
+   * If removeCacheDirective = true, any cache directive on the partition is removed.
    */
-  private HdfsPartition dropPartition(HdfsPartition partition) {
+  private HdfsPartition dropPartition(HdfsPartition partition,
+      boolean removeCacheDirective) {
     if (partition == null) return null;
     fileMetadataStats_.totalFileBytes -= partition.getSize();
     fileMetadataStats_.numFiles -= partition.getNumFileDescriptors();
@@ -1160,6 +1163,14 @@ public class HdfsTable extends Table implements FeFsTable {
     Long partitionId = partition.getId();
     partitionMap_.remove(partitionId);
     nameToPartitionMap_.remove(partition.getPartitionName());
+    if (removeCacheDirective && partition.isMarkedCached()) {
+      try {
+        HdfsCachingUtil.removePartitionCacheDirective(partition);
+      } catch (ImpalaException e) {
+        LOG.error("Unable to remove the cache directive on table " + getFullName() +
+            ", partition " + partition.getPartitionName() + ": ", e);
+      }
+    }
     if (!isStoredInImpaladCatalogCache()) return partition;
     for (int i = 0; i < partition.getPartitionValues().size(); ++i) {
       ColumnStats stats = getColumns().get(i).getStats();
@@ -1185,18 +1196,27 @@ public class HdfsTable extends Table implements FeFsTable {
     return partition;
   }
 
+  private HdfsPartition dropPartition(HdfsPartition partition) {
+    return dropPartition(partition, true);
+  }
+
   /**
    * Drops the given partitions from this table. Cleans up its metadata from all the
    * mappings used to speed up partition pruning/lookup. Also updates partitions column
    * statistics. Returns the list of partitions that were dropped.
    */
-  public List<HdfsPartition> dropPartitions(List<HdfsPartition> partitions) {
+  public List<HdfsPartition> dropPartitions(List<HdfsPartition> partitions,
+      boolean removeCacheDirective) {
     ArrayList<HdfsPartition> droppedPartitions = Lists.newArrayList();
     for (HdfsPartition partition: partitions) {
-      HdfsPartition hdfsPartition = dropPartition(partition);
+      HdfsPartition hdfsPartition = dropPartition(partition, removeCacheDirective);
       if (hdfsPartition != null) droppedPartitions.add(hdfsPartition);
     }
     return droppedPartitions;
+  }
+
+  public List<HdfsPartition> dropPartitions(List<HdfsPartition> partitions) {
+    return dropPartitions(partitions, true);
   }
 
   /**
@@ -1360,16 +1380,15 @@ public class HdfsTable extends Table implements FeFsTable {
     Map<Path, List<HdfsPartition>> partitionsToUpdateFileMdByPath = Maps.newHashMap();
     // Partitions that need to be dropped and recreated from scratch
     List<HdfsPartition> dirtyPartitions = Lists.newArrayList();
-    // Partitions that need to be removed from this table. That includes dirty
-    // partitions as well as partitions that were removed from the Hive Metastore.
-    List<HdfsPartition> partitionsToRemove = Lists.newArrayList();
+    // Partitions removed from the Hive Metastore.
+    List<HdfsPartition> removedPartitions = Lists.newArrayList();
     // Identify dirty partitions that need to be loaded from the Hive Metastore and
     // partitions that no longer exist in the Hive Metastore.
     for (HdfsPartition partition: partitionMap_.values()) {
       // Remove partitions that don't exist in the Hive Metastore. These are partitions
       // that were removed from HMS using some external process, e.g. Hive.
       if (!msPartitionNames.contains(partition.getPartitionName())) {
-        partitionsToRemove.add(partition);
+        removedPartitions.add(partition);
       }
       if (partition.isDirty()) {
         // Dirty partitions are updated by removing them from table's partition
@@ -1391,8 +1410,9 @@ public class HdfsTable extends Table implements FeFsTable {
       Preconditions.checkNotNull(partition.getCachedMsPartitionDescriptor());
       partitionNames.add(partition.getPartitionName());
     }
-    partitionsToRemove.addAll(dirtyPartitions);
-    dropPartitions(partitionsToRemove);
+    dropPartitions(removedPartitions);
+    // dirtyPartitions are reloaded and hence cache directives are not dropped.
+    dropPartitions(dirtyPartitions, false);
     // Load dirty partitions from Hive Metastore
     loadPartitionsFromMetastore(dirtyPartitions, client);
 
@@ -2146,7 +2166,7 @@ public class HdfsTable extends Table implements FeFsTable {
     refreshPartitionFileMetadata(refreshedPartition);
     Preconditions.checkArgument(oldPartition == null
         || HdfsPartition.KV_COMPARATOR.compare(oldPartition, refreshedPartition) == 0);
-    dropPartition(oldPartition);
+    dropPartition(oldPartition, false);
     addPartition(refreshedPartition);
   }
 
