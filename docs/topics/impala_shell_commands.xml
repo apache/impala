@@ -260,12 +260,14 @@ under the License.
                 or <codeph>profile</codeph>.
               </p>
               <p>
-                Specify an integer argument. A positive integer <codeph>N</codeph>
-                represents the command labelled <codeph>N</codeph> in the history list.
-                A negative integer <codeph>-N</codeph> represents the <codeph>N</codeph>th
-                command from the end of the list, such as -1 for the most recent command.
-                Commands that are executed again do not produce new entries in the
-                history list.
+                Specify an integer argument. A positive integer
+                  <codeph>N</codeph> represents the command labelled
+                  <codeph>N</codeph> in the output of the
+                  <codeph>HISTORY</codeph> command. A negative integer
+                  <codeph>-N</codeph> represents the <codeph>N</codeph>th
+                command from the end of the list, such as -1 for the most recent
+                command. Commands that are executed again do not produce new
+                entries in the <codeph>HISTORY</codeph> output list.
               </p>
             </entry>
           </row>
