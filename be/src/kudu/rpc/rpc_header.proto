@@ -1,0 +1,365 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+syntax = "proto2";
+
+option optimize_for = SPEED;
+
+package kudu.rpc;
+
+option java_package = "org.apache.kudu.rpc";
+
+import "google/protobuf/descriptor.proto";
+import "kudu/security/token.proto";
+import "kudu/util/pb_util.proto";
+
+// The Kudu RPC protocol is similar to the RPC protocol of Hadoop and HBase.
+// See the following for reference on those other protocols:
+//  - https://issues.apache.org/jira/browse/HBASE-7898
+//  - https://issues.apache.org/jira/browse/HADOOP-8990
+//
+// For a description of the Kudu protocol, see 'README' in this directory.
+
+// User Information proto.  Included in ConnectionContextPB on connection setup.
+message UserInformationPB {
+  optional string effective_user = 1;
+  required string real_user = 2;
+}
+
+// The connection context is sent as part of the connection establishment.
+// It establishes the context for ALL RPC calls within the connection.
+// This is sent on connection setup after the connection preamble is sent
+// and SASL has been negotiated.
+// No response is sent from the server to the client.
+message ConnectionContextPB {
+  // UserInfo beyond what is determined as part of security handshake
+  // at connection time (kerberos, tokens etc).
+  //
+  // DEPRECATED: No longer used in Kudu 1.1 and later.
+  // The 'real_user' should be taken from the SASL negotiation.
+  // Impersonation (effective user) was never supported, so we'll have
+  // to add that back at some point later.
+  optional UserInformationPB DEPRECATED_user_info = 2;
+
+  // If the server sends a nonce to the client during the SASL_SUCCESS
+  // negotiation step, the client is required to encode it with SASL integrity
+  // protection and return it in this field. The nonce protects the server
+  // against a Kerberos replay attack.
+  optional bytes encoded_nonce = 3 [(REDACT) = true];
+}
+
+// Features supported by the RPC system itself.
+//
+// Note that this should be used to evolve the RPC _system_, not the semantics
+// or compatibility of individual calls.
+//
+// For example, if we were to add a feature like call or response wire
+// compression in the future, we could add a flag here to indicate that the
+// client or server supports that feature. Optional features which may safely be
+// ignored by the receiver do not need a feature flag, instead the optional
+// field feature of ProtoBuf may be utilized.
+enum RpcFeatureFlag {
+  UNKNOWN = 0;
+
+  // The RPC system is required to support application feature flags in the
+  // request and response headers.
+  APPLICATION_FEATURE_FLAGS = 1;
+
+  // The RPC system supports TLS protected connections. If both sides support
+  // this flag, the connection will automatically be wrapped in a TLS protected
+  // channel following a TLS handshake.
+  TLS = 2;
+
+  // If both sides advertise TLS_AUTHENTICATION_ONLY, this means that they
+  // agree that, after handshaking TLS, they will *not* wrap the connection
+  // in a TLS-protected channel. Instead, they will use TLS only for its
+  // handshake-based authentication.
+  //
+  // This is currently used for loopback connections only, so that compute
+  // frameworks which schedule for locality don't pay encryption overhead.
+  TLS_AUTHENTICATION_ONLY = 3;
+};
+
+// An authentication type. This is modeled as a oneof in case any of these
+// authentication types, or any authentication types in the future, need to add
+// extra type-specific parameters during negotiation.
+message AuthenticationTypePB {
+  message Sasl {};
+  message Token {};
+  message Certificate {};
+
+  oneof type {
+    // The server and client mutually authenticate via SASL.
+    Sasl sasl = 1;
+
+    // The server authenticates the client via a signed token, and the client
+    // authenticates the server by verifying its certificate has been signed by
+    // a trusted CA.
+    //
+    // Token authentication requires the connection to be TLS encrypted.
+    Token token = 2;
+
+    // The server and client mutually authenticate by certificate.
+    //
+    // Certificate authentication requires the connection to be TLS encrypted.
+    Certificate certificate = 3;
+  }
+}
+
+// Message type passed back & forth for the SASL negotiation.
+message NegotiatePB {
+  enum NegotiateStep {
+    UNKNOWN        = 999;
+    NEGOTIATE      = 1;
+    SASL_SUCCESS   = 0;
+    SASL_INITIATE  = 2;
+    SASL_CHALLENGE = 3;
+    SASL_RESPONSE  = 4;
+    TLS_HANDSHAKE  = 5;
+    TOKEN_EXCHANGE = 6;
+  }
+
+  message SaslMechanism {
+    // The SASL mechanism, i.e. 'PLAIN' or 'GSSAPI'.
+    required string mechanism = 2;
+
+    // Deprecated: no longer used.
+    // optional string method = 1;
+    // optional bytes challenge = 5 [(REDACT) = true];
+  }
+
+  // When the client sends its NEGOTIATE step message, it sends its set of
+  // supported RPC system features. In the response to this message, the server
+  // sends back its own. This allows the two peers to agree on whether newer
+  // extensions of the RPC system may be used on this connection. We use a list
+  // of features rather than a simple version number to make it easier for the
+  // Java and C++ clients to implement features in different orders while still
+  // maintaining compatibility, as well as to simplify backporting of features
+  // out-of-order.
+  repeated RpcFeatureFlag supported_features = 1;
+
+  // The current negotiation step.
+  required NegotiateStep step  = 2;
+
+  // The SASL token, containing either the challenge during the SASL_CHALLENGE
+  // step, or the response during the SASL_RESPONSE step.
+  optional bytes token         = 3 [(REDACT) = true];
+
+  // During the TLS_HANDSHAKE step, contains the TLS handshake message.
+  optional bytes tls_handshake = 5 [(REDACT) = true];
+
+  // The tls-server-end-point channel bindings as specified in RFC 5929.  Sent
+  // from the server to the client during the SASL_SUCCESS step when the
+  // Kerberos (GSSAPI) SASL mechanism is used with TLS, in order to bind the
+  // Kerberos authenticated channel to the TLS channel. The value is integrity
+  // protected through SASL. The client is responsible for validating that the
+  // value matches the expected value.
+  optional bytes channel_bindings = 6 [(REDACT) = true];
+
+  // A random nonce sent from the server to the client during the SASL_SUCCESS
+  // step when the Kerberos (GSSAPI) SASL mechanism is used with TLS. The nonce
+  // must be sent back to the server, wrapped in SASL integrity protection, as
+  // part of the connection context.
+  optional bytes nonce = 9 [(REDACT) = true];
+
+  // During the NEGOTIATE step, contains the supported SASL mechanisms.
+  // During the SASL_INITIATE step, contains the single chosen SASL mechanism.
+  repeated SaslMechanism sasl_mechanisms = 4;
+
+  // During the client to server NEGOTIATE step, contains the supported authentication types.
+  // During the server to client NEGOTIATE step, contains the chosen authentication type.
+  repeated AuthenticationTypePB authn_types = 7;
+
+  // During the TOKEN_EXCHANGE step, contains the client's signed authentication token.
+  optional security.SignedTokenPB authn_token = 8;
+}
+
+message RemoteMethodPB {
+  // Service name for the RPC layer.
+  // The client created a proxy with this service name.
+  // Example: kudu.rpc_test.CalculatorService
+  required string service_name = 1;
+
+  // Name of the RPC method.
+  required string method_name = 2;
+};
+
+// The Id of a retriable RPC, whose results should be tracked on the server (see result_tracker.h).
+// This also includes some information that is useful for execution/garbage collection.
+message RequestIdPB {
+  // The (globally unique) id of the client performing this RPC.
+  required string client_id = 1;
+
+  // The (per-client unique) sequence number of this RPC.
+  required int64 seq_no = 2;
+
+  // The sequence number of the first RPC that has not been marked as completed by the client.
+  // Unset if there isn't an incomplete RPC.
+  required int64 first_incomplete_seq_no = 3;
+
+  // The number of times this RPC has been tried.
+  // Set to 1 in the first attempt.
+  required int64 attempt_no = 4;
+}
+
+// The header for the RPC request frame.
+message RequestHeader {
+  // A sequence number that uniquely identifies a call to a single remote server. This number is
+  // sent back in the Response and allows to match it to the original Request.
+  // Hadoop specifies a uint32 and casts it to a signed int. That is counterintuitive, so we use an
+  // int32 instead. Allowed values (inherited from Hadoop):
+  //   0 through INT32_MAX: Regular RPC call IDs.
+  //   -2: Invalid call ID.
+  //   -3: Connection context call ID.
+  //   -33: SASL negotiation call ID.
+  //
+  // NOTE: these calls must be increasing but may have gaps.
+  required int32 call_id = 3;
+
+  // RPC method being invoked.
+  // Not used for "connection setup" calls.
+  optional RemoteMethodPB remote_method = 6;
+
+  // Propagate the timeout as specified by the user. Note that, since there is some
+  // transit time between the client and server, if you wait exactly this amount of
+  // time and then respond, you are likely to cause a timeout on the client.
+  optional uint32 timeout_millis = 10;
+
+  // Feature flags that the service must support in order to properly interpret this
+  // request. The client can pass any set of flags, and if the server doesn't
+  // support any of them, then it will fail the request.
+  //
+  // NOTE: these are for evolving features at the level of the application, not
+  // the RPC framework. Hence, we have to use a generic int type rather than a
+  // particular enum.
+  // NOTE: the server will only interpret this field if it supports the
+  // APPLICATION_FEATURE_FLAGS flag.
+  repeated uint32 required_feature_flags = 11;
+
+  // The unique id of this request, if it's retriable and if the results are to be tracked.
+  // The request id is unique per logical request, i.e. retries of the same RPC must have the
+  // same request id.
+  // Note that this is different from 'call_id' in that a call_id is unique to a server while a
+  // request_id is unique to a logical request (i.e. the request_id remains the same when a request
+  // is retried on a different server).
+  // Optional for requests that are naturally idempotent or to maintain compatibility with
+  // older clients for requests that are not.
+  optional RequestIdPB request_id = 15;
+
+  // Byte offsets for side cars in the main body of the request message.
+  // These offsets are counted AFTER the message header, i.e., offset 0
+  // is the first byte after the bytes for this protobuf.
+  repeated uint32 sidecar_offsets = 16;
+}
+
+message ResponseHeader {
+  required int32 call_id = 1;
+
+  // If this is set, then this is an error response and the
+  // response message will be of type ErrorStatusPB instead of
+  // the expected response type.
+  optional bool is_error = 2 [ default = false ];
+
+  // Byte offsets for side cars in the main body of the response message.
+  // These offsets are counted AFTER the message header, i.e., offset 0
+  // is the first byte after the bytes for this protobuf.
+  repeated uint32 sidecar_offsets = 3;
+}
+
+// Sent as response when is_error == true.
+message ErrorStatusPB {
+
+  // These codes have all been inherited from Hadoop's RPC mechanism.
+  enum RpcErrorCodePB {
+    FATAL_UNKNOWN = 10;
+
+    // Non-fatal RPC errors. Connection should be left open for future RPC calls.
+    //------------------------------------------------------------
+    // The application generated an error status. See the message field for
+    // more details.
+    ERROR_APPLICATION = 1;
+
+    // The specified method was not valid.
+    ERROR_NO_SUCH_METHOD = 2;
+
+    // The specified service was not valid.
+    ERROR_NO_SUCH_SERVICE = 3;
+
+    // The server is overloaded - the client should try again shortly.
+    ERROR_SERVER_TOO_BUSY = 4;
+
+    // The request parameter was not parseable, was missing required fields,
+    // or the server does not support the required feature flags.
+    ERROR_INVALID_REQUEST = 5;
+
+    // The server might have previously received this request but its response is no
+    // longer cached. It's unknown whether the request was executed or not.
+    ERROR_REQUEST_STALE = 6;
+
+    // The server is not able to complete the connection or request at this
+    // time. The client may try again later.
+    ERROR_UNAVAILABLE = 7;
+
+    // FATAL_* errors indicate that the client should shut down the connection.
+    //------------------------------------------------------------
+    // The RPC server is already shutting down.
+    FATAL_SERVER_SHUTTING_DOWN = 11;
+    // Fields of RpcHeader are invalid.
+    FATAL_INVALID_RPC_HEADER = 12;
+    // Could not deserialize RPC request.
+    FATAL_DESERIALIZING_REQUEST = 13;
+    // IPC Layer version mismatch.
+    FATAL_VERSION_MISMATCH = 14;
+    // Auth failed.
+    FATAL_UNAUTHORIZED = 15;
+
+    // The authentication token is invalid or expired;
+    // the client should obtain a new one.
+    FATAL_INVALID_AUTHENTICATION_TOKEN = 16;
+  }
+
+  required string message = 1;
+
+  // TODO: Make code required?
+  optional RpcErrorCodePB code = 2;  // Specific error identifier.
+
+  // If the request is failed due to an unsupported feature flag, the particular
+  // flag(s) that were not supported will be sent back to the client.
+  repeated uint32 unsupported_feature_flags = 3;
+
+  // Allow extensions. When the RPC returns ERROR_APPLICATION, the server
+  // should also fill in exactly one of these extension fields, which contains
+  // more details on the service-specific error.
+  extensions 100 to max;
+}
+
+extend google.protobuf.MethodOptions {
+  // An option for RPC methods that allows to set whether that method's
+  // RPC results should be tracked with a ResultTracker.
+  optional bool track_rpc_result = 50006 [default=false];
+
+  // An option to set the authorization method for this particular
+  // RPC method. If this is not specified, the service's 'default_authz_method'
+  // is used.
+  optional string authz_method = 50007;
+}
+
+extend google.protobuf.ServiceOptions {
+  // Set the default authorization method for the RPCs in this service.
+  // If this is not set, then the default authorization is to allow all
+  // RPCs.
+  optional string default_authz_method = 50007;
+}
