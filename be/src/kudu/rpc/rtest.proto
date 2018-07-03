@@ -1,0 +1,160 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+// Test protocol for kudu RPC.
+syntax = "proto2";
+package kudu.rpc_test;
+
+import "kudu/rpc/rpc_header.proto";
+import "kudu/rpc/rtest_diff_package.proto";
+
+message AddRequestPB {
+  required uint32 x = 1;
+  required uint32 y = 2;
+}
+
+// Used by tests to simulate an old client which is missing
+// a newly added required field.
+message AddRequestPartialPB {
+  required uint32 x = 1;
+}
+
+message AddResponsePB {
+  required uint32 result = 1;
+}
+
+message SleepRequestPB {
+  required uint32 sleep_micros = 1;
+
+  // Used in rpc_stub-test: if this is true, it will respond from a different
+  // thread than the one that receives the request.
+  optional bool deferred = 2 [ default = false ];
+
+  // If set, returns a CalculatorError response.
+  optional bool return_app_error = 3 [ default = false ];
+
+  // Used in rpc-test: if this is set to true and no client timeout is set,
+  // the service will respond to the client with an error.
+  optional bool client_timeout_defined = 4 [ default = false ];
+}
+
+message SleepResponsePB {
+}
+
+message SleepWithSidecarRequestPB {
+  required uint32 sleep_micros = 1;
+  required uint32 pattern = 2;
+  required uint32 num_repetitions = 3;
+  required uint32 sidecar_idx = 4;
+}
+
+message SleepWithSidecarResponsePB {
+}
+
+message SendTwoStringsRequestPB {
+  required uint32 random_seed = 1;
+  required uint64 size1 = 2;
+  required uint64 size2 = 3;
+}
+
+message SendTwoStringsResponsePB {
+  required uint32 sidecar1 = 1;
+  required uint32 sidecar2 = 2;
+}
+
+// Push two strings to the server as part of the request, in sidecars.
+message PushTwoStringsRequestPB {
+  required uint32 sidecar1_idx = 1;
+  required uint32 sidecar2_idx = 2;
+}
+
+message PushTwoStringsResponsePB {
+  required uint32 size1 = 1;
+  required string data1 = 2;
+  required uint32 size2 = 3;
+  required string data2 = 4;
+}
+
+message EchoRequestPB {
+  required string data = 1;
+}
+message EchoResponsePB {
+  required string data = 1;
+}
+
+message WhoAmIRequestPB {
+}
+message WhoAmIResponsePB {
+  required kudu.rpc.UserInformationPB credentials = 1;
+  required string address = 2;
+}
+
+message CalculatorError {
+  extend kudu.rpc.ErrorStatusPB {
+    optional CalculatorError app_error_ext = 101;
+  }
+
+  required string extra_error_data = 1;
+}
+
+message PanicRequestPB {}
+message PanicResponsePB {}
+
+message TestInvalidResponseRequestPB {
+  enum ErrorType {
+    MISSING_REQUIRED_FIELD = 1;
+    RESPONSE_TOO_LARGE = 2;
+  }
+  required ErrorType error_type = 1;
+}
+
+message TestInvalidResponseResponsePB {
+  required bytes response = 1;
+}
+
+enum FeatureFlags {
+  UNKNOWN=0;
+  FOO=1;
+}
+
+message ExactlyOnceRequestPB {
+  optional uint32 sleep_for_ms = 1 [default = 0];
+  required uint32 value_to_add = 2;
+  optional bool randomly_fail = 3 [default = false];
+}
+message ExactlyOnceResponsePB {
+  required uint32 current_val = 1;
+  required fixed64 current_time_micros = 2;
+}
+
+service CalculatorService {
+  option (kudu.rpc.default_authz_method) = "AuthorizeDisallowAlice";
+
+  rpc Add(AddRequestPB) returns(AddResponsePB);
+  rpc Sleep(SleepRequestPB) returns(SleepResponsePB) {
+    option (kudu.rpc.authz_method) = "AuthorizeDisallowBob";
+  };
+  rpc Echo(EchoRequestPB) returns(EchoResponsePB);
+  rpc WhoAmI(WhoAmIRequestPB) returns (WhoAmIResponsePB);
+  rpc TestArgumentsInDiffPackage(kudu.rpc_test_diff_package.ReqDiffPackagePB)
+    returns(kudu.rpc_test_diff_package.RespDiffPackagePB);
+  rpc Panic(PanicRequestPB) returns (PanicResponsePB);
+  rpc AddExactlyOnce(ExactlyOnceRequestPB) returns (ExactlyOnceResponsePB) {
+    option (kudu.rpc.track_rpc_result) = true;
+  }
+  rpc TestInvalidResponse(TestInvalidResponseRequestPB) returns (TestInvalidResponseResponsePB);
+}

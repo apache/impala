@@ -1,0 +1,110 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+//
+// Protobuf used for introspection of RPC services (eg listing in-flight RPCs,
+// reflection, etc)
+syntax = "proto2";
+
+package kudu.rpc;
+
+option java_package = "org.apache.kudu";
+
+import "kudu/rpc/rpc_header.proto";
+
+message RpcCallInProgressPB {
+  required RequestHeader header = 1;
+  optional string trace_buffer = 2;
+  optional uint64 micros_elapsed = 3;
+
+  enum State {
+    UNKNOWN = 999;
+
+    // States for OutboundCall
+    ON_OUTBOUND_QUEUE = 1;
+    SENDING = 2;
+    SENT = 3;
+    TIMED_OUT = 4;
+    FINISHED_ERROR = 5;
+    FINISHED_SUCCESS = 6;
+    NEGOTIATION_TIMED_OUT = 7;
+    FINISHED_NEGOTIATION_ERROR = 8;
+    CANCELLED = 9;
+
+    // TODO(todd): add states for InboundCall
+  }
+
+  optional State state = 4;
+}
+
+message RpcConnectionPB {
+  enum StateType {
+    UNKNOWN = 999;
+    NEGOTIATING = 0;  // Connection is still being negotiated.
+    OPEN = 1;         // Connection is active.
+  };
+
+  required string remote_ip = 1;
+  required StateType state = 2;
+  // TODO: swap out for separate fields
+  optional string remote_user_credentials = 3;
+  repeated RpcCallInProgressPB calls_in_flight = 4;
+  optional int64 outbound_queue_size = 5;
+}
+
+message DumpRunningRpcsRequestPB {
+  optional bool include_traces = 1 [ default = false ];
+}
+
+message DumpRunningRpcsResponsePB {
+  repeated RpcConnectionPB inbound_connections = 1;
+  repeated RpcConnectionPB outbound_connections = 2;
+}
+
+//------------------------------------------------------------
+
+// A particular TraceMetric key/value pair from a sampled RPC.
+message TraceMetricPB {
+  // A '.'-separated path through the parent-child trace hierarchy.
+  optional string child_path = 1;
+  optional string key = 2;
+  optional int64 value = 3;
+}
+
+// A single sampled RPC call.
+message RpczSamplePB {
+  // The original request header.
+  optional RequestHeader header = 1;
+  // The stringified request trace.
+  optional string trace = 2;
+  // The number of millis that this call took to complete.
+  optional int32 duration_ms = 3;
+  // The metrics from the sampled trace.
+  repeated TraceMetricPB metrics = 4;
+}
+
+// A set of samples for a particular RPC method.
+message RpczMethodPB {
+  required string method_name = 1;
+  repeated RpczSamplePB samples = 2;
+}
+
+// Request and response for dumping previously sampled RPC calls.
+message DumpRpczStoreRequestPB {
+}
+message DumpRpczStoreResponsePB {
+  repeated RpczMethodPB methods = 1;
+}
