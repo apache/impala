@@ -115,9 +115,10 @@ MappedMemInfo MemInfo::ParseSmaps() {
     string line;
     getline(smaps, line);
     if (line.empty()) continue;
-    if (isdigit(line[0])) {
+    if (isdigit(line[0]) || (line[0] >= 'a' && line[0] <= 'f')) {
       // Line is the start of a new mapping, of form:
       // 561ceff9c000-561ceffa1000 rw-p 00000000 00:00 0
+      // We distinguish this case by checking for lower-case hex digits.
       ++result.num_maps;
       continue;
     }
