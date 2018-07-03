@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <glog/logging.h>
+#define LZ4_DISABLE_DEPRECATE_WARNINGS
 #include <lz4.h>
 #include <snappy-sinksource.h>
 #include <snappy.h>

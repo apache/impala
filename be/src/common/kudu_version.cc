@@ -27,6 +27,11 @@ void VersionInfo::GetVersionInfoPB(VersionInfoPB* pb) {
   DCHECK(false);
 }
 
+std::string VersionInfo::GetShortVersionInfo() {
+  DCHECK(false);
+  return "";
+}
+
 std::string VersionInfo::GetAllVersionInfo() {
   DCHECK(false);
   return "";
