@@ -19,8 +19,6 @@ cmake_minimum_required(VERSION 3.2.3)
 
 # This is a Kudu-specific flag that disables Kudu targets that are test-only.
 set(NO_TESTS 1)
-# Kudu-specific, disable NVM support so that libvmem is not a dependency.
-set(NO_NVM_SUPPORT 1)
 
 # Explicitly define project() to allow modifying the compiler before the project is
 # initialized.
@@ -343,7 +341,8 @@ endif()
 if (NOT APPLE)
   find_package(LibUnwind REQUIRED)
   include_directories(SYSTEM ${LIBUNWIND_INCLUDE_DIR})
-  IMPALA_ADD_THIRDPARTY_LIB(libunwind ${LIBUNWIND_INCLUDE_DIR} ${LIBUNWIND_STATIC_LIB} "")
+  IMPALA_ADD_THIRDPARTY_LIB(libunwind ${LIBUNWIND_INCLUDE_DIR} ${LIBUNWIND_STATIC_LIB}
+    ${LIBUNWIND_SHARED_LIB})
 endif()
 
 # Required for KRPC_GENERATE, which converts protobuf to stubs.

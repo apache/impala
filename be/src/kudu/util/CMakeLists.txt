@@ -160,7 +160,7 @@ set(UTIL_SRCS
   memory/overwrite.cc
   mem_tracker.cc
   metrics.cc
-  minidump.cc
+  # minidump.cc
   monotime.cc
   mutex.cc
   net/dns_resolver.cc
@@ -198,7 +198,9 @@ set(UTIL_SRCS
   trace_metrics.cc
   user.cc
   url-coding.cc
-  version_info.cc
+  # Remove from compilation, as it depends on generated method calls. Replaced by
+  # kudu_version.cc in Impala's common library.
+  # version_info.cc
   version_util.cc
   website_util.cc
   zlib.cc
@@ -282,7 +284,9 @@ add_library(kudu_test_util
 target_link_libraries(kudu_test_util
   gflags
   glog
-  gmock
+  # Impala doesn't have gmock in its toolchain
+  gtest
+  #gmock
   kudu_util)
 
 if(HAVE_LIB_VMEM)
@@ -329,7 +333,7 @@ endif()
 #######################################
 
 add_executable(protoc-gen-insertions protoc-gen-insertions.cc)
-target_link_libraries(protoc-gen-insertions gutil protobuf protoc ${KUDU_BASE_LIBS})
+target_link_libraries(protoc-gen-insertions gutil glog gflags protoc protobuf ${KUDU_BASE_LIBS})
 
 #######################################
 # Unit tests
