@@ -3,7 +3,7 @@
 set allow_erasure_coded_files=false;
 select count(*) from functional.alltypes;
 ---- CATCH
-ImpalaRuntimeException: Scanning of HDFS erasure-coded file (hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt) is not supported
+ImpalaRuntimeException: Scanning of HDFS erasure-coded file
 ====
 ---- QUERY
 set allow_erasure_coded_files=true;
