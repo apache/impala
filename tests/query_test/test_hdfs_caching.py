@@ -273,6 +273,25 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     drop_cache_directives_for_path(
         "/test-warehouse/cachedb.db/cached_tbl_reload_part/j=2")
 
+  @pytest.mark.execute_serially
+  def test_external_drop(self):
+    """IMPALA-3040: Tests that dropping a partition in Hive leads to the removal of the
+       cache directive after a refresh statement in Impala."""
+    num_entries_pre = get_num_cache_requests()
+    self.client.execute("use cachedb")
+    self.client.execute("create table test_external_drop_tbl (i int) partitioned by "
+                        "(j int) cached in 'testPool'")
+    self.client.execute("insert into test_external_drop_tbl (i,j) select 1, 2")
+    # 1 directive for the table and 1 directive for the partition.
+    assert num_entries_pre + 2 == get_num_cache_requests()
+    self.hive_client.drop_partition("cachedb", "test_external_drop_tbl", ["2"], True)
+    self.client.execute("refresh test_external_drop_tbl")
+    # The directive on the partition is removed.
+    assert num_entries_pre + 1 == get_num_cache_requests()
+    self.client.execute("drop table test_external_drop_tbl")
+    # We want to see the number of cached entities return to the original count.
+    assert num_entries_pre == get_num_cache_requests()
+
 def drop_cache_directives_for_path(path):
   """Drop the cache directive for a given path"""
   rc, stdout, stderr = exec_process("hdfs cacheadmin -removeDirectives -path %s" % path)
