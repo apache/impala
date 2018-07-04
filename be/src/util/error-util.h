@@ -93,16 +93,16 @@ class ErrorMsg {
   /// the cost of this method is proportional to the number of entries in the global error
   /// message list.
   /// WARNING: DO NOT CALL THIS METHOD IN A NON STATIC CONTEXT
-  static ErrorMsg Init(TErrorCode::type error, const ArgType& arg0 = ArgType::NoArg,
-      const ArgType& arg1 = ArgType::NoArg,
-      const ArgType& arg2 = ArgType::NoArg,
-      const ArgType& arg3 = ArgType::NoArg,
-      const ArgType& arg4 = ArgType::NoArg,
-      const ArgType& arg5 = ArgType::NoArg,
-      const ArgType& arg6 = ArgType::NoArg,
-      const ArgType& arg7 = ArgType::NoArg,
-      const ArgType& arg8 = ArgType::NoArg,
-      const ArgType& arg9 = ArgType::NoArg);
+  static ErrorMsg Init(TErrorCode::type error, const ArgType& arg0 = ArgType::kNoArg,
+      const ArgType& arg1 = ArgType::kNoArg,
+      const ArgType& arg2 = ArgType::kNoArg,
+      const ArgType& arg3 = ArgType::kNoArg,
+      const ArgType& arg4 = ArgType::kNoArg,
+      const ArgType& arg5 = ArgType::kNoArg,
+      const ArgType& arg6 = ArgType::kNoArg,
+      const ArgType& arg7 = ArgType::kNoArg,
+      const ArgType& arg8 = ArgType::kNoArg,
+      const ArgType& arg9 = ArgType::kNoArg);
 
   TErrorCode::type error() const { return error_; }
 

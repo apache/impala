@@ -423,6 +423,32 @@ inline void* memrchr(const void* bytes, int find_char, size_t len) {
 #define ATTRIBUTE_NO_SANITIZE_THREAD
 #endif
 
+// Tell UBSAN to ignore a given function completely. There is no
+// __has_feature(undefined_sanitizer) or equivalent, so ASAN support is used as
+// a proxy.
+#if defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+#  define ATTRIBUTE_NO_SANITIZE_UNDEFINED \
+      __attribute__((no_sanitize("undefined")))
+#  endif
+#endif
+#ifndef ATTRIBUTE_NO_SANITIZE_UNDEFINED
+#define ATTRIBUTE_NO_SANITIZE_UNDEFINED
+#endif
+
+// Tell UBSAN to ignore integer overflows in a given function. There is no
+// __has_feature(undefined_sanitizer) or equivalent, so ASAN support is used as
+// a proxy.
+#if defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+#  define ATTRIBUTE_NO_SANITIZE_INTEGER \
+      __attribute__((no_sanitize("integer")))
+#  endif
+#endif
+#ifndef ATTRIBUTE_NO_SANITIZE_INTEGER
+#define ATTRIBUTE_NO_SANITIZE_INTEGER
+#endif
+
 #ifndef HAVE_ATTRIBUTE_SECTION  // may have been pre-set to 0, e.g. for Darwin
 #define HAVE_ATTRIBUTE_SECTION 1
 #endif
