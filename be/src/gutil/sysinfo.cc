@@ -42,8 +42,8 @@
 #include <unistd.h>   // for read()
 #endif
 #if defined __MACH__          // Mac OS X, almost certainly
-#include <sys/types.h>
 #include <sys/sysctl.h>       // how we figure out numcpu's on OS X
+#include <sys/types.h>
 #elif defined __FreeBSD__
 #include <sys/sysctl.h>
 #elif defined __sun__         // Solaris
@@ -114,18 +114,25 @@ static int64 EstimateCyclesPerSecond(const int estimate_time_ms) {
 // issue a FATAL error.
 static bool SlurpSmallTextFile(const char* file, char* buf, int buflen) {
   bool ret = false;
-  int fd = open(file, O_RDONLY);
+  int fd;
+  RETRY_ON_EINTR(fd, open(file, O_RDONLY));
   if (fd == -1) return ret;
 
   memset(buf, '\0', buflen);
-  int n = read(fd, buf, buflen - 1);
+  int n;
+  RETRY_ON_EINTR(n, read(fd, buf, buflen - 1));
   CHECK_NE(n, buflen - 1) << "buffer of len " << buflen << " not large enough to store "
                           << "contents of " << file;
   if (n > 0) {
     ret = true;
   }
 
-  close(fd);
+  int close_ret;
+  RETRY_ON_EINTR(close_ret, close(fd));
+  if (PREDICT_FALSE(close_ret != 0)) {
+    PLOG(WARNING) << "Failed to close fd " << fd;
+  }
+
   return ret;
 }
 
@@ -220,7 +227,8 @@ static void InitializeSystemInfo() {
 
   // Read /proc/cpuinfo for other values, and if there is no cpuinfo_max_freq.
   const char* pname = "/proc/cpuinfo";
-  int fd = open(pname, O_RDONLY);
+  int fd;
+  RETRY_ON_EINTR(fd, open(pname, O_RDONLY));
   if (fd == -1) {
     PLOG(FATAL) << "Unable to read CPU info from /proc. procfs must be mounted.";
   }
@@ -243,7 +251,7 @@ static void InitializeSystemInfo() {
       const int linelen = strlen(line);
       const int bytes_to_read = sizeof(line)-1 - linelen;
       CHECK(bytes_to_read > 0);  // because the memmove recovered >=1 bytes
-      chars_read = read(fd, line + linelen, bytes_to_read);
+      RETRY_ON_EINTR(chars_read, read(fd, line + linelen, bytes_to_read));
       line[linelen + chars_read] = '\0';
       newline = strchr(line, '\n');
     }
@@ -288,7 +296,11 @@ static void InitializeSystemInfo() {
       num_cpus++;  // count up every time we see an "processor :" entry
     }
   } while (chars_read > 0);
-  close(fd);
+  int ret;
+  RETRY_ON_EINTR(ret, close(fd));
+  if (PREDICT_FALSE(ret != 0)) {
+    PLOG(WARNING) << "Failed to close fd " << fd;
+  }
 
   if (!saw_mhz) {
     if (saw_bogo) {
