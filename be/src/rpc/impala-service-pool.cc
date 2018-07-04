@@ -220,7 +220,7 @@ void ImpalaServicePool::RunThread() {
     }
 
     // We need to call RecordHandlingStarted() to update the InboundCall timing.
-    incoming->RecordHandlingStarted(incoming_queue_time_);
+    incoming->RecordHandlingStarted(incoming_queue_time_.get());
     ADOPT_TRACE(incoming->trace());
 
     if (UNLIKELY(incoming->ClientTimedOut())) {
