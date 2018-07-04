@@ -420,6 +420,7 @@ Status GroupingAggregator::AddBatch(RuntimeState* state, RowBatch* batch) {
 Status GroupingAggregator::AddBatchStreaming(
     RuntimeState* state, RowBatch* out_batch, RowBatch* child_batch) {
   SCOPED_TIMER(streaming_timer_);
+  RETURN_IF_ERROR(QueryMaintenance(state));
   num_input_rows_ += child_batch->num_rows();
 
   int remaining_capacity[PARTITION_FANOUT];
