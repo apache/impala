@@ -23,6 +23,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "kudu/rpc/rpc_context.h"
+#include "kudu/util/net/sockaddr.h"
 
 #include "exec/kudu-util.h"
 #include "runtime/exec-env.h"

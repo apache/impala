@@ -38,6 +38,7 @@
 
 #include "gen-cpp/rpc_test.proxy.h"
 #include "gen-cpp/rpc_test.service.h"
+#include "gen-cpp/rpc_test.pb.h"
 
 #include "common/names.h"
 
