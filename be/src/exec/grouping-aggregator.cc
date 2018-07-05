@@ -228,6 +228,7 @@ Status GroupingAggregator::Open(RuntimeState* state) {
 }
 
 Status GroupingAggregator::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  RETURN_IF_ERROR(QueryMaintenance(state));
   if (!partition_eos_) {
     RETURN_IF_ERROR(GetRowsFromPartition(state, row_batch));
   }
@@ -405,6 +406,7 @@ void GroupingAggregator::Close(RuntimeState* state) {
 
 Status GroupingAggregator::AddBatch(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(build_timer_);
+  RETURN_IF_ERROR(QueryMaintenance(state));
   num_input_rows_ += batch->num_rows();
 
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
@@ -950,11 +952,6 @@ int64_t GroupingAggregator::MinReservation() const {
   // Two of the buffers must fit the maximum row.
   return resource_profile_.spillable_buffer_size * (num_buffers - 2)
       + resource_profile_.max_row_buffer_size * 2;
-}
-
-Status GroupingAggregator::QueryMaintenance(RuntimeState* state) {
-  expr_results_pool_->Clear();
-  return state->CheckQueryState();
 }
 
 BufferPool::ClientHandle* GroupingAggregator::buffer_pool_client() {

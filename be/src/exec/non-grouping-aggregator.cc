@@ -72,6 +72,7 @@ Status NonGroupingAggregator::Open(RuntimeState* state) {
 
 Status NonGroupingAggregator::GetNext(
     RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  RETURN_IF_ERROR(QueryMaintenance(state));
   // There was no grouping, so evaluate the conjuncts and return the single result row.
   // We allow calling GetNext() after eos, so don't return this row again.
   if (!singleton_output_tuple_returned_) GetSingletonOutput(row_batch);
@@ -116,6 +117,7 @@ void NonGroupingAggregator::Close(RuntimeState* state) {
 
 Status NonGroupingAggregator::AddBatch(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(build_timer_);
+  RETURN_IF_ERROR(QueryMaintenance(state));
 
   if (add_batch_impl_fn_ != nullptr) {
     RETURN_IF_ERROR(add_batch_impl_fn_(this, batch));

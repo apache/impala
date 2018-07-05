@@ -196,6 +196,11 @@ Tuple* Aggregator::GetOutputTuple(
   return dst;
 }
 
+Status Aggregator::QueryMaintenance(RuntimeState* state) {
+  expr_results_pool_->Clear();
+  return state->CheckQueryState();
+}
+
 // IR Generation for updating a single aggregation slot. Signature is:
 // void UpdateSlot(AggFnEvaluator* agg_expr_eval, AggTuple* agg_tuple, char** row)
 //

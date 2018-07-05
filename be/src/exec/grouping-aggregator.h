@@ -587,12 +587,6 @@ class GroupingAggregator : public Aggregator {
   void CleanupHashTbl(
       const std::vector<AggFnEvaluator*>& agg_fn_evals, HashTable::Iterator it);
 
-  /// Clears 'expr_results_pool_' and returns the result of state->CheckQueryState().
-  /// Aggregators should call this periodically, e.g. once per input row batch. This
-  /// should not be called outside the main execution thread.
-  /// TODO: IMPALA-2399: replace QueryMaintenance() - see JIRA for more details.
-  Status QueryMaintenance(RuntimeState* state) WARN_UNUSED_RESULT;
-
   /// Codegen the non-streaming add row batch loop. The loop has already been compiled to
   /// IR and loaded into the codegen object. UpdateAggTuple has also been codegen'd to IR.
   /// This function will modify the loop subsituting the statically compiled functions
