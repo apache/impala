@@ -80,7 +80,6 @@ Status StreamingAggregationNode::GetNext(
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(QueryMaintenance(state));
 
   if (ReachedLimit()) {
     *eos = true;
@@ -113,7 +112,6 @@ Status StreamingAggregationNode::GetRowsStreaming(
   do {
     DCHECK_EQ(out_batch->num_rows(), 0);
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(QueryMaintenance(state));
 
     RETURN_IF_ERROR(child(0)->GetNext(state, child_batch_.get(), &child_eos_));
 
@@ -137,6 +135,9 @@ Status StreamingAggregationNode::Reset(RuntimeState* state) {
 
 void StreamingAggregationNode::Close(RuntimeState* state) {
   if (is_closed()) return;
+  // All expr mem allocations should happen in the Aggregator.
+  DCHECK(expr_results_pool() == nullptr
+      || expr_results_pool()->total_allocated_bytes() == 0);
   aggregator_->Close(state);
   child_batch_.reset();
   ExecNode::Close(state);

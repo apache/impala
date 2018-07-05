@@ -78,7 +78,6 @@ Status AggregationNode::Open(RuntimeState* state) {
   bool eos = false;
   do {
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(QueryMaintenance(state));
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
     RETURN_IF_ERROR(aggregator_->AddBatch(state, &batch));
     batch.Reset();
@@ -98,7 +97,6 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(QueryMaintenance(state));
 
   if (ReachedLimit()) {
     *eos = true;
@@ -118,6 +116,9 @@ Status AggregationNode::Reset(RuntimeState* state) {
 
 void AggregationNode::Close(RuntimeState* state) {
   if (is_closed()) return;
+  // All expr mem allocations should happen in the Aggregator.
+  DCHECK(expr_results_pool() == nullptr
+      || expr_results_pool()->total_allocated_bytes() == 0);
   aggregator_->Close(state);
   ExecNode::Close(state);
 }

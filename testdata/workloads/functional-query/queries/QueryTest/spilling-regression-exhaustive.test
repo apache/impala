@@ -245,6 +245,36 @@ BIGINT
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
+# Same as above, except disable streaming preaggs to ensure that AggregationNode is also
+# releasing local memory allocations as appropriate.
+set mem_limit=800m;
+set num_scanner_threads=1;
+set disable_streaming_preaggregations=true;
+select count(distinct concat(cast(l_comment as char(120)), cast(l_comment as char(120)),
+                             cast(l_comment as char(120)), cast(l_comment as char(120)),
+                             cast(l_comment as char(120)), cast(l_comment as char(120))))
+from lineitem
+---- RESULTS
+4502054
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+# Verify that the agg spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Same as above, except use a non-grouping aggregate function to ensure that
+# NonGroupingAggregator is also releasing local memory allocations as appropriate.
+set mem_limit=50m;
+set num_scanner_threads=1;
+select min(regexp_replace(l_comment, ".", "x"))
+from lineitem
+---- RESULTS
+'xxxxxxxxxx'
+---- TYPES
+STRING
+====
+---- QUERY
 # IMPALA-3304: test that avg() can spill with a query mem limit.
 # This test only covers that use FIXED_UDA_INTERMEDIATE, not functions that allocate
 # strings for intermediate values. mem_limit is tuned to reproduce the issue on a 3-node

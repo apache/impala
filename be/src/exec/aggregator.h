@@ -188,6 +188,12 @@ class Aggregator {
   Tuple* GetOutputTuple(
       const std::vector<AggFnEvaluator*>& agg_fn_evals, Tuple* tuple, MemPool* pool);
 
+  /// Clears 'expr_results_pool_' and returns the result of state->CheckQueryState().
+  /// Aggregators should call this periodically, e.g. once per input row batch. This
+  /// should not be called outside the main execution thread.
+  /// TODO: IMPALA-2399: replace QueryMaintenance() - see JIRA for more details.
+  Status QueryMaintenance(RuntimeState* state) WARN_UNUSED_RESULT;
+
   /// Codegen for updating aggregate expressions agg_fns_[agg_fn_idx]
   /// and returns the IR function in 'fn'. Returns non-OK status if codegen
   /// is unsuccessful.
