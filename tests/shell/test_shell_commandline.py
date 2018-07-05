@@ -650,3 +650,12 @@ class TestImpalaShell(ImpalaTestSuite):
       self._validate_expected_socket_connected(args2, s)
     finally:
       s.close()
+
+  def test_malformed_query(self):
+    """Test that malformed queries are handled by the commandline shell"""
+    args = " -q \"with foo as (select bar from temp where temp.a='\""
+    result = run_impala_shell_cmd(args, expect_success=False)
+    assert "Encountered: EOF" in result.stderr
+    args = "-q \"with v as (select 1) \;\""
+    result = run_impala_shell_cmd(args, expect_success=False)
+    assert "Encountered: Unexpected character" in result.stderr
