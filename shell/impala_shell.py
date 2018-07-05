@@ -1145,12 +1145,15 @@ class ImpalaShell(object, cmd.Cmd):
     lexer = shlex.shlex(sqlparse.format(query.query.lstrip(), strip_comments=True)
                         .encode('utf-8'), posix=True)
     lexer.escapedquotes += "'"
-    # Because the WITH clause may precede DML or SELECT queries,
-    # just checking the first token is insufficient.
-    is_dml = False
-    tokens = list(lexer)
-    if filter(self.DML_REGEX.match, tokens): is_dml = True
-    return self._execute_stmt(query, is_dml=is_dml, print_web_link=True)
+    try:
+      # Because the WITH clause may precede DML or SELECT queries,
+      # just checking the first token is insufficient.
+      is_dml = False
+      tokens = list(lexer)
+      if filter(self.DML_REGEX.match, tokens): is_dml = True
+      return self._execute_stmt(query, is_dml=is_dml, print_web_link=True)
+    except ValueError as e:
+      return self._execute_stmt(query, print_web_link=True)
 
   def do_use(self, args):
     """Executes a USE... query"""

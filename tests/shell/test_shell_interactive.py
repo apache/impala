@@ -652,6 +652,13 @@ class TestImpalaShellInteractive(object):
     assert (None, 'select 1') == \
         ImpalaShellClass.strip_leading_comment('select 1')
 
+  def test_malformed_query(self):
+    """Test the handling of malformed query without closing quotation"""
+    shell = ImpalaShell()
+    query = "with v as (select 1) \nselect foo('\\\\'), ('bar \n;"
+    shell.send_cmd(query)
+    result = shell.get_result()
+    assert "ERROR: AnalysisException: Unmatched string literal" in result.stderr
 
 def run_impala_shell_interactive(input_lines, shell_args=None):
   """Runs a command in the Impala shell interactively."""
