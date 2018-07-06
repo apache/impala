@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.base.Joiner;
 
 /**
  * Base class for CREATE VIEW and ALTER VIEW AS SELECT statements.
@@ -204,6 +205,19 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   public String getOwner() {
     Preconditions.checkNotNull(owner_);
     return owner_;
+  }
+
+  /**
+   * Returns the column names in columnDefs_. Should only be called for non-null
+   * columnDefs_.
+   */
+  protected String getColumnNames() {
+    Preconditions.checkNotNull(columnDefs_);
+    List<String> columnNames = Lists.newArrayList();
+    for (ColumnDef colDef : columnDefs_) {
+      columnNames.add(colDef.getColName());
+    }
+    return Joiner.on(", ").join(columnNames);
   }
 
   public boolean getIfNotExists() { return ifNotExists_; }
