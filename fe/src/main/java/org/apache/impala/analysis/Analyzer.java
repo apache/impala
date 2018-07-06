@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -2264,13 +2265,40 @@ public class Analyzer {
    * returns compatible type otherwise.
    */
   public Type castAllToCompatibleType(List<Expr> exprs) throws AnalysisException {
-    // Determine compatible type of exprs.
-    Expr lastCompatibleExpr = exprs.get(0);
+    // Group all decimal types together so that when finding a compatible type all
+    // decimal types will be compared against each other first. For example:
+    //
+    // These expressions are not compatible because of strict decimal and should throw
+    // an AnalysisException.
+    // [decimal(38, 1), double, decimal(38, 37)]
+    //
+    // Without sorting:
+    // 1. Comparing decimal(38, 1) and double - OK
+    // 2. Comparing double and decimal(38, 37) - OK
+    //
+    // With sorting:
+    // [decimal(38, 1), decimal(38, 37), double]
+    // 1. Comparing decimal(38, 1) with decimal(38, 37) - ERROR
+    //
+    // We need to create a new sorted list instead of mutating it when sorting it because
+    // mutating the original exprs will change the order of the original exprs.
+    List<Expr> sortedExprs = new ArrayList<>(exprs);
+    Collections.sort(sortedExprs, new Comparator<Expr>() {
+      @Override
+      public int compare(Expr expr1, Expr expr2) {
+        if ((expr1.getType().isDecimal() && expr2.getType().isDecimal()) ||
+            (!expr1.getType().isDecimal() && !expr2.getType().isDecimal())) {
+          return 0;
+        }
+        return expr1.getType().isDecimal() ? -1 : 1;
+      }
+    });
+    Expr lastCompatibleExpr = sortedExprs.get(0);
     Type compatibleType = null;
-    for (int i = 0; i < exprs.size(); ++i) {
-      exprs.get(i).analyze(this);
+    for (int i = 0; i < sortedExprs.size(); ++i) {
+      sortedExprs.get(i).analyze(this);
       compatibleType = getCompatibleType(compatibleType, lastCompatibleExpr,
-          exprs.get(i));
+          sortedExprs.get(i));
     }
     // Add implicit casts if necessary.
     for (int i = 0; i < exprs.size(); ++i) {
