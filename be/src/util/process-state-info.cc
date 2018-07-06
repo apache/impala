@@ -165,51 +165,27 @@ void ProcessStateInfo::ReadProcFileDescriptorCount() {
   process_state_map_["fd/count"] = to_string(fd_count);
 }
 
-ProcessStateInfo::ProcessStateInfo() {
-  ReadProcIO();
-  ReadProcCgroup();
-  ReadProcSched();
+ProcessStateInfo::ProcessStateInfo(bool get_extended_metrics)
+  : have_extended_metrics_(get_extended_metrics) {
   ReadProcStatus();
-  ReadProcFileDescriptorCount();
+  if (get_extended_metrics) {
+    ReadProcIO();
+    ReadProcCgroup();
+    ReadProcSched();
+    ReadProcFileDescriptorCount();
+  }
 }
 
 string ProcessStateInfo::DebugString() const {
   stringstream stream;
   stream << "Process State: " << endl
-         << "  I/O: " << endl
-         << "    Read: "
-         << PrettyPrinter::Print(GetBytes("io/read_bytes"), TUnit::BYTES) << endl
-         << "    Write: "
-         << PrettyPrinter::Print(GetBytes("io/write_bytes"), TUnit::BYTES) << endl
-         << "    Read I/O: " << GetInt64("io/syscr") << endl
-         << "    Write I/O: " << GetInt64("io/syscw") << endl
-         << "  CGroups: " << endl
-         << "    Hierarchy: " << GetString("cgroup/hierarchy_id") << endl
-         << "    Subsystems: " << GetString("cgroup/subsystems") <<endl
-         << "    Control Group: " << GetString("cgroup/control_group") << endl
-         << "  Schedule: " << endl
-         << "    Sum Execute Time: " << GetString("sched/se.sum_exec_runtime") << endl
-         << "    Max Wait Time: " << GetString("sched/se.statistics.wait_max") << endl
-         << "    Sum Wait Time: " << GetString("sched/se.statistics.wait_sum") << endl
-         << "    Wait Count: " << GetInt64("sched/se.statistics.wait_count") << endl
-         << "    Sum I/O Wait Time: "
-         << GetString("sched/se.statistics.iowait_sum") << endl
-         << "    I/O Wait Count: "
-         << GetInt64("sched/se.statistics.iowait_count") << endl
-         << "    Wakeup Count with cpu migration: "
-         << GetInt64("sched/se.statistics.nr_wakeups_migrate") << endl
-         << "    Switches: " << GetInt64("sched/nr_switches") << endl
-         << "    Voluntary Switches: " << GetInt("sched/nr_voluntary_switches") << endl
-         << "    Involuntary Switches: "
-         << GetInt("sched/nr_involuntary_switches") << endl
-         << "    Process Priority: " << GetInt("sched/prio") << endl
          << "  Status: " << endl
          << "    Process ID: " << getpid() << endl
          << "    Thread Number: " << GetInt("status/Threads") << endl
          << "    VM Peak: "
          << PrettyPrinter::Print(GetBytes("status/VmPeak"), TUnit::BYTES) << endl
          << "    VM Size: "
-         << PrettyPrinter::Print(GetBytes("status/VmSize"), TUnit::BYTES) << endl
+         << PrettyPrinter::Print(GetVmSize(), TUnit::BYTES) << endl
          << "    VM Lock: "
          << PrettyPrinter::Print(GetBytes("status/VmLck"), TUnit::BYTES) << endl
          << "    VM Pin: "
@@ -217,7 +193,7 @@ string ProcessStateInfo::DebugString() const {
          << "    VM HWM: "
          << PrettyPrinter::Print(GetBytes("status/VmHWM"), TUnit::BYTES) << endl
          << "    VM RSS: "
-         << PrettyPrinter::Print(GetBytes("status/VmRSS"), TUnit::BYTES) << endl
+         << PrettyPrinter::Print(GetRss(), TUnit::BYTES) << endl
          << "    VM Data: "
          << PrettyPrinter::Print(GetBytes("status/VmData"), TUnit::BYTES) << endl
          << "    VM Stk: "
@@ -231,9 +207,38 @@ string ProcessStateInfo::DebugString() const {
          << "    VM Swap: "
          << PrettyPrinter::Print(GetBytes("status/VmSwap"), TUnit::BYTES) << endl
          << "    Cpus Allowed List: " << GetString("status/Cpus_allowed_list") << endl
-         << "    Mems Allowed List: " << GetString("status/Mems_allowed_list") << endl
-         << "  File Descriptors: " << endl
-         << "    Number of File Descriptors: " << GetInt("fd/count") << endl;
+         << "    Mems Allowed List: " << GetString("status/Mems_allowed_list") << endl;
+  if (have_extended_metrics_) {
+    stream << "  I/O: " << endl
+           << "    Read: "
+           << PrettyPrinter::Print(GetBytes("io/read_bytes"), TUnit::BYTES) << endl
+           << "    Write: "
+           << PrettyPrinter::Print(GetBytes("io/write_bytes"), TUnit::BYTES) << endl
+           << "    Read I/O: " << GetInt64("io/syscr") << endl
+           << "    Write I/O: " << GetInt64("io/syscw") << endl
+           << "  CGroups: " << endl
+           << "    Hierarchy: " << GetString("cgroup/hierarchy_id") << endl
+           << "    Subsystems: " << GetString("cgroup/subsystems") <<endl
+           << "    Control Group: " << GetString("cgroup/control_group") << endl
+           << "  Schedule: " << endl
+           << "    Sum Execute Time: " << GetString("sched/se.sum_exec_runtime") << endl
+           << "    Max Wait Time: " << GetString("sched/se.statistics.wait_max") << endl
+           << "    Sum Wait Time: " << GetString("sched/se.statistics.wait_sum") << endl
+           << "    Wait Count: " << GetInt64("sched/se.statistics.wait_count") << endl
+           << "    Sum I/O Wait Time: "
+           << GetString("sched/se.statistics.iowait_sum") << endl
+           << "    I/O Wait Count: "
+           << GetInt64("sched/se.statistics.iowait_count") << endl
+           << "    Wakeup Count with cpu migration: "
+           << GetInt64("sched/se.statistics.nr_wakeups_migrate") << endl
+           << "    Switches: " << GetInt64("sched/nr_switches") << endl
+           << "    Voluntary Switches: " << GetInt("sched/nr_voluntary_switches") << endl
+           << "    Involuntary Switches: "
+           << GetInt("sched/nr_involuntary_switches") << endl
+           << "    Process Priority: " << GetInt("sched/prio") << endl
+           << "  File Descriptors: " << endl
+           << "    Number of File Descriptors: " << GetInt("fd/count") << endl;
+  }
   stream << endl;
   return stream.str();
 }

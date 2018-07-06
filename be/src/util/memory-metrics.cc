@@ -25,6 +25,7 @@
 #include "runtime/mem-tracker.h"
 #include "util/jni-util.h"
 #include "util/mem-info.h"
+#include "util/process-state-info.h"
 #include "util/time.h"
 
 using boost::algorithm::to_lower;
@@ -32,6 +33,10 @@ using namespace impala;
 using namespace strings;
 
 DECLARE_bool(mmap_buffers);
+DEFINE_bool_hidden(enable_extended_memory_metrics, false,
+    "(Experimental) enable extended memory metrics, including those that can be "
+    "expensive to compute. This was introduced as a workaround for poor /proc/*/smaps "
+    "performance in certain Linux kernel versions - see IMPALA-7239.");
 
 SumGauge* AggregateMemoryMetrics::TOTAL_USED = nullptr;
 IntGauge* AggregateMemoryMetrics::NUM_MAPS = nullptr;
@@ -116,15 +121,15 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
     RETURN_IF_ERROR(JvmMetric::InitMetrics(metrics->GetOrCreateChildGroup("jvm")));
   }
 
-  if (MemInfo::HaveSmaps()) {
+  if (FLAGS_enable_extended_memory_metrics && MemInfo::HaveSmaps()) {
     AggregateMemoryMetrics::NUM_MAPS =
         aggregate_metrics->AddGauge("memory.num-maps", 0U);
-    AggregateMemoryMetrics::MAPPED_BYTES =
-        aggregate_metrics->AddGauge("memory.mapped-bytes", 0U);
-    AggregateMemoryMetrics::RSS = aggregate_metrics->AddGauge("memory.rss", 0U);
     AggregateMemoryMetrics::ANON_HUGE_PAGE_BYTES =
         aggregate_metrics->AddGauge("memory.anon-huge-page-bytes", 0U);
   }
+  AggregateMemoryMetrics::MAPPED_BYTES =
+      aggregate_metrics->AddGauge("memory.mapped-bytes", 0U);
+  AggregateMemoryMetrics::RSS = aggregate_metrics->AddGauge("memory.rss", 0U);
   ThpConfig thp_config = MemInfo::ParseThpConfig();
   AggregateMemoryMetrics::THP_ENABLED =
       aggregate_metrics->AddProperty("memory.thp.enabled", thp_config.enabled);
@@ -141,10 +146,11 @@ void AggregateMemoryMetrics::Refresh() {
     // Only call ParseSmaps() if the metrics were created.
     MappedMemInfo map_info = MemInfo::ParseSmaps();
     NUM_MAPS->SetValue(map_info.num_maps);
-    MAPPED_BYTES->SetValue(map_info.size_kb * 1024);
-    RSS->SetValue(map_info.rss_kb * 1024);
     ANON_HUGE_PAGE_BYTES->SetValue(map_info.anon_huge_pages_kb * 1024);
   }
+  ProcessStateInfo proc_state(false);
+  MAPPED_BYTES->SetValue(proc_state.GetVmSize());
+  RSS->SetValue(proc_state.GetRss());
 
   ThpConfig thp_config = MemInfo::ParseThpConfig();
   THP_ENABLED->SetValue(thp_config.enabled);
