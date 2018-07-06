@@ -26,7 +26,6 @@ import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.service.BackendConfig;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
 /**
@@ -72,7 +71,7 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
     if (ifNotExists_) sb.append("IF NOT EXISTS ");
     if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
     sb.append(tableName_.getTbl());
-    if (columnDefs_ != null) sb.append("(" + Joiner.on(", ").join(columnDefs_) + ")");
+    if (columnDefs_ != null) sb.append("(" + getColumnNames() + ")");
     sb.append(" AS ");
     sb.append(viewDefStmt_.toSql());
     return sb.toString();

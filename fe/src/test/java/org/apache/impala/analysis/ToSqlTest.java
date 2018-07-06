@@ -363,6 +363,71 @@ public class ToSqlTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestCreateView() throws AnalysisException {
+    testToSql(
+      "create view foo_new as select int_col, string_col from functional.alltypes",
+      "default",
+      "CREATE VIEW foo_new AS SELECT int_col, string_col FROM functional.alltypes");
+    testToSql("create view if not exists foo as select * from functional.alltypes",
+        "default", "CREATE VIEW IF NOT EXISTS foo AS SELECT * FROM functional.alltypes");
+    testToSql("create view functional.foo (a, b) as select int_col x, double_col y " +
+        "from functional.alltypes", "default",
+        "CREATE VIEW functional.foo(a, b) AS SELECT int_col x, double_col y " +
+        "FROM functional.alltypes");
+    testToSql("create view foo (aaa, bbb) as select * from functional.complex_view",
+        "default", "CREATE VIEW foo(aaa, bbb) AS SELECT * FROM functional.complex_view");
+    testToSql("create view foo as select trim('abc'), 17 * 7", "default",
+        "CREATE VIEW foo AS SELECT trim('abc'), 17 * 7");
+    testToSql("create view foo (cnt) as " +
+        "select count(distinct x.int_col) from functional.alltypessmall x " +
+        "inner join functional.alltypessmall y on (x.id = y.id) group by x.bigint_col",
+        "default", "CREATE VIEW foo(cnt) AS "+
+        "SELECT count(DISTINCT x.int_col) FROM functional.alltypessmall x " +
+        "INNER JOIN functional.alltypessmall y ON (x.id = y.id) GROUP BY x.bigint_col");
+    testToSql("create view foo (a, b) as values(1, 'a'), (2, 'b')", "default",
+        "CREATE VIEW foo(a, b) AS VALUES((1, 'a'), (2, 'b'))");
+    testToSql("create view foo (a, b) as select 1, 'a' union all select 2, 'b'",
+      "default", "CREATE VIEW foo(a, b) AS SELECT 1, 'a' UNION ALL SELECT 2, 'b'");
+    testToSql("create view test_view_with_subquery as " +
+        "select * from functional.alltypestiny t where exists " +
+        "(select * from functional.alltypessmall s where s.id = t.id)", "default",
+        "CREATE VIEW test_view_with_subquery AS " +
+        "SELECT * FROM functional.alltypestiny t WHERE EXISTS " +
+        "(SELECT * FROM functional.alltypessmall s WHERE s.id = t.id)");
+  }
+
+  @Test
+  public void TestAlterView() throws AnalysisException{
+    testToSql("alter view functional.alltypes_view as " +
+        "select * from functional.alltypesagg", "default",
+        "ALTER VIEW functional.alltypes_view AS SELECT * FROM functional.alltypesagg");
+    testToSql("alter view functional.alltypes_view (a, b) as " +
+        "select int_col, string_col from functional.alltypes", "default",
+        "ALTER VIEW functional.alltypes_view(a, b) AS " +
+        "SELECT int_col, string_col FROM functional.alltypes");
+    testToSql("alter view functional.alltypes_view (a, b) as " +
+        "select int_col x, string_col y from functional.alltypes", "default",
+        "ALTER VIEW functional.alltypes_view(a, b) AS " +
+        "SELECT int_col x, string_col y FROM functional.alltypes");
+    testToSql("alter view functional.alltypes_view as select trim('abc'), 17 * 7",
+        "default", "ALTER VIEW functional.alltypes_view AS SELECT trim('abc'), 17 * 7");
+    testToSql("alter view functional.alltypes_view (aaa, bbb) as " +
+        "select * from functional.complex_view", "default",
+        "ALTER VIEW functional.alltypes_view(aaa, bbb) AS " +
+        "SELECT * FROM functional.complex_view");
+    testToSql("alter view functional.complex_view (abc, xyz) as " +
+        "select year, month from functional.alltypes_view", "default",
+        "ALTER VIEW functional.complex_view(abc, xyz) AS " +
+        "SELECT year, month FROM functional.alltypes_view");
+    testToSql("alter view functional.alltypes_view (cnt) as " +
+        "select count(distinct x.int_col) from functional.alltypessmall x " +
+        "inner join functional.alltypessmall y on (x.id = y.id) group by x.bigint_col",
+        "default", "ALTER VIEW functional.alltypes_view(cnt) AS "+
+        "SELECT count(DISTINCT x.int_col) FROM functional.alltypessmall x " +
+        "INNER JOIN functional.alltypessmall y ON (x.id = y.id) GROUP BY x.bigint_col");
+  }
+
+  @Test
   public void TestTableAliases() throws AnalysisException {
     String[] tables = new String[] { "alltypes", "alltypes_view" };
     String[] columns = new String[] { "int_col", "*" };
