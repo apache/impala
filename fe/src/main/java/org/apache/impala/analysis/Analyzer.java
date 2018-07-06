@@ -2261,24 +2261,13 @@ public class Analyzer {
   /**
    * Determines compatible type for given exprs, and casts them to compatible type.
    * Calls analyze() on each of the exprs.
-   * Throw an AnalysisException if the types are incompatible,
-   * returns compatible type otherwise.
+   * Throws an AnalysisException if the types are incompatible,
    */
-  public Type castAllToCompatibleType(List<Expr> exprs) throws AnalysisException {
-    // Group all decimal types together so that when finding a compatible type all
-    // decimal types will be compared against each other first. For example:
-    //
-    // These expressions are not compatible because of strict decimal and should throw
-    // an AnalysisException.
-    // [decimal(38, 1), double, decimal(38, 37)]
-    //
-    // Without sorting:
-    // 1. Comparing decimal(38, 1) and double - OK
-    // 2. Comparing double and decimal(38, 37) - OK
-    //
-    // With sorting:
-    // [decimal(38, 1), decimal(38, 37), double]
-    // 1. Comparing decimal(38, 1) with decimal(38, 37) - ERROR
+  public void castAllToCompatibleType(List<Expr> exprs) throws AnalysisException {
+    // Group all the decimal types together at the end of the list to avoid comparing
+    // the decimals with each other first. For example, if we have the following list,
+    // [decimal, decimal, double], we will end up casting everything to a double anyways,
+    // so it does not matter if the decimals are not compatible with each other.
     //
     // We need to create a new sorted list instead of mutating it when sorting it because
     // mutating the original exprs will change the order of the original exprs.
@@ -2290,7 +2279,7 @@ public class Analyzer {
             (!expr1.getType().isDecimal() && !expr2.getType().isDecimal())) {
           return 0;
         }
-        return expr1.getType().isDecimal() ? -1 : 1;
+        return expr1.getType().isDecimal() ? 1 : -1;
       }
     });
     Expr lastCompatibleExpr = sortedExprs.get(0);
@@ -2307,7 +2296,6 @@ public class Analyzer {
         exprs.set(i, castExpr);
       }
     }
-    return compatibleType;
   }
 
   /**
