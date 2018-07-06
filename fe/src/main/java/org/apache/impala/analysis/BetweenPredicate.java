@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
 
@@ -46,6 +48,23 @@ public class BetweenPredicate extends Predicate {
     isNotBetween_ = other.isNotBetween_;
   }
 
+  /* Returns true if all the children should be cast to decimal. */
+  private boolean checkDecimalCast() {
+    boolean allScalar = true;
+    // If there is at least one float, then all the children need to be cast to
+    // float (instead of decimal).
+    boolean noFloats = true;
+    boolean atLeastOneDecimal = false;
+    for(int i = 0; i < children_.size(); ++i) {
+      if (!children_.get(i).getType().isScalarType()) allScalar = false;
+      // If at least one child is a float, then we want to cast all the children to float.
+      if (children_.get(i).getType().isFloatingPointType()) noFloats = false;
+      if (children_.get(i).getType().isDecimal()) atLeastOneDecimal = true;
+    }
+
+    return allScalar && noFloats && atLeastOneDecimal;
+  }
+
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     super.analyzeImpl(analyzer);
@@ -54,7 +73,17 @@ public class BetweenPredicate extends Predicate {
       throw new AnalysisException("Comparison between subqueries is not " +
           "supported in a BETWEEN predicate: " + toSqlImpl());
     }
-    analyzer.castAllToCompatibleType(children_);
+
+    if (checkDecimalCast()) {
+      for(int i = 0; i < children_.size(); ++i) {
+        ScalarType t = (ScalarType) children_.get(i).getType();
+        // The backend function can handle decimals of different precision and scale, so
+        // it is ok if the children don't have the same decimal type.
+        children_.get(i).castTo(t.getMinResolutionDecimal());
+      }
+    } else {
+      analyzer.castAllToCompatibleType(children_);
+    }
   }
 
   @Override

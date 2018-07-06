@@ -729,6 +729,25 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "where int_struct_col between 10 and 20",
         "Incompatible return types 'STRUCT<f1:INT,f2:INT>' and 'TINYINT' " +
         "of exprs 'int_struct_col' and '10'.");
+    // IMPALA-7211: Do not cast decimal types to other decimal types
+    AnalyzesOk("select cast(1 as decimal(38,2)) between " +
+        "0.9 * cast(1 as decimal(38,3)) and 3");
+    AnalyzesOk("select cast(2 as decimal(38,37)) between " +
+        "cast(1 as decimal(38,1)) and cast(3 as decimal(38,15))");
+    AnalyzesOk("select cast(2 as decimal(38,37)) between " +
+        "cast(1 as double) and cast(3 as decimal(38,1))");
+    AnalyzesOk("select cast(2 as decimal(38,37)) between " +
+        "cast(1 as decimal(38,1)) and cast(3 as double)");
+    AnalyzesOk("select cast(2 as decimal(38,37)) between " +
+        "cast(1 as decimal(38,1)) and cast(3 as bigint)");
+    AnalyzesOk("select cast(2 as decimal(38,37)) between " +
+        "cast(1 as bigint) and cast(3 as bigint)");
+    AnalyzesOk("select cast(2 as decimal(38,37)) between " +
+        "cast(1 as bigint) and cast(3 as decimal(38,1))");
+    AnalyzesOk("select cast(2 as decimal(38,37)) between " +
+        "cast(1 as decimal(38,1)) and cast(3 as int)");
+    AnalyzesOk("select cast(2 as decimal(38,37)) between " +
+        "cast(1 as int) and cast(3 as decimal(38,1))");
   }
 
   @Test
@@ -2473,49 +2492,12 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select cast(2 as decimal(38, 37)) in (cast(2 as decimal(38, 1)))",
         "Incompatible return types 'DECIMAL(38,37)' and 'DECIMAL(38,1)' of exprs " +
         "'CAST(2 AS DECIMAL(38,37))' and 'CAST(2 AS DECIMAL(38,1))'");
-    AnalysisError("select cast(2 as double) in " +
-        "(cast(2 as decimal(38, 37)), cast(3 as decimal(38, 1)))",
-        "Incompatible return types 'DECIMAL(38,37)' and 'DECIMAL(38,1)' of exprs " +
-        "'CAST(2 AS DECIMAL(38,37))' and 'CAST(3 AS DECIMAL(38,1))'");
-    AnalysisError("select cast(2 as decimal(38, 37)) in " +
-        "(cast(2 as double), cast(3 as decimal(38, 1)))",
-        "Incompatible return types 'DECIMAL(38,37)' and 'DECIMAL(38,1)' of exprs " +
-        "'CAST(2 AS DECIMAL(38,37))' and 'CAST(3 AS DECIMAL(38,1))'");
-    AnalysisError("select cast(2 as decimal(38, 37)) in " +
-        "(cast(2 as decimal(38, 1)), cast(3 as double))",
-        "Incompatible return types 'DECIMAL(38,37)' and 'DECIMAL(38,1)' of exprs " +
-        "'CAST(2 AS DECIMAL(38,37))' and 'CAST(2 AS DECIMAL(38,1))'");
-    // Between predicate that does not result in a new precision.
-    AnalyzesOk("select cast(2 as double) between " +
-        "cast(2 as decimal(38, 37)) and cast(3 as decimal(38, 37))");
-    AnalyzesOk("select cast(2 as decimal(38, 37)) between " +
-        "cast(2 as double) and cast(3 as decimal(38, 37))");
-    AnalyzesOk("select cast(2 as decimal(38, 37)) between " +
-        "cast(2 as decimal(38, 37)) and cast(3 as double)");
-    // Between predicate that results in a new precision.
-    AnalyzesOk("select cast(2 as double) between " +
-        "cast(2 as decimal(5, 3)) and cast(3 as decimal(10, 5))");
-    AnalyzesOk("select cast(2 as decimal(5, 3)) between " +
-        "cast(2 as double) and cast(3 as decimal(10, 5))");
-    AnalyzesOk("select cast(2 as decimal(5, 3)) between " +
-        "cast(2 as decimal(10, 5)) and cast(3 as double)");
-    // Between predicate that results in a loss of precision.
-    AnalysisError("select cast(2 as decimal(38, 37)) between " +
-        "cast(2 as decimal(38, 1)) and cast(3 as decimal(38, 3))",
-        "Incompatible return types 'DECIMAL(38,37)' and 'DECIMAL(38,1)' of exprs " +
-        "'CAST(2 AS DECIMAL(38,37))' and 'CAST(2 AS DECIMAL(38,1))'");
-    AnalysisError("select cast(2 as double) between " +
-        "cast(2 as decimal(38, 37)) and cast(3 as decimal(38, 1))",
-        "Incompatible return types 'DECIMAL(38,37)' and 'DECIMAL(38,1)' of exprs " +
-        "'CAST(2 AS DECIMAL(38,37))' and 'CAST(3 AS DECIMAL(38,1))'");
-    AnalysisError("select cast(2 as decimal(38, 37)) between " +
-        "cast(2 as double) and cast(3 as decimal(38, 1))",
-        "Incompatible return types 'DECIMAL(38,37)' and 'DECIMAL(38,1)' of exprs " +
-        "'CAST(2 AS DECIMAL(38,37))' and 'CAST(3 AS DECIMAL(38,1))'");
-    AnalysisError("select cast(2 as decimal(38, 37)) between " +
-        "cast(2 as decimal(38, 1)) and cast(3 as double)",
-        "Incompatible return types 'DECIMAL(38,37)' and 'DECIMAL(38,1)' of exprs " +
-        "'CAST(2 AS DECIMAL(38,37))' and 'CAST(2 AS DECIMAL(38,1))'");
+    AnalyzesOk("select cast(2 as double) in " +
+        "(cast(2 as decimal(38, 37)), cast(3 as decimal(38, 1)))");
+    AnalyzesOk("select cast(2 as decimal(38, 37)) in " +
+        "(cast(2 as double), cast(3 as decimal(38, 1)))");
+    AnalyzesOk("select cast(2 as decimal(38, 37)) in " +
+        "(cast(2 as decimal(38, 1)), cast(3 as double))");
   }
 
   @Test
