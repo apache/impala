@@ -81,8 +81,9 @@ namespace impala {
 class ProcessStateInfo {
  public:
   /// Read the current process state info when constructed. There is no need
-  /// to be thread safe.
-  ProcessStateInfo();
+  /// to be thread safe. If 'get_extended_metrics' is false, only the contents
+  /// of /status are collected. It it is true, all metrics are collected.
+  ProcessStateInfo(bool get_extended_metrics=true);
 
   std::string DebugString() const;
 
@@ -92,9 +93,17 @@ class ProcessStateInfo {
 
   /// Original data's unit is B or KB.
   int64_t GetBytes(const std::string& state_key) const;
+
+  /// Return the virtual memory size in bytes.
+  int64_t GetVmSize() const { return GetBytes("status/VmSize"); }
+
+  //// Return the process RSS in bytes.
+  int64_t GetRss() const { return GetBytes("status/VmRSS"); }
  private:
   typedef std::map<std::string, std::string> ProcessStateMap;
   ProcessStateMap process_state_map_;
+
+  const bool have_extended_metrics_;
 
   /// Read I/O info from /proc/self/io.
   void ReadProcIO();

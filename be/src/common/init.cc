@@ -280,7 +280,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
 }
 
 Status impala::StartMemoryMaintenanceThread() {
-  DCHECK(AggregateMemoryMetrics::NUM_MAPS != nullptr) << "Mem metrics not registered.";
+  DCHECK(AggregateMemoryMetrics::TOTAL_USED != nullptr) << "Mem metrics not registered.";
   return Thread::Create("common", "memory-maintenance-thread",
       &MemoryMaintenanceThread, &memory_maintenance_thread);
 }
