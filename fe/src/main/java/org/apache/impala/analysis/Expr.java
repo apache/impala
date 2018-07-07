@@ -26,7 +26,6 @@ import java.util.ListIterator;
 import java.util.Set;
 
 import org.apache.impala.analysis.BinaryPredicate.Operator;
-import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.ImpaladCatalog;
@@ -470,10 +469,20 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       int ix = Math.min(fnArgs.length - 1, i);
       if (fnArgs[ix].isWildcardDecimal()) {
         if (children_.get(i).type_.isDecimal() && ignoreWildcardDecimals) continue;
-        Preconditions.checkState(resolvedWildcardType != null);
-        Preconditions.checkState(!resolvedWildcardType.isInvalid());
-        if (!children_.get(i).type_.equals(resolvedWildcardType)) {
-          castChild(resolvedWildcardType, i);
+        if (children_.get(i).type_.isDecimal() || !ignoreWildcardDecimals) {
+          Preconditions.checkState(resolvedWildcardType != null);
+          Preconditions.checkState(!resolvedWildcardType.isInvalid());
+          if (!children_.get(i).type_.equals(resolvedWildcardType)) {
+            castChild(resolvedWildcardType, i);
+          }
+        } else if (children_.get(i).type_.isNull()) {
+          castChild(ScalarType.createDecimalType(), i);
+        } else {
+          Preconditions.checkState(children_.get(i).type_.isScalarType());
+          // It is safe to assign an arbitrary decimal here only if the backend function
+          // can handle it (in which case ignoreWildcardDecimals is true).
+          Preconditions.checkState(ignoreWildcardDecimals);
+          castChild(((ScalarType) children_.get(i).type_).getMinResolutionDecimal(), i);
         }
       } else if (!children_.get(i).type_.matchesType(fnArgs[ix])) {
         castChild(fnArgs[ix], i);
