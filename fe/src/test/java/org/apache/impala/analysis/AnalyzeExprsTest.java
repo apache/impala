@@ -262,6 +262,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         }
       }
 
+      // IMPALA-7260: Check that when a numerical type gets implicitly cast to decimal,
+      // we do not get an error when the type of the decimal operand is not able to fit
+      // all of the digits of the non-deicmal operand.
+      AnalyzesOk("select cast(1 as decimal(38,37)) " + operator + " cast(2 as bigint)");
+      AnalyzesOk("select cast(1 as bigint) " + operator + " cast(2 as decimal(38,37))");
+      AnalyzesOk("select cast(1 as decimal(38,1)) " + operator + " cast(2 as bigint)");
+      AnalyzesOk("select cast(1 as decimal(38,37)) " + operator + " cast(2 as tinyint)");
+      AnalyzesOk("select cast(1 as decimal(38,37)) " + operator + " cast(2 as double)");
+
       // Chars of different length are comparable
       for (int i = 1; i < 16; ++i) {
         AnalyzesOk("select cast('hi' as char(" + i + ")) " + operator +
