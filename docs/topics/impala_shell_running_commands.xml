@@ -84,9 +84,9 @@ under the License.
 
       <li>
         If a comment contains the
-          <codeph>${<varname>variable_name</varname>}</codeph> character and it
-        is not for a variable substitution, the <codeph>$</codeph> character
-        must be escaped, e.g. <codeph>-- \${hello}</codeph>.
+          <codeph>${<varname>variable_name</varname>}</codeph> and it is not for
+        a variable substitution, the <codeph>$</codeph> character must be
+        escaped, e.g. <codeph>-- \${hello}</codeph>.
       </li>
     </ul>
 
