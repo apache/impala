@@ -112,7 +112,13 @@ SET(CXX_FLAGS_ADDRESS_SANITIZER
 
 # Set the flags to the undefined behavior sanitizer, also known as "ubsan"
 # Turn on sanitizer and debug symbols to get stack traces:
-SET(CXX_FLAGS_UBSAN "${CXX_CLANG_FLAGS} -ggdb3 -fno-omit-frame-pointer -fsanitize=undefined -DUNDEFINED_SANITIZER")
+SET(CXX_FLAGS_UBSAN "${CXX_CLANG_FLAGS} -ggdb3 -fno-omit-frame-pointer -fsanitize=undefined")
+# Set preprocessor macros to facilitate initialization the relevant configuration.
+SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -DUNDEFINED_SANITIZER")
+# Calling getenv() in __ubsan_default_options doesn't work, likely because of
+# initialization ordering. We need to double-quote to create a macro that expands
+# to a string-literal.
+SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -DUNDEFINED_SANITIZER_SUPPRESSIONS=\\\"$ENV{IMPALA_HOME}/bin/ubsan-suppressions.txt\\\"")
 # Add flags to enable symbol resolution in the stack traces:
 SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -rtlib=compiler-rt -lgcc_s")
 # Ignore a number of noisy errors with too many false positives:
