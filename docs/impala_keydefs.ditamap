@@ -10924,7 +10924,6 @@ under the License.
   <keydef href="topics/impala_shell_options.xml#shell_config_file" keys="shell_config_file"/>
   <keydef href="topics/impala_connecting.xml" keys="connecting"/>
   <keydef href="topics/impala_shell_running_commands.xml" keys="shell_running_commands"/>
-  <keydef href="topics/impala_shell_running_commands.xml#rerun" keys="rerun"/>
   <keydef href="topics/impala_shell_commands.xml" keys="shell_commands"/>
 
   <keydef href="topics/impala_performance.xml" keys="performance"/>
