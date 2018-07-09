@@ -296,9 +296,6 @@ extern "C" const char *__tsan_default_options() {
 // Default UBSAN_OPTIONS. Override by setting environment variable $UBSAN_OPTIONS.
 #if defined(UNDEFINED_SANITIZER)
 extern "C" const char *__ubsan_default_options() {
-  static const string default_options = Substitute(
-      "print_stacktrace=1 suppressions=$0/bin/ubsan-suppressions.txt",
-      getenv("IMPALA_HOME") == nullptr ? "." : getenv("IMPALA_HOME"));
-  return default_options.c_str();
+  return "print_stacktrace=1 suppressions=" UNDEFINED_SANITIZER_SUPPRESSIONS;
 }
 #endif
