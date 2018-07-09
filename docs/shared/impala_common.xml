@@ -390,6 +390,11 @@ under the License.
                 <entry>TABLE</entry>
               </row>
               <row>
+                <entry>COMMENT ON COLUMN</entry>
+                <entry>ALTER</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
                 <entry>DESCRIBE DATABASE</entry>
                 <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
                 <entry>DATABASE</entry>
