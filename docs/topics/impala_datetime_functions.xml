@@ -1913,6 +1913,42 @@ select now() as right_now, nanoseconds_sub(now(), 1e9) as 1_second_earlier;
         </dd>
 
       </dlentry>
+      <dlentry id="next_day">
+        <dt>
+          <codeph>next_day(timestamp date, string weekday)</codeph>
+        </dt>
+        <dd>
+          <b>Purpose:</b> Returns the date of the <varname>weekday</varname>
+          that follows the specified <varname>date</varname>. <p>
+            <b>Return type:</b>
+            <codeph>timestamp</codeph>
+          </p>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p> The <varname>weekday</varname> parameter is case-insensitive. The
+            following values are accepted for <varname>weekday</varname>:
+              <codeph>"Sunday"</codeph>/<codeph>"Sun"</codeph>,
+              <codeph>"Monday"</codeph>/<codeph>"Mon"</codeph>,
+              <codeph>"Tuesday"</codeph>/<codeph>"Tue"</codeph>,
+              <codeph>"Wednesday"</codeph>/<codeph>"Wed"</codeph>,
+              <codeph>"Thursday"</codeph>/<codeph>"Thu"</codeph>,
+              <codeph>"Friday"</codeph>/<codeph>"Fri"</codeph>,
+              <codeph>"Saturday"</codeph>/<codeph>"Sat"</codeph>
+          </p>
+          <p> Calling the function with the current date and weekday returns the
+            date that is one week later.</p><p
+            conref="../shared/impala_common.xml#common/example_blurb"/>
+          <p>
+            <codeblock>select next_day('2013-12-25','Saturday');
+-- Returns '2013-12-28 00:00:00' the first Saturday after December 25, 2013.
+select next_day(to_timestamp('08-1987-21', 'mm-yyyy-dd'), 'Friday');
+-- Returns '1987-08-28 00:00:00' the first Friday after August 28, 1987.
+
+select next_day(now(), 'Thu');
+-- Executed on 2018-07-12, the function returns '2018-07-13 00:00:00', one week
+-- after the current date.</codeblock>
+          </p>
+        </dd>
+      </dlentry>
 
       <dlentry id="now">
 
@@ -1922,34 +1958,41 @@ select now() as right_now, nanoseconds_sub(now(), 1e9) as 1_second_earlier;
 
         <dd>
           <indexterm audience="hidden">now() function</indexterm>
-          <b>Purpose:</b> Returns the current date and time (in the local time zone) as a
-          <codeph>TIMESTAMP</codeph> value.
+          <b>Purpose:</b> Returns the current date and time (in the local time
+          zone) as a <codeph>TIMESTAMP</codeph> value.
+
           <p>
             <b>Return type:</b> <codeph>timestamp</codeph>
           </p>
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
           <p>
-            To find a date/time value in the future or the past relative to the current date
-            and time, add or subtract an <codeph>INTERVAL</codeph> expression to the return value of
-            <codeph>now()</codeph>. See <xref href="impala_timestamp.xml#timestamp"/> for examples.
+            To find a date/time value in the future or the past relative to the
+            current date and time, add or subtract an <codeph>INTERVAL</codeph>
+            expression to the return value of <codeph>now()</codeph>. See <xref
+              href="impala_timestamp.xml#timestamp"/> for examples.
           </p>
           <p>
-            To produce a <codeph>TIMESTAMP</codeph> representing the current date and time that can be
-            shared or stored without interoperability problems due to time zone differences, use the
-            <codeph>to_utc_timestamp()</codeph> function and specify the time zone of the server.
-            When <codeph>TIMESTAMP</codeph> data is stored in UTC form, any application that queries
-            those values can convert them to the appropriate local time zone by calling the inverse
+            To produce a <codeph>TIMESTAMP</codeph> representing the current
+            date and time that can be shared or stored without interoperability
+            problems due to time zone differences, use the
+              <codeph>to_utc_timestamp()</codeph> function and specify the time
+            zone of the server. When <codeph>TIMESTAMP</codeph> data is stored
+            in UTC form, any application that queries those values can convert
+            them to the appropriate local time zone by calling the inverse
             function, <codeph>from_utc_timestamp()</codeph>.
           </p>
+
           <p conref="../shared/impala_common.xml#common/current_timezone_tip"/>
-          <p>
-            Any references to the <codeph>now()</codeph> function are evaluated at the start of a query.
-            All calls to <codeph>now()</codeph> within the same query return the same value,
-            and the value does not depend on how long the query takes.
+
+          <p> Any references to the <codeph>now()</codeph> function are
+            evaluated at the start of a query. All calls to
+              <codeph>now()</codeph> within the same query return the same
+            value, and the value does not depend on how long the query takes.
           </p>
 
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>
+          <codeblock>
 select now() as 'Current time in California USA',
   to_utc_timestamp(now(), 'PDT') as 'Current time in Greenwich UK';
 +--------------------------------+-------------------------------+
