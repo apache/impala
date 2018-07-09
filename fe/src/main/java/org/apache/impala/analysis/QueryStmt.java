@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
@@ -127,6 +128,19 @@ public abstract class QueryStmt extends StatementBase {
     if (!fromClauseOnly && withClause_ != null) {
       for (View v: withClause_.getViews()) {
         v.getQueryStmt().collectTableRefs(tblRefs, fromClauseOnly);
+      }
+    }
+  }
+
+  /**
+  * Returns all inline view references in this statement.
+  */
+  public void collectInlineViews(Set<FeView> inlineViews) {
+    if (withClause_ != null) {
+      List<? extends FeView> withClauseViews = withClause_.getViews();
+      for (FeView withView : withClauseViews) {
+        inlineViews.add(withView);
+        withView.getQueryStmt().collectInlineViews(inlineViews);
       }
     }
   }

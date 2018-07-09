@@ -1086,7 +1086,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "select * from functional.alltypesagg");
     // View-definition references a view.
     AnalyzesOk("alter view functional.alltypes_view as " +
-        "select * from functional.alltypes_view");
+        "select * from functional.alltypes_view_sub");
     // Change column definitions.
     AnalyzesOk("alter view functional.alltypes_view (a, b) as " +
         "select int_col, string_col from functional.alltypes");
@@ -1164,6 +1164,58 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter view functional.alltypes_view (a, b, a) as " +
         "select int_col, int_col, int_col from functional.alltypes",
         "Duplicate column name: a");
+
+    // Self-referncing view in view definition - SELECT.
+    AnalysisError("alter view functional.alltypes_view as " +
+        "select * from functional.alltypes_view",
+        "Self-reference not allowed on view: functional.alltypes_view");
+    AnalysisError("alter view functional.alltypes_view (a, b, c) as " +
+        "select smallint_col, int_col, bigint_col from functional.alltypes_view",
+        "Self-reference not allowed on view: functional.alltypes_view");
+    // Self-referencing view in view definition - UNION.
+    AnalysisError("alter view functional.alltypes_view as " +
+        "select * from functional.alltypes union all " +
+        "select * from functional.alltypes_view",
+        "Self-reference not allowed on view: functional.alltypes_view");
+    AnalysisError("alter view functional.alltypes_view as " +
+        "select * from functional.alltypes union distinct " +
+        "select * from functional.alltypes_view",
+        "Self-reference not allowed on view: functional.alltypes_view");
+    // Self-referencing view via a dependent view.
+    AnalysisError("alter view functional.alltypes_view as " +
+        "select * from functional.view_view",
+        "Self-reference not allowed on view: functional.alltypes_view");
+    AnalysisError("alter view functional.alltypes_view (a, b) as " +
+        "select smallint_col, int_col from functional.view_view",
+        "Self-reference not allowed on view: functional.alltypes_view");
+    // Self-referencing view in where caluse.
+    AnalysisError("alter view functional.alltypes_view as " +
+        "select * from functional.alltypes " +
+        "where id > (select sum(tinyint_col) from functional.alltypes_view)",
+        "Self-reference not allowed on view: functional.alltypes_view");
+    // Self-referencing view in with clause.
+    AnalysisError("alter view functional.alltypes_view as " +
+        "with temp_view(col_a, col_b, col_c) as " +
+        "(select tinyint_col, int_col, bigint_col from functional.alltypes_view) " +
+        "select * from temp_view",
+        "Self-reference not allowed on view: functional.alltypes_view");
+    AnalysisError("alter view functional.alltypes_view as " +
+        "with temp_view(col_a, col_b, col_c) as " +
+        "(select tinyint_col, int_col, bigint_col from functional.alltypes_view) " +
+        "select * from functional.alltypes",
+        "Self-reference not allowed on view: functional.alltypes_view");
+    AnalysisError("alter view functional.alltypes_view as " +
+        "with temp_view(col_a, col_b, col_c) as " +
+        "(select tinyint_col, int_col, bigint_col from functional.alltypes_view) " +
+        "select * from temp_view union all " +
+        "select tinyint_col, int_col, bigint_col from functional.alltypes",
+        "Self-reference not allowed on view: functional.alltypes_view");
+    AnalysisError("alter view functional.alltypes_view as " +
+        "with temp_view(col_a, col_b, col_c) as " +
+        "(select tinyint_col, int_col, bigint_col from functional.alltypes_view) " +
+        "select * from temp_view union distinct " +
+        "select tinyint_col, int_col, bigint_col from functional.alltypes",
+        "Self-reference not allowed on view: functional.alltypes_view");
   }
 
   @Test

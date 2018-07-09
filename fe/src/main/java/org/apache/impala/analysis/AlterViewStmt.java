@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeTable;
@@ -29,6 +30,7 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.service.BackendConfig;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 
 /**
  * Represents an ALTER VIEW AS statement.
@@ -57,6 +59,15 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
     }
     analyzer.addAccessEvent(new TAccessEvent(dbName_ + "." + tableName_.getTbl(),
         TCatalogObjectType.VIEW, Privilege.ALTER.toString()));
+
+    // viewDefStmt_ should not contain any references to the view being altered.
+    Set<FeView> inlineViews = Sets.newHashSet();
+    viewDefStmt_.collectInlineViews(inlineViews);
+    TableRef tblRef = analyzer.resolveTableRef(new TableRef(tableName_.toPath(), null));
+    if (inlineViews.contains(((InlineViewRef) tblRef).getView())) {
+      throw new AnalysisException(
+          String.format("Self-reference not allowed on view: %s", tblRef.toSql()));
+    }
 
     createColumnAndViewDefs(analyzer);
     if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {

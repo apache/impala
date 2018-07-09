@@ -25,6 +25,7 @@ import java.util.Set;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
@@ -141,6 +142,20 @@ public class SelectStmt extends QueryStmt {
       tableAliasGenerator_ = new TableAliasGenerator(analyzer_, null);
     }
     return tableAliasGenerator_;
+  }
+
+  /**
+   * @return the QueryStmt present in the whereClause_ if present, null otherwise.
+   */
+  private QueryStmt getWhereSubQueryStmt() {
+    QueryStmt whereQueryStmt = null;
+    if (whereClause_ != null) {
+      Subquery whereSubquery = whereClause_.getSubquery();
+      if (whereSubquery != null) {
+        whereQueryStmt = whereSubquery.getStatement();
+      }
+    }
+    return whereQueryStmt;
   }
 
   /**
@@ -1056,6 +1071,26 @@ public class SelectStmt extends QueryStmt {
       for (Subquery sq: subqueries) {
         sq.getStatement().collectTableRefs(tblRefs, fromClauseOnly);
       }
+    }
+  }
+
+  @Override
+  public void collectInlineViews(Set<FeView> inlineViews) {
+    // Impala currently supports sub queries only in FROM, WHERE & WITH clauses. Hence,
+    // this function does not carry out any checks on HAVING clause.
+    super.collectInlineViews(inlineViews);
+    List<TableRef> fromTblRefs = getTableRefs();
+    Preconditions.checkNotNull(inlineViews);
+    for (TableRef fromTblRef : fromTblRefs) {
+      if (fromTblRef instanceof InlineViewRef) {
+        InlineViewRef inlineViewRef = (InlineViewRef) fromTblRef;
+        inlineViews.add(inlineViewRef.getView());
+        inlineViewRef.getViewStmt().collectInlineViews(inlineViews);
+      }
+    }
+    QueryStmt whereStmt = getWhereSubQueryStmt();
+    if (whereStmt != null) {
+      whereStmt.collectInlineViews(inlineViews);
     }
   }
 

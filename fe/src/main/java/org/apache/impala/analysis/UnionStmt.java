@@ -19,8 +19,10 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.FeView;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.slf4j.Logger;
@@ -547,6 +549,14 @@ public class UnionStmt extends QueryStmt {
     super.collectTableRefs(tblRefs, fromClauseOnly);
     for (UnionOperand op: operands_) {
       op.getQueryStmt().collectTableRefs(tblRefs, fromClauseOnly);
+    }
+  }
+
+  @Override
+  public void collectInlineViews(Set<FeView> inlineViews) {
+    super.collectInlineViews(inlineViews);
+    for (UnionOperand operand : operands_) {
+      operand.getQueryStmt().collectInlineViews(inlineViews);
     }
   }
 
