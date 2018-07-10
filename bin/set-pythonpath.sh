@@ -36,7 +36,7 @@ done
 PYTHONPATH=${PYTHONPATH}:${HIVE_HOME}/lib/py
 
 # Add all the built eggs to the python path
-for EGG in ${IMPALA_HOME}/shell/ext-py/*/dist/*.egg; do
+for EGG in `find ${IMPALA_HOME}/shell/ext-py/ -name '*\.egg'`; do
   PYTHONPATH=${PYTHONPATH}:${EGG}
 done
 
