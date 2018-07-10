@@ -10521,6 +10521,7 @@ under the License.
   <keydef href="https://issues.apache.org/jira/browse/IMPALA-9999" scope="external" format="html" keys="IMPALA-9999"/>
 
 <!-- Short form of mapping from Impala release to vendor-specific releases, for use in headings. -->
+  <keydef keys="impala31"><topicmeta><keywords><keyword>Impala 3.1</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala30"><topicmeta><keywords><keyword>Impala 3.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala212"><topicmeta><keywords><keyword>Impala 2.12</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala211"><topicmeta><keywords><keyword>Impala 2.11</keyword></keywords></topicmeta></keydef>
@@ -10540,6 +10541,7 @@ under the License.
 
 <!-- 3-part forms of version numbers, for use in release notes. -->
 <!-- Using spaced-out form to avoid conflict with variable for 2.1.10 -->
+  <keydef keys="impala3_1_0"><topicmeta><keywords><keyword>Impala 3.1.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala3_00_0"><topicmeta><keywords><keyword>Impala 3.0.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala2_12_0"><topicmeta><keywords><keyword>Impala 2.12.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala2_11_0"><topicmeta><keywords><keyword>Impala 2.11.0</keyword></keywords></topicmeta></keydef>
@@ -10581,7 +10583,7 @@ under the License.
   <keydef keys="impala132"><topicmeta><keywords><keyword>Impala 1.3.2</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala130"><topicmeta><keywords><keyword>Impala 1.3.0</keyword></keywords></topicmeta></keydef>
 
-<!-- Long form of mapping from Impala release to vendor-specific releases, for use in running text. -->
+  <keydef keys="impala31_full"><topicmeta><keywords><keyword>Impala 3.1</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala30_full"><topicmeta><keywords><keyword>Impala 3.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala213_full"><topicmeta><keywords><keyword>Impala 2.13</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala212_full"><topicmeta><keywords><keyword>Impala 2.12</keyword></keywords></topicmeta></keydef>
