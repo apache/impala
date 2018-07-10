@@ -41,6 +41,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.parse.HiveLexer;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
@@ -48,7 +49,6 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
@@ -286,7 +286,7 @@ public class ToSqlUtils {
         // We shouldn't output the columns for external tables
         colsSql = null;
       }
-    } else if (table instanceof HdfsTable) {
+    } else if (table instanceof FeFsTable) {
       String inputFormat = msTable.getSd().getInputFormat();
       format = HdfsFileFormat.fromHdfsInputFormatClass(inputFormat);
       compression = HdfsCompression.fromHdfsInputFormatClass(inputFormat);

@@ -33,7 +33,6 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Type;
@@ -496,8 +495,8 @@ public class ComputeStatsStmt extends StatementBase {
     } else {
       // Not computing incremental stats.
       expectAllPartitions_ = true;
-      if (table_ instanceof HdfsTable) {
-        expectAllPartitions_ = !((HdfsTable) table_).isStatsExtrapolationEnabled();
+      if (table_ instanceof FeFsTable) {
+        expectAllPartitions_ = !((FeFsTable) table_).isStatsExtrapolationEnabled();
       }
     }
 
@@ -623,7 +622,7 @@ public class ComputeStatsStmt extends StatementBase {
     }
 
     // Compute effective sampling percent.
-    long totalFileBytes = ((HdfsTable)table_).getTotalHdfsBytes();
+    long totalFileBytes = ((FeFsTable)table_).getTotalHdfsBytes();
     if (totalFileBytes > 0) {
       effectiveSamplePerc_ = (double) sampleFileBytes / (double) totalFileBytes;
     } else {

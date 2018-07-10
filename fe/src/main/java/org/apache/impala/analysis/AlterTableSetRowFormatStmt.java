@@ -18,9 +18,9 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -58,7 +58,7 @@ public class AlterTableSetRowFormatStmt extends AlterTableSetStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     FeTable tbl = getTargetTable();
-    if (!(tbl instanceof HdfsTable)) {
+    if (!(tbl instanceof FeFsTable)) {
       throw new AnalysisException(String.format("ALTER TABLE SET ROW FORMAT is only " +
           "supported on HDFS tables. Conflicting table: %1$s", tbl.getFullName()));
     }
@@ -75,7 +75,7 @@ public class AlterTableSetRowFormatStmt extends AlterTableSetStmt {
       }
     } else {
       HdfsFileFormat format = HdfsFileFormat.fromHdfsInputFormatClass(
-          ((HdfsTable) tbl).getMetaStoreTable().getSd().getInputFormat());
+          ((FeFsTable) tbl).getMetaStoreTable().getSd().getInputFormat());
       if (format != HdfsFileFormat.TEXT &&
           format != HdfsFileFormat.SEQUENCE_FILE) {
         throw new AnalysisException(String.format("ALTER TABLE SET ROW FORMAT is " +

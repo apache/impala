@@ -17,7 +17,7 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
@@ -42,8 +42,8 @@ public class AlterTableRecoverPartitionsStmt extends AlterTableStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
 
-    // Make sure the target table is HdfsTable.
-    if (!(table_ instanceof HdfsTable)) {
+    // Make sure the target table is an FS-backed Table.
+    if (!(table_ instanceof FeFsTable)) {
       throw new AnalysisException("ALTER TABLE RECOVER PARTITIONS " +
           "must target an HDFS table: " + tableName_);
     }

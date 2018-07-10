@@ -102,9 +102,12 @@ public class LocalFsPartition implements FeFsPartition {
 
   @Override
   public THdfsPartitionLocation getLocationAsThrift() {
+    String loc = getLocation();
+    // The special "prototype partition" has a null location.
+    if (loc == null) return null;
     // TODO(todd): support prefix-compressed partition locations. For now,
     // using -1 indicates that the location is a full path string.
-    return new THdfsPartitionLocation(/*prefix_index=*/-1, getLocation());
+    return new THdfsPartitionLocation(/*prefix_index=*/-1, loc);
   }
 
   @Override
@@ -115,7 +118,7 @@ public class LocalFsPartition implements FeFsPartition {
   @Override
   public TAccessLevel getAccessLevel() {
     // TODO(todd): implement me
-    return TAccessLevel.READ_ONLY;
+    return TAccessLevel.READ_WRITE;
   }
 
   @Override

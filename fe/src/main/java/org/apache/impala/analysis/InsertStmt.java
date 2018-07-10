@@ -26,11 +26,11 @@ import java.util.Set;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
@@ -474,28 +474,28 @@ public class InsertStmt extends StatementBase {
       }
     }
 
-    if (table_ instanceof HdfsTable) {
-      HdfsTable hdfsTable = (HdfsTable) table_;
-      if (!hdfsTable.hasWriteAccess()) {
+    if (table_ instanceof FeFsTable) {
+      FeFsTable fsTable = (FeFsTable) table_;
+      if (!fsTable.hasWriteAccess()) {
         throw new AnalysisException(String.format("Unable to INSERT into target table " +
             "(%s) because Impala does not have WRITE access to at least one HDFS path" +
-            ": %s", targetTableName_, hdfsTable.getFirstLocationWithoutWriteAccess()));
+            ": %s", targetTableName_, fsTable.getFirstLocationWithoutWriteAccess()));
       }
       StringBuilder error = new StringBuilder();
-      hdfsTable.parseSkipHeaderLineCount(error);
+      fsTable.parseSkipHeaderLineCount(error);
       if (error.length() > 0) throw new AnalysisException(error.toString());
       try {
-        if (!FileSystemUtil.isImpalaWritableFilesystem(hdfsTable.getLocation())) {
+        if (!FileSystemUtil.isImpalaWritableFilesystem(fsTable.getLocation())) {
           throw new AnalysisException(String.format("Unable to INSERT into target " +
               "table (%s) because %s is not a supported filesystem.", targetTableName_,
-              hdfsTable.getLocation()));
+              fsTable.getLocation()));
         }
       } catch (IOException e) {
         throw new AnalysisException(String.format("Unable to INSERT into target " +
             "table (%s): %s.", targetTableName_, e.getMessage()), e);
       }
       for (int colIdx = 0; colIdx < numClusteringCols; ++colIdx) {
-        Column col = hdfsTable.getColumns().get(colIdx);
+        Column col = fsTable.getColumns().get(colIdx);
         // Hive 1.x has a number of issues handling BOOLEAN partition columns (see HIVE-6590).
         // Instead of working around the Hive bugs, INSERT is disabled for BOOLEAN
         // partitions in Impala when built against Hive 1. HIVE-6590 is currently resolved,
@@ -798,7 +798,7 @@ public class InsertStmt extends StatementBase {
    * an AnalysisException.
    */
   private void analyzeSortColumns() throws AnalysisException {
-    if (!(table_ instanceof HdfsTable)) return;
+    if (!(table_ instanceof FeFsTable)) return;
 
     sortColumns_ = AlterTableSetTblProperties.analyzeSortColumns(table_,
         table_.getMetaStoreTable().getParameters());

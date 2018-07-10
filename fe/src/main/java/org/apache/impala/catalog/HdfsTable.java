@@ -631,6 +631,7 @@ public class HdfsTable extends Table implements FeFsTable {
   // True if Impala has HDFS write permissions on the hdfsBaseDir (for an unpartitioned
   // table) or if Impala has write permissions on all partition directories (for
   // a partitioned table).
+  @Override
   public boolean hasWriteAccess() {
     return TAccessLevelUtil.impliesWriteAccess(accessLevel_);
   }
@@ -640,6 +641,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * to, or an null if none is found. For an unpartitioned table, this just
    * checks the hdfsBaseDir. For a partitioned table it checks all partition directories.
    */
+  @Override
   public String getFirstLocationWithoutWriteAccess() {
     if (getMetaStoreTable() == null) return null;
 
@@ -662,13 +664,18 @@ public class HdfsTable extends Table implements FeFsTable {
    * was found.
    */
   public HdfsPartition getPartition(List<PartitionKeyValue> partitionSpec) {
+    return (HdfsPartition)getPartition(this, partitionSpec);
+  }
+
+  public static PrunablePartition getPartition(FeFsTable table,
+      List<PartitionKeyValue> partitionSpec) {
     List<TPartitionKeyValue> partitionKeyValues = Lists.newArrayList();
     for (PartitionKeyValue kv: partitionSpec) {
       String value = PartitionKeyValue.getPartitionKeyValueString(
-          kv.getLiteralValue(), getNullPartitionKeyValue());
+          kv.getLiteralValue(), table.getNullPartitionKeyValue());
       partitionKeyValues.add(new TPartitionKeyValue(kv.getColName(), value));
     }
-    return getPartitionFromThriftPartitionSpec(partitionKeyValues);
+    return getPartitionFromThriftPartitionSpec(table, partitionKeyValues);
   }
 
   /**
@@ -677,11 +684,17 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   public HdfsPartition getPartitionFromThriftPartitionSpec(
       List<TPartitionKeyValue> partitionSpec) {
-    // First, build a list of the partition values to search for in the same order they
+    return (HdfsPartition)getPartitionFromThriftPartitionSpec(this, partitionSpec);
+  }
+
+  public static PrunablePartition getPartitionFromThriftPartitionSpec(
+      FeFsTable table,
+      List<TPartitionKeyValue> partitionSpec) {
+      // First, build a list of the partition values to search for in the same order they
     // are defined in the table.
     List<String> targetValues = Lists.newArrayList();
     Set<String> keys = Sets.newHashSet();
-    for (FieldSchema fs: getMetaStoreTable().getPartitionKeys()) {
+    for (FieldSchema fs: table.getMetaStoreTable().getPartitionKeys()) {
       for (TPartitionKeyValue kv: partitionSpec) {
         if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {
           targetValues.add(kv.getValue());
@@ -695,27 +708,27 @@ public class HdfsTable extends Table implements FeFsTable {
 
     // Make sure the number of values match up and that some values were found.
     if (targetValues.size() == 0 ||
-        (targetValues.size() != getMetaStoreTable().getPartitionKeysSize())) {
+        (targetValues.size() != table.getMetaStoreTable().getPartitionKeysSize())) {
       return null;
     }
 
     // Search through all the partitions and check if their partition key values
     // match the values being searched for.
-    for (HdfsPartition partition: partitionMap_.values()) {
+    for (PrunablePartition partition: table.getPartitions()) {
       List<LiteralExpr> partitionValues = partition.getPartitionValues();
       Preconditions.checkState(partitionValues.size() == targetValues.size());
       boolean matchFound = true;
       for (int i = 0; i < targetValues.size(); ++i) {
         String value;
         if (partitionValues.get(i) instanceof NullLiteral) {
-          value = getNullPartitionKeyValue();
+          value = table.getNullPartitionKeyValue();
         } else {
           value = partitionValues.get(i).getStringValue();
           Preconditions.checkNotNull(value);
           // See IMPALA-252: we deliberately map empty strings on to
           // NULL when they're in partition columns. This is for
           // backwards compatibility with Hive, and is clearly broken.
-          if (value.isEmpty()) value = getNullPartitionKeyValue();
+          if (value.isEmpty()) value = table.getNullPartitionKeyValue();
         }
         if (!targetValues.get(i).equals(value)) {
           matchFound = false;

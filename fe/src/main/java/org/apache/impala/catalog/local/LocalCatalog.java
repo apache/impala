@@ -31,20 +31,25 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalog;
+import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
-import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.HdfsCachePool;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.PartitionNotFoundException;
+import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.thrift.TException;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 
@@ -131,7 +136,7 @@ public class LocalCatalog implements FeCatalog {
   @Override
   public FeDb getDb(String db) {
     loadDbs();
-    return dbs_.get(db);
+    return dbs_.get(db.toLowerCase());
   }
 
   private FeDb getDbOrThrow(String dbName) throws DatabaseNotFoundException {
@@ -143,11 +148,28 @@ public class LocalCatalog implements FeCatalog {
     return db;
   }
 
+  private void throwPartitionNotFound(List<TPartitionKeyValue> partitionSpec)
+      throws PartitionNotFoundException {
+    throw new PartitionNotFoundException(
+        "Partition not found: " + Joiner.on(", ").join(partitionSpec));
+  }
+
   @Override
   public FeFsPartition getHdfsPartition(
-      String db, String tbl, List<TPartitionKeyValue> partition_spec)
+      String db, String tbl, List<TPartitionKeyValue> partitionSpec)
       throws CatalogException {
-    throw new UnsupportedOperationException("TODO");
+    // TODO(todd): somewhat copy-pasted from Catalog.getHdfsPartition
+
+    FeTable table = getTable(db, tbl);
+    // This is not an FS table, throw an error.
+    if (!(table instanceof FeFsTable)) {
+      throwPartitionNotFound(partitionSpec);
+    }
+    // Get the FeFsPartition object for the given partition spec.
+    PrunablePartition partition = HdfsTable.getPartitionFromThriftPartitionSpec(
+        (FeFsTable)table, partitionSpec);
+    if (partition == null) throwPartitionNotFound(partitionSpec);
+    return FeCatalogUtils.loadPartition((FeFsTable)table, partition.getId());
   }
 
   @Override

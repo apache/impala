@@ -19,8 +19,8 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
@@ -29,7 +29,7 @@ import com.google.common.base.Preconditions;
  * specifications of related DDL operations.
  */
 public abstract class PartitionSpecBase implements ParseNode {
-  protected HdfsTable table_;
+  protected FeFsTable table_;
   protected TableName tableName_;
   protected Boolean partitionShouldExist_;
   protected Privilege privilegeRequirement_;
@@ -85,8 +85,8 @@ public abstract class PartitionSpecBase implements ParseNode {
     }
 
     // Only HDFS tables are partitioned.
-    Preconditions.checkState(table instanceof HdfsTable);
-    table_ = (HdfsTable) table;
+    Preconditions.checkState(table instanceof FeFsTable);
+    table_ = (FeFsTable) table;
     nullPartitionKeyValue_ = table_.getNullPartitionKeyValue();
   }
 

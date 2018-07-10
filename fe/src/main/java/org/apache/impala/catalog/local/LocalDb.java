@@ -94,7 +94,7 @@ class LocalDb implements FeDb {
   @Override
   public FeTable getTable(String tblName) {
     Preconditions.checkNotNull(tblName);
-    Preconditions.checkArgument(tblName.toLowerCase().equals(tblName));
+    tblName = tblName.toLowerCase();
     loadTableNames();
     if (!tables_.containsKey(tblName)) {
       // Table doesn't exist.

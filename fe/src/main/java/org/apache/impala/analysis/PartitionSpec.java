@@ -18,13 +18,13 @@
 package org.apache.impala.analysis;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TPartitionKeyValue;
@@ -110,7 +110,7 @@ public class PartitionSpec extends PartitionSpecBase {
             pk.getValue().toSql(), colType.toString(), pk.getColName()));
       }
     }
-    partitionExists_ = table_.getPartition(partitionSpec_) != null;
+    partitionExists_ = HdfsTable.getPartition(table_, partitionSpec_) != null;
     if (partitionShouldExist_ != null) {
       if (partitionShouldExist_ && !partitionExists_) {
           throw new AnalysisException("Partition spec does not exist: (" +

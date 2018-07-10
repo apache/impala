@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.LiteralExpr;
@@ -188,6 +189,18 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   }
 
   @Override
+  public boolean hasWriteAccess() {
+    // TODO(todd): implement me properly
+    return true;
+  }
+
+  @Override
+  public String getFirstLocationWithoutWriteAccess() {
+    // TODO(todd): implement me properly
+    return null;
+  }
+
+  @Override
   public long getExtrapolatedNumRows(long totalBytes) {
     // TODO Auto-generated method stub
     return -1;
@@ -239,7 +252,14 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
   private LocalFsPartition createPrototypePartition() {
     Partition protoMsPartition = new Partition();
-    protoMsPartition.setSd(getMetaStoreTable().getSd());
+
+    // The prototype partition should not have a location set in its storage
+    // descriptor, or else all inserted files will end up written into the
+    // table directory instead of the new partition directories.
+    StorageDescriptor sd = getMetaStoreTable().getSd().deepCopy();
+    sd.unsetLocation();
+    protoMsPartition.setSd(sd);
+
     protoMsPartition.setParameters(Collections.<String, String>emptyMap());
     LocalPartitionSpec spec = new LocalPartitionSpec(
         this, "", CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);

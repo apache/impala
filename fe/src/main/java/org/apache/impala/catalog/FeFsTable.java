@@ -103,6 +103,22 @@ public interface FeFsTable extends FeTable {
   public HdfsFileFormat getMajorityFormat();
 
   /**
+   * Return true if the table may be written to.
+   */
+  public boolean hasWriteAccess();
+
+  /**
+   * Return some location found without write access for this table, useful
+   * in error messages about insufficient permissions to insert into a table.
+   *
+   * In case multiple locations are missing write access, the particular
+   * location returned is implementation-defined.
+   *
+   * Returns null if all partitions have write access.
+   */
+  public String getFirstLocationWithoutWriteAccess();
+
+  /**
    * @param totalBytes_ the known number of bytes in the table
    * @return Returns an estimated row count for the given number of file bytes
    */
@@ -181,4 +197,5 @@ public interface FeFsTable extends FeTable {
    * @return the index of hosts that store replicas of blocks of this table.
    */
   ListMap<TNetworkAddress> getHostIndex();
+
  }

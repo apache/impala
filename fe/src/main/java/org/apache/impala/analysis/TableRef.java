@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -353,7 +353,7 @@ public class TableRef implements ParseNode {
     if (sampleParams_ == null) return;
     sampleParams_.analyze(analyzer);
     if (!(this instanceof BaseTableRef)
-        || !(resolvedPath_.destTable() instanceof HdfsTable)) {
+        || !(resolvedPath_.destTable() instanceof FeFsTable)) {
       throw new AnalysisException(
           "TABLESAMPLE is only supported on HDFS tables: " + getUniqueAlias());
     }
@@ -376,7 +376,7 @@ public class TableRef implements ParseNode {
     // BaseTableRef will always have their path resolved at this point.
     Preconditions.checkState(getResolvedPath() != null);
     if (getResolvedPath().destTable() != null &&
-        !(getResolvedPath().destTable() instanceof HdfsTable)) {
+        !(getResolvedPath().destTable() instanceof FeFsTable)) {
       analyzer.addWarning("Table hints only supported for Hdfs tables");
     }
     for (PlanHint hint: tableHints_) {

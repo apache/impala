@@ -23,10 +23,10 @@ import java.util.List;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsPartition;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsPartition;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetLocationParams;
@@ -77,8 +77,8 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
 
     FeTable table = getTargetTable();
     Preconditions.checkNotNull(table);
-    if (table instanceof HdfsTable) {
-      HdfsTable hdfsTable = (HdfsTable) table;
+    if (table instanceof FeFsTable) {
+      FeFsTable hdfsTable = (FeFsTable) table;
       if (getPartitionSet() != null) {
         // Targeting a partition rather than a table.
         List<? extends FeFsPartition> partitions = getPartitionSet().getPartitions();
