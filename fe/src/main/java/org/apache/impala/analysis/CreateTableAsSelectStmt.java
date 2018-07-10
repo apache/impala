@@ -213,13 +213,11 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
       FeTable tmpTable = null;
       if (KuduTable.isKuduTable(msTbl)) {
-        // TODO(todd): avoid downcast to 'Db' here
-        tmpTable = KuduTable.createCtasTarget((Db)db, msTbl, createStmt_.getColumnDefs(),
+        tmpTable = db.createKuduCtasTarget(msTbl, createStmt_.getColumnDefs(),
             createStmt_.getPrimaryKeyColumnDefs(),
             createStmt_.getKuduPartitionParams());
       } else if (HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
-        // TODO(todd): avoid downcast to 'Db' here
-        tmpTable = HdfsTable.createCtasTarget((Db)db, msTbl);
+        tmpTable = db.createFsCtasTarget(msTbl);
       }
       Preconditions.checkState(tmpTable != null &&
           (tmpTable instanceof FeFsTable || tmpTable instanceof FeKuduTable));

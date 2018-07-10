@@ -21,10 +21,9 @@ import java.util.List;
 
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
@@ -36,8 +35,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
- * Base class for Hdfs data sinks such as HdfsTextTableSink.
+ * Sink for inserting into filesystem-backed tables.
  *
+ * TODO(vercegovac): rename to FsTableSink
  */
 public class HdfsTableSink extends TableSink {
   // Default number of partitions used for computeResourceProfile() in the absence of
@@ -61,7 +61,7 @@ public class HdfsTableSink extends TableSink {
   public HdfsTableSink(FeTable targetTable, List<Expr> partitionKeyExprs,
       boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns) {
     super(targetTable, Op.INSERT);
-    Preconditions.checkState(targetTable instanceof HdfsTable);
+    Preconditions.checkState(targetTable instanceof FeFsTable);
     partitionKeyExprs_ = partitionKeyExprs;
     overwrite_ = overwrite;
     inputIsClustered_ = inputIsClustered;
@@ -70,7 +70,7 @@ public class HdfsTableSink extends TableSink {
 
   @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
-    HdfsTable table = (HdfsTable) targetTable_;
+    FeFsTable table = (FeFsTable) targetTable_;
     // TODO: Estimate the memory requirements more accurately by partition type.
     HdfsFileFormat format = table.getMajorityFormat();
     PlanNode inputNode = fragment_.getPlanRoot();
@@ -164,7 +164,7 @@ public class HdfsTableSink extends TableSink {
     TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
     THdfsTableSink hdfsTableSink = new THdfsTableSink(
         Expr.treesToThrift(partitionKeyExprs_), overwrite_, inputIsClustered_);
-    HdfsTable table = (HdfsTable) targetTable_;
+    FeFsTable table = (FeFsTable) targetTable_;
     StringBuilder error = new StringBuilder();
     int skipHeaderLineCount = table.parseSkipHeaderLineCount(error);
     // Errors will be caught during analysis.

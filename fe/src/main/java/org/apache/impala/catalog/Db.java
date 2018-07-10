@@ -29,6 +29,8 @@ import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.impala.analysis.ColumnDef;
+import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCatalogObject;
@@ -168,6 +170,21 @@ public class Db extends CatalogObjectImpl implements FeDb {
    */
   public Table removeTable(String tableName) {
     return tableCache_.remove(tableName.toLowerCase());
+  }
+
+  @Override
+  public FeKuduTable createKuduCtasTarget(
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      List<ColumnDef> columnDefs, List<ColumnDef> primaryKeyColumnDefs,
+      List<KuduPartitionParam> kuduPartitionParams) {
+    return KuduTable.createCtasTarget(this, msTbl, columnDefs, primaryKeyColumnDefs,
+        kuduPartitionParams);
+  }
+
+  @Override
+  public FeFsTable createFsCtasTarget(org.apache.hadoop.hive.metastore.api.Table msTbl)
+      throws CatalogException {
+    return HdfsTable.createCtasTarget(this, msTbl);
   }
 
   /**

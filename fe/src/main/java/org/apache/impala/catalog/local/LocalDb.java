@@ -22,7 +22,13 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.impala.analysis.ColumnDef;
+import org.apache.impala.analysis.KuduPartitionParam;
+import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
@@ -101,6 +107,19 @@ class LocalDb implements FeDb {
       tables_.put(tblName, tbl);
     }
     return tbl;
+  }
+
+  @Override
+  public FeKuduTable createKuduCtasTarget(Table msTbl, List<ColumnDef> columnDefs,
+      List<ColumnDef> primaryKeyColumnDefs,
+      List<KuduPartitionParam> kuduPartitionParams) {
+    return LocalKuduTable.createCtasTarget(this, msTbl, columnDefs, primaryKeyColumnDefs,
+        kuduPartitionParams);
+  }
+
+  @Override
+  public FeFsTable createFsCtasTarget(Table msTbl) throws CatalogException {
+    return LocalFsTable.createCtasTarget(this, msTbl);
   }
 
   @Override

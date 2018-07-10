@@ -19,6 +19,9 @@ package org.apache.impala.catalog;
 import java.util.List;
 
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.impala.analysis.ColumnDef;
+import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.util.PatternMatcher;
@@ -98,4 +101,16 @@ public interface FeDb extends HasName {
    * @return the Thrift-serialized structure for this database
    */
   TDatabase toThrift();
+
+  /**
+   * Create a target Kudu table object for CTAS.
+   */
+  FeKuduTable createKuduCtasTarget(Table msTbl, List<ColumnDef> columnDefs,
+      List<ColumnDef> primaryKeyColumnDefs,
+      List<KuduPartitionParam> kuduPartitionParams);
+
+  /**
+   * Create a target FS table object for CTAS.
+   */
+  FeFsTable createFsCtasTarget(Table msTbl) throws CatalogException;
 }

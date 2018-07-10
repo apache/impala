@@ -54,6 +54,7 @@ import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -102,6 +103,20 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     nullColumnValue_ = tableNullFormat != null ? tableNullFormat :
         FeFsTable.DEFAULT_NULL_COLUMN_VALUE;
   }
+
+  /**
+   * Creates a temporary FsTable object populated with the specified properties.
+   * This is used for CTAS statements.
+   */
+  public static LocalFsTable createCtasTarget(LocalDb db,
+      Table msTbl) throws CatalogException {
+    // TODO(todd): set a member variable indicating this is a CTAS target
+    // so we can checkState() against it in various other methods and make
+    // sure we don't try to do something like load partitions for a not-yet-created
+    // table.
+    return new LocalFsTable(db, msTbl);
+  }
+
 
   @Override
   public boolean isCacheable() {
@@ -162,8 +177,14 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
   @Override
   public HdfsFileFormat getMajorityFormat() {
-    // Needed by HdfsTableSink.
-    throw new UnsupportedOperationException("TODO: implement me");
+    // TODO(todd): can we avoid loading all partitions here? this is called
+    // for any INSERT query, even if the partition is specified.
+    Collection<? extends FeFsPartition> parts = FeCatalogUtils.loadAllPartitions(this);
+    // In the case that we have no partitions added to the table yet, it's
+    // important to add the "prototype" partition as a fallback.
+    Iterable<FeFsPartition> partitionsToConsider = Iterables.concat(
+        parts, Collections.singleton(createPrototypePartition()));
+    return FeCatalogUtils.getMajorityFormat(partitionsToConsider);
   }
 
   @Override
@@ -184,8 +205,12 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   }
 
   @Override
-  public TTableDescriptor toThriftDescriptor(int tableId, Set<Long> referencedPartitions) {
-    Preconditions.checkNotNull(referencedPartitions);
+  public TTableDescriptor toThriftDescriptor(int tableId,
+      Set<Long> referencedPartitions) {
+    if (referencedPartitions == null) {
+      // null means "all partitions".
+      referencedPartitions = getPartitionIds();
+    }
     Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
     List<? extends FeFsPartition> partitions = loadPartitions(referencedPartitions);
     for (FeFsPartition partition : partitions) {

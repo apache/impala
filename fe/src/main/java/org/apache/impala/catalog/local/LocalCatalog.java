@@ -37,6 +37,7 @@ import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TPartitionKeyValue;
@@ -184,7 +185,14 @@ public class LocalCatalog implements FeCatalog {
 
   @Override
   public Path getTablePath(Table msTbl) {
-    throw new UnsupportedOperationException("TODO");
+    // If the table did not have its path set, build the path based on the
+    // location property of the parent database.
+    if (msTbl.getSd().getLocation() == null || msTbl.getSd().getLocation().isEmpty()) {
+      String dbLocation = getDb(msTbl.getDbName()).getMetaStoreDb().getLocationUri();
+      return new Path(dbLocation, msTbl.getTableName().toLowerCase());
+    } else {
+      return new Path(msTbl.getSd().getLocation());
+    }
   }
 
   @Override

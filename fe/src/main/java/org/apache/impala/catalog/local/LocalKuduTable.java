@@ -26,6 +26,7 @@ import javax.annotation.concurrent.Immutable;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalogUtils;
@@ -49,7 +50,6 @@ import com.google.common.collect.Lists;
 public class LocalKuduTable extends LocalTable implements FeKuduTable {
   private final TableParams tableParams_;
   private final List<KuduPartitionParam> partitionBy_;
-  private final org.apache.kudu.client.KuduTable kuduTable_;
   private final ImmutableList<String> primaryKeyColumnNames_;
 
   /**
@@ -74,8 +74,38 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
     // Use the schema derived from Kudu, rather than the one stored in the HMS.
     msTable.getSd().setCols(fieldSchemas);
 
+
+    List<String> pkNames = new ArrayList<>();
+    for (ColumnSchema c: kuduTable.getSchema().getPrimaryKeyColumns()) {
+      pkNames.add(c.getName().toLowerCase());
+    }
+
+    List<KuduPartitionParam> partitionBy = Utils.loadPartitionByParams(kuduTable);
+
     ColumnMap cmap = new ColumnMap(cols, /*numClusteringCols=*/0, fullTableName);
-    return new LocalKuduTable(db, msTable, cmap, kuduTable);
+    return new LocalKuduTable(db, msTable, cmap, pkNames, partitionBy);
+  }
+
+
+  public static FeKuduTable createCtasTarget(LocalDb db, Table msTable,
+      List<ColumnDef> columnDefs, List<ColumnDef> primaryKeyColumnDefs,
+      List<KuduPartitionParam> kuduPartitionParams) {
+    String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
+
+    List<Column> columns = new ArrayList<>();
+    List<String> pkNames = new ArrayList<>();
+    int pos = 0;
+    for (ColumnDef colDef: columnDefs) {
+      // TODO(todd): it seems odd that for CTAS targets, the columns are of type
+      // 'Column' instead of 'KuduColumn'.
+      columns.add(new Column(colDef.getColName(), colDef.getType(), pos++));
+    }
+    for (ColumnDef pkColDef: primaryKeyColumnDefs) {
+      pkNames.add(pkColDef.getColName());
+    }
+
+    ColumnMap cmap = new ColumnMap(columns, /*numClusteringCols=*/0, fullTableName);
+    return new LocalKuduTable(db, msTable, cmap, pkNames, kuduPartitionParams);
   }
 
   private static void convertColsFromKudu(Schema schema, List<Column> cols,
@@ -100,18 +130,12 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
   }
 
   private LocalKuduTable(LocalDb db, Table msTable, ColumnMap cmap,
-      org.apache.kudu.client.KuduTable kuduTable) {
+      List<String> primaryKeyColumnNames,
+      List<KuduPartitionParam> partitionBy)  {
     super(db, msTable, cmap);
     tableParams_ = new TableParams(msTable);
-    kuduTable_ = kuduTable;
-    partitionBy_ = ImmutableList.copyOf(Utils.loadPartitionByParams(
-        kuduTable));
-
-    ImmutableList.Builder<String> b = ImmutableList.builder();
-    for (ColumnSchema c: kuduTable_.getSchema().getPrimaryKeyColumns()) {
-      b.add(c.getName().toLowerCase());
-    }
-    primaryKeyColumnNames_ = b.build();
+    partitionBy_ = ImmutableList.copyOf(partitionBy);
+    primaryKeyColumnNames_ = ImmutableList.copyOf(primaryKeyColumnNames);
   }
 
   @Override
