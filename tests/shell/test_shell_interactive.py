@@ -77,6 +77,60 @@ class TestImpalaShellInteractive(object):
     self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
     self._expect_with_cmd(proc, "set live_summary=1")
     self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: True", "LIVE_SUMMARY: True"))
+    self._expect_with_cmd(proc, "set", ("WRITE_DELIMITED: False", "VERBOSE: True"))
+    self._expect_with_cmd(proc, "set", ("DELIMITER: \\t", "OUTPUT_FILE: None"))
+    self._expect_with_cmd(proc, "set write_delimited=true")
+    self._expect_with_cmd(proc, "set", ("WRITE_DELIMITED: True", "VERBOSE: True"))
+    self._expect_with_cmd(proc, "set DELIMITER=,")
+    self._expect_with_cmd(proc, "set", ("DELIMITER: ,", "OUTPUT_FILE: None"))
+    self._expect_with_cmd(proc, "set output_file=/tmp/clmn.txt")
+    self._expect_with_cmd(proc, "set", ("DELIMITER: ,", "OUTPUT_FILE: /tmp/clmn.txt"))
+
+  @pytest.mark.execute_serially
+  def test_write_delimited(self):
+    """Test output rows in delimited mode"""
+    p = ImpalaShell()
+    p.send_cmd("use tpch")
+    p.send_cmd("set write_delimited=true")
+    p.send_cmd("select * from nation")
+    result = p.get_result()
+    assert "+----------------+" not in result.stdout
+    assert "21\tVIETNAM\t2" in result.stdout
+
+  @pytest.mark.execute_serially
+  def test_change_delimiter(self):
+    """Test change output delimiter if delimited mode is enabled"""
+    p = ImpalaShell()
+    p.send_cmd("use tpch")
+    p.send_cmd("set write_delimited=true")
+    p.send_cmd("set delimiter=,")
+    p.send_cmd("select * from nation")
+    result = p.get_result()
+    assert "21,VIETNAM,2" in result.stdout
+
+  @pytest.mark.execute_serially
+  def test_print_to_file(self):
+    """Test print to output file and unset"""
+    # test print to file
+    p1 = ImpalaShell()
+    p1.send_cmd("use tpch")
+    local_file = tempfile.NamedTemporaryFile(delete=True)
+    p1.send_cmd("set output_file=%s" % local_file.name)
+    p1.send_cmd("select * from nation")
+    result = p1.get_result()
+    assert "VIETNAM" not in result.stdout
+    with open(local_file.name, "r") as fi:
+      # check if the results were written to the file successfully
+      result = fi.read()
+      assert "VIETNAM" in result
+    # test unset to print back to stdout
+    p2 = ImpalaShell()
+    p2.send_cmd("use tpch")
+    p2.send_cmd("set output_file=%s" % local_file.name)
+    p2.send_cmd("unset output_file")
+    p2.send_cmd("select * from nation")
+    result = p2.get_result()
+    assert "VIETNAM" in result.stdout
 
   @pytest.mark.execute_serially
   def test_compute_stats_with_live_progress_options(self):

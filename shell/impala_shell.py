@@ -140,10 +140,16 @@ class ImpalaShell(object, cmd.Cmd):
   DML_REGEX = re.compile("^(insert|upsert|update|delete)$", re.I)
   # Seperator for queries in the history file.
   HISTORY_FILE_QUERY_DELIM = '_IMP_DELIM_'
+  # Strings that are interpreted as True for some shell options.
+  TRUE_STRINGS = ("true", "TRUE", "True", "1")
 
   VALID_SHELL_OPTIONS = {
-    'LIVE_PROGRESS' : (lambda x: x in ("true", "TRUE", "True", "1"), "print_progress"),
-    'LIVE_SUMMARY' : (lambda x: x in ("true", "TRUE", "True", "1"), "print_summary")
+    'LIVE_PROGRESS' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "print_progress"),
+    'LIVE_SUMMARY' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "print_summary"),
+    'WRITE_DELIMITED' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "write_delimited"),
+    'VERBOSE' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "verbose"),
+    'DELIMITER' : (lambda x: " " if x == '\\s' else x, "output_delimiter"),
+    'OUTPUT_FILE' : (lambda x: None if x == '' else x, "output_file"),
   }
 
   # Minimum time in seconds between two calls to get the exec summary.
@@ -180,7 +186,8 @@ class ImpalaShell(object, cmd.Cmd):
 
     # Output formatting flags/options
     self.output_file = options.output_file
-    self.output_delimiter = options.output_delimiter
+    self.output_delimiter = " " if options.output_delimiter == "\\s" \
+        else options.output_delimiter
     self.write_delimited = options.write_delimited
     self.print_header = options.print_header
 
@@ -655,6 +662,14 @@ class ImpalaShell(object, cmd.Cmd):
     except KeyError:
       return False
 
+  def _handle_unset_shell_options(self, token):
+    try:
+      handle = self.VALID_SHELL_OPTIONS[token]
+      self.__dict__[handle[1]] = impala_shell_defaults[handle[1]]
+      return True
+    except KeyError:
+      return False
+
   def _get_var_name(self, name):
     """Look for a namespace:var_name pattern in an option name.
        Return the variable name if it's a match or None otherwise.
@@ -737,6 +752,8 @@ class ImpalaShell(object, cmd.Cmd):
     elif self.set_query_options.get(option):
       print 'Unsetting option %s' % option
       del self.set_query_options[option]
+    elif self._handle_unset_shell_options(option):
+      print 'Unsetting shell option %s' % option
     else:
       print "No option called %s is set" % option
 
@@ -1447,7 +1464,7 @@ LIVE_PROGRESS=1;'.",
 to remove formatting from results you want to save for later, or to benchmark Impala.",
   "You can run a single query from the command line using the '-q' option.",
   "When pretty-printing is disabled, you can use the '--output_delimiter' flag to set \
-the delimiter for fields in the same row. The default is ','.",
+the delimiter for fields in the same row. The default is '\\t'.",
   "Run the PROFILE command after a query has finished to see a comprehensive summary of \
 all the performance and diagnostic information that Impala gathered for that query. Be \
 warned, it can be very long!",
