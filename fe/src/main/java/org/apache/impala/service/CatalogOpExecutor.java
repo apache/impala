@@ -100,7 +100,6 @@ import org.apache.impala.thrift.TAlterTableAddReplaceColsParams;
 import org.apache.impala.thrift.TAlterTableAlterColParams;
 import org.apache.impala.thrift.TAlterTableDropColParams;
 import org.apache.impala.thrift.TAlterTableDropPartitionParams;
-import org.apache.impala.thrift.TAlterTableOrViewSetOwnerParams;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetCachedParams;
 import org.apache.impala.thrift.TAlterTableSetFileFormatParams;
@@ -557,11 +556,6 @@ public class CatalogOpExecutor {
         case RECOVER_PARTITIONS:
           alterTableRecoverPartitions(tbl);
           addSummary(response, "Partitions have been recovered.");
-          break;
-        case SET_OWNER:
-          Preconditions.checkState(params.isSetSet_owner_params());
-          alterTableOrViewSetOwner(tbl, params.getSet_owner_params());
-          addSummary(response, "Updated table/view.");
           break;
         default:
           throw new UnsupportedOperationException(
@@ -2787,14 +2781,6 @@ public class CatalogOpExecutor {
     }
   }
 
-  private void alterTableOrViewSetOwner(Table tbl, TAlterTableOrViewSetOwnerParams params)
-      throws ImpalaRuntimeException {
-    org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
-    msTbl.setOwner(params.owner_name);
-    msTbl.setOwnerType(PrincipalType.valueOf(params.owner_type.name()));
-    applyAlterTable(msTbl, true);
-  }
-
   /**
    * Create a new HMS Partition.
    */
@@ -3560,7 +3546,7 @@ public class CatalogOpExecutor {
       }
     }
     addDbToCatalogUpdate(db, response.result);
-    addSummary(response, "Updated database.");
+    addSummary(response, "Updated database");
   }
 
   private void addDbToCatalogUpdate(Db db, TCatalogUpdateResult result) {

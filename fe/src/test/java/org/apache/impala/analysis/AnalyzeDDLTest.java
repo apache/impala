@@ -4059,44 +4059,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     }
   }
 
-  @Test
-  public void TestAlterTableSetOwner() {
-    String[] ownerTypes = new String[]{"user", "role"};
-    for (String ownerType : ownerTypes) {
-      AnalyzesOk(String.format("alter table functional.alltypes set owner %s foo",
-          ownerType));
-      AnalysisError(String.format("alter table nodb.alltypes set owner %s foo",
-          ownerType), "Could not resolve table reference: 'nodb.alltypes'");
-      AnalysisError(String.format("alter table functional.notbl set owner %s foo",
-          ownerType), "Could not resolve table reference: 'functional.notbl'");
-      AnalysisError(String.format("alter table functional.alltypes set owner %s %s",
-          ownerType, buildLongOwnerName()), "Owner name exceeds maximum length of 128 " +
-          "characters. The given owner name has 133 characters.");
-      AnalysisError(String.format("alter table functional.alltypes_view " +
-          "set owner %s foo", ownerType), "ALTER TABLE not allowed on a view: " +
-          "functional.alltypes_view");
-    }
-  }
-
-  @Test
-  public void TestAlterViewSetOwner() {
-    String[] ownerTypes = new String[]{"user", "role"};
-    for (String ownerType : ownerTypes) {
-      AnalyzesOk(String.format("alter view functional.alltypes_view set owner %s foo",
-          ownerType));
-      AnalysisError(String.format("alter view nodb.alltypes set owner %s foo",
-          ownerType), "Could not resolve table reference: 'nodb.alltypes'");
-      AnalysisError(String.format("alter view functional.notbl set owner %s foo",
-          ownerType), "Could not resolve table reference: 'functional.notbl'");
-      AnalysisError(String.format("alter view functional.alltypes_view set owner %s %s",
-          ownerType, buildLongOwnerName()), "Owner name exceeds maximum length of 128 " +
-          "characters. The given owner name has 133 characters.");
-      AnalysisError(String.format("alter view functional.alltypes " +
-          "set owner %s foo", ownerType), "ALTER VIEW not allowed on a table: " +
-          "functional.alltypes");
-    }
-  }
-
   private static String buildLongOwnerName() {
     StringBuilder comment = new StringBuilder();
     for (int i = 0; i < MetaStoreUtil.MAX_OWNER_LENGTH + 5; i++) {

@@ -104,7 +104,6 @@ enum TAlterTableType {
   SET_CACHED,
   RECOVER_PARTITIONS,
   SET_ROW_FORMAT,
-  SET_OWNER
 }
 
 // Parameters of CREATE DATABASE commands
@@ -318,15 +317,6 @@ struct TAlterTableSetLocationParams {
   2: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
 }
 
-// Parameters for ALTER TABLE/VIEW SET OWNER commands.
-struct TAlterTableOrViewSetOwnerParams {
-  // The owner type.
-  1: required TOwnerType owner_type
-
-  // The owner name.
-  2: required string owner_name
-}
-
 // Parameters for updating the table and/or column statistics
 // of a table. Used by ALTER TABLE SET COLUMN STATS, and internally by
 // a COMPUTE STATS command.
@@ -407,9 +397,6 @@ struct TAlterTableParams {
 
   // Parameters for ALTER TABLE SET ROW FORMAT
   15: optional TAlterTableSetRowFormatParams set_row_format_params
-
-  // Parameters for ALTER TABLE/VIEW SET OWNER
-  16: optional TAlterTableOrViewSetOwnerParams set_owner_params
 }
 
 // Parameters of CREATE TABLE LIKE commands

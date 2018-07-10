@@ -227,28 +227,6 @@ class TestDdlStatements(TestDdlBase):
     assert len(properties) == 1
     assert {'foo_role': 'ROLE'} == properties
 
-  def test_alter_table_set_owner(self, vector, unique_database):
-    table_name = "{0}.test_owner_tbl".format(unique_database)
-    self.client.execute("create table {0}(i int)".format(table_name))
-    self.client.execute("alter table {0} set owner user foo_user".format(table_name))
-    owner = self._get_table_or_view_owner(table_name)
-    assert ('foo_user', 'USER') == owner
-
-    self.client.execute("alter table {0} set owner role foo_role".format(table_name))
-    owner = self._get_table_or_view_owner(table_name)
-    assert ('foo_role', 'ROLE') == owner
-
-  def test_alter_view_set_owner(self, vector, unique_database):
-    view_name = "{0}.test_owner_tbl".format(unique_database)
-    self.client.execute("create view {0} as select 1".format(view_name))
-    self.client.execute("alter view {0} set owner user foo_user".format(view_name))
-    owner = self._get_table_or_view_owner(view_name)
-    assert ('foo_user', 'USER') == owner
-
-    self.client.execute("alter view {0} set owner role foo_role".format(view_name))
-    owner = self._get_table_or_view_owner(view_name)
-    assert ('foo_role', 'ROLE') == owner
-
   # There is a query in QueryTest/create-table that references nested types, which is not
   # supported if old joins and aggs are enabled. Since we do not get any meaningful
   # additional coverage by running a DDL test under the old aggs and joins, it can be

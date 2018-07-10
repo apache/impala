@@ -3809,30 +3809,4 @@ public class ParserTest extends FrontendTestBase {
     ParserError("ALTER DATABASE SET OWNER ROLE foo");
     ParserError("ALTER DATABASE SET OWNER");
   }
-
-  @Test
-  public void TestAlterTableOrViewSetOwner() {
-    for (String type : new String[]{"TABLE", "VIEW"}) {
-      for (String valid : new String[]{"foo", "user", "owner"}) {
-        ParsesOk(String.format("ALTER %s %s SET OWNER USER %s", type, valid, valid));
-        ParsesOk(String.format("ALTER %s %s SET OWNER ROLE %s", type, valid, valid));
-      }
-
-      for (String invalid : new String[]{"'foo'", "''", "NULL"}) {
-        ParserError(String.format("ALTER %s %s SET OWNER ROLE %s", type, invalid, invalid));
-        ParserError(String.format("ALTER %s %s SET OWNER USER %s", type, invalid, invalid));
-      }
-
-      ParserError(String.format("ALTER %s tbl PARTITION(i=1) SET OWNER ROLE foo", type));
-      ParserError(String.format("ALTER %s tbl SET ABC USER foo", type));
-      ParserError(String.format("ALTER %s tbl SET ABC ROLE foo", type));
-      ParserError(String.format("ALTER %s tbl SET OWNER ABC foo", type));
-      ParserError(String.format("ALTER %s tbl SET OWNER USER", type));
-      ParserError(String.format("ALTER %s SET OWNER foo", type));
-      ParserError(String.format("ALTER %s SET OWNER USER foo", type));
-      ParserError(String.format("ALTER %s tbl SET OWNER ROLE", type));
-      ParserError(String.format("ALTER %s SET OWNER ROLE foo", type));
-      ParserError(String.format("ALTER %s SET OWNER", type));
-    }
-  }
 }

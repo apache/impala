@@ -1058,9 +1058,6 @@ alter_db_stmt ::=
   :}
   ;
 
-// In some places, the opt_partition_set is used to avoid conflicts even though
-// a partition clause does not make sense for this stmt. If a partition
-// is given, manually throw a parse error.
 alter_tbl_stmt ::=
   KW_ALTER KW_TABLE table_name:table replace_existing_cols_val:replace KW_COLUMNS
   LPAREN column_def_list:col_defs RPAREN
@@ -1110,7 +1107,9 @@ alter_tbl_stmt ::=
   | KW_ALTER KW_TABLE table_name:table opt_partition_set:partition KW_SET
     KW_COLUMN KW_STATS ident_or_default:col LPAREN properties_map:map RPAREN
   {:
-    // See above for special partition clause handling.
+    // The opt_partition_set is used to avoid conflicts even though
+    // a partition clause does not make sense for this stmt. If a partition
+    // is given, manually throw a parse error.
     if (partition != null) parser.parseError("set", SqlParserSymbols.KW_SET);
     RESULT = new AlterTableSetColumnStats(table, col, map);
   :}
@@ -1135,23 +1134,6 @@ alter_tbl_stmt ::=
   | KW_ALTER KW_TABLE table_name:table KW_ALTER opt_kw_column ident_or_default:col_name
     KW_DROP KW_DEFAULT
   {: RESULT = AlterTableAlterColStmt.createDropDefaultStmt(table, col_name); :}
-  | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET IDENT:owner_id
-    IDENT:user_id ident_or_default:user
-  {:
-    // See above for special partition clause handling.
-    if (partitions != null) parser.parseError("set", SqlParserSymbols.KW_SET);
-    parser.checkIdentKeyword("OWNER", owner_id);
-    parser.checkIdentKeyword("USER", user_id);
-    RESULT = new AlterTableSetOwnerStmt(table, new Owner(TOwnerType.USER, user));
-  :}
-  | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET IDENT:owner_id
-    KW_ROLE ident_or_default:role
-  {:
-    // See above for special partition clause handling.
-    if (partitions != null) parser.parseError("set", SqlParserSymbols.KW_SET);
-    parser.checkIdentKeyword("OWNER", owner_id);
-    RESULT = new AlterTableSetOwnerStmt(table, new Owner(TOwnerType.ROLE, role));
-  :}
   ;
 
 table_property_type ::=
@@ -1895,18 +1877,6 @@ alter_view_stmt ::=
   {: RESULT = new AlterViewStmt(table, col_defs, view_def); :}
   | KW_ALTER KW_VIEW table_name:before_table KW_RENAME KW_TO table_name:new_table
   {: RESULT = new AlterTableOrViewRenameStmt(before_table, new_table, false); :}
-  | KW_ALTER KW_VIEW table_name:table KW_SET IDENT:owner_id IDENT:user_id
-    ident_or_default:user
-  {:
-    parser.checkIdentKeyword("OWNER", owner_id);
-    parser.checkIdentKeyword("USER", user_id);
-    RESULT = new AlterViewSetOwnerStmt(table, new Owner(TOwnerType.USER, user));
-  :}
-  | KW_ALTER KW_VIEW table_name:table KW_SET IDENT:owner_id KW_ROLE ident_or_default:role
-  {:
-    parser.checkIdentKeyword("OWNER", owner_id);
-    RESULT = new AlterViewSetOwnerStmt(table, new Owner(TOwnerType.ROLE, role));
-  :}
   ;
 
 cascade_val ::=
