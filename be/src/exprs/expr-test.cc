@@ -5379,7 +5379,16 @@ TEST_F(ExprTest, MathFunctions) {
   // max and min value that would require int256_t for evalation
   TestValue("width_bucket(10000000000000000000000000000000000000, 1,"
             "99999999999999999999999999999999999999, 15)", TYPE_BIGINT, 2);
-
+  // IMPALA-7242/IMPALA-7243: check for overflow when converting IntVal to DecimalValue
+  TestErrorString("width_bucket(cast(-0.10 as decimal(37,30)), cast(-0.36028797018963968 "
+      "as decimal(25,25)), cast(9151517.4969773200562764155787276999832"
+      "as decimal(38,31)), 1328180220)",
+      "UDF ERROR: Overflow while representing the num_buckets:1328180220 as a "
+      "DecimalVal\n");
+  TestErrorString("width_bucket(cast(9 as decimal(10,7)), cast(-60000 as decimal(11,6)), "
+      "cast(10 as decimal(7,5)), 249895273);",
+      "UDF ERROR: Overflow while representing the num_buckets:249895273 as a "
+      "DecimalVal\n");
   // Run twice to test deterministic behavior.
   for (uint32_t seed : {0, 1234}) {
     stringstream rand, random;

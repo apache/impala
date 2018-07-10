@@ -537,6 +537,13 @@ BigIntVal MathFunctions::WidthBucketImpl(FunctionContext* ctx,
   Decimal16Value buckets = Decimal16Value::FromInt(input_precision, input_scale,
       num_buckets.val, &overflow);
 
+  if (UNLIKELY(overflow)) {
+    stringstream error_msg;
+    error_msg << "Overflow while representing the num_buckets:" << num_buckets.val
+        << " as a DecimalVal";
+    ctx->SetError(error_msg.str().c_str());
+    return BigIntVal::null();
+  }
   bool needs_int256 = false;
   // Check if dist_from_min * buckets would overflow and if there is a need to
   // store the intermediate results in int256_t to avoid an overflows
