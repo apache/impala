@@ -19,6 +19,7 @@ import pytest
 import re
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension
+from tests.util.parse_util import parse_duration_string_ms
 
 class TestRowsAvailability(ImpalaTestSuite):
   """Tests that the 'Rows available' timeline event is marked only after rows are
@@ -76,9 +77,9 @@ class TestRowsAvailability(ImpalaTestSuite):
     rows_avail_time_ms = None
     for line in profile.split("\n"):
       if "Ready to start on" in line:
-        start_time_ms = self.__parse_time_ms(self.__find_time(line))
+        start_time_ms = parse_duration_string_ms(self.__find_time(line))
       elif "Rows available:" in line:
-        rows_avail_time_ms = self.__parse_time_ms(self.__find_time(line))
+        rows_avail_time_ms = parse_duration_string_ms(self.__find_time(line))
 
     if start_time_ms is None:
       assert False, "Failed to find the 'Ready to start' timeline event in the " \
@@ -102,27 +103,3 @@ class TestRowsAvailability(ImpalaTestSuite):
     if match is None:
       assert False, "Failed to find time in runtime profile"
     return match.group(1)
-
-  @staticmethod
-  def __parse_time_ms(duration):
-    """Parses a duration string of the form 1h2h3m4s5.6ms7.8ns into milliseconds."""
-    matches = re.findall(r'([0-9]+h)?([0-9]+m)?([0-9]+s)?'\
-                         '([0-9]+(\.[0-9]+)?ms)?([0-9]+(\.[0-9]+)?ns)?',
-                         duration)
-    # Expect exactly two matches because all groups are optional in the regex.
-    if matches is None or len(matches) != 2:
-      assert False, 'Failed to parse duration string %s' % duration
-    hours = 0
-    minutes = 0
-    seconds = 0
-    milliseconds = 0
-    if matches[0][0]:
-      hours = int(matches[0][0][:-1])
-    if matches[0][1]:
-      minutes = int(matches[0][1][:-1])
-    if matches[0][2]:
-      seconds = int(matches[0][2][:-1])
-    if matches[0][3]:
-      # Truncate fractional milliseconds.
-      milliseconds = int(float(matches[0][3][:-2]))
-    return hours * 60 * 60 * 1000 + minutes * 60 * 1000 + seconds * 1000 + milliseconds

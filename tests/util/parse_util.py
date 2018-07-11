@@ -70,3 +70,16 @@ def parse_mem_to_mb(mem, units):
   else:
     raise Exception('Unexpected memory unit "%s"' % units)
   return int(mem)
+
+def parse_duration_string_ms(duration):
+  """Parses a duration string of the form 1h2h3m4s5.6ms4.5us7.8ns into milliseconds."""
+  pattern = r'(?P<value>[0-9]+\.?[0-9]*?)(?P<units>\D+)'
+  matches = list(re.finditer(pattern, duration))
+  assert matches, 'Failed to parse duration string %s' % duration
+
+  times = {'h': 0, 'm': 0, 's': 0, 'ms': 0}
+  for match in matches:
+    parsed = match.groupdict()
+    times[parsed['units']] = float(parsed['value'])
+
+  return (times['h'] * 60 * 60 + times['m'] * 60 + times['s']) * 1000 + times['ms']

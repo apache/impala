@@ -21,6 +21,7 @@ import re
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_vector import ImpalaTestDimension
+from tests.util.parse_util import parse_duration_string_ms
 from tests.verifiers.metric_verifier import MetricVerifier
 
 
@@ -154,27 +155,10 @@ class TestHashJoinTimer(ImpalaTestSuite):
         "Unable to verify ExecSummary: {0}".format(profile)
 
   def __verify_join_time(self, duration, comment):
-    duration_ms = self.__parse_duration_ms(duration)
+    duration_ms = parse_duration_string_ms(duration)
     if (duration_ms > self.HASH_JOIN_UPPER_BOUND_MS):
-        assert False, "Hash join timing too high for %s: %s %s" %(comment, duration, duration_ms)
+      assert False, "Hash join timing too high for %s: %s %s" % (
+        comment, duration, duration_ms)
     if (duration_ms < self.HASH_JOIN_LOWER_BOUND_MS):
-        assert False, "Hash join timing too low for %s: %s %s" %(comment, duration, duration_ms)
-
-  def __parse_duration_ms(self, duration):
-    """Parses a duration string of the form 1h2h3m4s5.6ms into milliseconds."""
-    matches = re.findall(r'(?P<value>[0-9]+(\.[0-9]+)?)(?P<units>\D+)', duration)
-    assert matches, 'Failed to parse duration string %s' % duration
-    hours = 0
-    minutes = 0
-    seconds = 0
-    milliseconds = 0
-    for match in matches:
-      if (match[2] == 'h'):
-        hours = float(match[0])
-      elif (match[2] == 'm'):
-        minutes = float(match[0])
-      elif (match[2] == 's'):
-        seconds = float(match[0])
-      elif (match[2] == 'ms'):
-        milliseconds = float(match[0])
-    return hours * 60 * 60 * 1000 + minutes * 60 * 1000 + seconds * 1000 + milliseconds
+      assert False, "Hash join timing too low for %s: %s %s" % (
+        comment, duration, duration_ms)
