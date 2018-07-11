@@ -1150,38 +1150,72 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
   @Test
   public void testStats() throws ImpalaException {
-    for (String statsType: new String[]{"compute", "drop"}) {
-      authorize(String.format("%s stats functional.alltypes", statsType))
-          .ok(onServer(TPrivilegeLevel.ALL))
-          .ok(onServer(TPrivilegeLevel.ALTER))
-          .ok(onDatabase("functional", TPrivilegeLevel.ALL))
-          .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
-          .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL))
-          .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALTER))
-          .error(alterError("functional.alltypes"))
-          .error(alterError("functional.alltypes"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
-          .error(alterError("functional.alltypes"), onDatabase("functional",
-              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
-          .error(alterError("functional.alltypes"), onTable("functional", "alltypes",
-              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)));
+    // Compute stats.
+    authorize("compute stats functional.alltypes")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.ALTER, TPrivilegeLevel.SELECT))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER, TPrivilegeLevel.SELECT))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALTER,
+            TPrivilegeLevel.SELECT))
+        .error(alterError("functional.alltypes"))
+        .error(alterError("functional.alltypes"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER, TPrivilegeLevel.SELECT)))
+        .error(alterError("functional.alltypes"), onDatabase("functional",
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER,
+                TPrivilegeLevel.SELECT)))
+        .error(alterError("functional.alltypes"), onTable("functional", "alltypes",
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER,
+                TPrivilegeLevel.SELECT)));
 
-      // Database does not exist.
-      authorize(String.format("%s stats nodb.notbl", statsType))
-          .error(alterError("nodb.notbl"))
-          .error(alterError("nodb.notbl"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
-          .error(alterError("default.nodb"), onDatabase("nodb", allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.ALL)));
+    // Compute stats on database that does not exist.
+    authorize("compute stats nodb.notbl")
+        .error(alterError("nodb.notbl"))
+        .error(alterError("nodb.notbl"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER, TPrivilegeLevel.SELECT)))
+        .error(alterError("nodb.notbl"), onDatabase("nodb", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER, TPrivilegeLevel.SELECT)));
 
-      // Table does not exist.
-      authorize(String.format("%s stats functional.notbl", statsType))
-          .error(alterError("functional.notbl"))
-          .error(alterError("functional.notbl"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
-          .error(alterError("default.functional"), onDatabase("functional", allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.ALL)));
-    }
+    // Compute stats on table that does not exist.
+    authorize("compute stats functional.notbl")
+        .error(alterError("functional.notbl"))
+        .error(alterError("functional.notbl"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER, TPrivilegeLevel.SELECT)))
+        .error(alterError("functional.notbl"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER, TPrivilegeLevel.SELECT)));
+
+    // Drop stats.
+    authorize("drop stats functional.alltypes")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.ALTER))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALTER))
+        .error(alterError("functional.alltypes"))
+        .error(alterError("functional.alltypes"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
+        .error(alterError("functional.alltypes"), onDatabase("functional",
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
+        .error(alterError("functional.alltypes"), onTable("functional", "alltypes",
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)));
+
+    // Drop stats on database that does not exist.
+    authorize("drop stats nodb.notbl")
+        .error(alterError("nodb.notbl"))
+        .error(alterError("nodb.notbl"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
+        .error(alterError("nodb.notbl"), onDatabase("nodb", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)));
+
+    // Drop stats on table that does not exist.
+    authorize("drop stats functional.notbl")
+        .error(alterError("functional.notbl"))
+        .error(alterError("functional.notbl"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
+        .error(alterError("functional.notbl"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)));
   }
 
   @Test

@@ -280,7 +280,9 @@ public class AuditingTest extends FrontendTestBase {
         "COMPUTE STATS functional_seq_snap.alltypes");
     Assert.assertEquals(accessEvents, Sets.newHashSet(
         new TAccessEvent(
-            "functional_seq_snap.alltypes", TCatalogObjectType.TABLE, "ALTER")));
+            "functional_seq_snap.alltypes", TCatalogObjectType.TABLE, "ALTER"),
+        new TAccessEvent(
+            "functional_seq_snap.alltypes", TCatalogObjectType.TABLE, "SELECT")));
   }
 
   @Test
@@ -443,7 +445,8 @@ public class AuditingTest extends FrontendTestBase {
     // Compute stats
     accessEvents = AnalyzeAccessEvents("compute stats functional_kudu.testtbl");
     Assert.assertEquals(accessEvents, Sets.newHashSet(
-        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALTER")));
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "ALTER"),
+        new TAccessEvent("functional_kudu.testtbl", TCatalogObjectType.TABLE, "SELECT")));
 
     // Describe
     accessEvents = AnalyzeAccessEvents("describe functional_kudu.testtbl");

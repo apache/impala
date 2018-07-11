@@ -2397,21 +2397,25 @@ public class Analyzer {
    * Returns the Table with the given name from the 'loadedTables' map in the global
    * analysis state. Throws an AnalysisException if the table or the db does not exist.
    * Throws a TableLoadingException if the registered table failed to load.
-   * Always registers a privilege request for the table at the given privilege level,
+   * Always registers privilege request(s) for the table at the given privilege level(s),
    * regardless of the state of the table (i.e. whether it exists, is loaded, etc.).
-   * If addAccessEvent is true adds an access event for successfully loaded tables.
+   * If addAccessEvent is true adds access event(s) for successfully loaded tables. When
+   * multiple privileges are specified, all those privileges will be required for the
+   * authorization check.
    */
-  public FeTable getTable(TableName tableName, Privilege privilege,
-      boolean addAccessEvent) throws AnalysisException, TableLoadingException {
+  public FeTable getTable(TableName tableName, boolean addAccessEvent,
+      Privilege... privilege) throws AnalysisException, TableLoadingException {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilege);
     tableName = getFqTableName(tableName);
-    if (privilege == Privilege.ANY) {
-      registerPrivReq(new PrivilegeRequestBuilder()
-          .any().onAnyColumn(tableName.getDb(), tableName.getTbl()).toRequest());
-    } else {
-      registerPrivReq(new PrivilegeRequestBuilder()
-          .allOf(privilege).onTable(tableName.getDb(), tableName.getTbl()).toRequest());
+    for (Privilege priv : privilege) {
+      if (priv == Privilege.ANY) {
+        registerPrivReq(new PrivilegeRequestBuilder()
+            .any().onAnyColumn(tableName.getDb(), tableName.getTbl()).toRequest());
+      } else {
+        registerPrivReq(new PrivilegeRequestBuilder()
+            .allOf(priv).onTable(tableName.getDb(), tableName.getTbl()).toRequest());
+      }
     }
     FeTable table = getTable(tableName.getDb(), tableName.getTbl());
     Preconditions.checkNotNull(table);
@@ -2419,8 +2423,10 @@ public class Analyzer {
       // Add an audit event for this access
       TCatalogObjectType objectType = TCatalogObjectType.TABLE;
       if (table instanceof FeView) objectType = TCatalogObjectType.VIEW;
-      globalState_.accessEvents.add(new TAccessEvent(
-          tableName.toString(), objectType, privilege.toString()));
+      for (Privilege priv : privilege) {
+        globalState_.accessEvents.add(new TAccessEvent(
+            tableName.toString(), objectType, priv.toString()));
+      }
     }
     return table;
   }
@@ -2433,10 +2439,10 @@ public class Analyzer {
    * AuthorizationException is thrown.
    * If the table or the db does not exist in the Catalog, an AnalysisError is thrown.
    */
-  public FeTable getTable(TableName tableName, Privilege privilege)
+  public FeTable getTable(TableName tableName, Privilege... privilege)
       throws AnalysisException {
     try {
-      return getTable(tableName, privilege, true);
+      return getTable(tableName, true, privilege);
     } catch (TableLoadingException e) {
       throw new AnalysisException(e);
     }

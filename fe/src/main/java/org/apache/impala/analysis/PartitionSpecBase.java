@@ -74,7 +74,7 @@ public abstract class PartitionSpecBase implements ParseNode {
     // be audited outside of the PartitionSpec.
     FeTable table;
     try {
-      table = analyzer.getTable(tableName_, privilegeRequirement_, false);
+      table = analyzer.getTable(tableName_, false, privilegeRequirement_);
     } catch (TableLoadingException e) {
       throw new AnalysisException(e.getMessage(), e);
     }

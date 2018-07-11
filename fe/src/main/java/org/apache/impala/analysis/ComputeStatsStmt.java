@@ -343,7 +343,7 @@ public class ComputeStatsStmt extends StatementBase {
       throw new AnalysisException(String.format(
           "COMPUTE STATS not supported for nested collection: %s", tableName_));
     }
-    table_ = analyzer.getTable(tableName_, Privilege.ALTER);
+    table_ = analyzer.getTable(tableName_, Privilege.ALTER, Privilege.SELECT);
 
     if (!(table_ instanceof FeFsTable)) {
       if (partitionSet_ != null) {
