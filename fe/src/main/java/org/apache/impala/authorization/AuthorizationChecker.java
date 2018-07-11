@@ -18,6 +18,7 @@
 package org.apache.impala.authorization;
 
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -138,10 +139,19 @@ public class AuthorizationChecker {
             "User '%s' does not have privileges to access: %s",
             user.getName(), privilegeRequest.getName()));
       } else if (privilege == Privilege.REFRESH) {
+        throw new AuthorizationException(String.format(
+            "User '%s' does not have privileges to execute " +
+            "'INVALIDATE METADATA/REFRESH' on: %s", user.getName(),
+            privilegeRequest.getName()));
+      } else if (privilege == Privilege.CREATE &&
+          privilegeRequest.getAuthorizeable() instanceof AuthorizeableTable) {
+        // Creating a table requires CREATE on a database and we shouldn't
+        // expose the table name.
+        AuthorizeableTable authorizeableTable =
+            (AuthorizeableTable) privilegeRequest.getAuthorizeable();
           throw new AuthorizationException(String.format(
-              "User '%s' does not have privileges to execute " +
-              "'INVALIDATE METADATA/REFRESH' on: %s", user.getName(),
-              privilegeRequest.getName()));
+              "User '%s' does not have privileges to execute '%s' on: %s",
+              user.getName(), privilege, authorizeableTable.getDbName()));
       } else {
         throw new AuthorizationException(String.format(
             "User '%s' does not have privileges to execute '%s' on: %s",

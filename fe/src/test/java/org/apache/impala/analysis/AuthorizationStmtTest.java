@@ -1239,9 +1239,9 @@ public class AuthorizationStmtTest extends FrontendTestBase {
           .ok(onServer(TPrivilegeLevel.CREATE))
           .ok(onDatabase("functional", TPrivilegeLevel.ALL))
           .ok(onDatabase("functional", TPrivilegeLevel.CREATE))
-          .error(createError("functional.new_table"), onServer(allExcept(
+          .error(createError("functional"), onServer(allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)))
-          .error(createError("functional.new_table"), onDatabase("functional", allExcept(
+          .error(createError("functional"), onDatabase("functional", allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)));
     }
 
@@ -1257,9 +1257,9 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         .error(accessError("functional.alltypes"))
         .error(accessError("functional.alltypes"), onServer(allExcept(
             join(viewMetadataPrivileges(), TPrivilegeLevel.CREATE))))
-        .error(createError("functional.new_table"), onDatabase("functional", allExcept(
+        .error(createError("functional"), onDatabase("functional", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE, TPrivilegeLevel.SELECT)))
-        .error(createError("functional.new_table"), onDatabase("functional", allExcept(
+        .error(createError("functional"), onDatabase("functional", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)), onTable(
                 "functional", "alltypes", viewMetadataPrivileges()))
         .error(accessError("functional.alltypes"), onDatabase("functional",
@@ -1270,10 +1270,10 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     for (AuthzTest test : new AuthzTest[]{
         authorize("create table functional.alltypes(i int)"),
         authorize("create table if not exists functional.alltypes(i int)")}) {
-      test.error(createError("functional.alltypes"))
-          .error(createError("functional.alltypes"), onServer(allExcept(
+      test.error(createError("functional"))
+          .error(createError("functional"), onServer(allExcept(
           TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)))
-          .error(createError("functional.alltypes"), onDatabase("functional", allExcept(
+          .error(createError("functional"), onDatabase("functional", allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)));
     }
 
@@ -1296,17 +1296,17 @@ public class AuthorizationStmtTest extends FrontendTestBase {
           .ok(onDatabase("functional"), onDatabase("functional", TPrivilegeLevel.CREATE,
               TPrivilegeLevel.INSERT), onColumn("functional", "alltypes", "int_col",
               TPrivilegeLevel.ALL))
-          .error(createError("functional.new_table"))
-          .error(createError("functional.new_table"), onServer(allExcept(
+          .error(createError("functional"))
+          .error(createError("functional"), onServer(allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE, TPrivilegeLevel.INSERT,
               TPrivilegeLevel.SELECT)))
-          .error(createError("functional.new_table"), onDatabase("functional", allExcept(
+          .error(createError("functional"), onDatabase("functional", allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE, TPrivilegeLevel.INSERT,
               TPrivilegeLevel.SELECT)))
-          .error(createError("functional.new_table"), onDatabase("functional", allExcept(
+          .error(createError("functional"), onDatabase("functional", allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE, TPrivilegeLevel.INSERT)),
               onTable("functional", "alltypes", TPrivilegeLevel.SELECT))
-          .error(selectError("functional.alltypes"), onDatabase("functional",
+          .error(selectError("functional"), onDatabase("functional",
               TPrivilegeLevel.CREATE, TPrivilegeLevel.INSERT), onTable("functional",
               "alltypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)));
     }
@@ -1317,9 +1317,9 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onServer(TPrivilegeLevel.CREATE),
             onUri("hdfs://localhost:20500/test-warehouse/new_table", TPrivilegeLevel.ALL))
-        .error(createError("functional.new_table"), onServer(allExcept(
+        .error(createError("functional"), onServer(allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)))
-        .error(createError("functional.new_table"), onDatabase("functional", allExcept(
+        .error(createError("functional"), onDatabase("functional", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)), onUri(
                 "hdfs://localhost:20500/test-warehouse/new_table", TPrivilegeLevel.ALL))
         .error(accessError("hdfs://localhost:20500/test-warehouse/new_table"),
@@ -1337,9 +1337,9 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             onServer(TPrivilegeLevel.CREATE),
             onUri("hdfs://localhost:20500/test-warehouse/upper_case/test",
                 TPrivilegeLevel.ALL))
-        .error(createError("functional.new_table"), onServer(allExcept(
+        .error(createError("functional"), onServer(allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)))
-        .error(createError("functional.new_table"), onDatabase("functional", allExcept(
+        .error(createError("functional"), onDatabase("functional", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)), onUri(
             "hdfs://localhost:20500/test-warehouse/UPPER_CASE/test", TPrivilegeLevel.ALL))
         .error(accessError("hdfs://localhost:20500/test-warehouse/UPPER_CASE/test"),
@@ -1354,7 +1354,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         .error(accessError(
             "hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet"),
             onServer(allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)))
-        .error(createError("functional.new_table"), onDatabase("functional", allExcept(
+        .error(createError("functional"), onDatabase("functional", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)), onUri(
             "hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet",
             TPrivilegeLevel.ALL))
@@ -1370,7 +1370,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     authorize("create external table functional.kudu_tbl stored as kudu " +
         "tblproperties ('kudu.master_addresses'='127.0.0.1', 'kudu.table_name'='tbl')")
         .ok(onServer(TPrivilegeLevel.ALL))
-        .error(createError("functional.kudu_tbl"))
+        .error(createError("functional"))
         .error(accessError("server1"), onServer(allExcept(TPrivilegeLevel.ALL)))
         .error(accessError("server1"), onDatabase("functional", TPrivilegeLevel.ALL));
 
@@ -1380,10 +1380,10 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onDatabase("functional", TPrivilegeLevel.ALL))
         .ok(onDatabase("functional", TPrivilegeLevel.CREATE))
-        .error(createError("functional.kudu_tbl"))
-        .error(createError("functional.kudu_tbl"), onServer(allExcept(
+        .error(createError("functional"))
+        .error(createError("functional"), onServer(allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)))
-        .error(createError("functional.kudu_tbl"), onDatabase("functional", allExcept(
+        .error(createError("functional"), onDatabase("functional", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)));
 
     // IMPALA-6451: CTAS for Kudu tables on non-external tables and without
@@ -1398,19 +1398,19 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       .ok(onServer(TPrivilegeLevel.ALL))
       .ok(onDatabase("functional", TPrivilegeLevel.CREATE, TPrivilegeLevel.INSERT,
           TPrivilegeLevel.SELECT))
-      .error(createError("functional.kudu_tbl"))
-      .error(createError("functional.kudu_tbl"), onServer(allExcept(TPrivilegeLevel.ALL,
+      .error(createError("functional"))
+      .error(createError("functional"), onServer(allExcept(TPrivilegeLevel.ALL,
           TPrivilegeLevel.CREATE, TPrivilegeLevel.INSERT, TPrivilegeLevel.SELECT)))
-      .error(createError("functional.kudu_tbl"), onDatabase("functional", allExcept(
+      .error(createError("functional"), onDatabase("functional", allExcept(
           TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE, TPrivilegeLevel.INSERT,
           TPrivilegeLevel.SELECT)));
 
     // Database does not exist.
     authorize("create table nodb.new_table(i int)")
-        .error(createError("nodb.new_table"))
-        .error(createError("nodb.new_table"), onServer(allExcept(
+        .error(createError("nodb"))
+        .error(createError("nodb"), onServer(allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)))
-        .error(createError("nodb.new_table"), onDatabase("functional", allExcept(
+        .error(createError("nodb"), onDatabase("functional", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)));
   }
 
@@ -1432,7 +1432,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
           .error(selectError("functional.alltypes"))
           .error(selectError("functional.alltypes"), onServer(allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE, TPrivilegeLevel.SELECT)))
-          .error(createError("functional.new_view"), onDatabase("functional", allExcept(
+          .error(createError("functional"), onDatabase("functional", allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)))
           .error(selectError("functional.alltypes"), onDatabase("functional", allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)))
@@ -1446,10 +1446,10 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         .ok(onServer(TPrivilegeLevel.CREATE))
         .ok(onDatabase("functional", TPrivilegeLevel.ALL))
         .ok(onDatabase("functional", TPrivilegeLevel.CREATE))
-        .error(createError("functional.new_view"))
-        .error(createError("functional.new_view"), onServer(allExcept(
+        .error(createError("functional"))
+        .error(createError("functional"), onServer(allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE, TPrivilegeLevel.SELECT)))
-        .error(createError("functional.new_view"), onDatabase("functional", allExcept(
+        .error(createError("functional"), onDatabase("functional", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)));
 
     // View already exists.
@@ -1461,7 +1461,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       test.error(selectError("functional.alltypes"))
           .error(selectError("functional.alltypes"), onServer(allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE, TPrivilegeLevel.SELECT)))
-          .error(createError("functional.alltypes_view"), onDatabase("functional", allExcept(
+          .error(createError("functional"), onDatabase("functional", allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)))
           .error(selectError("functional.alltypes"), onDatabase("functional", allExcept(
               TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)))
@@ -1474,10 +1474,10 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
     // Database does not exist.
     authorize("create view nodb.new_view as select 1")
-        .error(createError("nodb.new_view"))
-        .error(createError("nodb.new_view"), onServer(allExcept(
+        .error(createError("nodb"))
+        .error(createError("nodb"), onServer(allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)))
-        .error(createError("nodb.new_view"), onDatabase("functional", allExcept(
+        .error(createError("nodb"), onDatabase("functional", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)));
   }
 
@@ -1684,7 +1684,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         .error(alterError("functional.alltypes"), onDatabase("functional",
             TPrivilegeLevel.CREATE), onTable("functional", "alltypes", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
-        .error(createError("functional.new_table"), onDatabase("functional",
+        .error(createError("functional"), onDatabase("functional",
             allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)),
             onTable("functional", "alltypes", TPrivilegeLevel.ALTER));
 
@@ -1806,7 +1806,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         .error(alterError("functional.alltypes_view"), onDatabase("functional",
             TPrivilegeLevel.CREATE), onTable("functional", "alltypes_view", allExcept(
             TPrivilegeLevel.ALL, TPrivilegeLevel.ALTER)))
-        .error(createError("functional.new_view"), onDatabase("functional",
+        .error(createError("functional"), onDatabase("functional",
             allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.CREATE)),
             onTable("functional", "alltypes_view", TPrivilegeLevel.ALTER));
 
