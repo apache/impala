@@ -83,8 +83,7 @@ public class PartitionDef implements ParseNode {
 
     FeTable table;
     try {
-      table = analyzer.getTable(partitionSpec_.getTableName(), Privilege.ALTER,
-          false);
+      table = analyzer.getTable(partitionSpec_.getTableName(), false, Privilege.ALTER);
     } catch (TableLoadingException e) {
       throw new AnalysisException(e.getMessage(), e);
     }
