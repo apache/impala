@@ -1041,20 +1041,19 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     TTableName tableName = new TTableName("functional", "alltypes");
     TDescribeOutputStyle style = TDescribeOutputStyle.MINIMAL;
     authzTest = authorize("describe functional.alltypes");
-    for (TPrivilegeLevel privilege: new TPrivilegeLevel[]{
-        TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT}) {
+    for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
       authzTest.okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onServer(privilege))
           .okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onDatabase("functional",
               privilege))
           .okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onTable("functional",
               "alltypes", privilege));
     }
-    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onServer(allExcept(
-        TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)))
+    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onServer(
+        allExcept(viewMetadataPrivileges())))
         .okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onDatabase("functional",
-            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)))
+            allExcept(viewMetadataPrivileges())))
         .okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onTable("functional",
-            "alltypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)))
+            "alltypes", allExcept(viewMetadataPrivileges())))
         // In this test, since we only have column level privileges on "id", then
         // only the "id" column should show and the others should not.
         .okDescribe(tableName, style, new String[]{"id"}, ALLTYPES_COLUMNS_WITHOUT_ID,
@@ -1064,26 +1063,24 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     // Describe table extended.
     tableName = new TTableName("functional", "alltypes");
     style = TDescribeOutputStyle.EXTENDED;
-    String[] locationString = new String[]{"Location:"};
     String[] checkStrings = (String[]) ArrayUtils.addAll(ALLTYPES_COLUMNS,
-        locationString);
+        new String[]{"Location:"});
     authzTest = authorize("describe functional.alltypes");
-    for (TPrivilegeLevel privilege: new TPrivilegeLevel[]{
-        TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT}) {
+    for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
       authzTest.okDescribe(tableName, style, checkStrings, null, onServer(privilege))
           .okDescribe(tableName, style, checkStrings, null, onDatabase("functional",
               privilege))
           .okDescribe(tableName, style, checkStrings, null, onTable("functional",
               "alltypes", privilege));
     }
-    authzTest.okDescribe(tableName, style, locationString, ALLTYPES_COLUMNS,
-        onServer(allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)))
-        .okDescribe(tableName, style, locationString, ALLTYPES_COLUMNS,
-            onDatabase("functional", allExcept(TPrivilegeLevel.ALL,
-            TPrivilegeLevel.SELECT)))
-        .okDescribe(tableName, style, locationString, ALLTYPES_COLUMNS,
-            onTable("functional", "alltypes", allExcept(TPrivilegeLevel.ALL,
-            TPrivilegeLevel.SELECT)))
+    // Describe table without VIEW_METADATA privilege should not show all columns and
+    // location.
+    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS,
+            onServer(allExcept(viewMetadataPrivileges())))
+        .okDescribe(tableName, style, null, ALLTYPES_COLUMNS,
+            onDatabase("functional", allExcept(viewMetadataPrivileges())))
+        .okDescribe(tableName, style, null, ALLTYPES_COLUMNS,
+            onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())))
         // Location should not appear with only column level auth.
         .okDescribe(tableName, style, new String[]{"id"},
             (String[]) ArrayUtils.addAll(ALLTYPES_COLUMNS_WITHOUT_ID,
@@ -1095,20 +1092,17 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     tableName = new TTableName("functional", "alltypes_view");
     style = TDescribeOutputStyle.MINIMAL;
     authzTest = authorize("describe functional.alltypes_view");
-    for (TPrivilegeLevel privilege: new TPrivilegeLevel[]{
-        TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT}) {
+    for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
       authzTest.okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onServer(privilege))
           .okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onDatabase("functional",
               privilege))
           .okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onTable("functional",
               "alltypes_view", privilege));
     }
-    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onServer(allExcept(
-        TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)))
+    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onServer(
+        allExcept(viewMetadataPrivileges())))
         .okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onDatabase("functional",
-            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)))
-        .okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onTable("functional",
-            "alltypes_view", TPrivilegeLevel.INSERT))
+            allExcept(viewMetadataPrivileges())))
         .error(accessError("functional.alltypes_view"));
 
     // Describe view extended.
@@ -1118,20 +1112,17 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     String[] viewStrings = new String[]{"View Original Text:", "View Expanded Text:"};
     checkStrings = (String[]) ArrayUtils.addAll(ALLTYPES_COLUMNS, viewStrings);
     authzTest = authorize("describe functional.alltypes_view");
-    for (TPrivilegeLevel privilege: new TPrivilegeLevel[]{
-        TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT}) {
+    for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
       authzTest.okDescribe(tableName, style, checkStrings, null, onServer(privilege))
           .okDescribe(tableName, style, checkStrings, null, onDatabase("functional",
               privilege))
           .okDescribe(tableName, style, checkStrings, null, onTable("functional",
               "alltypes_view", privilege));
     }
-    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onServer(allExcept(
-        TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)))
+    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onServer(
+        allExcept(viewMetadataPrivileges())))
         .okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onDatabase("functional",
-            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.SELECT)))
-        .okDescribe(tableName, style, viewStrings, ALLTYPES_COLUMNS, onTable("functional",
-            "alltypes_view", TPrivilegeLevel.INSERT))
+            allExcept(viewMetadataPrivileges())))
         .error(accessError("functional.alltypes_view"));
 
     // Describe specific column on a table.

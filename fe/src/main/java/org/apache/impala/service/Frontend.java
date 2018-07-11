@@ -813,7 +813,8 @@ public class Frontend {
     if (authzConfig_.isEnabled()) {
       // First run a table check
       PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
-          .allOf(Privilege.SELECT).onTable(table.getDb().getName(), table.getName())
+          .allOf(Privilege.VIEW_METADATA).onTable(table.getDb().getName(),
+              table.getName())
           .toRequest();
       if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
         // Filter out columns that the user is not authorized to see.
@@ -821,7 +822,7 @@ public class Frontend {
         for (Column col: table.getColumnsInHiveOrder()) {
           String colName = col.getName();
           privilegeRequest = new PrivilegeRequestBuilder()
-              .allOf(Privilege.SELECT)
+              .allOf(Privilege.VIEW_METADATA)
               .onColumn(table.getDb().getName(), table.getName(), colName)
               .toRequest();
           if (authzChecker_.get().hasAccess(user, privilegeRequest)) {
