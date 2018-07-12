@@ -205,9 +205,6 @@ public class HdfsTable extends Table implements FeFsTable {
   // True iff this table has incremental stats in any of its partitions.
   private boolean hasIncrementalStats_ = false;
 
-  // True iff the table's partitions are located on more than one filesystem.
-  private boolean multipleFileSystems_ = false;
-
   private HdfsPartitionLocationCompressor partitionLocationCompressor_;
 
   // Base Hdfs directory where files of this table are stored.
@@ -1077,8 +1074,6 @@ public class HdfsTable extends Table implements FeFsTable {
     Path partDirPath = new Path(storageDescriptor.getLocation());
     try {
       FileSystem fs = partDirPath.getFileSystem(CONF);
-      multipleFileSystems_ = multipleFileSystems_ ||
-          !FileSystemUtil.isPathOnFileSystem(new Path(getLocation()), fs);
       if (msPartition != null) {
         HdfsCachingUtil.validateCacheParams(msPartition.getParameters());
       }
@@ -1667,7 +1662,6 @@ public class HdfsTable extends Table implements FeFsTable {
     hdfsBaseDir_ = hdfsTable.getHdfsBaseDir();
     nullColumnValue_ = hdfsTable.nullColumnValue;
     nullPartitionKeyValue_ = hdfsTable.nullPartitionKeyValue;
-    multipleFileSystems_ = hdfsTable.multiple_filesystems;
     hostIndex_.populate(hdfsTable.getNetwork_addresses());
     resetPartitions();
     try {
@@ -1764,7 +1758,6 @@ public class HdfsTable extends Table implements FeFsTable {
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_, idToPartition, prototypePartition);
     hdfsTable.setAvroSchema(avroSchema_);
-    hdfsTable.setMultiple_filesystems(multipleFileSystems_);
     if (includeFileDesc) {
       // Network addresses are used only by THdfsFileBlocks which are inside
       // THdfsFileDesc, so include network addreses only when including THdfsFileDesc.

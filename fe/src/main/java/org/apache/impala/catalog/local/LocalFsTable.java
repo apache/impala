@@ -187,7 +187,6 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
         /*includeIncrementalStats=*/false);
 
     // TODO(todd): implement avro schema support
-    // TODO(todd): set multiple_filesystems member?
     THdfsTable hdfsTable = new THdfsTable(getHdfsBaseDir(), getColumnNames(),
         getNullPartitionKeyValue(), schemaInfo_.getNullColumnValue(), idToPartition,
         tPrototypePartition);
