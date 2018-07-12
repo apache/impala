@@ -314,9 +314,7 @@ struct THdfsTable {
   // than duplicate the list of network address, which helps reduce memory usage.
   7: optional list<Types.TNetworkAddress> network_addresses
 
-  // Indicates that this table's partitions reside on more than one filesystem.
-  // TODO: remove once INSERT across filesystems is supported.
-  8: optional bool multiple_filesystems
+  // REMOVED: 8: optional bool multiple_filesystems
 
   // The prefixes of locations of partitions in this table. See THdfsPartitionLocation for
   // the description of how a prefix is computed.
