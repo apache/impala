@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.FrontendTestBase;
@@ -70,7 +71,8 @@ public class StatsExtrapolationTest extends FrontendTestBase {
       long fileBytes, long expectedExtrapNumRows) {
     Preconditions.checkState(tbl instanceof HdfsTable);
     setStats(tbl, rowCount, totalSize);
-    long actualExtrapNumRows = ((HdfsTable)tbl).getExtrapolatedNumRows(fileBytes);
+    long actualExtrapNumRows = FeFsTable.Utils.getExtrapolatedNumRows(
+        (HdfsTable)tbl, fileBytes);
     assertEquals(expectedExtrapNumRows, actualExtrapNumRows);
   }
 

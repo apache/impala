@@ -270,18 +270,6 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   }
 
   @Override
-  public long getExtrapolatedNumRows(long totalBytes) {
-    // TODO Auto-generated method stub
-    return -1;
-  }
-
-  @Override
-  public boolean isStatsExtrapolationEnabled() {
-    // TODO Auto-generated method stub
-    return false;
-  }
-
-  @Override
   public TResultSet getTableStats() {
     return HdfsTable.getTableStats(this);
   }

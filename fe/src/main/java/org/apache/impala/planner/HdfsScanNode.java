@@ -998,7 +998,7 @@ public class HdfsScanNode extends ScanNode {
    */
   private void computeCardinalities() {
     // Choose between the extrapolated row count and the one based on stored stats.
-    extrapolatedNumRows_ = tbl_.getExtrapolatedNumRows(totalBytes_);
+    extrapolatedNumRows_ = FeFsTable.Utils.getExtrapolatedNumRows(tbl_, totalBytes_);
     long statsNumRows = getStatsNumRows();
     if (extrapolatedNumRows_ != -1) {
       // The extrapolated row count is based on the 'totalBytes_' which already accounts
@@ -1242,7 +1242,7 @@ public class HdfsScanNode extends ScanNode {
       output.append(getStatsExplainString(detailPrefix));
       output.append("\n");
       String extrapRows = String.valueOf(extrapolatedNumRows_);
-      if (!tbl_.isStatsExtrapolationEnabled()) {
+      if (!FeFsTable.Utils.isStatsExtrapolationEnabled(tbl_)) {
         extrapRows = "disabled";
       } else if (extrapolatedNumRows_ == -1) {
         extrapRows = "unavailable";

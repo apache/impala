@@ -497,7 +497,8 @@ public class ComputeStatsStmt extends StatementBase {
       // Not computing incremental stats.
       expectAllPartitions_ = true;
       if (table_ instanceof FeFsTable) {
-        expectAllPartitions_ = !((FeFsTable) table_).isStatsExtrapolationEnabled();
+        expectAllPartitions_ = !FeFsTable.Utils.isStatsExtrapolationEnabled(
+            (FeFsTable) table_);
       }
     }
 
@@ -593,7 +594,7 @@ public class ComputeStatsStmt extends StatementBase {
       throw new AnalysisException("TABLESAMPLE is only supported on HDFS tables.");
     }
     FeFsTable hdfsTable = (FeFsTable) table_;
-    if (!hdfsTable.isStatsExtrapolationEnabled()) {
+    if (!FeFsTable.Utils.isStatsExtrapolationEnabled(hdfsTable)) {
       throw new AnalysisException(String.format(
           "COMPUTE STATS TABLESAMPLE requires stats extrapolation which is disabled.\n" +
           "Stats extrapolation can be enabled service-wide with %s=true or by altering " +
@@ -718,7 +719,8 @@ public class ComputeStatsStmt extends StatementBase {
    */
   private boolean updateTableStatsOnly() {
     if (!(table_ instanceof FeFsTable)) return true;
-    return !isIncremental_ && ((FeFsTable) table_).isStatsExtrapolationEnabled();
+    return !isIncremental_ && FeFsTable.Utils.isStatsExtrapolationEnabled(
+        (FeFsTable) table_);
   }
 
   /**

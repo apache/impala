@@ -25,9 +25,11 @@ import java.util.TreeMap;
 
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.ListMap;
 
 /**
@@ -119,17 +121,6 @@ public interface FeFsTable extends FeTable {
   public String getFirstLocationWithoutWriteAccess();
 
   /**
-   * @param totalBytes_ the known number of bytes in the table
-   * @return Returns an estimated row count for the given number of file bytes
-   */
-  public long getExtrapolatedNumRows(long totalBytes);
-
-  /**
-   * @return true if stats extrapolation is enabled for this table, false otherwise.
-   */
-  boolean isStatsExtrapolationEnabled();
-
-  /**
    * @return statistics on this table as a tabular result set. Used for the
    * SHOW TABLE STATS statement. The schema of the returned TResultSet is set
    * inside this method.
@@ -198,4 +189,47 @@ public interface FeFsTable extends FeTable {
    */
   ListMap<TNetworkAddress> getHostIndex();
 
- }
+  /**
+   * Utility functions for operating on FeFsTable. When we move fully to Java 8,
+   * these can become default methods of the interface.
+   */
+  abstract class Utils {
+    /**
+     * Returns true if stats extrapolation is enabled for this table, false otherwise.
+     * Reconciles the Impalad-wide --enable_stats_extrapolation flag and the
+     * TBL_PROP_ENABLE_STATS_EXTRAPOLATION table property
+     */
+    public static boolean isStatsExtrapolationEnabled(FeFsTable table) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl = table.getMetaStoreTable();
+      String propVal = msTbl.getParameters().get(
+          HdfsTable.TBL_PROP_ENABLE_STATS_EXTRAPOLATION);
+      if (propVal == null) return BackendConfig.INSTANCE.isStatsExtrapolationEnabled();
+      return Boolean.parseBoolean(propVal);
+    }
+
+    /**
+     * Returns an estimated row count for the given number of file bytes. The row count is
+     * extrapolated using the table-level row count and file bytes statistics.
+     * Returns zero only if the given file bytes is zero.
+     * Returns -1 if:
+     * - stats extrapolation has been disabled
+     * - the given file bytes statistic is negative
+     * - the row count or the file byte statistic is missing
+     * - the file bytes statistic is zero or negative
+     * - the row count statistic is zero and the file bytes is non-zero
+     * Otherwise, returns a value >= 1.
+     */
+    public static long getExtrapolatedNumRows(FeFsTable table, long fileBytes) {
+      if (!isStatsExtrapolationEnabled(table)) return -1;
+      if (fileBytes == 0) return 0;
+      if (fileBytes < 0) return -1;
+
+      TTableStats tableStats = table.getTTableStats();
+      if (tableStats.num_rows < 0 || tableStats.total_file_bytes <= 0) return -1;
+      if (tableStats.num_rows == 0 && tableStats.total_file_bytes != 0) return -1;
+      double rowsPerByte = tableStats.num_rows / (double) tableStats.total_file_bytes;
+      double extrapolatedNumRows = fileBytes * rowsPerByte;
+      return (long) Math.max(1, Math.round(extrapolatedNumRows));
+    }
+  }
+}

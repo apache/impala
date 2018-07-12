@@ -1940,43 +1940,6 @@ public class HdfsTable extends Table implements FeFsTable {
     return new Pair<String, LiteralExpr>(value, expr);
   }
 
-  /**
-   * Returns an estimated row count for the given number of file bytes. The row count is
-   * extrapolated using the table-level row count and file bytes statistics.
-   * Returns zero only if the given file bytes is zero.
-   * Returns -1 if:
-   * - stats extrapolation has been disabled
-   * - the given file bytes statistic is negative
-   * - the row count or the file byte statistic is missing
-   * - the file bytes statistic is zero or negative
-   * - the row count statistic is zero and the file bytes is non-zero
-   * Otherwise, returns a value >= 1.
-   */
-  @Override // FeFsTable
-  public long getExtrapolatedNumRows(long fileBytes) {
-    if (!isStatsExtrapolationEnabled()) return -1;
-    if (fileBytes == 0) return 0;
-    if (fileBytes < 0) return -1;
-    if (tableStats_.num_rows < 0 || tableStats_.total_file_bytes <= 0) return -1;
-    if (tableStats_.num_rows == 0 && tableStats_.total_file_bytes != 0) return -1;
-    double rowsPerByte = tableStats_.num_rows / (double) tableStats_.total_file_bytes;
-    double extrapolatedNumRows = fileBytes * rowsPerByte;
-    return (long) Math.max(1, Math.round(extrapolatedNumRows));
-  }
-
-  /**
-   * Returns true if stats extrapolation is enabled for this table, false otherwise.
-   * Reconciles the Impalad-wide --enable_stats_extrapolation flag and the
-   * TBL_PROP_ENABLE_STATS_EXTRAPOLATION table property
-   */
-  @Override // FeFsTable
-  public boolean isStatsExtrapolationEnabled() {
-    org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
-    String propVal = msTbl.getParameters().get(TBL_PROP_ENABLE_STATS_EXTRAPOLATION);
-    if (propVal == null) return BackendConfig.INSTANCE.isStatsExtrapolationEnabled();
-    return Boolean.parseBoolean(propVal);
-  }
-
   @Override // FeFsTable
   public TResultSet getTableStats() {
     return getTableStats(this);
@@ -1996,7 +1959,7 @@ public class HdfsTable extends Table implements FeFsTable {
       resultSchema.addToColumns(colDesc);
     }
 
-    boolean statsExtrap = table.isStatsExtrapolationEnabled();
+    boolean statsExtrap = Utils.isStatsExtrapolationEnabled(table);
 
     resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
     if (statsExtrap) {
@@ -2036,7 +1999,9 @@ public class HdfsTable extends Table implements FeFsTable {
       // Compute and report the extrapolated row count because the set of files could
       // have changed since we last computed stats for this partition. We also follow
       // this policy during scan-cardinality estimation.
-      if (statsExtrap) rowBuilder.add(table.getExtrapolatedNumRows(size));
+      if (statsExtrap) {
+        rowBuilder.add(Utils.getExtrapolatedNumRows(table, size));
+      }
 
       rowBuilder.add(numFiles).addBytes(size);
       if (!p.isMarkedCached()) {
@@ -2090,7 +2055,8 @@ public class HdfsTable extends Table implements FeFsTable {
       // have changed since we last computed stats for this partition. We also follow
       // this policy during scan-cardinality estimation.
       if (statsExtrap) {
-        rowBuilder.add(table.getExtrapolatedNumRows(table.getTotalHdfsBytes()));
+        rowBuilder.add(Utils.getExtrapolatedNumRows(
+            table, table.getTotalHdfsBytes()));
       }
       rowBuilder.add(totalNumFiles)
           .addBytes(totalBytes)
