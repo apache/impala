@@ -68,6 +68,14 @@ void WarnIfFileNotEqual(
 
 namespace impala {
 
+const int64_t CpuInfo::SSSE3;
+const int64_t CpuInfo::SSE4_1;
+const int64_t CpuInfo::SSE4_2;
+const int64_t CpuInfo::POPCNT;
+const int64_t CpuInfo::AVX;
+const int64_t CpuInfo::AVX2;
+const int64_t CpuInfo::PCLMULQDQ;
+
 bool CpuInfo::initialized_ = false;
 int64_t CpuInfo::hardware_flags_ = 0;
 int64_t CpuInfo::original_hardware_flags_;

@@ -48,6 +48,8 @@ using namespace impala;
 // As in bloom-filter.h, ndv refers to the number of unique items inserted into a filter
 // and fpp is the probability of false positives.
 //
+// This benchmark must be executed only in RELEASE mode. Since it executes some codepath
+// which would not occur in Impala's execution, it crashes due to a DCHECK in DEBUG mode.
 //
 // Machine Info: Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz
 //

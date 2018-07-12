@@ -111,6 +111,31 @@ class LlvmCodeGenTest : public testing:: Test {
     const auto& hf = codegen->handcrafted_functions_;
     return find(hf.begin(), hf.end(), function) != hf.end();
   }
+
+  // Helper function to enable and disable LlvmCodeGen's cpu_attrs_.
+  static void EnableCodeGenCPUFeature(int64_t flag, bool enable) {
+    DCHECK(LlvmCodeGen::llvm_initialized_);
+    auto enable_flag_it = LlvmCodeGen::cpu_flag_mappings_.find(flag);
+    auto disable_flag_it = LlvmCodeGen::cpu_flag_mappings_.find(~flag);
+    DCHECK(enable_flag_it != LlvmCodeGen::cpu_flag_mappings_.end());
+    DCHECK(disable_flag_it != LlvmCodeGen::cpu_flag_mappings_.end());
+    const std::string& enable_feature = enable_flag_it->second;
+    const std::string& disable_feature = disable_flag_it->second;
+    if (enable) {
+      auto attr_it = LlvmCodeGen::cpu_attrs_.find(disable_feature);
+      if (attr_it != LlvmCodeGen::cpu_attrs_.end()) {
+        LlvmCodeGen::cpu_attrs_.erase(attr_it);
+      }
+      LlvmCodeGen::cpu_attrs_.insert(enable_feature);
+    } else {
+      auto attr_it = LlvmCodeGen::cpu_attrs_.find(enable_feature);
+      // Disable feature if currently enabled.
+      if (attr_it != LlvmCodeGen::cpu_attrs_.end()) {
+        LlvmCodeGen::cpu_attrs_.erase(attr_it);
+        LlvmCodeGen::cpu_attrs_.insert(disable_feature);
+      }
+    }
+  }
 };
 
 // Simple test to just make and destroy llvmcodegen objects.  LLVM
@@ -460,9 +485,12 @@ TEST_F(LlvmCodeGenTest, HashTest) {
     uint32_t result = test_fn();
 
     // Validate that the hashes are identical
-    EXPECT_EQ(result, expected_hash) << CpuInfo::IsSupported(CpuInfo::SSE4_2);
+    EXPECT_EQ(result, expected_hash) << LlvmCodeGen::IsCPUFeatureEnabled(CpuInfo::SSE4_2);
 
-    if (i == 0 && CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
+    if (i == 0 && LlvmCodeGen::IsCPUFeatureEnabled(CpuInfo::SSE4_2)) {
+      // Modify both CpuInfo and LlvmCodeGen::cpu_attrs_ to ensure that they have the
+      // same view of the underlying hardware while generating the hash.
+      EnableCodeGenCPUFeature(CpuInfo::SSE4_2, false);
       CpuInfo::EnableFeature(CpuInfo::SSE4_2, false);
       restore_sse_support = true;
       LlvmCodeGenTest::ClearHashFns(codegen.get());
@@ -473,6 +501,7 @@ TEST_F(LlvmCodeGenTest, HashTest) {
   }
 
   // Restore hardware feature for next test
+  EnableCodeGenCPUFeature(CpuInfo::SSE4_2, restore_sse_support);
   CpuInfo::EnableFeature(CpuInfo::SSE4_2, restore_sse_support);
 }
 
@@ -495,19 +524,17 @@ TEST_F(LlvmCodeGenTest, CpuAttrWhitelist) {
   // Non-existent attributes should be disabled regardless of initial states.
   // Whitelisted attributes like sse2 and lzcnt should retain their initial
   // state.
-  EXPECT_EQ(vector<string>(
-          {"-dummy1", "-dummy2", "-dummy3", "-dummy4", "+sse2", "-lzcnt"}),
+  EXPECT_EQ(std::unordered_set<string>(
+                {"-dummy1", "-dummy2", "-dummy3", "-dummy4", "+sse2", "-lzcnt"}),
       LlvmCodeGen::ApplyCpuAttrWhitelist(
-          {"+dummy1", "+dummy2", "-dummy3", "+dummy4", "+sse2", "-lzcnt"}));
+                {"+dummy1", "+dummy2", "-dummy3", "+dummy4", "+sse2", "-lzcnt"}));
 
   // IMPALA-6291: Test that all AVX512 attributes are disabled.
   vector<string> avx512_attrs;
-  EXPECT_EQ(vector<string>(
-        {"-avx512ifma", "-avx512dqavx512er", "-avx512f", "-avx512bw", "-avx512vl",
-         "-avx512cd", "-avx512vbmi", "-avx512pf"}),
-      LlvmCodeGen::ApplyCpuAttrWhitelist(
-        {"+avx512ifma", "+avx512dqavx512er", "+avx512f", "+avx512bw", "+avx512vl",
-         "+avx512cd", "+avx512vbmi", "+avx512pf"}));
+  EXPECT_EQ(std::unordered_set<string>({"-avx512ifma", "-avx512dqavx512er", "-avx512f",
+                "-avx512bw", "-avx512vl", "-avx512cd", "-avx512vbmi", "-avx512pf"}),
+      LlvmCodeGen::ApplyCpuAttrWhitelist({"+avx512ifma", "+avx512dqavx512er", "+avx512f",
+          "+avx512bw", "+avx512vl", "+avx512cd", "+avx512vbmi", "+avx512pf"}));
 }
 
 // Test that exercises the code path that deletes non-finalized methods before it
