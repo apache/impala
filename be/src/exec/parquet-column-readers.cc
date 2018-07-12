@@ -1532,6 +1532,14 @@ static ParquetColumnReader* GetDecimalColumnReader(const SchemaNode& node,
             parent, node, slot_desc);
       }
       break;
+    case parquet::Type::INT32:
+      DCHECK_EQ(sizeof(Decimal4Value::StorageType), slot_desc->type().GetByteSize());
+      return new ScalarColumnReader<Decimal4Value, parquet::Type::INT32, true>(
+          parent, node, slot_desc);
+    case parquet::Type::INT64:
+      DCHECK_EQ(sizeof(Decimal8Value::StorageType), slot_desc->type().GetByteSize());
+      return new ScalarColumnReader<Decimal8Value, parquet::Type::INT64, true>(
+          parent, node, slot_desc);
     default:
       DCHECK(false) << "Invalid decimal primitive type";
   }

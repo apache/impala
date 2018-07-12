@@ -23,3 +23,21 @@ select * from decimal_encodings;
 ---- TYPES
 DECIMAL,DECIMAL,DECIMAL
 ====
+---- QUERY
+select score from decimal_stored_as_int32
+---- RESULTS
+12.340
+24.560
+34.123
+---- TYPES
+DECIMAL
+====
+---- QUERY
+select score from decimal_stored_as_int64
+---- RESULTS
+12.3400
+24.5600
+34.1230
+---- TYPES
+DECIMAL
+====

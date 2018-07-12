@@ -290,6 +290,20 @@ class TestParquet(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
 
+  def _create_table_from_file(self, table_name, unique_database):
+    filename = '%s.parquet' % table_name
+    local_file = os.path.join(os.environ['IMPALA_HOME'],
+                              'testdata/data/%s' % filename)
+    assert os.path.isfile(local_file)
+    hdfs_file = '/test-warehouse/{0}.db/{1}'.format(unique_database, filename)
+    check_call(['hdfs', 'dfs', '-copyFromLocal', '-f', local_file, hdfs_file])
+
+    qualified_table_name = '%s.%s' % (unique_database, table_name)
+    self.client.execute('create table %s like parquet "%s" stored as parquet' %
+                        (qualified_table_name, hdfs_file))
+    self.client.execute('load data inpath "%s" into table %s' %
+                        (hdfs_file, qualified_table_name))
+
   def test_parquet(self, vector):
     self.run_test_case('QueryTest/parquet', vector)
 
@@ -703,6 +717,9 @@ class TestParquet(ImpalaTestSuite):
       data_file_path = os.path.join(os.environ['IMPALA_HOME'],
                                     "testdata/data/", file_name)
       check_call(['hdfs', 'dfs', '-copyFromLocal', data_file_path, table_loc])
+
+    self._create_table_from_file('decimal_stored_as_int32', unique_database)
+    self._create_table_from_file('decimal_stored_as_int64', unique_database)
 
     self.run_test_case('QueryTest/parquet-decimal-formats', vector, unique_database)
 

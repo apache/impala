@@ -35,12 +35,13 @@ int Encode(const InternalType& v, int encoded_byte_size, uint8_t* buffer,
   return ParquetPlainEncoder::Encode(v, encoded_byte_size, buffer);
 }
 
-// Handle special case of encoding decimal types stored as BYTE_ARRAY since it is not
-// implemented in Impala.
+// Handle special case of encoding decimal types stored as BYTE_ARRAY, INT32, and INT64,
+// since these are not implemented in Impala.
 // When parquet_type equals BYTE_ARRAY: 'encoded_byte_size' is the sum of the
 // minimum number of bytes required to store the unscaled value and the bytes required to
 // store the size. Value 'v' passed to it should not contain leading zeros as this
 // method does not strictly conform to the parquet spec in removing those.
+// When parquet_type is INT32 or INT64, we simply write the unscaled value to the buffer.
 template <typename DecimalType>
 int EncodeDecimal(const DecimalType& v, int encoded_byte_size, uint8_t* buffer,
     parquet::Type::type parquet_type) {
@@ -51,6 +52,9 @@ int EncodeDecimal(const DecimalType& v, int encoded_byte_size, uint8_t* buffer,
     memcpy(buffer, &decimal_size, sizeof(int32_t));
     DecimalUtil::EncodeToFixedLenByteArray(buffer + sizeof(int32_t), decimal_size, v);
     return encoded_byte_size;
+  } else if (parquet_type == parquet::Type::INT32 ||
+             parquet_type == parquet::Type::INT64) {
+    return ParquetPlainEncoder::Encode(v.value(), encoded_byte_size, buffer);
   }
   return -1;
 }
@@ -139,6 +143,10 @@ TEST(PlainEncoding, Basic) {
       sizeof(Decimal4Value));
   TestType<Decimal4Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(
       Decimal4Value(test_val * -1), sizeof(Decimal4Value));
+  TestType<Decimal4Value, parquet::Type::INT32>(Decimal4Value(test_val),
+      sizeof(int32_t));
+  TestType<Decimal4Value, parquet::Type::INT32>(Decimal4Value(test_val * -1),
+      sizeof(int32_t));
 
   // Decimal8Value: General test case
   TestType<Decimal8Value, parquet::Type::BYTE_ARRAY>(Decimal8Value(test_val),
@@ -149,6 +157,10 @@ TEST(PlainEncoding, Basic) {
       sizeof(Decimal8Value));
   TestType<Decimal8Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(
       Decimal8Value(test_val * -1), sizeof(Decimal8Value));
+  TestType<Decimal8Value, parquet::Type::INT64>(Decimal8Value(test_val),
+      sizeof(int64_t));
+  TestType<Decimal8Value, parquet::Type::INT64>(Decimal8Value(test_val * -1),
+      sizeof(int64_t));
 
   // Decimal16Value: General test case
   TestType<Decimal16Value, parquet::Type::BYTE_ARRAY>(Decimal16Value(test_val),
@@ -171,6 +183,10 @@ TEST(PlainEncoding, Basic) {
       Decimal8Value(std::numeric_limits<int32_t>::max()), sizeof(Decimal8Value));
   TestType<Decimal8Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(
       Decimal8Value(std::numeric_limits<int32_t>::min()), sizeof(Decimal8Value));
+  TestType<Decimal8Value, parquet::Type::INT64>(
+      Decimal8Value(std::numeric_limits<int32_t>::max()), sizeof(int64_t));
+  TestType<Decimal8Value, parquet::Type::INT64>(
+      Decimal8Value(std::numeric_limits<int32_t>::min()), sizeof(int64_t));
 
   // Decimal16Value: int32 limits test
   TestType<Decimal16Value, parquet::Type::BYTE_ARRAY>(
@@ -205,6 +221,8 @@ TEST(PlainEncoding, Basic) {
           i + sizeof(int32_t));
       TestType<Decimal4Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(Decimal4Value(i), i);
       TestType<Decimal4Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(Decimal4Value(-i), i);
+      TestType<Decimal4Value, parquet::Type::INT32>(Decimal4Value(i), sizeof(int32_t));
+      TestType<Decimal4Value, parquet::Type::INT32>(Decimal4Value(-i), sizeof(int32_t));
     }
     if (i <= 8) {
       TestType<Decimal8Value, parquet::Type::BYTE_ARRAY>(Decimal8Value(i),
@@ -213,6 +231,8 @@ TEST(PlainEncoding, Basic) {
           i + sizeof(int32_t));
       TestType<Decimal8Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(Decimal8Value(i), i);
       TestType<Decimal8Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(Decimal8Value(-i), i);
+      TestType<Decimal8Value, parquet::Type::INT64>(Decimal8Value(i), sizeof(int64_t));
+      TestType<Decimal8Value, parquet::Type::INT64>(Decimal8Value(-i), sizeof(int64_t));
     }
     TestType<Decimal16Value, parquet::Type::BYTE_ARRAY>(Decimal16Value(i),
         i + sizeof(int32_t));

@@ -57,8 +57,8 @@ const map<PrimitiveType, set<parquet::Type::type>> SUPPORTED_PHYSICAL_TYPES = {
     {PrimitiveType::TYPE_DATE, {parquet::Type::BYTE_ARRAY}},
     {PrimitiveType::TYPE_DATETIME, {parquet::Type::BYTE_ARRAY}},
     {PrimitiveType::TYPE_BINARY, {parquet::Type::BYTE_ARRAY}},
-    {PrimitiveType::TYPE_DECIMAL, {parquet::Type::FIXED_LEN_BYTE_ARRAY,
-        parquet::Type::BYTE_ARRAY}},
+    {PrimitiveType::TYPE_DECIMAL, {parquet::Type::INT32, parquet::Type::INT64,
+        parquet::Type::FIXED_LEN_BYTE_ARRAY, parquet::Type::BYTE_ARRAY}},
     {PrimitiveType::TYPE_CHAR, {parquet::Type::BYTE_ARRAY}},
     {PrimitiveType::TYPE_VARCHAR, {parquet::Type::BYTE_ARRAY}},
 };
@@ -193,6 +193,19 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
   bool is_converted_type_decimal = schema_element.__isset.converted_type
       && schema_element.converted_type == parquet::ConvertedType::DECIMAL;
   if (slot_desc->type().type == TYPE_DECIMAL) {
+    // TODO: allow converting to wider type (IMPALA-2515)
+    if (schema_element.type == parquet::Type::INT32 &&
+        sizeof(int32_t) != slot_desc->type().GetByteSize()) {
+      return Status(Substitute("File '$0' decimal column '$1' is stored as INT32, but "
+          "based on the precision in the table metadata, another type would needed.",
+          filename, schema_element.name));
+    }
+    if (schema_element.type == parquet::Type::INT64 &&
+        sizeof(int64_t) != slot_desc->type().GetByteSize()) {
+      return Status(Substitute("File '$0' decimal column '$1' is stored as INT64, but "
+          "based on the precision in the table metadata, another type would needed.",
+          filename, schema_element.name));
+    }
     // We require that the scale and byte length be set.
     if (schema_element.type == parquet::Type::FIXED_LEN_BYTE_ARRAY) {
       if (!schema_element.__isset.type_length) {

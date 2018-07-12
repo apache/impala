@@ -57,7 +57,8 @@ parquet::CompressionCodec::type ConvertImpalaToParquetCodec(
 class ParquetPlainEncoder {
  public:
   /// Returns the byte size of 'v' where InternalType is the datatype that Impala uses
-  /// internally to store tuple data.
+  /// internally to store tuple data. Used in some template function implementations to
+  /// determine the encoded byte size for fixed-length types.
   template <typename InternalType>
   static int ByteSize(const InternalType& v) { return sizeof(InternalType); }
 
@@ -183,6 +184,17 @@ class ParquetPlainEncoder {
   /// need not be aligned. If PARQUET_TYPE is FIXED_LEN_BYTE_ARRAY then 'fixed_len_size'
   /// is the size of the object. Otherwise, it is unused.
   /// Returns the number of bytes read or -1 if the value was not decoded successfully.
+  /// This generic template function is used with the following types:
+  /// =============================
+  /// InternalType   | PARQUET_TYPE
+  /// =============================
+  /// int32_t        | INT32
+  /// int64_t        | INT64
+  /// float          | FLOAT
+  /// double         | DOUBLE
+  /// Decimal4Value  | INT32
+  /// Decimal8Value  | INT64
+  /// TimestampValue | INT96
   template <typename InternalType, parquet::Type::type PARQUET_TYPE>
   static int Decode(const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size,
       InternalType* v) {
@@ -203,24 +215,22 @@ template <> int ParquetPlainEncoder::Encode(const bool&, int fixed_len_size, uin
 template <> int ParquetPlainEncoder::Decode<bool, parquet::Type::BOOLEAN>(const uint8_t*,
     const uint8_t*, int fixed_len_size, bool* v);
 
-/// Not used for decimals since the plain encoding encodes them using
-/// FIXED_LEN_BYTE_ARRAY.
-inline int DecimalByteSize() {
-  DCHECK(false);
-  return -1;
-}
-
 template <>
 inline int ParquetPlainEncoder::ByteSize(const Decimal4Value&) {
-  return DecimalByteSize();
+  // Only used when the decimal is stored as INT32.
+  return sizeof(Decimal4Value::StorageType);
 }
 template <>
 inline int ParquetPlainEncoder::ByteSize(const Decimal8Value&) {
-  return DecimalByteSize();
+  // Only used when the decimal is stored as INT64.
+  return sizeof(Decimal8Value::StorageType);
 }
 template <>
 inline int ParquetPlainEncoder::ByteSize(const Decimal16Value&) {
-  return DecimalByteSize();
+  // Not used, since such big decimals can only be stored as BYTE_ARRAY or
+  // FIXED_LEN_BYTE_ARRAY.
+  DCHECK(false);
+  return -1;
 }
 
 /// Parquet doesn't have 8-bit or 16-bit ints. They are converted to 32-bit.
