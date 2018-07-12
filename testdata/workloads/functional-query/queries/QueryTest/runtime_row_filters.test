@@ -401,10 +401,9 @@ select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
     on a.month = b.id and b.int_col = -3
 ---- RESULTS
 ---- CATCH
-row_regex:.*Rejected query from pool default-pool: minimum memory reservation on
- backend '.*' is greater than memory available to the query for buffer reservations\.
- Increase the buffer_pool_limit to 290.17 MB\. See the query profile for more information
- about the per-node memory requirements\.
+row_regex:.*minimum memory reservation on backend '.*' is greater than memory available to
+ the query for buffer reservations\. Increase the buffer_pool_limit to 290.17 MB\. See
+ the query profile for more information about the per-node memory requirements\.
 ====
 ---- QUERY
 # Confirm that with broadcast join, memory limit is not hit.
