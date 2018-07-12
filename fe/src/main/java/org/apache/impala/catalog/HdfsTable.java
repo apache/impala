@@ -51,7 +51,6 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
-import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
@@ -81,7 +80,6 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.AvroSchemaConverter;
-import org.apache.impala.util.AvroSchemaParser;
 import org.apache.impala.util.AvroSchemaUtils;
 import org.apache.impala.util.FsPermissionChecker;
 import org.apache.impala.util.HdfsCachingUtil;
@@ -1558,6 +1556,9 @@ public class HdfsTable extends Table implements FeFsTable {
         Schema inferredSchema = AvroSchemaConverter.convertFieldSchemas(
             msTbl.getSd().getCols(), getFullName());
         avroSchema_ = inferredSchema.toString();
+        // NOTE: below we reconcile this inferred schema back into the table
+        // schema in the case of Avro-formatted tables. This has the side effect
+        // of promoting types like TINYINT to INT.
       }
       String serdeLib = msTbl.getSd().getSerdeInfo().getSerializationLib();
       if (serdeLib == null ||
@@ -1568,25 +1569,12 @@ public class HdfsTable extends Table implements FeFsTable {
         // using the fields from the storage descriptor (same as Hive).
         return;
       } else {
-        // Generate new FieldSchemas from the Avro schema. This step reconciles
-        // differences in the column definitions and the Avro schema. For
-        // Impala-created tables this step is not necessary because the same
-        // resolution is done during table creation. But Hive-created tables
-        // store the original column definitions, and not the reconciled ones.
-        List<ColumnDef> colDefs =
-            ColumnDef.createFromFieldSchemas(msTbl.getSd().getCols());
-        List<ColumnDef> avroCols = AvroSchemaParser.parse(avroSchema_);
-        StringBuilder warning = new StringBuilder();
-        List<ColumnDef> reconciledColDefs =
-            AvroSchemaUtils.reconcileSchemas(colDefs, avroCols, warning);
-        if (warning.length() != 0) {
-          LOG.warn(String.format("Warning while loading table %s:\n%s",
-              getFullName(), warning.toString()));
-        }
-        AvroSchemaUtils.setFromSerdeComment(reconciledColDefs);
-        // Reset and update nonPartFieldSchemas_ to the reconcicled colDefs.
+        List<FieldSchema> reconciledFieldSchemas = AvroSchemaUtils.reconcileAvroSchema(
+            msTbl, avroSchema_);
+
+        // Reset and update nonPartFieldSchemas_ to the reconciled colDefs.
         nonPartFieldSchemas_.clear();
-        nonPartFieldSchemas_.addAll(ColumnDef.toFieldSchemas(reconciledColDefs));
+        nonPartFieldSchemas_.addAll(reconciledFieldSchemas);
         // Update the columns as per the reconciled colDefs and re-load stats.
         clearColumns();
         addColumnsFromFieldSchemas(msTbl.getPartitionKeys());
@@ -1802,7 +1790,7 @@ public class HdfsTable extends Table implements FeFsTable {
   public String getHdfsBaseDir() { return hdfsBaseDir_; }
   public Path getHdfsBaseDirPath() { return new Path(hdfsBaseDir_); }
   @Override // FeFsTable
-  public boolean isAvroTable() { return avroSchema_ != null; }
+  public boolean usesAvroSchemaOverride() { return avroSchema_ != null; }
 
   @Override // FeFsTable
   public ListMap<TNetworkAddress> getHostIndex() { return hostIndex_; }

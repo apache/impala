@@ -125,6 +125,31 @@ class TestPartitionMetadata(ImpalaTestSuite):
     self.run_stmt_in_hive("select * from %s" % FQ_TBL_IMP)
 
 
+class TestMixedPartitions(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestMixedPartitions, cls).add_test_dimensions()
+    # This test only needs to be run once.
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+
+  @pytest.mark.parametrize('main_table_format', ['parquetfile', 'textfile'])
+  def test_incompatible_avro_partition_in_non_avro_table(
+      self, vector, unique_database, main_table_format):
+    if main_table_format == 'parquetfile' and \
+        not pytest.config.option.use_local_catalog:
+      pytest.xfail("IMPALA-7309: adding an avro partition to a parquet table "
+                   "changes its schema")
+    self.run_test_case("QueryTest/incompatible_avro_partition", vector,
+                       unique_database,
+                       test_file_vars={'$MAIN_TABLE_FORMAT': main_table_format})
+
+
 class TestPartitionMetadataUncompressedTextOnly(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

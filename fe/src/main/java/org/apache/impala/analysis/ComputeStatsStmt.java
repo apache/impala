@@ -376,7 +376,7 @@ public class ComputeStatsStmt extends StatementBase {
     FeFsTable hdfsTable = null;
     if (table_ instanceof FeFsTable) {
       hdfsTable = (FeFsTable)table_;
-      if (hdfsTable.isAvroTable()) checkIncompleteAvroSchema(hdfsTable);
+      if (hdfsTable.usesAvroSchemaOverride()) checkIncompleteAvroSchema(hdfsTable);
       if (isIncremental_ && hdfsTable.getNumClusteringCols() == 0 &&
           partitionSet_ != null) {
         throw new AnalysisException(String.format(
@@ -653,7 +653,7 @@ public class ComputeStatsStmt extends StatementBase {
    * the column definitions match the Avro schema exactly.
    */
   private void checkIncompleteAvroSchema(FeFsTable table) throws AnalysisException {
-    Preconditions.checkState(table.isAvroTable());
+    Preconditions.checkState(table.usesAvroSchemaOverride());
     org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
     // The column definitions from 'CREATE TABLE (column definitions) ...'
     Iterator<FieldSchema> colDefs = msTable.getSd().getCols().iterator();

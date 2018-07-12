@@ -105,6 +105,10 @@ def pytest_addoption(parser):
   parser.addoption("--use_kerberos", action="store_true", default=False,
                    help="use kerberos transport for running tests")
 
+  parser.addoption("--use_local_catalog", dest="use_local_catalog", action="store_true",
+                   default=False, help="Run all tests against Impala configured with "
+                   "LocalCatalog.")
+
   parser.addoption("--sanity", action="store_true", default=False,
                    help="Runs a single test vector from each test to provide a quick "
                    "sanity check at the cost of lower test coverage.")

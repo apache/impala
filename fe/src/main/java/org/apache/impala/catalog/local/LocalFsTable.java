@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.apache.avro.Schema;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -43,6 +45,7 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.PrunablePartition;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
@@ -51,10 +54,13 @@ import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.AvroSchemaConverter;
+import org.apache.impala.util.AvroSchemaUtils;
 import org.apache.impala.util.ListMap;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -84,7 +90,6 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
    */
   private ArrayList<HashSet<Long>> nullPartitionIds_;
 
-
   /**
    * The value that will be stored in a partition name to indicate NULL.
    */
@@ -96,14 +101,77 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
    */
   private final ListMap<TNetworkAddress> hostIndex_ = new ListMap<>();
 
-  public LocalFsTable(LocalDb db, Table msTbl) {
-    super(db, msTbl);
+  /**
+   * The Avro schema for this table. Non-null if this table is an Avro table.
+   * If this table is not an Avro table, this is usually null, but may be
+   * non-null in the case that an explicit external avro schema is specified
+   * as a table property. Such a schema is used when querying Avro partitions
+   * of non-Avro tables.
+   */
+  private final String avroSchema_;
+
+  public static LocalFsTable load(LocalDb db, Table msTbl) {
+    String fullName = msTbl.getDbName() + "." + msTbl.getTableName();
+
+    // Set Avro schema if necessary.
+    String avroSchema;
+    ColumnMap cmap;
+    try {
+      // Load the avro schema if it's external (explicitly specified).
+      avroSchema = loadAvroSchema(msTbl);
+
+      // If the table's format is Avro, then we should override the columns
+      // based on the schema (either inferred or explicit). Otherwise, even if
+      // there is an Avro schema set, we don't override the table-level columns:
+      // the Avro schema in that case is just used in case there is an Avro-formatted
+      // partition.
+      if (isAvroFormat(msTbl)) {
+        if (avroSchema == null) {
+          // No Avro schema was explicitly set in the table metadata, so infer the Avro
+          // schema from the column definitions.
+          Schema inferredSchema = AvroSchemaConverter.convertFieldSchemas(
+              msTbl.getSd().getCols(), fullName);
+          avroSchema = inferredSchema.toString();
+        }
+
+        List<FieldSchema> reconciledFieldSchemas = AvroSchemaUtils.reconcileAvroSchema(
+            msTbl, avroSchema);
+        Table msTblWithExplicitAvroSchema = msTbl.deepCopy();
+        msTblWithExplicitAvroSchema.getSd().setCols(reconciledFieldSchemas);
+        cmap = ColumnMap.fromMsTable(msTblWithExplicitAvroSchema);
+      } else {
+        cmap = ColumnMap.fromMsTable(msTbl);
+      }
+
+      return new LocalFsTable(db, msTbl, cmap, avroSchema);
+    } catch (AnalysisException e) {
+      throw new LocalCatalogException("Failed to load Avro schema for table "
+          + fullName);
+    }
+  }
+
+  private LocalFsTable(LocalDb db, Table msTbl, ColumnMap cmap,
+      String explicitAvroSchema) {
+    super(db, msTbl, cmap);
 
     // set NULL indicator string from table properties
     String tableNullFormat =
         msTbl.getParameters().get(serdeConstants.SERIALIZATION_NULL_FORMAT);
     nullColumnValue_ = tableNullFormat != null ? tableNullFormat :
         FeFsTable.DEFAULT_NULL_COLUMN_VALUE;
+
+    avroSchema_ = explicitAvroSchema;
+  }
+
+  private static String loadAvroSchema(Table msTbl) throws AnalysisException {
+    List<Map<String, String>> schemaSearchLocations = ImmutableList.of(
+        msTbl.getSd().getSerdeInfo().getParameters(),
+        msTbl.getParameters());
+
+    // TODO(todd): we should consider moving this to the MetaProvider interface
+    // so that it can more easily be cached rather than re-loaded from HDFS on
+    // each table reference.
+    return AvroSchemaUtils.getAvroSchema(schemaSearchLocations);
   }
 
   /**
@@ -116,7 +184,8 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     // so we can checkState() against it in various other methods and make
     // sure we don't try to do something like load partitions for a not-yet-created
     // table.
-    return new LocalFsTable(db, msTbl);
+    return new LocalFsTable(db, msTbl, ColumnMap.fromMsTable(msTbl),
+        /*explicitAvroSchema=*/null);
   }
 
 
@@ -172,9 +241,8 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   }
 
   @Override
-  public boolean isAvroTable() {
-    // TODO Auto-generated method stub
-    return false;
+  public boolean usesAvroSchemaOverride() {
+    return isAvroFormat(msTable_);
   }
 
   @Override
@@ -238,16 +306,36 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
         createPrototypePartition(), ThriftObjectType.DESCRIPTOR_ONLY,
         /*includeIncrementalStats=*/false);
 
-    // TODO(todd): implement avro schema support
     THdfsTable hdfsTable = new THdfsTable(getHdfsBaseDir(), getColumnNames(),
         getNullPartitionKeyValue(), nullColumnValue_, idToPartition,
         tPrototypePartition);
+
+    if (avroSchema_ != null) {
+      hdfsTable.setAvroSchema(avroSchema_);
+    } else if (hasAnyAvroPartition(partitions)) {
+      // Need to infer an Avro schema for the backend to use if any of the
+      // referenced partitions are Avro, even if the table is mixed-format.
+      hdfsTable.setAvroSchema(AvroSchemaConverter.convertFieldSchemas(
+          getMetaStoreTable().getSd().getCols(), getFullName()).toString());
+    }
 
     TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
         FeCatalogUtils.getTColumnDescriptors(this),
         getNumClusteringCols(), name_, db_.getName());
     tableDesc.setHdfsTable(hdfsTable);
     return tableDesc;
+  }
+
+  private static boolean isAvroFormat(Table msTbl) {
+    String inputFormat = msTbl.getSd().getInputFormat();
+    return HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO;
+  }
+
+  private static boolean hasAnyAvroPartition(List<? extends FeFsPartition> partitions) {
+    for (FeFsPartition p : partitions) {
+      if (p.getFileFormat() == HdfsFileFormat.AVRO) return true;
+    }
+    return false;
   }
 
   private LocalFsPartition createPrototypePartition() {

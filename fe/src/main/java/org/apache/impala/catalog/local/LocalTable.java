@@ -81,7 +81,7 @@ abstract class LocalTable implements FeTable {
       // TODO(todd) support datasource table
     } else if (HdfsFileFormat.isHdfsInputFormatClass(
         msTbl.getSd().getInputFormat())) {
-      t = new LocalFsTable(db, msTbl);
+      t = LocalFsTable.load(db, msTbl);
     }
 
     if (t == null) {

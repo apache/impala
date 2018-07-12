@@ -31,15 +31,19 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.apache.impala.analysis.ColumnDef;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 /**
  * Contains utility functions for dealing with Avro schemas.
  */
-public class AvroSchemaUtils {
+public abstract class AvroSchemaUtils {
+  private final static Logger LOG = LoggerFactory.getLogger(AvroSchemaUtils.class);
 
   /**
    * Gets an Avro table's JSON schema from the list of given table property search
@@ -102,6 +106,38 @@ public class AvroSchemaUtils {
     }
     return schema;
   }
+
+  /**
+   * Reconcile the schema in 'msTbl' with the Avro schema specified in 'avroSchema'.
+   *
+   * See {@link AvroSchemaUtils#reconcileSchemas(List, List, StringBuilder) for
+   * details.
+   */
+  public static List<FieldSchema> reconcileAvroSchema(
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      String avroSchema) throws AnalysisException {
+    Preconditions.checkNotNull(msTbl);
+    Preconditions.checkNotNull(avroSchema);
+
+    // Generate new FieldSchemas from the Avro schema. This step reconciles
+    // differences in the column definitions and the Avro schema. For
+    // Impala-created tables this step is not necessary because the same
+    // resolution is done during table creation. But Hive-created tables
+    // store the original column definitions, and not the reconciled ones.
+    List<ColumnDef> colDefs =
+        ColumnDef.createFromFieldSchemas(msTbl.getSd().getCols());
+    List<ColumnDef> avroCols = AvroSchemaParser.parse(avroSchema);
+    StringBuilder warning = new StringBuilder();
+    List<ColumnDef> reconciledColDefs =
+        AvroSchemaUtils.reconcileSchemas(colDefs, avroCols, warning);
+    if (warning.length() != 0) {
+      LOG.warn(String.format("Warning while loading table %s.%s:\n%s",
+          msTbl.getDbName(), msTbl.getTableName(), warning.toString()));
+    }
+    AvroSchemaUtils.setFromSerdeComment(reconciledColDefs);
+    return ColumnDef.toFieldSchemas(reconciledColDefs);
+  }
+
 
   /**
    * Reconciles differences in names/types between the given list of column definitions

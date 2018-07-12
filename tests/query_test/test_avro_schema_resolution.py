@@ -54,4 +54,5 @@ class TestAvroSchemaResolution(ImpalaTestSuite):
     ... ADD COLUMN ...
     Test for IMPALA-3776: Fix describe formatted when changing Avro schema.
     """
+    # TODO(todd): skip the "stale metadata" tests if LocalCatalog is enabled
     self.run_test_case('QueryTest/avro-schema-changes', vector, unique_database)

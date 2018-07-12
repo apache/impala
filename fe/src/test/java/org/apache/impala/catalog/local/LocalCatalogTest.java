@@ -239,4 +239,28 @@ public class LocalCatalogTest {
         "'serialization.format'='1')"
     ));
   }
+
+  /**
+   * Test loading an Avro table which has an explicit avro schema. The schema
+   * should override the columns from the HMS.
+   */
+  @Test
+  public void testAvroExplicitSchema() throws Exception {
+    FeFsTable t = (FeFsTable)catalog_.getTable("functional_avro", "zipcode_incomes");
+    assertNotNull(t.toThriftDescriptor(0, null).hdfsTable.avroSchema);
+    assertTrue(t.usesAvroSchemaOverride());
+  }
+
+  /**
+   * Test loading a table which does not have an explicit avro schema property.
+   * In this case we create an avro schema on demand from the table schema.
+   */
+  @Test
+  public void testAvroImplicitSchema() throws Exception {
+    FeFsTable t = (FeFsTable)catalog_.getTable("functional_avro_snap", "no_avro_schema");
+    assertNotNull(t.toThriftDescriptor(0, null).hdfsTable.avroSchema);
+    // The tinyint column should get promoted to INT to be Avro-compatible.
+    assertEquals(t.getColumn("tinyint_col").getType(), Type.INT);
+    assertTrue(t.usesAvroSchemaOverride());
+  }
 }

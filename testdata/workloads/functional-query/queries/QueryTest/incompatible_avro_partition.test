@@ -1,0 +1,65 @@
+====
+---- QUERY
+create external table mixed (
+  id INT COMMENT 'int commnet',
+  bool_col BOOLEAN COMMENT 'bool commnet',
+  tinyint_col TINYINT COMMENT 'tinyint comment',
+  smallint_col SMALLINT COMMENT 'smallint comment',
+  int_col INT COMMENT 'int comment',
+  bigint_col BIGINT COMMENT 'bigint comment',
+  float_col FLOAT COMMENT 'float comment',
+  double_col DOUBLE COMMENT 'double comment',
+  date_string_col STRING COMMENT 'string comment',
+  char_col char(2) COMMENT 'char comment',
+  varchar_col varchar(5) COMMENT 'varchar comment'
+) partitioned by (part int) stored as $MAIN_TABLE_FORMAT;
+====
+---- QUERY
+# Add a first partition which is not avro
+insert into mixed partition (part = 1)
+values (
+  1, false, 2, 3, 4, 5, 6.0, 7.0, '1985-07-15',
+  cast('c2' as char(2)),
+  cast('my varchar' as varchar(5)));
+====
+---- QUERY
+# And a second partition which is avro
+alter table mixed add partition (part = 2);
+alter table mixed partition (part = 2) set fileformat avro;
+====
+---- QUERY
+# The query should still yield the original types, even though there is
+# now an avro partition.
+select * from mixed;
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, char, string, int
+---- RESULTS
+1,false,2,3,4,5,6,7,'1985-07-15','c2','my va',1
+====
+---- QUERY
+# invalidate should have no effect
+invalidate metadata mixed;
+select * from mixed;
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, char, string, int
+---- RESULTS
+1,false,2,3,4,5,6,7,'1985-07-15','c2','my va',1
+====
+---- QUERY
+# Add incompatible data in the avro partition.
+alter table mixed partition (part = 2) set location '/test-warehouse/alltypes_avro/year=2009/month=1';
+refresh mixed;
+====
+---- QUERY
+# Reading data from the Avro partition should fail.
+select * from mixed;
+---- CATCH
+Unresolvable types for column 'tinyint_col': declared column type: TINYINT, table's Avro schema type: int
+====
+---- QUERY
+# Reading data from the non-Avro partition should be fine, with the same types as before.
+select * from mixed where part = 1;
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, char, string, int
+---- RESULTS
+1,false,2,3,4,5,6,7,'1985-07-15','c2','my va',1

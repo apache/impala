@@ -145,6 +145,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if use_exclusive_coordinators:
       cmd.append("--use_exclusive_coordinators")
 
+    if pytest.config.option.use_local_catalog:
+      cmd.append("--impalad_args=--use_local_catalog=1")
+
     if os.environ.get("ERASURE_CODING") == "true":
       cmd.append("--impalad_args=--default_query_options=allow_erasure_coded_files=true")
 
