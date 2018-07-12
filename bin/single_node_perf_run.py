@@ -227,7 +227,8 @@ def perf_ab_test(options, args):
   workloads = set(options.workloads.split(","))
 
   if options.load:
-    WORKLOAD_TO_DATASET = {"tpch": "tpch", "tpcds": "tpcds", "targeted-perf": "tpch"}
+    WORKLOAD_TO_DATASET = {"tpch": "tpch", "tpcds": "tpcds", "targeted-perf": "tpch",
+                           "tpcds-unmodified": "tpcds-unmodified"}
     datasets = set([WORKLOAD_TO_DATASET[workload] for workload in workloads])
     for dataset in datasets:
       load_data(dataset, options.table_formats, options.scale)
