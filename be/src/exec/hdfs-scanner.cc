@@ -491,7 +491,6 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanNodeBase* node,
         stringstream ss;
         ss << "Failed to codegen conjunct: " << status.GetDetail();
         state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
-        fn->eraseFromParent();
         return status;
       }
       if (node->materialized_slots().size() + conjunct_idx
