@@ -119,9 +119,18 @@ namespace impala {
 
 bool LlvmCodeGen::llvm_initialized_ = false;
 string LlvmCodeGen::cpu_name_;
-vector<string> LlvmCodeGen::cpu_attrs_;
+std::unordered_set<string> LlvmCodeGen::cpu_attrs_;
 string LlvmCodeGen::target_features_attr_;
 CodegenCallGraph LlvmCodeGen::shared_call_graph_;
+
+const map<int64_t, std::string> LlvmCodeGen::cpu_flag_mappings_{
+    {CpuInfo::SSSE3, "+ssse3"}, {CpuInfo::SSE4_1, "+sse4.1"},
+    {CpuInfo::SSE4_2, "+sse4.2"}, {CpuInfo::POPCNT, "+popcnt"}, {CpuInfo::AVX, "+avx"},
+    {CpuInfo::AVX2, "+avx2"}, {CpuInfo::PCLMULQDQ, "+pclmul"},
+    {~(CpuInfo::SSSE3), "-ssse3"}, {~(CpuInfo::SSE4_1), "-sse4.1"},
+    {~(CpuInfo::SSE4_2), "-sse4.2"}, {~(CpuInfo::POPCNT), "-popcnt"},
+    {~(CpuInfo::AVX), "-avx"}, {~(CpuInfo::AVX2), "-avx2"},
+    {~(CpuInfo::PCLMULQDQ), "-pclmul"}};
 
 [[noreturn]] static void LlvmCodegenHandleError(
     void* user_data, const string& reason, bool gen_crash_diag) {
@@ -238,7 +247,7 @@ Status LlvmCodeGen::CreateFromMemory(RuntimeState* state, ObjectPool* pool,
   // a machine without SSE4.2 support.
   llvm::StringRef module_ir;
   string module_name;
-  if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
+  if (IsCPUFeatureEnabled(CpuInfo::SSE4_2)) {
     module_ir = llvm::StringRef(
         reinterpret_cast<const char*>(impala_sse_llvm_ir), impala_sse_llvm_ir_len);
     module_name = "Impala IR with SSE 4.2 support";
@@ -471,15 +480,22 @@ void LlvmCodeGen::EnableOptimizations(bool enable) {
   optimizations_enabled_ = enable;
 }
 
-void LlvmCodeGen::GetHostCPUAttrs(vector<string>* attrs) {
+void LlvmCodeGen::GetHostCPUAttrs(std::unordered_set<string>* attrs) {
   // LLVM's ExecutionEngine expects features to be enabled or disabled with a list
   // of strings like ["+feature1", "-feature2"].
   llvm::StringMap<bool> cpu_features;
   llvm::sys::getHostCPUFeatures(cpu_features);
   for (const llvm::StringMapEntry<bool>& entry : cpu_features) {
-    attrs->emplace_back(
-        Substitute("$0$1", entry.second ? "+" : "-", entry.first().data()));
+    attrs->emplace(Substitute("$0$1", entry.second ? "+" : "-", entry.first().data()));
   }
+}
+
+bool LlvmCodeGen::IsCPUFeatureEnabled(int64_t flag) {
+  DCHECK(llvm_initialized_);
+  auto enable_flag_it = cpu_flag_mappings_.find(flag);
+  DCHECK(enable_flag_it != cpu_flag_mappings_.end());
+  const std::string& enabled_feature = enable_flag_it->second;
+  return cpu_attrs_.find(enabled_feature) != cpu_attrs_.end();
 }
 
 string LlvmCodeGen::GetIR(bool full_module) const {
@@ -1526,7 +1542,7 @@ void LlvmCodeGen::ClearHashFns() {
 //   ret i32 %12
 // }
 llvm::Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
-  if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
+  if (IsCPUFeatureEnabled(CpuInfo::SSE4_2)) {
     if (num_bytes == -1) {
       // -1 indicates variable length, just return the generic loop based
       // hash fn.
@@ -1671,8 +1687,9 @@ llvm::Constant* LlvmCodeGen::ConstantsToGVArrayPtr(llvm::Type* element_type,
   return ConstantToGVPtr(array_type, array_const, name);
 }
 
-vector<string> LlvmCodeGen::ApplyCpuAttrWhitelist(const vector<string>& cpu_attrs) {
-  vector<string> result;
+std::unordered_set<string> LlvmCodeGen::ApplyCpuAttrWhitelist(
+    const std::unordered_set<string>& cpu_attrs) {
+  std::unordered_set<string> result;
   vector<string> attr_whitelist;
   boost::split(attr_whitelist, FLAGS_llvm_cpu_attr_whitelist, boost::is_any_of(","));
   for (const string& attr : cpu_attrs) {
@@ -1680,17 +1697,17 @@ vector<string> LlvmCodeGen::ApplyCpuAttrWhitelist(const vector<string>& cpu_attr
     DCHECK(attr[0] == '-' || attr[0] == '+') << attr;
     if (attr[0] == '-') {
       // Already disabled - copy it over unmodified.
-      result.push_back(attr);
+      result.insert(attr);
       continue;
     }
     const string attr_name = attr.substr(1);
     auto it = std::find(attr_whitelist.begin(), attr_whitelist.end(), attr_name);
     if (it != attr_whitelist.end()) {
       // In whitelist - copy it over unmodified.
-      result.push_back(attr);
+      result.insert(attr);
     } else {
       // Not in whitelist - disable it.
-      result.push_back("-" + attr_name);
+      result.insert("-" + attr_name);
     }
   }
   return result;

@@ -238,7 +238,10 @@ class LlvmCodeGen {
   };
 
   /// Get host cpu attributes in format expected by EngineBuilder.
-  static void GetHostCPUAttrs(std::vector<std::string>* attrs);
+  static void GetHostCPUAttrs(std::unordered_set<std::string>* attrs);
+
+  /// Returns whether or not this cpu feature is supported.
+  static bool IsCPUFeatureEnabled(int64_t flag);
 
   /// Return a pointer type to 'type'
   llvm::PointerType* GetPtrType(llvm::Type* type);
@@ -593,6 +596,7 @@ class LlvmCodeGen {
   friend class ExprCodegenTest;
   friend class LlvmCodeGenTest;
   friend class LlvmCodeGenTest_CpuAttrWhitelist_Test;
+  friend class LlvmCodeGenTest_HashTest_Test;
   friend class SubExprElimination;
 
   /// Top level codegen object. 'module_id' is used for debugging when outputting the IR.
@@ -714,20 +718,28 @@ class LlvmCodeGen {
   /// always present in the output, except "+" is flipped to "-" for the disabled
   /// attributes. E.g. if 'cpu_attrs' is {"+x", "+y", "-z"} and the whitelist is
   /// {"x", "z"}, returns {"+x", "-y", "-z"}.
-  static std::vector<std::string> ApplyCpuAttrWhitelist(
-      const std::vector<std::string>& cpu_attrs);
+  static std::unordered_set<std::string> ApplyCpuAttrWhitelist(
+      const std::unordered_set<std::string>& cpu_attrs);
 
   /// Whether InitializeLlvm() has been called.
   static bool llvm_initialized_;
 
   /// Host CPU name and attributes, filled in by InitializeLlvm().
   static std::string cpu_name_;
-  static std::vector<std::string> cpu_attrs_;
+  /// The cpu_attrs_ should not be modified during the execution except for tests.
+  static std::unordered_set<std::string> cpu_attrs_;
 
   /// Value of "target-features" attribute to be set on all IR functions. Derived from
-  /// 'cpu_attrs_'. Using a consistent value for this attribute among hand-crafted IR
-  /// and cross-compiled functions allow them to be inlined into each other.
+  /// 'cpu_attrs_'. Using a consistent value for this attribute among
+  /// hand-crafted IR and cross-compiled functions allow them to be inlined into each
+  /// other.
   static std::string target_features_attr_;
+
+  /// Mapping between CpuInfo flags and the corresponding strings.
+  /// The key is mapped to the string as follows:
+  /// CpuInfo flag -> enabled feature.
+  /// Bitwise negation of CpuInfo flag -> disabled feature.
+  const static std::map<int64_t, std::string> cpu_flag_mappings_;
 
   /// A global shared call graph for all IR functions in the main module.
   /// Used for determining dependencies when materializing IR functions.

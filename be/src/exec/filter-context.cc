@@ -388,7 +388,7 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
 
     // Call Insert() on the bloom filter.
     llvm::Function* insert_bloom_filter_fn;
-    if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
+    if (LlvmCodeGen::IsCPUFeatureEnabled(CpuInfo::AVX2)) {
       insert_bloom_filter_fn =
           codegen->GetFunction(IRFunction::BLOOM_FILTER_INSERT_AVX2, false);
     } else {
