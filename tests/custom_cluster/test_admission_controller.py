@@ -517,7 +517,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       self.execute_query(query, exec_options)
     except ImpalaBeeswaxException as e:
       assert re.search("Rejected query from pool \S+: request memory needed 3.00 GB per "
-          "node is greater than process mem limit 2.00 GB of \S+", str(e)), str(e)
+          "node is greater than memory available for admission 2.00 GB of \S+", str(e)), \
+          str(e)
     # Exercise queuing checks in admission controller.
     try:
       # Wait for previous queries to finish to avoid flakiness.

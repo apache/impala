@@ -33,6 +33,7 @@ using boost::lock_guard;
 using namespace impala;
 using namespace strings;
 
+DECLARE_bool(mem_limit_includes_jvm);
 DECLARE_bool(mmap_buffers);
 DEFINE_bool_hidden(enable_extended_memory_metrics, false,
     "(Experimental) enable extended memory metrics, including those that can be "
@@ -55,6 +56,10 @@ TcmallocMetric* TcmallocMetric::PAGEHEAP_UNMAPPED_BYTES = nullptr;
 TcmallocMetric::PhysicalBytesMetric* TcmallocMetric::PHYSICAL_BYTES_RESERVED = nullptr;
 
 SanitizerMallocMetric* SanitizerMallocMetric::BYTES_ALLOCATED = nullptr;
+
+bool JvmMemoryMetric::initialized_ = false;
+JvmMemoryMetric* JvmMemoryMetric::HEAP_MAX_USAGE = nullptr;
+JvmMemoryMetric* JvmMemoryMetric::NON_HEAP_COMMITTED = nullptr;
 
 BufferPoolMetric* BufferPoolMetric::LIMIT = nullptr;
 BufferPoolMetric* BufferPoolMetric::SYSTEM_ALLOCATED = nullptr;
@@ -87,7 +92,13 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
     // properly tracked.
     used_metrics.push_back(BufferPoolMetric::SYSTEM_ALLOCATED);
   }
-
+  if (register_jvm_metrics) {
+    JvmMemoryMetric::InitMetrics(metrics);
+    if (FLAGS_mem_limit_includes_jvm) {
+      used_metrics.push_back(JvmMemoryMetric::HEAP_MAX_USAGE);
+      used_metrics.push_back(JvmMemoryMetric::NON_HEAP_COMMITTED);
+    }
+  }
 #if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
   SanitizerMallocMetric::BYTES_ALLOCATED = metrics->RegisterMetric(
       new SanitizerMallocMetric(MetricDefs::Get("sanitizer-total-bytes-allocated")));
@@ -118,13 +129,9 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
   MetricGroup* aggregate_metrics = metrics->GetOrCreateChildGroup("memory");
   AggregateMemoryMetrics::TOTAL_USED = aggregate_metrics->RegisterMetric(
       new SumGauge(MetricDefs::Get("memory.total-used"), used_metrics));
-  if (register_jvm_metrics) {
-    RETURN_IF_ERROR(JvmMemoryMetric::InitMetrics(metrics->GetOrCreateChildGroup("jvm")));
-  }
 
   if (FLAGS_enable_extended_memory_metrics && MemInfo::HaveSmaps()) {
-    AggregateMemoryMetrics::NUM_MAPS =
-        aggregate_metrics->AddGauge("memory.num-maps", 0U);
+    AggregateMemoryMetrics::NUM_MAPS = aggregate_metrics->AddGauge("memory.num-maps", 0U);
     AggregateMemoryMetrics::ANON_HUGE_PAGE_BYTES =
         aggregate_metrics->AddGauge("memory.anon-huge-page-bytes", 0U);
   }
@@ -179,19 +186,22 @@ int64_t JvmMemoryMetric::GetValue() {
   return JvmMetricCache::GetInstance()->GetPoolMetric(mempool_name_, metric_type_);
 }
 
-Status JvmMemoryMetric::InitMetrics(MetricGroup* metrics) {
+void JvmMemoryMetric::InitMetrics(MetricGroup* parent) {
+  if (initialized_) return;
+  MetricGroup* metrics = parent->GetOrCreateChildGroup("jvm");
   vector<string> names = JvmMetricCache::GetInstance()->GetPoolNames();
-  for (const string& name: names) {
-    JvmMemoryMetric::CreateAndRegister(
-        metrics, "jvm.$0.max-usage-bytes", name, MAX);
+  for (const string& name : names) {
+    JvmMemoryMetric* pool_max_usage =
+        JvmMemoryMetric::CreateAndRegister(metrics, "jvm.$0.max-usage-bytes", name, MAX);
+    if (name == "heap") HEAP_MAX_USAGE = pool_max_usage;
     JvmMemoryMetric::CreateAndRegister(
         metrics, "jvm.$0.current-usage-bytes", name, CURRENT);
-    JvmMemoryMetric::CreateAndRegister(
+    JvmMemoryMetric* pool_committed = JvmMemoryMetric::CreateAndRegister(
         metrics, "jvm.$0.committed-usage-bytes", name, COMMITTED);
+    if (name == "non-heap") NON_HEAP_COMMITTED = pool_committed;
+    JvmMemoryMetric::CreateAndRegister(metrics, "jvm.$0.init-usage-bytes", name, INIT);
     JvmMemoryMetric::CreateAndRegister(
-        metrics, "jvm.$0.init-usage-bytes", name, INIT);
-    JvmMemoryMetric::CreateAndRegister(metrics, "jvm.$0.peak-max-usage-bytes", name,
-        PEAK_MAX);
+        metrics, "jvm.$0.peak-max-usage-bytes", name, PEAK_MAX);
     JvmMemoryMetric::CreateAndRegister(
         metrics, "jvm.$0.peak-current-usage-bytes", name, PEAK_CURRENT);
     JvmMemoryMetric::CreateAndRegister(
@@ -215,7 +225,7 @@ Status JvmMemoryMetric::InitMetrics(MetricGroup* metrics) {
       "jvm.gc_total_extra_sleep_time_millis", [](const TGetJvmMemoryMetricsResponse& r) {
       return r.gc_total_extra_sleep_time_millis;
   });
-  return Status::OK();
+  initialized_ = true;
 }
 
 JvmMemoryCounterMetric* JvmMemoryCounterMetric::CreateAndRegister(

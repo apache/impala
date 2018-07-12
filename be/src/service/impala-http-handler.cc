@@ -845,6 +845,9 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::ArgumentMap& args,
         document->GetAllocator());
     backend_obj.AddMember("is_executor", backend.is_executor, document->GetAllocator());
     backend_obj.AddMember("is_quiescing", backend.is_quiescing, document->GetAllocator());
+    Value admit_mem_limit(PrettyPrinter::PrintBytes(backend.admit_mem_limit).c_str(),
+        document->GetAllocator());
+    backend_obj.AddMember("admit_mem_limit", admit_mem_limit, document->GetAllocator());
     backends_list.PushBack(backend_obj, document->GetAllocator());
   }
   document->AddMember("backends", backends_list, document->GetAllocator());

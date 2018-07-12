@@ -204,13 +204,25 @@ class JvmMetricCache {
 /// generation, survivor space, code cache and permanently tenured objects.
 class JvmMemoryMetric : public IntGauge {
  public:
-  /// Registers many Jvm memory metrics: one for every member of JvmMemoryMetricType for
-  /// each pool (usually ~5 pools plus a synthetic 'total' pool).
-  static Status InitMetrics(MetricGroup* metrics) WARN_UNUSED_RESULT;
+  /// Adds a "jvm" child group to 'parent' and registers many Jvm memory metrics: one
+  /// for every member of JvmMemoryMetricType for each pool (usually ~5 pools plus a
+  /// synthetic 'total' pool).
+  /// Idempotent but not thread-safe - can be safely called multiple times from the same
+  /// thread.
+  static void InitMetrics(MetricGroup* parent);
 
   /// Searches through jvm_metrics_response_ for a matching memory pool and pulls out the
   /// right value from that structure according to metric_type_.
   virtual int64_t GetValue() override;
+
+  // Expose the total memory metrics that may be counted against process memory limit.
+  // Initialised by InitMetrics().
+
+  // The jvm.heap.max-usage-bytes metric.
+  static JvmMemoryMetric* HEAP_MAX_USAGE;
+
+  // The jvm.non-heap.committed-usage-bytes metric.
+  static JvmMemoryMetric* NON_HEAP_COMMITTED;
 
  private:
   static JvmMemoryMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
@@ -226,6 +238,9 @@ class JvmMemoryMetric : public IntGauge {
   /// Each metric corresponds to one value; this tells us which value from the memory pool
   /// that is.
   JvmMemoryMetricType metric_type_;
+
+  /// Set the first time that InitMetrics() is called.
+  static bool initialized_;
 };
 
 // A counter that represents metrics about JVM Memory. It acesses the underlying

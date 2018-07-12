@@ -53,13 +53,18 @@ DEFINE_string(krb5_conf, "", "Absolute path to Kerberos krb5.conf if in a non-st
     "location. Does not normally need to be set.");
 DEFINE_string(krb5_debug_file, "", "Turn on Kerberos debugging and output to this file");
 
-static const string mem_limit_help_msg = "Limit on process memory consumption, "
-    "excluding the JVM's memory consumption. "
+static const string mem_limit_help_msg = "Limit on process memory consumption. "
+    "Includes the JVM's memory consumption only if --mem_limit_includes_jvm is true. "
     + Substitute(MEM_UNITS_HELP_MSG, "the physical memory");
 DEFINE_string(mem_limit, "80%",  mem_limit_help_msg.c_str());
 
+DEFINE_bool(mem_limit_includes_jvm, false,
+    "If true, --mem_limit will include the JVM's max heap size and committed memory in "
+    "the process memory limit.");
+
 static const string buffer_pool_limit_help_msg = "(Advanced) Limit on buffer pool size. "
-     + Substitute(MEM_UNITS_HELP_MSG, "the process memory limit") + " "
+     + Substitute(MEM_UNITS_HELP_MSG, "the process memory limit (minus the JVM heap if "
+       "--mem_limit_includes_jvm is true)") + " "
     "The default value and behaviour of this flag may change between releases.";
 DEFINE_string(buffer_pool_limit, "85%", buffer_pool_limit_help_msg.c_str());
 

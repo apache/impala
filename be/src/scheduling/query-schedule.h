@@ -72,9 +72,10 @@ struct BackendExecParams {
   // concurrently-executing fragment instances at any point in query execution.
   int64_t thread_reservation = 0;
 
-  // The process memory limit of this backend. Obtained from the scheduler's executors
-  // configuration which is updated by membership updates from the statestore.
-  int64_t proc_mem_limit = 0;
+  // The maximum bytes of memory that can be admitted to this backend by the
+  // admission controller. Obtained from the scheduler's executors configuration
+  // which is updated by membership updates from the statestore.
+  int64_t admit_mem_limit = 0;
 };
 
 /// map from an impalad host address to the list of assigned fragment instance params.

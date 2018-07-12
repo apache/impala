@@ -106,6 +106,7 @@ DECLARE_int32(num_cores);
 DECLARE_int32(be_port);
 DECLARE_int32(krpc_port);
 DECLARE_string(mem_limit);
+DECLARE_bool(mem_limit_includes_jvm);
 DECLARE_string(buffer_pool_limit);
 DECLARE_string(buffer_pool_clean_pages_limit);
 DECLARE_int64(min_buffer_size);
@@ -262,12 +263,25 @@ Status ExecEnv::Init() {
           "bytes value or percentage: $0", FLAGS_mem_limit));
   }
 
+  // Need to register JVM metrics first so that we can use them to compute the buffer pool
+  // limit.
+  JvmMemoryMetric::InitMetrics(metrics_.get());
   if (!BitUtil::IsPowerOf2(FLAGS_min_buffer_size)) {
     return Status(Substitute(
         "--min_buffer_size must be a power-of-two: $0", FLAGS_min_buffer_size));
   }
+  // The bytes limit we want to size everything else as a fraction of, excluding the
+  // JVM.
+  int64_t post_jvm_bytes_limit = bytes_limit;
+  if (FLAGS_mem_limit_includes_jvm) {
+    // The JVM max heap size is static and therefore known at this point. Other categories
+    // of JVM memory consumption are much smaller and dynamic so it is simpler not to
+    // include them here.
+    post_jvm_bytes_limit -= JvmMemoryMetric::HEAP_MAX_USAGE->GetValue();
+  }
+
   int64_t buffer_pool_limit = ParseUtil::ParseMemSpec(FLAGS_buffer_pool_limit,
-      &is_percent, bytes_limit);
+      &is_percent, post_jvm_bytes_limit);
   if (buffer_pool_limit <= 0) {
     return Status(Substitute("Invalid --buffer_pool_limit value, must be a percentage or "
           "positive bytes value or percentage: $0", FLAGS_buffer_pool_limit));
@@ -299,6 +313,13 @@ Status ExecEnv::Init() {
       "Buffer Pool: Free Buffers", mem_tracker_.get()));
   obj_pool_->Add(new MemTracker(BufferPoolMetric::CLEAN_PAGE_BYTES, -1,
       "Buffer Pool: Clean Pages", mem_tracker_.get()));
+  if (FLAGS_mem_limit_includes_jvm) {
+    // Add JVM metrics that should count against the process memory limit.
+    obj_pool_->Add(new MemTracker(
+        JvmMemoryMetric::HEAP_MAX_USAGE, -1, "JVM: max heap size", mem_tracker_.get()));
+    obj_pool_->Add(new MemTracker(JvmMemoryMetric::NON_HEAP_COMMITTED, -1,
+        "JVM: non-heap committed", mem_tracker_.get()));
+  }
   // Also need a MemTracker for unused reservations as a negative value. Unused
   // reservations are counted against queries but not against the process memory
   // consumption. This accounts for that difference.

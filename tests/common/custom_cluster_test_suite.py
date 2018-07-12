@@ -32,8 +32,8 @@ from tests.util.filesystem_utils import IS_LOCAL
 from time import sleep
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
-CLUSTER_SIZE = 3
-NUM_COORDINATORS = CLUSTER_SIZE
+DEFAULT_CLUSTER_SIZE = 3
+NUM_COORDINATORS = DEFAULT_CLUSTER_SIZE
 
 # Additional args passed to respective daemon command line.
 IMPALAD_ARGS = 'impalad_args'
@@ -43,6 +43,7 @@ CATALOGD_ARGS = 'catalogd_args'
 START_ARGS = 'start_args'
 SENTRY_CONFIG = 'sentry_config'
 SENTRY_LOG_DIR = 'sentry_log_dir'
+CLUSTER_SIZE = "cluster_size"
 # Default query options passed to the impala daemon command line. Handled separately from
 # other impala daemon arguments to allow merging multiple defaults into a single list.
 DEFAULT_QUERY_OPTIONS = 'default_query_options'
@@ -98,7 +99,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   @staticmethod
   def with_args(impalad_args=None, statestored_args=None, catalogd_args=None,
       start_args=None, sentry_config=None, default_query_options=None,
-      impala_log_dir=None, sentry_log_dir=None):
+      impala_log_dir=None, sentry_log_dir=None, cluster_size=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -121,6 +122,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[DEFAULT_QUERY_OPTIONS] = default_query_options
       if impala_log_dir is not None:
         func.func_dict[IMPALA_LOG_DIR] = impala_log_dir
+      if cluster_size is not None:
+        func.func_dict[CLUSTER_SIZE] = cluster_size
       return func
     return decorate
 
@@ -135,14 +138,21 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if SENTRY_CONFIG in method.func_dict:
       self._start_sentry_service(method.func_dict[SENTRY_CONFIG],
           method.func_dict.get(SENTRY_LOG_DIR))
+
+    cluster_size = DEFAULT_CLUSTER_SIZE
+    if CLUSTER_SIZE in method.func_dict:
+      cluster_size = method.func_dict[CLUSTER_SIZE]
+
     # Start a clean new cluster before each test
     if IMPALA_LOG_DIR in method.func_dict:
       self._start_impala_cluster(cluster_args,
           default_query_options=method.func_dict.get(DEFAULT_QUERY_OPTIONS),
-          impala_log_dir=method.func_dict[IMPALA_LOG_DIR])
+          impala_log_dir=method.func_dict[IMPALA_LOG_DIR], cluster_size=cluster_size)
     else:
       self._start_impala_cluster(cluster_args,
-          default_query_options=method.func_dict.get(DEFAULT_QUERY_OPTIONS))
+          default_query_options=method.func_dict.get(DEFAULT_QUERY_OPTIONS),
+          cluster_size=cluster_size, num_coordinators=cluster_size,
+          expected_num_executors=cluster_size)
     super(CustomClusterTestSuite, self).setup_class()
 
   def teardown_method(self, method):
@@ -178,9 +188,9 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   @classmethod
   def _start_impala_cluster(cls, options, impala_log_dir=os.getenv('LOG_DIR', "/tmp/"),
-      cluster_size=CLUSTER_SIZE, num_coordinators=NUM_COORDINATORS,
-      use_exclusive_coordinators=False, log_level=1, expected_num_executors=CLUSTER_SIZE,
-      default_query_options=None):
+      cluster_size=DEFAULT_CLUSTER_SIZE, num_coordinators=NUM_COORDINATORS,
+      use_exclusive_coordinators=False, log_level=1,
+      expected_num_executors=DEFAULT_CLUSTER_SIZE, default_query_options=None):
     cls.impala_log_dir = impala_log_dir
     # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
     # certain custom startup arguments work and we want to keep them independent of dev

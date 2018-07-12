@@ -147,8 +147,9 @@ const string REASON_REQ_OVER_POOL_MEM =
     "The total memory needed is the per-node MEM_LIMIT times the number of nodes "
     "executing the query. See the Admission Control documentation for more information.";
 const string REASON_REQ_OVER_NODE_MEM =
-    "request memory needed $0 per node is greater than process mem limit $1 of $2.\n\n"
-    "Use the MEM_LIMIT query option to indicate how much memory is required per node.";
+    "request memory needed $0 per node is greater than memory available for admission $1 "
+    "of $2.\n\nUse the MEM_LIMIT query option to indicate how much memory is required "
+    "per node.";
 const string REASON_THREAD_RESERVATION_LIMIT_EXCEEDED =
     "thread reservation on backend '$0' is greater than the THREAD_RESERVATION_LIMIT "
     "query option value: $1 > $2.";
@@ -394,20 +395,20 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host = entry.first;
     const string host_id = TNetworkAddressToString(host);
-    int64_t proc_mem_limit = entry.second.proc_mem_limit;
+    int64_t admit_mem_limit = entry.second.admit_mem_limit;
     int64_t mem_reserved = host_mem_reserved_[host_id];
     int64_t mem_admitted = host_mem_admitted_[host_id];
     VLOG_ROW << "Checking memory on host=" << host_id
              << " mem_reserved=" << PrintBytes(mem_reserved)
              << " mem_admitted=" << PrintBytes(mem_admitted)
              << " needs=" << PrintBytes(per_host_mem_to_admit)
-             << " proc_limit=" << PrintBytes(proc_mem_limit);
+             << " admit_mem_limit=" << PrintBytes(admit_mem_limit);
     int64_t effective_host_mem_reserved = std::max(mem_reserved, mem_admitted);
-    if (effective_host_mem_reserved + per_host_mem_to_admit > proc_mem_limit) {
-      *mem_unavailable_reason = Substitute(HOST_MEM_NOT_AVAILABLE, host_id,
-          PrintBytes(per_host_mem_to_admit),
-          PrintBytes(max(proc_mem_limit - effective_host_mem_reserved, 0L)),
-          PrintBytes(proc_mem_limit));
+    if (effective_host_mem_reserved + per_host_mem_to_admit > admit_mem_limit) {
+      *mem_unavailable_reason =
+          Substitute(HOST_MEM_NOT_AVAILABLE, host_id, PrintBytes(per_host_mem_to_admit),
+              PrintBytes(max(admit_mem_limit - effective_host_mem_reserved, 0L)),
+              PrintBytes(admit_mem_limit));
       return false;
     }
   }
@@ -462,11 +463,11 @@ bool AdmissionController::RejectImmediately(const QuerySchedule& schedule,
 
   // Compute the max (over all backends) and cluster total (across all backends) for
   // min_mem_reservation_bytes and thread_reservation and the min (over all backends)
-  // min_proc_mem_limit.
+  // min_admit_mem_limit.
   pair<const TNetworkAddress*, int64_t> largest_min_mem_reservation(nullptr, -1);
   int64_t cluster_min_mem_reservation_bytes = 0;
   pair<const TNetworkAddress*, int64_t> max_thread_reservation(nullptr, 0);
-  pair<const TNetworkAddress*, int64_t> min_proc_mem_limit(
+  pair<const TNetworkAddress*, int64_t> min_admit_mem_limit(
       nullptr, std::numeric_limits<int64_t>::max());
   int64_t cluster_thread_reservation = 0;
   for (const auto& e : schedule.per_backend_exec_params()) {
@@ -479,9 +480,9 @@ bool AdmissionController::RejectImmediately(const QuerySchedule& schedule,
     if (e.second.thread_reservation > max_thread_reservation.second) {
       max_thread_reservation = make_pair(&e.first, e.second.thread_reservation);
     }
-    if (e.second.proc_mem_limit < min_proc_mem_limit.second) {
-      min_proc_mem_limit.first = &e.first;
-      min_proc_mem_limit.second = e.second.proc_mem_limit;
+    if (e.second.admit_mem_limit < min_admit_mem_limit.second) {
+      min_admit_mem_limit.first = &e.first;
+      min_admit_mem_limit.second = e.second.admit_mem_limit;
     }
   }
 
@@ -542,10 +543,10 @@ bool AdmissionController::RejectImmediately(const QuerySchedule& schedule,
       return true;
     }
     int64_t per_backend_mem_to_admit = schedule.per_backend_mem_to_admit();
-    if (per_backend_mem_to_admit > min_proc_mem_limit.second) {
+    if (per_backend_mem_to_admit > min_admit_mem_limit.second) {
       *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
-          PrintBytes(per_backend_mem_to_admit), PrintBytes(min_proc_mem_limit.second),
-          TNetworkAddressToString(*min_proc_mem_limit.first));
+          PrintBytes(per_backend_mem_to_admit), PrintBytes(min_admit_mem_limit.second),
+          TNetworkAddressToString(*min_admit_mem_limit.first));
       return true;
     }
   }

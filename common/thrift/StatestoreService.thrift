@@ -72,8 +72,8 @@ struct TBackendDescriptor {
   // IP address + port of KRPC based ImpalaInternalService on this backend
   7: optional Types.TNetworkAddress krpc_address;
 
-  // The process memory limit of this backend (in bytes).
-  8: required i64 proc_mem_limit;
+  // The amount of memory that can be admitted to this backend (in bytes).
+  8: required i64 admit_mem_limit;
 
   // True if fragment instances should not be scheduled on this daemon because the
   // daemon has been quiescing, e.g. if it shutting down.
