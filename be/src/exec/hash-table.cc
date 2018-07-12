@@ -763,7 +763,6 @@ Status HashTableCtx::CodegenEvalRow(
     llvm::Function* expr_fn;
     Status status = exprs[i]->GetCodegendComputeFn(codegen, &expr_fn);
     if (!status.ok()) {
-      (*fn)->eraseFromParent(); // deletes function
       *fn = NULL;
       return Status(Substitute(
           "Problem with HashTableCtx::CodegenEvalRow(): $0", status.GetDetail()));
@@ -1113,7 +1112,6 @@ Status HashTableCtx::CodegenEquals(
     llvm::Function* expr_fn;
     Status status = build_exprs_[i]->GetCodegendComputeFn(codegen, &expr_fn);
     if (!status.ok()) {
-      (*fn)->eraseFromParent(); // deletes function
       *fn = NULL;
       return Status(
           Substitute("Problem with HashTableCtx::CodegenEquals: $0", status.GetDetail()));
