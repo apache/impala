@@ -59,6 +59,18 @@ try:
 except Exception:
   pass
 
+def strip_comments(sql):
+  """sqlparse default implementation of strip comments has a bad performance when parsing
+  very large SQL due to the grouping. This is because the default implementation tries to
+  format the SQL for pretty-printing. Impala shell use of strip comments is mostly for
+  checking and not for altering the actual SQL, so having a pretty-formatted SQL is
+  irrelevant in Impala shell. Removing the grouping gives a significant performance boost.
+  """
+  stack = sqlparse.engine.FilterStack()
+  stack.stmtprocess.append(sqlparse.filters.StripCommentsFilter())
+  stack.postprocess.append(sqlparse.filters.SerializerUnicode())
+  return ''.join(stack.run(sql, 'utf-8')).strip()
+
 class CmdStatus:
   """Values indicate the execution status of a command to the cmd shell driver module
   SUCCESS and ERROR continue running the shell and ABORT exits the shell
@@ -400,13 +412,13 @@ class ImpalaShell(object, cmd.Cmd):
     # Strip any comments to make a statement such as the following be considered as
     # ending with a delimiter:
     # select 1 + 1; -- this is a comment
-    line = sqlparse.format(line, strip_comments=True).encode('utf-8').rstrip()
+    line = strip_comments(line).encode('utf-8').rstrip()
     if line.endswith(ImpalaShell.CMD_DELIM):
       try:
         # Look for an open quotation in the entire command, and not just the
         # current line.
         if self.partial_cmd:
-          line = sqlparse.format('%s %s' % (self.partial_cmd, line), strip_comments=True)
+          line = strip_comments('%s %s' % (self.partial_cmd, line))
         self._shlex_split(line)
         return True
       # If the command ends with a delimiter, check if it has an open quotation.
@@ -1138,7 +1150,7 @@ class ImpalaShell(object, cmd.Cmd):
     query = self._create_beeswax_query(args)
     # Set posix=True and add "'" to escaped quotes
     # to deal with escaped quotes in string literals
-    lexer = shlex.shlex(sqlparse.format(query.query.lstrip(), strip_comments=True)
+    lexer = shlex.shlex(strip_comments(query.query.lstrip())
                         .encode('utf-8'), posix=True)
     lexer.escapedquotes += "'"
     try:
@@ -1341,24 +1353,31 @@ class ImpalaShell(object, cmd.Cmd):
       def _process(self, tlist):
         token = tlist.token_first()
         if self._is_comment(token):
-          self.comment = token.value
-          tidx = tlist.token_index(token)
-          tlist.tokens.pop(tidx)
+          self.comment = ''
+          while token:
+            if self._is_comment(token) or self._is_whitespace(token):
+              tidx = tlist.token_index(token)
+              self.comment += token.value
+              tlist.tokens.pop(tidx)
+              tidx -= 1
+              token = tlist.token_next(tidx, False)
+            else:
+              break
 
       def _is_comment(self, token):
-        if isinstance(token, sqlparse.sql.Comment):
-          return True
-        for comment in sqlparse.tokens.Comment:
-          if token.ttype == comment:
-            return True
-        return False
+        return isinstance(token, sqlparse.sql.Comment) or \
+               token.ttype == sqlparse.tokens.Comment.Single or \
+               token.ttype == sqlparse.tokens.Comment.Multiline
+
+      def _is_whitespace(self, token):
+        return token.ttype == sqlparse.tokens.Whitespace or \
+               token.ttype == sqlparse.tokens.Newline
 
       def process(self, stack, stmt):
         [self.process(stack, sgroup) for sgroup in stmt.get_sublists()]
         self._process(stmt)
 
     stack = sqlparse.engine.FilterStack()
-    stack.enable_grouping()
     strip_leading_comment_filter = StripLeadingCommentFilter()
     stack.stmtprocess.append(strip_leading_comment_filter)
     stack.postprocess.append(sqlparse.filters.SerializerUnicode())
@@ -1481,7 +1500,7 @@ def parse_query_text(query_text, utf8_encode_policy='strict'):
   # "--comment2" is sent as is. Impala's parser however doesn't consider it a valid SQL
   # and throws an exception. We identify such trailing comments and ignore them (do not
   # send them to Impala).
-  if query_list and not sqlparse.format(query_list[-1], strip_comments=True).strip("\n"):
+  if query_list and not strip_comments(query_list[-1]).strip("\n"):
     query_list.pop()
   return query_list
 

@@ -23,12 +23,13 @@ import re
 import signal
 import shlex
 import socket
+import tempfile
 
 from subprocess import call, Popen
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf
-from time import sleep
+from time import sleep, time
 from util import IMPALAD, SHELL_CMD
 from util import assert_var_substitution, run_impala_shell_cmd, ImpalaShell
 
@@ -659,3 +660,38 @@ class TestImpalaShell(ImpalaTestSuite):
     args = "-q \"with v as (select 1) \;\""
     result = run_impala_shell_cmd(args, expect_success=False)
     assert "Encountered: Unexpected character" in result.stderr
+
+  def test_large_sql(self, unique_database):
+    sql_file, sql_path = tempfile.mkstemp()
+    os.write(sql_file, "create table large_table (\n")
+    num_cols = 4000
+    for i in xrange(num_cols):
+      os.write(sql_file, "col_{0} int".format(i))
+      if i < num_cols - 1:
+        os.write(sql_file, ",")
+      os.write(sql_file, "\n")
+    os.write(sql_file, ");")
+    os.write(sql_file, "select \n")
+
+    for i in xrange(num_cols):
+      if i < num_cols:
+        os.write(sql_file, 'col_{0} as a{1},\n'.format(i, i))
+        os.write(sql_file, 'col_{0} as b{1},\n'.format(i, i))
+        os.write(sql_file, 'col_{0} as c{1}{2}\n'.format(i, i,
+                                                     ',' if i < num_cols - 1 else ''))
+    os.write(sql_file, 'from large_table;')
+    os.close(sql_file)
+
+    try:
+      args = "-f {0} -d {1}".format(sql_path, unique_database)
+      start_time = time()
+      result = run_impala_shell_cmd(args)
+      end_time = time()
+      assert "Fetched 0 row(s)" in result.stderr
+      time_limit_s = 30
+      actual_time_s = end_time - start_time
+      assert actual_time_s <= time_limit_s, (
+          "It took {0} seconds to execute the query. Time limit is {1} seconds.".format(
+              actual_time_s, time_limit_s))
+    finally:
+      os.remove(sql_path)
