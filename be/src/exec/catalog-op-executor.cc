@@ -312,6 +312,18 @@ Status CatalogOpExecutor::PrioritizeLoad(const TPrioritizeLoadRequest& req,
   return Status::OK();
 }
 
+Status CatalogOpExecutor::GetPartitionStats(
+    const TGetPartitionStatsRequest& req, TGetPartitionStatsResponse* result) {
+  const TNetworkAddress& address =
+      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
+  Status status;
+  CatalogServiceConnection client(env_->catalogd_client_cache(), address, &status);
+  RETURN_IF_ERROR(status);
+  RETURN_IF_ERROR(
+      client.DoRpc(&CatalogServiceClientWrapper::GetPartitionStats, req, result));
+  return Status::OK();
+}
+
 Status CatalogOpExecutor::SentryAdminCheck(const TSentryAdminCheckRequest& req) {
   const TNetworkAddress& address =
       MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);

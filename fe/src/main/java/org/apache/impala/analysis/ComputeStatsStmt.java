@@ -17,7 +17,9 @@
 
 package org.apache.impala.analysis;
 
+import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -25,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalogUtils;
@@ -35,19 +38,26 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.PartitionStatsUtil;
+import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.PrintUtils;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TComputeStatsParams;
+import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TGetPartitionStatsResponse;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TTableName;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -438,19 +448,23 @@ public class ComputeStatsStmt extends StatementBase {
               " does not have statistics, recomputing stats for the whole table");
         }
 
+        // Get incremental statistics from all relevant partitions.
         Collection<? extends FeFsPartition> allPartitions =
             FeCatalogUtils.loadAllPartitions(hdfsTable);
+        Map<Long, TPartitionStats> partitionStats =
+            getOrFetchPartitionStats(analyzer, hdfsTable, allPartitions,
+                /* excludedPartitions= */ Collections.<Long>emptySet());
         for (FeFsPartition p: allPartitions) {
-          if (!p.hasIncrementalStats() || tableIsMissingColStats) {
+          TPartitionStats partStats = partitionStats.get(p.getId());
+          if (partStats == null || tableIsMissingColStats) {
             if (!tableIsMissingColStats) filterPreds.add(p.getConjunctSql());
-            List<String> partValues = Lists.newArrayList();
-            for (LiteralExpr partValue: p.getPartitionValues()) {
-              partValues.add(PartitionKeyValue.getPartitionKeyValueString(partValue,
-                  "NULL"));
-            }
+            // TODO(vercegovac): check what happens when "NULL" is used as a partitioning
+            // value.
+            List<String> partValues = PartitionKeyValue.getPartitionKeyValueStringList(
+                p.getPartitionValues(), "NULL");
             expectedPartitions_.add(partValues);
           } else {
-            validPartStats_.add(p.getPartitionStats());
+            validPartStats_.add(partStats);
           }
         }
         if (expectedPartitions_.size() == hdfsTable.getPartitions().size()) {
@@ -461,26 +475,24 @@ public class ComputeStatsStmt extends StatementBase {
         // Always compute stats on a set of partitions when told to.
         for (FeFsPartition targetPartition: partitionSet_.getPartitions()) {
           filterPreds.add(targetPartition.getConjunctSql());
-          List<String> partValues = Lists.newArrayList();
-          for (LiteralExpr partValue: targetPartition.getPartitionValues()) {
-            partValues.add(PartitionKeyValue.getPartitionKeyValueString(partValue,
-                "NULL"));
-          }
+          List<String> partValues = PartitionKeyValue.getPartitionKeyValueStringList(
+              targetPartition.getPartitionValues(), "NULL");
           expectedPartitions_.add(partValues);
         }
         // Create a hash set out of partitionSet_ for O(1) lookups.
         // TODO(todd) avoid loading all partitions.
-        HashSet<FeFsPartition> targetPartitions =
-            Sets.newHashSet(partitionSet_.getPartitions());
+        HashSet<Long> targetPartitions =
+            Sets.newHashSetWithExpectedSize(partitionSet_.getPartitions().size());
+        for (FeFsPartition p: partitionSet_.getPartitions()) {
+          targetPartitions.add(p.getId());
+        }
+        // Get incremental statistics for partitions that are not recomputed.
         Collection<? extends FeFsPartition> allPartitions =
             FeCatalogUtils.loadAllPartitions(hdfsTable);
-        for (FeFsPartition p : allPartitions) {
-          if (targetPartitions.contains(p)) continue;
-          TPartitionStats partStats = p.getPartitionStats();
-          if (partStats != null) validPartStats_.add(partStats);
-        }
+        Map<Long, TPartitionStats> partitionStats = getOrFetchPartitionStats(
+            analyzer, hdfsTable, allPartitions, targetPartitions);
+        validPartStats_.addAll(partitionStats.values());
       }
-
       if (filterPreds.size() == 0 && validPartStats_.size() != 0) {
         if (LOG.isTraceEnabled()) {
           LOG.trace("No partitions selected for incremental stats update");
@@ -558,7 +570,6 @@ public class ComputeStatsStmt extends StatementBase {
 
     tableStatsQueryStr_ = tableStatsQueryBuilder.toString();
     if (LOG.isTraceEnabled()) LOG.trace("Table stats query: " + tableStatsQueryStr_);
-
     if (columnStatsSelectList.isEmpty()) {
       // Table doesn't have any columns that we can compute stats for.
       if (LOG.isTraceEnabled()) {
@@ -568,9 +579,103 @@ public class ComputeStatsStmt extends StatementBase {
       columnStatsQueryStr_ = null;
       return;
     }
-
     columnStatsQueryStr_ = columnStatsQueryBuilder.toString();
     if (LOG.isTraceEnabled()) LOG.trace("Column stats query: " + columnStatsQueryStr_);
+  }
+
+  /**
+   *  Get partition statistics from the list of partitions, omitting those in
+   *  excludedPartitions and those for which incremental statistics are not present.
+   *  If configured to pull incremental statistics directly from the
+   *  catalog, partition statistics are fetched from the catalog.
+   */
+  private static Map<Long, TPartitionStats> getOrFetchPartitionStats(Analyzer analyzer,
+      FeFsTable table, Collection<? extends FeFsPartition> partitions,
+      Set<Long> excludedPartitions) throws AnalysisException {
+    Preconditions.checkNotNull(partitions);
+    Preconditions.checkNotNull(excludedPartitions);
+    int expectedNumStats = partitions.size() - excludedPartitions.size();
+    Preconditions.checkArgument(expectedNumStats >= 0);
+
+    if (BackendConfig.INSTANCE.pullIncrementalStatistics()
+        && !RuntimeEnv.INSTANCE.isTestEnv()) {
+      // We're configured to fetch the statistics from catalogd, so collect the relevant
+      // partition ids.
+      List<FeFsPartition> partitionsToFetch = Lists.newArrayList();
+      for (FeFsPartition p: partitions) {
+        if (excludedPartitions.contains(p.getId())) continue;
+        partitionsToFetch.add(p);
+      }
+      // Gets the partition stats from catalogd.
+      return fetchPartitionStats(analyzer, table, partitionsToFetch);
+    }
+    // Get the statistics directly from the partition, if present.
+    Map<Long, TPartitionStats> ret = Maps.newHashMapWithExpectedSize(expectedNumStats);
+    for (FeFsPartition p: partitions) {
+      if (excludedPartitions.contains(p.getId())) continue;
+      if (!p.hasIncrementalStats()) continue;
+      TPartitionStats stats = p.getPartitionStats();
+      Preconditions.checkNotNull(stats);
+      ret.put(p.getId(), stats);
+    }
+    return ret;
+  }
+
+  /**
+   * Fetches statistics for the partitions specified from the target table directly
+   * from catalogd. The partition statistics that are returned are the ones where:
+   * - incremental statistics are present
+   * - the partition is whitelisted in 'partitions'
+   * - the partition is present in the local impalad catalog
+   * TODO(vercegovac): Add metrics to track time spent for these rpc's when fetching
+   *                   from catalog. Look into adding to timeline.
+   * TODO(vercegovac): Look into parallelizing the fetch while child-queries are
+   *                   running. Easiest would be to move this fetch to the backend.
+   */
+  private static Map<Long, TPartitionStats> fetchPartitionStats(Analyzer analyzer,
+      FeFsTable table, List<FeFsPartition> partitions) throws AnalysisException {
+    Preconditions.checkNotNull(partitions);
+    Preconditions.checkState(BackendConfig.INSTANCE.pullIncrementalStatistics()
+        && !RuntimeEnv.INSTANCE.isTestEnv());
+    if (partitions.isEmpty()) return Collections.emptyMap();
+    try {
+      TGetPartitionStatsResponse response =
+          analyzer.getCatalog().getPartitionStats(table.getTableName());
+      if (response.status.status_code != TErrorCode.OK) {
+        throw new AnalysisException(
+            "Error fetching partition statistics: " + response.status.toString());
+      }
+      if (!response.isSetPartition_stats()) return Collections.emptyMap();
+
+      // The response from catalogd is from a version of the table that may be newer
+      // than the local, impalad catalog. As a result, the response might include
+      // partitions not present locally and might not include partitions that are
+      // present locally. After stats are computed, they are sent to catalogd to update
+      // the HMS and catalog state. The catalogd already handles the case where the list
+      // of partitions are out of sync (see CatalogOpExecutor#alterTableUpdateStats).
+      // As a result, at most those partitions in the intersection between remote and
+      // local catalogs are returned.
+      Map<Long, TPartitionStats> partitionStats =
+          Maps.newHashMapWithExpectedSize(partitions.size());
+      for (FeFsPartition part: partitions) {
+        ByteBuffer compressedStats = response.partition_stats.get(
+            FeCatalogUtils.getPartitionName(part));
+        if (compressedStats != null) {
+          byte[] compressedStatsBytes = new byte[compressedStats.remaining()];
+          compressedStats.get(compressedStatsBytes);
+          TPartitionStats remoteStats =
+              PartitionStatsUtil.partStatsFromCompressedBytes(
+                  compressedStatsBytes, part);
+          if (remoteStats != null && remoteStats.isSetIntermediate_col_stats()) {
+            partitionStats.put(part.getId(), remoteStats);
+          }
+        }
+      }
+      return partitionStats;
+    } catch (Exception e) {
+      Throwables.propagateIfInstanceOf(e, AnalysisException.class);
+      throw new AnalysisException("Error fetching partition statistics", e);
+    }
   }
 
   /**

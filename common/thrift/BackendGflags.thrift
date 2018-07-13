@@ -85,4 +85,6 @@ struct TBackendGflags {
   29: required i32 local_catalog_cache_mb
 
   30: required i32 local_catalog_cache_expiration_s
+
+  31: required bool pull_incremental_statistics
 }

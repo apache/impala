@@ -23,8 +23,10 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -33,6 +35,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.codec.binary.Base64;
@@ -45,25 +48,43 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Reference;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.thrift.CatalogObjectsConstants;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TGetPartitionStatsRequest;
+import org.apache.impala.thrift.TGetPartitionStatsResponse;
+import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TUniqueId;
+import org.junit.Before;
 import org.junit.Test;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
+import junit.framework.AssertionFailedError;
+
 public class CatalogTest {
-  private static CatalogServiceCatalog catalog_ =
-      CatalogServiceTestCatalog.create();
+  private CatalogServiceCatalog catalog_;
+
+  @Before
+  public void init() {
+    catalog_ = CatalogServiceTestCatalog.create();
+  }
 
   public static void checkTableCols(FeDb db, String tblName, int numClusteringCols,
       String[] colNames, Type[] colTypes) throws TableLoadingException {
@@ -532,6 +553,85 @@ public class CatalogTest {
 
     assertEquals(expectedSize, column.getStats().getAvgSerializedSize(), 0.0001);
     assertEquals(expectedSize, column.getStats().getMaxSize(), 0.0001);
+  }
+
+  // Fetch partition statistics for dbName.tableName for partitionIds.
+  private Map<String, ByteBuffer> getPartitionStatistics(String dbName, String tableName)
+      throws CatalogException {
+    TGetPartitionStatsRequest req = new TGetPartitionStatsRequest();
+    req.setTable_name(new TTableName(dbName, tableName));
+    return catalog_.getPartitionStats(req);
+  }
+
+  // Expect expCount partitions have statistics (though not incremental statistics).
+  private void expectStatistics(String dbName, String tableName, int expCount)
+      throws CatalogException {
+    Map<String, ByteBuffer> result = getPartitionStatistics(dbName, tableName);
+    assertEquals(expCount, result.size());
+    for (Map.Entry<String, ByteBuffer> e : result.entrySet()) {
+      ByteBuffer compressedBuffer = e.getValue();
+      byte[] compressedBytes = new byte[compressedBuffer.remaining()];
+      compressedBuffer.get(compressedBytes);
+      try {
+        TPartitionStats stats =
+            PartitionStatsUtil.partStatsFromCompressedBytes(compressedBytes, null);
+        assertNotNull(stats);
+        assertTrue(!stats.isSetIntermediate_col_stats());
+      } catch (ImpalaException ex) {
+        throw new CatalogException("Error deserializing partition stats.", ex);
+      }
+    }
+  }
+
+  // Expect an exception whose message prefix-matches msgPrefix when fetching partition
+  // statistics.
+  private void expectStatisticsException(
+      String dbName, String tableName, String msgPrefix) {
+    try {
+      getPartitionStatistics(dbName, tableName);
+      fail("Expected exception.");
+    } catch (Exception e) {
+      assertTrue(e.getMessage(), e.getMessage().startsWith(msgPrefix));
+    }
+  }
+
+  @Test
+  public void testPullIncrementalStats() throws CatalogException {
+    // Save the current setting for pull_incremental_statistics.
+    TBackendGflags gflags = BackendConfig.INSTANCE.getBackendCfg();
+    boolean pullStats = gflags.isSetPull_incremental_statistics();
+
+    try {
+      // Restored in the finally clause.
+      gflags.setPull_incremental_statistics(true);
+
+      // Partitioned table with stats. Load the table prior to fetching.
+      catalog_.getOrLoadTable("functional", "alltypesagg");
+      expectStatistics("functional", "alltypesagg", 11);
+
+      // Partitioned table with stats. Invalidate the table prior to fetching.
+      Reference<Boolean> tblWasRemoved = new Reference<Boolean>();
+      Reference<Boolean> dbWasAdded = new Reference<Boolean>();
+      catalog_.invalidateTable(
+          new TTableName("functional", "alltypesagg"), tblWasRemoved, dbWasAdded);
+      expectStatistics("functional", "alltypesagg", 11);
+
+      // Unpartitioned table with no stats.
+      expectStatistics("functional", "table_no_newline", 0);
+
+      // Unpartitioned table with stats.
+      expectStatistics("functional", "dimtbl", 0);
+
+      // Bogus table.
+      expectStatisticsException("functional", "doesnotexist",
+          "Requested partition statistics for table that does not exist");
+
+      // Case of IncompleteTable due to loading error.
+      expectStatisticsException("functional", "bad_serde",
+          "No statistics available for incompletely loaded table");
+    } finally {
+      gflags.setPull_incremental_statistics(pullStats);
+    }
   }
 
   @Test

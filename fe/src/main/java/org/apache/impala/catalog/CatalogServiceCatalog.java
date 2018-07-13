@@ -18,7 +18,9 @@
 package org.apache.impala.catalog;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -42,6 +44,7 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCatalog;
@@ -54,11 +57,14 @@ import org.apache.impala.thrift.TGetCatalogUsageResponse;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.TPartialCatalogInfo;
+import org.apache.impala.thrift.TGetPartitionStatsRequest;
 import org.apache.impala.thrift.TPartitionKeyValue;
+import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTableUsageMetrics;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.FunctionUtils;
@@ -377,6 +383,66 @@ public class CatalogServiceCatalog extends Catalog {
       tableLoadingMgr_.prioritizeLoad(new TTableName(table.getDb_name().toLowerCase(),
           table.getTbl_name().toLowerCase()));
     }
+  }
+
+  /**
+   * Retrieves TPartitionStats as a map that associates partitions with their
+   * statistics. The table partitions are specified in
+   * TGetPartitionStatsRequest. If statistics are not available for a partition,
+   * a default TPartitionStats is used. Partitions are identified by their partitioning
+   * column string values.
+   */
+  public Map<String, ByteBuffer> getPartitionStats(TGetPartitionStatsRequest request)
+      throws CatalogException {
+    Preconditions.checkState(BackendConfig.INSTANCE.pullIncrementalStatistics()
+        && !RuntimeEnv.INSTANCE.isTestEnv());
+    TTableName tableName = request.table_name;
+    LOG.info("Fetching partition statistics for: " + tableName.getDb_name() + "."
+        + tableName.getTable_name());
+    Table table = getOrLoadTable(tableName.db_name, tableName.table_name);
+
+    // Table could be null if it does not exist anymore.
+    if (table == null) {
+      throw new CatalogException(
+          "Requested partition statistics for table that does not exist: "
+          + request.table_name);
+    }
+
+    // Table could be incomplete, in which case an exception should be thrown.
+    if (table instanceof IncompleteTable) {
+      throw new CatalogException("No statistics available for incompletely"
+          + " loaded table: " + request.table_name, ((IncompleteTable) table).getCause());
+    }
+
+    // Table must be a FeFsTable type at this point.
+    Preconditions.checkArgument(table instanceof HdfsTable,
+        "Partition statistics can only be requested for FS tables, type is: %s",
+        table.getClass().getCanonicalName());
+
+    // Table must be loaded.
+    Preconditions.checkState(table.isLoaded());
+
+    Map<String, ByteBuffer> stats = Maps.newHashMap();
+    HdfsTable hdfsTable = (HdfsTable) table;
+    hdfsTable.getLock().lock();
+    try {
+      Collection<? extends PrunablePartition> partitions = hdfsTable.getPartitions();
+      for (PrunablePartition partition : partitions) {
+        Preconditions.checkState(partition instanceof FeFsPartition);
+        FeFsPartition fsPartition = (FeFsPartition) partition;
+        TPartitionStats partStats = fsPartition.getPartitionStats();
+        if (partStats != null) {
+          ByteBuffer compressedStats =
+              ByteBuffer.wrap(fsPartition.getPartitionStatsCompressed());
+          stats.put(FeCatalogUtils.getPartitionName(fsPartition), compressedStats);
+        }
+      }
+    } finally {
+      hdfsTable.getLock().unlock();
+    }
+    LOG.info("Fetched partition statistics for " + stats.size()
+        + " partitions on: " + hdfsTable.getFullName());
+    return stats;
   }
 
   /**

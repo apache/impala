@@ -206,6 +206,16 @@ DEFINE_bool_hidden(disable_catalog_data_ops_debug_only, false,
     "Examples are when catalog reads data blocks to load avro schemas and copy jars."
     "Use only for testing/debugging, not in deployed clusters.");
 
+// TODO: this flag and others, since it requires multiple daemons to be set the
+// same way, is error prone. One fix for this flag is to set it only on
+// catalogd, propagate the setting as a property of the Catalog object, and let
+// impalad uses act on this setting.
+DEFINE_bool(pull_incremental_statistics, false,
+    "When set, impalad coordinators pull incremental statistics from catalogd on-demand "
+    "and catalogd does not broadcast incremental statistics via statestored to "
+    "coordinators. If used, the flag must be set on both catalogd and all impalad "
+    "coordinators.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

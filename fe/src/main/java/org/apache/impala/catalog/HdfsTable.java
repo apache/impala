@@ -185,7 +185,8 @@ public class HdfsTable extends Table implements FeFsTable {
   private final HashMap<Long, HdfsPartition> partitionMap_ = Maps.newHashMap();
 
   // Map of partition name to HdfsPartition object. Used for speeding up
-  // table metadata loading.
+  // table metadata loading. It is only populated if this table object is stored in
+  // catalog server.
   private final HashMap<String, HdfsPartition> nameToPartitionMap_ = Maps.newHashMap();
 
   // The partition used as a prototype when creating new partitions during
@@ -1745,6 +1746,21 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
+   * Determines whether incremental stats should be sent from the catalogd to impalad.
+   * Incremental stats will be sent if their size is less than the configured limit
+   * (function of numPartitions) and they are sent via statestore (and not a direct
+   * fetch from catalogd).
+   */
+  private boolean shouldSendIncrementalStats(int numPartitions) {
+    // TODO(bharath): Revisit the constant STATS_SIZE_PER_COLUMN_BYTES after the
+    // new incremental stats in-memory representation changes.
+    long statsSizeEstimate =
+        numPartitions * getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
+    return statsSizeEstimate < BackendConfig.INSTANCE.getIncStatsMaxSize()
+        && !BackendConfig.INSTANCE.pullIncrementalStatistics();
+  }
+
+  /**
    * Create a THdfsTable corresponding to this HdfsTable. If serializing the "FULL"
    * information, then then all partitions and THdfsFileDescs of each partition should be
    * included. Otherwise, don't include any THdfsFileDescs, and include only those
@@ -1768,12 +1784,7 @@ public class HdfsTable extends Table implements FeFsTable {
     int numPartitions =
         (refPartitions == null) ? partitionMap_.values().size() : refPartitions.size();
     memUsageEstimate += numPartitions * PER_PARTITION_MEM_USAGE_BYTES;
-    // TODO(bharath): Revisit the constant STATS_SIZE_PER_COLUMN_BYTES after the
-    // new incremental stats in-memory representation changes.
-    long statsSizeEstimate =
-        numPartitions * getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
-    boolean includeIncrementalStats =
-        (statsSizeEstimate < BackendConfig.INSTANCE.getIncStatsMaxSize());
+    boolean includeIncrementalStats = shouldSendIncrementalStats(numPartitions);
     FileMetadataStats stats = new FileMetadataStats();
     Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
     for (HdfsPartition partition: partitionMap_.values()) {
@@ -2066,7 +2077,6 @@ public class HdfsTable extends Table implements FeFsTable {
         rowBuilder.add(rep.toString());
       }
       rowBuilder.add(p.getInputFormatDescriptor().getFileFormat().toString());
-
       rowBuilder.add(String.valueOf(p.hasIncrementalStats()));
       rowBuilder.add(p.getLocation());
       result.addToRows(rowBuilder.get());

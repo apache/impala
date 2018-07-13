@@ -18,8 +18,11 @@
 package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+
 import org.apache.impala.common.AnalysisException;
 import java.util.Comparator;
+import java.util.List;
 
 /**
  * Representation of a single column:value element in the PARTITION (...) clause of an
@@ -85,6 +88,19 @@ public class PartitionKeyValue {
       return nullPartitionKeyValue;
     }
     return literalValue.getStringValue();
+  }
+
+  /**
+   * Utility method that applies getPartitionKeyValueString to each literal to return
+   * a list of partitioning key values as strings.
+   */
+  public static List<String> getPartitionKeyValueStringList(
+      List<LiteralExpr> literals, String nullPartitionKeyValue) {
+    List<String> partValues = Lists.newArrayList();
+    for (LiteralExpr partValue : literals) {
+      partValues.add(getPartitionKeyValueString(partValue, nullPartitionKeyValue));
+    }
+    return partValues;
   }
 
   public static Comparator<PartitionKeyValue> getColNameComparator() {

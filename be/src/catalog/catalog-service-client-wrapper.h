@@ -95,6 +95,14 @@ class CatalogServiceClientWrapper : public CatalogServiceClient {
     recv_PrioritizeLoad(_return);
   }
 
+  void GetPartitionStats(TGetPartitionStatsResponse& _return,
+      const TGetPartitionStatsRequest& req, bool* send_done) {
+    DCHECK(!*send_done);
+    send_GetPartitionStats(req);
+    *send_done = true;
+    recv_GetPartitionStats(_return);
+  }
+
   void SentryAdminCheck(TSentryAdminCheckResponse& _return,
       const TSentryAdminCheckRequest& req, bool* send_done) {
     DCHECK(!*send_done);

@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -33,6 +34,7 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDataSource;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TGetPartitionStatsResponse;
 import org.apache.impala.thrift.TPrincipal;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TTable;
@@ -218,6 +220,12 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
   @Override // FeCatalog
   public void prioritizeLoad(Set<TableName> tableNames) throws InternalException {
     FeSupport.PrioritizeLoad(tableNames);
+  }
+
+  @Override // FeCatalog
+  public TGetPartitionStatsResponse getPartitionStats(
+      TableName table) throws InternalException {
+    return FeSupport.GetPartitionStats(table);
   }
 
   @Override // FeCatalog

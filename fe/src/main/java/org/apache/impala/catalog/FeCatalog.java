@@ -22,6 +22,7 @@ import java.util.Set;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TGetPartitionStatsResponse;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
@@ -70,6 +71,12 @@ public interface FeCatalog {
    * Issues a load request to the catalogd for the given tables.
    */
   void prioritizeLoad(Set<TableName> tableNames) throws InternalException;
+
+  /**
+   * Fetches partition statistics for a table. The table is loaded if needed. If the table
+   * does not exist or cannot be loaded, an exception is thrown.
+   */
+  TGetPartitionStatsResponse getPartitionStats(TableName table) throws InternalException;
 
   /**
    * Causes the calling thread to wait until a catalog update notification has been sent

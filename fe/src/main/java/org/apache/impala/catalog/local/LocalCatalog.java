@@ -37,11 +37,14 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TGetPartitionStatsResponse;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
@@ -199,6 +202,16 @@ public class LocalCatalog implements FeCatalog {
   @Override
   public void prioritizeLoad(Set<TableName> tableNames) {
     // No-op for local catalog.
+  }
+
+  @Override
+  public TGetPartitionStatsResponse getPartitionStats(
+      TableName table) throws InternalException {
+    // TODO(vercegovac): add validation to ensure that both pulling incremental
+    // statistics and a local catalog are not specified.
+    throw new UnsupportedOperationException("--pull_incremental_statistics and "
+        + "--use_local_catalog cannot both be enabled."
+    );
   }
 
   @Override

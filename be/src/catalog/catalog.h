@@ -113,6 +113,10 @@ class Catalog {
   /// TPrioritizeLoadRequest.
   Status PrioritizeLoad(const TPrioritizeLoadRequest& req);
 
+  /// Get partition statistics for the partitions specified in TGetPartitionStatsRequest.
+  Status GetPartitionStats(
+      const TGetPartitionStatsRequest& req, TGetPartitionStatsResponse* resp);
+
   /// Checks whether the requesting user has admin privileges on the Sentry Service and
   /// returns OK if they do. Returns a bad status if the user is not an admin or if there
   /// was an error executing the request.
@@ -135,6 +139,7 @@ class Catalog {
   jmethodID get_table_names_id_; // JniCatalog.getTableNames()
   jmethodID get_table_metrics_id_; // JniCatalog.getTableMetrics()
   jmethodID get_functions_id_; // JniCatalog.getFunctions()
+  jmethodID get_partition_stats_id_; // JniCatalog.getPartitionStats()
   jmethodID prioritize_load_id_; // JniCatalog.prioritizeLoad()
   jmethodID sentry_admin_check_id_; // JniCatalog.checkUserSentryAdmin()
   jmethodID catalog_ctor_;

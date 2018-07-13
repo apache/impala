@@ -391,6 +391,25 @@ struct TGetCatalogObjectResponse {
   1: required CatalogObjects.TCatalogObject catalog_object
 }
 
+// Request the partition statistics for the specified table.
+struct TGetPartitionStatsRequest {
+  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+  2: required CatalogObjects.TTableName table_name
+}
+
+// Response for requesting partition statistics. All partition statistics
+// are returned. If a partition does not have statistics, it is not returned.
+// Partitions are identified by name, consisting of partition column name/value pairs.
+// The returned statistics are deflate-compressed bytes that represent
+// CatalogObject.TPartitionStats when decompressed.
+// An OK or null status means that the call succeeded.
+// If there was an error, an error status is returned and partition_stats
+// is left unset.
+struct TGetPartitionStatsResponse {
+  1: optional Status.TStatus status
+  2: optional map<string, binary> partition_stats
+}
+
 // Instructs the Catalog Server to prioritizing loading of metadata for the specified
 // catalog objects. Currently only used for controlling the priority of loading
 // tables/views since Db/Function metadata is loaded on startup.
@@ -432,6 +451,9 @@ service CatalogService {
 
   // Gets the catalog object corresponding to the given request.
   TGetCatalogObjectResponse GetCatalogObject(1: TGetCatalogObjectRequest req);
+
+  // Gets the statistics that are associated with table partitions.
+  TGetPartitionStatsResponse GetPartitionStats(1: TGetPartitionStatsRequest req);
 
   // Resets the Catalog metadata. Used to explicitly trigger reloading of the Hive
   // Metastore metadata and/or HDFS block location metadata.

@@ -67,7 +67,8 @@ Catalog::Catalog() {
     {"getCatalogDelta", "([B)[B", &get_catalog_delta_id_},
     {"getCatalogUsage", "()[B", &get_catalog_usage_id_},
     {"getCatalogVersion", "()J", &get_catalog_version_id_},
-    {"prioritizeLoad", "([B)V", &prioritize_load_id_}};
+    {"prioritizeLoad", "([B)V", &prioritize_load_id_},
+    {"getPartitionStats", "([B)[B", &get_partition_stats_id_}};
 
   JNIEnv* jni_env = getJNIEnv();
   // Create an instance of the java class JniCatalog
@@ -162,6 +163,11 @@ Status Catalog::GetFunctions(const TGetFunctionsRequest& request,
 
 Status Catalog::PrioritizeLoad(const TPrioritizeLoadRequest& req) {
   return JniUtil::CallJniMethod(catalog_, prioritize_load_id_, req);
+}
+
+Status Catalog::GetPartitionStats(
+    const TGetPartitionStatsRequest& req, TGetPartitionStatsResponse* resp) {
+  return JniUtil::CallJniMethod(catalog_, get_partition_stats_id_, req, resp);
 }
 
 Status Catalog::SentryAdminCheck(const TSentryAdminCheckRequest& req) {

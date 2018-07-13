@@ -19,10 +19,14 @@ package org.apache.impala.service;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.impala.authorization.SentryConfig;
@@ -38,6 +42,7 @@ import org.apache.impala.common.JniUtil;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDdlExecRequest;
+import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TGetCatalogDeltaResponse;
 import org.apache.impala.thrift.TGetCatalogDeltaRequest;
@@ -46,13 +51,17 @@ import org.apache.impala.thrift.TGetDbsResult;
 import org.apache.impala.thrift.TGetFunctionsRequest;
 import org.apache.impala.thrift.TGetFunctionsResponse;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
+import org.apache.impala.thrift.TGetPartitionStatsRequest;
+import org.apache.impala.thrift.TGetPartitionStatsResponse;
 import org.apache.impala.thrift.TGetTablesParams;
 import org.apache.impala.thrift.TGetTableMetricsParams;
 import org.apache.impala.thrift.TGetTablesResult;
 import org.apache.impala.thrift.TLogLevel;
+import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrioritizeLoadRequest;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TSentryAdminCheckRequest;
+import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TBackendGflags;
@@ -255,6 +264,21 @@ public class JniCatalog {
     TPrioritizeLoadRequest request = new TPrioritizeLoadRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftLoadReq);
     catalog_.prioritizeLoad(request.getObject_descs());
+  }
+
+  public byte[] getPartitionStats(byte[] thriftParams)
+      throws ImpalaException, TException {
+    TGetPartitionStatsRequest request = new TGetPartitionStatsRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, thriftParams);
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    TGetPartitionStatsResponse response = new TGetPartitionStatsResponse();
+    try {
+      response.setPartition_stats(catalog_.getPartitionStats(request));
+    } catch (CatalogException e) {
+      response.setStatus(
+          new TStatus(TErrorCode.INTERNAL_ERROR, ImmutableList.of(e.getMessage())));
+    }
+    return serializer.serialize(response);
   }
 
   /**

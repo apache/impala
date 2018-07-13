@@ -513,6 +513,7 @@ Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad(
   Status status = catalog_op_executor.PrioritizeLoad(request, &result);
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
+    // TODO: remove the wrapping; DoRPC's wrapping is sufficient.
     status.AddDetail("Error making an RPC call to Catalog server.");
     status.ToThrift(&result.status);
   }
@@ -544,6 +545,26 @@ Java_org_apache_impala_service_FeSupport_NativeGetPartialCatalogObject(
   return result_bytes;
 }
 
+// Used to call native code from the FE to make a request to catalogd
+// for per-partition statistics.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_org_apache_impala_service_FeSupport_NativeGetPartitionStats(
+    JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
+  TGetPartitionStatsRequest request;
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &request), env,
+      JniUtil::internal_exc_class(), nullptr);
+  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), nullptr, nullptr);
+  TGetPartitionStatsResponse result;
+  Status status = catalog_op_executor.GetPartitionStats(request, &result);
+  if (!status.ok()) {
+    LOG(ERROR) << status.GetDetail();
+    status.ToThrift(&result.status);
+  }
+  jbyteArray result_bytes = nullptr;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
+      JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
 
 // Used to call native code from the FE to parse and set comma-delimited key=value query
 // options.
@@ -606,6 +627,11 @@ static JNINativeMethod native_methods[] = {
       const_cast<char*>("NativeGetPartialCatalogObject"),
       const_cast<char*>("([B)[B"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeGetPartialCatalogObject
+  },
+  {
+      const_cast<char*>("NativeGetPartitionStats"),
+      const_cast<char*>("([B)[B"),
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeGetPartitionStats
   },
   {
       const_cast<char*>("NativeParseQueryOptions"),

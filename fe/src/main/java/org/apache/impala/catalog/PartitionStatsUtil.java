@@ -52,23 +52,35 @@ public class PartitionStatsUtil {
   private final static Logger LOG = LoggerFactory.getLogger(PartitionStatsUtil.class);
 
   /**
+   * Deflate-decompresses 'compressedStats' and deserializes it into TPartitionStats.
+   * Returns null if either 'compressedStats' is null or deserialization/decompression
+   * returns a null value. The partition, 'part', provides debugging context.
+   * Throws an exception if there is an error with deserialization/decompression.
+   */
+  public static TPartitionStats partStatsFromCompressedBytes(
+      byte[] compressedStats, FeFsPartition part) throws ImpalaException {
+    if (compressedStats == null) return null;
+    TCompactProtocol.Factory protocolFactory = new TCompactProtocol.Factory();
+    TPartitionStats ret = new TPartitionStats();
+    byte[] decompressed = CompressionUtil.deflateDecompress(compressedStats);
+    if (decompressed == null) {
+      String partitionName = (part == null ? "N/A" : part.getPartitionName());
+      LOG.warn("Error decompressing partition stats for partition: " + partitionName);
+      return null;
+    }
+    JniUtil.deserializeThrift(protocolFactory, ret, decompressed);
+    return ret;
+  }
+
+  /**
    * Get the partition stats from the given partition, or null if no stats
    * are available. If stats are present but cannot be parsed, logs a warning
    * and returns null.
    */
   public static TPartitionStats getPartStatsOrWarn(FeFsPartition part) {
     try {
-      byte[] compressedStats =  part.getPartitionStatsCompressed();
-      if (compressedStats == null) return null;
-      TCompactProtocol.Factory protocolFactory = new TCompactProtocol.Factory();
-      TPartitionStats ret = new TPartitionStats();
-      byte[] decompressed = CompressionUtil.deflateDecompress(compressedStats);
-      if (decompressed == null)  {
-        LOG.warn("Error decompressing partition stats for " + part.getPartitionName());
-        return null;
-      }
-      JniUtil.deserializeThrift(protocolFactory, ret, decompressed);
-      return ret;
+      byte[] compressedStats = part.getPartitionStatsCompressed();
+      return partStatsFromCompressedBytes(compressedStats, part);
     } catch (ImpalaException e) {
       LOG.warn("Bad partition stats for " + part.getPartitionName(), e);
       return null;
@@ -106,6 +118,19 @@ public class PartitionStatsUtil {
   }
 
   /**
+   * Serializes 'stats' and deflate-compresses it to bytes. Returns null if 'stats' is
+   * null. Throws an exception if there is an error with serialization/compression.
+   */
+  public static byte[] partStatsToCompressedBytes(TPartitionStats stats)
+      throws TException {
+    if (stats == null) return null;
+    TCompactProtocol.Factory protocolFactory = new TCompactProtocol.Factory();
+    TSerializer serializer = new TSerializer(protocolFactory);
+    byte[] serialized = CompressionUtil.deflateCompress(serializer.serialize(stats));
+    return serialized;
+  }
+
+  /**
    * Serialises a TPartitionStats object to a partition. If 'partStats' is null, the
    * partition's stats are removed.
    */
@@ -117,12 +142,8 @@ public class PartitionStatsUtil {
     }
 
     try {
-      TCompactProtocol.Factory protocolFactory = new TCompactProtocol.Factory();
-      TSerializer serializer = new TSerializer(protocolFactory);
-      byte[] serialized =
-          CompressionUtil.deflateCompress(serializer.serialize(partStats));
       partition.setPartitionStatsBytes(
-          serialized, partStats.isSetIntermediate_col_stats());
+          partStatsToCompressedBytes(partStats), partStats.isSetIntermediate_col_stats());
     } catch (TException e) {
       String debugString =
           String.format("Error saving partition stats: table %s, partition %s",
