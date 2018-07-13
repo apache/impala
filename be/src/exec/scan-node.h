@@ -28,6 +28,7 @@
 
 namespace impala {
 
+class RowBatchQueue;
 class TScanRange;
 
 /// Abstract base class of all scan nodes. Subclasses support different storage layers

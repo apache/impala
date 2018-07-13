@@ -25,6 +25,7 @@
 
 #include "exec/exec-node.h"
 #include "util/promise.h"
+#include "util/stopwatch.h"
 
 #include "gen-cpp/PlanNodes_types.h"  // for TJoinOp
 

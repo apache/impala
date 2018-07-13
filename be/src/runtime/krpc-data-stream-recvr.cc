@@ -31,6 +31,7 @@
 #include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
+#include "runtime/row-batch-queue.h"
 #include "runtime/sorted-run-merger.h"
 #include "service/data-stream-service.h"
 #include "util/runtime-profile-counters.h"
