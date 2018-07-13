@@ -2157,16 +2157,20 @@ public class HdfsTable extends Table implements FeFsTable {
     Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
     Preconditions.checkState(minSampleBytes >= 0);
 
+    long totalNumFiles = 0;
+    for (FeFsPartition part : inputParts) {
+      totalNumFiles += part.getNumFileDescriptors();
+    }
+
     // Conservative max size for Java arrays. The actual maximum varies
     // from JVM version and sometimes between configurations.
     final long JVM_MAX_ARRAY_SIZE = Integer.MAX_VALUE - 10;
-    if (fileMetadataStats_.numFiles > JVM_MAX_ARRAY_SIZE) {
+    if (totalNumFiles > JVM_MAX_ARRAY_SIZE) {
       throw new IllegalStateException(String.format(
-          "Too many files to generate a table sample. " +
-          "Table '%s' has %s files, but a maximum of %s files are supported.",
-          getTableName().toString(), fileMetadataStats_.numFiles, JVM_MAX_ARRAY_SIZE));
+          "Too many files to generate a table sample of table %s. " +
+          "Sample requested over %s files, but a maximum of %s files are supported.",
+          getTableName().toString(), totalNumFiles, JVM_MAX_ARRAY_SIZE));
     }
-    int totalNumFiles = (int) fileMetadataStats_.numFiles;
 
     // Ensure a consistent ordering of files for repeatable runs. The files within a
     // partition are already ordered based on how they are loaded in the catalog.
@@ -2176,12 +2180,11 @@ public class HdfsTable extends Table implements FeFsTable {
     // fileIdxs contains indexes into the file descriptor lists of all inputParts
     // parts[i] contains the partition corresponding to fileIdxs[i]
     // fileIdxs[i] is an index into the file descriptor list of the partition parts[i]
-    // Use max size to avoid looping over inputParts for the exact size.
     // The purpose of these arrays is to efficiently avoid selecting the same file
     // multiple times during the sampling, regardless of the sample percent. We purposely
     // avoid generating objects proportional to the number of files.
-    int[] fileIdxs = new int[totalNumFiles];
-    FeFsPartition[] parts = new FeFsPartition[totalNumFiles];
+    int[] fileIdxs = new int[(int)totalNumFiles];
+    FeFsPartition[] parts = new FeFsPartition[(int)totalNumFiles];
     int idx = 0;
     long totalBytes = 0;
     for (FeFsPartition part: orderedParts) {
@@ -2192,6 +2195,9 @@ public class HdfsTable extends Table implements FeFsTable {
         parts[idx] = part;
         ++idx;
       }
+    }
+    if (idx != totalNumFiles) {
+      throw new AssertionError("partition file counts changed during iteration");
     }
 
     int numFilesRemaining = idx;
