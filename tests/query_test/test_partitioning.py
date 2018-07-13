@@ -22,7 +22,6 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.environ import is_hive_2
 
 # Tests to validate HDFS partitioning.
 class TestPartitioning(ImpalaTestSuite):
@@ -79,10 +78,7 @@ class TestPartitioning(ImpalaTestSuite):
     # List the partitions. Show table stats returns 1 row for each partition + 1 summary
     # row
     result = self.execute_query("show table stats %s" % full_name)
-    if is_hive_2():
-      assert len(result.data) == 2 + 1
-    else:
-      assert len(result.data) == 3 + 1
+    assert len(result.data) == 2 + 1
 
     # Verify Impala properly merges the results of the Hive metadata,
     # whether it be good (Hive 2) or bad (Hive 1).

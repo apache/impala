@@ -19,20 +19,14 @@ NODE_DIR="${NODE_DIR}"
 PID_DIR="$NODE_DIR/var/run"
 LOG_DIR="$NODE_DIR/var/log"
 
-if [[ $IMPALA_MINICLUSTER_PROFILE == 3 ]]; then
-  export HADOOP_PID_DIR=$NODE_DIR/var/run
-fi
 export HADOOP_CONF_DIR="$NODE_DIR/etc/hadoop/conf"
-if [[ $IMPALA_MINICLUSTER_PROFILE == 2 ]]; then
-  export YARN_CONF_DIR="$HADOOP_CONF_DIR"
-fi
+export HADOOP_PID_DIR=$NODE_DIR/var/run
 
 # Mark each process so they can be killed if needed. This is a safety mechanism for
 # stopping the processes if the pid file has been removed for whatever reason.
 export HADOOP_OPTS+=" -D${KILL_CLUSTER_MARKER}"
-if [[ $IMPALA_MINICLUSTER_PROFILE == 3 ]]; then
-  export YARN_OPTS+=" -D${KILL_CLUSTER_MARKER}"
-fi
+export YARN_OPTS+=" -D${KILL_CLUSTER_MARKER}"
+
 # This is for KMS.
 export CATALINA_OPTS+=" -D${KILL_CLUSTER_MARKER}"
 

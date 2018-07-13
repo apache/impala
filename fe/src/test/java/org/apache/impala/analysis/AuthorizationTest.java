@@ -43,7 +43,6 @@ import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.compat.MiniclusterProfile;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TMetadataOpRequest;
@@ -824,13 +823,11 @@ public class AuthorizationTest extends FrontendTestBase {
   public void TestShortUsernameUsed() throws Exception {
     // Different long variations of the same username.
     List<User> users = Lists.newArrayList(
-        // Hadoop 2 accepts kerberos names missing a realm, but insists
-        // on having a terminating '@' even when the default realm
-        // is intended.  Hadoop 3 now has more normal name convetions,
-        // where to specify the default realm, everything after and
-        // including the '@' character is omitted.
-        new User(USER.getName() + "/abc.host.com" +
-          (MiniclusterProfile.MINICLUSTER_PROFILE == 3 ? "" : "@")),
+        // Historical note: Hadoop 2 accepts kerberos names missing a realm, but insists
+        // on having a terminating '@' even when the default realm is intended. Hadoop 3
+        // now has more normal name conventions, where to specify the default realm,
+        // everything after and including the '@' character is omitted.
+        new User(USER.getName() + "/abc.host.com"),
         new User(USER.getName() + "/abc.host.com@REAL.COM"),
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {

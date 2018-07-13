@@ -76,10 +76,10 @@ select id, int_col, string_col from functional.alltypesagg
 order by int_col limit 10 offset 5
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
-HIVE=SUCCESS_PROFILE_3_ONLY
+HIVE=SUCCESS
 ---- QUERY_IMPALA_VIEW_RESULTS
 IMPALA=SUCCESS
-HIVE=SUCCESS_PROFILE_3_ONLY
+HIVE=SUCCESS
 ====
 ---- CREATE_VIEW
 # Test that creating a view in Impala with "NULLS FIRST/LAST" works when the nulls
@@ -90,7 +90,7 @@ select id, int_col, string_col from functional.alltypesagg
 order by int_col asc nulls last limit 10
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
-HIVE=SUCCESS_PROFILE_3_ONLY
+HIVE=SUCCESS
 ---- QUERY_IMPALA_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=SUCCESS
@@ -103,10 +103,10 @@ select id, int_col, string_col from functional.alltypesagg
 order by int_col desc nulls last limit 10
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
-HIVE=SUCCESS_PROFILE_3_ONLY
+HIVE=SUCCESS
 ---- QUERY_IMPALA_VIEW_RESULTS
 IMPALA=SUCCESS
-HIVE=SUCCESS_PROFILE_3_ONLY
+HIVE=SUCCESS
 ====
 ---- CREATE_VIEW
 # Test that exotic column names are quoted in

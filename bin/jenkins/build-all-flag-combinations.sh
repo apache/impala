@@ -29,32 +29,22 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 
 . bin/impala-config.sh
 
-# These are configurations for buildall, with a special sigil for
-# "minicluster profile" where appropriate.
+# These are configurations for buildall.
 CONFIGS=(
   # Test gcc builds with and without -so:
   "-skiptests -noclean"
-  "-skiptests -noclean -so -profile2"
   "-skiptests -noclean -release"
   "-skiptests -noclean -release -so -ninja"
   # clang sanitizer builds:
   "-skiptests -noclean -asan"
-  "-skiptests -noclean -ubsan -so -ninja -profile2"
   "-skiptests -noclean -tsan"
+  "-skiptests -noclean -ubsan -so -ninja"
 )
 
 FAILED=""
 
 for CONFIG in "${CONFIGS[@]}"; do
-  CONFIG2=${CONFIG/-profile2/}
-  if [[ "$CONFIG" != "$CONFIG2" ]]; then
-    CONFIG=$CONFIG2
-    export IMPALA_MINICLUSTER_PROFILE_OVERRIDE=2
-  else
-    export IMPALA_MINICLUSTER_PROFILE_OVERRIDE=3
-  fi
-
-  DESCRIPTION="Options $CONFIG and profile $IMPALA_MINICLUSTER_PROFILE_OVERRIDE"
+  DESCRIPTION="Options $CONFIG"
 
   if [[ $# == 1 && $1 == "--dryrun" ]]; then
     echo $DESCRIPTION

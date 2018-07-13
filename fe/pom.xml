@@ -186,6 +186,18 @@ under the License.
     </dependency>
 
     <dependency>
+      <groupId>org.apache.sentry</groupId>
+      <artifactId>sentry-policy-engine</artifactId>
+      <version>${sentry.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.parquet</groupId>
+      <artifactId>parquet-hadoop-bundle</artifactId>
+      <version>${parquet.version}</version>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-client</artifactId>
       <version>${hbase.version}</version>
@@ -258,6 +270,7 @@ under the License.
         </exclusion>
       </exclusions>
     </dependency>
+
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-serde</artifactId>
@@ -268,6 +281,109 @@ under the License.
            <groupId>net.minidev</groupId>
            <artifactId>json-smart</artifactId>
          </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-exec</artifactId>
+      <version>${hive.version}</version>
+      <exclusions>
+        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-common</artifactId>
+      <version>${hive.version}</version>
+      <exclusions>
+        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-jdbc</artifactId>
+      <version>${hive.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-hbase-handler</artifactId>
+      <version>${hive.version}</version>
+      <exclusions>
+        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-metastore</artifactId>
+      <version>${hive.version}</version>
+      <exclusions>
+        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
+        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hive.shims</groupId>
+      <artifactId>hive-shims-common</artifactId>
+      <version>${hive.version}</version>
+      <exclusions>
+        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
@@ -490,19 +606,6 @@ under the License.
                         -->
                 <source>${project.basedir}/generated-sources/gen-java</source>
                 <source>${project.build.directory}/generated-sources/cup</source>
-                <source>${project.basedir}/src/compat-minicluster-profile-${env.IMPALA_MINICLUSTER_PROFILE}/java</source>
-              </sources>
-            </configuration>
-          </execution>
-          <execution>
-            <id>add-test-source</id>
-            <phase>generate-test-sources</phase>
-            <goals>
-              <goal>add-test-source</goal>
-            </goals>
-            <configuration>
-              <sources>
-                <source>${project.basedir}/src/compat-minicluster-profile-${env.IMPALA_MINICLUSTER_PROFILE}/test/java</source>
               </sources>
             </configuration>
           </execution>
@@ -566,6 +669,46 @@ under the License.
                when running tests like this: mvn test -DcodeCoverage -->
           <skip>${jacoco.skip}</skip>
         </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.0.0-M1</version>
+        <executions>
+          <execution>
+            <id>enforce-banned-dependencies</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <excludes>
+                    <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
+                    <!-- Assert that we only use artifacts from only the specified
+                         version of these components. -->
+                    <exclude>org.apache.hadoop:*</exclude>
+                    <exclude>org.apache.hbase:*</exclude>
+                    <exclude>org.apache.hive:*</exclude>
+                    <exclude>org.apache.kudu:*</exclude>
+                    <exclude>org.apache.sentry:*</exclude>
+                    <exclude>org.apache.parquet:*</exclude>
+                  </excludes>
+                  <includes>
+                    <include>org.apache.hadoop:*:${hadoop.version}</include>
+                    <include>org.apache.hbase:*:${hbase.version}</include>
+                    <include>org.apache.hive:*:${hive.version}</include>
+                    <include>org.apache.kudu:*:${kudu.version}</include>
+                    <include>org.apache.sentry:*:${sentry.version}</include>
+                    <include>org.apache.parquet:*:${parquet.version}</include>
+                  </includes>
+                </bannedDependencies>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
 
   </plugins>
@@ -730,270 +873,23 @@ under the License.
         </plugins>
       </build>
     </profile>
-
-    <profile>
-      <id>impala-minicluster-profile-2</id>
-      <activation>
-        <property>
-          <name>env.IMPALA_MINICLUSTER_PROFILE</name>
-          <value>2</value>
-        </property>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>org.apache.sentry</groupId>
-          <artifactId>sentry-policy-db</artifactId>
-          <version>${sentry.version}</version>
-        </dependency>
-        <dependency>
-          <groupId>com.twitter</groupId>
-          <artifactId>parquet-hadoop-bundle</artifactId>
-          <version>${parquet.version}</version>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-exec</artifactId>
-          <version>${hive.version}</version>
-          <exclusions>
-            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-common</artifactId>
-          <version>${hive.version}</version>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-jdbc</artifactId>
-          <version>${hive.version}</version>
-          <scope>test</scope>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-hbase-handler</artifactId>
-          <version>${hive.version}</version>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-metastore</artifactId>
-          <version>${hive.version}</version>
-        </dependency>
-      </dependencies>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-antrun-plugin</artifactId>
-            <version>1.8</version>
-            <executions>
-              <execution>
-                <id>generate-minicluster-profile-2-compat-shims</id>
-                <phase>generate-sources</phase>
-                <goals>
-                  <goal>run</goal>
-                </goals>
-                <configuration>
-                  <!-- Generates ParquetHelper for minicluster profile 2. -->
-                  <target>
-                    <echo file="${project.build.directory}/gen-compat-shims.sh">
-                      echo Generating shims for Minicluster Profile 2
-                      mkdir -p generated-sources/gen-java/org/apache/impala/analysis
-                      sed -e s,org.apache.parquet,parquet,g src/compat-minicluster-profile-3/java/org/apache/impala/analysis/ParquetHelper.java > generated-sources/gen-java/org/apache/impala/analysis/ParquetHelper.java
-                    </echo>
-                    <exec executable="bash" dir="${project.basedir}" failonerror="true">
-                      <arg line="-ex ${project.build.directory}/gen-compat-shims.sh" />
-                    </exec>
-                  </target>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-
-    </profile>
-    <profile>
-      <id>impala-minicluster-profile-3</id>
-      <activation>
-        <property>
-          <name>env.IMPALA_MINICLUSTER_PROFILE</name>
-          <value>3</value>
-        </property>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>org.apache.sentry</groupId>
-          <artifactId>sentry-policy-engine</artifactId>
-          <version>${sentry.version}</version>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.parquet</groupId>
-          <artifactId>parquet-hadoop-bundle</artifactId>
-          <version>${parquet.version}</version>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-exec</artifactId>
-          <version>${hive.version}</version>
-          <exclusions>
-            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-slf4j-impl</artifactId>
-            </exclusion>
-            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-common</artifactId>
-          <version>${hive.version}</version>
-          <exclusions>
-            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-slf4j-impl</artifactId>
-            </exclusion>
-            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-jdbc</artifactId>
-          <version>${hive.version}</version>
-          <scope>test</scope>
-          <exclusions>
-            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-slf4j-impl</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-hbase-handler</artifactId>
-          <version>${hive.version}</version>
-          <exclusions>
-            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-slf4j-impl</artifactId>
-            </exclusion>
-            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-metastore</artifactId>
-          <version>${hive.version}</version>
-          <exclusions>
-            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-slf4j-impl</artifactId>
-            </exclusion>
-            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive.shims</groupId>
-          <artifactId>hive-shims-common</artifactId>
-          <version>${hive.version}</version>
-          <exclusions>
-            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-slf4j-impl</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-      </dependencies>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-enforcer-plugin</artifactId>
-            <version>3.0.0-M1</version>
-            <executions>
-              <execution>
-                <id>enforce-banned-dependencies</id>
-                <goals>
-                  <goal>enforce</goal>
-                </goals>
-                <configuration>
-                  <rules>
-                    <bannedDependencies>
-                      <excludes>
-                        <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
-                        <!-- Assert that we only use artifacts from only the specified
-                             version of these components. -->
-                        <exclude>org.apache.hadoop:*</exclude>
-                        <exclude>org.apache.hbase:*</exclude>
-                        <exclude>org.apache.hive:*</exclude>
-                        <exclude>org.apache.kudu:*</exclude>
-                        <exclude>org.apache.sentry:*</exclude>
-                        <exclude>org.apache.parquet:*</exclude>
-                      </excludes>
-                      <includes>
-                        <include>org.apache.hadoop:*:${hadoop.version}</include>
-                        <include>org.apache.hbase:*:${hbase.version}</include>
-                        <include>org.apache.hive:*:${hive.version}</include>
-                        <include>org.apache.kudu:*:${kudu.version}</include>
-                        <include>org.apache.sentry:*:${sentry.version}</include>
-                        <include>org.apache.parquet:*:${parquet.version}</include>
-                      </includes>
-                    </bannedDependencies>
-                  </rules>
-                  <fail>true</fail>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-      <dependencyManagement>
-        <dependencies>
-          <!--
-          Pin org.glassfish:javax.el explicitly.
-
-          HBase depends on this indirectly, and it's configured with
-          a range of versions. This causes Maven to talk to all configured
-          repositories, leading both to a lot of chattiness, and also
-          failures if one of the repositories is unavailable.
-          -->
-          <dependency>
-            <groupId>org.glassfish</groupId>
-            <artifactId>javax.el</artifactId>
-            <version>3.0.1-b08</version>
-          </dependency>
-        </dependencies>
-      </dependencyManagement>
-    </profile>
   </profiles>
+
+  <dependencyManagement>
+    <dependencies>
+      <!--
+      Pin org.glassfish:javax.el explicitly.
+
+      HBase depends on this indirectly, and it's configured with
+      a range of versions. This causes Maven to talk to all configured
+      repositories, leading both to a lot of chattiness, and also
+      failures if one of the repositories is unavailable.
+      -->
+      <dependency>
+        <groupId>org.glassfish</groupId>
+        <artifactId>javax.el</artifactId>
+        <version>3.0.1-b08</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 </project>

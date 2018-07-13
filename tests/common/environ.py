@@ -181,6 +181,3 @@ def specific_build_type_timeout(
     timeout_val = default_timeout
   return timeout_val
 
-def is_hive_2():
-  """Returns True if IMPALA_MINICLUSTER_PROFILE in use provides Hive 2."""
-  return os.environ.get("IMPALA_MINICLUSTER_PROFILE", None) == "3"

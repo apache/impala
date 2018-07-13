@@ -87,6 +87,14 @@ under the License.
       </snapshots>
     </repository>
     <repository>
+      <id>impala.cdh.repo</id>
+      <url>https://${env.CDH_DOWNLOAD_HOST}/build/cdh_components/${env.CDH_BUILD_NUMBER}/maven</url>
+      <name>Impala CDH Repository</name>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+    <repository>
       <id>cloudera.thirdparty.repo</id>
       <url>https://repository.cloudera.com/content/repositories/third-party</url>
       <name>Cloudera Third Party Repository</name>
@@ -114,46 +122,5 @@ under the License.
       </snapshots>
     </pluginRepository>
   </pluginRepositories>
-
-  <profiles>
-    <profile>
-      <id>impala-mini-cluster-profile-2</id>
-      <activation>
-        <property>
-          <name>env.IMPALA_MINICLUSTER_PROFILE</name>
-          <value>2</value>
-        </property>
-      </activation>
-      <repositories>
-        <repository>
-          <id>cdh.snapshots.repo</id>
-          <url>https://repository.cloudera.com/content/repositories/snapshots</url>
-          <name>CDH Snapshots Repository</name>
-          <snapshots>
-            <enabled>true</enabled>
-          </snapshots>
-        </repository>
-      </repositories>
-    </profile>
-    <profile>
-      <id>impala-mini-cluster-profile-3</id>
-      <activation>
-        <property>
-          <name>env.IMPALA_MINICLUSTER_PROFILE</name>
-          <value>3</value>
-        </property>
-      </activation>
-      <repositories>
-        <repository>
-          <id>impala.cdh.repo</id>
-          <url>https://${env.CDH_DOWNLOAD_HOST}/build/cdh_components/${env.CDH_BUILD_NUMBER}/maven</url>
-          <name>Impala CDH Repository</name>
-          <snapshots>
-            <enabled>true</enabled>
-          </snapshots>
-        </repository>
-      </repositories>
-    </profile>
-  </profiles>
 
 </project>

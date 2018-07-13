@@ -157,67 +157,19 @@ fi
 export IMPALA_KUDU_VERSION=a954418
 unset IMPALA_KUDU_URL
 
-
-# Versions of Hadoop ecosystem dependencies.
-# ------------------------------------------
-# IMPALA_MINICLUSTER_PROFILE can have two values:
-# 2 represents:
-#    Hadoop 2.6
-#    HBase 1.2
-#    Hive 1.1
-#    Sentry 1.5
-#    Parquet 1.5
-#    Llama (used for Mini KDC) 1.0
-# 3 represents:
-#    Hadoop 3.0
-#    HBase 2.0
-#    Hive 2.1
-#    Sentry 2.0
-#    Parquet 1.9
-#
-# Impala 3.x defaults to profile 3 and marks profile 2 deprecated,
-# so that it may be removed in the 3.x line.
-
-DEFAULT_MINICLUSTER_PROFILE=3
-: ${IMPALA_MINICLUSTER_PROFILE_OVERRIDE:=$DEFAULT_MINICLUSTER_PROFILE}
-
 : ${CDH_DOWNLOAD_HOST:=native-toolchain.s3.amazonaws.com}
 export CDH_DOWNLOAD_HOST
-
-if [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 2 ]]; then
-  echo "IMPALA_MINICLUSTER_PROFILE=2 is deprecated and may be removed in Impala 3.x"
-
-  export IMPALA_MINICLUSTER_PROFILE=2
-  export CDH_MAJOR_VERSION=5
-  export CDH_BUILD_NUMBER=44
-  export IMPALA_HADOOP_VERSION=2.6.0-cdh5.16.0-SNAPSHOT
-  export IMPALA_HBASE_VERSION=1.2.0-cdh5.16.0-SNAPSHOT
-  export IMPALA_HIVE_VERSION=1.1.0-cdh5.16.0-SNAPSHOT
-  export IMPALA_SENTRY_VERSION=1.5.1-cdh5.16.0-SNAPSHOT
-  export IMPALA_PARQUET_VERSION=1.5.0-cdh5.16.0-SNAPSHOT
-  export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
-  export IMPALA_KITE_VERSION=1.0.0-cdh5.16.0-SNAPSHOT
-  # Kudu version used to identify Java client jar from maven
-  export KUDU_JAVA_VERSION=1.8.0-cdh5.16.0-SNAPSHOT
-  # IMPALA-6972: Temporarily disable Hive parallelism during dataload
-  # The Hive version used for IMPALA_MINICLUSTER_PROFIILE=2 has a concurrency issue
-  # that intermittent fails parallel dataload.
-  export IMPALA_SERIAL_DATALOAD=1
-
-elif [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 3 ]]; then
-  export IMPALA_MINICLUSTER_PROFILE=3
-  export CDH_MAJOR_VERSION=6
-  export CDH_BUILD_NUMBER=422770
-  export IMPALA_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
-  export IMPALA_HBASE_VERSION=2.0.0-cdh6.x-SNAPSHOT
-  export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
-  export IMPALA_SENTRY_VERSION=2.0.0-cdh6.x-SNAPSHOT
-  export IMPALA_PARQUET_VERSION=1.9.0-cdh6.x-SNAPSHOT
-  export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
-  export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
-  export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
-  export KUDU_JAVA_VERSION=1.8.0-cdh6.x-SNAPSHOT
-fi
+export CDH_MAJOR_VERSION=6
+export CDH_BUILD_NUMBER=422770
+export IMPALA_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
+export IMPALA_HBASE_VERSION=2.0.0-cdh6.x-SNAPSHOT
+export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
+export IMPALA_SENTRY_VERSION=2.0.0-cdh6.x-SNAPSHOT
+export IMPALA_PARQUET_VERSION=1.9.0-cdh6.x-SNAPSHOT
+export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
+export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
+export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
+export KUDU_JAVA_VERSION=1.8.0-cdh6.x-SNAPSHOT
 
 unset IMPALA_HADOOP_URL
 unset IMPALA_HBASE_URL
@@ -477,10 +429,6 @@ elif [ "${TARGET_FILESYSTEM}" = "local" ]; then
   export FILESYSTEM_PREFIX="${LOCAL_FS}"
 elif [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   if [[ "${ERASURE_CODING}" = true ]]; then
-    if [[ "${IMPALA_MINICLUSTER_PROFILE}" -lt 3 ]]; then
-      echo "Hadoop 3 is required for HDFS erasure coding."
-      return 1
-    fi
     export HDFS_ERASURECODE_POLICY="RS-3-2-1024k"
     export HDFS_ERASURECODE_PATH="/test-warehouse"
   fi
@@ -548,14 +496,12 @@ export HADOOP_CLASSPATH="${HADOOP_CLASSPATH-}:${HADOOP_HOME}/share/hadoop/tools/
 export LZO_JAR_PATH="$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar"
 HADOOP_CLASSPATH+=":$LZO_JAR_PATH"
 
-if [[ $IMPALA_MINICLUSTER_PROFILE == 3 ]]; then
-  # Beware of adding entries from $HADOOP_HOME here, because they can change
-  # the order of the classpath, leading to configuration not showing up first.
-  HADOOP_CLASSPATH="$LZO_JAR_PATH"
-  # Add the path containing the hadoop-aws jar, which is required to access AWS from the
-  # minicluster.
-  HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${HADOOP_HOME}/share/hadoop/tools/lib/*"
-fi
+# Beware of adding entries from $HADOOP_HOME here, because they can change
+# the order of the classpath, leading to configuration not showing up first.
+HADOOP_CLASSPATH="$LZO_JAR_PATH"
+# Add the path containing the hadoop-aws jar, which is required to access AWS from the
+# minicluster.
+HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${HADOOP_HOME}/share/hadoop/tools/lib/*"
 
 export MINI_DFS_BASE_DATA_DIR="$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data"
 export PATH="$HADOOP_HOME/bin:$PATH"
@@ -724,18 +670,16 @@ else
       | sort | uniq`
 fi
 
-if [[ $IMPALA_MINICLUSTER_PROFILE_OVERRIDE == 3 ]]; then
-  # Check for minimum required Java version
-  # Only issue Java version warning when running Java 7.
-  if $JAVA -version 2>&1 | grep -q 'java version "1.7'; then
-    cat << EOF
+# Check for minimum required Java version
+# Only issue Java version warning when running Java 7.
+if $JAVA -version 2>&1 | grep -q 'java version "1.7'; then
+  cat << EOF
 
 WARNING: Your development environment is configured for Hadoop 3 and Java 7. Hadoop 3
 requires at least Java 8. Your JAVA binary currently points to $JAVA
 and reports the following version:
 
 EOF
-    $JAVA -version
-    echo
-  fi
+  $JAVA -version
+  echo
 fi

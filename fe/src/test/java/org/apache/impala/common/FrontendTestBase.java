@@ -54,7 +54,6 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
-import org.apache.impala.compat.MiniclusterProfile;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
@@ -409,15 +408,14 @@ public class FrontendTestBase {
       String errorString = e.getMessage();
       Preconditions.checkNotNull(errorString, "Stack trace lost during exception.");
       String msg = "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString;
-      if (MiniclusterProfile.MINICLUSTER_PROFILE == 3) {
-        // Different versions of Hive have slightly different error messages;
-        // we normalize here as follows:
-        // 'No FileSystem for Scheme "x"' -> 'No FileSystem for scheme: x'
-        if (errorString.contains("No FileSystem for scheme ")) {
-          errorString = errorString.replace("\"", "");
-          errorString = errorString.replace("No FileSystem for scheme ",
-              "No FileSystem for scheme: ");
-        }
+      // TODO: This logic can be removed.
+      // Different versions of Hive have slightly different error messages;
+      // we normalize here as follows:
+      // 'No FileSystem for Scheme "x"' -> 'No FileSystem for scheme: x'
+      if (errorString.contains("No FileSystem for scheme ")) {
+        errorString = errorString.replace("\"", "");
+        errorString = errorString.replace("No FileSystem for scheme ",
+            "No FileSystem for scheme: ");
       }
       Assert.assertTrue(msg, errorString.startsWith(expectedErrorString));
       return;
