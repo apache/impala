@@ -32,6 +32,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/runtime-state.h"
+#include "runtime/scanner-mem-limiter.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/thread.h"
@@ -150,6 +151,7 @@ Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
       rpc_params.initial_mem_reservation_total_claims));
   RETURN_IF_ERROR(
       initial_reservations_->Init(query_id(), rpc_params.min_mem_reservation_bytes));
+  scanner_mem_limiter_ = obj_pool_.Add(new ScannerMemLimiter);
   return Status::OK();
 }
 

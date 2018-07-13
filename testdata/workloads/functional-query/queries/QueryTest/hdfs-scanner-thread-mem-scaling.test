@@ -1,0 +1,35 @@
+====
+---- QUERY
+# IMPALA-7076: this query will fail if the HDFS scanner scan spins up too many scanner
+# threads, because the threads need to decompress full input files into memory.
+# Only one scanner thread per impalad should be started.
+set num_nodes=1;
+set mem_limit=75m;
+select l_orderkey, l_shipmode from tpch_text_gzip.lineitem
+where l_comment = 'telets. quickly ';
+---- TYPES
+BIGINT,STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+49824,'RAIL'
+1380737,'AIR'
+2981252,'TRUCK'
+3415170,'MAIL'
+---- RUNTIME_PROFILE
+aggregation(SUM, NumScannerThreadsStarted): 1
+====
+---- QUERY
+# IMPALA-7076: check that the Parquet scanner also limits memory consumption.
+set num_nodes=1;
+set mem_limit=50m;
+select l_orderkey, l_shipmode from tpch_parquet.lineitem
+where l_comment = 'telets. quickly ';
+---- TYPES
+BIGINT,STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+49824,'RAIL'
+1380737,'AIR'
+2981252,'TRUCK'
+3415170,'MAIL'
+---- RUNTIME_PROFILE
+aggregation(SUM, NumScannerThreadsStarted): 1
+====

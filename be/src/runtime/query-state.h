@@ -39,6 +39,7 @@ class InitialReservations;
 class MemTracker;
 class ReservationTracker;
 class RuntimeState;
+class ScannerMemLimiter;
 
 /// Central class for all backend execution state (example: the FragmentInstanceStates
 /// of the individual fragment instances) created for a particular query.
@@ -127,6 +128,7 @@ class QueryState {
   // the following getters are only valid after Init()
   ReservationTracker* buffer_reservation() const { return buffer_reservation_; }
   InitialReservations* initial_reservations() const { return initial_reservations_; }
+  ScannerMemLimiter* scanner_mem_limiter() const { return scanner_mem_limiter_; }
   TmpFileMgr::FileGroup* file_group() const { return file_group_; }
   const TExecQueryFInstancesParams& rpc_params() const { return rpc_params_; }
 
@@ -302,13 +304,17 @@ class QueryState {
   /// TODO: find a way not to have to copy this
   TExecQueryFInstancesParams rpc_params_;
 
-  /// Buffer reservation for this query (owned by obj_pool_). Set in Prepare().
+  /// Buffer reservation for this query (owned by obj_pool_). Set in Init().
   ReservationTracker* buffer_reservation_ = nullptr;
 
   /// Pool of buffer reservations used to distribute initial reservations to operators
   /// in the query. Contains a ReservationTracker that is a child of
-  /// 'buffer_reservation_'. Owned by 'obj_pool_'. Set in Prepare().
+  /// 'buffer_reservation_'. Owned by 'obj_pool_'. Set in Init().
   InitialReservations* initial_reservations_ = nullptr;
+
+  /// Tracks expected memory consumption of all multithreaded scans for this query on
+  /// this daemon. Owned by 'obj_pool_'. Set in Init().
+  ScannerMemLimiter* scanner_mem_limiter_ = nullptr;
 
   /// Number of active fragment instances and coordinators for this query that may consume
   /// resources for query execution (i.e. threads, memory) on the Impala daemon.

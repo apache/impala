@@ -27,11 +27,13 @@
 #include "runtime/descriptors.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/io/request-context.h"
+#include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
+#include "runtime/row-batch-queue.h"
+#include "runtime/row-batch.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
-#include "runtime/mem-tracker.h"
-#include "runtime/row-batch.h"
-#include "runtime/row-batch-queue.h"
+#include "runtime/scanner-mem-limiter.h"
 #include "runtime/thread-resource-mgr.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
@@ -48,6 +50,18 @@ DECLARE_bool(skip_file_runtime_filtering);
 
 using namespace impala;
 using namespace impala::io;
+
+// Amount of memory that we approximate a scanner thread will use not including I/O
+// buffers. The memory used does not vary considerably between file formats (just a
+// couple of MBs). This value is conservative and taken from running against the tpch
+// lineitem table. Note: this is a crude heuristic to help reduce odds of OOM until
+// we can remove the multithreaded scanners.
+DEFINE_int64_hidden(hdfs_scanner_thread_max_estimated_bytes, 32L * 1024L * 1024L,
+    "Estimated bytes of memory consumed by HDFS scanner thread.");
+
+// Estimated upper bound on the compression ratio of compressed text files. Used to
+// estimate scanner thread memory usage.
+const int COMPRESSED_TEXT_COMPRESSION_RATIO = 11;
 
 // Amount of time to block waiting for GetNext() to release scanner threads between
 // checking if a scanner thread should yield itself back to the global thread pool.
@@ -132,7 +146,7 @@ Status HdfsScanNode::GetNextInternal(
 Status HdfsScanNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(HdfsScanNodeBase::Prepare(state));
-  thread_state_.Prepare(this);
+  thread_state_.Prepare(this, EstimateScannerThreadMemConsumption());
   scanner_thread_reservations_denied_counter_ =
       ADD_COUNTER(runtime_profile(), "NumScannerThreadReservationsDenied", TUnit::UNIT);
   return Status::OK();
@@ -157,7 +171,7 @@ void HdfsScanNode::Close(RuntimeState* state) {
   if (thread_avail_cb_id_ != -1) {
     state->resource_pool()->RemoveThreadAvailableCb(thread_avail_cb_id_);
   }
-  thread_state_.Close();
+  thread_state_.Close(this);
   HdfsScanNodeBase::Close(state);
 }
 
@@ -186,6 +200,31 @@ Status HdfsScanNode::AddDiskIoRanges(const vector<ScanRange*>& ranges,
   return Status::OK();
 }
 
+int64_t HdfsScanNode::EstimateScannerThreadMemConsumption() const {
+  // Start with the minimum I/O buffer requirement.
+  int64_t est_total_bytes = resource_profile_.min_reservation;
+
+  // Next add in the other memory that we estimate the scanner thread will use,
+  // e.g. decompression buffers, tuple buffers, etc.
+  // For compressed text, we estimate this based on the file size (since the whole file
+  // will need to be decompressed at once). For all other formats, we use a constant.
+  // Note: this is crude and we could try to refine it by factoring in the number of
+  // columns, etc, but it is unclear how beneficial this would be.
+  int64_t est_non_reserved_bytes = FLAGS_hdfs_scanner_thread_max_estimated_bytes;
+  auto it = per_type_files_.find(THdfsFileFormat::TEXT);
+  if (it != per_type_files_.end()) {
+    for (HdfsFileDesc* file : it->second) {
+      if (file->file_compression != THdfsCompression::NONE) {
+        int64_t compressed_text_est_bytes =
+            file->file_length * COMPRESSED_TEXT_COMPRESSION_RATIO;
+        est_non_reserved_bytes = max(compressed_text_est_bytes, est_non_reserved_bytes);
+      }
+    }
+  }
+  est_total_bytes += est_non_reserved_bytes;
+  return est_total_bytes;
+}
+
 void HdfsScanNode::ReturnReservationFromScannerThread(const unique_lock<mutex>& lock,
     int64_t bytes) {
   DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
@@ -205,18 +244,22 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
   //  3. Don't start up if the number of ranges left is less than the number of
   //     active scanner threads.
   //  4. Don't start up if no initial ranges have been issued (see IMPALA-1722).
-  //  5. Don't start up a ScannerThread if materialized_row_batches_ is full since
+  //  5. Don't start up a ScannerThread if the row batch queue is not full since
   //     we are not scanner bound.
-  //  6. Don't start up a thread if it is an extra thread and we can't reserve another
+  //  6. Don't start up a thread if there is not enough memory available for the
+  //     estimated memory consumption (include reservation and non-reserved memory).
+  //  7. Don't start up a thread if it is an extra thread and we can't reserve another
   //     minimum reservation's worth of memory for the thread.
-  //  7. Don't start up more than maximum number of scanner threads configured.
-  //  8. Don't start up if there are no thread tokens.
+  //  8. Don't start up more than maximum number of scanner threads configured.
+  //  9. Don't start up if there are no thread tokens.
 
   // Case 4. We have not issued the initial ranges so don't start a scanner thread.
   // Issuing ranges will call this function and we'll start the scanner threads then.
   // TODO: It would be good to have a test case for that.
   if (!initial_ranges_issued_) return;
 
+  ScannerMemLimiter* scanner_mem_limiter =
+      runtime_state_->query_state()->scanner_mem_limiter();
   Status status = Status::OK();
   while (true) {
     // The lock must be given up between loops in order to give writers to done_,
@@ -227,6 +270,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
 
     const int64_t num_active_scanner_threads = thread_state_.GetNumActive();
     const bool first_thread = num_active_scanner_threads == 0;
+    const int64_t est_mem = thread_state_.estimated_per_thread_mem();
     const int64_t scanner_thread_reservation = resource_profile_.min_reservation;
     // Cases 1, 2, 3.
     if (done_ || all_ranges_started_ ||
@@ -235,21 +279,28 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
     }
 
     if (!first_thread) {
-      // Cases 5 and 6.
+      // Cases 5, 6 and 7.
       if (thread_state_.batch_queue()->AtCapacity()) break;
+      if (!scanner_mem_limiter->ClaimMemoryForScannerThread(this, est_mem)) {
+        COUNTER_ADD(thread_state_.scanner_thread_mem_unavailable_counter(), 1);
+        break;
+      }
+
       // The node's min reservation is for the first thread so we don't need to check
       if (!buffer_pool_client()->IncreaseReservation(scanner_thread_reservation)) {
+        scanner_mem_limiter->ReleaseMemoryForScannerThread(this, est_mem);
         COUNTER_ADD(scanner_thread_reservations_denied_counter_, 1);
         break;
       }
     }
 
-    // Case 7 and 8.
+    // Case 8 and 9.
     if (first_thread) {
       // The first thread is required to make progress on the scan.
       pool->AcquireThreadToken();
     } else if (thread_state_.GetNumActive() >= thread_state_.max_num_scanner_threads()
         || !pool->TryAcquireThreadToken()) {
+      scanner_mem_limiter->ReleaseMemoryForScannerThread(this, est_mem);
       ReturnReservationFromScannerThread(lock, scanner_thread_reservation);
       break;
     }
@@ -261,9 +312,12 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
       this->ScannerThread(first_thread, scanner_thread_reservation);
     };
     std::unique_ptr<Thread> t;
-    status =
-      Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME, name, fn, &t, true);
+    status = Thread::Create(
+        FragmentInstanceState::FINST_THREAD_GROUP_NAME, name, fn, &t, true);
     if (!status.ok()) {
+      if (!first_thread) {
+        scanner_mem_limiter->ReleaseMemoryForScannerThread(this, est_mem);
+      }
       ReturnReservationFromScannerThread(lock, scanner_thread_reservation);
       // Release the token and skip running callbacks to find a replacement. Skipping
       // serves two purposes. First, it prevents a mutual recursion between this function
@@ -352,6 +406,11 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
       break;
     }
 
+    // Stop extra threads if we're over a soft limit in order to free up memory.
+    if (!first_thread && mem_tracker_->AnyLimitExceeded(MemLimit::SOFT)) {
+      break;
+    }
+
     // Done with range and it completed successfully
     if (progress_.done()) {
       // All ranges are finished.  Indicate we are done.
@@ -377,6 +436,11 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
   filter_mem_pool.FreeAll();
   expr_results_pool.FreeAll();
   runtime_state_->resource_pool()->ReleaseThreadToken(first_thread);
+  if (!first_thread) {
+    // Memory for the first thread is released in thread_state_.Close().
+    runtime_state_->query_state()->scanner_mem_limiter()->ReleaseMemoryForScannerThread(
+        this, thread_state_.estimated_per_thread_mem());
+  }
   thread_state_.DecrementNumActive();
 }
 

@@ -15,8 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_EXEC_KUDU_SCAN_NODE_H_
-#define IMPALA_EXEC_KUDU_SCAN_NODE_H_
+#pragma once
 
 #include <boost/scoped_ptr.hpp>
 #include <gtest/gtest.h>
@@ -74,6 +73,9 @@ class KuduScanNode : public KuduScanNodeBase {
   /// -1 if no callback is registered.
   int thread_avail_cb_id_;
 
+  /// Compute the estimated memory consumption of each Kudu scanner thread.
+  int64_t EstimateScannerThreadMemConsumption();
+
   /// Called when scanner threads are available for this scan node. This will
   /// try to spin up as many scanner threads as the quota allows.
   void ThreadAvailableCb(ThreadResourcePool* pool);
@@ -104,5 +106,3 @@ class KuduScanNode : public KuduScanNodeBase {
 };
 
 }
-
-#endif

@@ -63,6 +63,7 @@ add_library(Runtime
   runtime-filter-bank.cc
   runtime-filter-ir.cc
   runtime-state.cc
+  scanner-mem-limiter.cc
   sorted-run-merger.cc
   sorter.cc
   string-value.cc

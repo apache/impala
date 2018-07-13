@@ -25,9 +25,11 @@
 #include "gutil/gscoped_ptr.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/mem-pool.h"
-#include "runtime/runtime-state.h"
-#include "runtime/row-batch.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch-queue.h"
+#include "runtime/row-batch.h"
+#include "runtime/runtime-state.h"
+#include "runtime/scanner-mem-limiter.h"
 #include "runtime/thread-resource-mgr.h"
 #include "runtime/tuple-row.h"
 #include "util/runtime-profile-counters.h"
@@ -36,6 +38,18 @@
 
 DEFINE_int32(kudu_max_row_batches, 0, "The maximum size of the row batch queue, "
     " for Kudu scanners.");
+
+// Empirically derived estimate for the Kudu scan's memory consumption per column of
+// data materialized.
+DEFINE_int64_hidden(kudu_scanner_thread_estimated_bytes_per_column, 384L * 1024L,
+    "Estimated bytes of memory per materialized column consumed by Kudu scanner thread.");
+
+// Empirically derived estimate for the maximum consumption of Kudu scan, based on
+// experiments with 250-column table with num_scanner_threads=1, where I wasn't able
+// to coax the scan to use more than 25MB of memory.
+DEFINE_int64_hidden(kudu_scanner_thread_max_estimated_bytes, 32L * 1024L * 1024L,
+    "Estimated maximum bytes of memory consumed by Kudu scanner thread for high column "
+    "counts.");
 
 namespace impala {
 
@@ -53,7 +67,7 @@ KuduScanNode::~KuduScanNode() {
 
 Status KuduScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(KuduScanNodeBase::Prepare(state));
-  thread_state_.Prepare(this);
+  thread_state_.Prepare(this, EstimateScannerThreadMemConsumption());
   return Status::OK();
 }
 
@@ -119,22 +133,44 @@ void KuduScanNode::Close(RuntimeState* state) {
 
   SetDone();
 
-  thread_state_.Close();
+  thread_state_.Close(this);
   KuduScanNodeBase::Close(state);
 }
 
+int64_t KuduScanNode::EstimateScannerThreadMemConsumption() {
+  int64_t num_cols = max<int64_t>(1, tuple_desc()->slots().size());
+  return min(FLAGS_kudu_scanner_thread_max_estimated_bytes,
+      FLAGS_kudu_scanner_thread_estimated_bytes_per_column * num_cols);
+}
+
 void KuduScanNode::ThreadAvailableCb(ThreadResourcePool* pool) {
+  ScannerMemLimiter* mem_limiter = runtime_state_->query_state()->scanner_mem_limiter();
   while (true) {
     unique_lock<mutex> lock(lock_);
     // All done or all tokens are assigned.
     if (done_ || !HasScanToken()) break;
     bool first_thread = thread_state_.GetNumActive() == 0;
 
+    // * Don't start up a ScannerThread if the row batch queue is full since
+    //    we are not scanner bound.
+    // * Don't start up a thread if there is not enough memory available for the
+    //    estimated memory consumption (include reservation and non-reserved memory).
+    if (!first_thread) {
+      if (thread_state_.batch_queue()->AtCapacity()) break;
+      if (!mem_limiter->ClaimMemoryForScannerThread(
+              this, EstimateScannerThreadMemConsumption())) {
+        COUNTER_ADD(thread_state_.scanner_thread_mem_unavailable_counter(), 1);
+        break;
+      }
+    }
+
     // Check if we can get a token. We need at least one thread to run.
     if (first_thread) {
       pool->AcquireThreadToken();
     } else if (thread_state_.GetNumActive() >= thread_state_.max_num_scanner_threads()
         || !pool->TryAcquireThreadToken()) {
+      mem_limiter->ReleaseMemoryForScannerThread(
+          this, EstimateScannerThreadMemConsumption());
       break;
     }
 
@@ -157,6 +193,10 @@ void KuduScanNode::ThreadAvailableCb(ThreadResourcePool* pool) {
       // and ReleaseThreadToken()->InvokeCallbacks(). Second, Thread::Create() failed and
       // is likely to continue failing for future callbacks.
       pool->ReleaseThreadToken(first_thread, true);
+      if (!first_thread) {
+        mem_limiter->ReleaseMemoryForScannerThread(
+            this, EstimateScannerThreadMemConsumption());
+      }
 
       // Abort the query. This is still holding the lock_, so done_ is known to be
       // false and status_ must be ok.
@@ -235,6 +275,11 @@ void KuduScanNode::RunScannerThread(
   // lock_ is released before calling ThreadResourceMgr::ReleaseThreadToken() which
   // invokes ThreadAvailableCb() which attempts to take the same lock.
   VLOG_RPC << "Thread done: " << name;
+  if (!first_thread) {
+    ScannerMemLimiter* mem_limiter = runtime_state_->query_state()->scanner_mem_limiter();
+    mem_limiter->ReleaseMemoryForScannerThread(
+        this, EstimateScannerThreadMemConsumption());
+  }
   runtime_state_->resource_pool()->ReleaseThreadToken(first_thread);
 }
 

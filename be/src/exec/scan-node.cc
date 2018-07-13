@@ -21,10 +21,12 @@
 
 #include "exprs/scalar-expr.h"
 #include "runtime/io/disk-io-mgr.h"
-#include "runtime/row-batch.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch-queue.h"
+#include "runtime/row-batch.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
+#include "runtime/scanner-mem-limiter.h"
 #include "util/disk-info.h"
 #include "util/runtime-profile-counters.h"
 
@@ -192,10 +194,12 @@ bool ScanNode::WaitForRuntimeFilters() {
   return false;
 }
 
-void ScanNode::ScannerThreadState::Prepare(ScanNode* parent) {
+void ScanNode::ScannerThreadState::Prepare(
+    ScanNode* parent, int64_t estimated_per_thread_mem) {
+  DCHECK_GT(estimated_per_thread_mem, 0);
   RuntimeProfile* profile = parent->runtime_profile();
-  row_batches_mem_tracker_ = parent->runtime_state_->obj_pool()->Add(new MemTracker(
-        -1, "Queued Batches", parent->mem_tracker(), false));
+  row_batches_mem_tracker_ = parent->runtime_state_->obj_pool()->Add(
+      new MemTracker(-1, "Queued Batches", parent->mem_tracker(), false));
 
   thread_counters_ = ADD_THREAD_COUNTERS(profile, SCANNER_THREAD_COUNTERS_PREFIX);
   num_threads_started_ = ADD_COUNTER(profile, NUM_SCANNER_THREADS_STARTED, TUnit::UNIT);
@@ -207,6 +211,12 @@ void ScanNode::ScannerThreadState::Prepare(ScanNode* parent) {
   row_batches_put_timer_ = ADD_TIMER(profile, "RowBatchQueuePutWaitTime");
   row_batches_peak_mem_consumption_ =
       ADD_COUNTER(profile, "RowBatchQueuePeakMemoryUsage", TUnit::BYTES);
+  scanner_thread_mem_unavailable_counter_ =
+      ADD_COUNTER(profile, "NumScannerThreadMemUnavailable", TUnit::UNIT);
+
+  parent->runtime_state()->query_state()->scanner_mem_limiter()->RegisterScan(
+      parent, estimated_per_thread_mem);
+  estimated_per_thread_mem_ = estimated_per_thread_mem;
 }
 
 void ScanNode::ScannerThreadState::Open(
@@ -297,7 +307,7 @@ void ScanNode::ScannerThreadState::Shutdown() {
   if (batch_queue_ != nullptr) batch_queue_->Shutdown();
 }
 
-void ScanNode::ScannerThreadState::Close() {
+void ScanNode::ScannerThreadState::Close(ScanNode* parent) {
   scanner_threads_.JoinAll();
   DCHECK_EQ(num_active_.Load(), 0) << "There should be no active threads";
   if (batch_queue_ != nullptr) {
@@ -306,6 +316,13 @@ void ScanNode::ScannerThreadState::Close() {
     row_batches_peak_mem_consumption_->Set(row_batches_mem_tracker_->peak_consumption());
     batch_queue_->Cleanup();
   }
-  if (row_batches_mem_tracker_ != nullptr) row_batches_mem_tracker_->Close();
+  if (row_batches_mem_tracker_ != nullptr) {
+    row_batches_mem_tracker_->Close();
+  }
+  if (estimated_per_thread_mem_ != 0) {
+    parent->runtime_state()->query_state()->scanner_mem_limiter()
+        ->ReleaseMemoryForScannerThread(parent, estimated_per_thread_mem_);
+    estimated_per_thread_mem_ = 0;
+  }
 }
 }

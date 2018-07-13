@@ -15,9 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_EXEC_HDFS_SCAN_NODE_H_
-#define IMPALA_EXEC_HDFS_SCAN_NODE_H_
+#pragma once
 
 #include <map>
 #include <memory>
@@ -135,9 +133,13 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// -1 if no callback is registered.
   int thread_avail_cb_id_ = -1;
 
-  // Number of times scanner threads were not created because of reservation increase
-  // being denied.
+  /// Number of times scanner threads were not created because of reservation increase
+  /// being denied.
   RuntimeProfile::Counter* scanner_thread_reservations_denied_counter_ = nullptr;
+
+  /// Compute the estimated memory consumption of a scanner thread in bytes for the
+  /// purposes of deciding whether to start a new scanner thread.
+  int64_t EstimateScannerThreadMemConsumption() const;
 
   /// Tries to spin up as many scanner threads as the quota allows. Called explicitly
   /// (e.g., when adding new ranges) or when threads are available for this scan node.
@@ -184,5 +186,3 @@ class HdfsScanNode : public HdfsScanNodeBase {
 };
 
 }
-
-#endif

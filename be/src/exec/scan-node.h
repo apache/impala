@@ -15,9 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_EXEC_SCAN_NODE_H_
-#define IMPALA_EXEC_SCAN_NODE_H_
+#pragma once
 
 #include <string>
 #include "exec/exec-node.h"
@@ -210,7 +208,10 @@ class ScanNode : public ExecNode {
   class ScannerThreadState {
    public:
     /// Called from *ScanNode::Prepare() to initialize counters and MemTracker.
-    void Prepare(ScanNode* parent);
+    /// 'estimated_per_thread_mem' is the estimated memory consumption of each scanner
+    /// thread and must be positive. Prepare() registers the scan with the query-global
+    /// ScannerMemLimit and accounts for the first thread's memory consumption.
+    void Prepare(ScanNode* parent, int64_t estimated_per_thread_mem);
 
     /// Called from *ScanNode::Open() to create the row batch queue and start periodic
     /// counters running. 'max_row_batches_override' determines size of the row batch
@@ -223,7 +224,7 @@ class ScanNode : public ExecNode {
 
     /// Waits for all scanner threads to finish and cleans up the queue. Called from
     /// *ScanNode::Close(). No other methods can be called after this. Not thread-safe.
-    void Close();
+    void Close(ScanNode* parent);
 
     /// Add a new scanner thread to the thread group. Not thread-safe: only one thread
     /// should call AddThread() at a time.
@@ -255,6 +256,10 @@ class ScanNode : public ExecNode {
     RowBatchQueue* batch_queue() { return batch_queue_.get(); }
     RuntimeProfile::ThreadCounters* thread_counters() const { return thread_counters_; }
     int max_num_scanner_threads() const { return max_num_scanner_threads_; }
+    int64_t estimated_per_thread_mem() const { return estimated_per_thread_mem_; }
+    RuntimeProfile::Counter* scanner_thread_mem_unavailable_counter() const {
+      return scanner_thread_mem_unavailable_counter_;
+    }
 
    private:
     /// Thread group for all scanner threads.
@@ -265,6 +270,11 @@ class ScanNode : public ExecNode {
     /// are generally cpu bound so there is no benefit in spinning up more threads than
     /// the number of cores. Set in Open().
     int max_num_scanner_threads_ = 0;
+
+    /// Estimated amount of memory that each additional scanner thread will consume. Used
+    /// to decide whether enough memory is available to create a new scanner thread. Set
+    /// to 0 when the memory for the first thread claimed in Prepare() is released.
+    int64_t estimated_per_thread_mem_ = 0;
 
     // MemTracker for queued row batches. Initialized in Prepare(). Owned by RuntimeState.
     MemTracker* row_batches_mem_tracker_ = nullptr;
@@ -305,8 +315,9 @@ class ScanNode : public ExecNode {
 
     /// Peak memory consumption of the materialized batch queue. Updated in Close().
     RuntimeProfile::Counter* row_batches_peak_mem_consumption_ = nullptr;
+
+    /// Number of times scanner threads were not created because of memory not available.
+    RuntimeProfile::Counter* scanner_thread_mem_unavailable_counter_ = nullptr;
   };
 };
 }
-
-#endif

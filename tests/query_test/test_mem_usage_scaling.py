@@ -349,3 +349,16 @@ class TestScanMemLimit(ImpalaTestSuite):
         "refresh {0}.{1}".format(unique_database, TBL))
 
     self.execute_query_expect_success(self.client, SELECT_QUERY, SELECT_OPTIONS)
+
+  def test_kudu_scan_mem_usage(self, vector):
+    """Test that Kudu scans can stay within a low memory limit. Before IMPALA-7096 they
+    were not aware of mem_limit and would start up too many scanner threads."""
+    self.run_test_case('QueryTest/kudu-scan-mem-usage', vector)
+
+  def test_hdfs_scanner_thread_mem_scaling(self, vector):
+    """Test that HDFS scans can stay within a low memory limit. Before IMPALA-7096 they
+    were not aware of non-reserved memory consumption and could start up too many scanner
+    threads."""
+    # Remove num_nodes setting to allow .test file to set num_nodes.
+    del vector.get_value('exec_option')['num_nodes']
+    self.run_test_case('QueryTest/hdfs-scanner-thread-mem-scaling', vector)
