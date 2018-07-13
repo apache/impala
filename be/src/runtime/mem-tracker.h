@@ -29,6 +29,7 @@
 
 #include "common/logging.h"
 #include "common/atomic.h"
+#include "runtime/mem-tracker-types.h"
 #include "util/debug-util.h"
 #include "util/internal-queue.h"
 #include "util/metrics.h"
@@ -40,13 +41,18 @@
 namespace impala {
 
 class ObjectPool;
-class MemTracker;
 struct ReservationTrackerCounters;
 class TQueryOptions;
 
 /// A MemTracker tracks memory consumption; it contains an optional limit
 /// and can be arranged into a tree structure such that the consumption tracked
 /// by a MemTracker is also tracked by its ancestors.
+///
+/// A MemTracker has a hard and a soft limit derived from the limit. If the hard limit
+/// is exceeded, all memory allocations and queries should fail until we are under the
+/// limit again. The soft limit can be exceeded without causing query failures, but
+/// consumers of memory that can tolerate running without more memory should not allocate
+/// memory in excess of the soft limit.
 ///
 /// We use a five-level hierarchy of mem trackers: process, pool, query, fragment
 /// instance. Specific parts of the fragment (exec nodes, sinks, etc) will add a
@@ -77,22 +83,23 @@ class MemTracker {
  public:
   /// 'byte_limit' < 0 means no limit
   /// 'label' is the label used in the usage string (LogUsage())
-  /// If 'log_usage_if_zero' is false, this tracker (and its children) will not be included
+  /// If 'log_usage_if_zero' is false, this tracker (and its children) will not be
+  /// included
   /// in LogUsage() output if consumption is 0.
   MemTracker(int64_t byte_limit = -1, const std::string& label = std::string(),
-      MemTracker* parent = NULL, bool log_usage_if_zero = true);
+      MemTracker* parent = nullptr, bool log_usage_if_zero = true);
 
   /// C'tor for tracker for which consumption counter is created as part of a profile.
   /// The counter is created with name COUNTER_NAME.
   MemTracker(RuntimeProfile* profile, int64_t byte_limit,
-      const std::string& label = std::string(), MemTracker* parent = NULL);
+      const std::string& label = std::string(), MemTracker* parent = nullptr);
 
   /// C'tor for tracker that uses consumption_metric as the consumption value.
   /// Consume()/Release() can still be called. This is used for the root process tracker
   /// (if 'parent' is NULL). It is also to report on other categories of memory under the
   /// process tracker, e.g. buffer pool free buffers (if 'parent - non-NULL).
   MemTracker(IntGauge* consumption_metric, int64_t byte_limit = -1,
-      const std::string& label = std::string(), MemTracker* parent = NULL);
+      const std::string& label = std::string(), MemTracker* parent = nullptr);
 
   ~MemTracker();
 
@@ -129,13 +136,13 @@ class MemTracker {
       return;
     }
 
-    if (consumption_metric_ != NULL) {
+    if (consumption_metric_ != nullptr) {
       RefreshConsumptionFromMetric();
       return;
     }
     for (MemTracker* tracker : all_trackers_) {
       tracker->consumption_->Add(bytes);
-      if (tracker->consumption_metric_ == NULL) {
+      if (tracker->consumption_metric_ == nullptr) {
         DCHECK_GE(tracker->consumption_->current_value(), 0);
       }
     }
@@ -148,7 +155,7 @@ class MemTracker {
   /// the limit recorded in one of its ancestors already happened.
   void ConsumeLocal(int64_t bytes, MemTracker* end_tracker) {
     DCHECK(!closed_) << label_;
-    DCHECK(consumption_metric_ == NULL) << "Should not be called on root.";
+    DCHECK(consumption_metric_ == nullptr) << "Should not be called on root.";
     for (MemTracker* tracker : all_trackers_) {
       if (tracker == end_tracker) return;
       DCHECK(!tracker->has_limit());
@@ -163,19 +170,21 @@ class MemTracker {
   }
 
   /// Increases consumption of this tracker and its ancestors by 'bytes' only if
-  /// they can all consume 'bytes'. If this brings any of them over, none of them
-  /// are updated.
-  /// Returns true if the try succeeded.
+  /// they can all consume 'bytes' without exceeding limit (hard or soft) specified
+  /// by 'mode'. If any limit would be exceed, no MemTrackers are updated. If the
+  /// caller can tolerate an allocation failing, it should set mode=SOFT so that
+  /// other callers that may not tolerate allocation failures have a better chance
+  /// of success. Returns true if the consumption was successfully updated.
   WARN_UNUSED_RESULT
-  bool TryConsume(int64_t bytes) {
+  bool TryConsume(int64_t bytes, MemLimit mode = MemLimit::HARD) {
     DCHECK(!closed_) << label_;
-    if (consumption_metric_ != NULL) RefreshConsumptionFromMetric();
+    if (consumption_metric_ != nullptr) RefreshConsumptionFromMetric();
     if (UNLIKELY(bytes <= 0)) return true;
     int i;
     // Walk the tracker tree top-down.
     for (i = all_trackers_.size() - 1; i >= 0; --i) {
       MemTracker* tracker = all_trackers_[i];
-      const int64_t limit = tracker->limit();
+      const int64_t limit = tracker->GetLimit(mode);
       if (limit < 0) {
         tracker->consumption_->Add(bytes); // No limit at this tracker.
       } else {
@@ -215,7 +224,7 @@ class MemTracker {
       return;
     }
 
-    if (consumption_metric_ != NULL) {
+    if (consumption_metric_ != nullptr) {
       RefreshConsumptionFromMetric();
       return;
     }
@@ -227,9 +236,10 @@ class MemTracker {
       /// metric. Don't blow up in this case. (Note that this doesn't affect non-process
       /// trackers since we can enforce that the reported memory usage is internally
       /// consistent.)
-      if (tracker->consumption_metric_ == NULL) {
+      if (tracker->consumption_metric_ == nullptr) {
         DCHECK_GE(tracker->consumption_->current_value(), 0)
-          << std::endl << tracker->LogUsage(UNLIMITED_DEPTH);
+            << std::endl
+            << tracker->LogUsage(UNLIMITED_DEPTH);
       }
     }
   }
@@ -242,22 +252,23 @@ class MemTracker {
 
   /// Returns true if a valid limit of this tracker or one of its ancestors is
   /// exceeded.
-  bool AnyLimitExceeded() {
+  bool AnyLimitExceeded(MemLimit mode) {
     for (MemTracker* tracker : limit_trackers_) {
-      if (tracker->LimitExceeded()) return true;
+      if (tracker->LimitExceeded(mode)) return true;
     }
     return false;
   }
 
   /// If this tracker has a limit, checks the limit and attempts to free up some memory if
-  /// the limit is exceeded by calling any added GC functions. Returns true if the limit is
-  /// exceeded after calling the GC functions. Returns false if there is no limit.
-  bool LimitExceeded() {
-    if (UNLIKELY(CheckLimitExceeded())) {
-      if (bytes_over_limit_metric_ != NULL) {
+  /// the hard limit is exceeded by calling any added GC functions. Returns true if the
+  /// limit is exceeded after calling the GC functions. Returns false if there is no limit
+  /// or consumption is under the limit.
+  bool LimitExceeded(MemLimit mode) {
+    if (UNLIKELY(CheckLimitExceeded(mode))) {
+      if (mode == MemLimit::HARD && bytes_over_limit_metric_ != nullptr) {
         bytes_over_limit_metric_->SetValue(consumption() - limit_);
       }
-      return GcMemory(limit_);
+      return mode == MemLimit::HARD ? GcMemory(limit_) : true;
     }
     return false;
   }
@@ -265,15 +276,7 @@ class MemTracker {
   /// Returns the maximum consumption that can be made without exceeding the limit on
   /// this tracker or any of its parents. Returns int64_t::max() if there are no
   /// limits and a negative value if any limit is already exceeded.
-  int64_t SpareCapacity() const {
-    int64_t result = std::numeric_limits<int64_t>::max();
-    for (std::vector<MemTracker*>::const_iterator tracker = limit_trackers_.begin();
-         tracker != limit_trackers_.end(); ++tracker) {
-      int64_t mem_left = (*tracker)->limit() - (*tracker)->consumption();
-      result = std::min(result, mem_left);
-    }
-    return result;
-  }
+  int64_t SpareCapacity(MemLimit mode) const;
 
   /// Refresh the memory consumption value from the consumption metric. Only valid to
   /// call if this tracker has a consumption metric.
@@ -284,19 +287,17 @@ class MemTracker {
 
   int64_t limit() const { return limit_; }
   bool has_limit() const { return limit_ >= 0; }
+  int64_t soft_limit() const { return soft_limit_; }
+  int64_t GetLimit(MemLimit mode) const {
+    if (mode == MemLimit::SOFT) return soft_limit();
+    DCHECK_ENUM_EQ(mode, MemLimit::HARD);
+    return limit();
+  }
   const std::string& label() const { return label_; }
 
   /// Returns the lowest limit for this tracker and its ancestors. Returns
   /// -1 if there is no limit.
-  int64_t lowest_limit() const {
-    if (limit_trackers_.empty()) return -1;
-    int64_t v = std::numeric_limits<int64_t>::max();
-    for (int i = 0; i < limit_trackers_.size(); ++i) {
-      DCHECK(limit_trackers_[i]->has_limit());
-      v = std::min(v, limit_trackers_[i]->limit());
-    }
-    return v;
-  }
+  int64_t GetLowestLimit(MemLimit mode) const;
 
   /// Returns the memory 'reserved' by this resource pool mem tracker, which is the sum
   /// of the memory reserved by the queries in it (i.e. its child trackers). The mem
@@ -373,7 +374,10 @@ class MemTracker {
   friend class PoolMemTrackerRegistry;
 
   /// Returns true if the current memory tracker's limit is exceeded.
-  bool CheckLimitExceeded() const { return limit_ >= 0 && limit_ < consumption(); }
+  bool CheckLimitExceeded(MemLimit mode) const {
+    int64_t limit = GetLimit(mode);
+    return limit >= 0 && limit < consumption();
+  }
 
   /// If consumption is higher than max_consumption, attempts to free memory by calling
   /// any added GC functions.  Returns true if max_consumption is still exceeded. Takes
@@ -426,6 +430,10 @@ class MemTracker {
   /// Hard limit on memory consumption, in bytes. May not be exceeded. If limit_ == -1,
   /// there is no consumption limit.
   const int64_t limit_;
+
+  /// Soft limit on memory consumption, in bytes. Can be exceeded but callers to
+  /// TryConsume() can opt not to exceed this limit. If -1, there is no consumption limit.
+  const int64_t soft_limit_;
 
   std::string label_;
 

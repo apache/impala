@@ -196,7 +196,7 @@ class BufferPool::Client {
  public:
   Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group, const string& name,
       ReservationTracker* parent_reservation, MemTracker* mem_tracker,
-      int64_t reservation_limit, RuntimeProfile* profile);
+      MemLimit mem_limit_mode, int64_t reservation_limit, RuntimeProfile* profile);
 
   ~Client() {
     DCHECK_EQ(0, num_pages_);

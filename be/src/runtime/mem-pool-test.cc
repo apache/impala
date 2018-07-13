@@ -241,35 +241,35 @@ TEST(MemPoolTest, Limits) {
   MemTracker limit2(3 * MemPoolTest::INITIAL_CHUNK_SIZE, "", &limit3);
 
   MemPool* p1 = new MemPool(&limit1);
-  EXPECT_FALSE(limit1.AnyLimitExceeded());
+  EXPECT_FALSE(limit1.AnyLimitExceeded(MemLimit::HARD));
 
   MemPool* p2 = new MemPool(&limit2);
-  EXPECT_FALSE(limit2.AnyLimitExceeded());
+  EXPECT_FALSE(limit2.AnyLimitExceeded(MemLimit::HARD));
 
   // p1 exceeds a non-shared limit
   p1->Allocate(MemPoolTest::INITIAL_CHUNK_SIZE);
-  EXPECT_FALSE(limit1.LimitExceeded());
+  EXPECT_FALSE(limit1.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(MemPoolTest::INITIAL_CHUNK_SIZE, limit1.consumption());
-  EXPECT_FALSE(limit3.LimitExceeded());
+  EXPECT_FALSE(limit3.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(MemPoolTest::INITIAL_CHUNK_SIZE, limit3.consumption());
 
   p1->Allocate(MemPoolTest::INITIAL_CHUNK_SIZE);
-  EXPECT_TRUE(limit1.LimitExceeded());
+  EXPECT_TRUE(limit1.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(MemPoolTest::INITIAL_CHUNK_SIZE * 3, limit1.consumption());
-  EXPECT_FALSE(limit3.LimitExceeded());
+  EXPECT_FALSE(limit3.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(MemPoolTest::INITIAL_CHUNK_SIZE * 3, limit3.consumption());
 
   // p2 exceeds a shared limit
   p2->Allocate(MemPoolTest::INITIAL_CHUNK_SIZE);
-  EXPECT_FALSE(limit2.LimitExceeded());
+  EXPECT_FALSE(limit2.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(MemPoolTest::INITIAL_CHUNK_SIZE, limit2.consumption());
-  EXPECT_FALSE(limit3.LimitExceeded());
+  EXPECT_FALSE(limit3.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(MemPoolTest::INITIAL_CHUNK_SIZE * 4, limit3.consumption());
 
   p2->Allocate(1);
-  EXPECT_FALSE(limit2.LimitExceeded());
+  EXPECT_FALSE(limit2.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(MemPoolTest::INITIAL_CHUNK_SIZE * 3, limit2.consumption());
-  EXPECT_TRUE(limit3.LimitExceeded());
+  EXPECT_TRUE(limit3.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(MemPoolTest::INITIAL_CHUNK_SIZE * 6, limit3.consumption());
 
   // deleting pools reduces consumption
@@ -281,7 +281,7 @@ TEST(MemPoolTest, Limits) {
 
   // Allocate another chunk
   p2->FreeAll();
-  EXPECT_FALSE(limit2.LimitExceeded());
+  EXPECT_FALSE(limit2.LimitExceeded(MemLimit::HARD));
   uint8_t* result = p2->TryAllocate(MemPoolTest::INITIAL_CHUNK_SIZE);
   ASSERT_TRUE(result != NULL);
   ASSERT_TRUE(MemPoolTest::CheckIntegrity(p2, false));

@@ -29,6 +29,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "gutil/macros.h"
+#include "runtime/mem-tracker-types.h"
 #include "runtime/tmp-file-mgr.h"
 #include "util/aligned-new.h"
 #include "util/internal-queue.h"
@@ -37,7 +38,6 @@
 
 namespace impala {
 
-class MemTracker;
 class ReservationTracker;
 class RuntimeProfile;
 class SystemAllocator;
@@ -175,11 +175,12 @@ class BufferPool : public CacheLineAligned {
   ///
   /// The client's reservation is created as a child of 'parent_reservation' with limit
   /// 'reservation_limit' and associated with MemTracker 'mem_tracker'. The initial
-  /// reservation is 0 bytes.
+  /// reservation is 0 bytes. 'mem_limit_mode' determines whether reservation
+  /// increases are checked against the soft or hard limit of 'mem_tracker'.
   Status RegisterClient(const std::string& name, TmpFileMgr::FileGroup* file_group,
       ReservationTracker* parent_reservation, MemTracker* mem_tracker,
-      int64_t reservation_limit, RuntimeProfile* profile,
-      ClientHandle* client) WARN_UNUSED_RESULT;
+      int64_t reservation_limit, RuntimeProfile* profile, ClientHandle* client,
+      MemLimit mem_limit_mode = MemLimit::SOFT) WARN_UNUSED_RESULT;
 
   /// Deregister 'client' if it is registered. All pages must be destroyed and buffers
   /// must be freed for the client before calling this. Releases any reservation that

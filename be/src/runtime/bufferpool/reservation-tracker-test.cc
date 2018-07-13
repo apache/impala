@@ -340,6 +340,7 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
   // We can only handle MemTracker limits at the topmost linked ReservationTracker,
   // so avoid adding limits at lower level.
   const int LIMIT = HIERARCHY_DEPTH;
+  const int SOFT_LIMIT = static_cast<int>(LIMIT * 0.9);
   vector<int> mem_limits({LIMIT * 10, LIMIT, -1, -1, -1});
 
   // Root trackers aren't linked.
@@ -350,47 +351,64 @@ TEST_F(ReservationTrackerTest, MemTrackerIntegrationMultiLevel) {
         mem_limits[i], Substitute("Child $0", i), mem_trackers[i - 1].get()));
   }
 
-  vector<int> interesting_amounts({LIMIT - 1, LIMIT, LIMIT + 1});
+  vector<int> interesting_amounts(
+      {LIMIT - 1, LIMIT, LIMIT + 1, SOFT_LIMIT, SOFT_LIMIT - 1});
 
   // Test that all limits and consumption correctly reported when consuming
   // from a non-root ReservationTracker that is connected to a MemTracker.
-  for (int level = 1; level < HIERARCHY_DEPTH; ++level) {
-    int64_t lowest_limit = mem_trackers[level]->lowest_limit();
-    for (int amount : interesting_amounts) {
-      // Initialize the tracker, increase reservation, then release reservation by closing
-      // the tracker.
-      reservations[level].InitChildTracker(
-          NewProfile(), &reservations[level - 1], mem_trackers[level].get(), 500);
-      bool increased = reservations[level].IncreaseReservation(amount);
-      if (lowest_limit == -1 || amount <= lowest_limit) {
-        // The increase should go through.
-        ASSERT_TRUE(increased) << reservations[level].DebugString();
-        ASSERT_EQ(amount, reservations[level].GetReservation());
-        ASSERT_EQ(amount, mem_trackers[level]->consumption());
-        for (int ancestor = 0; ancestor < level; ++ancestor) {
-          ASSERT_EQ(amount, reservations[ancestor].GetChildReservations());
-          ASSERT_EQ(amount, mem_trackers[ancestor]->consumption());
-        }
+  // Test both soft and hard limits.
+  for (MemLimit limit_mode : {MemLimit::SOFT, MemLimit::HARD}) {
+    for (int level = 1; level < HIERARCHY_DEPTH; ++level) {
+      int64_t lowest_limit = mem_trackers[level]->GetLowestLimit(limit_mode);
+      for (int amount : interesting_amounts) {
+        LOG(INFO) << "level=" << level << " limit_mode=" << static_cast<int>(limit_mode)
+                  << " amount=" << amount << " lowest_limit=" << lowest_limit;
+        // Initialize the tracker, increase reservation, then release reservation by
+        // closing the tracker.
+        reservations[level].InitChildTracker(NewProfile(), &reservations[level - 1],
+            mem_trackers[level].get(), 500, limit_mode);
+        bool increased = reservations[level].IncreaseReservation(amount);
+        if (lowest_limit == -1 || amount <= lowest_limit) {
+          // The increase should go through.
+          ASSERT_TRUE(increased)
+              << reservations[level].DebugString() << "\n"
+              << mem_trackers[0]->LogUsage(MemTracker::UNLIMITED_DEPTH);
+          ASSERT_EQ(amount, reservations[level].GetReservation());
+          ASSERT_EQ(amount, mem_trackers[level]->consumption());
+          for (int ancestor = 0; ancestor < level; ++ancestor) {
+            ASSERT_EQ(amount, reservations[ancestor].GetChildReservations());
+            ASSERT_EQ(amount, mem_trackers[ancestor]->consumption());
+          }
 
-        LOG(INFO) << "\n" << mem_trackers[0]->LogUsage(MemTracker::UNLIMITED_DEPTH);
+          LOG(INFO) << "\n" << mem_trackers[0]->LogUsage(MemTracker::UNLIMITED_DEPTH);
+        } else {
+          ASSERT_FALSE(increased);
+        }
         reservations[level].Close();
-      } else {
-        ASSERT_FALSE(increased);
+        // Reservations should be released on all ancestors.
+        for (int i = 0; i < level; ++i) {
+          ASSERT_EQ(0, reservations[i].GetReservation()) << i << ": "
+                                                         << reservations[i].DebugString();
+          ASSERT_EQ(0, reservations[i].GetChildReservations());
+          ASSERT_EQ(0, mem_trackers[i]->consumption());
+        }
       }
-      // Reservations should be released on all ancestors.
-      for (int i = 0; i < level; ++i) {
-        ASSERT_EQ(0, reservations[i].GetReservation()) << i << ": "
-                                                       << reservations[i].DebugString();
-        ASSERT_EQ(0, reservations[i].GetChildReservations());
-        ASSERT_EQ(0, mem_trackers[i]->consumption());
-      }
+      // Set up tracker to be parent for next iteration.
+      reservations[level].InitChildTracker(NewProfile(), &reservations[level - 1],
+          mem_trackers[level].get(), 500, limit_mode);
     }
+    for (int level = 1; level < HIERARCHY_DEPTH; ++level) reservations[level].Close();
   }
 
   // "Pull down" a reservation from the top of the hierarchy level-by-level to the
   // leaves, checking that everything is consistent at each step.
   for (int level = 0; level < HIERARCHY_DEPTH; ++level) {
     const int amount = LIMIT;
+    if (level > 0) {
+      reservations[level].InitChildTracker(
+          NewProfile(), &reservations[level - 1], mem_trackers[level].get(), 500,
+          MemLimit::HARD);
+    }
     ASSERT_TRUE(reservations[level].IncreaseReservation(amount));
     ASSERT_EQ(amount, reservations[level].GetReservation());
     ASSERT_EQ(0, reservations[level].GetUsedReservation());

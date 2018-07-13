@@ -255,7 +255,7 @@ void RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
 
 Status RuntimeState::CheckQueryState() {
   DCHECK(instance_mem_tracker_ != nullptr);
-  if (UNLIKELY(instance_mem_tracker_->AnyLimitExceeded())) {
+  if (UNLIKELY(instance_mem_tracker_->AnyLimitExceeded(MemLimit::HARD))) {
     SetMemLimitExceeded(instance_mem_tracker_.get());
   }
   return GetQueryStatus();

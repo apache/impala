@@ -120,7 +120,7 @@ Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
   // more resources.
   ExecEnv* exec_env = ExecEnv::GetInstance();
   MemTracker* process_mem_tracker = exec_env->process_mem_tracker();
-  if (process_mem_tracker->LimitExceeded()) {
+  if (process_mem_tracker->LimitExceeded(MemLimit::HARD)) {
     string msg = Substitute(
         "Query $0 could not start because the backend Impala daemon "
         "is over its memory limit", PrintId(query_id()));
@@ -162,7 +162,7 @@ void QueryState::InitMemTrackers() {
 
 Status QueryState::InitBufferPoolState() {
   ExecEnv* exec_env = ExecEnv::GetInstance();
-  int64_t mem_limit = query_mem_tracker_->lowest_limit();
+  int64_t mem_limit = query_mem_tracker_->GetLowestLimit(MemLimit::HARD);
   int64_t max_reservation;
   if (query_options().__isset.buffer_pool_limit
       && query_options().buffer_pool_limit > 0) {

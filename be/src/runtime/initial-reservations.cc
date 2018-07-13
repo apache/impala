@@ -41,10 +41,13 @@ InitialReservations::InitialReservations(ObjectPool* obj_pool,
     ReservationTracker* query_reservation, MemTracker* query_mem_tracker,
     int64_t initial_reservation_total_claims)
   : initial_reservation_mem_tracker_(obj_pool->Add(
-      new MemTracker(-1, "Unclaimed reservations", query_mem_tracker, false))),
-      remaining_initial_reservation_claims_(initial_reservation_total_claims) {
+        new MemTracker(-1, "Unclaimed reservations", query_mem_tracker, false))),
+    remaining_initial_reservation_claims_(initial_reservation_total_claims) {
+  // Soft mem_limits should not apply to the initial reservation because we don't want
+  // to fail the query in the case where the initial reservation exceeds the soft
+  // limit.
   initial_reservations_.InitChildTracker(nullptr, query_reservation,
-      initial_reservation_mem_tracker_, numeric_limits<int64_t>::max());
+      initial_reservation_mem_tracker_, numeric_limits<int64_t>::max(), MemLimit::HARD);
 }
 
 Status InitialReservations::Init(

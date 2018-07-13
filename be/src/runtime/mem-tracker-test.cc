@@ -35,7 +35,7 @@ TEST(MemTestTest, SingleTrackerNoLimit) {
   EXPECT_EQ(t.consumption(), 20);
   t.Release(15);
   EXPECT_EQ(t.consumption(), 5);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   // Clean up.
   t.Release(5);
 }
@@ -45,15 +45,70 @@ TEST(MemTestTest, SingleTrackerWithLimit) {
   EXPECT_TRUE(t.has_limit());
   t.Consume(10);
   EXPECT_EQ(t.consumption(), 10);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   t.Consume(10);
   EXPECT_EQ(t.consumption(), 20);
-  EXPECT_TRUE(t.LimitExceeded());
+  EXPECT_TRUE(t.LimitExceeded(MemLimit::HARD));
   t.Release(15);
   EXPECT_EQ(t.consumption(), 5);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   // Clean up.
   t.Release(5);
+}
+
+/// Exercise individual functions that take MemLimit::SOFT option.
+TEST(MemTestTest, SoftLimit) {
+  MemTracker t(100);
+  MemTracker child(-1, "", &t);
+
+  // Exercise functions that return limits.
+  EXPECT_EQ(90, t.soft_limit());
+  EXPECT_EQ(90, t.GetLimit(MemLimit::SOFT));
+  EXPECT_EQ(100, t.GetLimit(MemLimit::HARD));
+  EXPECT_EQ(-1, child.soft_limit());
+  EXPECT_EQ(90, t.GetLowestLimit(MemLimit::SOFT));
+  EXPECT_EQ(90, child.GetLowestLimit(MemLimit::SOFT));
+  EXPECT_EQ(100, t.GetLowestLimit(MemLimit::HARD));
+
+  // Test SpareCapacity()
+  EXPECT_EQ(100, t.SpareCapacity(MemLimit::HARD));
+  EXPECT_EQ(90, t.SpareCapacity(MemLimit::SOFT));
+  EXPECT_EQ(100, child.SpareCapacity(MemLimit::HARD));
+  EXPECT_EQ(90, child.SpareCapacity(MemLimit::SOFT));
+
+  // Test TryConsume() within soft limit.
+  EXPECT_TRUE(t.TryConsume(90, MemLimit::SOFT));
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::SOFT));
+  EXPECT_FALSE(child.AnyLimitExceeded(MemLimit::SOFT));
+
+  // Test TryConsume() going over soft limit.
+  EXPECT_FALSE(t.TryConsume(1, MemLimit::SOFT));
+  EXPECT_FALSE(child.TryConsume(1, MemLimit::SOFT));
+  EXPECT_TRUE(t.TryConsume(1, MemLimit::HARD));
+  EXPECT_TRUE(t.LimitExceeded(MemLimit::SOFT));
+  EXPECT_FALSE(child.LimitExceeded(MemLimit::SOFT));
+  EXPECT_TRUE(t.AnyLimitExceeded(MemLimit::SOFT));
+  EXPECT_TRUE(child.AnyLimitExceeded(MemLimit::SOFT));
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
+  EXPECT_FALSE(child.AnyLimitExceeded(MemLimit::HARD));
+  EXPECT_EQ(9, child.SpareCapacity(MemLimit::HARD));
+  EXPECT_EQ(-1, child.SpareCapacity(MemLimit::SOFT));
+
+  // Test Consume() going over hard limit.
+  child.Consume(10);
+  EXPECT_TRUE(t.LimitExceeded(MemLimit::SOFT));
+  EXPECT_TRUE(t.LimitExceeded(MemLimit::HARD));
+  EXPECT_FALSE(child.LimitExceeded(MemLimit::SOFT));
+  EXPECT_FALSE(child.LimitExceeded(MemLimit::HARD));
+  EXPECT_TRUE(t.AnyLimitExceeded(MemLimit::SOFT));
+  EXPECT_TRUE(t.AnyLimitExceeded(MemLimit::HARD));
+  EXPECT_TRUE(child.AnyLimitExceeded(MemLimit::SOFT));
+  EXPECT_TRUE(child.AnyLimitExceeded(MemLimit::HARD));
+  EXPECT_EQ(-1, child.SpareCapacity(MemLimit::HARD));
+  EXPECT_EQ(-11, child.SpareCapacity(MemLimit::SOFT));
+
+  t.Release(91);
+  child.Release(10);
 }
 
 TEST(MemTestTest, ConsumptionMetric) {
@@ -80,12 +135,12 @@ TEST(MemTestTest, ConsumptionMetric) {
   t.Consume(150);
   EXPECT_EQ(t.consumption(), 0);
   EXPECT_EQ(t.peak_consumption(), 0);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(neg_t.consumption(), 0);
   t.Release(5);
   EXPECT_EQ(t.consumption(), 0);
   EXPECT_EQ(t.peak_consumption(), 0);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(neg_t.consumption(), 0);
 
   metric.Increment(10);
@@ -101,21 +156,21 @@ TEST(MemTestTest, ConsumptionMetric) {
   neg_t.Consume(1);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 10);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(neg_t.consumption(), -5);
   metric.Increment(150);
   t.Consume(1);
   neg_t.Consume(1);
   EXPECT_EQ(t.consumption(), 155);
   EXPECT_EQ(t.peak_consumption(), 155);
-  EXPECT_TRUE(t.LimitExceeded());
+  EXPECT_TRUE(t.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(neg_t.consumption(), -155);
   metric.Increment(-150);
   t.Consume(-1);
   neg_t.Consume(1);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 155);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(neg_t.consumption(), -5);
   // consumption_ is not updated when Consume()/Release() is called with a zero value
   metric.Increment(10);
@@ -123,7 +178,7 @@ TEST(MemTestTest, ConsumptionMetric) {
   neg_t.Consume(0);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 155);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(neg_t.consumption(), -5);
   // Clean up.
   metric.Increment(-15);
@@ -139,37 +194,37 @@ TEST(MemTestTest, TrackerHierarchy) {
   // everything below limits
   c1.Consume(60);
   EXPECT_EQ(c1.consumption(), 60);
-  EXPECT_FALSE(c1.LimitExceeded());
-  EXPECT_FALSE(c1.AnyLimitExceeded());
+  EXPECT_FALSE(c1.LimitExceeded(MemLimit::HARD));
+  EXPECT_FALSE(c1.AnyLimitExceeded(MemLimit::HARD));
   EXPECT_EQ(c2.consumption(), 0);
-  EXPECT_FALSE(c2.LimitExceeded());
-  EXPECT_FALSE(c2.AnyLimitExceeded());
+  EXPECT_FALSE(c2.LimitExceeded(MemLimit::HARD));
+  EXPECT_FALSE(c2.AnyLimitExceeded(MemLimit::HARD));
   EXPECT_EQ(p.consumption(), 60);
-  EXPECT_FALSE(p.LimitExceeded());
-  EXPECT_FALSE(p.AnyLimitExceeded());
+  EXPECT_FALSE(p.LimitExceeded(MemLimit::HARD));
+  EXPECT_FALSE(p.AnyLimitExceeded(MemLimit::HARD));
 
   // p goes over limit
   c2.Consume(50);
   EXPECT_EQ(c1.consumption(), 60);
-  EXPECT_FALSE(c1.LimitExceeded());
-  EXPECT_TRUE(c1.AnyLimitExceeded());
+  EXPECT_FALSE(c1.LimitExceeded(MemLimit::HARD));
+  EXPECT_TRUE(c1.AnyLimitExceeded(MemLimit::HARD));
   EXPECT_EQ(c2.consumption(), 50);
-  EXPECT_FALSE(c2.LimitExceeded());
-  EXPECT_TRUE(c2.AnyLimitExceeded());
+  EXPECT_FALSE(c2.LimitExceeded(MemLimit::HARD));
+  EXPECT_TRUE(c2.AnyLimitExceeded(MemLimit::HARD));
   EXPECT_EQ(p.consumption(), 110);
-  EXPECT_TRUE(p.LimitExceeded());
+  EXPECT_TRUE(p.LimitExceeded(MemLimit::HARD));
 
   // c2 goes over limit, p drops below limit
   c1.Release(20);
   c2.Consume(10);
   EXPECT_EQ(c1.consumption(), 40);
-  EXPECT_FALSE(c1.LimitExceeded());
-  EXPECT_FALSE(c1.AnyLimitExceeded());
+  EXPECT_FALSE(c1.LimitExceeded(MemLimit::HARD));
+  EXPECT_FALSE(c1.AnyLimitExceeded(MemLimit::HARD));
   EXPECT_EQ(c2.consumption(), 60);
-  EXPECT_TRUE(c2.LimitExceeded());
-  EXPECT_TRUE(c2.AnyLimitExceeded());
+  EXPECT_TRUE(c2.LimitExceeded(MemLimit::HARD));
+  EXPECT_TRUE(c2.AnyLimitExceeded(MemLimit::HARD));
   EXPECT_EQ(p.consumption(), 100);
-  EXPECT_FALSE(p.LimitExceeded());
+  EXPECT_FALSE(p.LimitExceeded(MemLimit::HARD));
 
   // Clean up.
   c1.Release(40);
@@ -254,34 +309,34 @@ TEST(MemTestTest, GcFunctions) {
   ASSERT_TRUE(t.has_limit());
 
   t.Consume(9);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
 
   // Test TryConsume()
   EXPECT_FALSE(t.TryConsume(2));
   EXPECT_EQ(t.consumption(), 9);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
 
   // Attach GcFunction that releases 1 byte
   GcFunctionHelper gc_func_helper(&t);
   t.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_func_helper));
   EXPECT_TRUE(t.TryConsume(2));
   EXPECT_EQ(t.consumption(), 10);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
 
   // GcFunction will be called even though TryConsume() fails
   EXPECT_FALSE(t.TryConsume(2));
   EXPECT_EQ(t.consumption(), 9);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
 
   // GcFunction won't be called
   EXPECT_TRUE(t.TryConsume(1));
   EXPECT_EQ(t.consumption(), 10);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
 
-  // Test LimitExceeded()
+  // Test LimitExceeded(MemLimit::HARD)
   t.Consume(1);
   EXPECT_EQ(t.consumption(), 11);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(t.consumption(), 10);
 
   // Add more GcFunctions, test that we only call them until the limit is no longer
@@ -292,13 +347,12 @@ TEST(MemTestTest, GcFunctions) {
   t.AddGcFunction(boost::bind(&GcFunctionHelper::GcFunc, &gc_func_helper3));
   t.Consume(1);
   EXPECT_EQ(t.consumption(), 11);
-  EXPECT_FALSE(t.LimitExceeded());
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(t.consumption(), 10);
 
-  //Clean up.
+  // Clean up.
   t.Release(10);
 }
-
 }
 
 IMPALA_TEST_MAIN();
