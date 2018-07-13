@@ -392,8 +392,8 @@ class LlvmCodeGen {
   /// passed to AddFunctionToJit() otherwise the functions will be deleted from the
   /// module when the module is finalized. Also, all loaded functions that need to be JIT
   /// compiled after modification also need to be finalized.
-  /// If the function does not verify, it will delete the function and return NULL,
-  /// otherwise, it returns the function object.
+  /// If the function does not verify, it returns NULL and the function will eventually
+  /// be deleted in FinalizeModule(), otherwise, it returns the function object.
   llvm::Function* FinalizeFunction(llvm::Function* function);
 
   /// Adds the function to be automatically jit compiled when the codegen object is
