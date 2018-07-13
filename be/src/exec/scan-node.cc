@@ -22,6 +22,7 @@
 #include "exprs/scalar-expr.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/row-batch.h"
+#include "runtime/row-batch-queue.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
 #include "util/disk-info.h"
