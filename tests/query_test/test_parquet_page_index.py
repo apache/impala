@@ -226,6 +226,11 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
           index_size = len(column_info.offset_index.page_locations)
           assert index_size > 0
           self._validate_page_locations(column_info.offset_index.page_locations)
+          # IMPALA-7304: Impala doesn't write column index for floating-point columns
+          # until PARQUET-1222 is resolved.
+          if column_info.schema.type in [4, 5]:
+            assert column_info.column_index is None
+            continue
           self._validate_null_stats(index_size, column_info)
           self._validate_min_max_values(index_size, column_info)
           self._validate_boundary_order(column_info)
