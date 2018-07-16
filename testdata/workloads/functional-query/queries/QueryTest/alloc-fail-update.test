@@ -59,3 +59,9 @@ select replace_string(l_comment) from tpch.lineitem limit 10;
 ---- CATCH
 failed to allocate
 ====
+---- QUERY
+with t as (select '[0,1]' as s union all select '[1,2]' union all select '[2,3]')
+select get_json_object(t.s, '$[0]') from t;
+---- CATCH
+failed to allocate
+====

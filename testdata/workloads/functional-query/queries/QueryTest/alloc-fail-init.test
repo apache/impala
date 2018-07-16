@@ -65,3 +65,8 @@ select to_date(now())
 ---- CATCH
 FunctionContextImpl::AllocateForResults() failed to allocate 10 bytes.
 ====
+---- QUERY
+select get_json_object('{"a": 1}', '$.a')
+---- CATCH
+FunctionContextImpl::AllocateForResults() failed to allocate 32 bytes
+====

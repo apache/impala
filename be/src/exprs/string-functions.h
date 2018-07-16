@@ -148,6 +148,13 @@ class StringFunctions {
   static StringVal Base64Encode(FunctionContext* ctx, const StringVal& str);
   static StringVal Base64Decode(FunctionContext* ctx, const StringVal& str);
 
+  static StringVal GetJsonObject(FunctionContext* ctx, const StringVal& json_str,
+      const StringVal& path_str);
+  /// Implementation of GetJsonObject, not cross-compiled since no significant benefits
+  /// can gain.
+  static StringVal GetJsonObjectImpl(FunctionContext* ctx, const StringVal& json_str,
+      const StringVal& path_str);
+
  private:
   /// Templatized implementation of the actual string trimming function.
   /// The first parameter, 'D', is one of StringFunctions::TrimPosition values.

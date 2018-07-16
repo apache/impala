@@ -511,6 +511,8 @@ visible_functions = [
   [['btrim'], 'STRING', ['STRING', 'STRING'], 'impala::StringFunctions::BTrimString',
    '_ZN6impala15StringFunctions11TrimPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
    '_ZN6impala15StringFunctions9TrimCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
+  [['get_json_object'], 'STRING', ['STRING', 'STRING'],
+   'impala::StringFunctions::GetJsonObject'],
 
   # Conditional Functions
   # Some of these have empty symbols because the BE special-cases them based on the

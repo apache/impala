@@ -3013,3 +3013,61 @@ select coordinator(), count(*) from functional.alltypesagg where int_col = 1
 ---- TYPES
 string, bigint
 ====
+---- QUERY
+# IMPALA-376: Test get_json_object builtin function
+select get_json_object(t.json, '$.a.b.c') from (values (
+  ('{"a": {"b": {"c": 1}}}' as json),
+  ('{"a": {"b": {"c": 2}}}'),
+  ('{"a": {"b": {"c": 3}}}')
+)) t
+---- RESULTS
+'1'
+'2'
+'3'
+---- TYPES
+STRING
+====
+---- QUERY
+select get_json_object(t.json, '$.a'),
+  get_json_object(t.json, '$.b'),
+  get_json_object(t.json, '$.c')
+from (values (
+  ('{"a":1, "b":2, "c":3}' as json),
+  ('{"b":2, "c":3}'),
+  ('{"c":3}')
+)) t
+---- RESULTS
+'1','2','3'
+'NULL','2','3'
+'NULL','NULL','3'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+select get_json_object(t.json, '$[0]'),
+  get_json_object(t.json, '$[1]'),
+  get_json_object(t.json, '$[2]')
+from (values (
+  ('["a", "b", "c"]' as json),
+  ('["b", "c"]'),
+  ('["c"]')
+)) t
+---- RESULTS
+'a','b','c'
+'b','c','NULL'
+'c','NULL','NULL'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+select count(*) from (values (
+  ('{"a": {"b": {"c": 1}}}' as json),
+  ('{"a": {"b": {"c": 2}}}'),
+  ('{"a": {"b": {"c": 3}}}')
+)) t
+where cast(get_json_object(t.json, '$.a.b.c') as int) > 1
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====

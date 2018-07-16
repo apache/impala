@@ -1100,4 +1100,9 @@ StringVal StringFunctions::Base64Decode(FunctionContext* ctx, const StringVal& s
   result.len = out_len;
   return result;
 }
+
+StringVal StringFunctions::GetJsonObject(FunctionContext *ctx, const StringVal &json_str,
+    const StringVal &path_str) {
+  return GetJsonObjectImpl(ctx, json_str, path_str);
+}
 }

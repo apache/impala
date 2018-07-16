@@ -53,6 +53,7 @@ add_library(Exprs
   scalar-expr-evaluator.cc
   scalar-expr-ir.cc
   slot-ref.cc
+  string-functions.cc
   string-functions-ir.cc
   timestamp-functions.cc
   timestamp-functions-ir.cc

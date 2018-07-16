@@ -609,7 +609,8 @@ class ExprTest : public testing::Test {
     Status status = executor_->Exec(stmt, &result_types);
     status = executor_->FetchResult(&result_row);
     ASSERT_FALSE(status.ok());
-    ASSERT_TRUE(EndsWith(status.msg().msg(), error_string));
+    ASSERT_TRUE(EndsWith(status.msg().msg(), error_string)) << "Actual: "
+        << status.msg().msg() << endl << "Expected: " << error_string;
   }
 
   template <typename T> void TestFixedPointComparisons(bool test_boundaries) {
@@ -8822,6 +8823,149 @@ TEST_F(ExprTest, DateTruncTest) {
   TestError("date_trunc('D', '2116-05-08 10:30:00')");
   TestError("date_trunc('2017-01-09', '2017-01-09 10:37:03.455722111' )");
   TestError("date_trunc('2017-01-09 10:00:00', 'HOUR')");
+}
+
+TEST_F(ExprTest, JsonTest) {
+  TestStringValue("get_json_object('{\"a\":1, \"b\":2, \"c\":3}', '$.b')", "2");
+  TestStringValue(
+      "get_json_object('{\"a\":true, \"b\":false, \"c\":true}', '$.b')", "false");
+  TestStringValue(
+      "get_json_object('{\"a\":-1, \"b\":-2, \"c\":-3}', '$.b')", "-2");
+  TestStringValue(
+      "get_json_object('{\"a\":\"A\", \"b\":\"B\", \"c\":\"C\"}', '$.b')", "B");
+  TestStringValue(
+      "get_json_object('{\"a\":[], \"b\":[2,3,4], \"c\":[3]}', '$.b')", "[2,3,4]");
+
+  TestStringValue("get_json_object('[\"abc\", \"ddd\", \"fff\"]', '$[1]')", "ddd");
+  TestStringValue("get_json_object('[1, 2, 3]', '$[*]')", "[1,2,3]");
+  TestStringValue(
+      "get_json_object('{\"key\": {\"a\": {\"b\": true}}}', '$.key.a.b')", "true");
+  TestStringValue(
+      "get_json_object('[{\"key\": \"v1\"}, {\"key\": \"v2\"}]', '$[*].key')",
+      "[\"v1\",\"v2\"]");
+  TestStringValue(
+      "get_json_object('[{\"key\": [1,2,3]}, {\"key\": [4,5]}]', '$[*].key')",
+      "[[1,2,3],[4,5]]");
+  TestStringValue(
+      "get_json_object('[{\"key\": [1,2,3]}, {\"key\": [4,5]}]', '$[*].key[*]')",
+      "[1,2,3,4,5]");
+  TestStringValue("get_json_object('[[0,1,2], [3,4,5], [6,7]]', '$[1][0]')", "3");
+  TestStringValue("get_json_object('[[0,1,2], [3,4,5], [6,7]]', '$[*][0]')", "[0,3,6]");
+  TestStringValue("get_json_object('[[0,1,2], [3,4,5], [6,7]]', '$[*][2]')", "[2,5]");
+  TestStringValue("get_json_object('[[0,1,2], [3,4,5], [6,7]]', '$[1][*]')", "[3,4,5]");
+
+  TestStringValue("get_json_object('{\"a\":1, \"b\":2, \"c\":3}', '$.*')", "[1,2,3]");
+  TestStringValue(
+      "get_json_object('{\"a\":true, \"b\":false, \"c\":true}', '$.*')",
+      "[true,false,true]");
+  TestStringValue(
+      "get_json_object('{\"a\":[], \"b\":[2,3,4], \"c\":[3]}', '$.*')",
+      "[[],[2,3,4],[3]]");
+  TestStringValue(
+      "get_json_object('[{\"key\": [1,2,3]}, {\"key\": [4,5]}]', '$[*].*')",
+      "[[1,2,3],[4,5]]");
+  TestStringValue(
+      "get_json_object('[{\"key\": [1,2,3]}, {\"key\": [4,5]}]', '$[*].*[*]')",
+      "[1,2,3,4,5]");
+  TestStringValue("get_json_object('[{\"key\": 1}, 123]', '$[*].*')", "1");
+  TestStringValue(
+      "get_json_object('{\"a\": {\"aa\": 1}, \"b\": {\"bb\": 2}}', '$.*')",
+      "[{\"aa\":1},{\"bb\":2}]");
+  TestStringValue(
+      "get_json_object('{\"a\": {\"aa\": 1}, \"b\": {\"bb\": 2}}', '$.*.*')",
+      "[1,2]");
+
+  // Tests about NULL
+  TestIsNull("get_json_object('{\"a\": 1}', '$.b')", TYPE_STRING);
+  TestIsNull("get_json_object('{\"a\": 1}', '$[0]')", TYPE_STRING);
+  TestIsNull("get_json_object('[1,2]', '$[2]')", TYPE_STRING);
+  TestIsNull("get_json_object('[1,2,3]', '$.*')", TYPE_STRING);
+  TestIsNull("get_json_object('{illegal_json}', '$.a')", TYPE_STRING);
+  TestIsNull("get_json_object('\"abc\"', '$.a')", TYPE_STRING);
+  TestIsNull("get_json_object('\"abc\"', '$[0]')", TYPE_STRING);
+  TestIsNull("get_json_object('123', '$.a')", TYPE_STRING);
+  TestIsNull("get_json_object('123', '$[0]')", TYPE_STRING);
+  TestIsNull("get_json_object('{}', '$.a')", TYPE_STRING);
+  TestIsNull("get_json_object('[]', '$[0]')", TYPE_STRING);
+  TestStringValue("get_json_object('[0, 1, null, 2, 3]', '$[*]')", "[0,1,null,2,3]");
+  TestStringValue("get_json_object('[{\"a\": null}, {\"a\": \"NULL\"}]', '$[*].a')",
+      "[null,\"NULL\"]");
+  TestIsNull(
+      "get_json_object('[{\"key\": \"v1\"}, {\"key\": \"v2\"}]', '$[*].key.abc')",
+      TYPE_STRING);
+  TestValue("get_json_object('{\"a\":\"NULL\", \"b\":null}', '$.a') IS NULL",
+      TYPE_BOOLEAN, false);
+  TestValue("get_json_object('{\"a\":\"NULL\", \"b\":null}', '$.b') IS NULL",
+      TYPE_BOOLEAN, true);
+
+  // Test whitespaces
+  TestStringValue("get_json_object('[1,2,3]', '  $[1]')", "2");
+  TestStringValue("get_json_object('[1,2,3]', '$[1]  ')", "2");
+  TestStringValue("get_json_object('[1,2,3]', ' $[ 1]')", "2");
+  TestStringValue("get_json_object('[1,2,3]', '$[  1  ]')", "2");
+  TestStringValue("get_json_object('[1,2,3]', '   $   [  1  ]  ')", "2");
+  TestStringValue("get_json_object('[1,2,3]', '   $   [  *  ]  ')", "[1,2,3]");
+  TestStringValue("get_json_object('{\"abc\":1}', ' $.abc')", "1");
+  TestStringValue("get_json_object('{\"abc\":1}', '$ .abc')", "1");
+  TestStringValue("get_json_object('{\"abc\":1}', '$. abc')", "1");
+  TestStringValue("get_json_object('{\"abc\":1}', '$.abc ')", "1");
+  TestStringValue("get_json_object('{\"abc\":1}', ' $ .abc')", "1");
+  TestStringValue("get_json_object('{\"abc\":1}', ' $ . abc ')", "1");
+  TestStringValue(
+      "get_json_object('{\"key\": 1, \" key\": 2, \" key \": 3}', ' $. key ')", "1");
+  TestStringValue("get_json_object('{\"abc\":[1,2,3]}', ' $ . abc  [  2 ] ')", "3");
+  TestStringValue("get_json_object('{\"a\":1}', '$.*  ')", "1");
+  TestStringValue("get_json_object('{\"a\":1}', '$.  *')", "1");
+  TestStringValue("get_json_object('{\"a\":1}', '$  .*')", "1");
+  TestStringValue("get_json_object('{\"a\":1}', '  $.*')", "1");
+  TestStringValue("get_json_object('{\"a\":1}', ' $ . * ')", "1");
+
+  // Test errors
+  TestErrorString("get_json_object('[1,2]', '$[-2]')",
+      "Failed to parse json path '$[-2]': Negative index at position 2\n");
+  TestErrorString("get_json_object('[1,2]', '$[999999999999999]')",
+      "Failed to parse json path '$[999999999999999]': Index too large at position 2\n");
+  TestErrorString("get_json_object('[1,2]', '$[0.1]')",
+      "Failed to parse json path '$[0.1]': Expected number at position 2\n");
+  TestErrorString("get_json_object('[1,2]', '$[]')",
+      "Failed to parse json path '$[]': Expected number at position 2\n");
+  TestErrorString("get_json_object('[1,2]', '$[  ]')",
+      "Failed to parse json path '$[  ]': Expected number at position 4\n");
+  TestErrorString("get_json_object('[1,2]', '$[a]')",
+      "Failed to parse json path '$[a]': Expected number at position 2\n");
+  TestErrorString("get_json_object('[1,2]', '$[1a]')",
+      "Failed to parse json path '$[1a]': Expected number at position 2\n");
+  TestErrorString("get_json_object('[1,2]', '$[0][a]')",
+      "Failed to parse json path '$[0][a]': Expected number at position 5\n");
+  TestErrorString("get_json_object('[1,2]', '$[*')",
+      "Unclosed brackets in json path '$[*'\n");
+  TestErrorString("get_json_object('{\"key\": 1}', '$.')",
+      "Failed to parse json path '$.': Found a trailing '.'\n");
+  TestErrorString("get_json_object('{\"key\": 1}', '$*')",
+      "Failed to parse json path '$*': Unexpected char '*' at position 1\n");
+  TestErrorString("get_json_object('{\"key\": 1}', '$.*a')",
+      "Failed to parse json path '$.*a': Encountered 'a' in position 3, "
+      "expects ' ', '[' or '.'\n");
+  TestErrorString("get_json_object('{\"key\": 1}', '$.a*')",
+      "Failed to parse json path '$.a*': Unexpected char '*' at position 3\n");
+  TestErrorString("get_json_object('[1,2]', '$[0')",
+      "Unclosed brackets in json path '$[0'\n");
+  TestErrorString("get_json_object('{\"key\": {\"a\": 1}}', '$..a')",
+      "Failed to parse json path '$..a': Expected key at position 2\n");
+  TestErrorString("get_json_object('{\"key\": \"value\"}', '$$')",
+      "Failed to parse json path '$$': $ should only be placed at start\n");
+  TestErrorString("get_json_object('{\"a\": 1}', '$a')",
+      "Failed to parse json path '$a': Unexpected char 'a' at position 1\n");
+  TestErrorString("get_json_object('[{\"a\": 1}]', '$[0]a')",
+      "Failed to parse json path '$[0]a': Unexpected char 'a' at position 4\n");
+  TestErrorString("get_json_object('{\"a\": 1}', 'a')",
+      "Failed to parse json path 'a': Should start with '$'\n");
+  TestErrorString("get_json_object('[1,2,3]', '$[**]')",
+      "Failed to parse json path '$[**]': "
+      "Encountered '*' in position 3, expects ' ' or ']'\n");
+  TestErrorString("get_json_object('[1,2,3]', '')", "Empty json path\n");
+  TestErrorString("get_json_object('[1,2,3]', '   ')",
+      "Failed to parse json path '   ': Should start with '$'\n");
 }
 } // namespace impala
 
