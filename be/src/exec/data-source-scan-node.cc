@@ -33,6 +33,7 @@
 #include "runtime/tuple-row.h"
 #include "util/jni-util.h"
 #include "util/periodic-counter-updater.h"
+#include "util/ubsan.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
@@ -149,7 +150,7 @@ Status DataSourceScanNode::GetNextInputBatch() {
   input_batch_.reset(new TGetNextResult());
   next_row_idx_ = 0;
   // Reset all the indexes into the column value arrays to 0
-  memset(cols_next_val_idx_.data(), 0, sizeof(int) * cols_next_val_idx_.size());
+  Ubsan::MemSet(cols_next_val_idx_.data(), 0, sizeof(int) * cols_next_val_idx_.size());
   TGetNextParams params;
   params.__set_scan_handle(scan_handle_);
   RETURN_IF_ERROR(data_source_executor_->GetNext(params, input_batch_.get()));
