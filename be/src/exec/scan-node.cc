@@ -42,6 +42,9 @@ DEFINE_int32(runtime_filter_wait_time_ms, 1000, "(Advanced) the maximum time, in
 DEFINE_int32_hidden(max_queued_row_batches_per_scanner_thread, 5,
     "(Advanced) the maximum number of queued row batches per scanner thread.");
 
+DEFINE_int64(max_queued_row_batch_bytes, 16L * 1024 * 1024,
+    "(Advanced) the maximum bytes of queued rows per multithreaded scan node.");
+
 using boost::algorithm::join;
 
 namespace impala {
@@ -202,8 +205,6 @@ void ScanNode::ScannerThreadState::Prepare(ScanNode* parent) {
       ADD_COUNTER(profile, "RowBatchBytesEnqueued", TUnit::BYTES);
   row_batches_get_timer_ = ADD_TIMER(profile, "RowBatchQueueGetWaitTime");
   row_batches_put_timer_ = ADD_TIMER(profile, "RowBatchQueuePutWaitTime");
-  row_batches_max_capacity_ =
-      profile->AddHighWaterMarkCounter("RowBatchQueueCapacity", TUnit::UNIT);
   row_batches_peak_mem_consumption_ =
       ADD_COUNTER(profile, "RowBatchQueuePeakMemoryUsage", TUnit::BYTES);
 }
@@ -240,7 +241,8 @@ void ScanNode::ScannerThreadState::Open(
   VLOG_QUERY << "Max row batch queue size for scan node '" << parent->id()
       << "' in fragment instance '" << PrintId(state->fragment_instance_id())
       << "': " << max_row_batches;
-  batch_queue_.reset(new RowBatchQueue(max_row_batches));
+  batch_queue_.reset(
+      new RowBatchQueue(max_row_batches, FLAGS_max_queued_row_batch_bytes));
 
   // Start measuring the scanner thread concurrency only once the node is opened.
   average_concurrency_ = parent->runtime_profile()->AddSamplingCounter(

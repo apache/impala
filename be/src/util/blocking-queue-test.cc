@@ -28,6 +28,14 @@
 
 namespace impala {
 
+/// Functor that returns the size of T.
+template <typename T>
+struct SizeofFn {
+  int64_t operator()(const T& item) {
+    return sizeof(T);
+  }
+};
+
 TEST(BlockingQueueTest, TestBasic) {
   int32_t i;
   BlockingQueue<int32_t> test_queue(5);
@@ -67,12 +75,49 @@ TEST(BlockingQueueTest, TestPutWithTimeout) {
   ASSERT_TRUE(test_queue.BlockingPutWithTimeout(3, timeout_micros));
 }
 
+TEST(BlockingQueueTest, TestBytesLimit) {
+  // 10 bytes => limit of 2 elements
+  BlockingQueue<int32_t, SizeofFn<int32_t>> test_queue(1000, 10);
+  int64_t SHORT_TIMEOUT_MICROS = 1 * 1000L; // 1ms
+  int64_t LONG_TIMEOUT_MICROS = 1000L * 1000L * 60L; // 1m
+
+  // First two should succeed.
+  ASSERT_TRUE(test_queue.BlockingPut(1));
+  ASSERT_TRUE(test_queue.BlockingPutWithTimeout(2, SHORT_TIMEOUT_MICROS));
+  EXPECT_EQ(2, test_queue.Size());
+
+  // Put should timeout - no capacity.
+  ASSERT_FALSE(test_queue.BlockingPutWithTimeout(3, SHORT_TIMEOUT_MICROS));
+  EXPECT_EQ(2, test_queue.Size());
+
+  // Test that puts of both types get blocked then unblocked when bytes are
+  // removed from queue.
+  thread put_thread([&] () { test_queue.BlockingPut(4); });
+  thread put_with_timeout_thread([&] () {
+    test_queue.BlockingPutWithTimeout(4, LONG_TIMEOUT_MICROS);
+  });
+  EXPECT_EQ(2, test_queue.Size());
+  int32_t v;
+  EXPECT_TRUE(test_queue.BlockingGet(&v));
+  EXPECT_EQ(1, v);
+  EXPECT_TRUE(test_queue.BlockingGet(&v));
+  EXPECT_EQ(2, v);
+  EXPECT_TRUE(test_queue.BlockingGet(&v));
+  EXPECT_EQ(4, v);
+  EXPECT_TRUE(test_queue.BlockingGet(&v));
+  EXPECT_EQ(4, v);
+
+  put_thread.join();
+  put_with_timeout_thread.join();
+}
+
+template <typename ElemBytesFn>
 class MultiThreadTest { // NOLINT: members are not arranged for minimal padding
  public:
-  MultiThreadTest()
+  MultiThreadTest(int64_t bytes_limit = -1)
     : iterations_(10000),
       nthreads_(5),
-      queue_(iterations_*nthreads_/10),
+      queue_(iterations_*nthreads_/10, bytes_limit),
       num_inserters_(nthreads_) {
   }
 
@@ -134,7 +179,7 @@ class MultiThreadTest { // NOLINT: members are not arranged for minimal padding
 
   int iterations_;
   int nthreads_;
-  BlockingQueue<int32_t> queue_;
+  BlockingQueue<int32_t, ElemBytesFn> queue_;
   // Lock for gotten_ and num_inserters_.
   mutex lock_;
   // Map from inserter thread id to number of consumed elements from that id.
@@ -148,7 +193,12 @@ class MultiThreadTest { // NOLINT: members are not arranged for minimal padding
 };
 
 TEST(BlockingQueueTest, TestMultipleThreads) {
-  MultiThreadTest test;
+  MultiThreadTest<ByteLimitDisabledFn<int32_t>> test;
+  test.Run();
+}
+
+TEST(BlockingQueueTest, TestMultipleThreadsWithBytesLimit) {
+  MultiThreadTest<SizeofFn<int32_t>> test(100);
   test.Run();
 }
 

@@ -108,6 +108,11 @@ def create_parquet_dimension(workload):
   return ImpalaTestDimension('table_format',
       TableFormatInfo.create_from_string(dataset, 'parquet/none'))
 
+def create_avro_snappy_dimension(workload):
+  dataset = get_dataset_from_workload(workload)
+  return ImpalaTestDimension('table_format',
+      TableFormatInfo.create_from_string(dataset, 'avro/snap/block'))
+
 # Common sets of values for the exec option vectors
 ALL_BATCH_SIZES = [0]
 

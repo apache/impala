@@ -303,9 +303,6 @@ class ScanNode : public ExecNode {
     /// The wait time for enqueuing a row batch into the row batch queue.
     RuntimeProfile::Counter* row_batches_put_timer_ = nullptr;
 
-    /// Maximum capacity of the row batch queue.
-    RuntimeProfile::HighWaterMarkCounter* row_batches_max_capacity_ = nullptr;
-
     /// Peak memory consumption of the materialized batch queue. Updated in Close().
     RuntimeProfile::Counter* row_batches_peak_mem_consumption_ = nullptr;
   };

@@ -21,6 +21,7 @@
 #include <list>
 #include <memory>
 
+#include "runtime/row-batch.h"
 #include "util/blocking-queue.h"
 #include "util/spinlock.h"
 
@@ -28,18 +29,32 @@ namespace impala {
 
 class RowBatch;
 
+/// Functor that returns the bytes in MemPool chunks for a row batch.
+/// Note that we don't include attached BufferPool::BufferHandle objects because this
+/// queue is only used in scan nodes that don't attach buffers.
+struct RowBatchBytesFn {
+  int64_t operator()(const std::unique_ptr<RowBatch>& batch) {
+    return batch->tuple_data_pool()->total_reserved_bytes();
+  }
+};
+
 /// Extends blocking queue for row batches. Row batches have a property that
 /// they must be processed in the order they were produced, even in cancellation
 /// paths. Preceding row batches can contain ptrs to memory in subsequent row batches
 /// and we need to make sure those ptrs stay valid.
 /// Row batches that are added after Shutdown() are queued in a separate "cleanup"
 /// queue, which can be cleaned up during Close().
+///
+/// The queue supports limiting the capacity in terms of bytes enqueued.
+///
 /// All functions are thread safe.
-class RowBatchQueue : public BlockingQueue<std::unique_ptr<RowBatch>> {
+class RowBatchQueue : public BlockingQueue<std::unique_ptr<RowBatch>, RowBatchBytesFn> {
  public:
-  /// max_batches is the maximum number of row batches that can be queued.
+  /// 'max_batches' is the maximum number of row batches that can be queued.
+  /// 'max_bytes' is the maximum number of bytes of row batches that can be queued (-1
+  /// means no limit).
   /// When the queue is full, producers will block.
-  RowBatchQueue(int max_batches);
+  RowBatchQueue(int max_batches, int64_t max_bytes);
   ~RowBatchQueue();
 
   /// Adds a batch to the queue. This is blocking if the queue is full.

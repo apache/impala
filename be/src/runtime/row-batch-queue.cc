@@ -23,8 +23,8 @@
 
 namespace impala {
 
-RowBatchQueue::RowBatchQueue(int max_batches)
-  : BlockingQueue<unique_ptr<RowBatch>>(max_batches) {}
+RowBatchQueue::RowBatchQueue(int max_batches, int64_t max_bytes)
+  : BlockingQueue<unique_ptr<RowBatch>,RowBatchBytesFn>(max_batches, max_bytes) {}
 
 RowBatchQueue::~RowBatchQueue() {
   DCHECK(cleanup_queue_.empty());

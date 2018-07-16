@@ -19,6 +19,7 @@ import pytest
 from copy import copy
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.test_dimensions import create_avro_snappy_dimension
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
@@ -300,3 +301,51 @@ class TestTpcdsMemLimitError(TestLowMemoryLimits):
   def test_low_mem_limit_q53(self, vector):
     self.low_memory_limit_test(
         vector, 'tpcds-decimal_v2-q53', self.MIN_MEM_FOR_TPCDS['q53'])
+
+
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
+class TestScanMemLimit(ImpalaTestSuite):
+  """Targeted test for scan memory limits."""
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestScanMemLimit, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_avro_snappy_dimension(cls.get_workload()))
+
+  def test_wide_avro_mem_usage(self, vector, unique_database):
+    """Create a wide avro table with large strings and test scans that can cause OOM."""
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip("only run resource-intensive query on exhaustive")
+    NUM_COLS = 250
+    NUM_ROWS = 50000
+    TBL = "wide_250_cols"
+    # This query caused OOM with the below memory limit before the IMPALA-7296 fix.
+    # When the sort starts to spill it causes row batches to accumulate rapidly in the
+    # scan node's queue.
+    SELECT_QUERY = """select * from {0}.{1} order by col224 limit 100""".format(
+        unique_database, TBL)
+    # Use disable_outermost_topn to enable spilling sort but prevent returning excessive
+    # rows. Limit NUM_SCANNER_THREADS to avoid higher memory consumption on systems with
+    # many cores (each scanner thread uses some memory in addition to the queued memory).
+    SELECT_OPTIONS = {
+        'mem_limit': "256MB", 'disable_outermost_topn': True, "NUM_SCANNER_THREADS": 1}
+    self.execute_query_expect_success(self.client,
+        "create table {0}.{1} ({2}) stored as avro".format(unique_database, TBL,
+         ",".join(["col{0} STRING".format(i) for i in range(NUM_COLS)])))
+    self.run_stmt_in_hive("""
+        SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+        SET mapred.output.compression.type=BLOCK;
+        SET hive.exec.compress.output=true;
+        SET avro.output.codec=snappy;
+        insert into {0}.{1} select {2} from tpch_parquet.lineitem
+        limit {3}
+        """.format(unique_database, TBL, ','.join(['l_comment'] * NUM_COLS), NUM_ROWS))
+    self.execute_query_expect_success(self.client,
+        "refresh {0}.{1}".format(unique_database, TBL))
+
+    self.execute_query_expect_success(self.client, SELECT_QUERY, SELECT_OPTIONS)

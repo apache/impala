@@ -34,8 +34,24 @@
 
 namespace impala {
 
+/// Default functor that always returns 0 bytes. This disables the byte limit
+/// functionality for the queue.
+template <typename T>
+struct ByteLimitDisabledFn {
+  int64_t operator()(const T& item) {
+    return 0;
+  }
+};
+
 /// Fixed capacity FIFO queue, where both BlockingGet() and BlockingPut() operations block
 /// if the queue is empty or full, respectively.
+///
+/// The queue always has a hard maximum capacity of elements. It also has an optional
+/// limit on the bytes enqueued. This limit is a soft limit - one element can always be
+/// enqueued regardless of the size in bytes. In order to use the bytes limit, the queue
+/// must be instantiated with a functor that returns the size in bytes of an enqueued
+/// item. The functor is invoked multiple times and must always return the same value for
+/// the same item.
 ///
 /// FIFO is made up of a 'get_list_' that BlockingGet() consumes from and a 'put_list_'
 /// that BlockingPut() enqueues into. They are protected by 'get_lock_' and 'put_lock_'
@@ -43,19 +59,21 @@ namespace impala {
 /// held before 'put_lock_'. When the 'get_list_' is empty, the caller of BlockingGet()
 /// will atomically swap the 'put_list_' with 'get_list_'. The swapping happens with both
 /// the 'get_lock_' and 'put_lock_' held.
-template <typename T>
+template <typename T, typename ElemBytesFn = ByteLimitDisabledFn<T>>
 class BlockingQueue : public CacheLineAligned {
  public:
-  BlockingQueue(size_t max_elements)
+  BlockingQueue(size_t max_elements, int64_t max_bytes = -1)
     : shutdown_(false),
       max_elements_(max_elements),
       total_put_wait_time_(0),
       get_list_size_(0),
-      total_get_wait_time_(0) {
+      total_get_wait_time_(0),
+      max_bytes_(max_bytes) {
+    DCHECK(max_bytes == -1 || max_bytes > 0) << max_bytes;
     DCHECK_GT(max_elements_, 0);
     // Make sure class members commonly used in BlockingPut() don't alias with class
-    // members used in BlockingGet(). 'pad_' is the point of division.
-    DCHECK_NE(offsetof(BlockingQueue, pad_) / 64,
+    // members used in BlockingGet(). 'put_bytes_enqueued_' is the point of division.
+    DCHECK_NE(offsetof(BlockingQueue, put_bytes_enqueued_) / 64,
         offsetof(BlockingQueue, get_lock_) / 64);
   }
 
@@ -96,11 +114,20 @@ class BlockingQueue : public CacheLineAligned {
     get_list_.pop_front();
     get_list_size_.Store(get_list_.size());
     read_lock.unlock();
+    int64_t val_bytes = ElemBytesFn()(*out);
+    DCHECK_GE(val_bytes, 0);
+    get_bytes_dequeued_.Add(val_bytes);
     // Note that there is a race with any writer if NotifyOne() is called between when
     // a writer checks the queue size and when it calls put_cv_.Wait(). If this race
     // occurs, a writer can stay blocked even if the queue is not full until the next
     // BlockingGet(). The race is benign correctness wise as BlockingGet() will always
     // notify a writer with 'put_lock_' held when both lists are empty.
+    //
+    // Relatedly, if multiple writers hit the bytes limit of the queue and queue elements
+    // vary in size, we may not immediately unblock all writers. E.g. if two writers are
+    // waiting to enqueue elements of N bytes and we dequeue an element of 2N bytes, we
+    // could wake up both writers but actually only wake up one. This is also benign
+    // correctness-wise because we will continue to make progress.
     put_cv_.NotifyOne();
     return true;
   }
@@ -112,9 +139,10 @@ class BlockingQueue : public CacheLineAligned {
   template <typename V>
   bool BlockingPut(V&& val) {
     MonotonicStopWatch timer;
+    int64_t val_bytes = ElemBytesFn()(val);
+    DCHECK_GE(val_bytes, 0);
     boost::unique_lock<boost::mutex> write_lock(put_lock_);
-
-    while (SizeLocked(write_lock) >= max_elements_ && !shutdown_) {
+    while (!HasCapacityInternal(write_lock, val_bytes) && !shutdown_) {
       timer.Start();
       put_cv_.Wait(write_lock);
       timer.Stop();
@@ -123,6 +151,7 @@ class BlockingQueue : public CacheLineAligned {
     if (UNLIKELY(shutdown_)) return false;
 
     DCHECK_LT(put_list_.size(), max_elements_);
+    put_bytes_enqueued_ += val_bytes;
     Put(std::forward<V>(val));
     write_lock.unlock();
     get_cv_.NotifyOne();
@@ -137,11 +166,13 @@ class BlockingQueue : public CacheLineAligned {
   template <typename V>
   bool BlockingPutWithTimeout(V&& val, int64_t timeout_micros) {
     MonotonicStopWatch timer;
+    int64_t val_bytes = ElemBytesFn()(val);
+    DCHECK_GE(val_bytes, 0);
     boost::unique_lock<boost::mutex> write_lock(put_lock_);
     timespec abs_time;
     TimeFromNowMicros(timeout_micros, &abs_time);
     bool notified = true;
-    while (SizeLocked(write_lock) >= max_elements_ && !shutdown_ && notified) {
+    while (!HasCapacityInternal(write_lock, val_bytes) && !shutdown_ && notified) {
       timer.Start();
       // Wait until we're notified or until the timeout expires.
       notified = put_cv_.WaitUntil(write_lock, abs_time);
@@ -152,8 +183,9 @@ class BlockingQueue : public CacheLineAligned {
     // NOTE: We don't check 'notified' here as it appears that pthread condition variables
     // have a weird behavior in which they can return ETIMEDOUT from timed_wait even if
     // another thread did in fact signal
-    if (SizeLocked(write_lock) >= max_elements_ || shutdown_) return false;
+    if (!HasCapacityInternal(write_lock, val_bytes)) return false;
     DCHECK_LT(put_list_.size(), max_elements_);
+    put_bytes_enqueued_ += val_bytes;
     Put(std::forward<V>(val));
     write_lock.unlock();
     get_cv_.NotifyOne();
@@ -203,6 +235,26 @@ class BlockingQueue : public CacheLineAligned {
     return get_list_size_.Load() + put_list_.size();
   }
 
+  /// Return true if the queue has capacity to add one more element with size 'val_bytes'.
+  /// Caller must hold 'put_lock_' via 'lock'.
+  bool HasCapacityInternal(
+      const boost::unique_lock<boost::mutex>& lock, int64_t val_bytes) {
+    DCHECK(lock.mutex() == &put_lock_ && lock.owns_lock());
+    uint32_t size = SizeLocked(lock);
+    if (size >= max_elements_) return false;
+    if (val_bytes == 0 || max_bytes_ == -1 || size == 0) return true;
+
+    // At this point we can enqueue the item if there is sufficient bytes capacity.
+    if (put_bytes_enqueued_ + val_bytes <= max_bytes_) return true;
+
+    // No bytes capacity left - swap over dequeued bytes to account for elements the
+    // consumer has dequeued. All decrementers of 'get_bytes_dequeued_' hold 'put_lock_'
+    // races with other decrementers are impossible.
+    int64_t dequeued = get_bytes_dequeued_.Swap(0);
+    put_bytes_enqueued_ -= dequeued;
+    return put_bytes_enqueued_ + val_bytes <= max_bytes_;
+  }
+
   /// Overloads for inserting an item into the list, depending on whether it should be
   /// moved or copied.
   void Put(const T& val) { put_list_.push_back(val); }
@@ -227,9 +279,10 @@ class BlockingQueue : public CacheLineAligned {
   /// Total amount of time threads blocked in BlockingPut(). Guarded by 'put_lock_'.
   int64_t total_put_wait_time_;
 
-  /// Padding to avoid data structures used in BlockingGet() to share cache lines
-  /// with data structures used in BlockingPut().
-  int64_t pad_;
+  /// Running counter for bytes enqueued, incremented through the producer thread.
+  /// Decremented by transferring value from 'get_bytes_dequeued_'.
+  /// Guarded by 'put_lock_'
+  int64_t put_bytes_enqueued_ = 0;
 
   /// Guards against concurrent access to 'get_list_'.
   mutable boost::mutex get_lock_;
@@ -249,6 +302,14 @@ class BlockingQueue : public CacheLineAligned {
   /// variable doesn't include the time which other threads block waiting for 'get_lock_'.
   int64_t total_get_wait_time_;
 
+  /// Running count of bytes dequeued. Decremented from 'put_bytes_enqueued_' when it
+  /// exceeds the queue capacity. Kept separate from 'put_bytes_enqueued_' so that
+  /// producers and consumers are not updating the same cache line for every put and get.
+  /// Decrementers must hold 'put_lock_'.
+  AtomicInt64 get_bytes_dequeued_{0};
+
+  /// Soft limit on total bytes in queue. -1 if no limit.
+  const int64_t max_bytes_;
 };
 
 }
