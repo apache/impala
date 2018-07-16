@@ -338,10 +338,16 @@ class HdfsParquetTableWriter::ColumnWriter :
       plain_encoded_value_size_(
           ParquetPlainEncoder::EncodedByteSize(eval->root().type())) {
     DCHECK_NE(eval->root().type().type, TYPE_BOOLEAN);
+    // IMPALA-7304: Don't write column index for floating-point columns until
+    // PARQUET-1222 is resolved.
+    if (std::is_floating_point<T>::value) valid_column_index_ = false;
   }
 
   virtual void Reset() {
     BaseColumnWriter::Reset();
+    // IMPALA-7304: Don't write column index for floating-point columns until
+    // PARQUET-1222 is resolved.
+    if (std::is_floating_point<T>::value) valid_column_index_ = false;
     // Default to dictionary encoding.  If the cardinality ends up being too high,
     // it will fall back to plain.
     current_encoding_ = parquet::Encoding::PLAIN_DICTIONARY;
