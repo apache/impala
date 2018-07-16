@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/shared_mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <rapidjson/document.h>
 
@@ -89,7 +90,8 @@ class QueryState;
 ///
 /// Lock ordering: (lower-numbered acquired before higher-numbered)
 /// 1. wait_lock_
-/// 2. exec_state_lock_, backend_states_init_lock_, filter_lock_,
+/// 2. filter_lock_
+/// 3. exec_state_lock_, backend_states_init_lock_, filter_update_lock_,
 ///    ExecSummary::lock (leafs)
 ///
 /// TODO: move into separate subdirectory and move nested classes into separate files
@@ -296,8 +298,16 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// - ERROR: error status
   Status exec_status_;
 
+  /// Synchronizes updates to the filter_routing_table_.
+  SpinLock filter_update_lock_;
+
   /// Protects filter_routing_table_.
-  SpinLock filter_lock_;
+  /// Usage pattern:
+  /// 1. To update filter_routing_table_: Acquire shared access on filter_lock_ and
+  ///    upgrade to exclusive access by subsequently acquiring filter_update_lock_.
+  /// 2. To read, initialize/destroy filter_routing_table: Directly acquire exclusive
+  ///    access on filter_lock_.
+  boost::shared_mutex filter_lock_;
 
   /// Map from filter ID to filter.
   typedef boost::unordered_map<int32_t, FilterState> FilterRoutingTable;
@@ -319,6 +329,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   const TUniqueId& query_id() const;
 
   /// Returns a pretty-printed table of the current filter state.
+  /// Caller must have exclusive access to filter_lock_.
   std::string FilterDebugString();
 
   /// Called when the query is done executing due to reaching EOS or client
@@ -445,6 +456,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   ///
   /// The ExecState state-machine ensures this is called exactly once.
   void ReleaseAdmissionControlResources();
+
+  /// Checks the exec_state_ of the query and returns true if the query is executing.
+  bool IsExecuting();
 };
 
 }

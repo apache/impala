@@ -76,7 +76,7 @@ Coordinator::Coordinator(
 
 Coordinator::~Coordinator() {
   // Must have entered a terminal exec state guaranteeing resources were released.
-  DCHECK_NE(exec_state_.Load(), ExecState::EXECUTING);
+  DCHECK(!IsExecuting());
   DCHECK_LE(backend_exec_complete_barrier_->pending(), 0);
   // Release the coordinator's reference to the query control structures.
   if (query_state_ != nullptr) {
@@ -261,6 +261,7 @@ void Coordinator::InitFilterRoutingTable() {
   DCHECK(!filter_routing_table_complete_)
       << "InitFilterRoutingTable() called after setting filter_routing_table_complete_";
 
+  lock_guard<shared_mutex> lock(filter_lock_);
   for (const FragmentExecParams& fragment_params: schedule_.fragment_exec_params()) {
     int num_instances = fragment_params.instance_exec_params.size();
     DCHECK_GT(num_instances, 0);
@@ -384,7 +385,6 @@ string Coordinator::FilterDebugString() {
   table_printer.AddColumn("Tgt. Node(s)", false);
   table_printer.AddColumn("Target type", false);
   table_printer.AddColumn("Partition filter", false);
-
   // Distribution metrics are only meaningful if the coordinator is routing the filter.
   if (filter_mode_ == TRuntimeFilterMode::GLOBAL) {
     table_printer.AddColumn("Pending (Expected)", false);
@@ -392,7 +392,6 @@ string Coordinator::FilterDebugString() {
     table_printer.AddColumn("Completed", false);
   }
   table_printer.AddColumn("Enabled", false);
-  lock_guard<SpinLock> l(filter_lock_);
   for (FilterRoutingTable::value_type& v: filter_routing_table_) {
     vector<string> row;
     const FilterState& state = v.second;
@@ -449,7 +448,7 @@ Status Coordinator::SetNonErrorTerminalState(const ExecState state) {
   {
     lock_guard<SpinLock> l(exec_state_lock_);
     // May have already entered a terminal state, in which case nothing to do.
-    if (exec_state_.Load() != ExecState::EXECUTING) return exec_status_;
+    if (!IsExecuting()) return exec_status_;
     DCHECK(exec_status_.ok()) << exec_status_;
     exec_state_.Store(state);
     if (state == ExecState::CANCELLED) exec_status_ = Status::CANCELLED;
@@ -709,7 +708,7 @@ Status Coordinator::UpdateBackendExecStatus(const TReportExecStatusParams& param
   }
   // If query execution has terminated, return a cancelled status to force the fragment
   // instance to stop executing.
-  return exec_state_.Load() == ExecState::EXECUTING ? Status::OK() : Status::CANCELLED;
+  return IsExecuting() ? Status::OK() : Status::CANCELLED;
 }
 
 // TODO: add histogram/percentile
@@ -750,16 +749,14 @@ string Coordinator::GetErrorLog() {
 }
 
 void Coordinator::ReleaseExecResources() {
+  lock_guard<shared_mutex> lock(filter_lock_);
   if (filter_routing_table_.size() > 0) {
     query_profile_->AddInfoString("Final filter table", FilterDebugString());
   }
 
-  {
-    lock_guard<SpinLock> l(filter_lock_);
-    for (auto& filter : filter_routing_table_) {
-      FilterState* state = &filter.second;
-      state->Disable(filter_mem_tracker_);
-    }
+  for (auto& filter : filter_routing_table_) {
+    FilterState* state = &filter.second;
+    state->Disable(filter_mem_tracker_);
   }
   // This may be NULL while executing UDFs.
   if (filter_mem_tracker_ != nullptr) filter_mem_tracker_->Close();
@@ -779,6 +776,7 @@ void Coordinator::ReleaseAdmissionControlResources() {
 }
 
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
+  shared_lock<shared_mutex> lock(filter_lock_);
   DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
       << "UpdateFilter() called although runtime filters are disabled";
   DCHECK(exec_rpcs_complete_barrier_.get() != nullptr)
@@ -791,7 +789,12 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
   TPublishFilterParams rpc_params;
   unordered_set<int> target_fragment_idxs;
   {
-    lock_guard<SpinLock> l(filter_lock_);
+    lock_guard<SpinLock> l(filter_update_lock_);
+    if (!IsExecuting()) {
+      LOG(INFO) << "Filter update received for non-executing query with id: "
+                << query_id();
+      return;
+    }
     FilterRoutingTable::iterator it = filter_routing_table_.find(params.filter_id);
     if (it == filter_routing_table_.end()) {
       LOG(INFO) << "Could not find filter with id: " << params.filter_id;
@@ -834,9 +837,7 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
     if (state->is_bloom_filter()) {
       // Assign outgoing bloom filter.
       TBloomFilter& aggregated_filter = state->bloom_filter();
-      filter_mem_tracker_->Release(aggregated_filter.directory.size());
 
-      // TODO: Track memory used by 'rpc_params'.
       swap(rpc_params.bloom_filter, aggregated_filter);
       DCHECK(rpc_params.bloom_filter.always_false || rpc_params.bloom_filter.always_true
           || !rpc_params.bloom_filter.directory.empty());
@@ -858,9 +859,18 @@ void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
   // Waited for exec_rpcs_complete_barrier_ so backend_states_ is valid.
   for (BackendState* bs: backend_states_) {
     for (int fragment_idx: target_fragment_idxs) {
+      if (!IsExecuting()) goto cleanup;
       rpc_params.__set_dst_fragment_idx(fragment_idx);
       bs->PublishFilter(rpc_params);
     }
+  }
+
+cleanup:
+  // For bloom filters, the memory used in the filter_routing_table_ is transfered to
+  // rpc_params. Hence the Release() function on the filter_mem_tracker_ is called
+  // here to ensure that the MemTracker is updated after the memory is actually freed.
+  if (rpc_params.__isset.bloom_filter) {
+    filter_mem_tracker_->Release(rpc_params.bloom_filter.directory.size());
   }
 }
 
@@ -975,4 +985,9 @@ const TUniqueId& Coordinator::query_id() const {
 const TFinalizeParams* Coordinator::finalize_params() const {
   return schedule_.request().__isset.finalize_params
       ? &schedule_.request().finalize_params : nullptr;
+}
+
+bool Coordinator::IsExecuting() {
+  ExecState current_state = exec_state_.Load();
+  return current_state == ExecState::EXECUTING;
 }
