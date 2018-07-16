@@ -799,6 +799,7 @@ server=impala-host.example.com->db=*->table=*->action=CREATE
 server=impala-host.example.com-&gt;db=*-&gt;table=audit_log-&gt;action=SELECT
 server=impala-host.example.com-&gt;db=default-&gt;table=t1-&gt;action=*
 </codeblock>
+        </p>
 
         </example>
       </conbody>
