@@ -344,6 +344,28 @@ under the License.
       </p>
       </conbody>
     </concept>
+    <concept id="IMPALLA-7298">
+      <title>Kerberos authentication fails with the reverse DNS lookup
+        disabled</title>
+      <conbody>
+        <p> Kerberos authentication does not function correctly if <codeph>rdns
+            = false</codeph> is configured in <codeph>krb5.conf</codeph>. If the
+          flag <codeph>rdns = false</codeph>, when Impala tries to match
+          principals, it will fail because Kerberos receives a SPN (Service
+          Principal Name) with an IP address in it, but Impala expects a
+          principal with a FQDN in it.</p>
+        <p>
+          <b>Bug:</b>
+          <xref keyref="IMPALA-7298">IMPALA-7298</xref></p>
+        <p><b>Affected Versions:</b> Impala 2.12.0 and 3.0</p>
+        <p>
+          <b>Workaround:</b> Set the following flags in
+            <codeph>krb5.conf</codeph>: <ul>
+            <li><codeph>dns_canonicalize_hostname = true</codeph></li>
+            <li><codeph>rdns = true</codeph></li>
+          </ul></p>
+      </conbody>
+    </concept>
 </concept>
 
   <concept id="known_issues_resources">
