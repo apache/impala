@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
   impala::IpAddr ip;
   impala::Status status = impala::HostnameToIpAddr(FLAGS_hostname, &ip);
   DCHECK(status.ok());
-  kdc_principal = Substitute("impala-test/$0", ip);
+  kdc_principal = Substitute("impala-test/$0", FLAGS_hostname);
   kdc_realm = "KRBTEST.COM";
 
   int port = impala::FindUnusedEphemeralPort(nullptr);

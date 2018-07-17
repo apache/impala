@@ -191,7 +191,7 @@ TEST_F(RpcMgrTest, SlowCallback) {
   ASSERT_OK(rpc_mgr_.StartServices(krpc_address_));
 
   unique_ptr<PingServiceProxy> proxy;
-  ASSERT_OK(rpc_mgr_.GetProxy<PingServiceProxy>(krpc_address_, &proxy));
+  ASSERT_OK(rpc_mgr_.GetProxy<PingServiceProxy>(krpc_address_, FLAGS_hostname, &proxy));
 
   PingRequestPB request;
   PingResponsePB response;
@@ -211,7 +211,8 @@ TEST_F(RpcMgrTest, AsyncCall) {
       static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker()));
 
   unique_ptr<ScanMemServiceProxy> scan_mem_proxy;
-  ASSERT_OK(rpc_mgr_.GetProxy<ScanMemServiceProxy>(krpc_address_, &scan_mem_proxy));
+  ASSERT_OK(rpc_mgr_.GetProxy<ScanMemServiceProxy>(krpc_address_, FLAGS_hostname,
+      &scan_mem_proxy));
 
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;

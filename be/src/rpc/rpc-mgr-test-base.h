@@ -246,10 +246,12 @@ Status RunMultipleServicesTestTemplate(RpcMgrTestBase<T>* test_base,
   RETURN_IF_ERROR(rpc_mgr->StartServices(krpc_address));
 
   unique_ptr<PingServiceProxy> ping_proxy;
-  RETURN_IF_ERROR(rpc_mgr->GetProxy<PingServiceProxy>(krpc_address, &ping_proxy));
+  RETURN_IF_ERROR(rpc_mgr->GetProxy<PingServiceProxy>(krpc_address, FLAGS_hostname,
+      &ping_proxy));
 
   unique_ptr<ScanMemServiceProxy> scan_mem_proxy;
-  RETURN_IF_ERROR(rpc_mgr->GetProxy<ScanMemServiceProxy>(krpc_address, &scan_mem_proxy));
+  RETURN_IF_ERROR(rpc_mgr->GetProxy<ScanMemServiceProxy>(krpc_address, FLAGS_hostname,
+      &scan_mem_proxy));
 
   RpcController controller;
   srand(0);
