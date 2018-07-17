@@ -17,9 +17,11 @@
 package org.apache.impala.catalog;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -31,6 +33,10 @@ import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.ListMap;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Frontend interface for interacting with a filesystem-backed table.
@@ -170,21 +176,6 @@ public interface FeFsTable extends FeTable {
   int parseSkipHeaderLineCount(StringBuilder error);
 
   /**
-   * Selects a random sample of files from the given list of partitions such that the sum
-   * of file sizes is at least 'percentBytes' percent of the total number of bytes in
-   * those partitions and at least 'minSampleBytes'. The sample is returned as a map from
-   * partition id to a list of file descriptors selected from that partition.
-   * This function allocates memory proportional to the number of files in 'inputParts'.
-   * Its implementation tries to minimize the constant factor and object generation.
-   * The given 'randomSeed' is used for random number generation.
-   * The 'percentBytes' parameter must be between 0 and 100.
-   */
-  Map<Long, List<FileDescriptor>> getFilesSample(
-      Collection<? extends FeFsPartition> inputParts,
-      long percentBytes, long minSampleBytes,
-      long randomSeed);
-
-  /**
    * @return the index of hosts that store replicas of blocks of this table.
    */
   ListMap<TNetworkAddress> getHostIndex();
@@ -230,6 +221,98 @@ public interface FeFsTable extends FeTable {
       double rowsPerByte = tableStats.num_rows / (double) tableStats.total_file_bytes;
       double extrapolatedNumRows = fileBytes * rowsPerByte;
       return (long) Math.max(1, Math.round(extrapolatedNumRows));
+    }
+
+    /**
+     * Selects a random sample of files from the given list of partitions such that the
+     * sum of file sizes is at least 'percentBytes' percent of the total number of bytes
+     * in those partitions and at least 'minSampleBytes'. The sample is returned as a map
+     * from partition id to a list of file descriptors selected from that partition.
+     *
+     * This function allocates memory proportional to the number of files in 'inputParts'.
+     * Its implementation tries to minimize the constant factor and object generation.
+     * The given 'randomSeed' is used for random number generation.
+     * The 'percentBytes' parameter must be between 0 and 100.
+     */
+    public static Map<Long, List<FileDescriptor>> getFilesSample(
+        FeFsTable table,
+        Collection<? extends FeFsPartition> inputParts,
+        long percentBytes, long minSampleBytes,
+        long randomSeed) {
+      Preconditions.checkState(percentBytes >= 0 && percentBytes <= 100);
+      Preconditions.checkState(minSampleBytes >= 0);
+
+      long totalNumFiles = 0;
+      for (FeFsPartition part : inputParts) {
+        totalNumFiles += part.getNumFileDescriptors();
+      }
+
+      // Conservative max size for Java arrays. The actual maximum varies
+      // from JVM version and sometimes between configurations.
+      final long JVM_MAX_ARRAY_SIZE = Integer.MAX_VALUE - 10;
+      if (totalNumFiles > JVM_MAX_ARRAY_SIZE) {
+        throw new IllegalStateException(String.format(
+            "Too many files to generate a table sample of table %s. " +
+            "Sample requested over %s files, but a maximum of %s files are supported.",
+            table.getTableName().toString(), totalNumFiles, JVM_MAX_ARRAY_SIZE));
+      }
+
+      // Ensure a consistent ordering of files for repeatable runs. The files within a
+      // partition are already ordered based on how they are loaded in the catalog.
+      List<FeFsPartition> orderedParts = Lists.newArrayList(inputParts);
+      Collections.sort(orderedParts, HdfsPartition.KV_COMPARATOR);
+
+      // fileIdxs contains indexes into the file descriptor lists of all inputParts
+      // parts[i] contains the partition corresponding to fileIdxs[i]
+      // fileIdxs[i] is an index into the file descriptor list of the partition parts[i]
+      // The purpose of these arrays is to efficiently avoid selecting the same file
+      // multiple times during the sampling, regardless of the sample percent.
+      // We purposely avoid generating objects proportional to the number of files.
+      int[] fileIdxs = new int[(int)totalNumFiles];
+      FeFsPartition[] parts = new FeFsPartition[(int)totalNumFiles];
+      int idx = 0;
+      long totalBytes = 0;
+      for (FeFsPartition part: orderedParts) {
+        totalBytes += part.getSize();
+        int numFds = part.getNumFileDescriptors();
+        for (int fileIdx = 0; fileIdx < numFds; ++fileIdx) {
+          fileIdxs[idx] = fileIdx;
+          parts[idx] = part;
+          ++idx;
+        }
+      }
+      if (idx != totalNumFiles) {
+        throw new AssertionError("partition file counts changed during iteration");
+      }
+
+      int numFilesRemaining = idx;
+      double fracPercentBytes = (double) percentBytes / 100;
+      long targetBytes = (long) Math.round(totalBytes * fracPercentBytes);
+      targetBytes = Math.max(targetBytes, minSampleBytes);
+
+      // Randomly select files until targetBytes has been reached or all files have been
+      // selected.
+      Random rnd = new Random(randomSeed);
+      long selectedBytes = 0;
+      Map<Long, List<FileDescriptor>> result = Maps.newHashMap();
+      while (selectedBytes < targetBytes && numFilesRemaining > 0) {
+        int selectedIdx = Math.abs(rnd.nextInt()) % numFilesRemaining;
+        FeFsPartition part = parts[selectedIdx];
+        Long partId = Long.valueOf(part.getId());
+        List<FileDescriptor> sampleFileIdxs = result.get(partId);
+        if (sampleFileIdxs == null) {
+          sampleFileIdxs = Lists.newArrayList();
+          result.put(partId, sampleFileIdxs);
+        }
+        FileDescriptor fd = part.getFileDescriptors().get(fileIdxs[selectedIdx]);
+        sampleFileIdxs.add(fd);
+        selectedBytes += fd.getFileLength();
+        // Avoid selecting the same file multiple times.
+        fileIdxs[selectedIdx] = fileIdxs[numFilesRemaining - 1];
+        parts[selectedIdx] = parts[numFilesRemaining - 1];
+        --numFilesRemaining;
+      }
+      return result;
     }
   }
 }

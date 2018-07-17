@@ -43,7 +43,6 @@ import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.CatalogObjectsConstants;
@@ -541,14 +540,6 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   public int parseSkipHeaderLineCount(StringBuilder error) {
     // TODO Auto-generated method stub
     return 0;
-  }
-
-  @Override
-  public Map<Long, List<FileDescriptor>> getFilesSample(
-      Collection<? extends FeFsPartition> inputParts,
-      long percentBytes, long minSampleBytes, long randomSeed) {
-    // TODO(todd): implement me
-    return Collections.emptyMap();
   }
 
   @Override
