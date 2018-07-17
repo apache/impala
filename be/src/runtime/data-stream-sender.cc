@@ -353,7 +353,7 @@ DataStreamSender::DataStreamSender(int sender_id, const RowDescriptor* row_desc,
   // TODO: use something like google3's linked_ptr here (scoped_ptr isn't copyable)
   for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
-        new Channel(this, row_desc, destinations[i].server,
+        new Channel(this, row_desc, destinations[i].thrift_backend,
             destinations[i].fragment_instance_id, sink.dest_node_id,
             per_channel_buffer_size));
   }

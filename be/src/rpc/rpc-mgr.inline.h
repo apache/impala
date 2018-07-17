@@ -30,13 +30,14 @@ namespace impala {
 
 /// Always inline to avoid having to provide a definition for each use type P.
 template <typename P>
-Status RpcMgr::GetProxy(const TNetworkAddress& address, std::unique_ptr<P>* proxy) {
+Status RpcMgr::GetProxy(const TNetworkAddress& address, const std::string& hostname,
+    std::unique_ptr<P>* proxy) {
   DCHECK(proxy != nullptr);
   DCHECK(is_inited()) << "Must call Init() before GetProxy()";
   DCHECK(IsResolvedAddress(address));
   kudu::Sockaddr sockaddr;
   RETURN_IF_ERROR(TNetworkAddressToSockaddr(address, &sockaddr));
-  proxy->reset(new P(messenger_, sockaddr, address.hostname));
+  proxy->reset(new P(messenger_, sockaddr, hostname));
   return Status::OK();
 }
 

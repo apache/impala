@@ -105,10 +105,11 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // data is getting accumulated before being sent; it only applies when data is added via
   // AddRow() and not sent directly via SendBatch().
   Channel(KrpcDataStreamSender* parent, const RowDescriptor* row_desc,
-      const TNetworkAddress& destination, const TUniqueId& fragment_instance_id,
-      PlanNodeId dest_node_id, int buffer_size)
+      const std::string& hostname, const TNetworkAddress& destination,
+      const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int buffer_size)
     : parent_(parent),
       row_desc_(row_desc),
+      hostname_(hostname),
       address_(destination),
       fragment_instance_id_(fragment_instance_id),
       dest_node_id_(dest_node_id) {
@@ -160,6 +161,7 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   const RowDescriptor* row_desc_;
 
   // The triplet of IP-address:port/finst-id/node-id uniquely identifies the receiver.
+  const std::string hostname_;
   const TNetworkAddress address_;
   const TUniqueId fragment_instance_id_;
   const PlanNodeId dest_node_id_;
@@ -305,7 +307,7 @@ Status KrpcDataStreamSender::Channel::Init(RuntimeState* state) {
 
   // Create a DataStreamService proxy to the destination.
   RpcMgr* rpc_mgr = ExecEnv::GetInstance()->rpc_mgr();
-  RETURN_IF_ERROR(rpc_mgr->GetProxy(address_, &proxy_));
+  RETURN_IF_ERROR(rpc_mgr->GetProxy(address_, hostname_, &proxy_));
   return Status::OK();
 }
 
@@ -593,9 +595,9 @@ KrpcDataStreamSender::KrpcDataStreamSender(int sender_id, const RowDescriptor* r
 
   for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
-        new Channel(this, row_desc, destinations[i].krpc_server,
-            destinations[i].fragment_instance_id, sink.dest_node_id,
-            per_channel_buffer_size));
+        new Channel(this, row_desc, destinations[i].thrift_backend.hostname,
+            destinations[i].krpc_backend, destinations[i].fragment_instance_id,
+            sink.dest_node_id, per_channel_buffer_size));
   }
 
   if (partition_type_ == TPartitionType::UNPARTITIONED ||

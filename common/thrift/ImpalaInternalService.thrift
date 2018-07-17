@@ -431,11 +431,11 @@ struct TPlanFragmentDestination {
   // the globally unique fragment instance id
   1: required Types.TUniqueId fragment_instance_id
 
-  // IP address + port of the thrift based ImpalaInteralService on the destination
-  2: required Types.TNetworkAddress server
+  // hostname + port of the Thrift based ImpalaInteralService on the destination
+  2: required Types.TNetworkAddress thrift_backend
 
   // IP address + port of the KRPC based ImpalaInternalService on the destination
-  3: optional Types.TNetworkAddress krpc_server
+  3: optional Types.TNetworkAddress krpc_backend
 }
 
 // Context to collect information, which is shared among all instances of that plan

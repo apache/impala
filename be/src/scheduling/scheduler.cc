@@ -345,12 +345,12 @@ void Scheduler::ComputeFragmentExecParams(
         TPlanFragmentDestination& dest = src_params->destinations[i];
         dest.__set_fragment_instance_id(dest_params->instance_exec_params[i].instance_id);
         const TNetworkAddress& host = dest_params->instance_exec_params[i].host;
-        dest.__set_server(host);
+        dest.__set_thrift_backend(host);
         if (FLAGS_use_krpc) {
           const TBackendDescriptor& desc = LookUpBackendDesc(executor_config, host);
           DCHECK(desc.__isset.krpc_address);
           DCHECK(IsResolvedAddress(desc.krpc_address));
-          dest.__set_krpc_server(desc.krpc_address);
+          dest.__set_krpc_backend(desc.krpc_address);
         }
       }
 

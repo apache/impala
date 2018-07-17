@@ -358,10 +358,10 @@ class DataStreamTest : public DataStreamTestBase<testing::TestWithParam<KrpcSwit
     dest_.push_back(TPlanFragmentDestination());
     TPlanFragmentDestination& dest = dest_.back();
     dest.fragment_instance_id = next_instance_id_;
-    dest.server.hostname = "127.0.0.1";
-    dest.server.port = FLAGS_port;
+    dest.thrift_backend.hostname = "localhost";
+    dest.thrift_backend.port = FLAGS_port;
     if (GetParam() == USE_KRPC) {
-      dest.__set_krpc_server(krpc_address_);
+      dest.__set_krpc_backend(krpc_address_);
     }
     *instance_id = next_instance_id_;
     ++next_instance_id_.lo;
