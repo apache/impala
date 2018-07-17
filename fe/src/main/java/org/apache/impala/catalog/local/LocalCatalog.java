@@ -40,7 +40,6 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.HdfsCachePool;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.thrift.TCatalogObject;
@@ -166,7 +165,7 @@ public class LocalCatalog implements FeCatalog {
       throwPartitionNotFound(partitionSpec);
     }
     // Get the FeFsPartition object for the given partition spec.
-    PrunablePartition partition = HdfsTable.getPartitionFromThriftPartitionSpec(
+    PrunablePartition partition = FeFsTable.Utils.getPartitionFromThriftPartitionSpec(
         (FeFsTable)table, partitionSpec);
     if (partition == null) throwPartitionNotFound(partitionSpec);
     return FeCatalogUtils.loadPartition((FeFsTable)table, partition.getId());

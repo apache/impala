@@ -49,7 +49,6 @@ import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TNetworkAddress;
-import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
@@ -214,13 +213,6 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   @Override
   public String getNullPartitionKeyValue() {
     return db_.getCatalog().getNullPartitionKeyValue();
-  }
-
-  @Override
-  public TResultSet getFiles(List<List<TPartitionKeyValue>> partitionSet)
-      throws CatalogException {
-    // TODO(todd): implement for SHOW FILES.
-    return null;
   }
 
   @Override

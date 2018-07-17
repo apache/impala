@@ -25,18 +25,26 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionKeyValue;
+import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.ListMap;
+import org.apache.impala.util.TResultRowBuilder;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * Frontend interface for interacting with a filesystem-backed table.
@@ -78,14 +86,6 @@ public interface FeFsTable extends FeTable {
    */
   public String getNullPartitionKeyValue();
 
-  /**
-   * Get file info for the given set of partitions, or all partitions if
-   * partitionSet is null.
-   *
-   * @return partition file info, ordered by partition
-   */
-  TResultSet getFiles(List<List<TPartitionKeyValue>> partitionSet)
-      throws CatalogException;
 
   /**
    * @return the base HDFS directory where files of this table are stored.
@@ -224,6 +224,45 @@ public interface FeFsTable extends FeTable {
     }
 
     /**
+     * Get file info for the given set of partitions, or all partitions if
+     * partitionSet is null.
+     *
+     * @return partition file info, ordered by partition
+     */
+    public static TResultSet getFiles(FeFsTable table,
+        List<List<TPartitionKeyValue>> partitionSet) {
+      TResultSet result = new TResultSet();
+      TResultSetMetadata resultSchema = new TResultSetMetadata();
+      result.setSchema(resultSchema);
+      resultSchema.addToColumns(new TColumn("Path", Type.STRING.toThrift()));
+      resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
+      resultSchema.addToColumns(new TColumn("Partition", Type.STRING.toThrift()));
+      result.setRows(Lists.<TResultRow>newArrayList());
+
+      List<? extends FeFsPartition> orderedPartitions;
+      if (partitionSet == null) {
+        orderedPartitions = Lists.newArrayList(FeCatalogUtils.loadAllPartitions(table));
+      } else {
+        // Get a list of HdfsPartition objects for the given partition set.
+        orderedPartitions = getPartitionsFromPartitionSet(table, partitionSet);
+      }
+      Collections.sort(orderedPartitions, HdfsPartition.KV_COMPARATOR);
+
+      for (FeFsPartition p: orderedPartitions) {
+        List<FileDescriptor> orderedFds = Lists.newArrayList(p.getFileDescriptors());
+        Collections.sort(orderedFds);
+        for (FileDescriptor fd: orderedFds) {
+          TResultRowBuilder rowBuilder = new TResultRowBuilder();
+          rowBuilder.add(p.getLocation() + "/" + fd.getFileName());
+          rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
+          rowBuilder.add(p.getPartitionName());
+          result.addToRows(rowBuilder.get());
+        }
+      }
+      return result;
+    }
+
+    /**
      * Selects a random sample of files from the given list of partitions such that the
      * sum of file sizes is at least 'percentBytes' percent of the total number of bytes
      * in those partitions and at least 'minSampleBytes'. The sample is returned as a map
@@ -313,6 +352,76 @@ public interface FeFsTable extends FeTable {
         --numFilesRemaining;
       }
       return result;
+    }
+
+    /**
+     * Get and load the specified partitions from the table.
+     */
+    public static List<? extends FeFsPartition> getPartitionsFromPartitionSet(
+        FeFsTable table, List<List<TPartitionKeyValue>> partitionSet) {
+      List<Long> partitionIds = Lists.newArrayList();
+      for (List<TPartitionKeyValue> kv : partitionSet) {
+        PrunablePartition partition = getPartitionFromThriftPartitionSpec(table, kv);
+        if (partition != null) partitionIds.add(partition.getId());
+      }
+      return table.loadPartitions(partitionIds);
+    }
+
+    /**
+     * Get the specified partition from the table, or null if no such partition
+     * exists.
+     */
+    public static PrunablePartition getPartitionFromThriftPartitionSpec(
+        FeFsTable table,
+        List<TPartitionKeyValue> partitionSpec) {
+      // First, build a list of the partition values to search for in the same order they
+      // are defined in the table.
+      List<String> targetValues = Lists.newArrayList();
+      Set<String> keys = Sets.newHashSet();
+      for (FieldSchema fs: table.getMetaStoreTable().getPartitionKeys()) {
+        for (TPartitionKeyValue kv: partitionSpec) {
+          if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {
+            targetValues.add(kv.getValue());
+            // Same key was specified twice
+            if (!keys.add(kv.getName().toLowerCase())) {
+              return null;
+            }
+          }
+        }
+      }
+
+      // Make sure the number of values match up and that some values were found.
+      if (targetValues.size() == 0 ||
+          (targetValues.size() != table.getMetaStoreTable().getPartitionKeysSize())) {
+        return null;
+      }
+
+      // Search through all the partitions and check if their partition key values
+      // match the values being searched for.
+      for (PrunablePartition partition: table.getPartitions()) {
+        List<LiteralExpr> partitionValues = partition.getPartitionValues();
+        Preconditions.checkState(partitionValues.size() == targetValues.size());
+        boolean matchFound = true;
+        for (int i = 0; i < targetValues.size(); ++i) {
+          String value;
+          if (partitionValues.get(i) instanceof NullLiteral) {
+            value = table.getNullPartitionKeyValue();
+          } else {
+            value = partitionValues.get(i).getStringValue();
+            Preconditions.checkNotNull(value);
+            // See IMPALA-252: we deliberately map empty strings on to
+            // NULL when they're in partition columns. This is for
+            // backwards compatibility with Hive, and is clearly broken.
+            if (value.isEmpty()) value = table.getNullPartitionKeyValue();
+          }
+          if (!targetValues.get(i).equals(value)) {
+            matchFound = false;
+            break;
+          }
+        }
+        if (matchFound) return partition;
+      }
+      return null;
     }
   }
 }

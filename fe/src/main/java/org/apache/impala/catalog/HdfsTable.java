@@ -59,7 +59,6 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
-import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.fb.FbFileBlock;
@@ -72,7 +71,6 @@ import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionKeyValue;
-import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TTable;
@@ -672,7 +670,7 @@ public class HdfsTable extends Table implements FeFsTable {
           kv.getLiteralValue(), table.getNullPartitionKeyValue());
       partitionKeyValues.add(new TPartitionKeyValue(kv.getColName(), value));
     }
-    return getPartitionFromThriftPartitionSpec(table, partitionKeyValues);
+    return Utils.getPartitionFromThriftPartitionSpec(table, partitionKeyValues);
   }
 
   /**
@@ -681,73 +679,16 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   public HdfsPartition getPartitionFromThriftPartitionSpec(
       List<TPartitionKeyValue> partitionSpec) {
-    return (HdfsPartition)getPartitionFromThriftPartitionSpec(this, partitionSpec);
-  }
-
-  public static PrunablePartition getPartitionFromThriftPartitionSpec(
-      FeFsTable table,
-      List<TPartitionKeyValue> partitionSpec) {
-      // First, build a list of the partition values to search for in the same order they
-    // are defined in the table.
-    List<String> targetValues = Lists.newArrayList();
-    Set<String> keys = Sets.newHashSet();
-    for (FieldSchema fs: table.getMetaStoreTable().getPartitionKeys()) {
-      for (TPartitionKeyValue kv: partitionSpec) {
-        if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {
-          targetValues.add(kv.getValue());
-          // Same key was specified twice
-          if (!keys.add(kv.getName().toLowerCase())) {
-            return null;
-          }
-        }
-      }
-    }
-
-    // Make sure the number of values match up and that some values were found.
-    if (targetValues.size() == 0 ||
-        (targetValues.size() != table.getMetaStoreTable().getPartitionKeysSize())) {
-      return null;
-    }
-
-    // Search through all the partitions and check if their partition key values
-    // match the values being searched for.
-    for (PrunablePartition partition: table.getPartitions()) {
-      List<LiteralExpr> partitionValues = partition.getPartitionValues();
-      Preconditions.checkState(partitionValues.size() == targetValues.size());
-      boolean matchFound = true;
-      for (int i = 0; i < targetValues.size(); ++i) {
-        String value;
-        if (partitionValues.get(i) instanceof NullLiteral) {
-          value = table.getNullPartitionKeyValue();
-        } else {
-          value = partitionValues.get(i).getStringValue();
-          Preconditions.checkNotNull(value);
-          // See IMPALA-252: we deliberately map empty strings on to
-          // NULL when they're in partition columns. This is for
-          // backwards compatibility with Hive, and is clearly broken.
-          if (value.isEmpty()) value = table.getNullPartitionKeyValue();
-        }
-        if (!targetValues.get(i).equals(value)) {
-          matchFound = false;
-          break;
-        }
-      }
-      if (matchFound) return partition;
-    }
-    return null;
+    return (HdfsPartition)Utils.getPartitionFromThriftPartitionSpec(this, partitionSpec);
   }
 
   /**
    * Gets hdfs partitions by the given partition set.
    */
+  @SuppressWarnings("unchecked")
   public List<HdfsPartition> getPartitionsFromPartitionSet(
       List<List<TPartitionKeyValue>> partitionSet) {
-    List<HdfsPartition> partitions = Lists.newArrayList();
-    for (List<TPartitionKeyValue> kv : partitionSet) {
-      HdfsPartition partition = getPartitionFromThriftPartitionSpec(kv);
-      if (partition != null) partitions.add(partition);
-    }
-    return partitions;
+    return (List<HdfsPartition>)Utils.getPartitionsFromPartitionSet(this, partitionSet);
   }
 
   /**
@@ -2061,40 +2002,6 @@ public class HdfsTable extends Table implements FeFsTable {
           .addBytes(totalBytes)
           .addBytes(totalCachedBytes).add("").add("").add("").add("");
       result.addToRows(rowBuilder.get());
-    }
-    return result;
-  }
-
-  @Override // FeFsTable
-  public TResultSet getFiles(List<List<TPartitionKeyValue>> partitionSet)
-      throws CatalogException {
-    TResultSet result = new TResultSet();
-    TResultSetMetadata resultSchema = new TResultSetMetadata();
-    result.setSchema(resultSchema);
-    resultSchema.addToColumns(new TColumn("Path", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
-    resultSchema.addToColumns(new TColumn("Partition", Type.STRING.toThrift()));
-    result.setRows(Lists.<TResultRow>newArrayList());
-
-    List<HdfsPartition> orderedPartitions;
-    if (partitionSet == null) {
-      orderedPartitions = Lists.newArrayList(partitionMap_.values());
-    } else {
-      // Get a list of HdfsPartition objects for the given partition set.
-      orderedPartitions = getPartitionsFromPartitionSet(partitionSet);
-    }
-    Collections.sort(orderedPartitions, HdfsPartition.KV_COMPARATOR);
-
-    for (HdfsPartition p: orderedPartitions) {
-      List<FileDescriptor> orderedFds = Lists.newArrayList(p.getFileDescriptors());
-      Collections.sort(orderedFds);
-      for (FileDescriptor fd: orderedFds) {
-        TResultRowBuilder rowBuilder = new TResultRowBuilder();
-        rowBuilder.add(p.getLocation() + "/" + fd.getFileName());
-        rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
-        rowBuilder.add(p.getPartitionName());
-        result.addToRows(rowBuilder.get());
-      }
     }
     return result;
   }

@@ -1225,7 +1225,7 @@ public class Frontend {
     FeTable table = getCatalog().getTable(request.getTable_name().getDb_name(),
         request.getTable_name().getTable_name());
     if (table instanceof FeFsTable) {
-      return ((FeFsTable) table).getFiles(request.getPartition_set());
+      return FeFsTable.Utils.getFiles((FeFsTable)table, request.getPartition_set());
     } else {
       throw new InternalException("SHOW FILES only supports Hdfs table. " +
           "Unsupported table class: " + table.getClass());
