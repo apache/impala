@@ -476,7 +476,7 @@ show column stats year_month_day;
             Set the impalad start-up configuration "--enable_stats_extrapolation" to
             enable the features globally. To enable them only for a specific table, set
             the "impala.enable.stats.extrapolation" table property to "true" for the
-            desired table. The tbale-level property overrides the global setting, so
+            desired table. The table-level property overrides the global setting, so
             it is also possible to enable sampling and extrapolation globally, but
             disable it for specific tables by setting the table property to "false".
             Example:
