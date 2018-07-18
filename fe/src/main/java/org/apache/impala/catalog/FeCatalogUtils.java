@@ -31,6 +31,7 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.analysis.ToSqlUtils;
+import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.THdfsPartition;
@@ -322,7 +323,7 @@ public abstract class FeCatalogUtils {
   }
 
   public static THdfsPartition fsPartitionToThrift(FeFsPartition part,
-      boolean includeFileDesc, boolean includeIncrementalStats) {
+      ThriftObjectType type, boolean includeIncrementalStats) {
     HdfsStorageDescriptor sd = part.getInputFormatDescriptor();
     THdfsPartition thriftHdfsPart = new THdfsPartition(
         sd.getLineDelim(),
@@ -333,19 +334,20 @@ public abstract class FeCatalogUtils {
         sd.getFileFormat().toThrift(),
         Expr.treesToThrift(part.getPartitionValues()),
         sd.getBlockSize());
-    thriftHdfsPart.setLocation(part.getLocationAsThrift());
-    thriftHdfsPart.setStats(new TTableStats(part.getNumRows()));
-    thriftHdfsPart.setAccess_level(part.getAccessLevel());
-    thriftHdfsPart.setIs_marked_cached(part.isMarkedCached());
     thriftHdfsPart.setId(part.getId());
-    thriftHdfsPart.setHas_incremental_stats(part.hasIncrementalStats());
-    // IMPALA-4902: Shallow-clone the map to avoid concurrent modifications. One thread
-    // may try to serialize the returned THdfsPartition after releasing the table's lock,
-    // and another thread doing DDL may modify the map.
-    thriftHdfsPart.setHms_parameters(Maps.newHashMap(
-        includeIncrementalStats ? part.getParameters() :
-          part.getFilteredHmsParameters()));
-    if (includeFileDesc) {
+    thriftHdfsPart.setLocation(part.getLocationAsThrift());
+    if (type == ThriftObjectType.FULL) {
+      thriftHdfsPart.setStats(new TTableStats(part.getNumRows()));
+      thriftHdfsPart.setAccess_level(part.getAccessLevel());
+      thriftHdfsPart.setIs_marked_cached(part.isMarkedCached());
+      thriftHdfsPart.setHas_incremental_stats(part.hasIncrementalStats());
+      // IMPALA-4902: Shallow-clone the map to avoid concurrent modifications. One thread
+      // may try to serialize the returned THdfsPartition after releasing the table's lock,
+      // and another thread doing DDL may modify the map.
+      thriftHdfsPart.setHms_parameters(Maps.newHashMap(
+          includeIncrementalStats ? part.getParameters() :
+            part.getFilteredHmsParameters()));
+
       // Add block location information
       long numBlocks = 0;
       long totalFileBytes = 0;

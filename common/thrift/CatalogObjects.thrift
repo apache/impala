@@ -241,17 +241,37 @@ struct THdfsPartitionLocation {
 // Represents an HDFS partition
 // TODO(vercegovac): rename to TFsPartition
 struct THdfsPartition {
+
+  // ============================================================
+  // Fields included in the "Descriptor" format sent to the backend
+  // as part of query plans and fragments.
+  // ============================================================
+
   1: required byte lineDelim
   2: required byte fieldDelim
   3: required byte collectionDelim
   4: required byte mapKeyDelim
   5: required byte escapeChar
   6: required THdfsFileFormat fileFormat
+
   // These are Literal expressions
   7: list<Exprs.TExpr> partitionKeyExprs
   8: required i32 blockSize
-  9: optional list<THdfsFileDesc> file_desc
+
   10: optional THdfsPartitionLocation location
+
+  // Unique (in this table) id of this partition. May be set to
+  // PROTOTYPE_PARTITION_ID when this object is used to describe
+  // a partition which will be created as part of a query.
+  14: optional i64 id
+
+
+  // ============================================================
+  // Fields only included when the catalogd serializes a table to be
+  // sent to the impalad as part of a catalog update.
+  // ============================================================
+
+  9: optional list<THdfsFileDesc> file_desc
 
   // The access level Impala has on this partition (READ_WRITE, READ_ONLY, etc).
   11: optional TAccessLevel access_level
@@ -262,10 +282,6 @@ struct THdfsPartition {
   // True if this partition has been marked as cached (does not necessarily mean the
   // underlying data is cached).
   13: optional bool is_marked_cached
-
-  // Unique (in this table) id of this partition. If -1, the partition does not currently
-  // exist.
-  14: optional i64 id
 
   // (key,value) pairs stored in the Hive Metastore.
   15: optional map<string, string> hms_parameters
@@ -282,12 +298,17 @@ struct THdfsPartition {
   18: optional bool has_incremental_stats
 }
 
-// Constant partition ID used for THdfsPartition.prototype_partition above.
+// Constant partition ID used for THdfsPartition.prototype_partition below.
 // Must be < 0 to avoid collisions
 const i64 PROTOTYPE_PARTITION_ID = -1;
 
 
 struct THdfsTable {
+  // ============================================================
+  // Fields included in the "Descriptor" format sent to the backend
+  // as part of query plans and fragments.
+  // ============================================================
+
   1: required string hdfsBaseDir
 
   // Deprecated. Use TTableDescriptor.colNames.
@@ -303,22 +324,28 @@ struct THdfsTable {
   6: optional string avroSchema
 
   // Map from partition id to partition metadata.
-  // Does not include the special prototype partition -1 (see below).
+  // Does not include the special prototype partition with id=PROTOTYPE_PARTITION_ID --
+  // that partition is separately included below.
   4: required map<i64, THdfsPartition> partitions
 
   // Prototype partition, used when creating new partitions during insert.
   10: required THdfsPartition prototype_partition
-
-  // Each TNetworkAddress is a datanode which contains blocks of a file in the table.
-  // Used so that each THdfsFileBlock can just reference an index in this list rather
-  // than duplicate the list of network address, which helps reduce memory usage.
-  7: optional list<Types.TNetworkAddress> network_addresses
 
   // REMOVED: 8: optional bool multiple_filesystems
 
   // The prefixes of locations of partitions in this table. See THdfsPartitionLocation for
   // the description of how a prefix is computed.
   9: optional list<string> partition_prefixes
+
+  // ============================================================
+  // Fields only included when the catalogd serializes a table to be
+  // sent to the impalad as part of a catalog update.
+  // ============================================================
+
+  // Each TNetworkAddress is a datanode which contains blocks of a file in the table.
+  // Used so that each THdfsFileBlock can just reference an index in this list rather
+  // than duplicate the list of network address, which helps reduce memory usage.
+  7: optional list<Types.TNetworkAddress> network_addresses
 }
 
 struct THBaseTable {

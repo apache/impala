@@ -33,6 +33,7 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeCatalogUtils;
@@ -229,13 +230,12 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     for (FeFsPartition partition : partitions) {
       idToPartition.put(partition.getId(),
           FeCatalogUtils.fsPartitionToThrift(partition,
-              /*includeFileDesc=*/false,
+              ThriftObjectType.DESCRIPTOR_ONLY,
               /*includeIncrementalStats=*/false));
     }
 
     THdfsPartition tPrototypePartition = FeCatalogUtils.fsPartitionToThrift(
-        createPrototypePartition(),
-        /*includeFileDesc=*/false,
+        createPrototypePartition(), ThriftObjectType.DESCRIPTOR_ONLY,
         /*includeIncrementalStats=*/false);
 
     // TODO(todd): implement avro schema support

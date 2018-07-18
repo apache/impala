@@ -1722,7 +1722,8 @@ public class HdfsTable extends Table implements FeFsTable {
     // need any information below the THdfsPartition level.
     TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
         getTColumnDescriptors(), numClusteringCols_, name_, db_.getName());
-    tableDesc.setHdfsTable(getTHdfsTable(false, referencedPartitions));
+    tableDesc.setHdfsTable(getTHdfsTable(ThriftObjectType.DESCRIPTOR_ONLY,
+        referencedPartitions));
     return tableDesc;
   }
 
@@ -1731,25 +1732,30 @@ public class HdfsTable extends Table implements FeFsTable {
     // Send all metadata between the catalog service and the FE.
     TTable table = super.toThrift();
     table.setTable_type(TTableType.HDFS_TABLE);
-    table.setHdfs_table(getTHdfsTable(true, null));
+    table.setHdfs_table(getTHdfsTable(ThriftObjectType.FULL, null));
     return table;
   }
 
   /**
-   * Create a THdfsTable corresponding to this HdfsTable. If includeFileDesc is true,
-   * then then all partitions and THdfsFileDescs of each partition should be included.
-   * Otherwise, don't include any THdfsFileDescs, and include only those partitions in
-   * the refPartitions set (the backend doesn't need metadata for unreferenced
-   * partitions). To prevent the catalog from hitting an OOM error while trying to
+   * Create a THdfsTable corresponding to this HdfsTable. If serializing the "FULL"
+   * information, then then all partitions and THdfsFileDescs of each partition should be
+   * included. Otherwise, don't include any THdfsFileDescs, and include only those
+   * partitions in the refPartitions set (the backend doesn't need metadata for
+   * unreferenced partitions). In addition, metadata that is not used by the backend will
+   * be omitted.
+   *
+   * To prevent the catalog from hitting an OOM error while trying to
    * serialize large partition incremental stats, we estimate the stats size and filter
    * the incremental stats data from partition objects if the estimate exceeds
    * --inc_stats_size_limit_bytes. This function also collects storage related statistics
    *  (e.g. number of blocks, files, etc) in order to compute an estimate of the metadata
    *  size of this table.
    */
-  private THdfsTable getTHdfsTable(boolean includeFileDesc, Set<Long> refPartitions) {
-    // includeFileDesc implies all partitions should be included (refPartitions == null).
-    Preconditions.checkState(!includeFileDesc || refPartitions == null);
+  private THdfsTable getTHdfsTable(ThriftObjectType type, Set<Long> refPartitions) {
+    if (type == ThriftObjectType.FULL) {
+      // "full" implies all partitions should be included.
+      Preconditions.checkArgument(refPartitions == null);
+    }
     long memUsageEstimate = 0;
     int numPartitions =
         (refPartitions == null) ? partitionMap_.values().size() : refPartitions.size();
@@ -1764,13 +1770,13 @@ public class HdfsTable extends Table implements FeFsTable {
       long id = partition.getId();
       if (refPartitions == null || refPartitions.contains(id)) {
         THdfsPartition tHdfsPartition = FeCatalogUtils.fsPartitionToThrift(
-            partition, includeFileDesc, includeIncrementalStats);
+            partition, type, includeIncrementalStats);
         if (tHdfsPartition.isSetHas_incremental_stats() &&
             tHdfsPartition.isHas_incremental_stats()) {
           memUsageEstimate += getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
           hasIncrementalStats_ = true;
         }
-        if (includeFileDesc) {
+        if (type == ThriftObjectType.FULL) {
           Preconditions.checkState(tHdfsPartition.isSetNum_blocks() &&
               tHdfsPartition.isSetTotal_file_size_bytes());
           stats.numBlocks += tHdfsPartition.getNum_blocks();
@@ -1781,10 +1787,10 @@ public class HdfsTable extends Table implements FeFsTable {
         idToPartition.put(id, tHdfsPartition);
       }
     }
-    if (includeFileDesc) fileMetadataStats_.set(stats);
+    if (type == ThriftObjectType.FULL) fileMetadataStats_.set(stats);
 
     THdfsPartition prototypePartition = FeCatalogUtils.fsPartitionToThrift(
-        prototypePartition_, false, false);
+        prototypePartition_, ThriftObjectType.DESCRIPTOR_ONLY, false);
 
     memUsageEstimate += fileMetadataStats_.numFiles * PER_FD_MEM_USAGE_BYTES +
         fileMetadataStats_.numBlocks * PER_BLOCK_MEM_USAGE_BYTES;
@@ -1792,7 +1798,7 @@ public class HdfsTable extends Table implements FeFsTable {
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_, idToPartition, prototypePartition);
     hdfsTable.setAvroSchema(avroSchema_);
-    if (includeFileDesc) {
+    if (type == ThriftObjectType.FULL) {
       // Network addresses are used only by THdfsFileBlocks which are inside
       // THdfsFileDesc, so include network addreses only when including THdfsFileDesc.
       hdfsTable.setNetwork_addresses(hostIndex_.getList());
