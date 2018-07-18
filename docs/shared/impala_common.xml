@@ -467,37 +467,37 @@ under the License.
               <row>
                 <entry>UPDATE (Kudu only)</entry>
                 <entry>ALL</entry>
-                <entry>SERVER</entry>
+                <entry>TABLE</entry>
               </row>
               <row>
                 <entry>EXPLAIN UPDATE (Kudu only)</entry>
                 <entry>ALL</entry>
-                <entry>SERVER</entry>
+                <entry>TABLE</entry>
               </row>
               <row>
                 <entry>UPSERT (Kudu only)</entry>
                 <entry>ALL</entry>
-                <entry>SERVER</entry>
+                <entry>TABLE</entry>
               </row>
               <row>
                 <entry>WITH UPSERT (Kudu only)</entry>
                 <entry>ALL</entry>
-                <entry>SERVER</entry>
+                <entry>TABLE</entry>
               </row>
               <row>
                 <entry>EXPLAIN UPSERT (Kudu only)</entry>
                 <entry>ALL</entry>
-                <entry>SERVER</entry>
+                <entry>TABLE</entry>
               </row>
               <row>
                 <entry>DELETE (Kudu only)</entry>
                 <entry>ALL</entry>
-                <entry>SERVER</entry>
+                <entry>TABLE</entry>
               </row>
               <row>
                 <entry>EXPLAIN DELETE (Kudu only)</entry>
                 <entry>ALL</entry>
-                <entry>SERVER</entry>
+                <entry>TABLE</entry>
               </row>
             </tbody>
           </tgroup>
