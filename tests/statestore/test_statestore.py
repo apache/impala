@@ -558,7 +558,7 @@ class TestStatestore():
         .wait_for_failure()
         .start()
         .register(topics=reg)
-        .wait_for_update(topic_name, 1)
+        .wait_for_update(topic_name, 2)
     )
 
     sub2 = StatestoreSubscriber(update_cb=check_entries)
