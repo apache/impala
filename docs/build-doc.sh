@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,18 +17,20 @@
 # specific language governing permissions and limitations
 # under the License.
 
-.PHONY: all html pdf
+set -euo pipefail
 
-all: html pdf
+function usage() {
+  echo "$0 <file_format> <output_file> <filter_file> <log_file>"
+  exit 1
+}
 
-html: build/html/index.html
+[[ $# -eq 4 ]] || usage
 
-pdf: build/impala.pdf
+FILE_FORMAT=$1
+OUTPUT_FILE=$2
+FILTER_FILE=$3
+LOG_FILE=$4
 
-ALL_DEPS=Makefile impala.ditamap shared/*.xml images/* topics/*.xml
-
-build/html/index.html: impala_html.ditaval ${ALL_DEPS}
-	./build-doc.sh html5 $(dir $@) $< gen-html.log
-
-build/impala.pdf: impala_pdf.ditaval ${ALL_DEPS}
-	./build-doc.sh pdf $(dir $@) $< gen-pdf.log
+dita -i impala.ditamap -f ${FILE_FORMAT} -o ${OUTPUT_FILE} -filter ${FILTER_FILE} 2>&1 \
+    | tee ${LOG_FILE}
+[[ -z $(grep "\[ERROR\]" ${LOG_FILE}) ]] || exit 1
