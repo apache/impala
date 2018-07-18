@@ -729,15 +729,11 @@ show column stats year_month_day;
             is 20971520, 200 MB.
           </p>
 
-          <p>
-            To change the <codeph>inc_stats_size_limit_bytes</codeph> value,
+          <p> To change the <codeph>inc_stats_size_limit_bytes</codeph> value,
             restart <codeph>impalad</codeph> and <codeph>catalogd</codeph> with
             the new value specified in bytes, for example, 1048576000 for 1 GB.
-            See <xref
-              href="../../../../cloudera-docs/docs/topics/impala_config_options.xml#config_options"
-            /> for the steps to change the option and restart Impala
-            daemons.
-          </p>
+            See <xref href="impala_config_options.xml#config_options"/> for the
+            steps to change the option and restart Impala daemons. </p>
 
           <note type="attention">
             The <codeph>inc_stats_size_limit_bytes</codeph> setting should be
