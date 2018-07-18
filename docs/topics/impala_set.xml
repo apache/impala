@@ -51,8 +51,8 @@ under the License.
       interpreted as an <codeph>impala-shell</codeph> command that has differences from the SQL
       <codeph>SET</codeph> statement. See
       <xref
-        href="impala_shell_commands.xml#shell_commands/set_cmd"/> for the
-      information about the <codeph>SET</codeph> command in <codeph>impala-shell</codeph>.
+        href="impala_shell_commands.xml#shell_commands"/> for the information about
+      the <codeph>SET</codeph> command in <codeph>impala-shell</codeph>.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
