@@ -30,7 +30,7 @@ from thrift.protocol import TBinaryProtocol
 from thrift_sasl import TSaslClientTransport
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
-from thrift.Thrift import TApplicationException
+from thrift.Thrift import TApplicationException, TException
 
 class RpcStatus:
   """Convenience enum to describe Rpc return statuses"""
@@ -229,11 +229,15 @@ class ImpalaClient(object):
       output += first_child_output
     return idx
 
-  def test_connection(self):
-    """Checks to see if the current Impala connection is still alive. If not, an exception
-    will be raised."""
+  def is_connected(self):
+    """Returns True if the current Impala connection is alive and False otherwise."""
     if self.connected:
-      self.imp_service.PingImpalaService()
+      try:
+        return self.imp_service.PingImpalaService()
+      except TException:
+        return False
+    else:
+      return False
 
   def connect(self):
     """Creates a connection to an Impalad instance

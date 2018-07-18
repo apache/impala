@@ -43,7 +43,6 @@ from option_parser import get_option_parser, get_config_from_file
 from shell_output import DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter
 from shell_output import OverwritingStdErrOutputStream
 from subprocess import call
-from thrift.Thrift import TException
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
 VERSION_STRING = "build version not available"
@@ -231,6 +230,8 @@ class ImpalaShell(object, cmd.Cmd):
 
     if options.impalad is not None:
       self.do_connect(options.impalad)
+      # Check if the database in shell option exists
+      self._validate_database(immediately=True)
 
     # We handle Ctrl-C ourselves, using an Event object to signal cancellation
     # requests between the handler and the main shell thread.
@@ -568,6 +569,10 @@ class ImpalaShell(object, cmd.Cmd):
     else:
       return query
 
+  def set_prompt(self, db):
+    self.prompt = ImpalaShell.PROMPT_FORMAT.format(
+        host=self.impalad[0], port=self.impalad[1], db=db)
+
   def precmd(self, args):
     args = self.sanitise_input(args)
     if not args: return args
@@ -581,9 +586,7 @@ class ImpalaShell(object, cmd.Cmd):
       # If cmdqueue is populated, then commands are executed from the cmdqueue, and user
       # input is ignored. Send an empty string as the user input just to be safe.
       return str()
-    try:
-      self.imp_client.test_connection()
-    except TException:
+    if not self.imp_client.is_connected():
       print_to_stderr("Connection lost, reconnecting...")
       self._connect()
       self._validate_database(immediately=True)
@@ -812,8 +815,7 @@ class ImpalaShell(object, cmd.Cmd):
     if self.imp_client.connected:
       self._print_if_verbose('Connected to %s:%s' % self.impalad)
       self._print_if_verbose('Server version: %s' % self.server_version)
-      self.prompt = ImpalaShell.PROMPT_FORMAT.format(
-        host=self.impalad[0], port=self.impalad[1], db=ImpalaShell.DEFAULT_DB)
+      self.set_prompt(ImpalaShell.DEFAULT_DB)
       self._validate_database()
     try:
       self.imp_client.build_default_query_options_dict()
@@ -883,10 +885,12 @@ class ImpalaShell(object, cmd.Cmd):
     If immediately is False, it appends the USE command to self.cmdqueue.
     If immediately is True, it executes the USE command right away.
     """
+    if not self.imp_client.connected:
+      return
+    # Should only check if successfully connected.
     if self.current_db:
       self.current_db = self.current_db.strip('`')
       use_current_db = ('use `%s`' % self.current_db)
-
       if immediately:
         self.onecmd(use_current_db)
       else:
@@ -1185,9 +1189,7 @@ class ImpalaShell(object, cmd.Cmd):
     query = self._create_beeswax_query(args)
     if self._execute_stmt(query) is CmdStatus.SUCCESS:
       self.current_db = args.strip('`').strip()
-      self.prompt = ImpalaShell.PROMPT_FORMAT.format(host=self.impalad[0],
-                                                     port=self.impalad[1],
-                                                     db=self.current_db)
+      self.set_prompt(self.current_db)
     elif args.strip('`') == self.current_db:
       # args == current_db means -d option was passed but the "use [db]" operation failed.
       # We need to set the current_db to None so that it does not show a database, which
