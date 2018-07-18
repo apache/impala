@@ -28,17 +28,13 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.FeCatalogUtils;
-import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.FsPermissionChecker;
-import org.apache.impala.util.TAccessLevelUtil;
 
 import com.google.common.base.Preconditions;
 
@@ -200,25 +196,9 @@ public class LoadDataStmt extends StatementBase {
         }
       }
 
-      String noWriteAccessErrorMsg = String.format("Unable to LOAD DATA into " +
-          "target table (%s) because Impala does not have WRITE access to HDFS " +
-          "location: ", table.getFullName());
-
-      if (partitionSpec_ != null) {
-        long partId = HdfsTable.getPartition(table,
-            partitionSpec_.getPartitionSpecKeyValues()).getId();
-        FeFsPartition partition = FeCatalogUtils.loadPartition(table, partId);
-        String location = partition.getLocation();
-        if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
-          throw new AnalysisException(noWriteAccessErrorMsg + location);
-        }
-      } else {
-        // No specific partition specified, so we need to check write access
-        // on the table as a whole.
-        if (!table.hasWriteAccess()) {
-          throw new AnalysisException(noWriteAccessErrorMsg + table.getLocation());
-        }
-      }
+      FeFsTable.Utils.checkWriteAccess(table,
+          partitionSpec_ != null ? partitionSpec_.getPartitionSpecKeyValues() : null,
+          "LOAD DATA");
     } catch (FileNotFoundException e) {
       throw new AnalysisException("File not found: " + e.getMessage(), e);
     } catch (IOException e) {

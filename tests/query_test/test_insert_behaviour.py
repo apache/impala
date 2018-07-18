@@ -19,6 +19,7 @@ import getpass
 import grp
 import pwd
 import pytest
+import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
@@ -241,6 +242,117 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, refresh_query)
     # Should be writable because 'other' ACLs allow writes
     self.execute_query_expect_success(self.client, insert_query)
+
+  @SkipIfS3.hdfs_acls
+  @SkipIfADLS.hdfs_acls
+  @SkipIfIsilon.hdfs_acls
+  def test_mixed_partition_permissions(self, unique_database):
+    """
+    Test that INSERT and LOAD DATA into explicit partitions is allowed even
+    if some partitions exist without appropriate permissions.
+    """
+    table = "`{0}`.`insert_partition_perms`".format(unique_database)
+    table_path = "test-warehouse/{0}.db/insert_partition_perms".format(unique_database)
+
+    def partition_path(partition):
+      return "%s/p=%s" % (table_path, partition)
+
+    def insert_query(partition):
+      return "INSERT INTO {0} PARTITION (p='{1}') VALUES(1)".format(table, partition)
+
+    def load_data(query_fn, partition):
+      path = "tmp/{0}/data_file".format(unique_database)
+      self.hdfs_client.delete_file_dir(path)
+      self.hdfs_client.create_file(path, "1")
+      q = "LOAD DATA INPATH '/{0}' INTO TABLE {1} PARTITION (p='{2}')".format(
+          path, table, partition)
+      return query_fn(self.client, q)
+
+    insert_dynamic_partition = \
+        "INSERT INTO {0} (col, p) SELECT col, p from {0}".format(table)
+
+    insert_dynamic_partition_2 = \
+        "INSERT INTO {0} PARTITION(p) SELECT col, p from {0}".format(table)
+
+    # TODO(todd): REFRESH does not seem to refresh the permissions of existing
+    # partitions -- need to fully reload the metadata to do so.
+    invalidate_query = "INVALIDATE METADATA {0}".format(table)
+
+    self.execute_query_expect_success(self.client,
+                                      "DROP TABLE IF EXISTS {0}".format(table))
+    self.execute_query_expect_success(
+        self.client, "CREATE TABLE {0} (col int) PARTITIONED BY (p string)".format(table))
+
+    # Check that a simple insert works
+    self.execute_query_expect_success(self.client, insert_query("initial_part"))
+
+    # Add a partition with no write permissions
+    self.execute_query_expect_success(
+        self.client,
+        "ALTER TABLE {0} ADD PARTITION (p=\"no_write\")".format(table))
+    self.hdfs_client.chown(partition_path("no_write"), "another_user", "another_group")
+    self.execute_query_expect_success(self.client, invalidate_query)
+
+    # Check that inserts into the new partition do not work.
+    err = self.execute_query_expect_failure(self.client, insert_query("no_write"))
+    assert re.search(r'Impala does not have WRITE access.*p=no_write', str(err))
+
+    err = load_data(self.execute_query_expect_failure, "no_write")
+    assert re.search(r'Impala does not have WRITE access.*p=no_write', str(err))
+
+    # Inserts into the existing partition should still work
+    self.execute_query_expect_success(self.client, insert_query("initial_part"))
+    load_data(self.execute_query_expect_success, "initial_part")
+
+    # Inserts into newly created partitions should work.
+    self.execute_query_expect_success(self.client, insert_query("added_part"))
+
+    # TODO(IMPALA-7313): loading data cannot currently add partitions, so this
+    # is commented out. If that behavior is changed, uncomment this.
+    # load_data(self.execute_query_expect_success, "added_part_load")
+
+    # Inserts into dynamic partitions should fail.
+    err = self.execute_query_expect_failure(self.client, insert_dynamic_partition)
+    assert re.search(r'Impala does not have WRITE access.*p=no_write', str(err))
+    err = self.execute_query_expect_failure(self.client, insert_dynamic_partition_2)
+    assert re.search(r'Impala does not have WRITE access.*p=no_write', str(err))
+
+    # If we make the top-level table directory read-only, we should still be able to
+    # insert into existing writable partitions.
+    self.hdfs_client.chown(table_path, "another_user", "another_group")
+    self.execute_query_expect_success(self.client, insert_query("added_part"))
+    load_data(self.execute_query_expect_success, "added_part")
+
+  @SkipIfS3.hdfs_acls
+  @SkipIfADLS.hdfs_acls
+  @SkipIfIsilon.hdfs_acls
+  def test_readonly_table_dir(self, unique_database):
+    """
+    Test that, if a partitioned table has a read-only base directory,
+    the frontend rejects queries that may attempt to create new
+    partitions.
+    """
+    table = "`{0}`.`insert_partition_perms`".format(unique_database)
+    table_path = "test-warehouse/{0}.db/insert_partition_perms".format(unique_database)
+    insert_dynamic_partition = \
+        "INSERT INTO {0} (col, p) SELECT col, p from {0}".format(table)
+
+    def insert_query(partition):
+      return "INSERT INTO {0} PARTITION (p='{1}') VALUES(1)".format(table, partition)
+
+    self.execute_query_expect_success(self.client,
+                                      "DROP TABLE IF EXISTS {0}".format(table))
+    self.execute_query_expect_success(
+        self.client, "CREATE TABLE {0} (col int) PARTITIONED BY (p string)".format(table))
+
+    # If we make the top-level table directory read-only, we should not be able
+    # to create new partitions, either explicitly, or dynamically.
+    self.hdfs_client.chown(table_path, "another_user", "another_group")
+    self.execute_query_expect_success(self.client, "INVALIDATE METADATA %s" % table)
+    err = self.execute_query_expect_failure(self.client, insert_dynamic_partition)
+    assert re.search(r'Impala does not have WRITE access.*' + table_path, str(err))
+    err = self.execute_query_expect_failure(self.client, insert_query("some_new_part"))
+    assert re.search(r'Impala does not have WRITE access.*' + table_path, str(err))
 
   @SkipIfS3.hdfs_acls
   @SkipIfADLS.hdfs_acls

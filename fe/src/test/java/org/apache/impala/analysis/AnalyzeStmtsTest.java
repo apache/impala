@@ -3200,8 +3200,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("insert into functional_seq.alltypes partition(year, month)" +
         "select * from functional.alltypes",
         "Unable to INSERT into target table (functional_seq.alltypes) because Impala " +
-        "does not have WRITE access to at least one HDFS path: " +
-        "hdfs://localhost:20500/test-warehouse/alltypes_seq/year=2009/month=");
+        "does not have WRITE access to HDFS location: " +
+        "hdfs://localhost:20500/test-warehouse/alltypes_seq");
 
     // Insert with a correlated inline view.
     AnalyzesOk("insert into table functional.alltypessmall " +

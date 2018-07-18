@@ -623,32 +623,26 @@ public class HdfsTable extends Table implements FeFsTable {
 
   List<FieldSchema> getNonPartitionFieldSchemas() { return nonPartFieldSchemas_; }
 
-  // True if Impala has HDFS write permissions on the hdfsBaseDir (for an unpartitioned
-  // table) or if Impala has write permissions on all partition directories (for
-  // a partitioned table).
+  // True if Impala has HDFS write permissions on the hdfsBaseDir
   @Override
-  public boolean hasWriteAccess() {
+  public boolean hasWriteAccessToBaseDir() {
     return TAccessLevelUtil.impliesWriteAccess(accessLevel_);
   }
 
   /**
    * Returns the first location (HDFS path) that Impala does not have WRITE access
    * to, or an null if none is found. For an unpartitioned table, this just
-   * checks the hdfsBaseDir. For a partitioned table it checks all partition directories.
+   * checks the hdfsBaseDir. For a partitioned table it checks the base directory
+   * as well as all partition directories.
    */
   @Override
   public String getFirstLocationWithoutWriteAccess() {
-    if (getMetaStoreTable() == null) return null;
-
-    if (getMetaStoreTable().getPartitionKeysSize() == 0) {
-      if (!TAccessLevelUtil.impliesWriteAccess(accessLevel_)) {
-        return hdfsBaseDir_;
-      }
-    } else {
-      for (HdfsPartition partition: partitionMap_.values()) {
-        if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
-          return partition.getLocation();
-        }
+    if (!hasWriteAccessToBaseDir()) {
+      return hdfsBaseDir_;
+    }
+    for (HdfsPartition partition: partitionMap_.values()) {
+      if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
+        return partition.getLocation();
       }
     }
     return null;
@@ -666,6 +660,8 @@ public class HdfsTable extends Table implements FeFsTable {
       List<PartitionKeyValue> partitionSpec) {
     List<TPartitionKeyValue> partitionKeyValues = Lists.newArrayList();
     for (PartitionKeyValue kv: partitionSpec) {
+      Preconditions.checkArgument(kv.isStatic(), "unexpected dynamic partition: %s",
+          kv);
       String value = PartitionKeyValue.getPartitionKeyValueString(
           kv.getLiteralValue(), table.getNullPartitionKeyValue());
       partitionKeyValues.add(new TPartitionKeyValue(kv.getColName(), value));
@@ -770,19 +766,20 @@ public class HdfsTable extends Table implements FeFsTable {
     // partitions.
     HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
 
+    Path tblLocation = FileSystemUtil.createFullyQualifiedPath(getHdfsBaseDirPath());
+    FileSystem fs = tblLocation.getFileSystem(CONF);
+    accessLevel_ = getAvailableAccessLevel(fs, tblLocation);
+
     if (msTbl.getPartitionKeysSize() == 0) {
       Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
       // This table has no partition key, which means it has no declared partitions.
       // We model partitions slightly differently to Hive - every file must exist in a
       // partition, so add a single partition with no keys which will get all the
       // files in the table's root directory.
-      Path tblLocation = FileSystemUtil.createFullyQualifiedPath(getHdfsBaseDirPath());
       HdfsPartition part = createPartition(msTbl.getSd(), null);
       partsByPath.put(tblLocation, Lists.newArrayList(part));
       if (isMarkedCached_) part.markCached();
       addPartition(part);
-      FileSystem fs = tblLocation.getFileSystem(CONF);
-      accessLevel_ = getAvailableAccessLevel(fs, tblLocation);
     } else {
       for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
         HdfsPartition partition = createPartition(msPartition.getSd(), msPartition);
@@ -1275,11 +1272,9 @@ public class HdfsTable extends Table implements FeFsTable {
     Preconditions.checkNotNull(msTbl);
     hdfsBaseDir_ = msTbl.getSd().getLocation();
     isMarkedCached_ = HdfsCachingUtil.validateCacheParams(msTbl.getParameters());
-    if (msTbl.getPartitionKeysSize() == 0) {
-      Path location = new Path(hdfsBaseDir_);
-      FileSystem fs = location.getFileSystem(CONF);
-      accessLevel_ = getAvailableAccessLevel(fs, location);
-    }
+    Path location = new Path(hdfsBaseDir_);
+    FileSystem fs = location.getFileSystem(CONF);
+    accessLevel_ = getAvailableAccessLevel(fs, location);
     setMetaStoreTable(msTbl);
   }
 

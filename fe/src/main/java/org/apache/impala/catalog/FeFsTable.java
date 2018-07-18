@@ -28,7 +28,9 @@ import java.util.TreeMap;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumn;
@@ -39,6 +41,7 @@ import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.ListMap;
+import org.apache.impala.util.TAccessLevelUtil;
 import org.apache.impala.util.TResultRowBuilder;
 
 import com.google.common.base.Preconditions;
@@ -111,9 +114,11 @@ public interface FeFsTable extends FeTable {
   public Set<HdfsFileFormat> getFileFormats();
 
   /**
-   * Return true if the table may be written to.
+   * Return true if the table's base directory may be written to, in order to
+   * create new partitions, or insert into the default partition in the case of
+   * an unpartitioned table.
    */
-  public boolean hasWriteAccess();
+  public boolean hasWriteAccessToBaseDir();
 
   /**
    * Return some location found without write access for this table, useful
@@ -422,6 +427,52 @@ public interface FeFsTable extends FeTable {
         if (matchFound) return partition;
       }
       return null;
+    }
+
+    /**
+     * Check that the Impala user has write access to the given target table.
+     * If 'partitionKeyValues' is null, the user should have write access to all
+     * partitions (or to the table directory itself in the case of unpartitioned
+     * tables). Otherwise, the user only needs write access to the specific partition.
+     *
+     * @throws AnalysisException if write access is not available
+     */
+    public static void checkWriteAccess(FeFsTable table,
+        List<PartitionKeyValue> partitionKeyValues,
+        String operationType) throws AnalysisException {
+      String noWriteAccessErrorMsg = String.format("Unable to %s into " +
+          "target table (%s) because Impala does not have WRITE access to HDFS " +
+          "location: ", operationType, table.getFullName());
+
+      PrunablePartition existingTargetPartition = null;
+      if (partitionKeyValues != null) {
+        existingTargetPartition = HdfsTable.getPartition(table, partitionKeyValues);
+        // This could be null in the case that we are writing to a specific partition that
+        // has not been created yet.
+      }
+
+      if (existingTargetPartition != null) {
+        FeFsPartition partition = FeCatalogUtils.loadPartition(table,
+            existingTargetPartition.getId());
+        String location = partition.getLocation();
+        if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
+          throw new AnalysisException(noWriteAccessErrorMsg + location);
+        }
+      } else if (partitionKeyValues != null) {
+        // Writing into a table with a specific partition specified which doesn't
+        // exist yet. In this case, we need write access to the top-level
+        // table location in order to create a new partition.
+        if (!table.hasWriteAccessToBaseDir()) {
+          throw new AnalysisException(noWriteAccessErrorMsg + table.getHdfsBaseDir());
+        }
+      } else {
+        // No explicit partition was specified. Need to ensure that write access is
+        // available to all partitions as well as the base dir.
+        String badPath = table.getFirstLocationWithoutWriteAccess();
+        if (badPath != null) {
+          throw new AnalysisException(noWriteAccessErrorMsg + badPath);
+        }
+      }
     }
   }
 }

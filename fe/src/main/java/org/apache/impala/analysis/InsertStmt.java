@@ -378,6 +378,10 @@ public class InsertStmt extends StatementBase {
       }
     }
 
+    // Check that we can write to the target table/partition. This must be
+    // done after the partition expression has been analyzed above.
+    analyzeWriteAccess();
+
     // Populate partitionKeyExprs from partitionKeyValues and selectExprTargetColumns
     prepareExpressions(selectExprTargetColumns, selectListExprs, table_, analyzer);
 
@@ -476,11 +480,6 @@ public class InsertStmt extends StatementBase {
 
     if (table_ instanceof FeFsTable) {
       FeFsTable fsTable = (FeFsTable) table_;
-      if (!fsTable.hasWriteAccess()) {
-        throw new AnalysisException(String.format("Unable to INSERT into target table " +
-            "(%s) because Impala does not have WRITE access to at least one HDFS path" +
-            ": %s", targetTableName_, fsTable.getFirstLocationWithoutWriteAccess()));
-      }
       StringBuilder error = new StringBuilder();
       fsTable.parseSkipHeaderLineCount(error);
       if (error.length() > 0) throw new AnalysisException(error.toString());
@@ -521,6 +520,25 @@ public class InsertStmt extends StatementBase {
     if (isHBaseTable && overwrite_) {
       throw new AnalysisException("HBase doesn't have a way to perform INSERT OVERWRITE");
     }
+  }
+
+  private void analyzeWriteAccess() throws AnalysisException {
+    if (!(table_ instanceof FeFsTable)) return;
+    FeFsTable fsTable = (FeFsTable) table_;
+
+    FeFsTable.Utils.checkWriteAccess(fsTable,
+        hasStaticPartitionTarget() ? partitionKeyValues_ : null, "INSERT");
+  }
+
+  private boolean hasStaticPartitionTarget() {
+    if (partitionKeyValues_ == null) return false;
+
+    // If the partition target is fully static, then check for write access against
+    // the specific partition. Otherwise, check the whole table.
+    for (PartitionKeyValue pkv : partitionKeyValues_) {
+      if (pkv.isDynamic()) return false;
+    }
+    return true;
   }
 
   /**

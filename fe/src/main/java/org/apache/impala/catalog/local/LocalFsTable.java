@@ -249,7 +249,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   }
 
   @Override
-  public boolean hasWriteAccess() {
+  public boolean hasWriteAccessToBaseDir() {
     // TODO(todd): implement me properly
     return true;
   }
