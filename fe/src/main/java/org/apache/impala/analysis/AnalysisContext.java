@@ -564,7 +564,9 @@ public class AnalysisContext {
     // These checks don't result in an AuthorizationException but set the
     // 'user_has_profile_access' flag in queryCtx_.
     for (Pair<PrivilegeRequest, String> maskedReq: analyzer.getMaskedPrivilegeReqs()) {
-      if (!authzChecker.hasAccess(analyzer.getUser(), maskedReq.first)) {
+      try {
+        authorizePrivilegeRequest(authzChecker, maskedReq.first);
+      } catch (AuthorizationException e) {
         analysisResult_.setUserHasProfileAccess(false);
         if (!Strings.isNullOrEmpty(maskedReq.second)) {
           throw new AuthorizationException(maskedReq.second);

@@ -993,6 +993,30 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     // Show create view on non-existent table.
     authorize("show create view functional.notbl").error(accessError("functional.notbl"));
 
+    // IMPALA-7325: show create view that references built-in function(s) should not
+    // require access to the _impala_builtins database this is because reading metadata
+    // in system database should always be allowed.
+    addTestView(authzCatalog_, "create view functional.test_view as " +
+        "select count(*) from functional.alltypes");
+    test = authorize("show create view functional.test_view");
+    for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
+      test.ok(onServer(privilege, TPrivilegeLevel.SELECT))
+          .ok(onDatabase("functional", privilege, TPrivilegeLevel.SELECT))
+          .ok(onTable("functional", "test_view", privilege),
+              onTable("functional", "alltypes", privilege, TPrivilegeLevel.SELECT));
+    }
+    test.error(accessError("functional.test_view"))
+        .error(accessError("functional.test_view"), onServer(
+            allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.test_view"), onDatabase("functional",
+            allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.test_view"), onTable("functional", "test_view",
+            allExcept(viewMetadataPrivileges())), onTable("functional", "alltypes",
+                TPrivilegeLevel.SELECT))
+        .error(viewDefError("functional.test_view"), onTable("functional", "test_view",
+            TPrivilegeLevel.SELECT), onTable("functional", "alltypes", allExcept(
+                viewMetadataPrivileges())));
+
     // Show create function.
     ScalarFunction fn = addFunction("functional", "f");
     try {
@@ -2215,6 +2239,11 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
   private static String systemDbError() {
     return "Cannot modify system database.";
+  }
+
+  private static String viewDefError(String object) {
+    return "User '%s' does not have privileges to see the definition of view '" +
+        object + "'.";
   }
 
   private static String createFunctionError(String object) {

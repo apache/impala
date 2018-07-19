@@ -211,8 +211,17 @@ public class FrontendTestBase {
    * Returns the new view.
    */
   protected Table addTestView(String createViewSql) {
+    return addTestView(catalog_, createViewSql);
+  }
+
+  /**
+   * Adds a test-local view to the specified catalog based on the given CREATE VIEW sql.
+   * The test views are registered in testTables_ and removed in the @After method.
+   * Returns the new view.
+   */
+  protected Table addTestView(Catalog catalog, String createViewSql) {
     CreateViewStmt createViewStmt = (CreateViewStmt) AnalyzesOk(createViewSql);
-    Db db = catalog_.getDb(createViewStmt.getDb());
+    Db db = catalog.getDb(createViewStmt.getDb());
     Preconditions.checkNotNull(db, "Test views must be created in an existing db.");
     // Do not analyze the stmt to avoid applying rewrites that would alter the view
     // definition. We want to model real views as closely as possible.
