@@ -1366,18 +1366,24 @@ public class HdfsScanNode extends ScanNode {
       columnReservations = computeMinColumnMemReservations();
     }
 
-    int perHostScanRanges;
-    HdfsFileFormat majorityFormat = FeCatalogUtils.getMajorityFormat(partitions_);
-    if (majorityFormat == HdfsFileFormat.PARQUET
-        || majorityFormat == HdfsFileFormat.ORC) {
-      Preconditions.checkNotNull(columnReservations);
-      // For the purpose of this estimation, the number of per-host scan ranges for
-      // Parquet/ORC files are equal to the number of columns read from the file. I.e.
-      // excluding partition columns and columns that are populated from file metadata.
-      perHostScanRanges = columnReservations.size();
-    } else {
-      perHostScanRanges = (int) Math.ceil(
-          ((double) scanRangeSize / (double) numNodes_) * SCAN_RANGE_SKEW_FACTOR);
+    int perHostScanRanges = 0;
+    for (HdfsFileFormat format : fileFormats_) {
+      int partitionScanRange = 0;
+      if ((format == HdfsFileFormat.PARQUET) || (format == HdfsFileFormat.ORC)) {
+        Preconditions.checkNotNull(columnReservations);
+        // For the purpose of this estimation, the number of per-host scan ranges for
+        // Parquet/ORC files are equal to the number of columns read from the file. I.e.
+        // excluding partition columns and columns that are populated from file metadata.
+        partitionScanRange = columnReservations.size();
+      } else {
+        partitionScanRange = (int) Math.ceil(
+            ((double) scanRangeSize / (double) numNodes_) * SCAN_RANGE_SKEW_FACTOR);
+      }
+      // From the resource management purview, we want to conservatively estimate memory
+      // consumption based on the partition with the highest memory requirements.
+      if (partitionScanRange > perHostScanRanges) {
+        perHostScanRanges = partitionScanRange;
+      }
     }
 
     // The non-MT scan node requires at least one scanner thread.

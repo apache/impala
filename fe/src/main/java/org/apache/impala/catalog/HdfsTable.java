@@ -1808,14 +1808,14 @@ public class HdfsTable extends Table implements FeFsTable {
   public ListMap<TNetworkAddress> getHostIndex() { return hostIndex_; }
 
   /**
-   * Returns the file format that the majority of partitions are stored in.
+   * Returns the set of file formats that the partitions are stored in.
    */
-  public HdfsFileFormat getMajorityFormat() {
+  public Set<HdfsFileFormat> getFileFormats() {
     // In the case that we have no partitions added to the table yet, it's
     // important to add the "prototype" partition as a fallback.
     Iterable<HdfsPartition> partitionsToConsider = Iterables.concat(
         partitionMap_.values(), Collections.singleton(prototypePartition_));
-    return FeCatalogUtils.getMajorityFormat(partitionsToConsider);
+    return FeCatalogUtils.getFileFormats(partitionsToConsider);
   }
 
   /**

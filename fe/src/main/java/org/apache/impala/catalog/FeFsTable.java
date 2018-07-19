@@ -95,12 +95,11 @@ public interface FeFsTable extends FeTable {
   boolean isAvroTable();
 
   /**
-   * @return the format that the majority of partitions in this table use
-   *
-   * TODO(todd): this API needs to be removed, since it depends on loading all
-   * partitions even when scanning few.
+   * @return the set of file formats that the partitions in this table use.
+   * This API is only used by the TableSink to write out partitions. It
+   * should not be used for scanning.
    */
-  public HdfsFileFormat getMajorityFormat();
+  public Set<HdfsFileFormat> getFileFormats();
 
   /**
    * Return true if the table may be written to.

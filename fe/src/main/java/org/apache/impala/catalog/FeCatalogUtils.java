@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
@@ -45,6 +46,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * Static utility functions shared between FeCatalog implementations.
@@ -294,32 +296,15 @@ public abstract class FeCatalogUtils {
   }
 
   /**
-   * Return the most commonly-used file format within a set of partitions.
+   * Return the set of all file formats used in the collection of partitions.
    */
-  public static HdfsFileFormat getMajorityFormat(
+  public static Set<HdfsFileFormat> getFileFormats(
       Iterable<? extends FeFsPartition> partitions) {
-    Map<HdfsFileFormat, Integer> numPartitionsByFormat = Maps.newTreeMap();
-    for (FeFsPartition partition: partitions) {
-      HdfsFileFormat format = partition.getInputFormatDescriptor().getFileFormat();
-      Integer numPartitions = numPartitionsByFormat.get(format);
-      if (numPartitions == null) {
-        numPartitions = Integer.valueOf(1);
-      } else {
-        numPartitions = Integer.valueOf(numPartitions.intValue() + 1);
-      }
-      numPartitionsByFormat.put(format, numPartitions);
+    Set<HdfsFileFormat> fileFormats = Sets.newHashSet();
+    for (FeFsPartition partition : partitions) {
+      fileFormats.add(partition.getFileFormat());
     }
-
-    int maxNumPartitions = Integer.MIN_VALUE;
-    HdfsFileFormat majorityFormat = null;
-    for (Map.Entry<HdfsFileFormat, Integer> entry: numPartitionsByFormat.entrySet()) {
-      if (entry.getValue().intValue() > maxNumPartitions) {
-        majorityFormat = entry.getKey();
-        maxNumPartitions = entry.getValue().intValue();
-      }
-    }
-    Preconditions.checkNotNull(majorityFormat);
-    return majorityFormat;
+    return fileFormats;
   }
 
   public static THdfsPartition fsPartitionToThrift(FeFsPartition part,

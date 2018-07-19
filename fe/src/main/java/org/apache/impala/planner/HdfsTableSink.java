@@ -18,12 +18,14 @@
 package org.apache.impala.planner;
 
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
@@ -31,8 +33,12 @@ import org.apache.impala.thrift.THdfsTableSink;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTableSinkType;
+
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Sink for inserting into filesystem-backed tables.
@@ -53,6 +59,10 @@ public class HdfsTableSink extends TableSink {
   // be opened, written, and closed one by one.
   protected final boolean inputIsClustered_;
 
+  private static final Set<HdfsFileFormat> SUPPORTED_FILE_FORMATS = ImmutableSet.of(
+      HdfsFileFormat.PARQUET, HdfsFileFormat.TEXT, HdfsFileFormat.LZO_TEXT,
+      HdfsFileFormat.RC_FILE, HdfsFileFormat.SEQUENCE_FILE, HdfsFileFormat.AVRO);
+
   // Stores the indices into the list of non-clustering columns of the target table that
   // are stored in the 'sort.columns' table property. This is sent to the backend to
   // populate the RowGroup::sorting_columns list in parquet files.
@@ -70,9 +80,6 @@ public class HdfsTableSink extends TableSink {
 
   @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
-    FeFsTable table = (FeFsTable) targetTable_;
-    // TODO: Estimate the memory requirements more accurately by partition type.
-    HdfsFileFormat format = table.getMajorityFormat();
     PlanNode inputNode = fragment_.getPlanRoot();
     int numInstances = fragment_.getNumInstances(queryOptions.getMt_dop());
     // Compute the per-instance number of partitions, taking the number of nodes
@@ -82,7 +89,11 @@ public class HdfsTableSink extends TableSink {
     if (numPartitionsPerInstance == -1) {
       numPartitionsPerInstance = DEFAULT_NUM_PARTITIONS;
     }
-    long perPartitionMemReq = getPerPartitionMemReq(format);
+
+    HdfsTable table = (HdfsTable) targetTable_;
+    // TODO: Estimate the memory requirements more accurately by partition type.
+    Set<HdfsFileFormat> formats = table.getFileFormats();
+    long perPartitionMemReq = getPerPartitionMemReq(formats);
 
     long perInstanceMemEstimate;
     // The estimate is based purely on the per-partition mem req if the input cardinality_
@@ -105,28 +116,25 @@ public class HdfsTableSink extends TableSink {
 
   /**
    * Returns the per-partition memory requirement for inserting into the given
-   * file format.
+   * set of file formats.
    */
-  private long getPerPartitionMemReq(HdfsFileFormat format) {
-    switch (format) {
-      case PARQUET:
-        // Writing to a Parquet table requires up to 1GB of buffer per partition.
-        // TODO: The per-partition memory requirement is configurable in the QueryOptions.
-        return 1024L * 1024L * 1024L;
-      case TEXT:
-      case LZO_TEXT:
-        // Very approximate estimate of amount of data buffered.
-        return 100L * 1024L;
-      case RC_FILE:
-      case SEQUENCE_FILE:
-      case AVRO:
-        // Very approximate estimate of amount of data buffered.
-        return 100L * 1024L;
-      default:
-        Preconditions.checkState(false, "Unsupported TableSink format " +
-            format.toString());
+  private long getPerPartitionMemReq(Set<HdfsFileFormat> formats) {
+    Set<HdfsFileFormat> unsupportedFormats =
+        Sets.difference(formats, SUPPORTED_FILE_FORMATS);
+    if (!unsupportedFormats.isEmpty()) {
+      Preconditions.checkState(false,
+          "Unsupported TableSink format(s): " + Joiner.on(',').join(unsupportedFormats));
     }
-    return 0;
+    if (formats.contains(HdfsFileFormat.PARQUET)) {
+      // Writing to a Parquet partition requires up to 1GB of buffer. From a resource
+      // management purview, even if there are non-Parquet partitions, we want to be
+      // conservative and make a high memory estimate.
+      return 1024L * 1024L * 1024L;
+    }
+
+    // For all other supported formats (TEXT, LZO_TEXT, RC_FILE, SEQUENCE_FILE & AVRO)
+    // 100KB is a very approximate estimate of the amount of data buffered.
+    return 100L * 1024L;
   }
 
   @Override
