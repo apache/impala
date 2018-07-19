@@ -42,11 +42,11 @@ import org.apache.hadoop.hive.ql.parse.HiveLexer;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Function;
-import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.KuduColumn;
@@ -240,7 +240,7 @@ public class ToSqlUtils {
     removeHiddenTableProperties(properties, Maps.<String, String>newHashMap());
     ArrayList<String> colsSql = Lists.newArrayList();
     ArrayList<String> partitionColsSql = Lists.newArrayList();
-    boolean isHbaseTable = table instanceof HBaseTable;
+    boolean isHbaseTable = table instanceof FeHBaseTable;
     for (int i = 0; i < table.getColumns().size(); i++) {
       if (!isHbaseTable && i < table.getNumClusteringCols()) {
         partitionColsSql.add(columnToSql(table.getColumns().get(i)));

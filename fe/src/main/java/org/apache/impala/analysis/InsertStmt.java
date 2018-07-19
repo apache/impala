@@ -27,10 +27,10 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
@@ -283,7 +283,7 @@ public class InsertStmt extends StatementBase {
     // Also checks if the target table is missing.
     analyzeTargetTable(analyzer);
 
-    boolean isHBaseTable = (table_ instanceof HBaseTable);
+    boolean isHBaseTable = (table_ instanceof FeHBaseTable);
     int numClusteringCols = isHBaseTable ? 0 : table_.getNumClusteringCols();
 
     // Analysis of the INSERT statement from this point is basically the act of matching
@@ -459,7 +459,7 @@ public class InsertStmt extends StatementBase {
    * - Overwrite is invalid for HBase and Kudu tables
    */
   private void analyzeTableForInsert(Analyzer analyzer) throws AnalysisException {
-    boolean isHBaseTable = (table_ instanceof HBaseTable);
+    boolean isHBaseTable = (table_ instanceof FeHBaseTable);
     int numClusteringCols = isHBaseTable ? 0 : table_.getNumClusteringCols();
 
     if (partitionKeyValues_ != null && numClusteringCols == 0) {
@@ -539,7 +539,7 @@ public class InsertStmt extends StatementBase {
       // exists. So all columns aren't mentioned in the query.
       if (table_ instanceof FeKuduTable) {
         checkRequiredKuduColumns(mentionedColumnNames);
-      } else if (table_ instanceof HBaseTable) {
+      } else if (table_ instanceof FeHBaseTable) {
         checkRequiredHBaseColumns(mentionedColumnNames);
       } else if (table_.getNumClusteringCols() > 0) {
         checkRequiredPartitionedColumns(mentionedColumnNames);
@@ -605,7 +605,7 @@ public class InsertStmt extends StatementBase {
    */
   private void checkRequiredHBaseColumns(Set<String> mentionedColumnNames)
       throws AnalysisException {
-    Preconditions.checkState(table_ instanceof HBaseTable);
+    Preconditions.checkState(table_ instanceof FeHBaseTable);
     Column column = table_.getColumns().get(0);
     if (!mentionedColumnNames.contains(column.getName())) {
       throw new AnalysisException("Row-key column '" + column.getName() +
@@ -660,7 +660,8 @@ public class InsertStmt extends StatementBase {
     List<Expr> tmpPartitionKeyExprs = new ArrayList<Expr>();
     List<String> tmpPartitionKeyNames = new ArrayList<String>();
 
-    int numClusteringCols = (tbl instanceof HBaseTable) ? 0 : tbl.getNumClusteringCols();
+    int numClusteringCols = (tbl instanceof FeHBaseTable) ? 0
+        : tbl.getNumClusteringCols();
     boolean isKuduTable = table_ instanceof FeKuduTable;
     Set<String> kuduPartitionColumnNames = null;
     if (isKuduTable) {
@@ -809,7 +810,7 @@ public class InsertStmt extends StatementBase {
 
   private void analyzePlanHints(Analyzer analyzer) throws AnalysisException {
     if (planHints_.isEmpty()) return;
-    if (table_ instanceof HBaseTable) {
+    if (table_ instanceof FeHBaseTable) {
       throw new AnalysisException(String.format("INSERT hints are only supported for " +
           "inserting into Hdfs and Kudu tables: %s", getTargetTableName()));
     }

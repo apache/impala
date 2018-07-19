@@ -30,8 +30,8 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
@@ -217,7 +217,8 @@ public class ComputeStatsStmt extends StatementBase {
     // For Hdfs tables, exclude partition columns from stats gathering because Hive
     // cannot store them as part of the non-partition column stats. For HBase tables,
     // include the single clustering column (the row key).
-    int startColIdx = (table_ instanceof HBaseTable) ? 0 : table_.getNumClusteringCols();
+    int startColIdx = (table_ instanceof FeHBaseTable) ? 0 :
+        table_.getNumClusteringCols();
 
     for (int i = startColIdx; i < table_.getColumns().size(); ++i) {
       Column c = table_.getColumns().get(i);

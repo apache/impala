@@ -23,9 +23,9 @@ import java.util.Set;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableAddReplaceColsParams;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -75,7 +75,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     FeTable t = getTargetTable();
     // TODO: Support column-level DDL on HBase tables. Requires updating the column
     // mappings along with the table columns.
-    if (t instanceof HBaseTable) {
+    if (t instanceof FeHBaseTable) {
       throw new AnalysisException("ALTER TABLE ADD|REPLACE COLUMNS not currently " +
           "supported on HBase tables.");
     }

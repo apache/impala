@@ -20,9 +20,9 @@ package org.apache.impala.analysis;
 import java.util.Map;
 
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableAlterColParams;
@@ -101,7 +101,7 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     FeTable t = getTargetTable();
-    if (t instanceof HBaseTable) {
+    if (t instanceof FeHBaseTable) {
       throw new AnalysisException(
           "ALTER TABLE CHANGE/ALTER COLUMN not currently supported on HBase tables.");
     }

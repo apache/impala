@@ -211,4 +211,32 @@ public class LocalCatalogTest {
         "STORED AS KUDU\n" +
         "TBLPROPERTIES"));
   }
+
+  @Test
+  public void testHbaseTable() throws Exception {
+    LocalHbaseTable t = (LocalHbaseTable) catalog_.getTable("functional_hbase",
+        "alltypes");
+    Assert.assertThat(ToSqlUtils.getCreateTableSql(t), CoreMatchers.startsWith(
+        "CREATE EXTERNAL TABLE functional_hbase.alltypes (\n" +
+        "  id INT COMMENT 'Add a comment',\n" +
+        "  bigint_col BIGINT,\n" +
+        "  bool_col BOOLEAN,\n" +
+        "  date_string_col STRING,\n" +
+        "  double_col DOUBLE,\n" +
+        "  float_col FLOAT,\n" +
+        "  int_col INT,\n" +
+        "  month INT,\n" +
+        "  smallint_col SMALLINT,\n" +
+        "  string_col STRING,\n" +
+        "  timestamp_col TIMESTAMP,\n" +
+        "  tinyint_col TINYINT,\n" +
+        "  year INT\n" +
+        ")\n" +
+        "STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'\n" +
+        "WITH SERDEPROPERTIES ('hbase.columns.mapping'=':key,d:bool_col,d:tinyint_col," +
+        "d:smallint_col,d:int_col,d:bigint_col,d:float_col,d:double_col," +
+        "d:date_string_col,d:string_col,d:timestamp_col,d:year,d:month', " +
+        "'serialization.format'='1')"
+    ));
+  }
 }

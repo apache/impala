@@ -81,10 +81,10 @@ import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
-import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -106,7 +106,6 @@ import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TCommentOnParams;
 import org.apache.impala.thrift.TCreateDropRoleParams;
 import org.apache.impala.thrift.TDdlExecRequest;
-import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
@@ -746,8 +745,8 @@ public class Frontend {
     FeTable table = getCatalog().getTable(dbName, tableName);
     if (table instanceof FeFsTable) {
       return ((FeFsTable) table).getTableStats();
-    } else if (table instanceof HBaseTable) {
-      return ((HBaseTable) table).getTableStats();
+    } else if (table instanceof FeHBaseTable) {
+      return ((FeHBaseTable) table).getTableStats();
     } else if (table instanceof FeDataSourceTable) {
       return ((FeDataSourceTable) table).getTableStats();
     } else if (table instanceof FeKuduTable) {

@@ -21,10 +21,9 @@ import java.util.List;
 
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
-import org.apache.impala.catalog.HBaseTable;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.thrift.TSinkAction;
 
 import com.google.common.base.Preconditions;
@@ -104,7 +103,7 @@ public abstract class TableSink extends DataSink {
       Preconditions.checkState(referencedColumns.isEmpty());
       return new HdfsTableSink(table, partitionKeyExprs, overwrite, inputIsClustered,
           sortColumns);
-    } else if (table instanceof HBaseTable) {
+    } else if (table instanceof FeHBaseTable) {
       // HBase only supports inserts.
       Preconditions.checkState(sinkAction == Op.INSERT);
       // Partition clause doesn't make sense for an HBase table.
