@@ -175,9 +175,13 @@ Status GroupingAggregator::Prepare(RuntimeState* state) {
       MAX_PARTITION_DEPTH, 1, expr_perm_pool_.get(), expr_results_pool_.get(),
       expr_results_pool_.get(), &ht_ctx_));
 
-  reservation_manager_.Init(
-      Substitute("GroupingAggregator id=$0 ptr=$1", id_, this), runtime_profile_,
-      mem_tracker_.get(), resource_profile_, debug_options_);
+  reservation_tracker_.reset(new ReservationTracker);
+  reservation_tracker_->InitChildTracker(runtime_profile_,
+      state->instance_buffer_reservation(), exec_node_->mem_tracker(),
+      numeric_limits<int64_t>::max());
+  reservation_manager_.Init(Substitute("GroupingAggregator id=$0 ptr=$1", id_, this),
+      runtime_profile_, reservation_tracker_.get(), mem_tracker_.get(),
+      resource_profile_, debug_options_);
   return Status::OK();
 }
 
@@ -400,6 +404,7 @@ void GroupingAggregator::Close(RuntimeState* state) {
   ScalarExpr::Close(build_exprs_);
 
   reservation_manager_.Close(state);
+  if (reservation_tracker_ != nullptr) reservation_tracker_->Close();
   // Must be called after tuple_pool_ is freed, so that mem_tracker_ can be closed.
   Aggregator::Close(state);
 }

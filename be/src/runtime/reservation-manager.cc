@@ -29,10 +29,11 @@ using strings::Substitute;
 namespace impala {
 
 void ReservationManager::Init(string name, RuntimeProfile* runtime_profile,
-    MemTracker* mem_tracker, const TBackendResourceProfile& resource_profile,
-    const TDebugOptions& debug_options) {
+    ReservationTracker* parent_reservation, MemTracker* mem_tracker,
+    const TBackendResourceProfile& resource_profile, const TDebugOptions& debug_options) {
   name_ = name;
   runtime_profile_ = runtime_profile;
+  parent_reservation_ = parent_reservation;
   mem_tracker_ = mem_tracker;
   resource_profile_ = resource_profile;
   debug_options_ = debug_options;
@@ -60,8 +61,8 @@ Status ReservationManager::ClaimBufferReservation(RuntimeState* state) {
   }
 
   RETURN_IF_ERROR(buffer_pool->RegisterClient(name_, state->query_state()->file_group(),
-      state->instance_buffer_reservation(), mem_tracker_,
-      resource_profile_.max_reservation, runtime_profile_, &buffer_pool_client_));
+      parent_reservation_, mem_tracker_, resource_profile_.max_reservation,
+      runtime_profile_, &buffer_pool_client_));
   VLOG_FILE << name_ << " claiming reservation " << resource_profile_.min_reservation;
   state->query_state()->initial_reservations()->Claim(
       &buffer_pool_client_, resource_profile_.min_reservation);

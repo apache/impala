@@ -93,6 +93,7 @@ class Aggregator {
  protected:
   /// The id of the ExecNode this Aggregator corresponds to.
   int id_;
+  ExecNode* exec_node_;
   ObjectPool* pool_;
 
   /// Account for peak memory used by this aggregator.

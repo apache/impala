@@ -126,7 +126,8 @@ Status ExecNode::Prepare(RuntimeState* state) {
   }
   reservation_manager_.Init(
       Substitute("$0 id=$1 ptr=$2", PrintThriftEnum(type_), id_, this), runtime_profile_,
-      mem_tracker_.get(), resource_profile_, debug_options_);
+      state->instance_buffer_reservation(), mem_tracker_.get(), resource_profile_,
+      debug_options_);
   return Status::OK();
 }
 

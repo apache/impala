@@ -46,6 +46,7 @@ const char* Aggregator::LLVM_CLASS_NAME = "class.impala::Aggregator";
 Aggregator::Aggregator(ExecNode* exec_node, ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs, const std::string& name)
   : id_(exec_node->id()),
+    exec_node_(exec_node),
     pool_(pool),
     intermediate_tuple_id_(tnode.agg_node.intermediate_tuple_id),
     intermediate_tuple_desc_(descs.GetTupleDescriptor(intermediate_tuple_id_)),
@@ -82,7 +83,7 @@ Status Aggregator::Init(const TPlanNode& tnode, RuntimeState* state) {
 
 Status Aggregator::Prepare(RuntimeState* state) {
   mem_tracker_.reset(new MemTracker(
-      runtime_profile_, -1, runtime_profile_->name(), state->instance_mem_tracker()));
+      runtime_profile_, -1, runtime_profile_->name(), exec_node_->mem_tracker()));
   expr_mem_tracker_.reset(new MemTracker(-1, "Exprs", mem_tracker_.get(), false));
   expr_perm_pool_.reset(new MemPool(expr_mem_tracker_.get()));
   expr_results_pool_.reset(new MemPool(expr_mem_tracker_.get()));
