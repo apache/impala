@@ -283,11 +283,21 @@ public class FsPermissionChecker {
   public Permissions getPermissions(FileSystem fs, Path path) throws IOException {
     Preconditions.checkNotNull(fs);
     Preconditions.checkNotNull(path);
+    return getPermissions(fs, fs.getFileStatus(path));
+  }
+
+  /**
+   * Returns a Permissions object for the given FileStatus object. In the common
+   * case that ACLs are not in use, this does not require any additional round-trip
+   * to the FileSystem. This allows batch construction using APIs like
+   * FileSystem.listStatus(...).
+   */
+  public Permissions getPermissions(FileSystem fs, FileStatus fileStatus)
+      throws IOException {
     AclStatus aclStatus = null;
-    FileStatus fileStatus = fs.getFileStatus(path);
     if (fileStatus.getPermission().getAclBit()) {
       try {
-        aclStatus = fs.getAclStatus(path);
+        aclStatus = fs.getAclStatus(fileStatus.getPath());
       } catch (AclException ex) {
         if (LOG.isTraceEnabled()) {
           LOG.trace(

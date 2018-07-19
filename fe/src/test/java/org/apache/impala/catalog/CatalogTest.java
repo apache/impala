@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -30,14 +31,20 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.GlobalStorageStatistics;
+import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.hdfs.DFSOpsCountStatistics;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.common.Reference;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TTableName;
 import org.junit.Test;
 
 import com.google.common.base.Strings;
@@ -282,6 +289,51 @@ public class CatalogTest {
     assertEquals(catalog_.getOrLoadTable("functional", "alltypes"),
         catalog_.getOrLoadTable("functional", "AllTypes"));
   }
+
+  /**
+   * Regression test for IMPALA-7320: we should use batch APIs to fetch
+   * file permissions for partitions.
+   */
+  @Test
+  public void testNumberOfGetFileStatusCalls() throws CatalogException, IOException {
+    // Reset the filesystem statistics and load the table, ensuring that it's
+    // loaded fresh by invalidating it first.
+    GlobalStorageStatistics stats = FileSystem.getGlobalStorageStatistics();
+    stats.reset();
+    catalog_.invalidateTable(new TTableName("functional", "alltypes"),
+        /*tblWasRemoved=*/new Reference<Boolean>(),
+        /*dbWasAdded=*/new Reference<Boolean>());
+
+    HdfsTable table = (HdfsTable)catalog_.getOrLoadTable("functional", "AllTypes");
+    StorageStatistics opsCounts = stats.get(DFSOpsCountStatistics.NAME);
+
+    // We expect:
+    // - one listLocatedStatus() per partition, to get the file info
+    // - one listStatus() for the month=2010/ dir
+    // - one listStatus() for the month=2009/ dir
+    long expectedCalls = table.getPartitionIds().size() + 2;
+    // Due to HDFS-13747, the listStatus calls are incorrectly accounted as
+    // op_list_located_status. So, we'll just add up the two to make our
+    // assertion resilient to this bug.
+    long seenCalls = opsCounts.getLong("op_list_located_status") +
+        opsCounts.getLong("op_list_status");
+    assertEquals(expectedCalls, seenCalls);
+
+    // We expect only one getFileStatus call, for the top-level directory.
+    assertEquals(1L, (long)opsCounts.getLong("op_get_file_status"));
+
+    // Now test REFRESH on the table...
+    stats.reset();
+    catalog_.reloadTable(table);
+
+    // Again, we expect only one getFileStatus call, for the top-level directory.
+    assertEquals(1L, (long)opsCounts.getLong("op_get_file_status"));
+    // REFRESH calls listStatus on each of the partitions, but doesn't re-check
+    // the permissions of the partition directories themselves.
+    assertEquals(table.getPartitionIds().size(),
+        (long)opsCounts.getLong("op_list_status"));
+  }
+
 
   @Test
   public void TestPartitions() throws CatalogException {

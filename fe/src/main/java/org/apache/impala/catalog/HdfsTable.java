@@ -78,6 +78,7 @@ import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.AvroSchemaConverter;
 import org.apache.impala.util.AvroSchemaUtils;
+import org.apache.impala.util.FsPermissionCache;
 import org.apache.impala.util.FsPermissionChecker;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.ListMap;
@@ -92,10 +93,12 @@ import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multiset;
 import com.google.common.collect.Sets;
 
 /**
@@ -765,10 +768,10 @@ public class HdfsTable extends Table implements FeFsTable {
     // using createPartition() calls. A single partition path can correspond to multiple
     // partitions.
     HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
+    FsPermissionCache permCache = preloadPermissionsCache(msPartitions);
 
     Path tblLocation = FileSystemUtil.createFullyQualifiedPath(getHdfsBaseDirPath());
-    FileSystem fs = tblLocation.getFileSystem(CONF);
-    accessLevel_ = getAvailableAccessLevel(fs, tblLocation);
+    accessLevel_ = getAvailableAccessLevel(getFullName(), tblLocation, permCache);
 
     if (msTbl.getPartitionKeysSize() == 0) {
       Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
@@ -776,13 +779,14 @@ public class HdfsTable extends Table implements FeFsTable {
       // We model partitions slightly differently to Hive - every file must exist in a
       // partition, so add a single partition with no keys which will get all the
       // files in the table's root directory.
-      HdfsPartition part = createPartition(msTbl.getSd(), null);
+      HdfsPartition part = createPartition(msTbl.getSd(), null, permCache);
       partsByPath.put(tblLocation, Lists.newArrayList(part));
       if (isMarkedCached_) part.markCached();
       addPartition(part);
     } else {
       for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
-        HdfsPartition partition = createPartition(msPartition.getSd(), msPartition);
+        HdfsPartition partition = createPartition(msPartition.getSd(), msPartition,
+            permCache);
         addPartition(partition);
         // If the partition is null, its HDFS path does not exist, and it was not added
         // to this table's partition list. Skip the partition.
@@ -799,26 +803,6 @@ public class HdfsTable extends Table implements FeFsTable {
     }
     // Load the file metadata from scratch.
     loadMetadataAndDiskIds(partsByPath, false);
-  }
-
-  /**
-   * Helper method to load the partition file metadata from scratch. This method is
-   * optimized for loading newly added partitions. For refreshing existing partitions
-   * use refreshPartitionFileMetadata(HdfsPartition).
-   */
-  private void resetAndLoadPartitionFileMetadata(HdfsPartition partition) {
-    Path partDir = partition.getLocationPath();
-    try {
-      FileMetadataLoadStats stats =
-          resetAndLoadFileMetadata(partDir, Lists.newArrayList(partition));
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Loaded file metadata for %s %s", getFullName(),
-            stats.debugString()));
-      }
-    } catch (Exception e) {
-        LOG.error("Error loading file metadata for path: " + partDir.toString() +
-            ". Partitions file metadata could be partially loaded.", e);
-    }
   }
 
   /**
@@ -911,9 +895,10 @@ public class HdfsTable extends Table implements FeFsTable {
    * from that.
    * Always returns READ_WRITE for S3 and ADLS files.
    */
-  private TAccessLevel getAvailableAccessLevel(FileSystem fs, Path location)
-      throws IOException {
-
+  private static TAccessLevel getAvailableAccessLevel(String tableName,
+      Path location, FsPermissionCache permCache) throws IOException {
+    Preconditions.checkNotNull(location);
+    FileSystem fs = location.getFileSystem(CONF);
     // Avoid calling getPermissions() on file path for S3 files, as that makes a round
     // trip to S3. Also, the S3A connector is currently unable to manage S3 permissions,
     // so for now it is safe to assume that all files(objects) have READ_WRITE
@@ -928,11 +913,9 @@ public class HdfsTable extends Table implements FeFsTable {
     // permissions to hadoop users/groups (HADOOP-14437).
     if (FileSystemUtil.isADLFileSystem(fs)) return TAccessLevel.READ_WRITE;
 
-    FsPermissionChecker permissionChecker = FsPermissionChecker.getInstance();
     while (location != null) {
       try {
-        FsPermissionChecker.Permissions perms =
-            permissionChecker.getPermissions(fs, location);
+        FsPermissionChecker.Permissions perms = permCache.getPermissions(location);
         if (perms.canReadAndWrite()) {
           return TAccessLevel.READ_WRITE;
         } else if (perms.canRead()) {
@@ -946,39 +929,29 @@ public class HdfsTable extends Table implements FeFsTable {
       }
     }
     // Should never get here.
-    Preconditions.checkNotNull(location, "Error: no path ancestor exists");
-    return TAccessLevel.NONE;
+    throw new NullPointerException("Error determining access level for table " +
+        tableName + ": no path ancestor exists for path: " + location);
   }
 
   /**
-   * Creates a new HdfsPartition object to be added to HdfsTable's partition list.
+   * Creates new HdfsPartition objects to be added to HdfsTable's partition list.
    * Partitions may be empty, or may not even exist in the filesystem (a partition's
    * location may have been changed to a new path that is about to be created by an
    * INSERT). Also loads the file metadata for this partition. Returns new partition
    * if successful or null if none was created.
    *
-   * Throws CatalogException if the supplied storage descriptor contains metadata that
-   * Impala can't understand.
-   */
-  public HdfsPartition createAndLoadPartition(
-      org.apache.hadoop.hive.metastore.api.Partition msPartition)
-      throws CatalogException {
-    HdfsPartition hdfsPartition = createPartition(msPartition.getSd(), msPartition);
-    resetAndLoadPartitionFileMetadata(hdfsPartition);
-    return hdfsPartition;
-  }
-
-  /**
-   * Same as createAndLoadPartition() but is optimized for loading file metadata of
-   * newly created HdfsPartitions in parallel.
+   * Throws CatalogException if one of the supplied storage descriptors contains metadata
+   * that Impala can't understand.
    */
   public List<HdfsPartition> createAndLoadPartitions(
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions)
       throws CatalogException {
     HashMap<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
     List<HdfsPartition> addedParts = Lists.newArrayList();
+    FsPermissionCache permCache = preloadPermissionsCache(msPartitions);
     for (org.apache.hadoop.hive.metastore.api.Partition partition: msPartitions) {
-      HdfsPartition hdfsPartition = createPartition(partition.getSd(), partition);
+      HdfsPartition hdfsPartition = createPartition(partition.getSd(), partition,
+          permCache);
       Preconditions.checkNotNull(hdfsPartition);
       addedParts.add(hdfsPartition);
       Path partitionPath = hdfsPartition.getLocationPath();
@@ -998,8 +971,8 @@ public class HdfsTable extends Table implements FeFsTable {
    * object.
    */
   private HdfsPartition createPartition(StorageDescriptor storageDescriptor,
-      org.apache.hadoop.hive.metastore.api.Partition msPartition)
-      throws CatalogException {
+      org.apache.hadoop.hive.metastore.api.Partition msPartition,
+      FsPermissionCache permCache) throws CatalogException {
     HdfsStorageDescriptor fileFormatDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
     List<LiteralExpr> keyValues;
@@ -1010,13 +983,14 @@ public class HdfsTable extends Table implements FeFsTable {
     }
     Path partDirPath = new Path(storageDescriptor.getLocation());
     try {
-      FileSystem fs = partDirPath.getFileSystem(CONF);
       if (msPartition != null) {
         HdfsCachingUtil.validateCacheParams(msPartition.getParameters());
       }
+      TAccessLevel accessLevel = getAvailableAccessLevel(getFullName(), partDirPath,
+          permCache);
       HdfsPartition partition =
           new HdfsPartition(this, msPartition, keyValues, fileFormatDescriptor,
-          new ArrayList<FileDescriptor>(), getAvailableAccessLevel(fs, partDirPath));
+          new ArrayList<FileDescriptor>(), accessLevel);
       partition.checkWellFormed();
       // Set the partition's #rows.
       if (msPartition != null && msPartition.getParameters() != null) {
@@ -1273,8 +1247,8 @@ public class HdfsTable extends Table implements FeFsTable {
     hdfsBaseDir_ = msTbl.getSd().getLocation();
     isMarkedCached_ = HdfsCachingUtil.validateCacheParams(msTbl.getParameters());
     Path location = new Path(hdfsBaseDir_);
-    FileSystem fs = location.getFileSystem(CONF);
-    accessLevel_ = getAvailableAccessLevel(fs, location);
+    accessLevel_ = getAvailableAccessLevel(getFullName(), location,
+        new FsPermissionCache());
     setMetaStoreTable(msTbl);
   }
 
@@ -1290,7 +1264,7 @@ public class HdfsTable extends Table implements FeFsTable {
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
     setPrototypePartition(msTbl.getSd());
-    HdfsPartition part = createPartition(msTbl.getSd(), null);
+    HdfsPartition part = createPartition(msTbl.getSd(), null, new FsPermissionCache());
     addPartition(part);
     if (isMarkedCached_) part.markCached();
     refreshPartitionFileMetadata(part);
@@ -1577,14 +1551,75 @@ public class HdfsTable extends Table implements FeFsTable {
     msPartitions.addAll(MetaStoreUtil.fetchPartitionsByName(client,
         Lists.newArrayList(partitionNames), db_.getName(), name_));
 
+    FsPermissionCache permCache = preloadPermissionsCache(msPartitions);
+
     for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
-      HdfsPartition partition = createPartition(msPartition.getSd(), msPartition);
+      HdfsPartition partition = createPartition(msPartition.getSd(), msPartition,
+          permCache);
       addPartition(partition);
       // If the partition is null, its HDFS path does not exist, and it was not added to
       // this table's partition list. Skip the partition.
       if (partition == null) continue;
       refreshPartitionFileMetadata(partition);
     }
+  }
+
+  /**
+   * For each of the partitions in 'msPartitions' with a location inside the table's
+   * base directory, attempt to pre-cache the associated file permissions into the
+   * returned cache. This takes advantage of the fact that many partition directories will
+   * be in the same parent directories, and we can bulk fetch the permissions with a
+   * single round trip to the filesystem instead of individually looking up each.
+   */
+  private FsPermissionCache preloadPermissionsCache(List<Partition> msPartitions) {
+    FsPermissionCache permCache = new FsPermissionCache();
+    // Only preload permissions if the number of partitions to be added is
+    // large (3x) relative to the number of existing partitions. This covers
+    // two common cases:
+    //
+    // 1) initial load of a table (no existing partition metadata)
+    // 2) ALTER TABLE RECOVER PARTITIONS after creating a table pointing to
+    // an already-existing partition directory tree
+    //
+    // Without this heuristic, we would end up using a "listStatus" call to
+    // potentially fetch a bunch of irrelevant information about existing
+    // partitions when we only want to know about a small number of newly-added
+    // partitions.
+    if (msPartitions.size() < partitionMap_.size() * 3) return permCache;
+
+    // TODO(todd): when HDFS-13616 (batch listing of multiple directories)
+    // is implemented, we could likely implement this with a single round
+    // trip.
+    Multiset<Path> parentPaths = HashMultiset.create();
+    for (Partition p : msPartitions) {
+      // We only do this optimization for partitions which are within the table's base
+      // directory. Otherwise we risk a case where a user has specified an external
+      // partition location that is in a directory containing a high number of irrelevant
+      // files, and we'll potentially regress performance compared to just looking up
+      // the partition file directly.
+      String loc = p.getSd().getLocation();
+      if (!loc.startsWith(hdfsBaseDir_)) continue;
+      Path parent = new Path(loc).getParent();
+      if (parent == null) continue;
+      parentPaths.add(parent);
+    }
+
+    // For any paths that contain more than one partition, issue a listStatus
+    // and pre-cache the resulting permissions.
+    for (Multiset.Entry<Path> entry : parentPaths.entrySet()) {
+      if (entry.getCount() == 1) continue;
+      Path p = entry.getElement();
+      try {
+        FileSystem fs = p.getFileSystem(CONF);
+        permCache.precacheChildrenOf(fs, p);
+      } catch (IOException ioe) {
+        // If we fail to pre-warm the cache we'll just wait for later when we
+        // try to actually load the individual permissions, at which point
+        // we can handle the issue accordingly.
+        LOG.debug("Unable to bulk-load permissions for parent path: " + p, ioe);
+      }
+    }
+    return permCache;
   }
 
   @Override
@@ -2024,7 +2059,7 @@ public class HdfsTable extends Table implements FeFsTable {
   public void reloadPartition(HdfsPartition oldPartition, Partition hmsPartition)
       throws CatalogException {
     HdfsPartition refreshedPartition = createPartition(
-        hmsPartition.getSd(), hmsPartition);
+        hmsPartition.getSd(), hmsPartition, new FsPermissionCache());
     refreshPartitionFileMetadata(refreshedPartition);
     Preconditions.checkArgument(oldPartition == null
         || HdfsPartition.KV_COMPARATOR.compare(oldPartition, refreshedPartition) == 0);
