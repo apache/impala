@@ -294,8 +294,12 @@ Status GroupingAggregator::GetRowsFromPartition(
 
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   partition_eos_ = ReachedLimit();
-  if (output_iterator_.AtEnd()) row_batch->MarkNeedsDeepCopy();
-
+  if (partition_eos_ || output_iterator_.AtEnd()) {
+    // Attach all buffers referenced by previously-returned rows. On the next GetNext()
+    // call we will close the partition.
+    output_partition_->aggregated_row_stream->Close(
+        row_batch, RowBatch::FlushMode::FLUSH_RESOURCES);
+  }
   return Status::OK();
 }
 
