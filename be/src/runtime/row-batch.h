@@ -418,6 +418,7 @@ class RowBatch {
   friend class RowBatchSerializeBaseline;
   friend class RowBatchSerializeBenchmark;
   friend class RowBatchSerializeTest;
+  friend class SimpleTupleStreamTest;
 
   /// Creates an empty row batch based on the serialized row batch header. Called from
   /// FromProtobuf() above before desrialization of a protobuf row batch.

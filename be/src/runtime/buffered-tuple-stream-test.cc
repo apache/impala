@@ -398,6 +398,22 @@ class SimpleTupleStreamTest : public testing::Test {
 
   void TestTransferMemory(bool pinned_stream, bool read_write);
 
+  void TestAttachMemory(bool pinned_stream, bool attach_on_read);
+
+  void TestFlushResourcesReadWrite(bool pinned_stream, bool attach_on_read);
+
+  /// Helper for TestFlushResourcesReadWrite() to write and read back rows from
+  /// *stream. 'append_batch_size' is the number of rows to append at a time before
+  /// reading them back. *num_buffers_attached tracks the number of buffers attached
+  /// to the output batch.
+  void AppendToReadWriteStream(int64_t append_batch_size, int64_t buffer_size,
+      int* num_buffers_attached, BufferedTupleStream* stream);
+
+  // Helper for AppendToReadWriteStream() to verify 'out_batch' contents. The value of
+  // row i of 'out_batch' is expected to be the same as the row at index
+  // (i + start_index) % out_batch->num_rows() of 'in_batch'.
+  void VerifyReadWriteBatch(RowBatch* in_batch, RowBatch* out_batch, int64_t start_index);
+
   // Helper to writes 'row' comprised of only string slots to 'data'. The expected
   // length of the data written is 'expected_len'.
   void WriteStringRow(const RowDescriptor* row_desc, TupleRow* row, int64_t fixed_size,
@@ -649,13 +665,13 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data, bool read_write) {
   ASSERT_TRUE(pinned);
 
   // Read and verify result a few times. We should be able to reread the stream if
-  // we don't use delete on read mode.
+  // we don't use attach on read mode.
   int read_iters = 3;
   for (int i = 0; i < read_iters; ++i) {
-    bool delete_on_read = i == read_iters - 1;
+    bool attach_on_read = i == read_iters - 1;
     if (i > 0 || !read_write) {
       bool got_read_reservation;
-      ASSERT_OK(stream.PrepareForRead(delete_on_read, &got_read_reservation));
+      ASSERT_OK(stream.PrepareForRead(attach_on_read, &got_read_reservation));
       ASSERT_TRUE(got_read_reservation);
     }
 
@@ -670,15 +686,13 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data, bool read_write) {
     }
   }
 
-  // After delete_on_read, all blocks aside from the last should be deleted.
-  // Note: this should really be 0, but the BufferedTupleStream returns eos before
-  // deleting the last block, rather than after, so the last block isn't deleted
-  // until the stream is closed.
-  ASSERT_EQ(stream.BytesPinned(false), buffer_size);
+  // After attach_on_read, all buffers should have been attached to the output batches
+  // on previous GetNext() calls.
+  ASSERT_EQ(0, stream.BytesPinned(false));
 
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 
-  ASSERT_EQ(stream.BytesPinned(false), 0);
+  ASSERT_EQ(0, stream.BytesPinned(false));
 }
 
 TEST_F(SimpleTupleStreamTest, UnpinPin) {
@@ -765,6 +779,205 @@ TEST_F(SimpleTupleStreamTest, TransferMemoryFromUnpinnedStreamNoReadWrite) {
   TestTransferMemory(false, false);
 }
 
+/// Test iteration over a stream with and without attaching memory.
+void SimpleTupleStreamTest::TestAttachMemory(bool pin_stream, bool attach_on_read) {
+  // Use smaller buffers so that the explicit FLUSH_RESOURCES flag is required to
+  // make the batch at capacity.
+  int buffer_size = 4 * 1024;
+  Init(100 * buffer_size);
+
+  BufferedTupleStream stream(
+      runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
+  ASSERT_OK(stream.Init(-1, pin_stream));
+  bool got_write_reservation;
+  ASSERT_OK(stream.PrepareForWrite(&got_write_reservation));
+  ASSERT_TRUE(got_write_reservation);
+  RowBatch* in_batch = CreateIntBatch(0, 1024, false);
+
+  // Construct a stream with 4 pages.
+  const int total_num_pages = 4;
+  while (stream.byte_size() < total_num_pages * buffer_size) {
+    Status status;
+    for (int i = 0; i < in_batch->num_rows(); ++i) {
+      bool ret = stream.AddRow(in_batch->GetRow(i), &status);
+      EXPECT_TRUE(ret);
+      ASSERT_OK(status);
+    }
+  }
+
+  RowBatch* out_batch = pool_.Add(new RowBatch(int_desc_, 100, &tracker_));
+  int num_buffers_attached = 0;
+  int num_flushes = 0;
+  int64_t num_rows_returned = 0;
+  bool got_read_reservation;
+  ASSERT_OK(stream.PrepareForRead(attach_on_read, &got_read_reservation));
+  ASSERT_TRUE(got_read_reservation);
+  bool eos;
+  do {
+    ASSERT_EQ(0, out_batch->num_buffers());
+    ASSERT_OK(stream.GetNext(out_batch, &eos));
+    EXPECT_LE(out_batch->num_buffers(), 1) << "Should only attach one buffer at a time";
+    if (out_batch->num_buffers() > 0) {
+      EXPECT_TRUE(out_batch->AtCapacity()) << "Flush resources flag should have been set";
+    }
+    num_buffers_attached += out_batch->num_buffers();
+    for (int i = 0; i < out_batch->num_rows(); ++i) {
+      int slot_offset = int_desc_->tuple_descriptors()[0]->slots()[0]->tuple_offset();
+      TupleRow* in_row = in_batch->GetRow(num_rows_returned % in_batch->num_rows());
+      EXPECT_EQ(*in_row->GetTuple(0)->GetIntSlot(slot_offset),
+          *out_batch->GetRow(i)->GetTuple(0)->GetIntSlot(slot_offset));
+      ++num_rows_returned;
+    }
+    num_flushes += out_batch->flush_mode() == RowBatch::FlushMode::FLUSH_RESOURCES;
+    out_batch->Reset();
+  } while (!eos);
+
+  if (attach_on_read) {
+    EXPECT_EQ(4, num_buffers_attached) << "All buffers attached during iteration.";
+  } else {
+    EXPECT_EQ(0, num_buffers_attached) << "No buffers attached during iteration.";
+  }
+  if (attach_on_read || !pin_stream) EXPECT_EQ(4, num_flushes);
+  out_batch->Reset();
+  stream.Close(out_batch, RowBatch::FlushMode::FLUSH_RESOURCES);
+  if (attach_on_read) {
+    EXPECT_EQ(0, out_batch->num_buffers());
+  } else if (pin_stream) {
+    // All buffers should be attached.
+    EXPECT_EQ(4, out_batch->num_buffers());
+  } else {
+    // Buffer from last pinned page should be attached.
+    EXPECT_EQ(1, out_batch->num_buffers());
+  }
+  in_batch->Reset();
+  out_batch->Reset();
+}
+
+TEST_F(SimpleTupleStreamTest, TestAttachMemoryPinned) {
+  TestAttachMemory(true, true);
+}
+
+TEST_F(SimpleTupleStreamTest, TestNoAttachMemoryPinned) {
+  TestAttachMemory(true, false);
+}
+
+TEST_F(SimpleTupleStreamTest, TestAttachMemoryUnpinned) {
+  TestAttachMemory(false, true);
+}
+
+TEST_F(SimpleTupleStreamTest, TestNoAttachMemoryUnpinned) {
+  TestAttachMemory(false, false);
+}
+
+// Test for advancing the read/write page with resource flushing.
+void SimpleTupleStreamTest::TestFlushResourcesReadWrite(
+    bool pin_stream, bool attach_on_read) {
+  // Use smaller buffers so that the explicit FLUSH_RESOURCES flag is required to
+  // make the batch at capacity.
+  const int BUFFER_SIZE = 512;
+  const int BATCH_SIZE = 100;
+  // For unpinned streams, we should be able to iterate with only two buffers.
+  const int MAX_PINNED_PAGES = pin_stream ? 1000 : 2;
+  Init(MAX_PINNED_PAGES * BUFFER_SIZE);
+
+  BufferedTupleStream stream(
+      runtime_state_, int_desc_, &client_, BUFFER_SIZE, BUFFER_SIZE);
+  ASSERT_OK(stream.Init(-1, pin_stream));
+  bool got_reservation;
+  ASSERT_OK(stream.PrepareForReadWrite(attach_on_read, &got_reservation));
+  ASSERT_TRUE(got_reservation);
+  int num_buffers_attached = 0;
+  /// Read over the page in different increments.
+  for (int append_batch_size : {1, 10, 100, 1000}) {
+    AppendToReadWriteStream(
+        append_batch_size, BUFFER_SIZE, &num_buffers_attached, &stream);
+  }
+
+  if (attach_on_read) {
+    EXPECT_EQ(stream.byte_size() / BUFFER_SIZE - 1, num_buffers_attached)
+        << "All buffers except the current write page should have been attached";
+  } else {
+    EXPECT_EQ(0, num_buffers_attached);
+  }
+
+  RowBatch* final_out_batch = pool_.Add(new RowBatch(int_desc_, BATCH_SIZE, &tracker_));
+  stream.Close(final_out_batch, RowBatch::FlushMode::FLUSH_RESOURCES);
+  final_out_batch->Reset();
+}
+
+void SimpleTupleStreamTest::AppendToReadWriteStream(int64_t append_batch_size,
+    int64_t buffer_size, int* num_buffers_attached, BufferedTupleStream* stream) {
+  RowBatch* in_batch = CreateIntBatch(0, BATCH_SIZE, false);
+
+  /// Accumulate row batches until we see a flush. The contents of the batches should
+  /// remain valid until reset or delete trailing batches.
+  vector<unique_ptr<RowBatch>> out_batches;
+  // The start row index of each batch in 'out_batches'.
+  vector<int64_t> out_batch_start_indices;
+  // Iterate over at least 10 pages.
+  int64_t start_byte_size = stream->byte_size();
+  while (stream->byte_size() - start_byte_size < 10 * buffer_size) {
+    Status status;
+    for (int i = 0; i < append_batch_size; ++i) {
+      bool ret = stream->AddRow(
+          in_batch->GetRow(stream->num_rows() % in_batch->num_rows()), &status);
+      EXPECT_TRUE(ret);
+      ASSERT_OK(status);
+    }
+    int64_t rows_read = 0;
+    bool eos;
+    while (rows_read < append_batch_size) {
+      out_batches.emplace_back(new RowBatch(int_desc_, BATCH_SIZE, &tracker_));
+      out_batch_start_indices.push_back(stream->rows_returned());
+      ASSERT_OK(stream->GetNext(out_batches.back().get(), &eos));
+      // Verify the contents of all valid batches to make sure that they haven't become
+      // invalid.
+      LOG(INFO) << "Verifying " << out_batches.size() << " batches";
+      for (int i = 0; i < out_batches.size(); ++i) {
+        VerifyReadWriteBatch(in_batch, out_batches[i].get(), out_batch_start_indices[i]);
+      }
+      *num_buffers_attached += out_batches.back()->num_buffers();
+      rows_read += out_batches.back()->num_rows();
+      EXPECT_EQ(rows_read == append_batch_size, eos);
+      if (out_batches.back().get()->flush_mode()
+          == RowBatch::FlushMode::FLUSH_RESOURCES) {
+        out_batches.clear();
+        out_batch_start_indices.clear();
+      }
+    }
+    EXPECT_EQ(append_batch_size, rows_read);
+    EXPECT_EQ(true, eos);
+  }
+  in_batch->Reset();
+}
+
+void SimpleTupleStreamTest::VerifyReadWriteBatch(
+    RowBatch* in_batch, RowBatch* out_batch, int64_t start_index) {
+  int slot_offset = int_desc_->tuple_descriptors()[0]->slots()[0]->tuple_offset();
+  int64_t row_index = start_index;
+  for (int i = 0; i < out_batch->num_rows(); ++i) {
+    TupleRow* in_row = in_batch->GetRow(row_index++ % in_batch->num_rows());
+    EXPECT_EQ(*in_row->GetTuple(0)->GetIntSlot(slot_offset),
+        *out_batch->GetRow(i)->GetTuple(0)->GetIntSlot(slot_offset));
+  }
+}
+
+TEST_F(SimpleTupleStreamTest, TestFlushResourcesReadWritePinnedAttach) {
+  TestFlushResourcesReadWrite(true, true);
+}
+
+TEST_F(SimpleTupleStreamTest, TestFlushResourcesReadWritePinnedNoAttach) {
+  TestFlushResourcesReadWrite(true, false);
+}
+
+TEST_F(SimpleTupleStreamTest, TestFlushResourcesReadWriteUnpinnedAttach) {
+  TestFlushResourcesReadWrite(false, true);
+}
+
+TEST_F(SimpleTupleStreamTest, TestFlushResourcesReadWriteUnpinnedNoAttach) {
+  TestFlushResourcesReadWrite(false, false);
+}
+
 // Test that tuple stream functions if it references strings outside stream. The
 // aggregation node relies on this since it updates tuples in-place.
 TEST_F(SimpleTupleStreamTest, StringsOutsideStream) {
@@ -805,11 +1018,11 @@ TEST_F(SimpleTupleStreamTest, StringsOutsideStream) {
 
   DCHECK_EQ(rows_added, stream.num_rows());
 
-  for (int delete_on_read = 0; delete_on_read <= 1; ++delete_on_read) {
+  for (int attach_on_read = 0; attach_on_read <= 1; ++attach_on_read) {
     // Keep stream in memory and test we can read ok.
     vector<StringValue> results;
     bool got_read_reservation;
-    ASSERT_OK(stream.PrepareForRead(delete_on_read, &got_read_reservation));
+    ASSERT_OK(stream.PrepareForRead(attach_on_read, &got_read_reservation));
     ASSERT_TRUE(got_read_reservation);
     ReadValues(&stream, string_desc_, &results);
     VerifyResults<StringValue>(*string_desc_, results, rows_added, false);
@@ -934,8 +1147,8 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
   vector<uint8_t> tuple_mem(tuple_desc->byte_size());
   Tuple* write_tuple = reinterpret_cast<Tuple*>(tuple_mem.data());
   write_row->SetTuple(0, write_tuple);
-  StringValue* write_str = reinterpret_cast<StringValue*>(
-      write_tuple->GetSlot(tuple_desc->slots()[0]->tuple_offset()));
+  StringValue* write_str =
+      write_tuple->GetStringSlot(tuple_desc->slots()[0]->tuple_offset());
   // Make the string large enough to fill a page.
   const int64_t string_len = BIG_ROW_BYTES - tuple_desc->byte_size();
   vector<char> data(string_len);
@@ -961,8 +1174,7 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
     EXPECT_EQ(1, read_batch.num_rows());
     EXPECT_TRUE(eos);
     Tuple* tuple = read_batch.GetRow(0)->GetTuple(0);
-    StringValue* str = reinterpret_cast<StringValue*>(
-        tuple->GetSlot(tuple_desc->slots()[0]->tuple_offset()));
+    StringValue* str = tuple->GetStringSlot(tuple_desc->slots()[0]->tuple_offset());
     EXPECT_EQ(string_len, str->len);
     for (int j = 0; j < string_len; ++j) {
       EXPECT_EQ(i, str->ptr[j]) << j;
@@ -988,8 +1200,7 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
     EXPECT_EQ(1, read_batch.num_rows());
     EXPECT_EQ(eos, i == MAX_BUFFERS) << i;
     Tuple* tuple = read_batch.GetRow(0)->GetTuple(0);
-    StringValue* str = reinterpret_cast<StringValue*>(
-        tuple->GetSlot(tuple_desc->slots()[0]->tuple_offset()));
+    StringValue* str = tuple->GetStringSlot(tuple_desc->slots()[0]->tuple_offset());
     EXPECT_EQ(string_len, str->len);
     for (int j = 0; j < string_len; ++j) {
       ASSERT_EQ(i, str->ptr[j]) << j;
@@ -1117,10 +1328,10 @@ TEST_F(MultiTupleStreamTest, MultiTupleAddRowCustom) {
   }
 
   for (int i = 0; i < 3; ++i) {
-    bool delete_on_read = i == 2;
+    bool attach_on_read = i == 2;
     vector<StringValue> results;
     bool got_read_reservation;
-    ASSERT_OK(stream.PrepareForRead(delete_on_read, &got_read_reservation));
+    ASSERT_OK(stream.PrepareForRead(attach_on_read, &got_read_reservation));
     ASSERT_TRUE(got_read_reservation);
     ReadValues(&stream, string_desc_, &results);
     VerifyResults<StringValue>(*string_desc_, results, rows_added, false);
