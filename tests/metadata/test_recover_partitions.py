@@ -346,12 +346,11 @@ class TestRecoverPartitions(ImpalaTestSuite):
         self.client, "ALTER TABLE %s RECOVER PARTITIONS" % FQ_TBL_NAME)
       result = self.execute_query_expect_success(
         self.client, "SHOW PARTITIONS %s" % FQ_TBL_NAME)
-      assert (self.count_partition(result.data) == 1,
-        "ALTER TABLE %s RECOVER PARTITIONS produced more than 1 partitions" %
-        FQ_TBL_NAME)
-      assert (self.count_value('p=100%25', result.data) == 1,
-        "ALTER TABLE %s RECOVER PARTITIONS failed to handle encoded partitioned value" %
-        FQ_TBL_NAME)
+      assert self.count_partition(result.data) == 1, \
+        "ALTER TABLE %s RECOVER PARTITIONS produced more than 1 partitions" % FQ_TBL_NAME
+      assert self.count_value('p=100%25', result.data) == 1, \
+        "ALTER TABLE %s RECOVER PARTITIONS failed to handle encoded partitioned value" % \
+        FQ_TBL_NAME
 
   @SkipIfLocal.hdfs_client
   @SkipIfS3.empty_directory
