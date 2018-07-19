@@ -216,6 +216,7 @@ class GroupingAggregator : public Aggregator {
   /// Resource information sent from the frontend.
   const TBackendResourceProfile resource_profile_;
 
+  std::unique_ptr<ReservationTracker> reservation_tracker_;
   ReservationManager reservation_manager_;
   BufferPool::ClientHandle* buffer_pool_client();
 

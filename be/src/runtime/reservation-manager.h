@@ -40,7 +40,8 @@ class ReservationManager {
   /// and error messages, 'debug_options' is used for the SET_DENY_RESERVATION_PROBABILITY
   /// action. Does not take ownership of 'runtime_profile' and 'mem_tracker'. Must be
   /// called before ClaimBufferReservation().
-  void Init(std::string name, RuntimeProfile* runtime_profile, MemTracker* mem_tracker,
+  void Init(std::string name, RuntimeProfile* runtime_profile,
+      ReservationTracker* parent_reservation, MemTracker* mem_tracker,
       const TBackendResourceProfile& resource_profile,
       const TDebugOptions& debug_options);
   void Close(RuntimeState* state);
@@ -71,6 +72,8 @@ class ReservationManager {
   RuntimeProfile* runtime_profile_;
 
   MemTracker* mem_tracker_;
+
+  ReservationTracker* parent_reservation_;
 
   /// Buffer pool client for this node. Initialized with the node's minimum reservation
   /// in ClaimBufferReservation(). After initialization, the client must hold onto at
