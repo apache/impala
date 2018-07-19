@@ -219,6 +219,9 @@ class JniUtil {
   /// Find JniUtil class, and get JniUtil.throwableToString method id
   static Status Init() WARN_UNUSED_RESULT;
 
+  /// Initializes the JvmPauseMonitor.
+  static Status InitJvmPauseMonitor() WARN_UNUSED_RESULT;
+
   /// Returns true if the given class could be found on the CLASSPATH in env.
   /// Returns false otherwise, or if any other error occurred (e.g. a JNI exception).
   /// This function does not log any errors or exceptions.
@@ -264,6 +267,9 @@ class JniUtil {
   static jmethodID throwable_to_string_id() { return throwable_to_string_id_; }
   static jmethodID throwable_to_stack_trace_id() { return throwable_to_stack_trace_id_; }
 
+  /// Returns true if an embedded JVM is initialized, false otherwise.
+  static bool is_jvm_inited() { return jvm_inited_; }
+
   /// Global reference to java JniUtil class
   static jclass jni_util_class() { return jni_util_cl_; }
 
@@ -278,13 +284,16 @@ class JniUtil {
 
   /// Populates 'result' with a list of memory metrics from the Jvm. Returns Status::OK
   /// unless there is an exception.
-  static Status GetJvmMetrics(const TGetJvmMetricsRequest& request,
-      TGetJvmMetricsResponse* result) WARN_UNUSED_RESULT;
+  static Status GetJvmMemoryMetrics(const TGetJvmMemoryMetricsRequest& request,
+      TGetJvmMemoryMetricsResponse* result) WARN_UNUSED_RESULT;
 
-  // Populates 'result' with information about live JVM threads. Returns
-  // Status::OK unless there is an exception.
+  /// Populates 'result' with information about live JVM threads. Returns
+  /// Status::OK unless there is an exception.
   static Status GetJvmThreadsInfo(const TGetJvmThreadsInfoRequest& request,
       TGetJvmThreadsInfoResponse* result) WARN_UNUSED_RESULT;
+
+  /// Gets JMX metrics of the JVM encoded as a JSON string.
+  static Status GetJMXJson(TGetJMXJsonResponse* result) WARN_UNUSED_RESULT;
 
   /// Loads a method whose signature is in the supplied descriptor. Returns Status::OK
   /// and sets descriptor->method_id to a JNI method handle if successful, otherwise an
@@ -367,12 +376,15 @@ class JniUtil {
   }
 
  private:
+  // Set in Init() once the JVM is initialized.
+  static bool jvm_inited_;
   static jclass jni_util_cl_;
   static jclass internal_exc_cl_;
   static jmethodID throwable_to_string_id_;
   static jmethodID throwable_to_stack_trace_id_;
   static jmethodID get_jvm_metrics_id_;
   static jmethodID get_jvm_threads_id_;
+  static jmethodID get_jmx_json_;
 };
 
 }

@@ -758,7 +758,7 @@ struct TJvmMemoryPool {
 }
 
 // Request to get one or all sets of memory pool metrics.
-struct TGetJvmMetricsRequest {
+struct TGetJvmMemoryMetricsRequest {
   // If set, return all pools
   1: required bool get_all
 
@@ -766,8 +766,8 @@ struct TGetJvmMetricsRequest {
   2: optional string memory_pool
 }
 
-// Response from JniUtil::GetJvmMetrics()
-struct TGetJvmMetricsResponse {
+// Response from JniUtil::GetJvmMemoryMetrics()
+struct TGetJvmMemoryMetricsResponse {
   // One entry for every pool tracked by the Jvm, plus a synthetic aggregate pool called
   // 'total'
   1: required list<TJvmMemoryPool> memory_pools
@@ -816,6 +816,11 @@ struct TGetJvmThreadsInfoResponse {
   // Information about JVM threads. It is not included when
   // TGetJvmThreadsInfoRequest.get_complete_info is false.
   4: optional list<TJvmThreadInfo> threads
+}
+
+struct TGetJMXJsonResponse {
+  // JMX of the JVM serialized to a json string.
+  1: required string jmx_json
 }
 
 struct TGetHadoopConfigRequest {

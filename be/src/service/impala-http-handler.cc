@@ -240,7 +240,7 @@ void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::ArgumentMap&
       ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }
   }
-  document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
+  document->AddMember(Webserver::ENABLE_RAW_HTML_KEY, true, document->GetAllocator());
   Value profile(ss.str().c_str(), document->GetAllocator());
   document->AddMember("contents", profile, document->GetAllocator());
 }
@@ -252,7 +252,7 @@ void ImpalaHttpHandler::InflightQueryIdsHandler(const Webserver::ArgumentMap& ar
       [&](const std::shared_ptr<ClientRequestState>& request_state) {
           ss << PrintId(request_state->query_id()) << "\n";
       });
-  document->AddMember(Webserver::ENABLE_RAW_JSON_KEY, true, document->GetAllocator());
+  document->AddMember(Webserver::ENABLE_RAW_HTML_KEY, true, document->GetAllocator());
   Value query_ids(ss.str().c_str(), document->GetAllocator());
   document->AddMember("contents", query_ids, document->GetAllocator());
 }

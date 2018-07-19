@@ -137,7 +137,9 @@ const char* GetDefaultDocumentRoot() {
 
 namespace impala {
 
-const char* Webserver::ENABLE_RAW_JSON_KEY = "__raw__";
+const char* Webserver::ENABLE_RAW_HTML_KEY = "__raw__";
+
+const char* Webserver::ENABLE_PLAIN_JSON_KEY = "__json__";
 
 // Supported HTTP response codes
 enum ResponseCode {
@@ -435,9 +437,10 @@ void Webserver::RenderUrlWithTemplate(const ArgumentMap& arguments,
   document.SetObject();
   GetCommonJson(&document);
 
-  bool raw_json = (arguments.find("json") != arguments.end());
   url_handler.callback()(arguments, &document);
-  if (raw_json) {
+  bool plain_json = (arguments.find("json") != arguments.end())
+      || document.HasMember(ENABLE_PLAIN_JSON_KEY);
+  if (plain_json) {
     // Callbacks may optionally be rendered as a text-only, pretty-printed Json document
     // (mostly for debugging or integration with third-party tools).
     StringBuffer strbuf;
@@ -447,9 +450,9 @@ void Webserver::RenderUrlWithTemplate(const ArgumentMap& arguments,
     *content_type = JSON;
   } else {
     if (arguments.find("raw") != arguments.end()) {
-      document.AddMember(ENABLE_RAW_JSON_KEY, "true", document.GetAllocator());
+      document.AddMember(ENABLE_RAW_HTML_KEY, "true", document.GetAllocator());
     }
-    if (document.HasMember(ENABLE_RAW_JSON_KEY)) {
+    if (document.HasMember(ENABLE_RAW_HTML_KEY)) {
       *content_type = PLAIN;
     }
 

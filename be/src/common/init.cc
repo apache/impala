@@ -261,6 +261,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   if (init_jvm) {
     ABORT_IF_ERROR(JniUtil::Init());
     InitJvmLoggingSupport();
+    ABORT_IF_ERROR(JniUtil::InitJvmPauseMonitor());
     ZipUtil::InitJvm();
   }
 

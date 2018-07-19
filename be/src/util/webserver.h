@@ -54,10 +54,16 @@ class Webserver {
   typedef boost::function<void (const ArgumentMap& args, std::stringstream* output)>
       RawUrlCallback;
 
-  /// Any callback may add a member to their Json output with key ENABLE_RAW_JSON_KEY;
+  /// Any callback may add a member to their Json output with key ENABLE_RAW_HTML_KEY;
   /// this causes the result of the template rendering process to be sent to the browser
   /// as text, not HTML.
-  static const char* ENABLE_RAW_JSON_KEY;
+  static const char* ENABLE_RAW_HTML_KEY;
+
+  /// Any callback may add a member to their Json output with key ENABLE_PLAIN_JSON_KEY;
+  /// this causes the result of the template rendering process to be sent to the browser
+  /// as pretty printed JSON plain text.
+  static const char* ENABLE_PLAIN_JSON_KEY;
+
 
   /// Using this constructor, the webserver will bind to all available interfaces.
   Webserver(const int port);

@@ -152,14 +152,14 @@ class SanitizerMallocMetric : public IntGauge {
   }
 };
 
-/// A JvmMetric corresponds to one value drawn from one 'memory pool' in the JVM. A memory
-/// pool is an area of memory assigned for one particular aspect of memory management. For
-/// example Hotspot has pools for the permanent generation, the old generation, survivor
-/// space, code cache and permanently tenured objects.
-class JvmMetric : public IntGauge {
+/// A JvmMemoryMetric corresponds to one value drawn from one 'memory pool' in the JVM. A
+/// memory pool is an area of memory assigned for one particular aspect of memory
+/// management. For example Hotspot has pools for the permanent generation, the old
+/// generation, survivor space, code cache and permanently tenured objects.
+class JvmMemoryMetric : public IntGauge {
  public:
-  /// Registers many Jvm memory metrics: one for every member of JvmMetricType for each
-  /// pool (usually ~5 pools plus a synthetic 'total' pool).
+  /// Registers many Jvm memory metrics: one for every member of JvmMemoryMetricType for
+  /// each pool (usually ~5 pools plus a synthetic 'total' pool).
   static Status InitMetrics(MetricGroup* metrics) WARN_UNUSED_RESULT;
 
   /// Searches through jvm_metrics_response_ for a matching memory pool and pulls out the
@@ -168,7 +168,7 @@ class JvmMetric : public IntGauge {
 
  private:
   /// Each names one of the fields in TJvmMemoryPool.
-  enum JvmMetricType {
+  enum JvmMemoryMetricType {
     MAX,
     INIT,
     COMMITTED,
@@ -179,18 +179,19 @@ class JvmMetric : public IntGauge {
     PEAK_CURRENT
   };
 
-  static JvmMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
-      const std::string& pool_name, JvmMetric::JvmMetricType type);
+  static JvmMemoryMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
+      const std::string& pool_name, JvmMemoryMetric::JvmMemoryMetricType type);
 
-  /// Private constructor to ensure only InitMetrics() can create JvmMetrics.
-  JvmMetric(const TMetricDef& def, const std::string& mempool_name, JvmMetricType type);
+  /// Private constructor to ensure only InitMetrics() can create JvmMemoryMetrics.
+  JvmMemoryMetric(
+      const TMetricDef& def, const std::string& mempool_name, JvmMemoryMetricType type);
 
   /// The name of the memory pool, defined by the Jvm.
   std::string mempool_name_;
 
   /// Each metric corresponds to one value; this tells us which value from the memory pool
   /// that is.
-  JvmMetricType metric_type_;
+  JvmMemoryMetricType metric_type_;
 };
 
 /// Metric that reports information about the buffer pool.

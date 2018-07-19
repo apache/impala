@@ -36,6 +36,8 @@ class TestWebPage(ImpalaTestSuite):
   RPCZ_URL = "http://localhost:{0}/rpcz"
   THREAD_GROUP_URL = "http://localhost:{0}/thread-group"
   METRICS_URL = "http://localhost:{0}/metrics"
+  JMX_URL = "http://localhost:{0}/jmx"
+
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
   # log level endpoints, one without the statestore port and the
@@ -63,6 +65,20 @@ class TestWebPage(ImpalaTestSuite):
     result = impalad.service.read_debug_webpage("query_profile_encoded?query_id=123")
     assert result.startswith("Could not obtain runtime profile: Query id")
 
+  def test_jmx_endpoint(self):
+    """Tests that the /jmx endpoint on the Catalog and Impalads returns a valid json."""
+    for port in self.TEST_PORTS_WITHOUT_SS:
+      input_url = self.JMX_URL.format(port)
+      response = requests.get(input_url)
+      assert response.status_code == requests.codes.ok
+      assert "application/json" == response.headers['Content-Type']
+      jmx_json = ""
+      try:
+       jmx_json = json.loads(response.text)
+       assert "beans" in jmx_json.keys(), "Ill formatted JSON returned: %s" % jmx_json
+      except ValueError:
+        assert False, "Invalid JSON returned from /jmx endpoint: %s" % jmx_json
+
   def get_and_check_status(self, url, string_to_search = "", ports_to_test = None):
     """Helper method that polls a given url and asserts the return code is ok and
     the response contains the input string."""
@@ -73,7 +89,6 @@ class TestWebPage(ImpalaTestSuite):
       response = requests.get(input_url)
       assert response.status_code == requests.codes.ok\
           and string_to_search in response.text, "Offending url: " + input_url
-    return response.text
 
   def get_debug_page(self, page_url):
     """Returns the content of the debug page 'page_url' as json."""
@@ -83,8 +98,8 @@ class TestWebPage(ImpalaTestSuite):
 
   def get_and_check_status_jvm(self, url, string_to_search = ""):
     """Calls get_and_check_status() for impalad and catalogd only"""
-    return self.get_and_check_status(url, string_to_search,
-                                     ports_to_test=self.TEST_PORTS_WITHOUT_SS)
+    self.get_and_check_status(url, string_to_search,
+                              ports_to_test=self.TEST_PORTS_WITHOUT_SS)
 
   def test_content_type(self):
     """Checks that an appropriate content-type is set for various types of pages."""

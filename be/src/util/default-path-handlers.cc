@@ -26,6 +26,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
+#include "rpc/jni-thrift-util.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/exec-env.h"
 #include "service/impala-server.h"
@@ -37,6 +38,7 @@
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/process-state-info.h"
+#include "util/jni-util.h"
 
 #include "common/names.h"
 
@@ -192,6 +194,34 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
   }
 }
 
+void JmxHandler(const Webserver::ArgumentMap& args, Document* document) {
+  document->AddMember(Webserver::ENABLE_PLAIN_JSON_KEY, true, document->GetAllocator());
+  TGetJMXJsonResponse result;
+  Status status = JniUtil::GetJMXJson(&result);
+  if (!status.ok()) {
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    VLOG(1) << "Error fetching JMX metrics: " << status.GetDetail();
+    return;
+  }
+  // Parse the JSON string returned from fe. We do an additional round of
+  // parsing to populate the JSON structure in the 'document' for our template
+  // rendering to work correctly. Otherwise the whole JSON content is considered
+  // as a single string mapped to another key.
+  Document doc(&document->GetAllocator());
+  doc.Parse<kParseDefaultFlags>(result.jmx_json.c_str());
+  if (doc.HasParseError()) {
+    Value error(doc.GetParseError(), document->GetAllocator());
+    document->AddMember("error", error, document->GetAllocator());
+    VLOG(1) << "Error fetching JMX metrics: " << doc.GetParseError();
+    return;
+  }
+  // Populate the members in the document.
+  for (Value::MemberIterator it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
+    document->AddMember(it->name.GetString(), it->value, document->GetAllocator());
+  }
+}
+
 namespace impala {
 
 void RootHandler(const Webserver::ArgumentMap& args, Document* document) {
@@ -226,10 +256,16 @@ void RootHandler(const Webserver::ArgumentMap& args, Document* document) {
       document->GetAllocator());
 }
 
-void AddDefaultUrlCallbacks(
-    Webserver* webserver, MemTracker* process_mem_tracker, MetricGroup* metric_group) {
+void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracker,
+    MetricGroup* metric_group) {
   webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler);
   webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler);
+  if (JniUtil::is_jvm_inited()) {
+    // JmxHandler outputs a plain JSON string and does not require a template to
+    // render. However RawUrlCallback only supports PLAIN content type.
+    // (TODO): Switch to RawUrlCallback when it supports JSON content-type.
+    webserver->RegisterUrlCallback("/jmx", "raw_text.tmpl", JmxHandler);
+  }
   if (process_mem_tracker != NULL) {
     auto callback = [process_mem_tracker, metric_group]
         (const Webserver::ArgumentMap& args, Document* doc) {

@@ -17,10 +17,10 @@
 
 package org.apache.impala.common;
 
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryPoolMXBean;
@@ -31,6 +31,8 @@ import java.lang.management.ThreadInfo;
 import java.util.ArrayList;
 import java.util.Map;
 
+import org.apache.impala.thrift.TGetJMXJsonResponse;
+import org.apache.impala.util.JMXJsonUtil;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.TDeserializer;
@@ -39,20 +41,32 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
 
-import org.apache.impala.thrift.TGetJvmMetricsRequest;
-import org.apache.impala.thrift.TGetJvmMetricsResponse;
+import org.apache.impala.thrift.TGetJvmMemoryMetricsRequest;
+import org.apache.impala.thrift.TGetJvmMemoryMetricsResponse;
 import org.apache.impala.thrift.TGetJvmThreadsInfoRequest;
 import org.apache.impala.thrift.TGetJvmThreadsInfoResponse;
 import org.apache.impala.thrift.TJvmMemoryPool;
 import org.apache.impala.thrift.TJvmThreadInfo;
+import org.apache.impala.util.JvmPauseMonitor;
 
+import org.apache.log4j.Logger;
 /**
  * Utility class with methods intended for JNI clients
  */
 public class JniUtil {
   private final static TBinaryProtocol.Factory protocolFactory_ =
       new TBinaryProtocol.Factory();
+
+  private static final Logger LOG = Logger.getLogger(JniUtil.class);
+
+  /**
+   * Initializes the JvmPauseMonitor instance.
+   */
+  public static void initPauseMonitor() {
+    JvmPauseMonitor.INSTANCE.initPauseMonitor();
+  }
 
   /**
    * Returns a formatted string containing the simple exception name and the
@@ -82,6 +96,18 @@ public class JniUtil {
   }
 
   /**
+   * Serializes input into a byte[] using a given protocol factory.
+   */
+  public static <T extends TBase<?, ?>, F extends TProtocolFactory>
+  byte[] serializeToThrift(T input, F protocolFactory) throws ImpalaException {
+    TSerializer serializer = new TSerializer(protocolFactory);
+    try {
+      return serializer.serialize(input);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+  /**
    * Deserialize a serialized form of a Thrift data structure to its object form.
    */
   public static <T extends TBase<?, ?>, F extends TProtocolFactory>
@@ -101,11 +127,11 @@ public class JniUtil {
    * Impala metrics by the backend. A synthetic 'total' memory pool is included with
    * aggregate statistics for all real pools.
    */
-  public static byte[] getJvmMetrics(byte[] argument) throws ImpalaException {
-    TGetJvmMetricsRequest request = new TGetJvmMetricsRequest();
+  public static byte[] getJvmMemoryMetrics(byte[] argument) throws ImpalaException {
+    TGetJvmMemoryMetricsRequest request = new TGetJvmMemoryMetricsRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, argument);
 
-    TGetJvmMetricsResponse jvmMetrics = new TGetJvmMetricsResponse();
+    TGetJvmMemoryMetricsResponse jvmMetrics = new TGetJvmMemoryMetricsResponse();
     jvmMetrics.setMemory_pools(new ArrayList<TJvmMemoryPool>());
     TJvmMemoryPool totalUsage = new TJvmMemoryPool();
     boolean is_total =
@@ -182,13 +208,7 @@ public class JniUtil {
       nonHeap.setPeak_used(0);
       jvmMetrics.getMemory_pools().add(nonHeap);
     }
-
-    TSerializer serializer = new TSerializer(protocolFactory_);
-    try {
-      return serializer.serialize(jvmMetrics);
-    } catch (TException e) {
-      throw new InternalException(e.getMessage());
-    }
+    return serializeToThrift(jvmMetrics, protocolFactory_);
   }
 
   /**
@@ -215,13 +235,12 @@ public class JniUtil {
         response.addToThreads(tThreadInfo);
       }
     }
+    return serializeToThrift(response, protocolFactory_);
+  }
 
-    TSerializer serializer = new TSerializer(protocolFactory_);
-    try {
-      return serializer.serialize(response);
-    } catch (TException e) {
-      throw new InternalException(e.getMessage());
-    }
+  public static byte[] getJMXJson() throws  ImpalaException {
+    TGetJMXJsonResponse response = new TGetJMXJsonResponse(JMXJsonUtil.getJMXJson());
+    return serializeToThrift(response, protocolFactory_);
   }
 
   /**

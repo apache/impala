@@ -247,8 +247,8 @@ TEST_F(MetricsTest, MemMetric) {
 #endif
 }
 
-TEST_F(MetricsTest, JvmMetrics) {
-  MetricGroup metrics("JvmMetrics");
+TEST_F(MetricsTest, JvmMemoryMetrics) {
+  MetricGroup metrics("JvmMemoryMetrics");
   ASSERT_OK(RegisterMemoryMetrics(&metrics, true, nullptr, nullptr));
   IntGauge* jvm_total_used =
       metrics.GetOrCreateChildGroup("jvm")->FindMetricForTesting<IntGauge>(

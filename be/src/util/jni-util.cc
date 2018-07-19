@@ -64,10 +64,12 @@ bool JniScopedArrayCritical::Create(JNIEnv* env, jbyteArray jarr,
   return true;
 }
 
+bool JniUtil::jvm_inited_ = false;
 jclass JniUtil::jni_util_cl_ = NULL;
 jclass JniUtil::internal_exc_cl_ = NULL;
 jmethodID JniUtil::get_jvm_metrics_id_ = NULL;
 jmethodID JniUtil::get_jvm_threads_id_ = NULL;
+jmethodID JniUtil::get_jmx_json_ = NULL;
 jmethodID JniUtil::throwable_to_string_id_ = NULL;
 jmethodID JniUtil::throwable_to_stack_trace_id_ = NULL;
 
@@ -176,10 +178,10 @@ Status JniUtil::Init() {
   }
 
   get_jvm_metrics_id_ =
-      env->GetStaticMethodID(jni_util_cl_, "getJvmMetrics", "([B)[B");
+      env->GetStaticMethodID(jni_util_cl_, "getJvmMemoryMetrics", "([B)[B");
   if (get_jvm_metrics_id_ == NULL) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
-    return Status("Failed to find JniUtil.getJvmMetrics method.");
+    return Status("Failed to find JniUtil.getJvmMemoryMetrics method.");
   }
 
   get_jvm_threads_id_ =
@@ -189,6 +191,13 @@ Status JniUtil::Init() {
     return Status("Failed to find JniUtil.getJvmThreadsInfo method.");
   }
 
+  get_jmx_json_ =
+      env->GetStaticMethodID(jni_util_cl_, "getJMXJson", "()[B");
+  if (get_jmx_json_ == NULL) {
+    if (env->ExceptionOccurred()) env->ExceptionDescribe();
+    return Status("Failed to find JniUtil.getJMXJson method.");
+  }
+  jvm_inited_ = true;
   return Status::OK();
 }
 
@@ -197,6 +206,17 @@ void JniUtil::InitLibhdfs() {
   // null; see xxx for an explanation
   hdfsFS fs = hdfsConnect("default", 0);
   hdfsDisconnect(fs);
+}
+
+Status JniUtil::InitJvmPauseMonitor() {
+  JNIEnv* env = getJNIEnv();
+  if (!env) return Status("Failed to get/create JVM.");
+  if (!jni_util_cl_) return Status("JniUtil::Init() not called.");
+  jmethodID init_jvm_pm_method;
+  JniMethodDescriptor init_jvm_pm_desc = {"initPauseMonitor", "()V", &init_jvm_pm_method};
+  RETURN_IF_ERROR(JniUtil::LoadStaticJniMethod(env, jni_util_cl_, &init_jvm_pm_desc));
+  RETURN_IF_ERROR(JniUtil::CallJniMethod(jni_util_cl_, init_jvm_pm_method));
+  return Status::OK();
 }
 
 Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& prefix) {
@@ -234,14 +254,18 @@ Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& pr
   return Status(Substitute("$0$1", prefix, msg_str_guard.get()));
 }
 
-Status JniUtil::GetJvmMetrics(const TGetJvmMetricsRequest& request,
-    TGetJvmMetricsResponse* result) {
+Status JniUtil::GetJvmMemoryMetrics(const TGetJvmMemoryMetricsRequest& request,
+    TGetJvmMemoryMetricsResponse* result) {
   return JniUtil::CallJniMethod(jni_util_class(), get_jvm_metrics_id_, request, result);
 }
 
 Status JniUtil::GetJvmThreadsInfo(const TGetJvmThreadsInfoRequest& request,
     TGetJvmThreadsInfoResponse* result) {
   return JniUtil::CallJniMethod(jni_util_class(), get_jvm_threads_id_, request, result);
+}
+
+Status JniUtil::GetJMXJson(TGetJMXJsonResponse* result) {
+  return JniUtil::CallJniMethod(jni_util_class(), get_jmx_json_, result);
 }
 
 Status JniUtil::LoadJniMethod(JNIEnv* env, const jclass& jni_class,
