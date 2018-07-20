@@ -71,6 +71,26 @@ under the License.
       </snapshots>
     </repository>
     <repository>
+      <!--
+      The Impala development bootstrapping depends on CDH Maven snapshots
+      which transitively pull dependencies from other repositories which
+      can cause the build to be non-reproducible, e.g. IMPALA-7316. This
+      patch makes the build to be reproducible by blacklisting
+      cdh.snapshots.repo so that Maven does not accidentally downloads the
+      latest CDH snapshots when running a build, which can cause
+      incompatibility issues.
+      -->
+      <id>cdh.snapshots.repo</id>
+      <url>https://repository.cloudera.com/content/repositories/snapshots</url>
+      <name>CDH Snapshots Repository</name>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
       <id>cdh.rcs.releases.repo</id>
       <url>https://repository.cloudera.com/content/groups/cdh-releases-rcs</url>
       <name>CDH Releases Repository</name>
