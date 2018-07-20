@@ -96,38 +96,59 @@ Trying to re-register with state-store</codeblock>
       <note conref="../shared/impala_common.xml#common/timeout_clock_blurb"/>
 
       <p>
-        Specify the following startup options for the <cmdname>impalad</cmdname> daemon:
+        Use the following startup options for the <cmdname>impalad</cmdname>
+        daemon to specify timeout values:
       </p>
 
       <ul>
-        <li>
+        <li><codeph>--idle_query_timeout</codeph>
           <p>
-            The <codeph>--idle_query_timeout</codeph> option specifies the time in seconds after
-            which an idle query is cancelled. This could be a query whose results were all fetched
-            but was never closed, or one whose results were partially fetched and then the client
-            program stopped requesting further results. This condition is most likely to occur in
-            a client program using the JDBC or ODBC interfaces, rather than in the interactive
-            <cmdname>impala-shell</cmdname> interpreter. Once the query is cancelled, the client
-            program cannot retrieve any further results.
+            Specifies the time in
+            seconds after which an idle query is cancelled. This could be a
+            query whose results were all fetched but was never closed, or one
+            whose results were partially fetched and then the client program
+            stopped requesting further results. This condition is most likely to
+            occur in a client program using the JDBC or ODBC interfaces, rather
+            than in the interactive <cmdname>impala-shell</cmdname> interpreter.
+            Once a query is cancelled, the client program cannot retrieve any
+            further results from the query.
           </p>
-
           <p rev="2.0.0">
-            You can reduce the idle query timeout by using the <codeph>QUERY_TIMEOUT_S</codeph>
-            query option. Any non-zero value specified for the <codeph>--idle_query_timeout</codeph> startup
-            option serves as an upper limit for the <codeph>QUERY_TIMEOUT_S</codeph> query option.
-            A zero value for <codeph>--idle_query_timeout</codeph> disables query timeouts.
-            See <xref href="impala_query_timeout_s.xml#query_timeout_s"/> for details.
+            You can reduce
+            the idle query timeout by using the <codeph>QUERY_TIMEOUT_S</codeph>
+            query option. Any non-zero value specified for the
+              <codeph>--idle_query_timeout</codeph> startup option serves as an
+            upper limit for the <codeph>QUERY_TIMEOUT_S</codeph> query option.
+            See <xref href="impala_query_timeout_s.xml#query_timeout_s"/> about
+            the query option.
+          </p>
+          <p rev="2.0.0">A zero value for
+              <codeph>--idle_query_timeout</codeph> disables query timeouts.
+          </p>
+          <p>
+            Cancelled queries remain in the open state but use only the
+            minimal resources.
           </p>
         </li>
 
-        <li>
+        <li><codeph>--idle_session_timeout</codeph>
           <p>
-            The <codeph>--idle_session_timeout</codeph> option specifies the time in seconds after
-            which an idle session is expired. A session is idle when no activity is occurring for
-            any of the queries in that session, and the session has not started any new queries.
-            Once a session is expired, you cannot issue any new query requests to it. The session
-            remains open, but the only operation you can perform is to close it. The default value
-            of 0 means that sessions never expire.
+            Specifies the time in
+            seconds after which an idle session expires. A session is idle when
+            no activity is occurring for any of the queries in that session, and
+            the session has not started any new queries. Once a session is
+            expired, you cannot issue any new query requests to it. The session
+            remains open, but the only operation you can perform is to close it.
+          </p>
+          <p>
+            The default value of 0 specifies sessions never
+            expire.
+          </p>
+          <p rev="2.12.0">
+            You can override the
+              <codeph>--idle_session_timeout</codeph> value with the <xref
+              href="impala_idle_session_timeout.xml#idle_session_timeout"/> at
+            the session level.
           </p>
         </li>
       </ul>
@@ -185,11 +206,26 @@ Trying to re-register with state-store</codeblock>
     <conbody>
 
       <p>
-        Sometimes, an Impala query might run for an unexpectedly long time, tying up resources
-        in the cluster. You can cancel the query explicitly, independent of the timeout period,
-        by going into the web UI for the <cmdname>impalad</cmdname> host (on port 25000 by
-        default), and using the link on the <codeph>/queries</codeph> tab to cancel the running
-        query. For example, press <codeph>^C</codeph> in <cmdname>impala-shell</cmdname>.
+        Sometimes, an Impala query might run for an unexpectedly long time,
+        tying up resources in the cluster. You can cancel the query explicitly,
+        independent of the timeout period, by going into the web UI for the
+          <cmdname>impalad</cmdname> host (on port 25000 by default), and using
+        the link on the <codeph>/queries</codeph> tab to cancel the running
+        query.
+      </p>
+
+      <p>
+        Various client applications let you interactively cancel queries
+        submitted or monitored through those applications. For example:
+        <ul>
+          <li>
+            Press <systemoutput>^C</systemoutput> in
+            <cmdname>impala-shell</cmdname>.
+          </li>
+          <li>
+            Click <b>Cancel</b> from the <b>Watch</b>page in Hue.
+          </li>
+        </ul>
       </p>
 
     </conbody>
