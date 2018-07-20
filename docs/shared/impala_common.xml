@@ -3771,13 +3771,20 @@ sudo pip-python install ssl</codeblock>
 
       <note id="timeout_clock_blurb">
         <p>
-          The timeout clock for queries and sessions only starts ticking when the query or session is idle.
-          For queries, this means the query has results ready but is waiting for a client to fetch the data. A
-          query can run for an arbitrary time without triggering a timeout, because the query is computing results
-          rather than sitting idle waiting for the results to be fetched. The timeout period is intended to prevent
-          unclosed queries from consuming resources and taking up slots in the admission count of running queries,
-          potentially preventing other queries from starting.
+          The timeout clock for queries and sessions only starts ticking when
+          the query or session is idle.
         </p>
+
+        <p>
+          For queries, this means the query has results ready but is waiting
+          for a client to fetch the data. A query can run for an arbitrary time
+          without triggering a timeout, because the query is computing results
+          rather than sitting idle waiting for the results to be fetched. The
+          timeout period is intended to prevent unclosed queries from consuming
+          resources and taking up slots in the admission count of running
+          queries, potentially preventing other queries from starting.
+        </p>
+
         <p>
           For sessions, this means that no query has been submitted for some period of time.
         </p>

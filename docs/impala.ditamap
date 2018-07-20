@@ -192,6 +192,7 @@ under the License.
           <topicref href="topics/impala_explain_level.xml"/>
           <topicref href="topics/impala_hbase_cache_blocks.xml"/>
           <topicref href="topics/impala_hbase_caching.xml"/>
+          <topicref href="topics/impala_idle_session_timeout.xml"/>
           <topicref href="topics/impala_kudu_read_mode.xml"/>
           <topicref href="topics/impala_live_progress.xml"/>
           <topicref href="topics/impala_live_summary.xml"/>

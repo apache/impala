@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="2.12.0" id="idle_session_timeout">
+
+  <title>IDLE_SESSION_TIMEOUT Query Option (<keyword keyref="impala212_full"/> or higher only)</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>IDLE_SESSION_TIMEOUT</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="2.12.0">
+      The <codeph>IDLE_SESSION_TIMEOUT</codeph> query option sets the time in seconds after
+      which an idle session is cancelled. A session is idle when no activity is occurring for
+      any of the queries in that session, and the session has not started any new queries. Once
+      a session is expired, you cannot issue any new query requests to it. The session remains
+      open, but the only operation you can perform is to close it.
+    </p>
+
+    <p rev="2.12.0">
+      The <codeph>IDLE_SESSION_TIMEOUT</codeph> query option overrides the
+      <codeph>--idle_session_timeout</codeph> startup option. See
+      <xref href="impala_timeouts.xml#timeouts"/> for the
+      <codeph>--idle_session_timeout</codeph> startup option.
+    </p>
+
+    <p>
+      The <codeph>IDLE_SESSION_TIMEOUT</codeph> query option allows JDBC/ODBC connections to set
+      the session timeout as a query option with the <codeph>SET</codeph> statement.
+    </p>
+
+    <p>
+      <b>Syntax:</b>
+    </p>
+
+<codeblock>SET IDLE_SESSION_TIMEOUT=<varname>seconds</varname>;</codeblock>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p>
+      <b>Default:</b> 0
+      <ul>
+        <li>
+          If <codeph>--idle_session_timeout</codeph> is not set, the session never expires.
+        </li>
+
+        <li>
+          If <codeph>--idle_session_timeout</codeph> is set, use that timeout value.
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala212_full"/>
+    </p>
+
+    <p>
+      <b>Related information:</b>
+    </p>
+
+    <p>
+      <xref href="impala_timeouts.xml#timeouts"/>
+    </p>
+
+  </conbody>
+
+</concept>
