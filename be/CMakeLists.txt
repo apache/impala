@@ -63,8 +63,6 @@ SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 #        makes extra calls to clang which may have extra includes (-I) that are unused.
 #   -fcolor-diagnostics: ensure clang generates colorized output, which is necessary
 #        when using ccache as clang thinks it is not called from a terminal.
-#   -Wno-mismatched-tags: ignore harmless class/struct mismatch for forward declarations.
-#        Disabling to be consistent with gcc, which doesn't have this warning.
 #   -Wno-zero-as-null-pointer-constant: We are slowly moving towards the use of nullptr,
 #        but till we switch to it completely, we will ignore the warnings due to use of
 #        NULL as a null pointer constant.
@@ -75,10 +73,10 @@ SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 #        destructors with 'override' which is enforced by clang by not recommended by c++
 #        core guidelines (read C.128).
 SET(CXX_CLANG_FLAGS "-Qunused-arguments -fcolor-diagnostics -Wno-unused-local-typedef")
-SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-mismatched-tags")
 SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-zero-as-null-pointer-constant")
 SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-c++17-extensions")
 SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-inconsistent-missing-destructor-override")
+SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -Wno-return-type-c-linkage")
 # For any gcc builds:
 #   -g: Enable symbols for profiler tools
 #   -Wno-unused-local-typedefs: Do not warn for local typedefs that are unused.
@@ -104,15 +102,15 @@ endif()
 # Debug information is stored as dwarf2 to be as compatible as possible
 SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb -gdwarf-2")
 # -Werror: compile warnings should be errors when using the toolchain compiler.
-#   Only enable for debug builds because this is what we test in pre-commit tests.
+#   Enabled for DEBUG, ASAN, TSAN and UBSAN builds which are built pre-commit.
 SET(CXX_FLAGS_DEBUG "${CXX_FLAGS_DEBUG} -Werror")
 SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG -gdwarf-2")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
-  "${CXX_CLANG_FLAGS} -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
+  "${CXX_CLANG_FLAGS} -Werror -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
 
 # Set the flags to the undefined behavior sanitizer, also known as "ubsan"
 # Turn on sanitizer and debug symbols to get stack traces:
-SET(CXX_FLAGS_UBSAN "${CXX_CLANG_FLAGS} -ggdb3 -fno-omit-frame-pointer -fsanitize=undefined")
+SET(CXX_FLAGS_UBSAN "${CXX_CLANG_FLAGS} -Werror -ggdb3 -fno-omit-frame-pointer -fsanitize=undefined")
 # Set preprocessor macros to facilitate initialization the relevant configuration.
 SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -DUNDEFINED_SANITIZER")
 # Calling getenv() in __ubsan_default_options doesn't work, likely because of
@@ -131,7 +129,7 @@ SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -O0")
 
 # Set the flags to the thread sanitizer, also known as "tsan"
 # Turn on sanitizer and debug symbols to get stack traces:
-SET(CXX_FLAGS_TSAN "${CXX_CLANG_FLAGS} -O1 -ggdb3 -fno-omit-frame-pointer")
+SET(CXX_FLAGS_TSAN "${CXX_CLANG_FLAGS} -Werror -O1 -ggdb3 -fno-omit-frame-pointer")
 SET(CXX_FLAGS_TSAN "${CXX_FLAGS_TSAN} -fsanitize=thread -DTHREAD_SANITIZER")
 
 SET(CXX_FLAGS_TIDY "${CXX_CLANG_FLAGS}")

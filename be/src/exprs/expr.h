@@ -32,7 +32,7 @@
 namespace impala {
 
 class IsNullExpr;
-class LibCacheEntry;
+struct LibCacheEntry;
 class LlvmCodeGen;
 class MemTracker;
 class ObjectPool;

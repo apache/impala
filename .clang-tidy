@@ -46,7 +46,6 @@ Checks: "-*,clang*,\
 -clang-diagnostic-gnu-anonymous-struct,\
 -clang-diagnostic-header-hygiene,\
 -clang-diagnostic-implicit-fallthrough,\
--clang-diagnostic-mismatched-tags,\
 -clang-diagnostic-missing-prototypes,\
 -clang-diagnostic-missing-variable-declarations,\
 -clang-diagnostic-nested-anon-types,\
