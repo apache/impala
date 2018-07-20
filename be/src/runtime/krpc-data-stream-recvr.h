@@ -43,7 +43,7 @@ class MemTracker;
 class RowBatch;
 class RuntimeProfile;
 class SortedRunMerger;
-class TransmitDataCtx;
+struct TransmitDataCtx;
 class TransmitDataRequestPB;
 class TransmitDataResponsePB;
 

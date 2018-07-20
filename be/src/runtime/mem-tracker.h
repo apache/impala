@@ -41,7 +41,7 @@ namespace impala {
 
 class ObjectPool;
 class MemTracker;
-class ReservationTrackerCounters;
+struct ReservationTrackerCounters;
 class TQueryOptions;
 
 /// A MemTracker tracks memory consumption; it contains an optional limit

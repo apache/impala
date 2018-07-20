@@ -30,7 +30,7 @@ namespace impala {
 class HdfsPartitionDescriptor;
 class HdfsTableDescriptor;
 class HdfsTableSink;
-class OutputPartition;
+struct OutputPartition;
 class RowBatch;
 class RuntimeState;
 class ScalarExprEvaluator;

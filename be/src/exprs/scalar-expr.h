@@ -55,7 +55,7 @@ using impala_udf::StringVal;
 using impala_udf::DecimalVal;
 using impala_udf::CollectionVal;
 
-class LibCacheEntry;
+struct LibCacheEntry;
 class LlvmCodeGen;
 class MemTracker;
 class ObjectPool;
