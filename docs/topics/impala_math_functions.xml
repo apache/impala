@@ -1147,9 +1147,9 @@ select pmod(5,-2);
       <dlentry id="rand">
 
         <dt>
-          <codeph>rand()</codeph>, <codeph>rand(int seed)</codeph>,
+          <codeph>rand()</codeph>, <codeph>rand(bigint seed)</codeph>,
           <codeph rev="2.3.0" id="random">random()</codeph>,
-          <codeph rev="2.3.0">random(int seed)</codeph>
+          <codeph rev="2.3.0">random(bigint seed)</codeph>
         </dt>
 
         <dd>
