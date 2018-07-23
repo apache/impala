@@ -1048,7 +1048,7 @@ class TestImpalaKuduIntegration(KuduTestSuite):
       # Drop the underlying Kudu table
       kudu_client.delete_table(kudu_table.name)
       assert not kudu_client.table_exists(kudu_table.name)
-      err_msg = 'The table does not exist: table_name: "%s"' % (kudu_table.name)
+      err_msg = 'the table does not exist: table_name: "%s"' % (kudu_table.name)
       try:
         cursor.execute("REFRESH %s" % (impala_table_name))
       except Exception as e:
