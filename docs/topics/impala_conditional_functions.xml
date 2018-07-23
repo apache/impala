@@ -391,16 +391,18 @@ END</codeblock>
           <codeph>nullifzero(<varname>numeric_expr</varname>)</codeph>
         </dt>
 
-        <dd>
-          <indexterm audience="hidden">nullifzero() function</indexterm>
-          <b>Purpose:</b> Returns <codeph>NULL</codeph> if the numeric expression evaluates to 0, otherwise returns
-          the result of the expression.
+        <dd><b>Purpose:</b> Returns <codeph>NULL</codeph> if the numeric
+          expression evaluates to 0, otherwise returns the result of the
+          expression.
           <p>
-            <b>Usage notes:</b> Used to avoid error conditions such as divide-by-zero in numeric calculations.
-            Serves as shorthand for a more elaborate <codeph>CASE</codeph> expression, to simplify porting SQL with
-            vendor extensions to Impala.
+            <b>Usage notes:</b> Used to avoid error conditions such as
+            divide-by-zero in numeric calculations. Serves as shorthand for a
+            more elaborate <codeph>CASE</codeph> expression, to simplify porting
+            SQL with vendor extensions to Impala.
           </p>
-          <p conref="../shared/impala_common.xml#common/return_same_type"/>
+          <p><b>Return type:</b>
+            Same type as the input argument
+          </p>
           <p conref="../shared/impala_common.xml#common/added_in_130"/>
         </dd>
 
@@ -500,16 +502,15 @@ select s, nvl2(s, 'is not null', 'is null') from nvl2_demo;
           <codeph>zeroifnull(<varname>numeric_expr</varname>)</codeph>
         </dt>
 
-        <dd>
-          <indexterm audience="hidden">zeroifnull() function</indexterm>
-          <b>Purpose:</b> Returns 0 if the numeric expression evaluates to <codeph>NULL</codeph>, otherwise returns
-          the result of the expression.
-          <p>
-            <b>Usage notes:</b> Used to avoid unexpected results due to unexpected propagation of
-            <codeph>NULL</codeph> values in numeric calculations. Serves as shorthand for a more elaborate
-            <codeph>CASE</codeph> expression, to simplify porting SQL with vendor extensions to Impala.
-          </p>
-          <p conref="../shared/impala_common.xml#common/return_same_type"/>
+        <dd><b>Purpose:</b> Returns 0 if the numeric expression evaluates to
+            <codeph>NULL</codeph>, otherwise returns the result of the
+          expression. <p>
+            <b>Usage notes:</b> Used to avoid unexpected results due to
+            unexpected propagation of <codeph>NULL</codeph> values in numeric
+            calculations. Serves as shorthand for a more elaborate
+              <codeph>CASE</codeph> expression, to simplify porting SQL with
+            vendor extensions to Impala. </p>
+          <p><b>Return type:</b> Same type as the input argument </p>
           <p conref="../shared/impala_common.xml#common/added_in_130"/>
         </dd>
 
