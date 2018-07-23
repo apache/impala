@@ -180,6 +180,10 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
       reset_req.reset_metadata_params.__set_is_refresh(true);
       reset_req.reset_metadata_params.__set_table_name(
           exec_request_.load_data_request.table_name);
+      if (exec_request_.load_data_request.__isset.partition_spec) {
+        reset_req.reset_metadata_params.__set_partition_spec(
+            exec_request_.load_data_request.partition_spec);
+      }
       reset_req.reset_metadata_params.__set_sync_ddl(
           exec_request_.query_options.sync_ddl);
       catalog_op_executor_.reset(
