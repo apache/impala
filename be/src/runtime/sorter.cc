@@ -334,8 +334,8 @@ class Sorter::Run {
   Status AddPage(vector<Page>* page_sequence) WARN_UNUSED_RESULT;
 
   /// Advance to the next read page. If the run is pinned, has no effect. If the run
-  /// is unpinned, atomically pin the page at 'page_index' + 1 in 'pages' and delete
-  /// the page at 'page_index'.
+  /// is unpinned, the pin at 'page_index' was already attached to an output batch and
+  /// this function will pin the page at 'page_index' + 1 in 'pages'.
   Status PinNextReadPage(vector<Page>* pages, int page_index) WARN_UNUSED_RESULT;
 
   /// Copy the StringValues in 'var_values' to 'dest' in order and update the StringValue
@@ -918,22 +918,11 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
 
   if (end_of_fixed_len_page_
       && fixed_len_pages_index_ >= static_cast<int>(fixed_len_pages_.size()) - 1) {
-    if (is_pinned_) {
-      // All pages were previously attached to output batches. GetNextBatch() assumes
-      // that we don't attach resources to the batch on eos.
-      DCHECK_EQ(NumOpenPages(fixed_len_pages_), 0);
-      DCHECK_EQ(NumOpenPages(var_len_pages_), 0);
+    // All pages were previously attached to output batches. GetNextBatch() assumes
+    // that we don't attach resources to the batch on eos.
+    DCHECK_EQ(NumOpenPages(fixed_len_pages_), 0);
+    DCHECK_EQ(NumOpenPages(var_len_pages_), 0);
 
-      // Flush resources in case we are in a subplan and need to allocate more pages
-      // when the node is reopened.
-      output_batch->MarkFlushResources();
-    } else {
-      // We held onto the last fixed or var len blocks without transferring them to the
-      // caller. We signalled MarkNeedsDeepCopy() to the caller, so we can safely delete
-      // them now to free memory.
-      if (!fixed_len_pages_.empty()) DCHECK_EQ(NumOpenPages(fixed_len_pages_), 1);
-      if (!var_len_pages_.empty()) DCHECK_EQ(NumOpenPages(var_len_pages_), 1);
-    }
     CloseAllPages();
     *eos = true;
     DCHECK_EQ(num_tuples_returned_, num_tuples_);
@@ -976,12 +965,16 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
     if (CONVERT_OFFSET_TO_PTR && !ConvertOffsetsToPtrs(input_tuple)) {
       DCHECK(!is_pinned_);
       // The var-len data is in the next page. We are done with the current page, so
-      // return rows we've accumulated so far and advance to the next page in the next
-      // GetNext() call. This is needed for the unpinned case where we will exchange
-      // this page for the next in the next GetNext() call. So therefore we must hold
-      // onto the current var-len page and signal to the caller that the page is going
-      // to be deleted.
-      output_batch->MarkNeedsDeepCopy();
+      // return rows we've accumulated so far along with the page's buffer and advance
+      // to the next page in the next GetNext() call. We need the page's reservation to
+      // pin the next page, so flush resources.
+      DCHECK_GE(var_len_pages_index_, 0);
+      DCHECK_LT(var_len_pages_index_, var_len_pages_.size());
+      BufferPool::BufferHandle buffer =
+          var_len_pages_[var_len_pages_index_].ExtractBuffer(
+              sorter_->buffer_pool_client_);
+      output_batch->AddBuffer(sorter_->buffer_pool_client_, move(buffer),
+          RowBatch::FlushMode::FLUSH_RESOURCES);
       end_of_var_len_page_ = true;
       break;
     }
@@ -993,27 +986,23 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
 
   if (fixed_len_page_offset_ >= fixed_len_page->valid_data_len()) {
     // Reached the page boundary, need to move to the next page.
-    if (is_pinned_) {
-      BufferPool::ClientHandle* client = sorter_->buffer_pool_client_;
-      // Attach page to batch. Caller can delete the page when it wants to.
-      output_batch->AddBuffer(client,
-          fixed_len_pages_[fixed_len_pages_index_].ExtractBuffer(client),
-          RowBatch::FlushMode::NO_FLUSH_RESOURCES);
-
-      // Attach the var-len pages at eos once no more rows will reference the pages.
-      if (fixed_len_pages_index_ == fixed_len_pages_.size() - 1) {
-        for (Page& var_len_page : var_len_pages_) {
-          DCHECK(var_len_page.is_open());
+    BufferPool::ClientHandle* client = sorter_->buffer_pool_client_;
+    // Attach page to batch. For unpinned pages we need to flush resource so we can pin
+    // the next page on the next call to GetNext().
+    RowBatch::FlushMode flush = is_pinned_ ? RowBatch::FlushMode::NO_FLUSH_RESOURCES :
+                                             RowBatch::FlushMode::FLUSH_RESOURCES;
+    output_batch->AddBuffer(
+        client, fixed_len_pages_[fixed_len_pages_index_].ExtractBuffer(client), flush);
+    // Attach remaining var-len pages at eos once no more rows will reference the pages.
+    if (fixed_len_pages_index_ == fixed_len_pages_.size() - 1) {
+      for (Page& var_len_page : var_len_pages_) {
+        DCHECK(!is_pinned_ || var_len_page.is_open());
+        if (var_len_page.is_open()) {
           output_batch->AddBuffer(client, var_len_page.ExtractBuffer(client),
               RowBatch::FlushMode::NO_FLUSH_RESOURCES);
         }
-        var_len_pages_.clear();
       }
-    } else {
-      // To iterate over unpinned runs, we need to exchange this page for the next
-      // in the next GetNext() call, so we need to hold onto the page and signal to
-      // the caller that the page is going to be deleted.
-      output_batch->MarkNeedsDeepCopy();
+      var_len_pages_.clear();
     }
     end_of_fixed_len_page_ = true;
   }
@@ -1027,14 +1016,10 @@ Status Sorter::Run::PinNextReadPage(vector<Page>* pages, int page_index) {
   Page* curr_page = &(*pages)[page_index];
   Page* next_page = &(*pages)[page_index + 1];
   DCHECK_EQ(is_pinned_, next_page->is_pinned());
-  if (is_pinned_) {
-    // The current page was attached to a batch and 'next_page' is already pinned.
-    DCHECK(!curr_page->is_open());
-    return Status::OK();
-  }
-  // Close the previous page to free memory and pin the next page. Should always succeed
-  // since the pages are the same size.
-  curr_page->Close(sorter_->buffer_pool_client_);
+  // The current page was attached to a batch.
+  DCHECK(!curr_page->is_open());
+  // 'next_page' is already pinned if the whole stream is pinned.
+  if (is_pinned_) return Status::OK();
   RETURN_IF_ERROR(next_page->Pin(sorter_->buffer_pool_client_));
   return Status::OK();
 }

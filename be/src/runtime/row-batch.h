@@ -198,7 +198,7 @@ class RowBatch {
     DCHECK_LE(num_rows_, capacity_);
     // Check AtCapacity() condition enforced in MarkNeedsDeepCopy() and
     // MarkFlushResources().
-    DCHECK((!needs_deep_copy_ && flush_ == FlushMode::NO_FLUSH_RESOURCES)
+    DCHECK((!needs_deep_copy_ && flush_mode_ == FlushMode::NO_FLUSH_RESOURCES)
         || num_rows_ == capacity_);
     int64_t mem_usage = attached_buffer_bytes_ + tuple_data_pool_.total_allocated_bytes();
     return num_rows_ == capacity_ || mem_usage >= AT_CAPACITY_MEM_USAGE;
@@ -293,8 +293,10 @@ class RowBatch {
   void MarkFlushResources() {
     DCHECK_LE(num_rows_, capacity_);
     capacity_ = num_rows_;
-    flush_ = FlushMode::FLUSH_RESOURCES;
+    flush_mode_ = FlushMode::FLUSH_RESOURCES;
   }
+
+  FlushMode flush_mode() const { return flush_mode_; }
 
   /// Called to indicate that some resources backing this batch were not attached and
   /// will be cleaned up after the next GetNext() call. This means that the batch must
@@ -499,10 +501,10 @@ class RowBatch {
   /// If FLUSH_RESOURCES, the resources attached to this batch should be freed or
   /// acquired by a new owner as soon as possible. See MarkFlushResources(). If
   /// FLUSH_RESOURCES, AtCapacity() is also true.
-  FlushMode flush_;
+  FlushMode flush_mode_;
 
   /// If true, this batch references unowned memory that will be cleaned up soon.
-  /// See MarkNeedsDeepCopy(). If true, 'flush_' is FLUSH_RESOURCES and
+  /// See MarkNeedsDeepCopy(). If true, 'flush_mode_' is FLUSH_RESOURCES and
   /// AtCapacity() is true.
   bool needs_deep_copy_;
 

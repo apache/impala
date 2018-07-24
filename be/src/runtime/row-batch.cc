@@ -44,7 +44,7 @@ const int RowBatch::FIXED_LEN_BUFFER_LIMIT;
 RowBatch::RowBatch(const RowDescriptor* row_desc, int capacity, MemTracker* mem_tracker)
   : num_rows_(0),
     capacity_(capacity),
-    flush_(FlushMode::NO_FLUSH_RESOURCES),
+    flush_mode_(FlushMode::NO_FLUSH_RESOURCES),
     needs_deep_copy_(false),
     num_tuples_per_row_(row_desc->tuple_descriptors().size()),
     tuple_ptrs_size_(capacity * num_tuples_per_row_ * sizeof(Tuple*)),
@@ -71,7 +71,7 @@ RowBatch::RowBatch(
     const RowDescriptor* row_desc, const TRowBatch& input_batch, MemTracker* mem_tracker)
   : num_rows_(input_batch.num_rows),
     capacity_(input_batch.num_rows),
-    flush_(FlushMode::NO_FLUSH_RESOURCES),
+    flush_mode_(FlushMode::NO_FLUSH_RESOURCES),
     needs_deep_copy_(false),
     num_tuples_per_row_(input_batch.row_tuples.size()),
     tuple_ptrs_size_(capacity_ * num_tuples_per_row_ * sizeof(Tuple*)),
@@ -108,7 +108,7 @@ RowBatch::RowBatch(const RowDescriptor* row_desc, const RowBatchHeaderPB& header
     MemTracker* mem_tracker)
   : num_rows_(0),
     capacity_(0),
-    flush_(FlushMode::NO_FLUSH_RESOURCES),
+    flush_mode_(FlushMode::NO_FLUSH_RESOURCES),
     needs_deep_copy_(false),
     num_tuples_per_row_(header.num_tuples_per_row()),
     tuple_ptrs_size_(header.num_rows() * num_tuples_per_row_ * sizeof(Tuple*)),
@@ -436,7 +436,7 @@ void RowBatch::Reset() {
   tuple_data_pool_.FreeAll();
   FreeBuffers();
   attached_buffer_bytes_ = 0;
-  flush_ = FlushMode::NO_FLUSH_RESOURCES;
+  flush_mode_ = FlushMode::NO_FLUSH_RESOURCES;
   needs_deep_copy_ = false;
 }
 
@@ -449,7 +449,7 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
   buffers_.clear();
   if (needs_deep_copy_) {
     dest->MarkNeedsDeepCopy();
-  } else if (flush_ == FlushMode::FLUSH_RESOURCES) {
+  } else if (flush_mode_ == FlushMode::FLUSH_RESOURCES) {
     dest->MarkFlushResources();
   }
   Reset();

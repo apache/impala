@@ -43,10 +43,11 @@ class RuntimeProfile;
 /// and transfers resource ownership from the input batches to the output batch when
 /// an input batch is processed.
 ///
-/// SortedRunMerger cannot handle the 'needs_deep_copy' resource-transfer model so
-/// if the RunBatchSupplierFn can return batches with the 'needs_deep_copy' flag set,
-/// the merger must have 'deep_copy_input' set. TODO: once 'needs_deep_copy' is removed
-/// this is no longer a problem.
+/// SortedRunMerger cannot handle "flushing resources" so if the RunBatchSupplierFn
+/// can return batches with FLUSH_RESOURCES set, the merger must have 'deep_copy_input'
+/// set. This is because AdvanceMinRow() gets the next batch before freeing resources
+/// from the previous batch.
+/// TODO: it would be nice to fix this to avoid unnecessary copies.
 class SortedRunMerger {
  public:
   /// Function that returns the next batch of rows from an input sorted run. The batch
