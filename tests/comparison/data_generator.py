@@ -236,12 +236,14 @@ class DbPopulator(object):
     self.cluster.yarn.run_mr_job(self.cluster.yarn.find_mr_streaming_jar(), job_args=r'''
         -D mapred.reduce.tasks=%s \
         -D stream.num.map.output.key.fields=2 \
+        -libjars '%s/share/hadoop/hdfs/lib/*' \
         -files %s \
         -input %s \
         -output %s \
         -mapper data_generator_mapper.py \
         -reducer data_generator_reducer.py'''.strip()
-        % (reducer_count, ','.join(files), mapper_input_file, hdfs_output_dir))
+        % (reducer_count, os.environ["HADOOP_HOME"], ','.join(files), mapper_input_file,
+           hdfs_output_dir))
 
 
 if __name__ == '__main__':

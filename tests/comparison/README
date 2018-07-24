@@ -11,7 +11,11 @@ slower but has a larger coverage area.
 
 Requirements:
 
-1) It's assumed that Impala is running locally.
+1) It's assumed that Impala is running locally. The minicluster should either be run with
+   Yarn (by setting INCLUDE_YARN=true and running ./buildall.sh -start_minicluster), or
+   mapreduce should be configured to use local mode (by modifying mapreduce.framework.name
+   in testdata/cluster/node_templates/common/etc/hadoop/conf/mapred-site.xml to 'local'
+   and running ./buildall.sh -start_minicluster)
 
 2) Impyla -- an implementation of DB API 2 for Impala.
 
