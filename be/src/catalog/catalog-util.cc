@@ -135,8 +135,8 @@ TCatalogObjectType::type TCatalogObjectTypeFromName(const string& name) {
     return TCatalogObjectType::DATA_SOURCE;
   } else if (upper == "HDFS_CACHE_POOL") {
     return TCatalogObjectType::HDFS_CACHE_POOL;
-  } else if (upper == "ROLE") {
-    return TCatalogObjectType::ROLE;
+  } else if (upper == "PRINCIPAL") {
+    return TCatalogObjectType::PRINCIPAL;
   } else if (upper == "PRIVILEGE") {
     return TCatalogObjectType::PRIVILEGE;
   }
@@ -196,10 +196,10 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       catalog_object->__set_cache_pool(THdfsCachePool());
       catalog_object->cache_pool.__set_pool_name(object_name);
       break;
-    case TCatalogObjectType::ROLE:
+    case TCatalogObjectType::PRINCIPAL:
       catalog_object->__set_type(object_type);
-      catalog_object->__set_role(TRole());
-      catalog_object->role.__set_role_name(object_name);
+      catalog_object->__set_principal(TPrincipal());
+      catalog_object->principal.__set_principal_name(object_name);
       break;
     case TCatalogObjectType::PRIVILEGE: {
       int pos = object_name.find(".");
@@ -210,7 +210,8 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       }
       catalog_object->__set_type(object_type);
       catalog_object->__set_privilege(TPrivilege());
-      catalog_object->privilege.__set_role_id(atoi(object_name.substr(0, pos).c_str()));
+      catalog_object->privilege.__set_principal_id(
+          atoi(object_name.substr(0, pos).c_str()));
       catalog_object->privilege.__set_privilege_name(object_name.substr(pos + 1));
       break;
     }

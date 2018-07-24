@@ -19,6 +19,7 @@ package org.apache.impala.util;
 
 import java.util.List;
 
+import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.sentry.api.service.thrift.SentryPolicyServiceClient;
 import org.apache.sentry.api.service.thrift.TSentryGrantOption;
 import org.apache.sentry.api.service.thrift.TSentryPrivilege;
@@ -31,7 +32,6 @@ import org.apache.impala.analysis.PrivilegeSpec;
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.AuthorizationException;
-import org.apache.impala.catalog.RolePrivilege;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TPrivilege;
@@ -236,7 +236,7 @@ public class SentryPolicyService {
    *
    * @param requestingUser - The requesting user.
    * @param roleName - The role to grant privileges to (case insensitive).
-   * @param privilege - The privilege to grant.
+   * @param privileges - The privileges to grant.
    * @throws ImpalaException - On any error
    */
   public void grantRolePrivileges(User requestingUser, String roleName,
@@ -307,7 +307,7 @@ public class SentryPolicyService {
    *
    * @param requestingUser - The requesting user.
    * @param roleName - The role to revoke privileges from (case insensitive).
-   * @param privilege - The privilege to revoke.
+   * @param privileges - The privileges to revoke.
    * @throws ImpalaException - On any error
    */
   public void revokeRolePrivileges(User requestingUser, String roleName,
@@ -448,7 +448,7 @@ public class SentryPolicyService {
       privilege.setPrivilege_level(Enum.valueOf(TPrivilegeLevel.class,
           sentryPriv.getAction().toUpperCase()));
     }
-    privilege.setPrivilege_name(RolePrivilege.buildRolePrivilegeName(privilege));
+    privilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(privilege));
     privilege.setCreate_time_ms(sentryPriv.getCreateTime());
     if (sentryPriv.isSetGrantOption() &&
         sentryPriv.getGrantOption() == TSentryGrantOption.TRUE) {

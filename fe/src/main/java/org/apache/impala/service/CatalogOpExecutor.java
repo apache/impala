@@ -51,7 +51,6 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.apache.impala.analysis.AlterTableSortByStmt;
-import org.apache.impala.analysis.ColumnName;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
@@ -75,8 +74,8 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PartitionStatsUtil;
+import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
-import org.apache.impala.catalog.RolePrivilege;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Table;
@@ -2989,7 +2988,7 @@ public class CatalogOpExecutor {
 
     TCatalogObject catalogObject = new TCatalogObject();
     catalogObject.setType(role.getCatalogObjectType());
-    catalogObject.setRole(role.toThrift());
+    catalogObject.setPrincipal(role.toThrift());
     catalogObject.setCatalog_version(role.getCatalogVersion());
     if (createDropRoleParams.isIs_drop()) {
       resp.result.addToRemoved_catalog_objects(catalogObject);
@@ -3024,7 +3023,7 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(role);
     TCatalogObject catalogObject = new TCatalogObject();
     catalogObject.setType(role.getCatalogObjectType());
-    catalogObject.setRole(role.toThrift());
+    catalogObject.setPrincipal(role.toThrift());
     catalogObject.setCatalog_version(role.getCatalogVersion());
     resp.result.addToUpdated_catalog_objects(catalogObject);
     if (grantRevokeRoleParams.isIs_grant()) {
@@ -3046,7 +3045,7 @@ public class CatalogOpExecutor {
     verifySentryServiceEnabled();
     String roleName = grantRevokePrivParams.getRole_name();
     List<TPrivilege> privileges = grantRevokePrivParams.getPrivileges();
-    List<RolePrivilege> rolePrivileges = null;
+    List<PrincipalPrivilege> rolePrivileges = null;
     if (grantRevokePrivParams.isIs_grant()) {
       rolePrivileges = catalog_.getSentryProxy().grantRolePrivileges(requestingUser,
           roleName, privileges);
@@ -3058,7 +3057,7 @@ public class CatalogOpExecutor {
     }
     Preconditions.checkNotNull(rolePrivileges);
     List<TCatalogObject> updatedPrivs = Lists.newArrayList();
-    for (RolePrivilege rolePriv: rolePrivileges) {
+    for (PrincipalPrivilege rolePriv: rolePrivileges) {
       updatedPrivs.add(rolePriv.toTCatalogObject());
     }
 

@@ -25,8 +25,8 @@ import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
-import org.apache.impala.catalog.RolePrivilege;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FrontendTestBase;
@@ -38,6 +38,7 @@ import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
@@ -66,7 +67,7 @@ import static org.junit.Assert.fail;
  */
 public class AuthorizationStmtTest extends FrontendTestBase {
   private static final String SENTRY_SERVER = "server1";
-  private final static User USER = new User(System.getProperty("user.name"));
+  private static final User USER = new User(System.getProperty("user.name"));
   private final AnalysisContext analysisContext_;
   private final SentryPolicyService sentryService_;
   private final ImpaladTestCatalog authzCatalog_;
@@ -963,7 +964,16 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     authorize(String.format("show role grant group `%s`", USER.getName())).ok();
 
     // Show grant role should always be allowed.
-    authorize(String.format("show grant role authz_test_role")).ok();
+    try {
+      authzCatalog_.addRole("test_role");
+      authorize("show grant role test_role").ok();
+      authorize("show grant role test_role on server").ok();
+      authorize("show grant role test_role on database functional").ok();
+      authorize("show grant role test_role on table functional.alltypes").ok();
+      authorize("show grant role test_role on uri '/test-warehouse'").ok();
+    } finally {
+      authzCatalog_.removeRole("test_role");
+    }
 
     // Show create table.
     test = authorize("show create table functional.alltypes");
@@ -2299,10 +2309,51 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     return privLevels.toArray(new TPrivilegeLevel[0]);
   }
 
+  private static abstract class WithPrincipal {
+    protected final AuthzTest test_;
+
+    public WithPrincipal(AuthzTest test) { test_ = test; }
+
+    public abstract void create(TPrivilege[]... privileges) throws ImpalaException;
+    public abstract void drop() throws ImpalaException;
+    public abstract String getName();
+  }
+
+  private static class WithUser extends WithPrincipal {
+    public WithUser(AuthzTest test) { super(test); }
+
+    @Override
+    public void create(TPrivilege[]... privileges) throws ImpalaException {
+      test_.createUser(privileges);
+    }
+
+    @Override
+    public void drop() throws ImpalaException { test_.dropUser(); }
+
+    @Override
+    public String getName() { return test_.user_; }
+  }
+
+  private static class WithRole extends WithPrincipal {
+    public WithRole(AuthzTest test) { super(test); }
+
+    @Override
+    public void create(TPrivilege[]... privileges) throws ImpalaException {
+      test_.createRole(privileges);
+    }
+
+    @Override
+    public void drop() throws ImpalaException { test_.dropRole(); }
+
+    @Override
+    public String getName() { return test_.role_; }
+  }
+
   private class AuthzTest {
     private final AnalysisContext context_;
     private final String stmt_;
     private final String role_ = "authz_test_role";
+    private final String user_ = USER.getName();
 
     public AuthzTest(String stmt) {
       this(null, stmt);
@@ -2319,8 +2370,20 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       authzCatalog_.addRoleGrantGroup(role_, USER.getName());
       for (TPrivilege[] privs: privileges) {
         for (TPrivilege privilege: privs) {
-          privilege.setRole_id(role.getId());
+          privilege.setPrincipal_id(role.getId());
+          privilege.setPrincipal_type(TPrincipalType.ROLE);
           authzCatalog_.addRolePrivilege(role_, privilege);
+        }
+      }
+    }
+
+    private void createUser(TPrivilege[]... privileges) throws ImpalaException {
+      org.apache.impala.catalog.User user = authzCatalog_.addUser(user_);
+      for (TPrivilege[] privs: privileges) {
+        for (TPrivilege privilege: privs) {
+          privilege.setPrincipal_id(user.getId());
+          privilege.setPrincipal_type(TPrincipalType.USER);
+          authzCatalog_.addUserPrivilege(user_, privilege);
         }
       }
     }
@@ -2329,85 +2392,99 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       authzCatalog_.removeRole(role_);
     }
 
+    private void dropUser() throws ImpalaException {
+      authzCatalog_.removeUser(user_);
+    }
+
     /**
-     * This method runs with the specified privileges.
+     * This method runs with the specified privileges for the role and then for the user.
      *
-     * A new temporary role will be created and assigned to the specified privileges
-     * into the new role. The new role will be dropped once this method finishes.
+     * A new temporary role/user will be created and assigned to the specified privileges
+     * into the new role/user. The new role/user will be dropped once this method
+     * finishes.
      */
     public AuthzTest ok(TPrivilege[]... privileges) throws ImpalaException {
-      try {
-        createRole(privileges);
-        if (context_ != null) {
-          authzOk(context_, stmt_);
-        } else {
-          authzOk(stmt_);
+      for (WithPrincipal withPrincipal: new WithPrincipal[]{
+          new WithRole(this), new WithUser(this)}) {
+        try {
+          withPrincipal.create(privileges);
+          if (context_ != null) {
+            authzOk(context_, stmt_, withPrincipal);
+          } else {
+            authzOk(stmt_, withPrincipal);
+          }
+        } finally {
+          withPrincipal.drop();
         }
-      } catch (AuthorizationException ae) {
-        // Because the same test can be called from multiple statements
-        // it is useful to know which statement caused the exception.
-        throw new AuthorizationException(stmt_ + ": " + ae.getMessage(), ae);
-      } finally {
-        dropRole();
       }
       return this;
     }
 
     /**
-     * This method runs with the specified privileges and checks describe output.
+     * This method runs with the specified privileges and checks describe output for the
+     * role and then the user.
      *
-     * A new temporary role will be created and assigned to the specified privileges
-     * into the new role. The new role will be dropped once this method finishes.
+     * A new temporary role/user will be created and assigned to the specified privileges
+     * into the new role/user. The new role/user will be dropped once this method
+     * finishes.
      */
     public AuthzTest okDescribe(TTableName table, TDescribeOutputStyle style,
         String[] requiredStrings, String[] excludedStrings, TPrivilege[]... privileges)
         throws ImpalaException {
-      try {
-        createRole(privileges);
-        if (context_ != null) {
-          authzOk(context_, stmt_);
-        } else {
-          authzOk(stmt_);
-        }
-        List<String> result = resultToStringList(authzFrontend_.describeTable(table,
-            style, USER));
-        if (requiredStrings != null) {
-          for (String str: requiredStrings) {
-            assertTrue(String.format("\"%s\" is not in the describe output.\n" +
-                "Expected : %s\n" +
-                "Actual   : %s", str, Arrays.toString(requiredStrings), result),
-                result.contains(str));
+      for (WithPrincipal withPrincipal: new WithPrincipal[]{
+          new WithRole(this), new WithUser(this)}) {
+        try {
+          withPrincipal.create(privileges);
+          if (context_ != null) {
+            authzOk(context_, stmt_, withPrincipal);
+          } else {
+            authzOk(stmt_, withPrincipal);
           }
-        }
-        if (excludedStrings != null) {
-          for (String str: excludedStrings) {
-            assertTrue(String.format("\"%s\" should not be in the describe output.", str),
-                !result.contains(str));
+          List<String> result = resultToStringList(authzFrontend_.describeTable(table,
+              style, USER));
+          if (requiredStrings != null) {
+            for (String str : requiredStrings) {
+              assertTrue(String.format("\"%s\" is not in the describe output.\n" +
+                  "Expected : %s\n" +
+                  "Actual   : %s", str, Arrays.toString(requiredStrings), result),
+                  result.contains(str));
+            }
           }
+          if (excludedStrings != null) {
+            for (String str : excludedStrings) {
+              assertTrue(String.format(
+                  "\"%s\" should not be in the describe output.", str),
+                  !result.contains(str));
+            }
+          }
+        } finally {
+          withPrincipal.drop();
         }
-      } finally {
-        dropRole();
       }
       return this;
     }
 
     /**
-     * This method runs with the specified privileges.
+     * This method runs with the specified privileges for the user and then the role.
      *
-     * A new temporary role will be created and assigned to the specified privileges
-     * into the new role. The new role will be dropped once this method finishes.
+     * A new temporary role/user will be created and assigned to the specified privileges
+     * into the new role/user. The new role/user will be dropped once this method
+     * finishes.
      */
     public AuthzTest error(String expectedError, TPrivilege[]... privileges)
         throws ImpalaException {
-      try {
-        createRole(privileges);
-        if (context_ != null) {
-          authzError(context_, stmt_, expectedError);
-        } else {
-          authzError(stmt_, expectedError);
+      for (WithPrincipal withPrincipal: new WithPrincipal[]{
+          new WithRole(this), new WithUser(this)}) {
+        try {
+          withPrincipal.create(privileges);
+          if (context_ != null) {
+            authzError(context_, stmt_, expectedError, withPrincipal);
+          } else {
+            authzError(stmt_, expectedError, withPrincipal);
+          }
+        } finally {
+          withPrincipal.drop();
         }
-      } finally {
-        dropRole();
       }
       return this;
     }
@@ -2426,7 +2503,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     for (int i = 0; i < levels.length; i++) {
       privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.SERVER, false);
       privileges[i].setServer_name(SENTRY_SERVER);
-      privileges[i].setPrivilege_name(RolePrivilege.buildRolePrivilegeName(
+      privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
           privileges[i]));
     }
     return privileges;
@@ -2438,7 +2515,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.DATABASE, false);
       privileges[i].setServer_name(SENTRY_SERVER);
       privileges[i].setDb_name(db);
-      privileges[i].setPrivilege_name(RolePrivilege.buildRolePrivilegeName(
+      privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
           privileges[i]));
     }
     return privileges;
@@ -2451,7 +2528,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       privileges[i].setServer_name(SENTRY_SERVER);
       privileges[i].setDb_name(db);
       privileges[i].setTable_name(table);
-      privileges[i].setPrivilege_name(RolePrivilege.buildRolePrivilegeName(
+      privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
           privileges[i]));
     }
     return privileges;
@@ -2474,7 +2551,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         privileges[idx].setDb_name(db);
         privileges[idx].setTable_name(table);
         privileges[idx].setColumn_name(column);
-        privileges[idx].setPrivilege_name(RolePrivilege.buildRolePrivilegeName(
+        privileges[idx].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
             privileges[idx]));
         idx++;
       }
@@ -2488,47 +2565,56 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.URI, false);
       privileges[i].setServer_name(SENTRY_SERVER);
       privileges[i].setUri(uri);
-      privileges[i].setPrivilege_name(RolePrivilege.buildRolePrivilegeName(
+      privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
           privileges[i]));
     }
     return privileges;
   }
 
-  private void authzOk(String stmt) throws ImpalaException {
-    authzOk(analysisContext_, stmt);
+  private void authzOk(String stmt, WithPrincipal withPrincipal) throws ImpalaException {
+    authzOk(analysisContext_, stmt, withPrincipal);
   }
 
-  private void authzOk(AnalysisContext context, String stmt) throws ImpalaException {
-    authzOk(authzFrontend_, context, stmt);
-  }
-
-  private void authzOk(Frontend fe, AnalysisContext context, String stmt)
+  private void authzOk(AnalysisContext context, String stmt, WithPrincipal withPrincipal)
       throws ImpalaException {
-    parseAndAnalyze(stmt, context, fe);
+    authzOk(authzFrontend_, context, stmt, withPrincipal);
+  }
+
+  private void authzOk(Frontend fe, AnalysisContext context, String stmt,
+      WithPrincipal withPrincipal) throws ImpalaException {
+    try {
+      parseAndAnalyze(stmt, context, fe);
+    } catch (AuthorizationException e) {
+      // Because the same test can be called from multiple statements
+      // it is useful to know which statement caused the exception.
+      throw new AuthorizationException(String.format(
+          "\nPrincipal: %s\nStatement: %s\nError: %s", withPrincipal.getName(),
+          stmt, e.getMessage(), e));
+    }
   }
 
   /**
    * Verifies that a given statement fails authorization and the expected error
    * string matches.
    */
-  private void authzError(String stmt, String expectedError, Matcher matcher)
-      throws ImpalaException {
-    authzError(analysisContext_, stmt, expectedError, matcher);
+  private void authzError(String stmt, String expectedError, Matcher matcher,
+      WithPrincipal withPrincipal) throws ImpalaException {
+    authzError(analysisContext_, stmt, expectedError, matcher, withPrincipal);
   }
 
-  private void authzError(String stmt, String expectedError)
+  private void authzError(String stmt, String expectedError, WithPrincipal withPrincipal)
       throws ImpalaException {
-    authzError(analysisContext_, stmt, expectedError, startsWith());
+    authzError(analysisContext_, stmt, expectedError, startsWith(), withPrincipal);
   }
 
   private void authzError(AnalysisContext ctx, String stmt, String expectedError,
-      Matcher matcher) throws ImpalaException {
-    authzError(authzFrontend_, ctx, stmt, expectedError, matcher);
+      Matcher matcher, WithPrincipal withPrincipal) throws ImpalaException {
+    authzError(authzFrontend_, ctx, stmt, expectedError, matcher, withPrincipal);
   }
 
-  private void authzError(AnalysisContext ctx, String stmt, String expectedError)
-      throws ImpalaException {
-    authzError(authzFrontend_, ctx, stmt, expectedError, startsWith());
+  private void authzError(AnalysisContext ctx, String stmt, String expectedError,
+      WithPrincipal withPrincipal) throws ImpalaException {
+    authzError(authzFrontend_, ctx, stmt, expectedError, startsWith(), withPrincipal);
   }
 
   private interface Matcher {
@@ -2553,8 +2639,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     };
   }
 
-  private void authzError(Frontend fe, AnalysisContext ctx,
-      String stmt, String expectedErrorString, Matcher matcher)
+  private void authzError(Frontend fe, AnalysisContext ctx, String stmt,
+      String expectedErrorString, Matcher matcher, WithPrincipal withPrincipal)
       throws ImpalaException {
     Preconditions.checkNotNull(expectedErrorString);
     try {
@@ -2568,7 +2654,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
           matcher.match(errorString, expectedErrorString));
       return;
     }
-    fail("Stmt didn't result in authorization error: " + stmt);
+    fail(String.format("Statement did not result in authorization error.\n" +
+        "Principal: %s\nStatement: %s", withPrincipal.getName(), stmt));
   }
 
   private void verifyPrivilegeReqs(String stmt, Set<String> expectedPrivilegeNames)

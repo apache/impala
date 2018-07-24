@@ -27,9 +27,11 @@ import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.Principal;
+import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
-import org.apache.impala.catalog.RolePrivilege;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.catalog.User;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.util.PatternMatcher;
 
@@ -123,14 +125,26 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
     return srcCatalog_.addRole(roleName, new HashSet<String>());
   }
 
-  public Role addRoleGrantGroup(String roleName, String groupName) throws CatalogException {
+  public Role addRoleGrantGroup(String roleName, String groupName)
+      throws CatalogException {
     return srcCatalog_.addRoleGrantGroup(roleName, groupName);
   }
 
-  public RolePrivilege addRolePrivilege(String roleName, TPrivilege privilege)
+  public PrincipalPrivilege addRolePrivilege(String roleName, TPrivilege privilege)
       throws CatalogException {
     return srcCatalog_.addRolePrivilege(roleName, privilege);
   }
 
   public void removeRole(String roleName) { srcCatalog_.removeRole(roleName); }
+
+  public User addUser(String userName) {
+    return srcCatalog_.addUser(userName);
+  }
+
+  public PrincipalPrivilege addUserPrivilege(String userName, TPrivilege privilege)
+      throws CatalogException {
+    return srcCatalog_.addUserPrivilege(userName, privilege);
+  }
+
+  public void removeUser(String userName) { srcCatalog_.removeUser(userName); }
 }

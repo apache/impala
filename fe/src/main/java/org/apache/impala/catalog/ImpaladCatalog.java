@@ -33,8 +33,8 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDataSource;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TPrincipal;
 import org.apache.impala.thrift.TPrivilege;
-import org.apache.impala.thrift.TRole;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
@@ -113,7 +113,7 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
     return catalogObject.getType() == TCatalogObjectType.DATABASE ||
         catalogObject.getType() == TCatalogObjectType.DATA_SOURCE ||
         catalogObject.getType() == TCatalogObjectType.HDFS_CACHE_POOL ||
-        catalogObject.getType() == TCatalogObjectType.ROLE;
+        catalogObject.getType() == TCatalogObjectType.PRINCIPAL;
   }
 
   /**
@@ -284,14 +284,14 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
       case DATA_SOURCE:
         addDataSource(catalogObject.getData_source(), catalogObject.getCatalog_version());
         break;
-      case ROLE:
-        Role role = Role.fromThrift(catalogObject.getRole());
-        role.setCatalogVersion(catalogObject.getCatalog_version());
-        authPolicy_.addRole(role);
+      case PRINCIPAL:
+        Principal principal = Principal.fromThrift(catalogObject.getPrincipal());
+        principal.setCatalogVersion(catalogObject.getCatalog_version());
+        authPolicy_.addPrincipal(principal);
         break;
       case PRIVILEGE:
-        RolePrivilege privilege =
-            RolePrivilege.fromThrift(catalogObject.getPrivilege());
+        PrincipalPrivilege privilege =
+            PrincipalPrivilege.fromThrift(catalogObject.getPrivilege());
         privilege.setCatalogVersion(catalogObject.getCatalog_version());
         try {
           authPolicy_.addPrivilege(privilege);
@@ -331,8 +331,8 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
       case DATA_SOURCE:
         removeDataSource(catalogObject.getData_source(), dropCatalogVersion);
         break;
-      case ROLE:
-        removeRole(catalogObject.getRole(), dropCatalogVersion);
+      case PRINCIPAL:
+        removePrincipal(catalogObject.getPrincipal(), dropCatalogVersion);
         break;
       case PRIVILEGE:
         removePrivilege(catalogObject.getPrivilege(), dropCatalogVersion);
@@ -467,24 +467,28 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
     }
   }
 
-  private void removeRole(TRole thriftRole, long dropCatalogVersion) {
-    Role existingRole = authPolicy_.getRole(thriftRole.getRole_name());
+  private void removePrincipal(TPrincipal thriftPrincipal, long dropCatalogVersion) {
+    Principal existingPrincipal = authPolicy_.getPrincipal(
+        thriftPrincipal.getPrincipal_name(), thriftPrincipal.getPrincipal_type());
     // version of the drop, remove the function.
-    if (existingRole != null && existingRole.getCatalogVersion() < dropCatalogVersion) {
-      authPolicy_.removeRole(thriftRole.getRole_name());
-      CatalogObjectVersionSet.INSTANCE.removeAll(existingRole.getPrivileges());
+    if (existingPrincipal != null &&
+        existingPrincipal.getCatalogVersion() < dropCatalogVersion) {
+      authPolicy_.removePrincipal(thriftPrincipal.getPrincipal_name(),
+          thriftPrincipal.getPrincipal_type());
+      CatalogObjectVersionSet.INSTANCE.removeAll(existingPrincipal.getPrivileges());
     }
   }
 
   private void removePrivilege(TPrivilege thriftPrivilege, long dropCatalogVersion) {
-    Role role = authPolicy_.getRole(thriftPrivilege.getRole_id());
-    if (role == null) return;
-    RolePrivilege existingPrivilege =
-        role.getPrivilege(thriftPrivilege.getPrivilege_name());
+    Principal principal = authPolicy_.getPrincipal(thriftPrivilege.getPrincipal_id(),
+        thriftPrivilege.getPrincipal_type());
+    if (principal == null) return;
+    PrincipalPrivilege existingPrivilege =
+        principal.getPrivilege(thriftPrivilege.getPrivilege_name());
     // version of the drop, remove the function.
     if (existingPrivilege != null &&
         existingPrivilege.getCatalogVersion() < dropCatalogVersion) {
-      role.removePrivilege(thriftPrivilege.getPrivilege_name());
+      principal.removePrivilege(thriftPrivilege.getPrivilege_name());
     }
   }
 

@@ -18,14 +18,17 @@
 package org.apache.impala.catalog;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -44,6 +47,10 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.Reference;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TPrincipalType;
+import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TPrivilegeLevel;
+import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.impala.thrift.TTableName;
 import org.junit.Test;
 
@@ -698,5 +705,85 @@ public class CatalogTest {
     assertTrue(catalog_.addFunction(largeUdf) == false);
     fnNames = getFunctionSignatures("default");
     assertEquals(fnNames.size(), 0);
+  }
+
+  @Test
+  public void testSentryCatalog() throws CatalogException {
+    AuthorizationPolicy authPolicy = catalog_.getAuthPolicy();
+
+    User user = catalog_.addUser("user1");
+    TPrivilege userPrivilege = new TPrivilege();
+    userPrivilege.setPrincipal_type(TPrincipalType.USER);
+    userPrivilege.setPrincipal_id(user.getId());
+    userPrivilege.setCreate_time_ms(-1);
+    userPrivilege.setServer_name("server1");
+    userPrivilege.setScope(TPrivilegeScope.SERVER);
+    userPrivilege.setPrivilege_level(TPrivilegeLevel.ALL);
+    userPrivilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(userPrivilege));
+    catalog_.addUserPrivilege("user1", userPrivilege);
+    assertSame(user, authPolicy.getPrincipal("user1", TPrincipalType.USER));
+    assertNull(authPolicy.getPrincipal("user2", TPrincipalType.USER));
+    assertNull(authPolicy.getPrincipal("user1", TPrincipalType.ROLE));
+    // Add the same user, the old user will be deleted.
+    user = catalog_.addUser("user1");
+    assertSame(user, authPolicy.getPrincipal("user1", TPrincipalType.USER));
+    // Delete the user.
+    assertSame(user, catalog_.removeUser("user1"));
+    assertNull(authPolicy.getPrincipal("user1", TPrincipalType.USER));
+
+    Role role = catalog_.addRole("role1", Sets.newHashSet("group1", "group2"));
+    TPrivilege rolePrivilege = new TPrivilege();
+    rolePrivilege.setPrincipal_type(TPrincipalType.ROLE);
+    rolePrivilege.setPrincipal_id(role.getId());
+    rolePrivilege.setCreate_time_ms(-1);
+    rolePrivilege.setServer_name("server1");
+    rolePrivilege.setScope(TPrivilegeScope.SERVER);
+    rolePrivilege.setPrivilege_level(TPrivilegeLevel.ALL);
+    rolePrivilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(rolePrivilege));
+    catalog_.addRolePrivilege("role1", rolePrivilege);
+    assertSame(role, catalog_.getAuthPolicy().getPrincipal("role1", TPrincipalType.ROLE));
+    assertNull(catalog_.getAuthPolicy().getPrincipal("role1", TPrincipalType.USER));
+    assertNull(catalog_.getAuthPolicy().getPrincipal("role2", TPrincipalType.ROLE));
+    // Add the same role, the old role will be deleted.
+    role = catalog_.addRole("role1", new HashSet<String>());
+    assertSame(role, authPolicy.getPrincipal("role1", TPrincipalType.ROLE));
+    // Delete the role.
+    assertSame(role, catalog_.removeRole("role1"));
+    assertNull(authPolicy.getPrincipal("role1", TPrincipalType.ROLE));
+
+    // Assert that principal IDs will be unique between roles and users, e.g. no user and
+    // role with the same principal ID. The same name can be used for both user and role.
+    int size = 10;
+    String prefix = "foo";
+    for (int i = 0; i < size; i++) {
+      String name = prefix + i;
+      catalog_.addUser(name);
+      catalog_.addRole(name, new HashSet<String>());
+    }
+
+    for (int i = 0; i < size; i++) {
+      String name = prefix + i;
+      Principal u = authPolicy.getPrincipal(name, TPrincipalType.USER);
+      Principal r = authPolicy.getPrincipal(name, TPrincipalType.ROLE);
+      assertEquals(name, u.getName());
+      assertEquals(name, r.getName());
+      assertNotEquals(u.getId(), r.getId());
+    }
+
+    // Validate getAllUsers vs getAllUserNames
+    List<User> allUsers = authPolicy.getAllUsers();
+    Set<String> allUserNames = authPolicy.getAllUserNames();
+    assertEquals(allUsers.size(), allUserNames.size());
+    for (Principal principal: allUsers) {
+      assertTrue(allUserNames.contains(principal.getName()));
+    }
+
+    // Validate getAllRoles and getAllRoleNames work as expected.
+    List<Role> allRoles = authPolicy.getAllRoles();
+    Set<String> allRoleNames = authPolicy.getAllRoleNames();
+    assertEquals(allRoles.size(), allRoleNames.size());
+    for (Principal principal: allRoles) {
+      assertTrue(allRoleNames.contains(principal.getName()));
+    }
   }
 }

@@ -60,7 +60,8 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
     params.setIs_grant(isGrantPrivStmt_);
     List<TPrivilege> privileges = privilegeSpec_.toThrift();
     for (TPrivilege privilege: privileges) {
-      privilege.setRole_id(role_.getId());
+      privilege.setPrincipal_id(role_.getId());
+      privilege.setPrincipal_type(role_.getPrincipalType());
       privilege.setHas_grant_opt(hasGrantOpt_);
     }
     params.setHas_grant_opt(hasGrantOpt_);

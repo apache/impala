@@ -21,16 +21,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.net.ntp.TimeStamp;
-import org.apache.log4j.Logger;
-import org.apache.sentry.core.common.ActiveRoleSet;
-import org.apache.sentry.provider.cache.PrivilegeCache;
-
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.log4j.Logger;
+import org.apache.sentry.core.common.ActiveRoleSet;
+import org.apache.sentry.provider.cache.PrivilegeCache;
+
 import org.apache.impala.util.TResultRowBuilder;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -39,17 +41,24 @@ import com.google.common.collect.Sets;
 
 /**
  * A thread safe authorization policy cache, consisting of roles, groups that are
- * members of that role, and the privileges associated with the role. The source data
- * this cache is backing is read from the Sentry Policy Service. Writing to the cache
- * will replace any matching items, but will not write back to the Sentry Policy Service.
- * A role can have 0 or more privileges and roles are stored in a map of role name
- * to role object. For example:
- * RoleName -> Role -> [RolePriv1, ..., RolePrivN]
+ * members of that role, the privileges associated with the role, and users and the
+ * privileges associated with the user. The source data this cache is backing is read from
+ * the Sentry Policy Service. Writing to the cache will replace any matching items, but
+ * will not write back to the Sentry Policy Service.
+ * The roleCache_ contains all roles defined in Sentry whereas userCache_ only contains
+ * users that have privileges defined in Sentry and does not represent all users in the
+ * system. A principal type can have 0 or more privileges and principal types are stored
+ * in a map of principal name to principal object. For example:
+ * RoleName -> Role -> [PrincipalPriv1, ..., PrincipalPrivN]
+ * UserName -> User -> [PrincipalPriv1, ..., PrincipalPrivN]
+ * There is a separate cache for users since we cannot guarantee uniqueness between
+ * user names and role names.
  * To ensure we can efficiently retrieve the roles that a user is a member of, a map
  * of user group name to role name is tracked as grantGroups_.
- * To reduce duplication of metadata, privileges are linked to roles using a "role ID"
- * rather than embedding the role name. When a privilege is added to a role, we do
- * a lookup to get the role ID to using the roleIds_ map.
+ * To reduce duplication of metadata, privileges are linked to roles/users using a
+ * "principal ID" rather than embedding the principal name. When a privilege is added to
+ * a principal type, we do a lookup to get the principal ID to probe the principalIds_
+ * map.
  * Acts as the backing cache for the Sentry cached based provider (which is why
  * PrivilegeCache is implemented).
  * TODO: Instead of calling into Sentry to perform final authorization checks, we
@@ -58,11 +67,16 @@ import com.google.common.collect.Sets;
 public class AuthorizationPolicy implements PrivilegeCache {
   private static final Logger LOG = Logger.getLogger(AuthorizationPolicy.class);
 
+  // Need to keep separate caches of role names and user names since there is
+  // no uniqueness guarantee across roles and users
   // Cache of role names (case-insensitive) to role objects.
-  private final CatalogObjectCache<Role> roleCache_ = new CatalogObjectCache<Role>();
+  private final CatalogObjectCache<Role> roleCache_ = new CatalogObjectCache<>();
 
-  // Map of role ID -> role name. Used to match privileges to roles.
-  Map<Integer, String> roleIds_ = Maps.newHashMap();
+  // Cache of user names (case-insensitive) to user objects.
+  private final CatalogObjectCache<User> userCache_ = new CatalogObjectCache<>();
+
+  // Map of principal ID -> user/role name. Used to match privileges to users/roles.
+  private final Map<Integer, String> principalIds_ = Maps.newHashMap();
 
   // Map of group name (case sensitive) to set of role names (case insensitive) that
   // have been granted to this group. Kept in sync with roleCache_. Provides efficient
@@ -70,87 +84,100 @@ public class AuthorizationPolicy implements PrivilegeCache {
   Map<String, Set<String>> groupsToRoles_ = Maps.newHashMap();
 
   /**
-   * Adds a new role to the policy. If a role with the same name already
-   * exists and the role ID's are different, it will be overwritten by the new role.
-   * If a role exists and the role IDs are the same, the privileges from the old
-   * role will be copied to the new role.
+   * Adds a new principal to the policy. If a principal with the same name already
+   * exists and the principal ID's are different, it will be overwritten by the new
+   * principal. If a principal exists and the principal IDs are the same, the privileges
+   * from the old principal will be copied to the new principal.
    */
-  public synchronized void addRole(Role role) {
-    Role existingRole = roleCache_.get(role.getName());
-    // There is already a newer version of this role in the catalog, ignore
+  public synchronized void addPrincipal(Principal principal) {
+    Principal existingPrincipal = getPrincipal(principal.getName(),
+        principal.getPrincipalType());
+    // There is already a newer version of this principal in the catalog, ignore
     // just return.
-    if (existingRole != null &&
-        existingRole.getCatalogVersion() >= role.getCatalogVersion()) return;
+    if (existingPrincipal != null &&
+        existingPrincipal.getCatalogVersion() >= principal.getCatalogVersion()) return;
 
-    // If there was an existing role that was replaced we first need to remove it.
-    if (existingRole != null) {
-      // Remove the role. This will also clean up the grantGroup mappings.
-      removeRole(existingRole.getName());
-      CatalogObjectVersionSet.INSTANCE.removeAll(existingRole.getPrivileges());
-      if (existingRole.getId() == role.getId()) {
-        // Copy the privileges from the existing role.
-        for (RolePrivilege p: existingRole.getPrivileges()) {
-          role.addPrivilege(p);
+    // If there was an existing principal that was replaced we first need to remove it.
+    if (existingPrincipal != null) {
+      // Remove the principal. This will also clean up the grantGroup mappings.
+      removePrincipal(existingPrincipal.getName(), existingPrincipal.getPrincipalType());
+      CatalogObjectVersionSet.INSTANCE.removeAll(existingPrincipal.getPrivileges());
+      if (existingPrincipal.getId() == principal.getId()) {
+        // Copy the privileges from the existing principal.
+        for (PrincipalPrivilege p: existingPrincipal.getPrivileges()) {
+          principal.addPrivilege(p);
         }
       }
     }
-    roleCache_.add(role);
+    if (principal.getPrincipalType() == TPrincipalType.USER) {
+      Preconditions.checkArgument(principal instanceof User);
+      userCache_.add((User) principal);
+    } else {
+      Preconditions.checkArgument(principal instanceof Role);
+      roleCache_.add((Role) principal);
+    }
 
     // Add new grants
-    for (String groupName: role.getGrantGroups()) {
+    for (String groupName: principal.getGrantGroups()) {
       Set<String> grantedRoles = groupsToRoles_.get(groupName);
       if (grantedRoles == null) {
         grantedRoles = Sets.newHashSet();
         groupsToRoles_.put(groupName, grantedRoles);
       }
-      grantedRoles.add(role.getName().toLowerCase());
+      grantedRoles.add(principal.getName().toLowerCase());
     }
 
-    // Add this role to the role ID mapping
-    roleIds_.put(role.getId(), role.getName());
+    // Add this principal to the principal ID mapping
+    principalIds_.put(principal.getId(), principal.getName());
   }
 
   /**
-   * Adds a new privilege to the policy mapping to the role specified by the
-   * role ID in the privilege.
-   * Throws a CatalogException no role with a corresponding ID existing in the catalog.
+   * Adds a new privilege to the policy mapping to the principal specified by the
+   * principal ID in the privilege. Throws a CatalogException no principal with a
+   * corresponding ID existing in the catalog.
    */
-  public synchronized void addPrivilege(RolePrivilege privilege)
+  public synchronized void addPrivilege(PrincipalPrivilege privilege)
       throws CatalogException {
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Adding privilege: " + privilege.getName() +
-          " role ID: " + privilege.getRoleId());
+      LOG.trace("Adding privilege: " + privilege.getName() + " " +
+          Principal.toString(privilege.getPrincipalType()).toLowerCase() +
+          " ID: " + privilege.getPrincipalId());
     }
-    Role role = getRole(privilege.getRoleId());
-    if (role == null) {
-      throw new CatalogException(String.format("Error adding privilege: %s. Role ID " +
-          "'%d' does not exist.", privilege.getName(), privilege.getRoleId()));
+    Principal principal = getPrincipal(privilege.getPrincipalId(),
+        privilege.getPrincipalType());
+    if (principal == null) {
+      throw new CatalogException(String.format("Error adding privilege: %s. %s ID " +
+          "'%d' does not exist.", privilege.getName(),
+          Principal.toString(privilege.getPrincipalType()), privilege.getPrincipalId()));
     }
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Adding privilege: " + privilege.getName() + " to role: " +
-          role.getName() + "ID: " + role.getId());
+      LOG.trace("Adding privilege: " + privilege.getName() + " to " +
+          Principal.toString(privilege.getPrincipalType()).toLowerCase() + ": " +
+          principal.getName() + " with ID: " + principal.getId());
     }
-    role.addPrivilege(privilege);
+    principal.addPrivilege(privilege);
   }
 
   /**
-   * Removes a privilege from the policy mapping to the role specified by the
-   * role ID in the privilege.
-   * Throws a CatalogException if no role with a corresponding ID exists in the catalog.
-   * Returns null if no matching privilege is found in this role.
+   * Removes a privilege from the policy mapping to the role specified by the principal ID
+   * in the privilege. Throws a CatalogException if no role with a corresponding ID exists
+   * in the catalog. Returns null if no matching privilege is found in this principal.
    */
-  public synchronized RolePrivilege removePrivilege(RolePrivilege privilege)
+  public synchronized PrincipalPrivilege removePrivilege(PrincipalPrivilege privilege)
       throws CatalogException {
-    Role role = getRole(privilege.getRoleId());
-    if (role == null) {
-      throw new CatalogException(String.format("Error removing privilege: %s. Role ID " +
-          "'%d' does not exist.", privilege.getName(), privilege.getRoleId()));
+    Principal principal = getPrincipal(privilege.getPrincipalId(),
+        privilege.getPrincipalType());
+    if (principal == null) {
+      throw new CatalogException(String.format("Error removing privilege: %s. %s ID " +
+          "'%d' does not exist.", privilege.getName(),
+          Principal.toString(privilege.getPrincipalType()), privilege.getPrincipalId()));
     }
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Removing privilege: '" + privilege.getName() + "' from Role ID: " +
-          privilege.getRoleId() + " Role Name: " + role.getName());
+      LOG.trace("Removing privilege: " + privilege.getName() + " from " +
+          Principal.toString(privilege.getPrincipalType()).toLowerCase() + ": " +
+          principal.getName() + " with ID: " + principal.getId());
     }
-    return role.removePrivilege(privilege.getName());
+    return principal.removePrivilege(privilege.getName());
   }
 
   /**
@@ -161,6 +188,13 @@ public class AuthorizationPolicy implements PrivilegeCache {
   }
 
   /**
+   * Returns all users in the policy. Returns an empty list if no users exist.
+   */
+  public synchronized List<User> getAllUsers() {
+    return userCache_.getValues();
+  }
+
+  /**
    * Returns all role names in the policy. Returns an empty set if no roles exist.
    */
   public synchronized Set<String> getAllRoleNames() {
@@ -168,30 +202,62 @@ public class AuthorizationPolicy implements PrivilegeCache {
   }
 
   /**
-   * Gets a role given a role name. Returns null if no roles exist with this name.
+   * Gets a role given a role name. Returns null if no role exist with this name.
    */
   public synchronized Role getRole(String roleName) {
     return roleCache_.get(roleName);
   }
 
   /**
-   * Gets a role given a role ID. Returns null if no roles exist with this ID.
+   * Gets a role given a role ID. Returns null if no role exists with this ID.
    */
   public synchronized Role getRole(int roleId) {
-    String roleName = roleIds_.get(roleId);
+    String roleName = principalIds_.get(roleId);
     if (roleName == null) return null;
     return roleCache_.get(roleName);
   }
 
   /**
-   * Gets a privilege from the given role ID. Returns null of there are no roles with a
-   * matching ID or if no privilege with this name exists for the role.
+   * Returns all user names in the policy. Returns an empty set if no users exist.
    */
-  public synchronized RolePrivilege getPrivilege(int roleId, String privilegeName) {
-    String roleName = roleIds_.get(roleId);
-    if (roleName == null) return null;
-    Role role = roleCache_.get(roleName);
-    return role.getPrivilege(privilegeName);
+  public synchronized Set<String> getAllUserNames() {
+    return Sets.newHashSet(userCache_.keySet());
+  }
+
+  /**
+   * Gets a user given a user name. Returns null if no user exist with this name.
+   */
+  public synchronized User getUser(String userName) {
+    return userCache_.get(userName);
+  }
+
+  /**
+   * Gets a user given a user ID. Returns null if no user exists with this ID.
+   */
+  public synchronized User getUser(int userId) {
+    String userName = principalIds_.get(userId);
+    if (userName == null) return null;
+    return userCache_.get(userName);
+  }
+
+
+  /**
+   * Gets a principal given a principal name and type. Returns null if no principal exists
+   * with this name and type.
+   */
+  public synchronized Principal getPrincipal(String principalName, TPrincipalType type) {
+    return type == TPrincipalType.ROLE ?
+        roleCache_.get(principalName) : userCache_.get(principalName);
+  }
+
+  /**
+   * Gets a principal given a principal ID and type. Returns null if no principal exists
+   * with this ID and type.
+   */
+  public synchronized Principal getPrincipal(int principalId, TPrincipalType type) {
+    String principalName = principalIds_.get(principalId);
+    if (principalName == null) return null;
+    return getPrincipal(principalName, type);
   }
 
   /**
@@ -203,11 +269,21 @@ public class AuthorizationPolicy implements PrivilegeCache {
     if (roleNames != null) {
       for (String roleName: roleNames) {
         // TODO: verify they actually exist.
-        Role role = roleCache_.get(roleName);
+        Principal role = roleCache_.get(roleName);
         if (role != null) grantedRoles.add(roleCache_.get(roleName));
       }
     }
     return grantedRoles;
+  }
+
+  /**
+   * Removes a principal for a given principal name and type. Returns the removed
+   * principal or null if no principal with this name and type existed.
+   */
+  public synchronized Principal removePrincipal(String principalName,
+      TPrincipalType type) {
+    return type == TPrincipalType.ROLE ?
+        removeRole(principalName) : removeUser(principalName);
   }
 
   /**
@@ -223,17 +299,29 @@ public class AuthorizationPolicy implements PrivilegeCache {
       Set<String> roles = groupsToRoles_.get(grantGroup);
       if (roles != null) roles.remove(roleName.toLowerCase());
     }
-    // Cleanup role id.
-    roleIds_.remove(removedRole.getId());
+    // Cleanup role ID.
+    principalIds_.remove(removedRole.getId());
     return removedRole;
   }
 
   /**
+   * Removes a user. Returns the removed user or null if no user with
+   * this name existed.
+   */
+  public synchronized User removeUser(String userName) {
+    User removedUser = userCache_.remove(userName);
+    if (removedUser == null) return null;
+    // Cleanup user ID.
+    principalIds_.remove(removedUser.getId());
+    return removedUser;
+  }
+
+  /**
    * Adds a new grant group to the specified role. Returns the updated
-   * Role, if a matching role was found. If the role does not exist a
+   * Principal, if a matching role was found. If the role does not exist a
    * CatalogException is thrown.
    */
-  public synchronized Role addGrantGroup(String roleName, String groupName)
+  public synchronized Role addRoleGrantGroup(String roleName, String groupName)
       throws CatalogException {
     Role role = roleCache_.get(roleName);
     if (role == null) throw new CatalogException("Role does not exist: " + roleName);
@@ -249,10 +337,10 @@ public class AuthorizationPolicy implements PrivilegeCache {
 
   /**
    * Removes a grant group from the specified role. Returns the updated
-   * Role, if a matching role was found. If the role does not exist a
+   * Principal, if a matching role was found. If the role does not exist a
    * CatalogException is thrown.
    */
-  public synchronized Role removeGrantGroup(String roleName, String groupName)
+  public synchronized Role removeRoleGrantGroup(String roleName, String groupName)
       throws CatalogException {
     Role role = roleCache_.get(roleName);
     if (role == null) throw new CatalogException("Role does not exist: " + roleName);
@@ -268,8 +356,8 @@ public class AuthorizationPolicy implements PrivilegeCache {
    * Returns a set of privilege strings in Sentry format.
    */
   @Override
-  public synchronized Set<String>
-      listPrivileges(Set<String> groups, ActiveRoleSet roleSet) {
+  public synchronized Set<String> listPrivileges(Set<String> groups,
+      ActiveRoleSet roleSet) {
     Set<String> privileges = Sets.newHashSet();
     if (roleSet != ActiveRoleSet.ALL) {
       throw new UnsupportedOperationException("Impala does not support role subsets.");
@@ -279,7 +367,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
     for (String groupName: groups) {
       List<Role> grantedRoles = getGrantedRoles(groupName);
       for (Role role: grantedRoles) {
-        for (RolePrivilege privilege: role.getPrivileges()) {
+        for (PrincipalPrivilege privilege: role.getPrivileges()) {
           String authorizeable = privilege.getName();
           if (authorizeable == null) {
             if (LOG.isTraceEnabled()) {
@@ -294,17 +382,29 @@ public class AuthorizationPolicy implements PrivilegeCache {
     return privileges;
   }
 
-   /**
+  /**
    * Returns a set of privilege strings in Sentry format.
    */
-  // This is an override for Sentry 2.1, but not for Sentry 1.x; we
-  // avoid annotation to support both.
-  // @Override
+  @Override
   public Set<String> listPrivileges(Set<String> groups, Set<String> users,
       ActiveRoleSet roleSet) {
-    /* User based roles and authorization hierarchy is not currently supported.
-      Fallback to listing privileges using groups. */
-    return listPrivileges(groups, roleSet);
+    Set<String> privileges = listPrivileges(groups, roleSet);
+    for (String userName: users) {
+      User user = getUser(userName);
+      if (user != null) {
+        for (PrincipalPrivilege privilege: user.getPrivileges()) {
+          String authorizeable = privilege.getName();
+          if (authorizeable == null) {
+            if (LOG.isTraceEnabled()) {
+              LOG.trace("Ignoring invalid privilege: " + privilege.getName());
+            }
+            continue;
+          }
+          privileges.add(authorizeable);
+        }
+      }
+    }
+    return privileges;
   }
 
   @Override
@@ -318,6 +418,25 @@ public class AuthorizationPolicy implements PrivilegeCache {
    * granted to the role. Used by the SHOW GRANT ROLE statement.
    */
   public synchronized TResultSet getRolePrivileges(String roleName, TPrivilege filter) {
+    return getPrincipalPrivileges(roleName, filter, TPrincipalType.ROLE);
+  }
+
+  /**
+   * Returns the privileges that have been granted to a user as a tabular result set.
+   * Allows for filtering based on a specific privilege spec or showing all privileges
+   * granted to the user. Used by the SHOW GRANT USER statement.
+   */
+  public synchronized TResultSet getUserPrivileges(String userName, TPrivilege filter) {
+    return getPrincipalPrivileges(userName, filter, TPrincipalType.USER);
+  }
+
+  /**
+   * Returns the privileges that have been granted to a principal as a tabular result set.
+   * Allows for filtering based on a specific privilege spec or showing all privileges
+   * granted to the principal.
+   */
+  private TResultSet getPrincipalPrivileges(String principalName, TPrivilege filter,
+      TPrincipalType type) {
     TResultSet result = new TResultSet();
     result.setSchema(new TResultSetMetadata());
     result.getSchema().addToColumns(new TColumn("scope", Type.STRING.toThrift()));
@@ -331,14 +450,14 @@ public class AuthorizationPolicy implements PrivilegeCache {
     result.getSchema().addToColumns(new TColumn("create_time", Type.STRING.toThrift()));
     result.setRows(Lists.<TResultRow>newArrayList());
 
-    Role role = getRole(roleName);
-    if (role == null) return result;
-    for (RolePrivilege p: role.getPrivileges()) {
+    Principal principal = getPrincipal(principalName, type);
+    if (principal == null) return result;
+    for (PrincipalPrivilege p: principal.getPrivileges()) {
       TPrivilege privilege = p.toThrift();
       if (filter != null) {
         // Check if the privileges are targeting the same object.
         filter.setPrivilege_level(privilege.getPrivilege_level());
-        String privName = RolePrivilege.buildRolePrivilegeName(filter);
+        String privName = PrincipalPrivilege.buildPrivilegeName(filter);
         if (!privName.equalsIgnoreCase(privilege.getPrivilege_name())) continue;
       }
       TResultRowBuilder rowBuilder = new TResultRowBuilder();

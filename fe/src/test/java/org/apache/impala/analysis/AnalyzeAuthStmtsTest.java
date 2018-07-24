@@ -29,8 +29,8 @@ import org.apache.impala.util.EventSequence;
 import org.junit.Test;
 
 public class AnalyzeAuthStmtsTest extends AnalyzerTest {
-  public AnalyzeAuthStmtsTest() throws AnalysisException {
-    catalog_.getAuthPolicy().addRole(
+  public AnalyzeAuthStmtsTest() {
+    catalog_.getAuthPolicy().addPrincipal(
         new Role("myRole", new HashSet<String>()));
   }
 

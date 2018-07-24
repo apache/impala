@@ -19,37 +19,38 @@ package org.apache.impala.catalog;
 
 import java.util.List;
 
-import org.apache.log4j.Logger;
-
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
+import org.apache.log4j.Logger;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
- * Represents a privilege that has been granted to a role in an authorization policy.
+ * Represents a privilege that has been granted to a principal in an authorization policy.
  * This class is thread safe.
  */
-public class RolePrivilege extends CatalogObjectImpl {
+public class PrincipalPrivilege extends CatalogObjectImpl {
   private static final Logger LOG = Logger.getLogger(AuthorizationPolicy.class);
-  // These Joiners are used to build role names. For simplicity, the role name we
-  // use can also be sent to the Sentry library to perform authorization checks
+  // These Joiners are used to build principal names. For simplicity, the principal name
+  // we use can also be sent to the Sentry library to perform authorization checks
   // so we build them in the same format.
   private static final Joiner AUTHORIZABLE_JOINER = Joiner.on("->");
   private static final Joiner KV_JOINER = Joiner.on("=");
   private final TPrivilege privilege_;
 
-  private RolePrivilege(TPrivilege privilege) {
+  private PrincipalPrivilege(TPrivilege privilege) {
     privilege_ = privilege;
   }
 
   public TPrivilege toThrift() { return privilege_; }
-  public static RolePrivilege fromThrift(TPrivilege privilege) {
-    return new RolePrivilege(privilege);
+  public static PrincipalPrivilege fromThrift(TPrivilege privilege) {
+    return new PrincipalPrivilege(privilege);
   }
 
   /**
@@ -57,7 +58,7 @@ public class RolePrivilege extends CatalogObjectImpl {
    * generated in a format that can be sent to the Sentry client to perform authorization
    * checks.
    */
-  public static String buildRolePrivilegeName(TPrivilege privilege) {
+  public static String buildPrivilegeName(TPrivilege privilege) {
     List<String> authorizable = Lists.newArrayListWithExpectedSize(4);
     try {
       Preconditions.checkNotNull(privilege);
@@ -129,10 +130,12 @@ public class RolePrivilege extends CatalogObjectImpl {
   }
   @Override
   public String getName() { return privilege_.getPrivilege_name(); }
-  public int getRoleId() { return privilege_.getRole_id(); }
+  public int getPrincipalId() { return privilege_.getPrincipal_id(); }
+  public TPrincipalType getPrincipalType() { return privilege_.getPrincipal_type(); }
   @Override
   public String getUniqueName() {
-    return "PRIVILEGE:" + getName().toLowerCase() + "." + Integer.toString(getRoleId());
+    return "PRIVILEGE:" + getName().toLowerCase() + "." + Integer.toString(
+        getPrincipalId());
   }
 
   public TCatalogObject toTCatalogObject() {
@@ -142,9 +145,9 @@ public class RolePrivilege extends CatalogObjectImpl {
     return catalogObject;
   }
 
-  // The time this role was created. Used to quickly check if the same privilege
-  // was dropped and re-created. Assumes a role will not be created + dropped + created
-  // in less than 1ms. Returns -1 if create_time_ms was not set for the privilege.
+  // The time this principal was created. Used to quickly check if the same privilege
+  // was dropped and re-created. Assumes a principal will not be created + dropped +
+  // created in less than 1ms. Returns -1 if create_time_ms was not set for the privilege.
   public long getCreateTimeMs() {
     return privilege_.isSetCreate_time_ms() ? privilege_.getCreate_time_ms() : -1L;
   }

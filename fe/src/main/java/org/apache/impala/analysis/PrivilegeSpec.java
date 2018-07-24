@@ -23,7 +23,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
-import org.apache.impala.catalog.RolePrivilege;
+import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TPrivilege;
@@ -134,7 +134,7 @@ public class PrivilegeSpec implements ParseNode {
     if (uri_ != null) privilege.setUri(uri_.toString());
     if (columnName != null) privilege.setColumn_name(columnName);
     privilege.setCreate_time_ms(-1);
-    privilege.setPrivilege_name(RolePrivilege.buildRolePrivilegeName(privilege));
+    privilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(privilege));
     return privilege;
   }
 

@@ -26,14 +26,14 @@ import java.util.Set;
 /**
  * Represents a role in an authorization policy.
  */
-public class Role extends Principal {
-  public Role(String roleName, Set<String> grantGroups) {
-    super(roleName, TPrincipalType.ROLE, grantGroups);
+public class User extends Principal {
+  public User(String userName, Set<String> grantGroups) {
+    super(userName, TPrincipalType.USER, grantGroups);
   }
 
-  public Role(TPrincipal thriftPrincipal) {
+  public User(TPrincipal thriftPrincipal) {
     super(thriftPrincipal);
     Preconditions.checkArgument(
-        thriftPrincipal.getPrincipal_type() == TPrincipalType.ROLE);
+        thriftPrincipal.getPrincipal_type() == TPrincipalType.USER);
   }
 }

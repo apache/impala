@@ -18,11 +18,18 @@
 package org.apache.impala.util;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.PrincipalPrivilege;
+import org.apache.impala.catalog.Role;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.log4j.Logger;
 import org.apache.sentry.api.service.thrift.TSentryGroup;
 import org.apache.sentry.api.service.thrift.TSentryPrivilege;
@@ -30,11 +37,6 @@ import org.apache.sentry.api.service.thrift.TSentryRole;
 
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.authorization.User;
-import org.apache.impala.catalog.AuthorizationException;
-import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.catalog.CatalogServiceCatalog;
-import org.apache.impala.catalog.Role;
-import org.apache.impala.catalog.RolePrivilege;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.BackendConfig;
@@ -97,10 +99,10 @@ public class SentryProxy {
    * There is currently no way to get a snapshot of the policy from the Sentry Service,
    * so it is possible that Impala will end up in a state that is not consistent with a
    * state the Sentry Service has ever been in. For example, consider the case where a
-   * refresh is running and all privileges for Role A have been processed. Before moving
-   * to Role B, the user revokes a privilege from Role A and grants it to Role B.
-   * Impala will temporarily (until the next refresh) think the privilege is granted to
-   * Role A AND to Role B.
+   * refresh is running and all privileges for Principal A have been processed. Before
+   * moving to Principal B, the user revokes a privilege from Principal A and grants it to
+   * Principal B. Impala will temporarily (until the next refresh) think the privilege is
+   * granted to Principal A AND to Principal B.
    * TODO: Think more about consistency as well as how to recover from errors that leave
    * the policy in a potentially inconsistent state (an RPC fails part-way through a
    * refresh). We should also consider applying this entire update to the catalog
@@ -154,23 +156,25 @@ public class SentryProxy {
                 sentryPolicyService_.listRolePrivileges(processUser_, role.getName());
             } catch (ImpalaException e) {
               String roleName = role.getName() != null ? role.getName(): "null";
-              LOG.error("Error listing the Role name: " + roleName, e);
+              LOG.error("Error listing the role name: " + roleName, e);
             }
 
             // Check all the privileges that are part of this role.
             for (TSentryPrivilege sentryPriv: sentryPrivlist) {
               TPrivilege thriftPriv =
                   SentryPolicyService.sentryPrivilegeToTPrivilege(sentryPriv);
-              thriftPriv.setRole_id(role.getId());
+              thriftPriv.setPrincipal_id(role.getId());
+              thriftPriv.setPrincipal_type(TPrincipalType.ROLE);
+
               privilegesToRemove.remove(thriftPriv.getPrivilege_name().toLowerCase());
 
-              RolePrivilege existingPriv =
+              PrincipalPrivilege existingRolePriv =
                   role.getPrivilege(thriftPriv.getPrivilege_name());
               // We already know about this privilege (privileges cannot be modified).
-              if (existingPriv != null &&
-                  existingPriv.getCreateTimeMs() == sentryPriv.getCreateTime()) {
+              if (existingRolePriv != null &&
+                  existingRolePriv.getCreateTimeMs() == sentryPriv.getCreateTime()) {
                 if (resetVersions_) {
-                  existingPriv.setCatalogVersion(
+                  existingRolePriv.setCatalogVersion(
                       catalog_.incrementAndGetCatalogVersion());
                 }
                 continue;
@@ -288,11 +292,11 @@ public class SentryProxy {
    * Throws exception if there was any error updating the Sentry Service or if the Impala
    * catalog does not contain the given role name.
    */
-  public synchronized List<RolePrivilege> grantRolePrivileges(User user,
+  public synchronized List<PrincipalPrivilege> grantRolePrivileges(User user,
       String roleName, List<TPrivilege> privileges) throws ImpalaException {
     sentryPolicyService_.grantRolePrivileges(user, roleName, privileges);
     // Update the catalog
-    List<RolePrivilege> rolePrivileges = Lists.newArrayList();
+    List<PrincipalPrivilege> rolePrivileges = Lists.newArrayList();
     for (TPrivilege privilege: privileges) {
       rolePrivileges.add(catalog_.addRolePrivilege(roleName, privilege));
     }
@@ -306,15 +310,15 @@ public class SentryProxy {
    * updating the Sentry Service or if the Impala catalog does not contain the given role
    * name.
    */
-  public synchronized List<RolePrivilege> revokeRolePrivileges(User user,
+  public synchronized List<PrincipalPrivilege> revokeRolePrivileges(User user,
       String roleName, List<TPrivilege> privileges, boolean hasGrantOption)
       throws ImpalaException {
-    List<RolePrivilege> rolePrivileges = Lists.newArrayList();
+    List<PrincipalPrivilege> rolePrivileges = Lists.newArrayList();
     if (!hasGrantOption) {
       sentryPolicyService_.revokeRolePrivileges(user, roleName, privileges);
       // Update the catalog
       for (TPrivilege privilege: privileges) {
-        RolePrivilege rolePriv = catalog_.removeRolePrivilege(roleName, privilege);
+        PrincipalPrivilege rolePriv = catalog_.removeRolePrivilege(roleName, privilege);
         if (rolePriv == null) continue;
         rolePrivileges.add(rolePriv);
       }
@@ -326,7 +330,8 @@ public class SentryProxy {
       sentryPolicyService_.revokeRolePrivileges(user, roleName, privileges);
       List<TPrivilege> updatedPrivileges = Lists.newArrayList();
       for (TPrivilege privilege: privileges) {
-        RolePrivilege existingPriv = catalog_.getRolePrivilege(roleName, privilege);
+        PrincipalPrivilege existingPriv = catalog_.getPrincipalPrivilege(roleName,
+            privilege);
         if (existingPriv == null) continue;
         TPrivilege updatedPriv = existingPriv.toThrift();
         updatedPriv.setHas_grant_opt(false);

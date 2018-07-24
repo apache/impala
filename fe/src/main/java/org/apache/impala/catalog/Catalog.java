@@ -496,23 +496,28 @@ public abstract class Catalog {
         result.setCache_pool(pool.toThrift());
         break;
       }
-      case ROLE:
-        Role role = authPolicy_.getRole(objectDesc.getRole().getRole_name());
-        if (role == null) {
-          throw new CatalogException("Role not found: " +
-              objectDesc.getRole().getRole_name());
+      case PRINCIPAL:
+        Principal principal = authPolicy_.getPrincipal(
+            objectDesc.getPrincipal().getPrincipal_name(),
+            objectDesc.getPrincipal().getPrincipal_type());
+        if (principal == null) {
+          throw new CatalogException("Principal not found: " +
+              objectDesc.getPrincipal().getPrincipal_name());
         }
-        result.setType(role.getCatalogObjectType());
-        result.setCatalog_version(role.getCatalogVersion());
-        result.setRole(role.toThrift());
+        result.setType(principal.getCatalogObjectType());
+        result.setCatalog_version(principal.getCatalogVersion());
+        result.setPrincipal(principal.toThrift());
         break;
       case PRIVILEGE:
-        Role tmpRole = authPolicy_.getRole(objectDesc.getPrivilege().getRole_id());
-        if (tmpRole == null) {
-          throw new CatalogException("No role associated with ID: " +
-              objectDesc.getPrivilege().getRole_id());
+        Principal tmpPrincipal = authPolicy_.getPrincipal(
+            objectDesc.getPrincipal().getPrincipal_id(),
+            objectDesc.getPrincipal().getPrincipal_type());
+        if (tmpPrincipal == null) {
+          throw new CatalogException(String.format("No %s associated with ID: %d",
+              Principal.toString(objectDesc.getPrincipal().getPrincipal_type())
+                  .toLowerCase(), objectDesc.getPrivilege().getPrincipal_id()));
         }
-        for (RolePrivilege p: tmpRole.getPrivileges()) {
+        for (PrincipalPrivilege p: tmpPrincipal.getPrivileges()) {
           if (p.getName().equalsIgnoreCase(
               objectDesc.getPrivilege().getPrivilege_name())) {
             result.setType(p.getCatalogObjectType());
@@ -521,9 +526,9 @@ public abstract class Catalog {
             return result;
           }
         }
-        throw new CatalogException(String.format("Role '%s' does not contain " +
-            "privilege: '%s'", tmpRole.getName(),
-            objectDesc.getPrivilege().getPrivilege_name()));
+        throw new CatalogException(String.format("%s '%s' does not contain " +
+            "privilege: '%s'", Principal.toString(tmpPrincipal.getPrincipalType()),
+            tmpPrincipal.getName(), objectDesc.getPrivilege().getPrivilege_name()));
       default: throw new IllegalStateException(
           "Unexpected TCatalogObject type: " + objectDesc.getType());
     }
@@ -550,12 +555,13 @@ public abstract class Catalog {
       case FUNCTION:
         return "FUNCTION:" + catalogObject.getFn().getName() + "(" +
             catalogObject.getFn().getSignature() + ")";
-      case ROLE:
-        return "ROLE:" + catalogObject.getRole().getRole_name().toLowerCase();
+      case PRINCIPAL:
+        return "PRINCIPAL:" + catalogObject.getPrincipal().getPrincipal_name()
+            .toLowerCase();
       case PRIVILEGE:
         return "PRIVILEGE:" +
             catalogObject.getPrivilege().getPrivilege_name().toLowerCase() + "." +
-            Integer.toString(catalogObject.getPrivilege().getRole_id());
+            Integer.toString(catalogObject.getPrivilege().getPrincipal_id());
       case HDFS_CACHE_POOL:
         return "HDFS_CACHE_POOL:" +
             catalogObject.getCache_pool().getPool_name().toLowerCase();
