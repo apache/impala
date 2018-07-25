@@ -79,7 +79,7 @@ ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname>
           For example:
 <codeblock>
 ALTER VIEW v1 AS SELECT x, UPPER(s) s FROM t2;
-ALTER VIEW v1 (c1, c2, c3) AS SELECT x, UPPER(s) s FROM t2;
+ALTER VIEW v1 (c1, c2) AS SELECT x, UPPER(s) s FROM t2;
 ALTER VIEW v7 (c1 COMMENT 'Comment for c1', c2) AS SELECT t1.c1, t1.c2 FROM t1;
 </codeblock>
         </p>
