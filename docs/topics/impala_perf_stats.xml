@@ -726,7 +726,7 @@ show column stats year_month_day;
 
           <p>
             The default value for <codeph>inc_stats_size_limit_bytes</codeph>
-            is 20971520, 200 MB.
+            is 209715200, 200 MB.
           </p>
 
           <p> To change the <codeph>inc_stats_size_limit_bytes</codeph> value,
