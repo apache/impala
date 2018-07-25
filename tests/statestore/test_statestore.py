@@ -18,6 +18,7 @@
 from collections import defaultdict
 import json
 import logging
+from random import randint
 import socket
 import threading
 import traceback
@@ -523,6 +524,25 @@ class TestStatestore():
            .wait_for_update(topic_name, 1)
            .wait_for_failure(timeout=60)
        )
+
+  def test_slow_subscriber(self):
+    """Test for IMPALA-6644: This test kills a healthy subscriber and sleeps for a random
+    interval between 1 and 9 seconds, this lets the heartbeats fail without removing the
+    subscriber from the set of active subscribers. It then checks the subscribers page
+    of the statestore to ensure that the 'time_since_heartbeat' field is updated with an
+    acceptable value. Since the statestore heartbeats at 1 second intervals, an acceptable
+    value would be between ((sleep_time-1.0), (sleep_time+1.0))."""
+    sub = StatestoreSubscriber()
+    sub.start().register().wait_for_heartbeat(1)
+    sub.kill()
+    sleep_time = randint(1, 9)
+    time.sleep(sleep_time)
+    subscribers = get_statestore_subscribers()["subscribers"]
+    for s in subscribers:
+      if str(s["id"]) == sub.subscriber_id:
+        secs_since_heartbeat = float(s["secs_since_heartbeat"])
+        assert (secs_since_heartbeat > float(sleep_time - 1.0))
+        assert (secs_since_heartbeat < float(sleep_time + 1.0))
 
   def test_topic_persistence(self):
     """Test that persistent topic entries survive subscriber failure, but transent topic

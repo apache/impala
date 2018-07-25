@@ -18,6 +18,7 @@
 #ifndef STATESTORE_STATESTORE_H
 #define STATESTORE_STATESTORE_H
 
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -130,6 +131,9 @@ class Statestore : public CacheLineAligned {
   /// The only constructor; initialises member variables only.
   Statestore(MetricGroup* metrics);
 
+  /// Destructor, should not be called once the Statestore is initialized.
+  ~Statestore();
+
   /// Initialize and start the backing ThriftServer with port 'state_store_port'.
   /// Initialize the ThreadPools used for updates and heartbeats. Returns an error if
   /// any of the above initialization fails.
@@ -150,7 +154,7 @@ class Statestore : public CacheLineAligned {
 
   void RegisterWebpages(Webserver* webserver);
 
-  /// The main processing loop. Blocks until the exit flag is set.
+  /// The main processing loop. Runs infinitely.
   void MainLoop();
 
   /// Returns the Thrift API interface that proxies requests onto the local Statestore.
@@ -384,6 +388,12 @@ class Statestore : public CacheLineAligned {
     const SubscriberId& id() const { return subscriber_id_; }
     const RegistrationId& registration_id() const { return registration_id_; }
 
+    /// Returns the time elapsed (in seconds) since the last heartbeat.
+    double SecondsSinceHeartbeat() const {
+      return (static_cast<double>(MonotonicMillis() - last_heartbeat_ts_.Load()))
+          / 1000.0;
+    }
+
     /// Get the Topics map that would be used to store 'topic_id'.
     const Topics& GetTopicsMapForId(const TopicId& topic_id) const {
       return IsPrioritizedTopic(topic_id) ? priority_subscribed_topics_
@@ -427,6 +437,9 @@ class Statestore : public CacheLineAligned {
     void SetLastTopicVersionProcessed(const TopicId& topic_id,
         TopicEntry::Version version);
 
+    /// Refresh the subscriber's last heartbeat timestamp to the current monotonic time.
+    void RefreshLastHeartbeatTimestamp();
+
    private:
     /// Unique human-readable identifier for this subscriber, set by the subscriber itself
     /// on a Register call.
@@ -448,6 +461,10 @@ class Statestore : public CacheLineAligned {
     /// on the topic. The set of keys is not modified after construction.
     Topics priority_subscribed_topics_;
     Topics non_priority_subscribed_topics_;
+
+    /// The timestamp of the last successful heartbeat in milliseconds. A timestamp much
+    /// older than the heartbeat frequency implies an unresponsive subscriber.
+    AtomicInt64 last_heartbeat_ts_{0};
 
     /// Lock held when adding or deleting transient entries. See class comment for lock
     /// acquisition order.
@@ -533,6 +550,12 @@ class Statestore : public CacheLineAligned {
   ThreadPool<ScheduledSubscriberUpdate> subscriber_priority_topic_update_threadpool_;
 
   ThreadPool<ScheduledSubscriberUpdate> subscriber_heartbeat_threadpool_;
+
+  /// Thread that monitors the heartbeats of all subscribers.
+  std::unique_ptr<Thread> heartbeat_monitoring_thread_;
+
+  /// Flag to indicate that the statestore has been initialized.
+  bool initialized_ = false;
 
   /// Cache of subscriber clients used for UpdateState() RPCs. Only one client per
   /// subscriber should be used, but the cache helps with the client lifecycle on failure.
@@ -683,6 +706,11 @@ class Statestore : public CacheLineAligned {
   void SubscribersHandler(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);
 
+  /// Monitors the heartbeats of all subscribers every
+  /// FLAGS_heartbeat_monitoring_frequency_ms milliseconds. If a subscriber's
+  /// last_heartbeat_ts_ has not been updated in that interval, it logs the subscriber's
+  /// id.
+  [[noreturn]] void MonitorSubscriberHeartbeat();
 };
 
 }

@@ -75,6 +75,8 @@ DEFINE_int32(statestore_num_heartbeat_threads, 10, "(Advanced) Number of threads
     " send heartbeats in parallel to all registered subscribers.");
 DEFINE_int32(statestore_heartbeat_frequency_ms, 1000, "(Advanced) Frequency (in ms) with"
     " which the statestore sends heartbeat heartbeats to subscribers.");
+DEFINE_double_hidden(heartbeat_monitoring_frequency_ms, 60000, "(Advanced) Frequency (in "
+    "ms) with which the statestore monitors heartbeats from a subscriber.");
 
 DEFINE_int32(state_store_port, 24000, "port where StatestoreService is running");
 
@@ -315,6 +317,7 @@ Statestore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
   : subscriber_id_(subscriber_id),
     registration_id_(registration_id),
     network_address_(network_address) {
+  RefreshLastHeartbeatTimestamp();
   for (const TTopicRegistration& topic : subscribed_topics) {
     GetTopicsMapForId(topic.topic_name)
         ->emplace(piecewise_construct, forward_as_tuple(topic.topic_name),
@@ -388,6 +391,11 @@ void Statestore::Subscriber::SetLastTopicVersionProcessed(const TopicId& topic_i
   topic_it->second.last_version.Store(version);
 }
 
+void Statestore::Subscriber::RefreshLastHeartbeatTimestamp() {
+  DCHECK_GE(MonotonicMillis(), last_heartbeat_ts_.Load());
+  last_heartbeat_ts_.Store(MonotonicMillis());
+}
+
 Statestore::Statestore(MetricGroup* metrics)
   : subscriber_topic_update_threadpool_("statestore-update",
         "subscriber-update-worker",
@@ -419,7 +427,6 @@ Statestore::Statestore(MetricGroup* metrics)
     failure_detector_(new MissedHeartbeatFailureDetector(
         FLAGS_statestore_max_missed_heartbeats,
         FLAGS_statestore_max_missed_heartbeats / 2)) {
-
   DCHECK(metrics != NULL);
   metrics_ = metrics;
   num_subscribers_metric_ = metrics->AddGauge(STATESTORE_LIVE_SUBSCRIBERS, 0);
@@ -438,6 +445,10 @@ Statestore::Statestore(MetricGroup* metrics)
 
   update_state_client_cache_->InitMetrics(metrics, "subscriber-update-state");
   heartbeat_client_cache_->InitMetrics(metrics, "subscriber-heartbeat");
+}
+
+Statestore::~Statestore() {
+  CHECK(initialized_) << "Cannot shutdown Statestore once initialized.";
 }
 
 Status Statestore::Init(int32_t state_store_port) {
@@ -464,6 +475,9 @@ Status Statestore::Init(int32_t state_store_port) {
   RETURN_IF_ERROR(subscriber_topic_update_threadpool_.Init());
   RETURN_IF_ERROR(subscriber_priority_topic_update_threadpool_.Init());
   RETURN_IF_ERROR(subscriber_heartbeat_threadpool_.Init());
+  RETURN_IF_ERROR(Thread::Create("statestore-heartbeat", "heartbeat-monitoring-thread",
+      &Statestore::MonitorSubscriberHeartbeat, this, &heartbeat_monitoring_thread_));
+  initialized_ = true;
 
   return Status::OK();
 }
@@ -535,6 +549,12 @@ void Statestore::SubscribersHandler(const Webserver::ArgumentMap& args,
     Value registration_id(PrintId(subscriber.second->registration_id()).c_str(),
         document->GetAllocator());
     sub_json.AddMember("registration_id", registration_id, document->GetAllocator());
+
+    Value secs_since_heartbeat(
+        StringPrintf("%.3f", subscriber.second->SecondsSinceHeartbeat()).c_str(),
+        document->GetAllocator());
+    sub_json.AddMember(
+        "secs_since_heartbeat", secs_since_heartbeat, document->GetAllocator());
 
     subscribers.PushBack(sub_json, document->GetAllocator());
   }
@@ -898,7 +918,9 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
   Status status;
   if (is_heartbeat) {
     status = SendHeartbeat(subscriber.get());
-    if (status.code() == TErrorCode::RPC_RECV_TIMEOUT) {
+    if (status.ok()) {
+      subscriber->RefreshLastHeartbeatTimestamp();
+    } else if (status.code() == TErrorCode::RPC_RECV_TIMEOUT) {
       // Add details to status to make it more useful, while preserving the stack
       status.AddDetail(Substitute(
           "Subscriber $0 timed-out during heartbeat RPC. Timeout is $1s.",
@@ -964,6 +986,35 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
                   << " message to subscriber '" << subscriber->id() << "': "
                   << status.GetDetail();
       }
+    }
+  }
+}
+
+[[noreturn]] void Statestore::MonitorSubscriberHeartbeat() {
+  while (1) {
+    int num_subscribers;
+    vector<SubscriberId> inactive_subscribers;
+    SleepForMs(FLAGS_heartbeat_monitoring_frequency_ms);
+    {
+      lock_guard<mutex> l(subscribers_lock_);
+      num_subscribers = subscribers_.size();
+      for (const auto& subscriber : subscribers_) {
+        if (subscriber.second->SecondsSinceHeartbeat()
+            > FLAGS_heartbeat_monitoring_frequency_ms) {
+          inactive_subscribers.push_back(subscriber.second->id());
+        }
+      }
+    }
+    if (inactive_subscribers.empty()) {
+      LOG(INFO) << "All " << num_subscribers
+                << " subscribers successfully heartbeat in the last "
+                << FLAGS_heartbeat_monitoring_frequency_ms << "ms.";
+    } else {
+      int num_active_subscribers = num_subscribers - inactive_subscribers.size();
+      LOG(WARNING) << num_active_subscribers << "/" << num_subscribers
+                   << " subscribers successfully heartbeat in the last "
+                   << FLAGS_heartbeat_monitoring_frequency_ms << "ms."
+                   << " Slow subscribers: " << boost::join(inactive_subscribers, ", ");
     }
   }
 }
