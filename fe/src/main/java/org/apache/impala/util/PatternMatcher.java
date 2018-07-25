@@ -18,11 +18,11 @@
 package org.apache.impala.util;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.base.Predicate;
 import com.google.common.collect.Lists;
 
 /**
@@ -30,7 +30,7 @@ import com.google.common.collect.Lists;
  * e.g. hive SHOW patterns, JDBC patterns).
  * It maps those patterns onto the java regex pattern objects.
  */
-public class PatternMatcher {
+public class PatternMatcher implements Predicate<String> {
   // Patterns to match against. A string is considered to match if it matches
   // any of the patterns.
   private List<Pattern> patterns_;
@@ -44,6 +44,11 @@ public class PatternMatcher {
       if (pattern.matcher(candidate).matches()) return true;
     }
     return false;
+  }
+
+  @Override // Implementation of Predicate interface.
+  public boolean apply(String input) {
+    return matches(input);
   }
 
   // Immutable pattern matcher that matches all

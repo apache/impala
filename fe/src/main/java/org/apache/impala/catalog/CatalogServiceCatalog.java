@@ -18,16 +18,12 @@
 package org.apache.impala.catalog;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -36,26 +32,19 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.codec.binary.Base64;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
-import org.apache.hadoop.hive.metastore.api.FunctionType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.ResourceType;
-import org.apache.hadoop.hive.metastore.api.ResourceUri;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
-import org.apache.hadoop.hive.ql.exec.FunctionUtils;
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.JniUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
-import org.apache.impala.hive.executor.UdfExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCatalog;
 import org.apache.impala.thrift.TCatalogObject;
@@ -69,6 +58,7 @@ import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableUsageMetrics;
 import org.apache.impala.thrift.TUniqueId;
+import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.SentryProxy;
 import org.apache.log4j.Logger;
@@ -78,7 +68,6 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TCompactProtocol;
 
 import com.codahale.metrics.Timer;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -163,7 +152,7 @@ import com.google.common.collect.Sets;
  * loading thread pool.
  */
 public class CatalogServiceCatalog extends Catalog {
-  private static final Logger LOG = Logger.getLogger(CatalogServiceCatalog.class);
+  public static final Logger LOG = Logger.getLogger(CatalogServiceCatalog.class);
 
   private static final int INITIAL_META_STORE_CLIENT_POOL_SIZE = 10;
   private static final int MAX_NUM_SKIPPED_TOPIC_UPDATES = 2;
@@ -204,9 +193,6 @@ public class CatalogServiceCatalog extends Catalog {
   // policy metadata. Null if Sentry Service is not enabled.
   private final SentryProxy sentryProxy_;
 
-  // Local temporary directory to copy UDF Jars.
-  private static String localLibraryPath_;
-
   // Log of deleted catalog objects.
   private final CatalogDeltaLog deleteLog_;
 
@@ -219,6 +205,8 @@ public class CatalogServiceCatalog extends Catalog {
   private static final long TOPIC_UPDATE_WAIT_TIMEOUT_MS = 10000;
 
   private final TopicUpdateLog topicUpdateLog_ = new TopicUpdateLog();
+
+  private final String localLibraryPath_;
 
   /**
    * Initialize the CatalogServiceCatalog. If 'loadInBackground' is true, table metadata
@@ -249,7 +237,7 @@ public class CatalogServiceCatalog extends Catalog {
     } else {
       sentryProxy_ = null;
     }
-    localLibraryPath_ = new String("file://" + localLibraryPath);
+    localLibraryPath_ = localLibraryPath;
     deleteLog_ = new CatalogDeltaLog();
   }
 
@@ -780,131 +768,6 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Checks if the Hive function 'fn' is Impala compatible. A function is Impala
-   * compatible iff
-   *
-   * 1. The function is JAVA based,
-   * 2. Has exactly one binary resource associated (We don't support loading
-   *    dependencies yet) and
-   * 3. The binary is of type JAR.
-   *
-   * Returns true if compatible and false otherwise. In case of incompatible
-   * functions 'incompatMsg' has the reason for the incompatibility.
-   * */
-   public static boolean isFunctionCompatible(
-       org.apache.hadoop.hive.metastore.api.Function fn, StringBuilder incompatMsg) {
-    boolean isCompatible = true;
-    if (fn.getFunctionType() != FunctionType.JAVA) {
-      isCompatible = false;
-      incompatMsg.append("Function type: " + fn.getFunctionType().name()
-          + " is not supported. Only " + FunctionType.JAVA.name() + " functions "
-          + "are supported.");
-    } else if (fn.getResourceUrisSize() == 0) {
-      isCompatible = false;
-      incompatMsg.append("No executable binary resource (like a JAR file) is " +
-          "associated with this function. To fix this, recreate the function by " +
-          "specifying a 'location' in the function create statement.");
-    } else if (fn.getResourceUrisSize() != 1) {
-      isCompatible = false;
-      List<String> resourceUris = Lists.newArrayList();
-      for (ResourceUri resource: fn.getResourceUris()) {
-        resourceUris.add(resource.getUri());
-      }
-      incompatMsg.append("Impala does not support multiple Jars for dependencies."
-          + "(" + Joiner.on(",").join(resourceUris) + ") ");
-    } else if (fn.getResourceUris().get(0).getResourceType() != ResourceType.JAR) {
-      isCompatible = false;
-      incompatMsg.append("Function binary type: " +
-        fn.getResourceUris().get(0).getResourceType().name()
-        + " is not supported. Only " + ResourceType.JAR.name()
-        + " type is supported.");
-    }
-    return isCompatible;
-  }
-
-  /**
-   * Returns a list of Impala Functions, one per compatible "evaluate" method in the UDF
-   * class referred to by the given Java function. This method copies the UDF Jar
-   * referenced by "function" to a temporary file in localLibraryPath_ and loads it
-   * into the jvm. Then we scan all the methods in the class using reflection and extract
-   * those methods and create corresponding Impala functions. Currently Impala supports
-   * only "JAR" files for symbols and also a single Jar containing all the dependent
-   * classes rather than a set of Jar files.
-   */
-  public static List<Function> extractFunctions(String db,
-      org.apache.hadoop.hive.metastore.api.Function function)
-      throws ImpalaRuntimeException{
-    List<Function> result = Lists.newArrayList();
-    List<String> addedSignatures = Lists.newArrayList();
-    StringBuilder warnMessage = new StringBuilder();
-    if (!isFunctionCompatible(function, warnMessage)) {
-      LOG.warn("Skipping load of incompatible function: " +
-          function.getFunctionName() + ". " + warnMessage.toString());
-      return result;
-    }
-    String jarUri = function.getResourceUris().get(0).getUri();
-    Class<?> udfClass = null;
-    Path localJarPath = null;
-    try {
-      localJarPath = new Path(localLibraryPath_, UUID.randomUUID().toString() + ".jar");
-      try {
-        FileSystemUtil.copyToLocal(new Path(jarUri), localJarPath);
-      } catch (IOException e) {
-        String errorMsg = "Error loading Java function: " + db + "." +
-            function.getFunctionName() + ". Couldn't copy " + jarUri +
-            " to local path: " + localJarPath.toString();
-        LOG.error(errorMsg, e);
-        throw new ImpalaRuntimeException(errorMsg);
-      }
-      URL[] classLoaderUrls = new URL[] {new URL(localJarPath.toString())};
-      URLClassLoader urlClassLoader = new URLClassLoader(classLoaderUrls);
-      udfClass = urlClassLoader.loadClass(function.getClassName());
-      // Check if the class is of UDF type. Currently we don't support other functions
-      // TODO: Remove this once we support Java UDAF/UDTF
-      if (FunctionUtils.getUDFClassType(udfClass) != FunctionUtils.UDFClassType.UDF) {
-        LOG.warn("Ignoring load of incompatible Java function: " +
-            function.getFunctionName() + " as " + FunctionUtils.getUDFClassType(udfClass)
-            + " is not a supported type. Only UDFs are supported");
-        return result;
-      }
-      // Load each method in the UDF class and create the corresponding Impala Function
-      // object.
-      for (Method m: udfClass.getMethods()) {
-        if (!m.getName().equals(UdfExecutor.UDF_FUNCTION_NAME)) continue;
-        Function fn = ScalarFunction.fromHiveFunction(db,
-            function.getFunctionName(), function.getClassName(),
-            m.getParameterTypes(), m.getReturnType(), jarUri);
-        if (fn == null) {
-          LOG.warn("Ignoring incompatible method: " + m.toString() + " during load of " +
-             "Hive UDF:" + function.getFunctionName() + " from " + udfClass);
-          continue;
-        }
-        if (!addedSignatures.contains(fn.signatureString())) {
-          result.add(fn);
-          addedSignatures.add(fn.signatureString());
-        }
-      }
-    } catch (ClassNotFoundException c) {
-      String errorMsg = "Error loading Java function: " + db + "." +
-          function.getFunctionName() + ". Symbol class " + udfClass +
-          "not found in Jar: " + jarUri;
-      LOG.error(errorMsg);
-      throw new ImpalaRuntimeException(errorMsg, c);
-    } catch (Exception e) {
-      LOG.error("Skipping function load: " + function.getFunctionName(), e);
-      throw new ImpalaRuntimeException("Error extracting functions", e);
-    } catch (LinkageError e) {
-      String errorMsg = "Error resolving dependencies for Java function: " + db + "." +
-          function.getFunctionName();
-      LOG.error(errorMsg);
-      throw new ImpalaRuntimeException(errorMsg, e);
-    } finally {
-      if (localJarPath != null) FileSystemUtil.deleteIfExists(localJarPath);
-    }
-    return result;
-  }
-
- /**
    * Extracts Impala functions stored in metastore db parameters and adds them to
    * the catalog cache.
    */
@@ -912,21 +775,13 @@ public class CatalogServiceCatalog extends Catalog {
       org.apache.hadoop.hive.metastore.api.Database msDb) {
     if (msDb == null || msDb.getParameters() == null) return;
     LOG.info("Loading native functions for database: " + db.getName());
-    TCompactProtocol.Factory protocolFactory = new TCompactProtocol.Factory();
-    for (String key: msDb.getParameters().keySet()) {
-      if (!key.startsWith(Db.FUNCTION_INDEX_PREFIX)) continue;
-      try {
-        TFunction fn = new TFunction();
-        JniUtil.deserializeThrift(protocolFactory, fn,
-            Base64.decodeBase64(msDb.getParameters().get(key)));
-        Function addFn = Function.fromThrift(fn);
-        db.addFunction(addFn, false);
-        addFn.setCatalogVersion(incrementAndGetCatalogVersion());
-      } catch (ImpalaException e) {
-        LOG.error("Encountered an error during function load: key=" + key
-            + ",continuing", e);
-      }
+    List<Function> funcs = FunctionUtils.deserializeNativeFunctionsFromDbParams(
+        msDb.getParameters());
+    for (Function f : funcs) {
+      db.addFunction(f, false);
+      f.setCatalogVersion(incrementAndGetCatalogVersion());
     }
+
     LOG.info("Loaded native functions for database: " + db.getName());
   }
 
@@ -941,7 +796,9 @@ public class CatalogServiceCatalog extends Catalog {
     LOG.info("Loading Java functions for database: " + db.getName());
     for (org.apache.hadoop.hive.metastore.api.Function function: functions) {
       try {
-        for (Function fn: extractFunctions(db.getName(), function)) {
+        List<Function> fns = FunctionUtils.extractFunctions(db.getName(), function,
+            localLibraryPath_);
+        for (Function fn: fns) {
           db.addFunction(fn);
           fn.setCatalogVersion(incrementAndGetCatalogVersion());
         }

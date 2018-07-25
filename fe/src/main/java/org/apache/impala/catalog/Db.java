@@ -18,7 +18,6 @@
 package org.apache.impala.catalog;
 
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +37,7 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
 
 import com.google.common.base.Preconditions;
@@ -187,45 +187,6 @@ public class Db extends CatalogObjectImpl implements FeDb {
     return HdfsTable.createCtasTarget(this, msTbl);
   }
 
-  /**
-   * Comparator that sorts function overloads. We want overloads to be always considered
-   * in a canonical order so that overload resolution in the case of multiple valid
-   * overloads does not depend on the order in which functions are added to the Db. The
-   * order is based on the PrimitiveType enum because this was the order used implicitly
-   * for builtin operators and functions in earlier versions of Impala.
-   */
-  private static class FunctionResolutionOrder implements Comparator<Function> {
-    @Override
-    public int compare(Function f1, Function f2) {
-      int numSharedArgs = Math.min(f1.getNumArgs(), f2.getNumArgs());
-      for (int i = 0; i < numSharedArgs; ++i) {
-        int cmp = typeCompare(f1.getArgs()[i], f2.getArgs()[i]);
-        if (cmp < 0) {
-          return -1;
-        } else if (cmp > 0) {
-          return 1;
-        }
-      }
-      // Put alternative with fewer args first.
-      if (f1.getNumArgs() < f2.getNumArgs()) {
-        return -1;
-      } else if (f1.getNumArgs() > f2.getNumArgs()) {
-        return 1;
-      }
-      return 0;
-    }
-
-    private int typeCompare(Type t1, Type t2) {
-      Preconditions.checkState(!t1.isComplexType());
-      Preconditions.checkState(!t2.isComplexType());
-      return Integer.compare(t1.getPrimitiveType().ordinal(),
-          t2.getPrimitiveType().ordinal());
-    }
-  }
-
-  private static final FunctionResolutionOrder FUNCTION_RESOLUTION_ORDER =
-      new FunctionResolutionOrder();
-
   @Override // FeDb
   public org.apache.hadoop.hive.metastore.api.Database getMetaStoreDb() {
     return thriftDb_.getMetastore_db();
@@ -253,31 +214,8 @@ public class Db extends CatalogObjectImpl implements FeDb {
     synchronized (functions_) {
       List<Function> fns = functions_.get(desc.functionName());
       if (fns == null) return null;
-
-      // First check for identical
-      for (Function f: fns) {
-        if (f.compare(desc, Function.CompareMode.IS_IDENTICAL)) return f;
-      }
-      if (mode == Function.CompareMode.IS_IDENTICAL) return null;
-
-      // Next check for indistinguishable
-      for (Function f: fns) {
-        if (f.compare(desc, Function.CompareMode.IS_INDISTINGUISHABLE)) return f;
-      }
-      if (mode == Function.CompareMode.IS_INDISTINGUISHABLE) return null;
-
-      // Next check for strict supertypes
-      for (Function f: fns) {
-        if (f.compare(desc, Function.CompareMode.IS_SUPERTYPE_OF)) return f;
-      }
-      if (mode == Function.CompareMode.IS_SUPERTYPE_OF) return null;
-
-      // Finally check for non-strict supertypes
-      for (Function f: fns) {
-        if (f.compare(desc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF)) return f;
-      }
+      return FunctionUtils.resolveFunction(fns, desc, mode);
     }
-    return null;
   }
 
   public Function getFunction(String signatureString) {
@@ -345,7 +283,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
       }
       if (addToDbParams && !addFunctionToDbParams(fn)) return false;
       fns.add(fn);
-      Collections.sort(fns, FUNCTION_RESOLUTION_ORDER);
+      Collections.sort(fns, FunctionUtils.FUNCTION_RESOLUTION_ORDER);
       return true;
     }
   }
@@ -472,31 +410,23 @@ public class Db extends CatalogObjectImpl implements FeDb {
    */
   @Override // FeDb
   public List<Function> getFunctions(String name) {
-    List<Function> result = Lists.newArrayList();
     Preconditions.checkNotNull(name);
     synchronized (functions_) {
-      if (!functions_.containsKey(name)) return result;
-      for (Function fn: functions_.get(name)) {
-        if (fn.userVisible()) result.add(fn);
-      }
+      List<Function> candidates = functions_.get(name);
+      if (candidates == null) return Lists.newArrayList();
+      return FunctionUtils.getVisibleFunctions(candidates);
     }
-    return result;
   }
 
   @Override
   public List<Function> getFunctions(TFunctionCategory category, String name) {
-    List<Function> result = Lists.newArrayList();
     Preconditions.checkNotNull(category);
     Preconditions.checkNotNull(name);
     synchronized (functions_) {
-      if (!functions_.containsKey(name)) return result;
-      for (Function fn: functions_.get(name)) {
-        if (fn.userVisible() && Function.categoryMatch(fn, category)) {
-          result.add(fn);
-        }
-      }
+      List<Function> candidates = functions_.get(name);
+      if (candidates == null) return Lists.newArrayList();
+      return FunctionUtils.getVisibleFunctionsInCategory(candidates, category);
     }
-    return result;
   }
 
   public TCatalogObject toTCatalogObject() {

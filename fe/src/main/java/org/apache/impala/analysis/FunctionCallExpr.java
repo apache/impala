@@ -22,8 +22,6 @@ import java.util.List;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.BuiltinsDb;
-import org.apache.impala.catalog.Catalog;
-import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ScalarFunction;

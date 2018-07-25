@@ -156,6 +156,7 @@ import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateCatalogResponse;
+import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.log4j.Logger;
@@ -1080,7 +1081,8 @@ public class CatalogOpExecutor {
         Preconditions.checkState(fn instanceof ScalarFunction);
         org.apache.hadoop.hive.metastore.api.Function hiveFn =
             ((ScalarFunction)fn).toHiveFunction();
-        List<Function> funcs = CatalogServiceCatalog.extractFunctions(fn.dbName(), hiveFn);
+        List<Function> funcs = FunctionUtils.extractFunctions(fn.dbName(), hiveFn,
+            BackendConfig.INSTANCE.getBackendCfg().local_library_path);
         if (funcs.isEmpty()) {
           throw new CatalogException(
             "No compatible function signatures found in class: " + hiveFn.getClassName());

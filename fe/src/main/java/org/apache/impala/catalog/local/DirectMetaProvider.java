@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
@@ -161,6 +162,25 @@ class DirectMetaProvider implements MetaProvider {
     return ret;
   }
 
+  @Override
+  public List<String> loadFunctionNames(String dbName) throws TException {
+    Preconditions.checkNotNull(dbName);
+    try (MetaStoreClient c = msClientPool_.getClient()) {
+      return ImmutableList.copyOf(c.getHiveClient().getFunctions(
+          dbName, /*pattern=*/null));
+    }
+  }
+
+
+  @Override
+  public Function getFunction(String dbName, String functionName) throws TException {
+    Preconditions.checkNotNull(dbName);
+    Preconditions.checkNotNull(functionName);
+
+    try (MetaStoreClient c = msClientPool_.getClient()) {
+      return c.getHiveClient().getFunction(dbName, functionName);
+    }
+  }
 
   @Override
   public List<ColumnStatisticsObj> loadTableColumnStatistics(String dbName,

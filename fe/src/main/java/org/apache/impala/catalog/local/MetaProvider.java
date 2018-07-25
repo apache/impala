@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
@@ -59,6 +60,16 @@ interface MetaProvider {
 
   List<String> loadPartitionNames(String dbName, String tableName)
       throws MetaException, TException;
+
+  /**
+   * Retrieve the list of functions in the given database.
+   */
+  List<String> loadFunctionNames(String dbName) throws TException;
+
+  /**
+   * Retrieve the specified function from the metadata store.
+   */
+  Function getFunction(String dbName, String functionName) throws TException;
 
   /**
    * Load the given partitions from the specified table.
