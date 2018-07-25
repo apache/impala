@@ -293,7 +293,7 @@ select date_add(cast('2016-01-31' as timestamp), interval 3 months) as 'april_31
           with the argument order reversed. Supports the same date and time units as <codeph>EXTRACT()</codeph>.
           For compatibility with SQL code containing vendor extensions.
           <p>
-            <b>Return type:</b> <codeph>int</codeph>
+            <b>Return type:</b> <codeph>bigint</codeph>
           </p>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
 <codeblock>
@@ -816,22 +816,24 @@ select now() as right_now, days_sub(now(), 31) as 31_days_ago;
         <dd>
           <indexterm audience="hidden">extract() function</indexterm>
           <b>Purpose:</b> Returns one of the numeric date or time fields from a
-            <codeph>TIMESTAMP</codeph> value.
-          <p>
+            <codeph>TIMESTAMP</codeph> value. <p>
             <b>Unit argument:</b> The <codeph>unit</codeph> string can be one of
               <codeph>epoch</codeph>, <codeph>year</codeph>,
               <codeph>quarter</codeph>, <codeph>month</codeph>,
               <codeph>day</codeph>, <codeph>hour</codeph>,
               <codeph>minute</codeph>, <codeph>second</codeph>, or
               <codeph>millisecond</codeph>. This argument value is
-            case-insensitive.
-          </p>
-          <p rev="2.0.0"> In Impala 2.0 and higher, you can use special syntax
-            rather than a regular function call, for compatibility with code
-            that uses the SQL-99 format with the <codeph>FROM</codeph> keyword.
-            With this style, the unit names are identifiers rather than
-              <codeph>STRING</codeph> literals. For example, the following calls
-            are both equivalent:
+            case-insensitive. </p><p>If you specify <codeph>millisecond</codeph>
+            for the <codeph>unit</codeph> argument, the function returns the
+            seconds component and the milliseconds component. For example,
+              <codeph>extract(cast('2006-05-12 18:27:28.123456789' as
+              timestamp), 'MILLISECOND')</codeph> will return
+              <codeph>28123</codeph>. </p><p rev="2.0.0"> In Impala 2.0 and
+            higher, you can use special syntax rather than a regular function
+            call, for compatibility with code that uses the SQL-99 format with
+            the <codeph>FROM</codeph> keyword. With this style, the unit names
+            are identifiers rather than <codeph>STRING</codeph> literals. For
+            example, the following calls are both equivalent:
             <codeblock>extract(year from now());
 extract(now(), "year");
 </codeblock>
@@ -847,7 +849,7 @@ extract(now(), "year");
               <codeph>TRUNC()</codeph> function instead. </p>
           <p>
             <b>Return type:</b>
-            <codeph>int</codeph>
+            <codeph>bigint</codeph>
           </p>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
           <codeblock>
