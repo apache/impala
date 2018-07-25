@@ -23,8 +23,7 @@ import os
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_service import ImpaladService
-from tests.common.skip import SkipIfBuildType
-from tests.shell.util import ImpalaShell, move_shell_history, restore_shell_history
+from tests.shell.util import ImpalaShell
 # Follow tests/shell/test_shell_interactive.py naming.
 from shell.impala_shell import ImpalaShell as ImpalaShellClass
 
@@ -36,18 +35,6 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
   @classmethod
   def get_workload(cls):
     return 'functional-query'
-
-  @classmethod
-  def setup_class(cls):
-    super(TestShellInteractiveReconnect, cls).setup_class()
-
-    cls.tempfile_name = tempfile.mktemp()
-    move_shell_history(cls.tempfile_name)
-
-  @classmethod
-  def teardown_class(cls):
-    restore_shell_history(cls.tempfile_name)
-    super(TestShellInteractiveReconnect, cls).teardown_class()
 
   @pytest.mark.execute_serially
   def test_manual_reconnect(self):

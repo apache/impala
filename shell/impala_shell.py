@@ -175,7 +175,7 @@ class ImpalaShell(object, cmd.Cmd):
     self.webserver_address = ImpalaShell.UNKNOWN_WEBSERVER
 
     self.current_db = options.default_db
-    self.history_file = os.path.expanduser("~/.impalahistory")
+    self.history_file = os.path.expanduser(options.history_file)
     # Stores the state of user input until a delimiter is seen.
     self.partial_cmd = str()
     # Stores the old prompt while the user input is incomplete.

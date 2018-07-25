@@ -23,10 +23,14 @@ import getpass
 import os
 import socket
 
+_histfile_from_env = os.environ.get(
+    'IMPALA_HISTFILE', '~/.impalahistory')
+
 impala_shell_defaults = {
             'ca_cert': None,
             'config_file': os.path.expanduser("~/.impalarc"),
             'default_db': None,
+            'history_file': _histfile_from_env,
             'history_max': 1000,
             'ignore_query_failure': False,
             'impalad': socket.getfqdn() + ':21000',

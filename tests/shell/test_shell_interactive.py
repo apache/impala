@@ -25,7 +25,6 @@ import re
 import signal
 import socket
 import sys
-import tempfile
 from time import sleep
 
 # This import is the actual ImpalaShell class from impala_shell.py.
@@ -34,29 +33,40 @@ from time import sleep
 # to mask it.
 from shell.impala_shell import ImpalaShell as ImpalaShellClass
 
+from tempfile import NamedTemporaryFile
 from tests.common.impala_service import ImpaladService
 from tests.common.skip import SkipIfLocal
 from util import assert_var_substitution, ImpalaShell
-from util import move_shell_history, restore_shell_history
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
-SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
 # Regex to match the interactive shell prompt that is expected after each command.
 PROMPT_REGEX = r'\[[^:]+:2100[0-9]\]'
 
+
+@pytest.fixture
+def tmp_history_file(request):
+  """
+  Test fixture which uses a temporary file as the path for the shell
+  history.
+  """
+  tmp = NamedTemporaryFile()
+  old_path = os.environ.get('IMPALA_HISTFILE')
+  os.environ['IMPALA_HISTFILE'] = tmp.name
+
+  def cleanup():
+    if old_path is not None:
+      os.environ['IMPALA_HISTFILE'] = old_path
+    else:
+      del os.environ['IMPALA_HISTFILE']
+
+  request.addfinalizer(cleanup)
+  return tmp.name
+
+
 class TestImpalaShellInteractive(object):
   """Test the impala shell interactively"""
-
-  @classmethod
-  def setup_class(cls):
-    cls.tempfile_name = tempfile.mktemp()
-    move_shell_history(cls.tempfile_name)
-
-  @classmethod
-  def teardown_class(cls):
-    restore_shell_history(cls.tempfile_name)
 
   def _expect_with_cmd(self, proc, cmd, expectations=(), db="default"):
     """Executes a command on the expect process instance and verifies a set of
@@ -67,7 +77,6 @@ class TestImpalaShellInteractive(object):
     for e in expectations:
       assert e in proc.before
 
-  @pytest.mark.execute_serially
   def test_local_shell_options(self):
     """Test that setting the local shell options works"""
     proc = pexpect.spawn(SHELL_CMD)
@@ -114,7 +123,7 @@ class TestImpalaShellInteractive(object):
     # test print to file
     p1 = ImpalaShell()
     p1.send_cmd("use tpch")
-    local_file = tempfile.NamedTemporaryFile(delete=True)
+    local_file = NamedTemporaryFile(delete=True)
     p1.send_cmd("set output_file=%s" % local_file.name)
     p1.send_cmd("select * from nation")
     result = p1.get_result()
@@ -132,7 +141,6 @@ class TestImpalaShellInteractive(object):
     result = p2.get_result()
     assert "VIETNAM" in result.stdout
 
-  @pytest.mark.execute_serially
   def test_compute_stats_with_live_progress_options(self):
     """Test that setting LIVE_PROGRESS options won't cause COMPUTE STATS query fail"""
     p = ImpalaShell()
@@ -146,7 +154,6 @@ class TestImpalaShellInteractive(object):
     result = p.get_result()
     assert "Updated 1 partition(s) and 1 column(s)" in result.stdout
 
-  @pytest.mark.execute_serially
   def test_escaped_quotes(self):
     """Test escaping quotes"""
     # test escaped quotes outside of quotes
@@ -173,7 +180,6 @@ class TestImpalaShellInteractive(object):
     assert "Cancelled" not in result.stderr
     assert impalad.wait_for_num_in_flight_queries(0)
 
-  @pytest.mark.execute_serially
   def test_unicode_input(self):
     "Test queries containing non-ascii input"
     # test a unicode query spanning multiple lines
@@ -182,7 +188,6 @@ class TestImpalaShellInteractive(object):
     result = run_impala_shell_interactive(args)
     assert "Fetched 1 row(s)" in result.stderr
 
-  @pytest.mark.execute_serially
   def test_welcome_string(self):
     """Test that the shell's welcome message is only printed once
     when the shell is started. Ensure it is not reprinted on errors.
@@ -193,14 +198,12 @@ class TestImpalaShellInteractive(object):
     result = run_impala_shell_interactive('select * from non_existent_table;')
     assert result.stdout.count("Welcome to the Impala shell") == 1
 
-  @pytest.mark.execute_serially
   def test_disconnected_shell(self):
     """Test that the shell presents a disconnected prompt if it can't connect
     """
     result = run_impala_shell_interactive('asdf;', shell_args='-i foo')
     assert ImpalaShellClass.DISCONNECTED_PROMPT in result.stdout
 
-  @pytest.mark.execute_serially
   def test_bash_cmd_timing(self):
     """Test existence of time output in bash commands run from shell"""
     args = "! ls;"
@@ -279,8 +282,7 @@ class TestImpalaShellInteractive(object):
       run_impala_shell_interactive("drop table if exists %s.%s;" % (TMP_DB, TMP_TBL))
       run_impala_shell_interactive("drop database if exists foo;")
 
-  @pytest.mark.execute_serially
-  def test_multiline_queries_in_history(self):
+  def test_multiline_queries_in_history(self, tmp_history_file):
     """Test to ensure that multiline queries with comments are preserved in history
 
     Ensure that multiline queries are preserved when they're read back from history.
@@ -309,13 +311,26 @@ class TestImpalaShellInteractive(object):
     for _, history_entry in queries:
       assert history_entry in result.stderr, "'%s' not in '%s'" % (history_entry, result.stderr)
 
-  @pytest.mark.execute_serially
-  def test_rerun(self):
+  def test_history_file_option(self, tmp_history_file):
+    """
+    Setting the 'tmp_history_file' fixture above means that the IMPALA_HISTFILE
+    environment will be overriden. Here we override that environment by passing
+    the --history_file command line option, ensuring that the history ends up
+    in the appropriate spot.
+    """
+    with NamedTemporaryFile() as new_hist:
+      child_proc = pexpect.spawn(
+          SHELL_CMD,
+          args=["--history_file=%s" % new_hist.name])
+      child_proc.expect(":21000] default>")
+      self._expect_with_cmd(child_proc, "select 'hi'", ('hi'))
+      child_proc.sendline('exit;')
+      child_proc.expect(pexpect.EOF)
+      history_contents = file(new_hist.name).read()
+      assert "select 'hi'" in history_contents
+
+  def test_rerun(self, tmp_history_file):
     """Smoke test for the 'rerun' command"""
-    # Clear history first.
-    if os.path.exists(SHELL_HISTORY_FILE):
-      os.remove(SHELL_HISTORY_FILE)
-    assert not os.path.exists(SHELL_HISTORY_FILE)
     child_proc = pexpect.spawn(SHELL_CMD)
     child_proc.expect(":21000] default>")
     self._expect_with_cmd(child_proc, "@1", ("Command index out of range"))
@@ -345,7 +360,6 @@ class TestImpalaShellInteractive(object):
     self._expect_with_cmd(child_proc, "rerun1", ("Syntax error"))
     child_proc.sendline('quit;')
 
-  @pytest.mark.execute_serially
   def test_tip(self):
     """Smoke test for the TIP command"""
     # Temporarily add impala_shell module to path to get at TIPS list for verification
@@ -359,14 +373,12 @@ class TestImpalaShellInteractive(object):
       if t in result.stderr: return
     assert False, "No tip found in output %s" % result.stderr
 
-  @pytest.mark.execute_serially
   def test_var_substitution(self):
     cmds = open(os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql')).read()
     args = '''--var=foo=123 --var=BAR=456 --delimited "--output_delimiter= " '''
     result = run_impala_shell_interactive(cmds, shell_args=args)
     assert_var_substitution(result)
 
-  @pytest.mark.execute_serially
   def test_query_option_configuration(self):
     rcfile_path = os.path.join(QUERY_FILE_PATH, 'impalarc_with_query_options')
     args = '-Q MT_dop=1 --query_option=MAX_ERRORS=200 --config_file="%s"' % rcfile_path
@@ -378,7 +390,6 @@ class TestImpalaShellInteractive(object):
     assert "INVALID_QUERY_OPTION is not supported for the impalad being "
     "connected to, ignoring." in result.stdout
 
-  @pytest.mark.execute_serially
   def test_source_file(self):
     cwd = os.getcwd()
     try:
@@ -399,7 +410,6 @@ class TestImpalaShellInteractive(object):
     finally:
       os.chdir(cwd)
 
-  @pytest.mark.execute_serially
   def test_source_file_with_errors(self):
     full_path = "%s/tests/shell/shell_error.cmds" % os.environ['IMPALA_HOME']
     result = run_impala_shell_interactive("source %s;" % full_path)
@@ -412,13 +422,11 @@ class TestImpalaShellInteractive(object):
     assert "Query: SHOW TABLES" in result.stderr
     assert "alltypes" in result.stdout
 
-  @pytest.mark.execute_serially
   def test_source_missing_file(self):
     full_path = "%s/tests/shell/doesntexist.cmds" % os.environ['IMPALA_HOME']
     result = run_impala_shell_interactive("source %s;" % full_path)
     assert "No such file or directory" in result.stderr
 
-  @pytest.mark.execute_serially
   def test_zero_row_fetch(self):
     # IMPALA-4418: DROP and USE are generally exceptional statements where
     # the client does not fetch. For statements returning 0 rows we do not
@@ -429,7 +437,6 @@ class TestImpalaShellInteractive(object):
     assert "Fetched 0 row(s)" in result.stderr
     assert re.search('> \[', result.stdout)
 
-  @pytest.mark.execute_serially
   def test_set_and_set_all(self):
     """IMPALA-2181. Tests the outputs of SET and SET ALL commands. SET should contain the
     REGULAR and ADVANCED options only. SET ALL should contain all the options grouped by
@@ -472,7 +479,6 @@ class TestImpalaShellInteractive(object):
     shell.send_cmd(command)
     assert expected in shell.get_result().stderr
 
-  @pytest.mark.execute_serially
   def test_unexpected_conversion_for_literal_string_to_lowercase(self):
     # IMPALA-4664: Impala shell can accidentally convert certain literal
     # strings to lowercase. Impala shell splits each command into tokens
@@ -487,7 +493,6 @@ class TestImpalaShellInteractive(object):
     result = run_impala_shell_interactive("select\n'MUST_HAVE_UPPER_STRING'")
     assert re.search('MUST_HAVE_UPPER_STRING', result.stdout)
 
-  @pytest.mark.execute_serially
   def test_case_sensitive_command(self):
     # IMPALA-2640: Make a given command case-sensitive
     cwd = os.getcwd()
@@ -511,7 +516,6 @@ class TestImpalaShellInteractive(object):
     finally:
       os.chdir(cwd)
 
-  @pytest.mark.execute_serially
   def test_line_with_leading_comment(self):
     # IMPALA-2195: A line with a comment produces incorrect command.
     try:
@@ -560,7 +564,6 @@ class TestImpalaShellInteractive(object):
     finally:
       run_impala_shell_interactive('drop table if exists leading_comment;')
 
-  @pytest.mark.execute_serially
   def test_line_ends_with_comment(self):
     # IMPALA-5269: Test lines that end with a comment.
     queries = ['select 1 + 1; --comment',
@@ -599,7 +602,6 @@ class TestImpalaShellInteractive(object):
     result = run_impala_shell_interactive(query)
     assert '| id   |' in result.stdout
 
-  @pytest.mark.execute_serially
   def test_fix_infinite_loop(self):
     # IMPALA-6337: Fix infinite loop.
     result = run_impala_shell_interactive("select 1 + 1; \"\n;\";")
@@ -613,7 +615,6 @@ class TestImpalaShellInteractive(object):
     result = run_impala_shell_interactive("select '1\"23\"4'\";\n;\n\";")
     assert '| 1"23"4 |' in result.stdout
 
-  @pytest.mark.execute_serially
   def test_comment_with_quotes(self):
     # IMPALA-2751: Comment does not need to have matching quotes
     queries = [
@@ -631,7 +632,6 @@ class TestImpalaShellInteractive(object):
       result = run_impala_shell_interactive(query)
       assert '| 1 |' in result.stdout
 
-  @pytest.mark.execute_serially
   def test_shell_prompt(self):
     proc = pexpect.spawn(SHELL_CMD)
     proc.expect(":21000] default>")
@@ -739,7 +739,7 @@ def run_impala_shell_interactive(input_lines, shell_args=None):
   # since piping defaults to ascii
   my_env = os.environ
   my_env['PYTHONIOENCODING'] = 'utf-8'
-  p = ImpalaShell(shell_args, env=my_env)
+  p = ImpalaShell(args=shell_args, env=my_env)
   for line in input_lines:
     p.send_cmd(line)
   return p.get_result()

@@ -112,17 +112,6 @@ def run_impala_shell_cmd_no_expect(shell_args, stdin_input=None):
   cmd = "%s %s" % (SHELL_CMD, shell_args)
   return result
 
-def move_shell_history(filepath):
-  """ Moves history file to given filepath.
-      If there is no history file, this function has no effect. """
-  if os.path.exists(SHELL_HISTORY_FILE):
-    shutil.move(SHELL_HISTORY_FILE, filepath)
-
-def restore_shell_history(filepath):
-  """ Moves back history file from given filepath.
-      If 'filepath' doesn't exist in the filesystem, this function has no effect. """
-  if os.path.exists(filepath): shutil.move(filepath, SHELL_HISTORY_FILE)
-
 class ImpalaShellResult(object):
   def __init__(self):
     self.rc = 0

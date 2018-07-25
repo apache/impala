@@ -156,6 +156,10 @@ class ImpalaTestSuite(BaseTestSuite):
     elif IS_ADLS:
       cls.filesystem_client = ADLSClient(ADLS_STORE_NAME)
 
+    # Override the shell history path so that commands run by any tests
+    # don't write any history into the developer's file.
+    os.environ['IMPALA_HISTFILE'] = '/dev/null'
+
   @classmethod
   def teardown_class(cls):
     """Setup section that runs after each test suite"""
