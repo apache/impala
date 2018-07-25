@@ -21,7 +21,13 @@ under the License.
 <concept rev="1.1" id="alter_view">
 
   <title>ALTER VIEW Statement</title>
-  <titlealts audience="PDF"><navtitle>ALTER VIEW</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>ALTER VIEW</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -38,61 +44,70 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="hidden">ALTER VIEW statement</indexterm>
-      Changes the characteristics of a view. The syntax has two forms:
+      The <codeph>ALTER VIEW</codeph> statement changes the characteristics of a view.
     </p>
+
+    <p>
+      Because a view is a logical construct, an alias for a query, with no physical data behind
+      it, <codeph>ALTER VIEW</codeph> only involves changes to metadata in the metastore
+      database, not any data files in HDFS.
+    </p>
+
+    <p>
+      To see the definition of the updated view, issue a <codeph>DESCRIBE FORMATTED</codeph>
+      statement.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
+
+<codeblock>ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname>
+   [(<varname>column_name</varname> [COMMENT '<varname>column_comment</varname>'][, ...])]
+   AS <varname>select_statement</varname>;
+
+ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname>
+   RENAME TO [<varname>database_name</varname>.]<varname>view_name</varname>;</codeblock>
 
     <ul>
       <li>
         The <codeph>AS</codeph> clause associates the view with a different query.
+        <p>
+          An optional list of column names can be specified with or without the column-level
+          comments.
+        </p>
+
+        <p>
+          For example:
+<codeblock>
+ALTER VIEW v1 AS SELECT x, UPPER(s) s FROM t2;
+ALTER VIEW v1 (c1, c2, c3) AS SELECT x, UPPER(s) s FROM t2;
+ALTER VIEW v7 (c1 COMMENT 'Comment for c1', c2) AS SELECT t1.c1, t1.c2 FROM t1;
+</codeblock>
+        </p>
       </li>
+
       <li>
-        The <codeph>RENAME TO</codeph> clause changes the name of the view, moves the view to
-        a different database, or both.
+        The <codeph>RENAME TO</codeph> clause changes the name of the view, moves the view to a
+        different database, or both.
+        <p>
+          For example:
+<codeblock>ALTER VIEW db1.v1 RENAME TO db2.v2; -- Move the view to a different database with a new name.
+ALTER VIEW db1.v1 RENAME TO db1.v2;  -- Rename the view in the same database.
+ALTER VIEW db1.v1 RENAME TO db2.v1; -- Move the view to a difference database with the same view name.</codeblock>
+        </p>
       </li>
     </ul>
-
-    <p>
-      Because a view is purely a logical construct (an alias for a query) with no physical data behind it,
-      <codeph>ALTER VIEW</codeph> only involves changes to metadata in the metastore database, not any data files
-      in HDFS.
-    </p>
-
-<!-- View _permissions_ don't rely on underlying table. -->
-
-<!-- Could use views to grant access only to certain columns. -->
-
-<!-- Treated like a table for authorization. -->
-
-<!-- ALTER VIEW that queries another view - possibly a runtime error. -->
-
-    <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
-
-<codeblock>ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname> AS <varname>select_statement</varname>
-ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname> RENAME TO [<varname>database_name</varname>.]<varname>view_name</varname></codeblock>
 
     <p conref="../shared/impala_common.xml#common/ddl_blurb"/>
 
     <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
 
     <p conref="../shared/impala_common.xml#common/security_blurb"/>
+
     <p conref="../shared/impala_common.xml#common/redaction_yes"/>
 
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
-
-    <p conref="../shared/impala_common.xml#common/example_blurb"/>
-
-<codeblock>create table t1 (x int, y int, s string);
-create table t2 like t1;
-create view v1 as select * from t1;
-alter view v1 as select * from t2;
-alter view v1 as select x, upper(s) s from t2;</codeblock>
-
-<!-- Repeat the same blurb + example to see the definition of a view, as in CREATE VIEW. -->
-
-    <p conref="../shared/impala_common.xml#common/describe_formatted_view"/>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
@@ -100,5 +115,7 @@ alter view v1 as select x, upper(s) s from t2;</codeblock>
       <xref href="impala_views.xml#views"/>, <xref href="impala_create_view.xml#create_view"/>,
       <xref href="impala_drop_view.xml#drop_view"/>
     </p>
+
   </conbody>
+
 </concept>
