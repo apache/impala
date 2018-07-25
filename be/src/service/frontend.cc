@@ -93,7 +93,7 @@ Frontend::Frontend() {
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"getRoles", "([B)[B", &show_roles_id_},
-    {"getRolePrivileges", "([B)[B", &get_role_privileges_id_},
+    {"getPrincipalPrivileges", "([B)[B", &get_principal_privileges_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
     {"setCatalogIsReady", "()V", &set_catalog_is_ready_id_},
     {"waitForCatalog", "()V", &wait_for_catalog_id_},
@@ -186,9 +186,9 @@ Status Frontend::GetStats(const TShowStatsParams& params,
   return JniUtil::CallJniMethod(fe_, get_stats_id_, params, result);
 }
 
-Status Frontend::GetRolePrivileges(const TShowGrantRoleParams& params,
+Status Frontend::GetPrincipalPrivileges(const TShowGrantPrincipalParams& params,
     TResultSet* result) {
-  return JniUtil::CallJniMethod(fe_, get_role_privileges_id_, params, result);
+  return JniUtil::CallJniMethod(fe_, get_principal_privileges_id_, params, result);
 }
 
 Status Frontend::GetFunctions(TFunctionCategory::type fn_category, const string& db,

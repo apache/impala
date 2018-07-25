@@ -413,30 +413,12 @@ public class AuthorizationPolicy implements PrivilegeCache {
   }
 
   /**
-   * Returns the privileges that have been granted to a role as a tabular result set.
-   * Allows for filtering based on a specific privilege spec or showing all privileges
-   * granted to the role. Used by the SHOW GRANT ROLE statement.
-   */
-  public synchronized TResultSet getRolePrivileges(String roleName, TPrivilege filter) {
-    return getPrincipalPrivileges(roleName, filter, TPrincipalType.ROLE);
-  }
-
-  /**
-   * Returns the privileges that have been granted to a user as a tabular result set.
-   * Allows for filtering based on a specific privilege spec or showing all privileges
-   * granted to the user. Used by the SHOW GRANT USER statement.
-   */
-  public synchronized TResultSet getUserPrivileges(String userName, TPrivilege filter) {
-    return getPrincipalPrivileges(userName, filter, TPrincipalType.USER);
-  }
-
-  /**
    * Returns the privileges that have been granted to a principal as a tabular result set.
    * Allows for filtering based on a specific privilege spec or showing all privileges
-   * granted to the principal.
+   * granted to the principal. Used by the SHOW GRANT ROLE/USER statement.
    */
-  private TResultSet getPrincipalPrivileges(String principalName, TPrivilege filter,
-      TPrincipalType type) {
+  public synchronized TResultSet getPrincipalPrivileges(String principalName,
+      TPrivilege filter, TPrincipalType type) {
     TResultSet result = new TResultSet();
     result.setSchema(new TResultSetMetadata());
     result.getSchema().addToColumns(new TColumn("scope", Type.STRING.toThrift()));

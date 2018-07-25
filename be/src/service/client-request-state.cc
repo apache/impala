@@ -346,8 +346,8 @@ Status ClientRequestState::ExecLocalCatalogOp(
       SetResultSet(result.role_names);
       return Status::OK();
     }
-    case TCatalogOpType::SHOW_GRANT_ROLE: {
-      const TShowGrantRoleParams& params = catalog_op.show_grant_role_params;
+    case TCatalogOpType::SHOW_GRANT_PRINCIPAL: {
+      const TShowGrantPrincipalParams& params = catalog_op.show_grant_principal_params;
       if (params.is_admin_op) {
         // Verify the user has privileges to perform this operation by checking against
         // the Sentry Service (via the Catalog Server).
@@ -361,7 +361,7 @@ Status ClientRequestState::ExecLocalCatalogOp(
       }
 
       TResultSet response;
-      RETURN_IF_ERROR(frontend_->GetRolePrivileges(params, &response));
+      RETURN_IF_ERROR(frontend_->GetPrincipalPrivileges(params, &response));
       // Set the result set and its schema from the response.
       request_result_set_.reset(new vector<TResultRow>(response.rows));
       result_metadata_ = response.schema;

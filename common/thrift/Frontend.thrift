@@ -265,20 +265,23 @@ struct TShowRolesResult {
   1: required list<string> role_names
 }
 
-// Parameters for SHOW GRANT ROLE commands
-struct TShowGrantRoleParams {
+// Parameters for SHOW GRANT ROLE/USER commands
+struct TShowGrantPrincipalParams {
   // The effective user who submitted this request.
   1: optional string requesting_user
 
-  // The target role name.
-  2: required string role_name
+  // The target name.
+  2: required string name
+
+  // The principal type.
+  3: required CatalogObjects.TPrincipalType principal_type;
 
   // True if this operation requires admin privileges on the Sentry Service (when
   // the requesting user has not been granted the target role name).
-  3: required bool is_admin_op
+  4: required bool is_admin_op
 
   // An optional filter to show grants that match a specific privilege spec.
-  4: optional CatalogObjects.TPrivilege privilege
+  5: optional CatalogObjects.TPrivilege privilege
 }
 
 // Arguments to getFunctions(), which returns a list of non-qualified function
@@ -436,7 +439,7 @@ enum TCatalogOpType {
   SHOW_CREATE_TABLE,
   SHOW_DATA_SRCS,
   SHOW_ROLES,
-  SHOW_GRANT_ROLE,
+  SHOW_GRANT_PRINCIPAL,
   SHOW_FILES,
   SHOW_CREATE_FUNCTION
 }
@@ -473,8 +476,8 @@ struct TCatalogOpRequest {
   // Parameters for SHOW ROLES
   10: optional TShowRolesParams show_roles_params
 
-  // Parameters for SHOW GRANT ROLE
-  11: optional TShowGrantRoleParams show_grant_role_params
+  // Parameters for SHOW GRANT ROLE/USER
+  11: optional TShowGrantPrincipalParams show_grant_principal_params
 
   // Parameters for DDL requests executed using the CatalogServer
   // such as CREATE, ALTER, and DROP. See CatalogService.TDdlExecRequest

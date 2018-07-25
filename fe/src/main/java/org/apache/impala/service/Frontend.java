@@ -55,7 +55,7 @@ import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.ResetMetadataStmt;
 import org.apache.impala.analysis.ShowFunctionsStmt;
-import org.apache.impala.analysis.ShowGrantRoleStmt;
+import org.apache.impala.analysis.ShowGrantPrincipalStmt;
 import org.apache.impala.analysis.ShowRolesStmt;
 import org.apache.impala.analysis.SqlParser;
 import org.apache.impala.analysis.SqlScanner;
@@ -472,16 +472,17 @@ public class Frontend {
       }
       metadata.setColumns(Arrays.asList(
           new TColumn("role_name", Type.STRING.toThrift())));
-    } else if (analysis.isShowGrantRoleStmt()) {
-      ddl.op_type = TCatalogOpType.SHOW_GRANT_ROLE;
-      ShowGrantRoleStmt showGrantRoleStmt = (ShowGrantRoleStmt) analysis.getStmt();
-      ddl.setShow_grant_role_params(showGrantRoleStmt.toThrift());
+    } else if (analysis.isShowGrantPrincipalStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_GRANT_PRINCIPAL;
+      ShowGrantPrincipalStmt showGrantPrincipalStmt =
+          (ShowGrantPrincipalStmt) analysis.getStmt();
+      ddl.setShow_grant_principal_params(showGrantPrincipalStmt.toThrift());
       Set<String> groupNames =
           getAuthzChecker().getUserGroups(analysis.getAnalyzer().getUser());
       // User must be an admin to execute this operation if they have not been granted
-      // this role.
-      ddl.getShow_grant_role_params().setIs_admin_op(Sets.intersection(groupNames,
-          showGrantRoleStmt.getRole().getGrantGroups()).isEmpty());
+      // this principal.
+      ddl.getShow_grant_principal_params().setIs_admin_op(Sets.intersection(groupNames,
+          showGrantPrincipalStmt.getPrincipal().getGrantGroups()).isEmpty());
       metadata.setColumns(Arrays.asList(
           new TColumn("name", Type.STRING.toThrift())));
     } else if (analysis.isCreateDropRoleStmt()) {

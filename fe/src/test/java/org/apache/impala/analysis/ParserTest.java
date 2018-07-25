@@ -3675,22 +3675,25 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestShowGrantRole() {
-    // Show all grants on a role
-    ParsesOk("SHOW GRANT ROLE foo");
+  public void TestShowGrantPrincipal() {
+    for (String type: new String[]{"ROLE", "USER"}) {
+      // Show all grants on a particular principal type.
+      ParsesOk(String.format("SHOW GRANT %s foo", type));
 
-    // Show grants on a specific object
-    ParsesOk("SHOW GRANT ROLE foo ON SERVER");
-    ParsesOk("SHOW GRANT ROLE foo ON DATABASE foo");
-    ParsesOk("SHOW GRANT ROLE foo ON TABLE foo");
-    ParsesOk("SHOW GRANT ROLE foo ON TABLE foo.bar");
-    ParsesOk("SHOW GRANT ROLE foo ON URI '/abc/123'");
+      // Show grants on a specific object
+      ParsesOk(String.format("SHOW GRANT %s foo ON SERVER", type));
+      ParsesOk(String.format("SHOW GRANT %s foo ON DATABASE foo", type));
+      ParsesOk(String.format("SHOW GRANT %s foo ON TABLE foo", type));
+      ParsesOk(String.format("SHOW GRANT %s foo ON TABLE foo.bar", type));
+      ParsesOk(String.format("SHOW GRANT %s foo ON URI '/abc/123'", type));
 
-    ParserError("SHOW GRANT ROLE");
-    ParserError("SHOW GRANT ROLE foo ON SERVER foo");
-    ParserError("SHOW GRANT ROLE foo ON DATABASE");
-    ParserError("SHOW GRANT ROLE foo ON TABLE");
-    ParserError("SHOW GRANT ROLE foo ON URI abc");
+      ParserError(String.format("SHOW GRANT %s", type));
+      ParserError(String.format("SHOW GRANT %s foo ON SERVER foo", type));
+      ParserError(String.format("SHOW GRANT %s foo ON DATABASE", type));
+      ParserError(String.format("SHOW GRANT %s foo ON TABLE", type));
+      ParserError(String.format("SHOW GRANT %s foo ON URI abc", type));
+    }
+    ParserError("SHOW GRANT FOO bar");
   }
 
   @Test

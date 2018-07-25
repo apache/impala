@@ -54,6 +54,7 @@ import org.apache.impala.thrift.TOwnerType;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TTablePropertyType;
+import org.apache.impala.thrift.TPrincipalType;
 
 parser code {:
   private Symbol errorToken_;
@@ -497,7 +498,8 @@ nonterminal Map<Option, Object> column_options_map;
 
 // For GRANT/REVOKE/AUTH DDL statements
 nonterminal ShowRolesStmt show_roles_stmt;
-nonterminal ShowGrantRoleStmt show_grant_role_stmt;
+nonterminal ShowGrantPrincipalStmt show_grant_principal_stmt;
+nonterminal TPrincipalType principal_type;
 nonterminal CreateDropRoleStmt create_drop_role_stmt;
 nonterminal GrantRevokeRoleStmt grant_role_stmt;
 nonterminal GrantRevokeRoleStmt revoke_role_stmt;
@@ -655,8 +657,8 @@ stmt ::=
   {: RESULT = set; :}
   | show_roles_stmt:show_roles
   {: RESULT = show_roles; :}
-  | show_grant_role_stmt:show_grant_role
-  {: RESULT = show_grant_role; :}
+  | show_grant_principal_stmt:show_grant_principal
+  {: RESULT = show_grant_principal; :}
   | create_drop_role_stmt:create_drop_role
   {: RESULT = create_drop_role; :}
   | grant_role_stmt:grant_role
@@ -903,29 +905,31 @@ show_roles_stmt ::=
   {: RESULT = new ShowRolesStmt(true, null); :}
   ;
 
-show_grant_role_stmt ::=
-  KW_SHOW KW_GRANT KW_ROLE ident_or_default:role
-  {: RESULT = new ShowGrantRoleStmt(role, null); :}
-  | KW_SHOW KW_GRANT KW_ROLE ident_or_default:role KW_ON server_ident:server_kw
+show_grant_principal_stmt ::=
+  KW_SHOW KW_GRANT principal_type:type ident_or_default:name
+  {: RESULT = new ShowGrantPrincipalStmt(name, type, null); :}
+  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON
+  server_ident:server_kw
   {:
-    RESULT = new ShowGrantRoleStmt(role,
+    RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createServerScopedPriv(TPrivilegeLevel.ALL));
   :}
-  | KW_SHOW KW_GRANT KW_ROLE ident_or_default:role KW_ON
+  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON
     KW_DATABASE ident_or_default:db_name
   {:
-    RESULT = new ShowGrantRoleStmt(role,
+    RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createDbScopedPriv(TPrivilegeLevel.ALL, db_name));
   :}
-  | KW_SHOW KW_GRANT KW_ROLE ident_or_default:role KW_ON KW_TABLE table_name:tbl_name
+  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON KW_TABLE
+  table_name:tbl_name
   {:
-    RESULT = new ShowGrantRoleStmt(role,
+    RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createTableScopedPriv(TPrivilegeLevel.ALL, tbl_name));
   :}
-  | KW_SHOW KW_GRANT KW_ROLE ident_or_default:role KW_ON uri_ident:uri_kw
+  | KW_SHOW KW_GRANT principal_type:type ident_or_default:name KW_ON uri_ident:uri_kw
     STRING_LITERAL:uri
   {:
-    RESULT = new ShowGrantRoleStmt(role,
+    RESULT = new ShowGrantPrincipalStmt(name, type,
         PrivilegeSpec.createUriScopedPriv(TPrivilegeLevel.ALL, new HdfsUri(uri)));
   :}
   ;
@@ -989,6 +993,16 @@ privilege ::=
   {: RESULT = TPrivilegeLevel.DROP; :}
   | KW_ALL
   {: RESULT = TPrivilegeLevel.ALL; :}
+  ;
+
+principal_type ::=
+  KW_ROLE
+  {: RESULT = TPrincipalType.ROLE; :}
+  | IDENT:user
+  {:
+    parser.checkIdentKeyword("USER", user);
+    RESULT = TPrincipalType.USER;
+  :}
   ;
 
 opt_grantopt_for ::=

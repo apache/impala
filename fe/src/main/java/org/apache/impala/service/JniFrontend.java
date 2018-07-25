@@ -87,7 +87,7 @@ import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TShowFilesParams;
-import org.apache.impala.thrift.TShowGrantRoleParams;
+import org.apache.impala.thrift.TShowGrantPrincipalParams;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowRolesResult;
 import org.apache.impala.thrift.TShowStatsOp;
@@ -551,11 +551,16 @@ public class JniFrontend {
     }
   }
 
-  public byte[] getRolePrivileges(byte[] showGrantRolesParams) throws ImpalaException {
-    TShowGrantRoleParams params = new TShowGrantRoleParams();
-    JniUtil.deserializeThrift(protocolFactory_, params, showGrantRolesParams);
-    TResultSet result = frontend_.getCatalog().getAuthPolicy().getRolePrivileges(
-        params.getRole_name(), params.getPrivilege());
+  /**
+   * Gets the principal privileges for the given principal.
+   */
+  public byte[] getPrincipalPrivileges(byte[] showGrantPrincipalParams)
+      throws ImpalaException {
+    TShowGrantPrincipalParams params = new TShowGrantPrincipalParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, showGrantPrincipalParams);
+    TResultSet result;
+    result = frontend_.getCatalog().getAuthPolicy().getPrincipalPrivileges(
+        params.getName(), params.getPrivilege(), params.getPrincipal_type());
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);

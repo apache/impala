@@ -1093,16 +1093,20 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     // Show role grant group should always be allowed.
     authorize(String.format("show role grant group `%s`", USER.getName())).ok();
 
-    // Show grant role should always be allowed.
+    // Show grant role/user should always be allowed.
     try {
       authzCatalog_.addRole("test_role");
-      authorize("show grant role test_role").ok();
-      authorize("show grant role test_role on server").ok();
-      authorize("show grant role test_role on database functional").ok();
-      authorize("show grant role test_role on table functional.alltypes").ok();
-      authorize("show grant role test_role on uri '/test-warehouse'").ok();
+      authzCatalog_.addUser("test_user");
+      for (String type : new String[]{"role test_role", "user test_user"}) {
+        authorize(String.format("show grant %s", type)).ok();
+        authorize(String.format("show grant %s on server", type)).ok();
+        authorize(String.format("show grant %s on database functional", type)).ok();
+        authorize(String.format("show grant %s on table functional.alltypes", type)).ok();
+        authorize(String.format("show grant %s on uri '/test-warehouse'", type)).ok();
+      }
     } finally {
       authzCatalog_.removeRole("test_role");
+      authzCatalog_.removeUser("test_user");
     }
 
     // Show create table.

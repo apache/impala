@@ -92,8 +92,9 @@ class Frontend {
   /// Call FE to get the table/column stats.
   Status GetStats(const TShowStatsParams& params, TResultSet* result);
 
-  /// Call FE to get the privileges granted to a role.
-  Status GetRolePrivileges(const TShowGrantRoleParams& params, TResultSet* result);
+  /// Call FE to get the privileges granted to a principal.
+  Status GetPrincipalPrivileges(const TShowGrantPrincipalParams& params,
+      TResultSet* result);
 
   /// Return all functions of 'category' that match the optional argument 'pattern'.
   /// If pattern is NULL match all functions, otherwise match only those functions that
@@ -208,7 +209,7 @@ class Frontend {
   jmethodID get_functions_id_; // JniFrontend.getFunctions
   jmethodID get_catalog_object_id_; // JniFrontend.getCatalogObject
   jmethodID show_roles_id_; // JniFrontend.getRoles
-  jmethodID get_role_privileges_id_; // JniFrontend.getRolePrivileges
+  jmethodID get_principal_privileges_id_; // JniFrontend.getPrincipalPrivileges
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID set_catalog_is_ready_id_; // JniFrontend.setCatalogIsReady
