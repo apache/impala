@@ -206,27 +206,36 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
 }
 
 Status BaseSequenceScanner::ReadSync() {
-  uint8_t* hash;
-  int64_t out_len;
-  bool success = stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &parse_status_);
-  // We are done when we read a sync marker occurring completely in the next scan range.
-  eos_ = stream_->eosr() || stream_->eof();
-  if (!success) return parse_status_;
-  if (out_len != SYNC_HASH_SIZE) {
-    return Status(Substitute("Hit end of stream after reading $0 bytes of $1-byte "
-        "synchronization marker", out_len, SYNC_HASH_SIZE));
-  } else if (memcmp(hash, header_->sync, SYNC_HASH_SIZE) != 0) {
-    stringstream ss;
-    ss  << "Bad synchronization marker" << endl
-        << "  Expected: '"
-        << ReadWriteUtil::HexDump(header_->sync, SYNC_HASH_SIZE) << "'" << endl
-        << "  Actual:   '"
-        << ReadWriteUtil::HexDump(hash, SYNC_HASH_SIZE) << "'";
-    return Status(ss.str());
+  DCHECK(!eos_);
+  if (stream_->eosr()) {
+    // Either we're at the end of file or the next sync marker is completely in the next
+    // scan range.
+    eos_ = true;
+  } else {
+    // Not at end of scan range or file - we expect there to be another sync marker, which
+    // is either followed by another block or the end of the file.
+    uint8_t* hash;
+    int64_t out_len;
+    bool success = stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &parse_status_);
+    if (!success) return parse_status_;
+    if (out_len != SYNC_HASH_SIZE) {
+      return Status(Substitute("Hit end of stream after reading $0 bytes of $1-byte "
+          "synchronization marker", out_len, SYNC_HASH_SIZE));
+    } else if (memcmp(hash, header_->sync, SYNC_HASH_SIZE) != 0) {
+      stringstream ss;
+      ss  << "Bad synchronization marker" << endl
+          << "  Expected: '"
+          << ReadWriteUtil::HexDump(header_->sync, SYNC_HASH_SIZE) << "'" << endl
+          << "  Actual:   '"
+          << ReadWriteUtil::HexDump(hash, SYNC_HASH_SIZE) << "'";
+      return Status(ss.str());
+    }
+    // If we read the sync marker at end of file then we're done!
+    eos_ = stream_->eof();
+    ++num_syncs_;
+    block_start_ = stream_->file_offset();
   }
   total_block_size_ += stream_->file_offset() - block_start_;
-  block_start_ = stream_->file_offset();
-  ++num_syncs_;
   return Status::OK();
 }
 

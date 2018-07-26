@@ -1,0 +1,28 @@
+====
+---- QUERY
+# Check number of rows.
+select count(*)
+from lineitem
+---- RESULTS
+6001215
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Check values in numeric column.
+select sum(l_quantity)
+from lineitem
+---- RESULTS
+153078795.00
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Checksum values in string column.
+select sum(murmur_hash(l_comment))
+from lineitem
+---- RESULTS
+54541443255294703
+---- TYPES
+BIGINT
+====

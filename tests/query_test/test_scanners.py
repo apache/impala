@@ -740,7 +740,8 @@ class TestParquet(ImpalaTestSuite):
 # 2. scan range with no tuple
 # 3. tuple that span across multiple scan ranges
 # 4. scan range length = 16 for ParseSse() execution path
-MAX_SCAN_RANGE_LENGTHS = [0, 1, 2, 5, 16, 17, 32]
+# 5. scan range fits at least one row
+MAX_SCAN_RANGE_LENGTHS = [0, 1, 2, 5, 16, 17, 32, 512]
 
 class TestScanRangeLengths(ImpalaTestSuite):
   @classmethod
@@ -757,6 +758,34 @@ class TestScanRangeLengths(ImpalaTestSuite):
     vector.get_value('exec_option')['max_scan_range_length'] =\
         vector.get_value('max_scan_range_length')
     self.run_test_case('QueryTest/hdfs-tiny-scan', vector)
+
+
+# Scan range lengths for TPC-H data sets. Test larger scan range sizes. Random
+# variation to the length is added by the test in order to exercise edge cases.
+TPCH_SCAN_RANGE_LENGTHS = [128 * 1024, 16 * 1024 * 1024]
+
+class TestTpchScanRangeLengths(ImpalaTestSuite):
+  """Exercise different scan range lengths on the larger TPC-H data sets."""
+  @classmethod
+  def get_workload(cls):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTpchScanRangeLengths, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('scan_range_length', *TPCH_SCAN_RANGE_LENGTHS))
+    # IMPALA-7360: sequence file scan returns spurious errors
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format != 'seq')
+
+  def test_tpch_scan_ranges(self, vector):
+    # Randomly adjust the scan range length to exercise different code paths.
+    max_scan_range_length = \
+        int(vector.get_value('scan_range_length') * (random.random() + 0.5))
+    LOG.info("max_scan_range_length={0}".format(max_scan_range_length))
+    vector.get_value('exec_option')['max_scan_range_length'] = max_scan_range_length
+    self.run_test_case('tpch-scan-range-lengths', vector)
 
 # More tests for text scanner
 # 1. Test file that ends w/o tuple delimiter
