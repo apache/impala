@@ -39,6 +39,20 @@ QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 RUSSIAN_CHARS = (u"А, Б, В, Г, Д, Е, Ё, Ж, З, И, Й, К, Л, М, Н, О, П, Р,"
                  u"С, Т, У, Ф, Х, Ц,Ч, Ш, Щ, Ъ, Ы, Ь, Э, Ю, Я")
 
+
+def find_query_option(key, string, strip_brackets=True):
+  """
+  Parses 'string' for 'key': value pairs, and returns value. It is assumed
+  that the 'string' contains the pair exactly once.
+
+  If 'strip_brackets' is true, enclosing [] are stripped (this is used to mark
+  query options that have their default value).
+  """
+  pattern = r'^\s*%s: (.*)\s*$' % key
+  values = re.findall(pattern, string, re.MULTILINE)
+  assert len(values) == 1
+  return values[0].strip("[]") if strip_brackets else values[0]
+
 @pytest.fixture
 def empty_table(unique_database, request):
   """Create an empty table within the test database before executing test.
@@ -695,3 +709,32 @@ class TestImpalaShell(ImpalaTestSuite):
               actual_time_s, time_limit_s))
     finally:
       os.remove(sql_path)
+
+  def test_default_timezone(self):
+    """Test that the default TIMEZONE query option is a valid timezone.
+
+       It would be nice to check that the default timezone is the system's timezone,
+       but doing this reliably on different Linux distributions is quite hard.
+    """
+    result_set = run_impala_shell_cmd('-q "set;"')
+    tzname = find_query_option("TIMEZONE", result_set.stdout)
+    assert os.path.isfile("/usr/share/zoneinfo/" + tzname)
+
+  def test_find_query_option(self):
+    """Test utility function find_query_option()."""
+    test_input = """
+        not_an_option
+        default: [default]
+        non_default: non_default
+        has_space: has space
+        duplicate: d
+        duplicate: d
+        empty: """
+    assert find_query_option("default", test_input) == "default"
+    assert find_query_option("non_default", test_input) == "non_default"
+    assert find_query_option("has_space", test_input) == "has space"
+    assert find_query_option("empty", test_input) == ""
+    with pytest.raises(AssertionError):
+      find_query_option("duplicate", test_input)
+    with pytest.raises(AssertionError):
+      find_query_option("not_an_option", test_input)

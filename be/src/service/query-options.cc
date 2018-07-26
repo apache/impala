@@ -22,11 +22,13 @@
 #include "util/mem-info.h"
 #include "util/parse-util.h"
 #include "util/string-parser.h"
+#include "exprs/timezone_db.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
 #include <sstream>
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
+#include <gutil/strings/strip.h>
 
 #include "common/names.h"
 
@@ -679,6 +681,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::ALLOW_ERASURE_CODED_FILES: {
         query_options->__set_allow_erasure_coded_files(
             iequals(value, "true") || iequals(value, "1"));
+        break;
+      }
+      case TImpalaQueryOptions::TIMEZONE: {
+        // Leading/trailing " and ' characters are stripped because the / character
+        // cannot be entered unquoted in some contexts.
+        string timezone = value;
+        TrimString(&timezone, "'\"");
+        timezone = timezone.empty() ? TimezoneDatabase::LocalZoneName() : timezone;
+        if (TimezoneDatabase::FindTimezone(timezone) == nullptr) {
+          return Status(Substitute("Invalid timezone name '$0'.", timezone));
+        }
+        query_options->__set_timezone(timezone);
         break;
       }
       default:

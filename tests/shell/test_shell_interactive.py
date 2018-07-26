@@ -716,6 +716,20 @@ class TestImpalaShellInteractive(object):
     result = shell.get_result()
     assert "ERROR: AnalysisException: Unmatched string literal" in result.stderr
 
+  def test_timezone_validation(self):
+    """Test that query option TIMEZONE is validated when executing a query.
+
+       Query options are not sent to the coordinator immediately, so the error checking
+       will only happen when running a query.
+    """
+    p = ImpalaShell()
+    p.send_cmd('set timezone=BLA;')
+    p.send_cmd('select 1;')
+    results = p.get_result()
+    assert "Fetched 1 row" not in results.stderr
+    assert "ERROR: Errors parsing query options" in results.stderr
+    assert "Invalid timezone name 'BLA'" in results.stderr
+
 def run_impala_shell_interactive(input_lines, shell_args=None):
   """Runs a command in the Impala shell interactively."""
   # if argument "input_lines" is a string, makes it into a list

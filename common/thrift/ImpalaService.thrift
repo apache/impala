@@ -327,6 +327,10 @@ enum TImpalaQueryOptions {
 
   // Allow reading of erasure coded files.
   ALLOW_ERASURE_CODED_FILES,
+
+  // The timezone used in UTC<->localtime conversions. The default is the OS's timezone
+  // at the coordinator, which can be overridden by environment variable $TZ.
+  TIMEZONE,
 }
 
 // The summary of a DML statement.

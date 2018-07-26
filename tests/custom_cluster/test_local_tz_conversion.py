@@ -49,12 +49,18 @@ class TestLocalTzConversion(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--use_local_tz_for_unix_timestamp_conversions=true")
-  def test_utc_timestamp_functions(self, vector):
-    """Tests for UTC timestamp functions, i.e. functions that do not depend on the
-       behavior of the flag --use_local_tz_for_unix_timestamp_conversions. These tests
-       are also executed in test_exprs.py to ensure the same behavior when running
-       without the gflag set."""
+  def test_timestamp_functions(self, vector):
+    """Tests timestamp functions with --use_local_tz_for_unix_timestamp_conversions=true
+    """
     vector.get_value('exec_option')['enable_expr_rewrites'] = \
         vector.get_value('enable_expr_rewrites')
+
+    # Tests for UTC timestamp functions, i.e. functions that do not depend on the
+    # behavior of the flag --use_local_tz_for_unix_timestamp_conversions. These tests
+    # are also executed in test_exprs.py to ensure the same behavior when running
+    # without the gflag set.
     self.run_test_case('QueryTest/utc-timestamp-functions', vector)
 
+    # Tests for local timestamp functions, i.e. functions that depend on the
+    # behavior of the flag --use_local_tz_for_unix_timestamp_conversions.
+    self.run_test_case('QueryTest/local-timestamp-functions', vector)

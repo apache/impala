@@ -295,6 +295,9 @@ struct TQueryOptions {
 
   // Allow reading of erasure coded files in HDFS.
   69: optional bool allow_erasure_coded_files = false;
+
+  // See comment in ImpalaService.thrift.
+  70: optional string timezone = ""
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
@@ -423,6 +426,10 @@ struct TQueryCtx {
   // String containing name of the local timezone.
   // It is guaranteed to be a valid timezone on the coordinator (but not necessarily on
   // the executor, since in theory the executor could have a different timezone db).
+  // TODO(Csaba): adding timezone as a query option made this property redundant. It
+  //   still has an effect if TimezoneDatabase::LocalZoneName() cannot find the
+  //   system's local timezone and falls back to UTC. This logic will be removed in
+  //   IMPALA-7359, which will make this member completely obsolete.
   18: required string local_time_zone
 }
 

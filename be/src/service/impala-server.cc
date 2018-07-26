@@ -976,7 +976,8 @@ void ImpalaServer::PrepareQueryContext(
   query_ctx->__set_pid(getpid());
   int64_t now_us = UnixMicros();
   const Timezone& utc_tz = TimezoneDatabase::GetUtcTimezone();
-  string local_tz_name = TimezoneDatabase::LocalZoneName();
+  string local_tz_name = query_ctx->client_request.query_options.timezone;
+  if (local_tz_name.empty()) local_tz_name = TimezoneDatabase::LocalZoneName();
   const Timezone* local_tz = TimezoneDatabase::FindTimezone(local_tz_name);
   if (local_tz != nullptr) {
     LOG(INFO) << "Found local timezone \"" << local_tz_name << "\".";
@@ -1283,6 +1284,7 @@ void ImpalaServer::InitializeConfigVariables() {
   map<string, string> string_map;
   TQueryOptionsToMap(default_query_options_, &string_map);
   string_map["SUPPORT_START_OVER"] = "false";
+  string_map["TIMEZONE"] = TimezoneDatabase::LocalZoneName();
   PopulateQueryOptionLevels(&query_option_levels_);
   map<string, string>::const_iterator itr = string_map.begin();
   for (; itr != string_map.end(); ++itr) {

@@ -1,0 +1,61 @@
+# This test should be run with -use_local_tz_for_unix_timestamp_conversions=true
+====
+---- QUERY
+SET timezone=CET;
+SELECT
+from_unixtime(0),
+from_unixtime((40 * 365) * 24 * 60 * 60),
+from_unixtime((180 + 40 * 365) * 24 * 60 * 60);
+---- TYPES
+STRING,STRING,STRING
+---- RESULTS
+'1970-01-01 01:00:00','2009-12-22 01:00:00','2010-06-20 02:00:00'
+====
+---- QUERY
+set timezone="America/Los_Angeles";
+SELECT
+from_unixtime(0),
+from_unixtime((40 * 365) * 24 * 60 * 60),
+from_unixtime((180 + 40 * 365) * 24 * 60 * 60);
+---- TYPES
+STRING,STRING,STRING
+---- RESULTS
+'1969-12-31 16:00:00','2009-12-21 16:00:00','2010-06-19 17:00:00'
+====
+---- QUERY
+SET timezone=CET;
+SELECT
+unix_timestamp('1970-01-01 01:00:00'),
+unix_timestamp('2009-12-22 01:00:00'),
+unix_timestamp('2010-06-20 02:00:00');
+---- TYPES
+BIGINT,BIGINT,BIGINT
+---- RESULTS
+0,1261440000,1276992000
+====
+---- QUERY
+set timezone="America/Los_Angeles";
+SELECT
+unix_timestamp('1969-12-31 16:00:00'),
+unix_timestamp('2009-12-21 16:00:00'),
+unix_timestamp('2010-06-19 17:00:00');
+---- TYPES
+BIGINT,BIGINT,BIGINT
+---- RESULTS
+0,1261440000,1276992000
+====
+---- QUERY
+SET timezone=CET;
+select cast(0 as timestamp);
+---- TYPES
+TIMESTAMP
+---- RESULTS
+1970-01-01 01:00:00
+====
+---- QUERY
+SET timezone="America/Los_Angeles";
+select cast(0 as timestamp);
+---- TYPES
+TIMESTAMP
+---- RESULTS
+1969-12-31 16:00:00
