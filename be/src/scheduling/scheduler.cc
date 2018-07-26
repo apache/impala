@@ -787,12 +787,16 @@ void Scheduler::ComputeBackendExecParams(
     }
   }
 
+  int64_t largest_min_reservation = 0;
   for (auto& backend: per_backend_params) {
     const TNetworkAddress& host = backend.first;
     backend.second.proc_mem_limit =
         LookUpBackendDesc(executor_config, host).proc_mem_limit;
+    largest_min_reservation =
+        max(largest_min_reservation, backend.second.min_mem_reservation_bytes);
   }
   schedule->set_per_backend_exec_params(per_backend_params);
+  schedule->set_largest_min_reservation(largest_min_reservation);
 
   stringstream min_mem_reservation_ss;
   for (const auto& e: per_backend_params) {

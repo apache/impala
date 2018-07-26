@@ -8,6 +8,10 @@
     <queue name="queueB">
       <aclSubmitApps>userB root</aclSubmitApps>
     </queue>
+    <queue name="queueC">
+      <aclSubmitApps>* </aclSubmitApps>
+      <maxResources>1024 mb, 0 vcores</maxResources>
+    </queue>
     <aclSubmitApps> </aclSubmitApps>
   </queue>
   <queuePlacementPolicy>

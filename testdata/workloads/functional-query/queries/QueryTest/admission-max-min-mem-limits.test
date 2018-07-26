@@ -1,0 +1,153 @@
+====
+---- QUERY
+# All queries in this file are run with num_nodes=1 by default unless specified.
+############################
+# No mem_limit set
+# check if mem_admitted is same as mem_estimate
+set request_pool=regularPool;
+# set this to make estimates deterministic.
+set num_scanner_threads=2;
+select * from (select * from functional_parquet.alltypes limit 10) A,
+ (select * from functional_parquet.alltypes limit 10) B;
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=64MB.*
+row_regex: .*Cluster Memory Admitted: 64.00 MB.*
+====
+---- QUERY
+# No mem_limit set
+# lower bound enforced based on largest min_reservation (32.09 MB for this query)
+set request_pool=poolLowMinLimit;
+select * from functional_parquet.alltypes limit 1;
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=16MB.*
+row_regex: .*Cluster Memory Admitted: 32.09 MB.*
+====
+---- QUERY
+# No mem_limit set
+# lower bound enforced based on largest min_reservation (32.09 MB for this query) but the
+# upper bound enforced by pool.max_query_mem_limit takes precedence that cause the query
+# to be rejected eventually.
+set request_pool=poolLowMaxLimit;
+select * from functional_parquet.alltypes limit 1;
+---- CATCH
+Rejected query from pool root.poolLowMaxLimit: minimum memory reservation is greater than
+ memory available to the query for buffer reservations. Memory reservation needed given
+ the current plan: 88.00 KB. Adjust either the mem_limit or the pool config
+ (max-query-mem-limit, min-query-mem-limit) for the query to allow the query
+ memory limit to be at least 32.09 MB. Note that changing the mem_limit may also change
+ the plan. See the query profile for more information about the per-node memory
+ requirements.
+====
+---- QUERY
+# No mem_limit set
+# Upper bound enforced by pool.max_query_mem_limit
+set request_pool=regularPool;
+# set this to make estimates deterministic.
+set num_scanner_threads=2;
+select * from functional_parquet.alltypes A, functional_parquet.alltypes B where
+ A.int_col = B.int_col limit 1;
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=2.06GB.*
+row_regex: .*Cluster Memory Admitted: 1.50 GB.*
+====
+---- QUERY
+# No mem_limit set
+# Lower bound enforced by pool.min_query_mem_limit
+set request_pool=regularPool;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=10MB.*
+row_regex: .*Cluster Memory Admitted: 50.00 MB.*
+====
+---- QUERY
+############################
+# mem_limit is set
+# check if mem_admitted is same as mem_limit set in query options
+set request_pool=regularPool;
+set mem_limit=200mb;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Cluster Memory Admitted: 200.00 MB.*
+====
+---- QUERY
+# mem_limit is set
+# No lower bound enforced based on largest min_reservation (32.09 MB for this query)
+set request_pool=poolLowMinLimit;
+set mem_limit=27mb;
+select * from functional_parquet.alltypes limit 1;
+---- CATCH
+Rejected query from pool root.poolLowMinLimit: minimum memory reservation is greater than
+ memory available to the query for buffer reservations. Memory reservation needed given
+ the current plan: 88.00 KB. Adjust either the mem_limit or the pool config
+ (max-query-mem-limit, min-query-mem-limit) for the query to allow the query
+ memory limit to be at least 32.09 MB. Note that changing the mem_limit may also change
+ the plan. See the query profile for more information about the per-node memory
+ requirements.
+====
+---- QUERY
+# mem_limit is set and pool.clamp_mem_limit_query_option is true
+# Upper bound using pool.max_query_mem_limit
+set request_pool=regularPool;
+set mem_limit=2G;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Cluster Memory Admitted: 1.50 GB.*
+====
+---- QUERY
+# mem_limit is set and pool.clamp_mem_limit_query_option is true
+# Lower bound using pool.min_query_mem_limit
+set request_pool=regularPool;
+set mem_limit=40mb;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Cluster Memory Admitted: 50.00 MB.*
+====
+---- QUERY
+# mem_limit is set and pool.clamp_mem_limit_query_option is false
+# Upper bound using pool.max_query_mem_limit
+set request_pool=regularPoolWithoutClamping;
+set mem_limit=2G;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Cluster Memory Admitted: 2.00 GB.*
+====
+---- QUERY
+# mem_limit is set and pool.clamp_mem_limit_query_option is false
+# Lower bound using pool.min_query_mem_limit
+set request_pool=regularPoolWithoutClamping;
+set mem_limit=50mb;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Cluster Memory Admitted: 50.00 MB.*
+====
+---- QUERY
+############################
+# Old behaviour: Both pool.max_query_mem_limit and pool.min_query_mem_limit are zero
+# No mem_limit set, check that the mem_estimate is used as mem_admitted and is allowed to
+# run which implies that it passes the check for min mem_limit required based on largest
+# min_reservation because the mem_limit is -1 (since it is not set in query options)
+set request_pool=poolNoMemLimits;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Per-Host Resource Estimates: Memory=10MB.*
+row_regex: .*Cluster Memory Admitted: 10.00 MB.*
+====
+---- QUERY
+############################
+# Invalid pool config
+# min_query_mem_limit is greater than the max_query_mem_limit
+set request_pool=maxLessThanMinLimit;
+Select 1;
+---- CATCH
+Rejected query from pool root.maxLessThanMinLimit: Invalid pool config: the
+ min_query_mem_limit is greater than the max_query_mem_limit (100001 > 100000)
+====
+---- QUERY
+# Invalid pool config
+# min_query_mem_limit is greater than the max_mem_resources
+set request_pool=maxMemLessThanMinLimit;
+Select 1;
+---- CATCH
+Rejected query from pool root.maxMemLessThanMinLimit: Invalid pool config: the
+ min_query_mem_limit is greater than the max_mem_resources (2621440001 > 2621440000)
+====

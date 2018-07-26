@@ -47,7 +47,8 @@ Status QueryExecMgr::StartQuery(const TExecQueryFInstancesParams& params) {
           << " coord=" << TNetworkAddressToString(params.query_ctx.coord_address);
 
   bool dummy;
-  QueryState* qs = GetOrCreateQueryState(params.query_ctx, &dummy);
+  QueryState* qs =
+      GetOrCreateQueryState(params.query_ctx, params.per_backend_mem_limit, &dummy);
   Status status = qs->Init(params);
   if (!status.ok()) {
     qs->ReleaseBackendResourceRefcount(); // Release refcnt acquired in Init().
@@ -71,9 +72,10 @@ Status QueryExecMgr::StartQuery(const TExecQueryFInstancesParams& params) {
   return Status::OK();
 }
 
-QueryState* QueryExecMgr::CreateQueryState(const TQueryCtx& query_ctx) {
+QueryState* QueryExecMgr::CreateQueryState(
+    const TQueryCtx& query_ctx, int64_t mem_limit) {
   bool created;
-  QueryState* qs = GetOrCreateQueryState(query_ctx, &created);
+  QueryState* qs = GetOrCreateQueryState(query_ctx, mem_limit, &created);
   DCHECK(created);
   return qs;
 }
@@ -97,7 +99,7 @@ QueryState* QueryExecMgr::GetQueryState(const TUniqueId& query_id) {
 }
 
 QueryState* QueryExecMgr::GetOrCreateQueryState(
-    const TQueryCtx& query_ctx, bool* created) {
+    const TQueryCtx& query_ctx, int64_t mem_limit, bool* created) {
   QueryState* qs = nullptr;
   int refcnt;
   {
@@ -108,7 +110,7 @@ QueryState* QueryExecMgr::GetOrCreateQueryState(
     auto it = map_ref->find(query_ctx.query_id);
     if (it == map_ref->end()) {
       // register new QueryState
-      qs = new QueryState(query_ctx);
+      qs = new QueryState(query_ctx, mem_limit);
       map_ref->insert(make_pair(query_ctx.query_id, qs));
       *created = true;
     } else {

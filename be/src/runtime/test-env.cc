@@ -113,9 +113,14 @@ Status TestEnv::CreateQueryState(
   query_ctx.query_id.hi = 0;
   query_ctx.query_id.lo = query_id;
   query_ctx.request_pool = "test-pool";
+  TQueryOptions* query_options_to_use = &query_ctx.client_request.query_options;
+  int64_t mem_limit =
+      query_options_to_use->__isset.mem_limit && query_options_to_use->mem_limit > 0 ?
+      query_options_to_use->mem_limit :
+      -1;
 
   // CreateQueryState() enforces the invariant that 'query_id' must be unique.
-  QueryState* qs = exec_env_->query_exec_mgr()->CreateQueryState(query_ctx);
+  QueryState* qs = exec_env_->query_exec_mgr()->CreateQueryState(query_ctx, mem_limit);
   query_states_.push_back(qs);
   // make sure to initialize data structures unrelated to the TExecQueryFInstancesParams
   // param

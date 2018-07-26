@@ -54,7 +54,7 @@ class QueryExecMgr : public CacheLineAligned {
   /// Creates a QueryState for the given query with the provided parameters. Only valid
   /// to call if the QueryState does not already exist. The caller must call
   /// ReleaseQueryState() with the returned QueryState to decrement the refcount.
-  QueryState* CreateQueryState(const TQueryCtx& query_ctx);
+  QueryState* CreateQueryState(const TQueryCtx& query_ctx, int64_t mem_limit);
 
   /// If a QueryState for the given query exists, increments that refcount and returns
   /// the QueryState, otherwise returns nullptr.
@@ -71,7 +71,8 @@ class QueryExecMgr : public CacheLineAligned {
   /// Gets the existing QueryState or creates a new one if not present.
   /// 'created' is set to true if it was created, false otherwise.
   /// Increments the refcount.
-  QueryState* GetOrCreateQueryState(const TQueryCtx& query_ctx, bool* created);
+  QueryState* GetOrCreateQueryState(
+      const TQueryCtx& query_ctx, int64_t mem_limit, bool* created);
 
   /// Execute instances and decrement refcount (acquire ownership of qs).
   void StartQueryHelper(QueryState* qs);

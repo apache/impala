@@ -84,6 +84,7 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
       backend_exec_params_->min_mem_reservation_bytes);
   rpc_params->__set_initial_mem_reservation_total_claims(
       backend_exec_params_->initial_mem_reservation_total_claims);
+  rpc_params->__set_per_backend_mem_limit(coord_.schedule_.per_backend_mem_limit());
 
   // set fragment_ctxs and fragment_instance_ctxs
   rpc_params->__isset.fragment_ctxs = true;

@@ -546,6 +546,10 @@ struct TExecQueryFInstancesParams {
   // operators in all fragment instances that execute on this backend. This is used for
   // an optimization in InitialReservation. Measured in bytes. required in V1
   7: optional i64 initial_mem_reservation_total_claims
+
+  // The backend memory limit (in bytes) as set by the admission controller. Used by the
+  // query mem tracker to enforce the memory limit. required in V1
+  8: optional i64 per_backend_mem_limit
 }
 
 struct TExecQueryFInstancesResult {
@@ -773,6 +777,20 @@ struct TPoolConfig {
 
   // Default query options that are applied to requests mapped to this pool.
   5: required string default_query_options;
+
+  // Maximum amount of memory that can be assigned to a query (in bytes).
+  // 0 indicates no limit. If both max_query_mem_limit and min_query_mem_limit are zero
+  // then the admission controller will fall back on old behavior, which is to not set
+  // any backend mem limit if mem_limit is not set in the query options.
+  6: required i64 max_query_mem_limit = 0;
+
+  // Minimum amount of memory that can be assigned to a query (in bytes).
+  // 0 indicates no limit.
+  7: required i64 min_query_mem_limit = 0;
+
+  // If false, the mem_limit query option will not be bounded by the max/min query mem
+  // limits specified for the pool. Default is true.
+  8: required bool clamp_mem_limit_query_option = true;
 }
 
 struct TBloomFilter {

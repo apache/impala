@@ -43,4 +43,16 @@
     <name>impala.admission-control.pool-default-query-options.root.queueA</name>
     <value>mem_limit=1024m,query_timeout_s=10</value>
   </property>
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.queueC</name>
+    <value>1000</value>
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.queueC</name>
+    <value>10</value>
+  </property>
+  <property>
+    <name>impala.admission-control.clamp-mem-limit-query-option.root.queueC</name>
+    <value>false</value>
+  </property>
 </configuration>

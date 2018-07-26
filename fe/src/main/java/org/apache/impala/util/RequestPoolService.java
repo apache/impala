@@ -50,6 +50,7 @@ import org.apache.impala.util.FileWatchService.FileChangeListener;
 import org.apache.impala.yarn.server.resourcemanager.scheduler.fair.AllocationConfiguration;
 import org.apache.impala.yarn.server.resourcemanager.scheduler.fair.AllocationFileLoaderService;
 import org.apache.impala.yarn.server.resourcemanager.scheduler.fair.FairSchedulerConfiguration;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -113,6 +114,19 @@ public class RequestPoolService {
   // This is specified in the llama-site.xml but is Impala-specific and Llama does not
   // use this.
   final static String QUERY_OPTIONS_KEY = "impala.admission-control.pool-default-query-options";
+
+  // Keys for the pool max and min query mem limits (in bytes) respectively. This is
+  // specified in the llama-site.xml but is Impala-specific and Llama does not use this.
+  final static String MAX_QUERY_MEM_LIMIT_BYTES =
+      "impala.admission-control.max-query-mem-limit";
+  final static String MIN_QUERY_MEM_LIMIT_BYTES =
+      "impala.admission-control.min-query-mem-limit";
+
+  // Key for specifying if the mem_limit query option can override max/min mem limits
+  // of the pool. This is specified in the llama-site.xml but is Impala-specific and
+  // Llama does not use this.
+  final static String CLAMP_MEM_LIMIT_QUERY_OPTION =
+      "impala.admission-control.clamp-mem-limit-query-option";
 
   // String format for a per-pool configuration key. First parameter is the key for the
   // default, e.g. LLAMA_MAX_PLACED_RESERVATIONS_KEY, and the second parameter is the
@@ -369,11 +383,17 @@ public class RequestPoolService {
           LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT));
 
       // Only return positive values. Admission control has a default from gflags.
-      int queueTimeoutMs = getLlamaPoolConfigValue(currentLlamaConf, pool,
-          QUEUE_TIMEOUT_KEY, -1);
+      long queueTimeoutMs = getLlamaPoolConfigValue(currentLlamaConf, pool,
+          QUEUE_TIMEOUT_KEY, -1L);
       if (queueTimeoutMs > 0) result.setQueue_timeout_ms(queueTimeoutMs);
       result.setDefault_query_options(getLlamaPoolConfigValue(currentLlamaConf, pool,
           QUERY_OPTIONS_KEY, ""));
+      result.setMax_query_mem_limit(getLlamaPoolConfigValue(currentLlamaConf, pool,
+          MAX_QUERY_MEM_LIMIT_BYTES, 0L));
+      result.setMin_query_mem_limit(getLlamaPoolConfigValue(currentLlamaConf, pool,
+          MIN_QUERY_MEM_LIMIT_BYTES, 0L));
+      result.setClamp_mem_limit_query_option(getLlamaPoolConfigValue(currentLlamaConf,
+          pool, CLAMP_MEM_LIMIT_QUERY_OPTION, true));
     }
     if (LOG.isTraceEnabled()) {
       LOG.debug("getPoolConfig(pool={}): max_mem_resources={}, max_requests={}, " +
@@ -392,10 +412,10 @@ public class RequestPoolService {
    * @param conf The Configuration to use, provided so the caller can ensure the same
    *        Configuration is used to look up multiple properties.
    */
-  private int getLlamaPoolConfigValue(Configuration conf, String pool, String key,
-      int defaultValue) {
-    return conf.getInt(String.format(LLAMA_PER_POOL_CONFIG_KEY_FORMAT, key, pool),
-        conf.getInt(key, defaultValue));
+  private long getLlamaPoolConfigValue(Configuration conf, String pool, String key,
+      long defaultValue) {
+    return conf.getLong(String.format(LLAMA_PER_POOL_CONFIG_KEY_FORMAT, key, pool),
+        conf.getLong(key, defaultValue));
   }
 
   /**
@@ -405,6 +425,15 @@ public class RequestPoolService {
       String defaultValue) {
     return conf.get(String.format(LLAMA_PER_POOL_CONFIG_KEY_FORMAT, key, pool),
         conf.get(key, defaultValue));
+  }
+
+  /**
+   * Looks up the per-pool Boolean config from the llama Configuration. See above.
+   */
+  private boolean getLlamaPoolConfigValue(Configuration conf, String pool, String key,
+      boolean defaultValue) {
+    return conf.getBoolean(String.format(LLAMA_PER_POOL_CONFIG_KEY_FORMAT, key, pool),
+        conf.getBoolean(key, defaultValue));
   }
 
   /**

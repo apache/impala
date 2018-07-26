@@ -137,8 +137,15 @@ struct FragmentExecParams {
 /// and the granted resource reservation.
 ///
 /// QuerySchedule is a container class for scheduling data, but it doesn't contain
-/// scheduling logic itself. Its state either comes from the static TQueryExecRequest
-/// or is computed by Scheduler.
+/// scheduling logic itself.
+/// The general usage pattern is that part of its state gets set from the static
+/// TQueryExecRequest during initialization, then the actual schedule gets set by the
+/// scheduler, then finally it is passed to the admission controller that keeps updating
+/// the memory requirements by calling UpdateMemoryRequirements() every time it tries to
+/// admit the query but only sets the final values once the query gets admitted
+/// successfully. Note: Due to this usage pattern the memory requirement values should not
+/// be accessed by other clients of this class while the query is in admission control
+/// phase.
 class QuerySchedule {
  public:
   QuerySchedule(const TUniqueId& query_id, const TQueryExecRequest& request,
@@ -157,13 +164,8 @@ class QuerySchedule {
   // Valid after Schedule() succeeds.
   const std::string& request_pool() const { return request().query_ctx.request_pool; }
 
-  /// Gets the estimated memory (bytes) per-node. Returns the user specified estimate
-  /// (MEM_LIMIT query parameter) if provided or the estimate from planning if available,
-  /// but is capped at the amount of physical memory to avoid problems if either estimate
-  /// is unreasonably large.
+  /// Returns the estimated memory (bytes) per-node from planning.
   int64_t GetPerHostMemoryEstimate() const;
-  /// Total estimated memory for all nodes. set_num_hosts() must be set before calling.
-  int64_t GetClusterMemoryEstimate() const;
 
   /// Helper methods used by scheduler to populate this QuerySchedule.
   void IncNumScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
@@ -221,9 +223,34 @@ class QuerySchedule {
   RuntimeProfile* summary_profile() { return summary_profile_; }
   RuntimeProfile::EventSequence* query_events() { return query_events_; }
 
+  int64_t largest_min_reservation() const { return largest_min_reservation_; }
+
+  /// Must call UpdateMemoryRequirements() at least once before calling this.
+  int64_t per_backend_mem_limit() const { return per_backend_mem_limit_; }
+
+  /// Must call UpdateMemoryRequirements() at least once before calling this.
+  int64_t per_backend_mem_to_admit() const {
+    DCHECK_GT(per_backend_mem_to_admit_, 0);
+    return per_backend_mem_to_admit_;
+  }
+
   void set_per_backend_exec_params(const PerBackendExecParams& params) {
     per_backend_exec_params_ = params;
   }
+
+  void set_largest_min_reservation(const int64_t largest_min_reservation) {
+    largest_min_reservation_ = largest_min_reservation;
+  }
+
+  /// Returns the Cluster wide memory admitted by the admission controller.
+  /// Must call UpdateMemoryRequirements() at least once before calling this.
+  int64_t GetClusterMemoryToAdmit() const;
+
+  /// Populates or updates the per host query memory limit and the amount of memory to be
+  /// admitted based on the pool configuration passed to it. Must be called at least once
+  /// before making any calls to per_backend_mem_to_admit(), per_backend_mem_limit() and
+  /// GetClusterMemoryToAdmit().
+  void UpdateMemoryRequirements(const TPoolConfig& pool_cfg);
 
  private:
   /// These references are valid for the lifetime of this query schedule because they
@@ -258,6 +285,20 @@ class QuerySchedule {
 
   /// Used to generate consecutive fragment instance ids.
   TUniqueId next_instance_id_;
+
+  /// The largest min memory reservation across all backends. Set in
+  /// Scheduler::Schedule().
+  int64_t largest_min_reservation_ = 0;
+
+  /// The memory limit per backend that will be imposed on the query.
+  /// Set by the admission controller with a value that is only valid if it was admitted
+  /// successfully. -1 means no limit.
+  int64_t per_backend_mem_limit_ = 0;
+
+  /// The per backend memory used for admission accounting.
+  /// Set by the admission controller with a value that is only valid if it was admitted
+  /// successfully.
+  int64_t per_backend_mem_to_admit_ = 0;
 
   /// Populate fragment_exec_params_ from request_.plan_exec_info.
   /// Sets is_coord_fragment and input_fragments.

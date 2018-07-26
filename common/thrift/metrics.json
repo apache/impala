@@ -50,6 +50,36 @@
     "key": "admission-controller.pool-max-queued.$0"
   },
   {
+    "description": "Resource Pool $0 Max Query Memory Limit",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Max Query Memory Limit",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-max-query-mem-limit.$0"
+  },
+  {
+    "description": "Resource Pool $0 Min Query Memory Limit",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Min Query Memory Limit",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "admission-controller.pool-min-query-mem-limit.$0"
+  },
+  {
+    "description": "If false, the mem_limit query option will not be bounded by the max/min query mem limits specified for the pool",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Clamp 'MEM_LIMIT' Query Option Flag",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "admission-controller.pool-clamp-mem-limit-query-option.$0"
+  },
+  {
     "description": "Resource Pool $0 Aggregate Queue Size",
     "contexts": [
       "RESOURCE_POOL"

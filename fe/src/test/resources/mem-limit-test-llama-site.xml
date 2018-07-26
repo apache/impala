@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <!--regularPoolWithoutClamping pool config-->
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.regularPoolWithoutClamping</name>
+    <value>1610612736</value><!--1.5GB-->
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.regularPoolWithoutClamping</name>
+    <value>104857600</value><!--100MB-->
+  </property>
+  <property>
+    <name>impala.admission-control.clamp-mem-limit-query-option.root.regularPoolWithoutClamping</name>
+    <value>false</value>
+  </property>
+  <!--poolLowMinLimit pool config-->
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.poolLowMinLimit</name>
+    <value>26214400</value><!--25MB-->
+  </property>
+  <!--poolLowMaxLimit pool config-->
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.poolLowMaxLimit</name>
+    <value>26214400</value><!--25MB-->
+  </property>
+  <!--regularPool pool config-->
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.regularPool</name>
+    <value>1610612736</value><!--1.5GB-->
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.regularPool</name>
+    <value>52428800</value><!--50MB-->
+  </property>
+  <property>
+    <name>impala.admission-control.clamp-mem-limit-query-option.root.regularPool</name>
+    <value>true</value>
+  </property>
+  <!--regularPoolNoMinLimit pool config-->
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.regularPoolNoMinLimit</name>
+    <value>1610612736</value><!--1.5GB-->
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.regularPoolNoMinLimit</name>
+    <value>0</value>
+  </property>
+  <property>
+    <name>impala.admission-control.clamp-mem-limit-query-option.root.regularPoolNoMinLimit</name>
+    <value>true</value>
+  </property>
+  <!--poolNoMemLimits pool config-->
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.poolNoMemLimits</name>
+    <value>0</value>
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.poolNoMemLimits</name>
+    <value>0</value>
+  </property>
+  <!--maxLessThanMinLimit pool config-->
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.maxLessThanMinLimit</name>
+    <value>100000</value>
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.maxLessThanMinLimit</name>
+    <value>100001</value>
+  </property>
+  <!--maxMemLessThanMinLimit pool config-->
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.maxMemLessThanMinLimit</name>
+    <value>2621440001</value><!--2500MB + 1B-->
+  </property>
+  <!--invalidTestPool pool config-->
+  <property>
+    <name>impala.admission-control.max-query-mem-limit.root.invalidTestPool</name>
+    <value>0</value>
+  </property>
+  <property>
+    <name>impala.admission-control.min-query-mem-limit.root.invalidTestPool</name>
+    <value>26214400</value>
+  </property>
+  <property>
+    <name>llama.am.throttling.maximum.placed.reservations.root.invalidTestPool</name>
+    <value>1</value>
+  </property>
+</configuration>

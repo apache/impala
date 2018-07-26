@@ -209,26 +209,22 @@ MemTracker* PoolMemTrackerRegistry::GetRequestPoolMemTracker(
 }
 
 MemTracker* MemTracker::CreateQueryMemTracker(const TUniqueId& id,
-    const TQueryOptions& query_options, const string& pool_name, ObjectPool* obj_pool) {
-  int64_t byte_limit = -1;
-  if (query_options.__isset.mem_limit && query_options.mem_limit > 0) {
-    byte_limit = query_options.mem_limit;
-  }
-  if (byte_limit != -1) {
-    if (byte_limit > MemInfo::physical_mem()) {
-      LOG(WARNING) << "Memory limit " << PrettyPrinter::Print(byte_limit, TUnit::BYTES)
+    int64_t mem_limit, const string& pool_name, ObjectPool* obj_pool) {
+  if (mem_limit != -1) {
+    if (mem_limit > MemInfo::physical_mem()) {
+      LOG(WARNING) << "Memory limit " << PrettyPrinter::Print(mem_limit, TUnit::BYTES)
                    << " exceeds physical memory of "
                    << PrettyPrinter::Print(MemInfo::physical_mem(), TUnit::BYTES);
     }
     VLOG(2) << "Using query memory limit: "
-            << PrettyPrinter::Print(byte_limit, TUnit::BYTES);
+            << PrettyPrinter::Print(mem_limit, TUnit::BYTES);
   }
 
   MemTracker* pool_tracker =
       ExecEnv::GetInstance()->pool_mem_trackers()->GetRequestPoolMemTracker(
           pool_name, true);
   MemTracker* tracker = obj_pool->Add(new MemTracker(
-      byte_limit, Substitute("Query($0)", PrintId(id)), pool_tracker));
+      mem_limit, Substitute("Query($0)", PrintId(id)), pool_tracker));
   tracker->is_query_mem_tracker_ = true;
   tracker->query_id_ = id;
   return tracker;

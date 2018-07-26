@@ -195,6 +195,9 @@ Status RequestPoolService::GetPoolConfig(const string& pool_name,
         FLAGS_disable_pool_mem_limits ? -1 : default_pool_mem_limit_);
     pool_config->__set_max_queued(FLAGS_default_pool_max_queued);
     pool_config->__set_default_query_options("");
+    pool_config->__set_min_query_mem_limit(0);
+    pool_config->__set_max_query_mem_limit(0);
+    pool_config->__set_clamp_mem_limit_query_option(true);
     return Status::OK();
   }
 

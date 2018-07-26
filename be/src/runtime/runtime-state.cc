@@ -80,10 +80,15 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
 }
 
 // Constructor for standalone RuntimeState for test execution and fe-support.cc.
-// Sets up a dummy local QueryState to allow evaluating exprs, etc.
+// Sets up a dummy local QueryState (with mem_limit picked up from the query options)
+// to allow evaluating exprs, etc.
 RuntimeState::RuntimeState(
     const TQueryCtx& qctx, ExecEnv* exec_env, DescriptorTbl* desc_tbl)
-  : query_state_(new QueryState(qctx, "test-pool")),
+  : query_state_(new QueryState(qctx, qctx.client_request.query_options.__isset.mem_limit
+                && qctx.client_request.query_options.mem_limit > 0 ?
+            qctx.client_request.query_options.mem_limit :
+            -1,
+        "test-pool")),
     fragment_ctx_(nullptr),
     instance_ctx_(nullptr),
     local_query_state_(query_state_),

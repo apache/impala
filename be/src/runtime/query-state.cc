@@ -55,7 +55,8 @@ QueryState::ScopedRef::~ScopedRef() {
   ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(query_state_);
 }
 
-QueryState::QueryState(const TQueryCtx& query_ctx, const string& request_pool)
+QueryState::QueryState(
+    const TQueryCtx& query_ctx, int64_t mem_limit, const string& request_pool)
   : query_ctx_(query_ctx),
     backend_resource_refcnt_(0),
     refcnt_(0),
@@ -77,7 +78,8 @@ QueryState::QueryState(const TQueryCtx& query_ctx, const string& request_pool)
   if (query_options.batch_size <= 0) {
     query_options.__set_batch_size(DEFAULT_BATCH_SIZE);
   }
-  InitMemTrackers();
+  query_mem_tracker_ = MemTracker::CreateQueryMemTracker(
+      query_id(), mem_limit, query_ctx_.request_pool, &obj_pool_);
 }
 
 void QueryState::ReleaseBackendResources() {
@@ -152,18 +154,6 @@ Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
       initial_reservations_->Init(query_id(), rpc_params.min_mem_reservation_bytes));
   scanner_mem_limiter_ = obj_pool_.Add(new ScannerMemLimiter);
   return Status::OK();
-}
-
-void QueryState::InitMemTrackers() {
-  const string& pool = query_ctx_.request_pool;
-  int64_t bytes_limit = -1;
-  if (query_options().__isset.mem_limit && query_options().mem_limit > 0) {
-    bytes_limit = query_options().mem_limit;
-    VLOG(2) << "Using query memory limit from query options: "
-            << PrettyPrinter::Print(bytes_limit, TUnit::BYTES);
-  }
-  query_mem_tracker_ =
-      MemTracker::CreateQueryMemTracker(query_id(), query_options(), pool, &obj_pool_);
 }
 
 Status QueryState::InitBufferPoolState() {

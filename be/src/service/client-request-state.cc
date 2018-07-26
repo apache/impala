@@ -506,8 +506,9 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
   DebugActionNoFail(schedule_->query_options(), "CRS_BEFORE_ADMISSION");
 
   DCHECK(exec_env_->admission_controller() != nullptr);
-  Status admit_status = ExecEnv::GetInstance()->admission_controller()->AdmitQuery(
-      schedule_.get(), &admit_outcome_);
+  Status admit_status =
+      ExecEnv::GetInstance()->admission_controller()->SubmitForAdmission(
+          schedule_.get(), &admit_outcome_);
   {
     lock_guard<mutex> l(lock_);
     if (!UpdateQueryStatus(admit_status).ok()) return;

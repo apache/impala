@@ -390,16 +390,15 @@ class QueryState {
   /// StartFInstances().
   int64_t fragment_events_start_time_ = 0;
 
-  /// Create QueryState w/ refcnt of 0.
-  /// The query is associated with the resource pool query_ctx.request_pool or
-  /// 'request_pool', if the former is not set (needed for tests).
-  QueryState(const TQueryCtx& query_ctx, const std::string& request_pool = "");
+  /// Create QueryState w/ a refcnt of 0 and a memory limit of 'mem_limit' bytes applied
+  /// to the query mem tracker. The query is associated with the resource pool set in
+  /// 'query_ctx.request_pool' or from 'request_pool', if the former is not set (needed
+  /// for tests).
+  QueryState(const TQueryCtx& query_ctx, int64_t mem_limit,
+      const std::string& request_pool = "");
 
   /// Execute the fragment instance and decrement the refcnt when done.
   void ExecFInstance(FragmentInstanceState* fis);
-
-  /// Called from constructor to initialize MemTrackers.
-  void InitMemTrackers();
 
   /// Called from Init() to set up buffer reservations and the file group.
   Status InitBufferPoolState() WARN_UNUSED_RESULT;

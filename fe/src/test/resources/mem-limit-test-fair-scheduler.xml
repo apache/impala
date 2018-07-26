@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<allocations>
+  <queue name="root">
+    <queue name="regularPoolWithoutClamping">
+      <aclSubmitApps>*</aclSubmitApps>
+      <maxResources>2500 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="poolLowMinLimit">
+      <aclSubmitApps>*</aclSubmitApps>
+      <maxResources>2500 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="poolLowMaxLimit">
+      <aclSubmitApps>*</aclSubmitApps>
+      <maxResources>2500 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="regularPool">
+      <aclSubmitApps>*</aclSubmitApps>
+      <maxResources>2500 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="regularPoolNoMinLimit">
+      <aclSubmitApps>*</aclSubmitApps>
+      <maxResources>2500 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="poolNoMemLimits">
+      <aclSubmitApps>*</aclSubmitApps>
+      <maxResources>2500 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="maxLessThanMinLimit">
+      <aclSubmitApps>*</aclSubmitApps>
+      <maxResources>2500 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="maxMemLessThanMinLimit">
+      <aclSubmitApps>*</aclSubmitApps>
+      <maxResources>2500 mb, 0 vcores</maxResources>
+    </queue>
+    <queue name="invalidTestPool">
+      <aclSubmitApps>*</aclSubmitApps>
+      <maxResources>2500 mb, 0 vcores</maxResources>
+    </queue>
+    <aclSubmitApps> </aclSubmitApps>
+  </queue>
+  <queuePlacementPolicy>
+    <rule name="specified"/>
+    <rule name="default" queue="root.regularPool"/>
+  </queuePlacementPolicy>
+</allocations>

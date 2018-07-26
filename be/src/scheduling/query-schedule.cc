@@ -22,6 +22,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 
+#include "runtime/bufferpool/reservation-util.h"
 #include "util/container-util.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"
@@ -165,37 +166,9 @@ void QuerySchedule::Validate() const {
   // TODO: add validation for BackendExecParams
 }
 
-int64_t QuerySchedule::GetClusterMemoryEstimate() const {
-  DCHECK_GT(per_backend_exec_params_.size(), 0);
-  const int64_t total_cluster_mem =
-      GetPerHostMemoryEstimate() * per_backend_exec_params_.size();
-  DCHECK_GE(total_cluster_mem, 0); // Assume total cluster memory fits in an int64_t.
-  return total_cluster_mem;
-}
-
 int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
-  // Precedence of different estimate sources is:
-  // user-supplied RM query option >
-  //     query option limit >
-  //       estimate >
-  //         server-side defaults
-  int64_t query_option_memory_limit = numeric_limits<int64_t>::max();
-  bool has_query_option = false;
-  if (query_options_.__isset.mem_limit && query_options_.mem_limit > 0) {
-    query_option_memory_limit = query_options_.mem_limit;
-    has_query_option = true;
-  }
-
-  int64_t per_host_mem = 0L;
-  if (has_query_option) {
-    per_host_mem = query_option_memory_limit;
-  } else {
-    DCHECK(request_.__isset.per_host_mem_estimate);
-    per_host_mem = request_.per_host_mem_estimate;
-  }
-  // Cap the memory estimate at the amount of physical memory available. The user's
-  // provided value or the estimate from planning can each be unreasonable.
-  return min(per_host_mem, MemInfo::physical_mem());
+  DCHECK(request_.__isset.per_host_mem_estimate);
+  return request_.per_host_mem_estimate;
 }
 
 TUniqueId QuerySchedule::GetNextInstanceId() {
@@ -248,6 +221,58 @@ int QuerySchedule::GetNumFragmentInstances() const {
     total += p.instance_exec_params.size();
   }
   return total;
+}
+
+int64_t QuerySchedule::GetClusterMemoryToAdmit() const {
+  return per_backend_mem_to_admit() *  per_backend_exec_params_.size();
+}
+
+void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
+  // If the min_query_mem_limit and max_query_mem_limit are not set in the pool config
+  // then it falls back to traditional(old) behavior, which means that, if for_admission
+  // is false, it returns the mem_limit if it is set in the query options, else returns -1
+  // which means no limit; if for_admission is true, it returns the mem_limit if it is set
+  // in the query options, else returns the per host mem estimate calculated during
+  // planning.
+  bool mimic_old_behaviour =
+      pool_cfg.min_query_mem_limit == 0 && pool_cfg.max_query_mem_limit == 0;
+
+  per_backend_mem_to_admit_ = 0;
+  bool has_query_option = false;
+  if (query_options().__isset.mem_limit && query_options().mem_limit > 0) {
+    per_backend_mem_to_admit_ = query_options().mem_limit;
+    has_query_option = true;
+  }
+
+  if (!has_query_option) {
+    per_backend_mem_to_admit_ = GetPerHostMemoryEstimate();
+    if (!mimic_old_behaviour) {
+      int64_t min_mem_limit_required = ReservationUtil::GetMinMemLimitFromReservation(
+          largest_min_reservation());
+      per_backend_mem_to_admit_ = max(per_backend_mem_to_admit_, min_mem_limit_required);
+    }
+  }
+
+  if (!has_query_option || pool_cfg.clamp_mem_limit_query_option) {
+    if (pool_cfg.min_query_mem_limit > 0) {
+      per_backend_mem_to_admit_ =
+          max(per_backend_mem_to_admit_, pool_cfg.min_query_mem_limit);
+    }
+    if (pool_cfg.max_query_mem_limit > 0) {
+      per_backend_mem_to_admit_ =
+          min(per_backend_mem_to_admit_, pool_cfg.max_query_mem_limit);
+    }
+  }
+
+  // Cap the memory estimate at the amount of physical memory available. The user's
+  // provided value or the estimate from planning can each be unreasonable.
+  per_backend_mem_to_admit_ = min(per_backend_mem_to_admit_, MemInfo::physical_mem());
+
+  if (mimic_old_behaviour && !has_query_option) {
+    per_backend_mem_limit_ = -1;
+  } else {
+    per_backend_mem_limit_ = per_backend_mem_to_admit_;
+  }
 }
 
 }

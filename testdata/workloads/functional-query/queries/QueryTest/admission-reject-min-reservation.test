@@ -5,7 +5,9 @@ select distinct * from functional_parquet.alltypesagg
 ---- CATCH
 minimum memory reservation is greater than memory available to the
  query for buffer reservations. Memory reservation needed given the
- current plan: 68.09 MB. Set mem_limit to at least 100.09 MB.
+ current plan: 68.09 MB. Adjust either the mem_limit or the pool config
+ (max-query-mem-limit, min-query-mem-limit) for the query to allow the query
+ memory limit to be at least 100.09 MB.
 ====
 ---- QUERY
 set mem_limit=150mb;
@@ -30,7 +32,9 @@ from tpch_parquet.lineitem join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- CATCH
 minimum memory reservation is greater than memory available to the
  query for buffer reservations. Memory reservation needed given the
- current plan: 14.75 MB. Set mem_limit to at least 46.75 MB.
+ current plan: 14.75 MB. Adjust either the mem_limit or the pool config
+ (max-query-mem-limit, min-query-mem-limit) for the query to allow the query
+ memory limit to be at least 46.75 MB.
 ====
 ---- QUERY
 set mem_limit=50mb;
@@ -39,5 +43,7 @@ from tpch_parquet.lineitem join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- CATCH
 minimum memory reservation is greater than memory available to the
  query for buffer reservations. Memory reservation needed given the
- current plan: 26.00 MB. Set mem_limit to at least 58.00 MB.
+ current plan: 26.00 MB. Adjust either the mem_limit or the pool config
+ (max-query-mem-limit, min-query-mem-limit) for the query to allow the query
+ memory limit to be at least 58.00 MB.
 ====

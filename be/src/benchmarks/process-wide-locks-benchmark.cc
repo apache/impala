@@ -84,7 +84,7 @@ void CreateAndAccessQueryStates(const TUniqueId& query_id, int num_accesses) {
   query_ctx.__set_request_pool(resolved_pool);
 
   QueryState *query_state;
-  query_state = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(query_ctx);
+  query_state = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(query_ctx, -1);
   DCHECK(query_state != nullptr);
   query_state->AcquireBackendResourceRefcount();
 
