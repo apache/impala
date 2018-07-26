@@ -44,6 +44,35 @@ class TestRefreshPartition(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
+  def test_refresh_partition_num_rows(self, vector, unique_database):
+    """Refreshing a partition should not change it's numRows stat."""
+    # Create a partitioned table and add data to it.
+    tbl = unique_database + ".t1"
+    self.client.execute("create table %s(a int) partitioned by (b int)" % tbl)
+    self.client.execute("insert into %s partition(b=1) values (1)" % tbl)
+    # Compute stats on tbl. It should populate the partition num rows.
+    self.client.execute("compute stats %s" % tbl)
+    result = self.client.execute("show partitions %s" % tbl)
+    # Format: partition/#Rows/#Files (first 3 entries)
+    assert result.get_data().startswith("1\t1\t1"),\
+        "Incorrect partition stats %s" % result.get_data()
+    # Add another file to the same partition using hive.
+    self.run_stmt_in_hive("insert into table %s partition (b=1) values (2)" % tbl)
+    # Make sure Impala still sees a single row.
+    assert "1" == self.client.execute("select count(*) from %s" % tbl).get_data()
+    # refresh the partition and make sure the new row is visible
+    self.client.execute("refresh %s partition (b=1)" % tbl)
+    assert "2" == self.client.execute("select count(*) from %s" % tbl).get_data()
+    # Make sure the partition num rows are unchanged and still 1 but the #files is updated.
+    result = self.client.execute("show partitions %s" % tbl)
+    assert result.get_data().startswith("1\t1\t2"),\
+        "Incorrect partition stats %s" % result.get_data()
+    # Do a full table refresh and it should still remain the same.
+    self.client.execute("refresh %s" % tbl)
+    result = self.client.execute("show partitions %s" % tbl)
+    assert result.get_data().startswith("1\t1\t2"),\
+        "Incorrect partition stats %s" % result.get_data()
+
   def test_add_hive_partition_and_refresh(self, vector, unique_database):
     """
     Partition added in Hive can be viewed in Impala after refreshing
