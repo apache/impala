@@ -1272,11 +1272,39 @@ select split_part('one\|/two\|/three','\|/',3);
         </dt>
 
         <dd>
-          <indexterm audience="hidden">translate() function</indexterm>
-          <b>Purpose:</b> Returns the input string with a set of characters replaced by another set of characters.
+          <b>Purpose:</b> Returns the <codeph>input</codeph> string with each
+          character in the <codeph>from</codeph> argument replaced with the
+          corresponding character in the <codeph>to</codeph> argument. The
+          characters are matched in the order they appear in
+            <codeph>from</codeph> and <codeph>to</codeph>. <p> For example:
+              <codeph>translate ('hello world','world','earth')</codeph> returns
+              <codeph>'hetta earth'</codeph>. </p>
           <p>
-            <b>Return type:</b> <codeph>string</codeph>
+            <b>Return type:</b>
+            <codeph>string</codeph>
           </p>
+          <p>
+            <b>Usage notes:</b>
+          </p>
+          <p> If <codeph>from</codeph> contains more characters than
+              <codeph>to</codeph>, the <codeph>from</codeph> characters that are
+            beyond the length of <codeph>to</codeph> are removed in the result. </p>
+          <p> For example: </p>
+          <p>
+            <codeph>translate('abcdedg', 'bcd', '1')</codeph> returns
+              <codeph>'a1eg'</codeph>. </p>
+          <p><codeph>translate('Unit Number#2', '# ', '_')</codeph> returns
+              <codeph>'UnitNumber_2'</codeph>. </p>
+          <p> If <codeph>from</codeph> is <codeph>NULL</codeph>, the function
+            returns <codeph>NULL</codeph>. </p>
+          <p> If <codeph>to</codeph> contains more characters than
+              <codeph>from</codeph>, the extra characters in <codeph>to</codeph>
+            are ignored. </p>
+          <p> If <codeph>from</codeph> contains duplicate characters, the
+            duplicate character is replaced with the first matching character in
+              <codeph>to</codeph>. </p>
+          <p> For example: <codeph>translate ('hello','ll','67')</codeph>
+            returns <codeph>'he66o'</codeph>. </p>
         </dd>
 
       </dlentry>
