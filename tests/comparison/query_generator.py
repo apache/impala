@@ -1333,58 +1333,17 @@ class QueryGenerator(object):
     return HavingClause(predicate)
 
   def _enable_distinct_on_random_agg_items(self, agg_items):
-    '''Randomly choose an agg func and set it to use DISTINCT'''
-    # Impala has a limitation where 'DISTINCT' may only be applied to one agg
-    # expr. If an agg expr is used more than once, each usage may
-    # or may not include DISTINCT.
-    #
-    # Examples:
-    #   OK: SELECT COUNT(DISTINCT a) + SUM(DISTINCT a) + MAX(a)...
-    #   Not OK: SELECT COUNT(DISTINCT a) + COUNT(DISTINCT b)...
-    #
-    # Given a select list like:
-    #   COUNT(a), SUM(a), MAX(b)
-    #
-    # We want to ouput one of:
-    #   COUNT(DISTINCT a), SUM(DISTINCT a), AVG(b)
-    #   COUNT(DISTINCT a), SUM(a), AVG(b)
-    #   COUNT(a), SUM(a), AVG(DISTINCT b)
-    #
-    # This will be done by first grouping all agg funcs by their inner
-    # expr:
-    #   {a: [COUNT(a), SUM(a)],
-    #    b: [MAX(b)]}
-    #
-    # then choosing a random val (which is a list of aggs) in the above dict, and
-    # finally randomly adding DISTINCT to items in the list.
-    exprs_to_funcs = defaultdict(list)
+    '''For each agg function, set it to be DISTINCT with some probability'''
+    def _enable_distinct_helper(val_expr):
+      if val_expr.is_agg:
+        if self.profile.use_distinct_in_func():
+          val_expr.distinct = True
+      elif val_expr.is_func:
+        for arg in val_expr.args:
+          _enable_distinct_helper(arg)
+
     for item in agg_items:
-      for expr, funcs in self._group_agg_funcs_by_expr(item.val_expr).iteritems():
-        exprs_to_funcs[expr].extend(funcs)
-    funcs = choice(exprs_to_funcs.values())
-    for func in funcs:
-      if self.profile.use_distinct_in_func():
-        func.distinct = True
-
-  def _group_agg_funcs_by_expr(self, val_expr):
-    '''Group exprs and return a dict mapping the expr to the agg items
-       it is used in.
-
-       Example: COUNT(a) * SUM(a) - MAX(b) + MIN(c) -> {a: [COUNT(a), SUM(a)],
-                                                        b: [MAX(b)],
-                                                        c: [MIN(c)]}
-
-    '''
-    exprs_to_funcs = defaultdict(list)
-    if val_expr.is_agg:
-      exprs_to_funcs[tuple(val_expr.args)].append(val_expr)
-    elif val_expr.is_func:
-      for arg in val_expr.args:
-        for expr, funcs in self._group_agg_funcs_by_expr(arg).iteritems():
-          exprs_to_funcs[expr].extend(funcs)
-    # else: The remaining case could happen if the original expr was something like
-    #       "SUM(a) + b + 1" where b is a GROUP BY field.
-    return exprs_to_funcs
+      _enable_distinct_helper(item.val_expr)
 
   def _create_boolean_func_tree(self, require_relational_func=False,
                                 relational_col_types=None, allow_subquery=False,
