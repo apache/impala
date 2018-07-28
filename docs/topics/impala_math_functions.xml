@@ -195,19 +195,72 @@ under the License.
       <dlentry id="conv">
 
         <dt>
-          <codeph>conv(bigint num, int from_base, int to_base), conv(string num, int from_base, int
-          to_base)</codeph>
+          <codeph>conv(bigint n, int from_base, int to_base), conv(string s, int
+            from_base, int to_base)</codeph>
         </dt>
 
         <dd>
-          <indexterm audience="hidden">conv() function</indexterm>
-          <b>Purpose:</b> Returns a string representation of an integer value in a particular base. The input value
-          can be a string, for example to convert a hexadecimal number such as <codeph>fce2</codeph> to decimal. To
-          use the return value as a number (for example, when converting to base 10), use <codeph>CAST()</codeph>
-          to convert to the appropriate type.
-          <p>
-            <b>Return type:</b> <codeph>string</codeph>
+          <b>Purpose:</b> Returns a string representation of the first argument
+          converted from <codeph>from_base</codeph> to <codeph>to_base</codeph>.
+          The first argument can be specified as a number or a string. For
+          example, <codeph>conv(100, 2, 10)</codeph> and <codeph>conv('100', 2,
+            10)</codeph> both return <codeph>'4'</codeph>. <p>
+            <b>Return type:</b>
+            <codeph>string</codeph>
           </p>
+          <p>
+            <b>Usage notes:</b>
+          </p>
+          <p> If <codeph>to_base</codeph> is negative, the first argument is
+            treated as signed, and otherwise, it is treated as unsigned. For
+            example: </p>
+          <ul>
+            <li>
+              <codeph>conv(-17, 10, -2) </codeph>returns
+                <codeph>'-10001'</codeph>,<codeph> -17</codeph> in base 2. </li>
+            <li>
+              <codeph>conv(-17, 10, 10)</codeph> returns
+                <codeph>'18446744073709551599'</codeph>. <codeph>-17</codeph> is
+              interpreted as an unsigned, 2^64-17, and then the value is
+              returned in base 10.</li>
+          </ul><p>The function returns <codeph>NULL</codeph> when the following
+            illegal arguments are specified: </p>
+          <ul>
+            <li> Any argument is <codeph>NULL</codeph>. </li>
+            <li>
+              <codeph>from_base</codeph> or <codeph>to_base</codeph> is below
+                <codeph>-36</codeph> or above <codeph>36</codeph>. </li>
+            <li>
+              <codeph>from_base</codeph> or <codeph>to_base</codeph> is
+                <codeph>-1</codeph>, <codeph>0</codeph>, or <codeph>1</codeph>. </li>
+            <li> The first argument represents a positive number and
+                <codeph>from_base</codeph> is a negative number.</li>
+          </ul>
+          <p>If the first argument represents a negative number and
+              <codeph>from_base</codeph> is a negative number, the function
+            returns <codeph>0</codeph>.</p><p> If the first argument represents
+            a number larger than the maximum <codeph>bigint</codeph>, the
+            function returns: </p>
+          <ul>
+            <li> The string representation of -1 in <codeph>to_base</codeph> if
+                <codeph>to_base</codeph> is negative. </li>
+            <li> The string representation of 18446744073709551615' (2^64 - 1)
+              in <codeph>to_base</codeph> if <codeph>to_base</codeph> is
+              positive.</li>
+          </ul>
+          <p> If the first argument does not represent a valid number in
+              <codeph>from_base</codeph>, e.g. 3 in base 2 or '1a23' in base 10,
+            the digits in the first argument are evaluated from left-to-right
+            and used if a valid digit in <codeph>from_base</codeph>. The invalid
+            digit and the digits to the right are ignored. </p>
+          <p> For example:<ul>
+              <li><codeph> conv(445, 5, 10)</codeph> is converted to
+                  <codeph>conv(44, 5, 10)</codeph> and returns
+                  <codeph>'24'</codeph>. </li>
+              <li><codeph> conv('1a23', 10, 16)</codeph> is converted to
+                  <codeph>conv('1', 10 , 16)</codeph> and returns
+                  <codeph>'1'</codeph>. </li>
+            </ul></p>
         </dd>
 
       </dlentry>
