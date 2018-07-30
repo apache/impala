@@ -505,7 +505,14 @@ class TestWithDocker(object):
         # requirement may be lifted in newer Docker versions.
         "--privileged",
         "--name", name,
-        "--hostname", name,
+        # Whereas the container names vary across containers, we use the same
+        # hostname repeatedly, so that the build container and the test
+        # containers have the same hostnames. Kudu errors out with "Remote
+        # error: Service unavailable: Timed out: could not wait for desired
+        # snapshot timestamp to be consistent: Tablet is lagging too much to be
+        # able to serve snapshot scan." if reading with READ_AT_SNAPSHOT
+        # if the hostnames change underneath it.
+        "--hostname", self.name,
         # Label with the git root directory for easier cleanup
         "--label=pwd=" + self.git_root,
         # Consistent locales
