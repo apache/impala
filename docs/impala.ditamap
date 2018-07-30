@@ -283,6 +283,7 @@ under the License.
     <topicref audience="hidden" href="topics/impala_perf_ddl.xml"/>
   </topicref>
   <topicref href="topics/impala_scalability.xml"/>
+    <topicref href="topics/impala_dedicated_coordinator.xml"/>
   <topicref href="topics/impala_partitioning.xml"/>
   <topicref href="topics/impala_file_formats.xml">
     <topicref href="topics/impala_txtfile.xml"/>
