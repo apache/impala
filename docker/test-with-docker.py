@@ -499,6 +499,12 @@ class TestWithDocker(object):
     if self.test_mode:
       extras = ["-e", "TEST_TEST_WITH_DOCKER=true"] + extras
 
+    # According to localtime(5), /etc/localtime is supposed
+    # to be a symlink to somewhere inside /usr/share/zoneinfo
+    assert os.path.islink("/etc/localtime")
+    localtime_link_target = os.path.realpath("/etc/localtime")
+    assert localtime_link_target.startswith("/usr/share/zoneinfo")
+
     container_id = _check_output([
         "docker", "create",
         # Required for some of the ntp handling in bootstrap and Kudu;
@@ -526,9 +532,9 @@ class TestWithDocker(object):
         "-v", self.git_root + ":/repo:ro",
         "-v", self.git_common_dir + ":/git_common_dir:ro",
         "-e", "GIT_HEAD_REV=" + self.git_head_rev,
-        "-v", self.ccache_dir + ":/ccache",
         # Share timezone between host and container
-        "-v", "/etc/localtime:/mnt/localtime",
+        "-e", "LOCALTIME_LINK_TARGET=" + localtime_link_target,
+        "-v", self.ccache_dir + ":/ccache",
         "-v", _make_dir_if_not_exist(self.log_dir,
                                      logdir) + ":/logs",
         "-v", base + ":/mnt/base:ro"]
