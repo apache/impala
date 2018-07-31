@@ -22,7 +22,7 @@ STRING,STRING
 row_regex: .*Query Options \(set by configuration\).*MAX_MEM_ESTIMATE_FOR_ADMISSION=31457280.*
 # Memory estimate sent to backend is overridden, but the explain plan shows the planner output.
 row_regex: .*Estimated Per-Host Mem: 31457280.*
-row_regex: .*Per-Host Resource Estimates: Memory=82.94MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=83MB.*
 ====
 ---- QUERY
 # If the estimate is set to a higher value that is still > the max mem resources for
@@ -61,7 +61,7 @@ STRING,STRING
 row_regex: .*Query Options \(set by configuration\).*MEM_LIMIT=41943040.*MAX_MEM_ESTIMATE_FOR_ADMISSION=47185920.*
 # Memory estimate sent to backend is overridden, but the explain plan shows the planner output.
 row_regex: .*Estimated Per-Host Mem: 47185920.*
-row_regex: .*Per-Host Resource Estimates: Memory=82.94MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=83MB.*
 ====
 ---- QUERY
 # Larger queries that use more memory than the estimate can still run because no mem_limit is set.
@@ -75,7 +75,7 @@ STRING
 row_regex: .*Query Options \(set by configuration\).*MAX_MEM_ESTIMATE_FOR_ADMISSION=10485760.*
 # Memory estimate sent to backend is overridden, but the explain plan shows the planner output.
 row_regex: .*Estimated Per-Host Mem: 10485760.*
-row_regex: .*Per-Host Resource Estimates: Memory=90.00MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=90MB.*
 ====
 ---- QUERY
 # If the memory estimate is less than max_mem_estimate_for_admission, then the estimate
@@ -90,5 +90,5 @@ STRING
 ---- RUNTIME_PROFILE
 row_regex: .*Query Options \(set by configuration\).*MAX_MEM_ESTIMATE_FOR_ADMISSION=52428800.*
 row_regex: .*Estimated Per-Host Mem: 10485760.*
-row_regex: .*Per-Host Resource Estimates: Memory=10.00MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=10MB.*
 ====

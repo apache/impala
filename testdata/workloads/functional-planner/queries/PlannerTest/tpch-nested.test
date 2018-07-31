@@ -22,6 +22,8 @@ order by
   l_returnflag,
   l_linestatus
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=66.00MB Threads=2
+Per-Host Resource Estimates: Memory=744MB
 PLAN-ROOT SINK
 |
 02:SORT
@@ -32,9 +34,11 @@ PLAN-ROOT SINK
 |  group by: l_returnflag, l_linestatus
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_shipdate <= '1998-09-02'
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=112.00MB Threads=4
+Per-Host Resource Estimates: Memory=886MB
 PLAN-ROOT SINK
 |
 05:MERGING-EXCHANGE [UNPARTITIONED]
@@ -54,7 +58,7 @@ PLAN-ROOT SINK
 |  group by: l_returnflag, l_linestatus
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_shipdate <= '1998-09-02'
 ====
 # TPCH-Q2
@@ -100,6 +104,8 @@ order by
   p_partkey
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=76.84MB Threads=6
+Per-Host Resource Estimates: Memory=865MB
 PLAN-ROOT SINK
 |
 26:TOP-N [LIMIT=100]
@@ -126,7 +132,7 @@ PLAN-ROOT SINK
 |  |  |  19:UNNEST [r.r_nations n]
 |  |  |
 |  |  16:SCAN HDFS [tpch_nested_parquet.region r]
-|  |     partitions=1/1 files=1 size=3.24KB
+|  |     partitions=1/1 files=1 size=3.36KB
 |  |     predicates: r_name = 'EUROPE', !empty(r.r_nations)
 |  |
 |  12:SUBPLAN
@@ -138,7 +144,7 @@ PLAN-ROOT SINK
 |  |  14:UNNEST [s.s_partsupps ps]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     predicates: !empty(s.s_partsupps)
 |     runtime filters: RF008 -> s_nationkey
 |
@@ -155,14 +161,14 @@ PLAN-ROOT SINK
 |  |  09:UNNEST [r.r_nations n]
 |  |
 |  06:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |     predicates: r_name = 'EUROPE', !empty(r.r_nations)
 |
 23:HASH JOIN [INNER JOIN]
 |  hash predicates: ps_partkey = p_partkey
 |
 |--05:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_size = 15, p_type LIKE '%BRASS'
 |     runtime filters: RF000 -> p_partkey
 |
@@ -175,10 +181,12 @@ PLAN-ROOT SINK
 |  03:UNNEST [s.s_partsupps ps]
 |
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
-   partitions=1/1 files=1 size=43.00MB
+   partitions=1/1 files=1 size=41.79MB
    predicates: !empty(s.s_partsupps)
    runtime filters: RF004 -> s_nationkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=114.73MB Threads=12
+Per-Host Resource Estimates: Memory=1.00GB
 PLAN-ROOT SINK
 |
 33:MERGING-EXCHANGE [UNPARTITIONED]
@@ -219,7 +227,7 @@ PLAN-ROOT SINK
 |  |  |  19:UNNEST [r.r_nations n]
 |  |  |
 |  |  16:SCAN HDFS [tpch_nested_parquet.region r]
-|  |     partitions=1/1 files=1 size=3.24KB
+|  |     partitions=1/1 files=1 size=3.36KB
 |  |     predicates: r_name = 'EUROPE', !empty(r.r_nations)
 |  |
 |  12:SUBPLAN
@@ -231,7 +239,7 @@ PLAN-ROOT SINK
 |  |  14:UNNEST [s.s_partsupps ps]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     predicates: !empty(s.s_partsupps)
 |     runtime filters: RF008 -> s_nationkey
 |
@@ -250,7 +258,7 @@ PLAN-ROOT SINK
 |  |  09:UNNEST [r.r_nations n]
 |  |
 |  06:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |     predicates: r_name = 'EUROPE', !empty(r.r_nations)
 |
 23:HASH JOIN [INNER JOIN, BROADCAST]
@@ -259,7 +267,7 @@ PLAN-ROOT SINK
 |--27:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_size = 15, p_type LIKE '%BRASS'
 |     runtime filters: RF000 -> p_partkey
 |
@@ -272,7 +280,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [s.s_partsupps ps]
 |
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
-   partitions=1/1 files=1 size=43.00MB
+   partitions=1/1 files=1 size=41.79MB
    predicates: !empty(s.s_partsupps)
    runtime filters: RF004 -> s_nationkey
 ====
@@ -300,6 +308,8 @@ order by
   o_orderdate
 limit 10
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=66.00MB Threads=2
+Per-Host Resource Estimates: Memory=744MB
 PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=10]
@@ -326,11 +336,13 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: c_mktsegment = 'BUILDING', !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate < '1995-03-15'
    predicates on l: l_shipdate > '1995-03-15'
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=100.00MB Threads=4
+Per-Host Resource Estimates: Memory=872MB
 PLAN-ROOT SINK
 |
 13:MERGING-EXCHANGE [UNPARTITIONED]
@@ -367,7 +379,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: c_mktsegment = 'BUILDING', !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate < '1995-03-15'
    predicates on l: l_shipdate > '1995-03-15'
@@ -396,6 +408,8 @@ group by
 order by
   o_orderpriority
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=50.00MB Threads=2
+Per-Host Resource Estimates: Memory=480MB
 PLAN-ROOT SINK
 |
 10:SORT
@@ -422,11 +436,13 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
    predicates on o_lineitems: l_commitdate < l_receiptdate
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=96.00MB Threads=4
+Per-Host Resource Estimates: Memory=620MB
 PLAN-ROOT SINK
 |
 13:MERGING-EXCHANGE [UNPARTITIONED]
@@ -462,7 +478,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
    predicates on o_lineitems: l_commitdate < l_receiptdate
@@ -491,6 +507,8 @@ group by
 order by
   revenue desc
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=63.88MB Threads=4
+Per-Host Resource Estimates: Memory=606MB
 PLAN-ROOT SINK
 |
 18:SORT
@@ -505,7 +523,7 @@ PLAN-ROOT SINK
 |  runtime filters: RF000 <- s_nationkey
 |
 |--09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |
 15:HASH JOIN [INNER JOIN]
 |  hash predicates: c.c_nationkey = n.n_nationkey
@@ -520,7 +538,7 @@ PLAN-ROOT SINK
 |  |  13:UNNEST [r.r_nations n]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |     predicates: r_name = 'ASIA', !empty(r.r_nations)
 |
 01:SUBPLAN
@@ -540,11 +558,13 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
    runtime filters: RF000 -> c_nationkey, RF004 -> c.c_nationkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=110.02MB Threads=8
+Per-Host Resource Estimates: Memory=1.26GB
 PLAN-ROOT SINK
 |
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -570,7 +590,7 @@ PLAN-ROOT SINK
 |--20:EXCHANGE [BROADCAST]
 |  |
 |  09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |
 15:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c.c_nationkey = n.n_nationkey
@@ -587,7 +607,7 @@ PLAN-ROOT SINK
 |  |  13:UNNEST [r.r_nations n]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |     predicates: r_name = 'ASIA', !empty(r.r_nations)
 |
 01:SUBPLAN
@@ -607,7 +627,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
    runtime filters: RF000 -> c_nationkey, RF004 -> c.c_nationkey
@@ -624,15 +644,19 @@ where
   and l_discount between 0.05 and 0.07
   and l_quantity < 24
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=2
+Per-Host Resource Estimates: Memory=362MB
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice * l_discount)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_discount <= 0.07, l_discount >= 0.05, l_quantity < 24, l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=3
+Per-Host Resource Estimates: Memory=372MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
@@ -644,7 +668,7 @@ PLAN-ROOT SINK
 |  output: sum(l_extendedprice * l_discount)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_discount <= 0.07, l_discount >= 0.05, l_quantity < 24, l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
 ====
 # TPCH-Q7
@@ -686,6 +710,8 @@ order by
   cust_nation,
   l_year
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=65.81MB Threads=5
+Per-Host Resource Estimates: Memory=712MB
 PLAN-ROOT SINK
 |
 16:SORT
@@ -701,20 +727,20 @@ PLAN-ROOT SINK
 |  runtime filters: RF000 <- n2.n_nationkey
 |
 |--11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n1.n_nationkey
 |  runtime filters: RF002 <- n1.n_nationkey
 |
 |--10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |
 12:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
 |
 |--09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     runtime filters: RF002 -> s_nationkey
 |
 01:SUBPLAN
@@ -734,12 +760,14 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems)
    predicates on l: l_shipdate >= '1995-01-01', l_shipdate <= '1996-12-31'
    runtime filters: RF000 -> c_nationkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=112.97MB Threads=10
+Per-Host Resource Estimates: Memory=997MB
 PLAN-ROOT SINK
 |
 22:MERGING-EXCHANGE [UNPARTITIONED]
@@ -766,7 +794,7 @@ PLAN-ROOT SINK
 |--19:EXCHANGE [BROADCAST]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n1.n_nationkey
@@ -775,7 +803,7 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_suppkey = s_suppkey
@@ -783,7 +811,7 @@ PLAN-ROOT SINK
 |--17:EXCHANGE [BROADCAST]
 |  |
 |  09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     runtime filters: RF002 -> s_nationkey
 |
 01:SUBPLAN
@@ -803,7 +831,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems)
    predicates on l: l_shipdate >= '1995-01-01', l_shipdate <= '1996-12-31'
@@ -846,6 +874,8 @@ group by
 order by
   o_year
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=67.75MB Threads=6
+Per-Host Resource Estimates: Memory=746MB
 PLAN-ROOT SINK
 |
 22:SORT
@@ -860,7 +890,7 @@ PLAN-ROOT SINK
 |  runtime filters: RF000 <- n2.n_nationkey
 |
 |--16:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |
 19:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n1.n_nationkey
@@ -875,21 +905,21 @@ PLAN-ROOT SINK
 |  |  14:UNNEST [r.r_nations n1]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |     predicates: r_name = 'AMERICA', !empty(r.r_nations)
 |
 18:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
 |
 |--10:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_type = 'ECONOMY ANODIZED STEEL'
 |
 17:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
 |
 |--09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     runtime filters: RF000 -> s_nationkey
 |
 01:SUBPLAN
@@ -909,11 +939,13 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
    runtime filters: RF002 -> c_nationkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=110.91MB Threads=12
+Per-Host Resource Estimates: Memory=1.01GB
 PLAN-ROOT SINK
 |
 29:MERGING-EXCHANGE [UNPARTITIONED]
@@ -939,7 +971,7 @@ PLAN-ROOT SINK
 |--26:EXCHANGE [BROADCAST]
 |  |
 |  16:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |
 19:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n1.n_nationkey
@@ -956,7 +988,7 @@ PLAN-ROOT SINK
 |  |  14:UNNEST [r.r_nations n1]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |     predicates: r_name = 'AMERICA', !empty(r.r_nations)
 |
 18:HASH JOIN [INNER JOIN, BROADCAST]
@@ -965,7 +997,7 @@ PLAN-ROOT SINK
 |--24:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_type = 'ECONOMY ANODIZED STEEL'
 |
 17:HASH JOIN [INNER JOIN, BROADCAST]
@@ -974,7 +1006,7 @@ PLAN-ROOT SINK
 |--23:EXCHANGE [BROADCAST]
 |  |
 |  09:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     runtime filters: RF000 -> s_nationkey
 |
 01:SUBPLAN
@@ -994,7 +1026,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
    runtime filters: RF002 -> c_nationkey
@@ -1031,6 +1063,8 @@ order by
   nation,
   o_year desc
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=72.31MB Threads=5
+Per-Host Resource Estimates: Memory=830MB
 PLAN-ROOT SINK
 |
 16:SORT
@@ -1045,13 +1079,13 @@ PLAN-ROOT SINK
 |  runtime filters: RF000 <- n_nationkey
 |
 |--11:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
 |
 |--10:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_name LIKE '%green%'
 |
 12:HASH JOIN [INNER JOIN]
@@ -1066,7 +1100,7 @@ PLAN-ROOT SINK
 |  |  08:UNNEST [s.s_partsupps ps]
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     predicates: !empty(s.s_partsupps)
 |     runtime filters: RF000 -> s_nationkey
 |
@@ -1079,9 +1113,11 @@ PLAN-ROOT SINK
 |  03:UNNEST [o.o_lineitems l]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(o.o_lineitems)
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=143.33MB Threads=10
+Per-Host Resource Estimates: Memory=1.09GB
 PLAN-ROOT SINK
 |
 22:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1107,7 +1143,7 @@ PLAN-ROOT SINK
 |--19:EXCHANGE [BROADCAST]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
@@ -1115,7 +1151,7 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_name LIKE '%green%'
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1132,7 +1168,7 @@ PLAN-ROOT SINK
 |  |  08:UNNEST [s.s_partsupps ps]
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     predicates: !empty(s.s_partsupps)
 |     runtime filters: RF000 -> s_nationkey
 |
@@ -1145,7 +1181,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [o.o_lineitems l]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(o.o_lineitems)
 ====
 # TPCH-Q10
@@ -1182,6 +1218,8 @@ order by
   revenue desc
 limit 20
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=60.94MB Threads=3
+Per-Host Resource Estimates: Memory=835MB
 PLAN-ROOT SINK
 |
 12:TOP-N [LIMIT=20]
@@ -1196,7 +1234,7 @@ PLAN-ROOT SINK
 |  runtime filters: RF000 <- n_nationkey
 |
 |--09:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |
 01:SUBPLAN
 |
@@ -1215,12 +1253,14 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1993-10-01', o_orderdate < '1994-01-01'
    predicates on l: l_returnflag = 'R'
    runtime filters: RF000 -> c_nationkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=94.95MB Threads=6
+Per-Host Resource Estimates: Memory=995MB
 PLAN-ROOT SINK
 |
 16:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1247,7 +1287,7 @@ PLAN-ROOT SINK
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  09:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |
 01:SUBPLAN
 |
@@ -1266,7 +1306,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1993-10-01', o_orderdate < '1994-01-01'
    predicates on l: l_returnflag = 'R'
@@ -1306,6 +1346,8 @@ where
 order by
   value desc
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=71.89MB Threads=5
+Per-Host Resource Estimates: Memory=558MB
 PLAN-ROOT SINK
 |
 17:SORT
@@ -1322,7 +1364,7 @@ PLAN-ROOT SINK
 |  |  runtime filters: RF002 <- n_nationkey
 |  |
 |  |--13:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|  |     partitions=1/1 files=1 size=3.24KB
+|  |     partitions=1/1 files=1 size=3.36KB
 |  |     predicates: n_name = 'GERMANY'
 |  |
 |  09:SUBPLAN
@@ -1334,7 +1376,7 @@ PLAN-ROOT SINK
 |  |  11:UNNEST [s.s_partsupps ps]
 |  |
 |  08:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     predicates: !empty(s.s_partsupps)
 |     runtime filters: RF002 -> s_nationkey
 |
@@ -1347,7 +1389,7 @@ PLAN-ROOT SINK
 |  runtime filters: RF000 <- n_nationkey
 |
 |--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |     predicates: n_name = 'GERMANY'
 |
 01:SUBPLAN
@@ -1359,10 +1401,12 @@ PLAN-ROOT SINK
 |  03:UNNEST [s.s_partsupps ps]
 |
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
-   partitions=1/1 files=1 size=43.00MB
+   partitions=1/1 files=1 size=41.79MB
    predicates: !empty(s.s_partsupps)
    runtime filters: RF000 -> s_nationkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=111.91MB Threads=11
+Per-Host Resource Estimates: Memory=744MB
 PLAN-ROOT SINK
 |
 25:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1391,7 +1435,7 @@ PLAN-ROOT SINK
 |  |--21:EXCHANGE [BROADCAST]
 |  |  |
 |  |  13:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|  |     partitions=1/1 files=1 size=3.24KB
+|  |     partitions=1/1 files=1 size=3.36KB
 |  |     predicates: n_name = 'GERMANY'
 |  |
 |  09:SUBPLAN
@@ -1403,7 +1447,7 @@ PLAN-ROOT SINK
 |  |  11:UNNEST [s.s_partsupps ps]
 |  |
 |  08:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     predicates: !empty(s.s_partsupps)
 |     runtime filters: RF002 -> s_nationkey
 |
@@ -1424,7 +1468,7 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |     predicates: n_name = 'GERMANY'
 |
 01:SUBPLAN
@@ -1436,7 +1480,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [s.s_partsupps ps]
 |
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
-   partitions=1/1 files=1 size=43.00MB
+   partitions=1/1 files=1 size=41.79MB
    predicates: !empty(s.s_partsupps)
    runtime filters: RF000 -> s_nationkey
 ====
@@ -1470,6 +1514,8 @@ group by
 order by
   l_shipmode
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=58.00MB Threads=2
+Per-Host Resource Estimates: Memory=568MB
 PLAN-ROOT SINK
 |
 06:SORT
@@ -1488,10 +1534,12 @@ PLAN-ROOT SINK
 |  03:UNNEST [o.o_lineitems l]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(o.o_lineitems)
    predicates on l: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate, l_receiptdate >= '1994-01-01', l_receiptdate < '1995-01-01'
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=104.00MB Threads=4
+Per-Host Resource Estimates: Memory=718MB
 PLAN-ROOT SINK
 |
 09:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1519,7 +1567,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [o.o_lineitems l]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(o.o_lineitems)
    predicates on l: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate, l_receiptdate >= '1994-01-01', l_receiptdate < '1995-01-01'
 ====
@@ -1545,6 +1593,8 @@ order by
   custdist desc,
   c_count desc
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=40.00MB Threads=2
+Per-Host Resource Estimates: Memory=274MB
 PLAN-ROOT SINK
 |
 07:SORT
@@ -1567,9 +1617,11 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=96.94MB Threads=5
+Per-Host Resource Estimates: Memory=546MB
 PLAN-ROOT SINK
 |
 12:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1607,7 +1659,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
 ====
 # TPCH-Q14
@@ -1626,6 +1678,8 @@ where
   and l_shipdate >= '1995-09-01'
   and l_shipdate < '1995-10-01'
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=36.00MB Threads=3
+Per-Host Resource Estimates: Memory=402MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
@@ -1636,13 +1690,15 @@ PLAN-ROOT SINK
 |  runtime filters: RF000 <- p_partkey
 |
 |--01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_shipdate < '1995-10-01', l_shipdate >= '1995-09-01'
    runtime filters: RF000 -> l_partkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=36.00MB Threads=5
+Per-Host Resource Estimates: Memory=422MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
@@ -1660,10 +1716,10 @@ PLAN-ROOT SINK
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_shipdate < '1995-10-01', l_shipdate >= '1995-09-01'
    runtime filters: RF000 -> l_partkey
 ====
@@ -1700,6 +1756,8 @@ where
 order by
   s_suppkey
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=104.88MB Threads=4
+Per-Host Resource Estimates: Memory=1.16GB
 PLAN-ROOT SINK
 |
 08:SORT
@@ -1716,7 +1774,7 @@ PLAN-ROOT SINK
 |  |  group by: l_suppkey
 |  |
 |  03:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=292.36MB
+|     partitions=1/1 files=4 size=288.98MB
 |     predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
 |
 06:HASH JOIN [INNER JOIN]
@@ -1724,17 +1782,19 @@ PLAN-ROOT SINK
 |  runtime filters: RF000 <- s_suppkey
 |
 |--00:SCAN HDFS [tpch_nested_parquet.supplier]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |
 02:AGGREGATE [FINALIZE]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: l_suppkey
 |
 01:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
    runtime filters: RF000 -> l.l_suppkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=186.88MB Threads=10
+Per-Host Resource Estimates: Memory=1.45GB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1767,7 +1827,7 @@ PLAN-ROOT SINK
 |  |  group by: l_suppkey
 |  |
 |  03:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=292.36MB
+|     partitions=1/1 files=4 size=288.98MB
 |     predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -1777,7 +1837,7 @@ PLAN-ROOT SINK
 |--11:EXCHANGE [HASH(s_suppkey)]
 |  |
 |  00:SCAN HDFS [tpch_nested_parquet.supplier]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |
 10:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_extendedprice * (1 - l_discount))
@@ -1790,7 +1850,7 @@ PLAN-ROOT SINK
 |  group by: l_suppkey
 |
 01:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
    runtime filters: RF000 -> l.l_suppkey
 ====
@@ -1821,6 +1881,8 @@ order by
   p_type,
   p_size
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=13.94MB Threads=3
+Per-Host Resource Estimates: Memory=234MB
 PLAN-ROOT SINK
 |
 09:SORT
@@ -1837,7 +1899,7 @@ PLAN-ROOT SINK
 |  hash predicates: ps_partkey = p_partkey
 |
 |--05:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
 |
 01:SUBPLAN
@@ -1849,9 +1911,11 @@ PLAN-ROOT SINK
 |  03:UNNEST [s.s_partsupps ps]
 |
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
-   partitions=1/1 files=1 size=43.00MB
+   partitions=1/1 files=1 size=41.79MB
    predicates: NOT s_comment LIKE '%Customer%Complaints%', !empty(s.s_partsupps)
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=31.81MB Threads=7
+Per-Host Resource Estimates: Memory=286MB
 PLAN-ROOT SINK
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1884,7 +1948,7 @@ PLAN-ROOT SINK
 |--10:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
 |
 01:SUBPLAN
@@ -1896,7 +1960,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [s.s_partsupps ps]
 |
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
-   partitions=1/1 files=1 size=43.00MB
+   partitions=1/1 files=1 size=41.79MB
    predicates: NOT s_comment LIKE '%Customer%Complaints%', !empty(s.s_partsupps)
 ====
 # TPCH-Q17
@@ -1919,6 +1983,8 @@ where
       l_partkey = p_partkey
   )
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=96.94MB Threads=4
+Per-Host Resource Estimates: Memory=703MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
@@ -1934,21 +2000,23 @@ PLAN-ROOT SINK
 |  |  group by: l_partkey
 |  |
 |  02:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=292.36MB
+|     partitions=1/1 files=4 size=288.98MB
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
 |  runtime filters: RF002 <- p_partkey
 |
 |--01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_container = 'MED BOX', p_brand = 'Brand#23'
 |     runtime filters: RF000 -> p_partkey
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    runtime filters: RF000 -> l.l_partkey, RF002 -> l_partkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=154.94MB Threads=8
+Per-Host Resource Estimates: Memory=865MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -1975,7 +2043,7 @@ PLAN-ROOT SINK
 |  |  group by: l_partkey
 |  |
 |  02:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     partitions=1/1 files=4 size=292.36MB
+|     partitions=1/1 files=4 size=288.98MB
 |
 10:EXCHANGE [HASH(p_partkey)]
 |
@@ -1986,12 +2054,12 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_container = 'MED BOX', p_brand = 'Brand#23'
 |     runtime filters: RF000 -> p_partkey
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    runtime filters: RF000 -> l.l_partkey, RF002 -> l_partkey
 ====
 # TPCH-Q18
@@ -2014,6 +2082,8 @@ order by
   o_orderdate
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=24.00MB Threads=2
+Per-Host Resource Estimates: Memory=538MB
 PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=100]
@@ -2040,9 +2110,11 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=24.00MB Threads=3
+Per-Host Resource Estimates: Memory=538MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2073,7 +2145,7 @@ PLAN-ROOT SINK
 |  03:UNNEST [c.c_orders o]
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
 ====
 # TPCH-Q19
@@ -2114,6 +2186,8 @@ where
     )
   )
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=29.88MB Threads=3
+Per-Host Resource Estimates: Memory=596MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
@@ -2125,14 +2199,16 @@ PLAN-ROOT SINK
 |  runtime filters: RF000 <- p_partkey
 |
 |--01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_size >= 1
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_shipmode IN ('AIR', 'AIR REG'), l_shipinstruct = 'DELIVER IN PERSON'
    runtime filters: RF000 -> l_partkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=29.88MB Threads=5
+Per-Host Resource Estimates: Memory=616MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
@@ -2151,11 +2227,11 @@ PLAN-ROOT SINK
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.part p]
-|     partitions=1/1 files=1 size=6.24MB
+|     partitions=1/1 files=1 size=6.23MB
 |     predicates: p_size >= 1
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_shipmode IN ('AIR', 'AIR REG'), l_shipinstruct = 'DELIVER IN PERSON'
    runtime filters: RF000 -> l_partkey
 ====
@@ -2194,6 +2270,8 @@ where
 order by
   s_name
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=90.81MB Threads=5
+Per-Host Resource Estimates: Memory=888MB
 PLAN-ROOT SINK
 |
 13:SORT
@@ -2211,7 +2289,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: ps_partkey = p_partkey
 |  |
 |  |--06:SCAN HDFS [tpch_nested_parquet.part p]
-|  |     partitions=1/1 files=1 size=6.24MB
+|  |     partitions=1/1 files=1 size=6.23MB
 |  |     predicates: p_name LIKE 'forest%'
 |  |
 |  09:HASH JOIN [INNER JOIN]
@@ -2219,7 +2297,7 @@ PLAN-ROOT SINK
 |  |  runtime filters: RF006 <- n_nationkey
 |  |
 |  |--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|  |     partitions=1/1 files=1 size=3.24KB
+|  |     partitions=1/1 files=1 size=3.36KB
 |  |     predicates: n_name = 'CANADA'
 |  |
 |  01:SUBPLAN
@@ -2231,7 +2309,7 @@ PLAN-ROOT SINK
 |  |  03:UNNEST [s.s_partsupps ps]
 |  |
 |  00:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     predicates: !empty(s.s_partsupps)
 |     runtime filters: RF006 -> s_nationkey
 |
@@ -2240,10 +2318,12 @@ PLAN-ROOT SINK
 |  group by: l_partkey, l_suppkey
 |
 07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    runtime filters: RF000 -> l.l_partkey, RF001 -> l.l_suppkey
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=164.33MB Threads=11
+Per-Host Resource Estimates: Memory=1.04GB
 PLAN-ROOT SINK
 |
 21:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2273,7 +2353,7 @@ PLAN-ROOT SINK
 |  |--17:EXCHANGE [BROADCAST]
 |  |  |
 |  |  06:SCAN HDFS [tpch_nested_parquet.part p]
-|  |     partitions=1/1 files=1 size=6.24MB
+|  |     partitions=1/1 files=1 size=6.23MB
 |  |     predicates: p_name LIKE 'forest%'
 |  |
 |  09:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2283,7 +2363,7 @@ PLAN-ROOT SINK
 |  |--16:EXCHANGE [BROADCAST]
 |  |  |
 |  |  05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|  |     partitions=1/1 files=1 size=3.24KB
+|  |     partitions=1/1 files=1 size=3.36KB
 |  |     predicates: n_name = 'CANADA'
 |  |
 |  01:SUBPLAN
@@ -2295,7 +2375,7 @@ PLAN-ROOT SINK
 |  |  03:UNNEST [s.s_partsupps ps]
 |  |
 |  00:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     predicates: !empty(s.s_partsupps)
 |     runtime filters: RF006 -> s_nationkey
 |
@@ -2310,7 +2390,7 @@ PLAN-ROOT SINK
 |  group by: l_partkey, l_suppkey
 |
 07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    runtime filters: RF000 -> l.l_partkey, RF001 -> l.l_suppkey
 ====
@@ -2355,6 +2435,8 @@ order by
   s_name
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=39.33MB Threads=4
+Per-Host Resource Estimates: Memory=919MB
 PLAN-ROOT SINK
 |
 20:TOP-N [LIMIT=100]
@@ -2383,14 +2465,14 @@ PLAN-ROOT SINK
 |  runtime filters: RF000 <- n_nationkey
 |
 |--10:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |     predicates: n_name = 'SAUDI ARABIA'
 |
 11:HASH JOIN [INNER JOIN]
 |  hash predicates: l1.l_suppkey = s_suppkey
 |
 |--00:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     runtime filters: RF000 -> s_nationkey
 |
 02:SUBPLAN
@@ -2410,12 +2492,14 @@ PLAN-ROOT SINK
 |  04:UNNEST [c.c_orders o]
 |
 01:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderstatus = 'F'
    predicates on l1: l1.l_receiptdate > l1.l_commitdate
    predicates on l3: l3.l_receiptdate > l3.l_commitdate
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=42.84MB Threads=10
+Per-Host Resource Estimates: Memory=1.10GB
 PLAN-ROOT SINK
 |
 25:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2456,7 +2540,7 @@ PLAN-ROOT SINK
 |--22:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     partitions=1/1 files=1 size=3.24KB
+|     partitions=1/1 files=1 size=3.36KB
 |     predicates: n_name = 'SAUDI ARABIA'
 |
 11:HASH JOIN [INNER JOIN, BROADCAST]
@@ -2465,7 +2549,7 @@ PLAN-ROOT SINK
 |--21:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=43.00MB
+|     partitions=1/1 files=1 size=41.79MB
 |     runtime filters: RF000 -> s_nationkey
 |
 02:SUBPLAN
@@ -2485,7 +2569,7 @@ PLAN-ROOT SINK
 |  04:UNNEST [c.c_orders o]
 |
 01:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderstatus = 'F'
    predicates on l1: l1.l_receiptdate > l1.l_commitdate
@@ -2526,6 +2610,8 @@ group by
 order by
   cntrycode
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=13.94MB Threads=3
+Per-Host Resource Estimates: Memory=460MB
 PLAN-ROOT SINK
 |
 09:SORT
@@ -2550,13 +2636,15 @@ PLAN-ROOT SINK
 |  |  output: avg(c_acctbal)
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.customer c]
-|     partitions=1/1 files=4 size=292.36MB
+|     partitions=1/1 files=4 size=288.98MB
 |     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=25.94MB Threads=8
+Per-Host Resource Estimates: Memory=688MB
 PLAN-ROOT SINK
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2597,10 +2685,10 @@ PLAN-ROOT SINK
 |  |  output: avg(c_acctbal)
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.customer c]
-|     partitions=1/1 files=4 size=292.36MB
+|     partitions=1/1 files=4 size=288.98MB
 |     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=292.36MB
+   partitions=1/1 files=4 size=288.98MB
    predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 ====

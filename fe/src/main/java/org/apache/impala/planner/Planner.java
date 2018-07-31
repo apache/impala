@@ -273,7 +273,7 @@ public class Planner {
           PrintUtils.printBytes(request.getMax_per_host_min_mem_reservation()),
           request.getMax_per_host_thread_reservation()));
       str.append(String.format("Per-Host Resource Estimates: Memory=%s\n",
-          PrintUtils.printBytes(request.getPer_host_mem_estimate())));
+          PrintUtils.printBytesRoundedToMb(request.getPer_host_mem_estimate())));
       hasHeader = true;
     }
     if (request.query_ctx.disable_codegen_hint) {

@@ -228,7 +228,9 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testTpch() {
-    runPlannerTestFile("tpch-all", "tpch");
+    runPlannerTestFile("tpch-all", "tpch",
+        ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
+            PlannerTestOption.VALIDATE_RESOURCES));
   }
 
   @Test
@@ -246,7 +248,9 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testTpchNested() {
-    runPlannerTestFile("tpch-nested", "tpch_nested_parquet");
+    runPlannerTestFile("tpch-nested", "tpch_nested_parquet",
+        ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
+            PlannerTestOption.VALIDATE_RESOURCES));
   }
 
   @Test
@@ -254,7 +258,9 @@ public class PlannerTest extends PlannerTestBase {
     // Uses ss_sold_date_sk as the partition key of store_sales to allow static partition
     // pruning. The original predicates were rephrased in terms of the ss_sold_date_sk
     // partition key, with the query semantics identical to the original queries.
-    runPlannerTestFile("tpcds-all", "tpcds");
+    runPlannerTestFile("tpcds-all", "tpcds",
+        ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
+            PlannerTestOption.VALIDATE_RESOURCES));
   }
 
   @Test
@@ -367,7 +373,9 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testKuduTpch() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
-    runPlannerTestFile("tpch-kudu");
+    runPlannerTestFile("tpch-kudu", ImmutableSet.of(
+        PlannerTestOption.INCLUDE_RESOURCE_HEADER,
+        PlannerTestOption.VALIDATE_RESOURCES));
   }
 
   @Test

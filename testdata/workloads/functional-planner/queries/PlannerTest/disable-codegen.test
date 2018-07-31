@@ -2,7 +2,7 @@
 select count(*) from functional.alltypes
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=32.00KB Threads=3
-Per-Host Resource Estimates: Memory=148.00MB
+Per-Host Resource Estimates: Memory=148MB
 Codegen disabled by planner
 
 PLAN-ROOT SINK
@@ -22,7 +22,7 @@ PLAN-ROOT SINK
 select count(*) from functional.alltypesagg
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=128.00KB Threads=3
-Per-Host Resource Estimates: Memory=100.00MB
+Per-Host Resource Estimates: Memory=100MB
 
 PLAN-ROOT SINK
 |
@@ -41,7 +41,7 @@ PLAN-ROOT SINK
 select count(*) from functional_parquet.alltypes
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=16.00KB Threads=3
-Per-Host Resource Estimates: Memory=21.00MB
+Per-Host Resource Estimates: Memory=21MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypes
 
@@ -62,7 +62,7 @@ PLAN-ROOT SINK
 select * from functional_parquet.alltypes
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=88.00KB Threads=3
-Per-Host Resource Estimates: Memory=128.00MB
+Per-Host Resource Estimates: Memory=128MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypes
 
@@ -79,7 +79,7 @@ from functional.alltypes t1
 join functional.alltypestiny t2 on t1.id = t2.id
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=2.98MB Threads=5
-Per-Host Resource Estimates: Memory=182.94MB
+Per-Host Resource Estimates: Memory=183MB
 Codegen disabled by planner
 
 PLAN-ROOT SINK
@@ -109,7 +109,7 @@ PLAN-ROOT SINK
 select count(*) from functional.alltypes t1, functional.alltypes t2
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=64.00KB Threads=5
-Per-Host Resource Estimates: Memory=276.00MB
+Per-Host Resource Estimates: Memory=276MB
 
 PLAN-ROOT SINK
 |
@@ -138,7 +138,7 @@ select count(*) from (
   select * from functional.alltypestiny) v
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=32.00KB Threads=3
-Per-Host Resource Estimates: Memory=148.00MB
+Per-Host Resource Estimates: Memory=148MB
 Codegen disabled by planner
 
 PLAN-ROOT SINK
@@ -167,7 +167,7 @@ select count(*) from (
   select * from functional.alltypes) v
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=32.00KB Threads=3
-Per-Host Resource Estimates: Memory=148.00MB
+Per-Host Resource Estimates: Memory=148MB
 
 PLAN-ROOT SINK
 |
@@ -194,7 +194,7 @@ select sum(l_discount)
 from (select * from tpch.lineitem limit 1000) v
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=3
-Per-Host Resource Estimates: Memory=274.00MB
+Per-Host Resource Estimates: Memory=274MB
 Codegen disabled by planner
 
 PLAN-ROOT SINK
@@ -215,7 +215,7 @@ select sum(l_discount)
 from (select * from tpch.lineitem where l_orderkey > 100 limit 1000) v
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=3
-Per-Host Resource Estimates: Memory=274.00MB
+Per-Host Resource Estimates: Memory=274MB
 
 PLAN-ROOT SINK
 |

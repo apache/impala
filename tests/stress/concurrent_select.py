@@ -98,7 +98,7 @@ EXPECTED_TPCH_QUERIES_COUNT = 22
 # The unit prefixes can be found in
 # fe/src/main/java/org/apache/impala/common/PrintUtils.java
 MEM_ESTIMATE_PATTERN = re.compile(
-    r"Per-Host Resource Estimates: Memory=(\d+.?\d*)(P|T|G|M|K)?B")
+    r"Per-Host Resource Estimates: Memory=(\d+\.?\d*)(P|T|G|M|K)?B")
 
 PROFILES_DIR = "profiles"
 RESULT_HASHES_DIR = "result_hashes"

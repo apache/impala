@@ -131,7 +131,7 @@ select * from functional_parquet.alltypes where year = 2010;
 explain select id from alltypes where year = 2010;
 ---- RESULTS: VERIFY_IS_EQUAL
 row_regex:.*Max Per-Host Resource Reservation: Memory=.*
-row_regex:.*Per-Host Resource Estimates: Memory=16.00MB'
+row_regex:.*Per-Host Resource Estimates: Memory=16MB'
 'Codegen disabled by planner'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
@@ -157,7 +157,7 @@ compute stats alltypes;
 explain select id from alltypes where year = 2010;
 ---- RESULTS: VERIFY_IS_EQUAL
 row_regex:.*Max Per-Host Resource Reservation: Memory=.*
-row_regex:.*Per-Host Resource Estimates: Memory=16.00MB'
+row_regex:.*Per-Host Resource Estimates: Memory=16MB'
 'Codegen disabled by planner'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'

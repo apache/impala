@@ -4,7 +4,7 @@ from tpch_parquet.customer
     inner join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=18.97MB Threads=5
-Per-Host Resource Estimates: Memory=42.94MB
+Per-Host Resource Estimates: Memory=43MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -50,7 +50,7 @@ Per-Host Resources: mem-estimate=26.94MB mem-reservation=18.94MB thread-reservat
    tuple-ids=0 row-size=238B cardinality=150000
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=37.94MB Threads=5
-Per-Host Resource Estimates: Memory=85.88MB
+Per-Host Resource Estimates: Memory=86MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -109,7 +109,7 @@ from tpch_parquet.lineitem
     left join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=98.00MB Threads=5
-Per-Host Resource Estimates: Memory=420.41MB
+Per-Host Resource Estimates: Memory=420MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -153,7 +153,7 @@ Per-Host Resources: mem-estimate=380.41MB mem-reservation=74.00MB thread-reserva
    tuple-ids=0 row-size=263B cardinality=6001215
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=196.00MB Threads=5
-Per-Host Resource Estimates: Memory=840.83MB
+Per-Host Resource Estimates: Memory=841MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -210,7 +210,7 @@ from tpch_parquet.orders
     join /*+shuffle*/ tpch_parquet.customer on o_custkey = c_custkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=76.00MB Threads=6
-Per-Host Resource Estimates: Memory=100.00MB
+Per-Host Resource Estimates: Memory=100MB
 
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -262,7 +262,7 @@ Per-Host Resources: mem-estimate=41.00MB mem-reservation=25.00MB thread-reservat
    tuple-ids=0 row-size=191B cardinality=1500000
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=118.00MB Threads=7
-Per-Host Resource Estimates: Memory=166.00MB
+Per-Host Resource Estimates: Memory=166MB
 
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -327,7 +327,7 @@ from tpch_parquet.orders
     join /*+broadcast*/ tpch_parquet.customer on o_custkey = c_custkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=75.00MB Threads=5
-Per-Host Resource Estimates: Memory=102.38MB
+Per-Host Resource Estimates: Memory=102MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -373,7 +373,7 @@ Per-Host Resources: mem-estimate=78.38MB mem-reservation=59.00MB thread-reservat
    tuple-ids=0 row-size=191B cardinality=1500000
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=150.00MB Threads=5
-Per-Host Resource Estimates: Memory=204.76MB
+Per-Host Resource Estimates: Memory=205MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -541,7 +541,7 @@ from tpch_parquet.customer
 group by c_nationkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=5.94MB Threads=4
-Per-Host Resource Estimates: Memory=44.00MB
+Per-Host Resource Estimates: Memory=44MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -582,7 +582,7 @@ Per-Host Resources: mem-estimate=34.00MB mem-reservation=4.00MB thread-reservati
    tuple-ids=0 row-size=10B cardinality=150000
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=11.88MB Threads=5
-Per-Host Resource Estimates: Memory=88.00MB
+Per-Host Resource Estimates: Memory=88MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -630,7 +630,7 @@ group by 1, 2
 having count(*) = 1
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=99.00MB Threads=7
-Per-Host Resource Estimates: Memory=227.12MB
+Per-Host Resource Estimates: Memory=227MB
 
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -701,7 +701,7 @@ Per-Host Resources: mem-estimate=81.00MB mem-reservation=5.00MB thread-reservati
    tuple-ids=0 row-size=8B cardinality=6001215
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=147.00MB Threads=9
-Per-Host Resource Estimates: Memory=363.00MB
+Per-Host Resource Estimates: Memory=363MB
 
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -867,7 +867,7 @@ from functional_parquet.alltypestiny
 group by string_col
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=68.01MB Threads=4
-Per-Host Resource Estimates: Memory=272.00MB
+Per-Host Resource Estimates: Memory=272MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypestiny
 
@@ -911,7 +911,7 @@ Per-Host Resources: mem-estimate=144.00MB mem-reservation=34.01MB thread-reserva
    tuple-ids=0 row-size=16B cardinality=unavailable
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=136.02MB Threads=5
-Per-Host Resource Estimates: Memory=544.00MB
+Per-Host Resource Estimates: Memory=544MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional_parquet.alltypestiny
 

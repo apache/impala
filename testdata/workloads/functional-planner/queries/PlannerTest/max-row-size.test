@@ -5,7 +5,7 @@ from tpch_parquet.customer
     inner join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=33.97MB Threads=5
-Per-Host Resource Estimates: Memory=57.94MB
+Per-Host Resource Estimates: Memory=58MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -57,7 +57,7 @@ from tpch_parquet.lineitem
     left join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=110.00MB Threads=5
-Per-Host Resource Estimates: Memory=420.41MB
+Per-Host Resource Estimates: Memory=420MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -106,7 +106,7 @@ select * from tpch_parquet.lineitem
 where l_orderkey not in (select o_orderkey from tpch_parquet.orders)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=78.00MB Threads=5
-Per-Host Resource Estimates: Memory=154.00MB
+Per-Host Resource Estimates: Memory=154MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -157,7 +157,7 @@ group by 1, 2
 having count(*) = 1
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=125.00MB Threads=7
-Per-Host Resource Estimates: Memory=253.12MB
+Per-Host Resource Estimates: Memory=253MB
 
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -278,7 +278,7 @@ from tpch_parquet.lineitem
 group by 1, 2
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=98.00MB Threads=4
-Per-Host Resource Estimates: Memory=482.91MB
+Per-Host Resource Estimates: Memory=483MB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -324,7 +324,7 @@ select max(tinyint_col) over(partition by int_col)
 from functional.alltypes
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=40.03MB Threads=4
-Per-Host Resource Estimates: Memory=56.00MB
+Per-Host Resource Estimates: Memory=56MB
 Codegen disabled by planner
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1

@@ -23,6 +23,8 @@ order by
   brand_id
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=29.88MB Threads=4
+Per-Host Resource Estimates: Memory=214MB
 PLAN-ROOT SINK
 |
 06:TOP-N [LIMIT=100]
@@ -49,9 +51,11 @@ PLAN-ROOT SINK
 |     predicates: item.i_manufact_id = 436
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=34.81MB Threads=9
+Per-Host Resource Estimates: Memory=235MB
 PLAN-ROOT SINK
 |
 12:MERGING-EXCHANGE [UNPARTITIONED]
@@ -94,9 +98,11 @@ PLAN-ROOT SINK
 |     predicates: item.i_manufact_id = 436
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=69.62MB Threads=11
+Per-Host Resource Estimates: Memory=166MB
 PLAN-ROOT SINK
 |
 12:MERGING-EXCHANGE [UNPARTITIONED]
@@ -147,7 +153,7 @@ PLAN-ROOT SINK
 |     predicates: item.i_manufact_id = 436
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
 ====
 # TPCDS-Q7
@@ -180,6 +186,8 @@ order by
   i_item_id
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=50.38MB Threads=6
+Per-Host Resource Estimates: Memory=434MB
 PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=100]
@@ -221,9 +229,11 @@ PLAN-ROOT SINK
 |     predicates: d_year = 1998
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_promo_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=54.31MB Threads=12
+Per-Host Resource Estimates: Memory=454MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -283,9 +293,11 @@ PLAN-ROOT SINK
 |     predicates: d_year = 1998
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_promo_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=108.62MB Threads=13
+Per-Host Resource Estimates: Memory=397MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -361,7 +373,7 @@ PLAN-ROOT SINK
 |     predicates: d_year = 1998
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_promo_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
 ====
 # TPCDS-Q8
@@ -434,6 +446,8 @@ order by
   s_store_name
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=33.32MB Threads=6
+Per-Host Resource Estimates: Memory=281MB
 PLAN-ROOT SINK
 |
 11:TOP-N [LIMIT=100]
@@ -482,9 +496,11 @@ PLAN-ROOT SINK
 |     runtime filters: RF000 -> substr(store.s_zip, 1, 2)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=90/1824 files=90 size=9.71MB
+   partitions=90/1824 files=90 size=10.32MB
    runtime filters: RF002 -> store_sales.ss_store_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=47.07MB Threads=13
+Per-Host Resource Estimates: Memory=327MB
 PLAN-ROOT SINK
 |
 20:MERGING-EXCHANGE [UNPARTITIONED]
@@ -557,9 +573,11 @@ PLAN-ROOT SINK
 |     runtime filters: RF000 -> substr(store.s_zip, 1, 2)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=90/1824 files=90 size=9.71MB
+   partitions=90/1824 files=90 size=10.32MB
    runtime filters: RF002 -> store_sales.ss_store_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=94.14MB Threads=15
+Per-Host Resource Estimates: Memory=285MB
 PLAN-ROOT SINK
 |
 20:MERGING-EXCHANGE [UNPARTITIONED]
@@ -648,7 +666,7 @@ PLAN-ROOT SINK
 |     runtime filters: RF000 -> substr(store.s_zip, 1, 2)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=90/1824 files=90 size=9.71MB
+   partitions=90/1824 files=90 size=10.32MB
    runtime filters: RF002 -> store_sales.ss_store_sk
 ====
 # TPCDS-Q19
@@ -689,6 +707,8 @@ order by
   i_manufact
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=43.32MB Threads=7
+Per-Host Resource Estimates: Memory=331MB
 PLAN-ROOT SINK
 |
 12:TOP-N [LIMIT=100]
@@ -731,7 +751,7 @@ PLAN-ROOT SINK
 |  |  |     predicates: i_manager_id = 7
 |  |  |
 |  |  01:SCAN HDFS [tpcds.store_sales]
-|  |     partitions=30/1824 files=30 size=9.93MB
+|  |     partitions=30/1824 files=30 size=10.55MB
 |  |     runtime filters: RF000 -> ss_store_sk, RF006 -> ss_sold_date_sk, RF008 -> ss_item_sk
 |  |
 |  03:SCAN HDFS [tpcds.customer]
@@ -742,6 +762,8 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=5.25MB
    runtime filters: RF002 -> ca_address_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=54.13MB Threads=16
+Per-Host Resource Estimates: Memory=358MB
 PLAN-ROOT SINK
 |
 22:MERGING-EXCHANGE [UNPARTITIONED]
@@ -815,9 +837,11 @@ PLAN-ROOT SINK
 |     predicates: i_manager_id = 7
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=30/1824 files=30 size=9.93MB
+   partitions=30/1824 files=30 size=10.55MB
    runtime filters: RF000 -> ss_store_sk, RF004 -> ss_customer_sk, RF006 -> ss_sold_date_sk, RF008 -> ss_item_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=108.27MB Threads=19
+Per-Host Resource Estimates: Memory=299MB
 PLAN-ROOT SINK
 |
 22:MERGING-EXCHANGE [UNPARTITIONED]
@@ -911,7 +935,7 @@ PLAN-ROOT SINK
 |     predicates: i_manager_id = 7
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=30/1824 files=30 size=9.93MB
+   partitions=30/1824 files=30 size=10.55MB
    runtime filters: RF000 -> ss_store_sk, RF004 -> ss_customer_sk, RF006 -> ss_sold_date_sk, RF008 -> ss_item_sk
 ====
 # TPCDS-Q27
@@ -946,6 +970,8 @@ order by
   s_state
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=50.32MB Threads=6
+Per-Host Resource Estimates: Memory=434MB
 PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=100]
@@ -987,9 +1013,11 @@ PLAN-ROOT SINK
 |     predicates: d_year = 1998
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=54.26MB Threads=12
+Per-Host Resource Estimates: Memory=454MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1049,9 +1077,11 @@ PLAN-ROOT SINK
 |     predicates: d_year = 1998
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=108.52MB Threads=13
+Per-Host Resource Estimates: Memory=397MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1127,7 +1157,7 @@ PLAN-ROOT SINK
 |     predicates: d_year = 1998
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
 ====
 # TPCDS-Q34
@@ -1175,6 +1205,8 @@ order by
   c_preferred_cust_flag desc
 limit 100000
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=34.07MB Threads=6
+Per-Host Resource Estimates: Memory=298MB
 PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=100000]
@@ -1214,13 +1246,15 @@ PLAN-ROOT SINK
 |  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
 |
 08:SCAN HDFS [tpcds.customer]
    partitions=1/1 files=1 size=12.60MB
    runtime filters: RF000 -> c_customer_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=56.01MB Threads=13
+Per-Host Resource Estimates: Memory=339MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1283,9 +1317,11 @@ PLAN-ROOT SINK
 |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=95.02MB Threads=15
+Per-Host Resource Estimates: Memory=276MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1364,7 +1400,7 @@ PLAN-ROOT SINK
 |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), (CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END) > 1.2
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
 ====
 # TPCDS-Q42
@@ -1394,6 +1430,8 @@ order by
   item.i_category
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=29.88MB Threads=4
+Per-Host Resource Estimates: Memory=214MB
 PLAN-ROOT SINK
 |
 06:TOP-N [LIMIT=100]
@@ -1420,9 +1458,11 @@ PLAN-ROOT SINK
 |     predicates: item.i_manager_id = 1
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=33.81MB Threads=8
+Per-Host Resource Estimates: Memory=234MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1463,9 +1503,11 @@ PLAN-ROOT SINK
 |     predicates: item.i_manager_id = 1
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=67.62MB Threads=9
+Per-Host Resource Estimates: Memory=164MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1514,7 +1556,7 @@ PLAN-ROOT SINK
 |     predicates: item.i_manager_id = 1
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
 ====
 # TPCDS-Q43
@@ -1552,6 +1594,8 @@ order by
   sat_sales
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=21.88MB Threads=4
+Per-Host Resource Estimates: Memory=214MB
 PLAN-ROOT SINK
 |
 06:TOP-N [LIMIT=100]
@@ -1578,9 +1622,11 @@ PLAN-ROOT SINK
 |     predicates: d_year = 1998
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=25.82MB Threads=8
+Per-Host Resource Estimates: Memory=234MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1621,9 +1667,11 @@ PLAN-ROOT SINK
 |     predicates: d_year = 1998
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=51.64MB Threads=9
+Per-Host Resource Estimates: Memory=164MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1672,7 +1720,7 @@ PLAN-ROOT SINK
 |     predicates: d_year = 1998
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
 ====
 # TPCDS-Q46
@@ -1727,6 +1775,8 @@ order by
   ss_ticket_number
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=84.06MB Threads=8
+Per-Host Resource Estimates: Memory=378MB
 PLAN-ROOT SINK
 |
 14:TOP-N [LIMIT=100]
@@ -1784,9 +1834,11 @@ PLAN-ROOT SINK
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=130.70MB Threads=17
+Per-Host Resource Estimates: Memory=442MB
 PLAN-ROOT SINK
 |
 24:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1868,9 +1920,11 @@ PLAN-ROOT SINK
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=259.52MB Threads=19
+Per-Host Resource Estimates: Memory=435MB
 PLAN-ROOT SINK
 |
 24:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1976,7 +2030,7 @@ PLAN-ROOT SINK
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
 ====
 # TPCDS-Q52
@@ -2005,6 +2059,8 @@ order by
   brand_id
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=29.88MB Threads=4
+Per-Host Resource Estimates: Memory=214MB
 PLAN-ROOT SINK
 |
 06:TOP-N [LIMIT=100]
@@ -2031,9 +2087,11 @@ PLAN-ROOT SINK
 |     predicates: item.i_manager_id = 1
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=33.81MB Threads=8
+Per-Host Resource Estimates: Memory=234MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2074,9 +2132,11 @@ PLAN-ROOT SINK
 |     predicates: item.i_manager_id = 1
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=67.62MB Threads=9
+Per-Host Resource Estimates: Memory=164MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2125,7 +2185,7 @@ PLAN-ROOT SINK
 |     predicates: item.i_manager_id = 1
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
 ====
 # TPCDS-Q53
@@ -2160,6 +2220,8 @@ order by
   i_manufact_id
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=32.82MB Threads=5
+Per-Host Resource Estimates: Memory=249MB
 PLAN-ROOT SINK
 |
 08:TOP-N [LIMIT=100]
@@ -2193,9 +2255,11 @@ PLAN-ROOT SINK
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=36.76MB Threads=10
+Per-Host Resource Estimates: Memory=269MB
 PLAN-ROOT SINK
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2245,9 +2309,11 @@ PLAN-ROOT SINK
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=73.52MB Threads=11
+Per-Host Resource Estimates: Memory=202MB
 PLAN-ROOT SINK
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2309,7 +2375,7 @@ PLAN-ROOT SINK
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'reference', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ====
 # TPCDS-Q55
@@ -2335,6 +2401,8 @@ order by
   i_brand_id
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=29.88MB Threads=4
+Per-Host Resource Estimates: Memory=214MB
 PLAN-ROOT SINK
 |
 06:TOP-N [LIMIT=100]
@@ -2361,9 +2429,11 @@ PLAN-ROOT SINK
 |     predicates: i_manager_id = 36
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=33.81MB Threads=8
+Per-Host Resource Estimates: Memory=234MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2404,9 +2474,11 @@ PLAN-ROOT SINK
 |     predicates: i_manager_id = 36
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=67.62MB Threads=9
+Per-Host Resource Estimates: Memory=164MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2455,7 +2527,7 @@ PLAN-ROOT SINK
 |     predicates: i_manager_id = 36
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
 ====
 # TPCDS-Q59
@@ -2541,6 +2613,8 @@ order by
   d_week_seq1
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=74.27MB Threads=9
+Per-Host Resource Estimates: Memory=537MB
 PLAN-ROOT SINK
 |
 17:TOP-N [LIMIT=100]
@@ -2578,7 +2652,7 @@ PLAN-ROOT SINK
 |  |     runtime filters: RF012 -> tpcds.date_dim.d_week_seq
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> tpcds.store_sales.ss_store_sk, RF014 -> ss_sold_date_sk
 |
 07:HASH JOIN [INNER JOIN]
@@ -2611,9 +2685,11 @@ PLAN-ROOT SINK
 |     runtime filters: RF000 -> tpcds.date_dim.d_week_seq, RF006 -> tpcds.date_dim.d_week_seq
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> tpcds.store_sales.ss_store_sk, RF008 -> ss_sold_date_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=106.89MB Threads=20
+Per-Host Resource Estimates: Memory=589MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2669,7 +2745,7 @@ PLAN-ROOT SINK
 |  |     runtime filters: RF012 -> tpcds.date_dim.d_week_seq
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> tpcds.store_sales.ss_store_sk, RF014 -> ss_sold_date_sk
 |
 28:EXCHANGE [HASH(d_week_seq,s_store_id)]
@@ -2716,9 +2792,11 @@ PLAN-ROOT SINK
 |     runtime filters: RF000 -> tpcds.date_dim.d_week_seq, RF006 -> tpcds.date_dim.d_week_seq
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> tpcds.store_sales.ss_store_sk, RF008 -> ss_sold_date_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=210.03MB Threads=23
+Per-Host Resource Estimates: Memory=470MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2790,7 +2868,7 @@ PLAN-ROOT SINK
 |  |     runtime filters: RF012 -> tpcds.date_dim.d_week_seq
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> tpcds.store_sales.ss_store_sk, RF014 -> ss_sold_date_sk
 |
 28:EXCHANGE [HASH(d_week_seq,s_store_id)]
@@ -2849,7 +2927,7 @@ PLAN-ROOT SINK
 |     runtime filters: RF000 -> tpcds.date_dim.d_week_seq, RF006 -> tpcds.date_dim.d_week_seq
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> tpcds.store_sales.ss_store_sk, RF008 -> ss_sold_date_sk
 ====
 # TPCDS-Q63
@@ -2889,6 +2967,8 @@ order by
   sum_sales
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=29.32MB Threads=5
+Per-Host Resource Estimates: Memory=253MB
 PLAN-ROOT SINK
 |
 11:TOP-N [LIMIT=100]
@@ -2932,9 +3012,11 @@ PLAN-ROOT SINK
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'refernece', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=364/1824 files=364 size=62.92MB
+   partitions=364/1824 files=364 size=66.85MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=39.26MB Threads=10
+Per-Host Resource Estimates: Memory=279MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2994,9 +3076,11 @@ PLAN-ROOT SINK
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'refernece', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=364/1824 files=364 size=62.92MB
+   partitions=364/1824 files=364 size=66.85MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=78.52MB Threads=11
+Per-Host Resource Estimates: Memory=222MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3068,7 +3152,7 @@ PLAN-ROOT SINK
 |     predicates: ((i_category IN ('Books', 'Children', 'Electronics') AND i_class IN ('personal', 'portable', 'refernece', 'self-help') AND i_brand IN ('scholaramalgamalg #14', 'scholaramalgamalg #7', 'exportiunivamalg #9', 'scholaramalgamalg #9')) OR (i_category IN ('Women', 'Music', 'Men') AND i_class IN ('accessories', 'classical', 'fragrances', 'pants') AND i_brand IN ('amalgimporto #1', 'edu packscholar #1', 'exportiimporto #1', 'importoamalg #1')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=364/1824 files=364 size=62.92MB
+   partitions=364/1824 files=364 size=66.85MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ====
 # TPCDS-Q65
@@ -3127,6 +3211,8 @@ order by
   i_item_desc
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=55.57MB Threads=7
+Per-Host Resource Estimates: Memory=432MB
 PLAN-ROOT SINK
 |
 14:TOP-N [LIMIT=100]
@@ -3154,7 +3240,7 @@ PLAN-ROOT SINK
 |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |
 |  02:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF008 -> ss_sold_date_sk
 |
 12:HASH JOIN [INNER JOIN]
@@ -3185,9 +3271,11 @@ PLAN-ROOT SINK
 |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |
 07:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_store_sk, RF002 -> tpcds.store_sales.ss_item_sk, RF004 -> tpcds.store_sales.ss_store_sk, RF006 -> ss_sold_date_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=76.51MB Threads=17
+Per-Host Resource Estimates: Memory=495MB
 PLAN-ROOT SINK
 |
 27:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3235,7 +3323,7 @@ PLAN-ROOT SINK
 |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |
 |  02:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF008 -> ss_sold_date_sk
 |
 12:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -3280,9 +3368,11 @@ PLAN-ROOT SINK
 |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |
 07:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_store_sk, RF002 -> tpcds.store_sales.ss_item_sk, RF004 -> tpcds.store_sales.ss_store_sk, RF006 -> ss_sold_date_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=153.02MB Threads=21
+Per-Host Resource Estimates: Memory=381MB
 PLAN-ROOT SINK
 |
 27:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3338,7 +3428,7 @@ PLAN-ROOT SINK
 |  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |  |
 |  02:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF008 -> ss_sold_date_sk
 |
 12:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -3395,7 +3485,7 @@ PLAN-ROOT SINK
 |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
 |
 07:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_store_sk, RF002 -> tpcds.store_sales.ss_item_sk, RF004 -> tpcds.store_sales.ss_store_sk, RF006 -> ss_sold_date_sk
 ====
 # TPCDS-Q68
@@ -3448,6 +3538,8 @@ order by
   ss_ticket_number
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=84.06MB Threads=8
+Per-Host Resource Estimates: Memory=378MB
 PLAN-ROOT SINK
 |
 14:TOP-N [LIMIT=100]
@@ -3505,9 +3597,11 @@ PLAN-ROOT SINK
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=136.32MB Threads=16
+Per-Host Resource Estimates: Memory=511MB
 PLAN-ROOT SINK
 |
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3587,9 +3681,11 @@ PLAN-ROOT SINK
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=272.64MB Threads=17
+Per-Host Resource Estimates: Memory=574MB
 PLAN-ROOT SINK
 |
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3693,7 +3789,7 @@ PLAN-ROOT SINK
 |     predicates: (household_demographics.hd_dep_count = 5 OR household_demographics.hd_vehicle_count = 3)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
 ====
 # TPCDS-Q73
@@ -3735,6 +3831,8 @@ order by
   cnt desc
 limit 1000
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=34.07MB Threads=6
+Per-Host Resource Estimates: Memory=298MB
 PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=1000]
@@ -3773,13 +3871,15 @@ PLAN-ROOT SINK
 |  |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
 |
 08:SCAN HDFS [tpcds.customer]
    partitions=1/1 files=1 size=12.60MB
    runtime filters: RF000 -> c_customer_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=61.82MB Threads=13
+Per-Host Resource Estimates: Memory=336MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3841,9 +3941,11 @@ PLAN-ROOT SINK
 |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=106.64MB Threads=15
+Per-Host Resource Estimates: Memory=271MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3921,7 +4023,7 @@ PLAN-ROOT SINK
 |     predicates: household_demographics.hd_vehicle_count > 0, household_demographics.hd_buy_potential IN ('>10000', 'unknown'), CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
 ====
 # TPCDS-Q79
@@ -3968,6 +4070,8 @@ order by
   profit
 limit 100
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=34.07MB Threads=6
+Per-Host Resource Estimates: Memory=298MB
 PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=100]
@@ -4006,13 +4110,15 @@ PLAN-ROOT SINK
 |  |     predicates: (household_demographics.hd_dep_count = 8 OR household_demographics.hd_vehicle_count > 0)
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF002 -> store_sales.ss_sold_date_sk, RF004 -> store_sales.ss_store_sk, RF006 -> store_sales.ss_hdemo_sk
 |
 08:SCAN HDFS [tpcds.customer]
    partitions=1/1 files=1 size=12.60MB
    runtime filters: RF000 -> c_customer_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=53.32MB Threads=13
+Per-Host Resource Estimates: Memory=327MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4074,9 +4180,11 @@ PLAN-ROOT SINK
 |     predicates: (household_demographics.hd_dep_count = 8 OR household_demographics.hd_vehicle_count > 0)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_sold_date_sk, RF004 -> store_sales.ss_store_sk, RF006 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=99.14MB Threads=15
+Per-Host Resource Estimates: Memory=263MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4154,7 +4262,7 @@ PLAN-ROOT SINK
 |     predicates: (household_demographics.hd_dep_count = 8 OR household_demographics.hd_vehicle_count > 0)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_sold_date_sk, RF004 -> store_sales.ss_store_sk, RF006 -> store_sales.ss_hdemo_sk
 ====
 # TPCDS-Q89
@@ -4184,6 +4292,8 @@ where case when (avg_monthly_sales <> 0) then (abs(sum_sales - avg_monthly_sales
 order by sum_sales - avg_monthly_sales, s_store_name
 limit 100) tmp2
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=36.82MB Threads=5
+Per-Host Resource Estimates: Memory=253MB
 PLAN-ROOT SINK
 |
 11:TOP-N [LIMIT=100]
@@ -4227,9 +4337,11 @@ PLAN-ROOT SINK
 |     predicates: ((i_category IN ('Children', 'Music', 'Home') AND i_class IN ('toddlers', 'pop', 'lighting')) OR (i_category IN ('Jewelry', 'Books', 'Sports') AND i_class IN ('costume', 'travel', 'football')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=54.70MB Threads=10
+Per-Host Resource Estimates: Memory=285MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4289,9 +4401,11 @@ PLAN-ROOT SINK
 |     predicates: ((i_category IN ('Children', 'Music', 'Home') AND i_class IN ('toddlers', 'pop', 'lighting')) OR (i_category IN ('Jewelry', 'Books', 'Sports') AND i_class IN ('costume', 'travel', 'football')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=109.39MB Threads=11
+Per-Host Resource Estimates: Memory=234MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4363,7 +4477,7 @@ PLAN-ROOT SINK
 |     predicates: ((i_category IN ('Children', 'Music', 'Home') AND i_class IN ('toddlers', 'pop', 'lighting')) OR (i_category IN ('Jewelry', 'Books', 'Sports') AND i_class IN ('costume', 'travel', 'football')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ====
 # TPCDS-Q96
@@ -4382,6 +4496,8 @@ WHERE
   AND hd.hd_dep_count = 5
   AND s.s_store_name = 'ese'
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=25.07MB Threads=5
+Per-Host Resource Estimates: Memory=233MB
 PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
@@ -4412,9 +4528,11 @@ PLAN-ROOT SINK
 |     predicates: td.t_hour = 8, td.t_minute >= 30
 |
 00:SCAN HDFS [tpcds.store_sales ss]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss.ss_store_sk, RF002 -> ss.ss_hdemo_sk, RF004 -> ss.ss_sold_time_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=25.07MB Threads=9
+Per-Host Resource Estimates: Memory=253MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -4456,9 +4574,11 @@ PLAN-ROOT SINK
 |     predicates: td.t_hour = 8, td.t_minute >= 30
 |
 00:SCAN HDFS [tpcds.store_sales ss]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss.ss_store_sk, RF002 -> ss.ss_hdemo_sk, RF004 -> ss.ss_sold_time_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=50.14MB Threads=9
+Per-Host Resource Estimates: Memory=176MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -4512,7 +4632,7 @@ PLAN-ROOT SINK
 |     predicates: td.t_hour = 8, td.t_minute >= 30
 |
 00:SCAN HDFS [tpcds.store_sales ss]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss.ss_store_sk, RF002 -> ss.ss_hdemo_sk, RF004 -> ss.ss_sold_time_sk
 ====
 # TPCDS-Q98
@@ -4547,6 +4667,8 @@ order by
   revenueratio
 limit 1000
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=26.50MB Threads=4
+Per-Host Resource Estimates: Memory=218MB
 PLAN-ROOT SINK
 |
 08:TOP-N [LIMIT=1000]
@@ -4576,7 +4698,7 @@ PLAN-ROOT SINK
 |  runtime filters: RF002 <- ss_item_sk
 |
 |--00:SCAN HDFS [tpcds.store_sales]
-|     partitions=31/1824 files=31 size=3.43MB
+|     partitions=31/1824 files=31 size=3.64MB
 |     runtime filters: RF000 -> ss_sold_date_sk
 |
 01:SCAN HDFS [tpcds.item]
@@ -4584,6 +4706,8 @@ PLAN-ROOT SINK
    predicates: i_category IN ('Jewelry', 'Sports', 'Books')
    runtime filters: RF002 -> i_item_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=58.81MB Threads=9
+Per-Host Resource Estimates: Memory=253MB
 PLAN-ROOT SINK
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4633,9 +4757,11 @@ PLAN-ROOT SINK
 09:EXCHANGE [HASH(ss_item_sk)]
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=31/1824 files=31 size=3.43MB
+   partitions=31/1824 files=31 size=3.64MB
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=115.75MB Threads=11
+Per-Host Resource Estimates: Memory=200MB
 PLAN-ROOT SINK
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4693,7 +4819,7 @@ PLAN-ROOT SINK
 09:EXCHANGE [HASH(ss_item_sk)]
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=31/1824 files=31 size=3.43MB
+   partitions=31/1824 files=31 size=3.64MB
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
 ====
 # TPCD-Q6
@@ -4723,6 +4849,8 @@ select * from (
  having count(*) >= 10
  order by cnt limit 100) as t
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=74.56MB Threads=8
+Per-Host Resource Estimates: Memory=403MB
 PLAN-ROOT SINK
 |
 16:TOP-N [LIMIT=100]
@@ -4789,9 +4917,11 @@ PLAN-ROOT SINK
 |     runtime filters: RF008 -> c.c_current_addr_sk
 |
 02:SCAN HDFS [tpcds.store_sales s]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> s.ss_item_sk, RF006 -> s.ss_sold_date_sk, RF010 -> s.ss_customer_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=89.38MB Threads=19
+Per-Host Resource Estimates: Memory=450MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4894,9 +5024,11 @@ PLAN-ROOT SINK
 |     runtime filters: RF008 -> c.c_current_addr_sk
 |
 02:SCAN HDFS [tpcds.store_sales s]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> s.ss_item_sk, RF006 -> s.ss_sold_date_sk, RF010 -> s.ss_customer_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=178.75MB Threads=22
+Per-Host Resource Estimates: Memory=435MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5023,7 +5155,7 @@ PLAN-ROOT SINK
 |     runtime filters: RF008 -> c.c_current_addr_sk
 |
 02:SCAN HDFS [tpcds.store_sales s]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> s.ss_item_sk, RF006 -> s.ss_sold_date_sk, RF010 -> s.ss_customer_sk
 ====
 # TPCDS-Q47
@@ -5077,6 +5209,8 @@ with v1 as (
  limit 100
  ) as v3
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=171.25MB Threads=13
+Per-Host Resource Estimates: Memory=765MB
 PLAN-ROOT SINK
 |
 35:TOP-N [LIMIT=100]
@@ -5121,7 +5255,7 @@ PLAN-ROOT SINK
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF012 -> ss_store_sk, RF014 -> ss_item_sk, RF016 -> ss_sold_date_sk
 |
 33:HASH JOIN [INNER JOIN]
@@ -5173,7 +5307,7 @@ PLAN-ROOT SINK
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |
 |  01:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF006 -> ss_store_sk, RF008 -> ss_item_sk, RF010 -> ss_sold_date_sk
 |
 22:ANALYTIC
@@ -5212,9 +5346,11 @@ PLAN-ROOT SINK
 |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |
 14:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=393.21MB Threads=29
+Per-Host Resource Estimates: Memory=1.33GB
 PLAN-ROOT SINK
 |
 54:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5277,7 +5413,7 @@ PLAN-ROOT SINK
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF012 -> ss_store_sk, RF014 -> ss_item_sk, RF016 -> ss_sold_date_sk
 |
 52:EXCHANGE [HASH(rank(),s_store_name,i_category,s_company_name,i_brand)]
@@ -5345,7 +5481,7 @@ PLAN-ROOT SINK
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |
 |  01:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF006 -> ss_store_sk, RF008 -> ss_item_sk, RF010 -> ss_sold_date_sk
 |
 22:ANALYTIC
@@ -5396,9 +5532,11 @@ PLAN-ROOT SINK
 |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |
 14:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=752.42MB Threads=33
+Per-Host Resource Estimates: Memory=1.33GB
 PLAN-ROOT SINK
 |
 54:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5477,7 +5615,7 @@ PLAN-ROOT SINK
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF012 -> ss_store_sk, RF014 -> ss_item_sk, RF016 -> ss_sold_date_sk
 |
 52:EXCHANGE [HASH(rank(),s_store_name,i_category,s_company_name,i_brand)]
@@ -5561,7 +5699,7 @@ PLAN-ROOT SINK
 |  |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |  |
 |  01:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF006 -> ss_store_sk, RF008 -> ss_item_sk, RF010 -> ss_sold_date_sk
 |
 22:ANALYTIC
@@ -5624,7 +5762,7 @@ PLAN-ROOT SINK
 |     predicates: (d_year = 2000 OR (d_year = 1999 AND d_moy = 12) OR (d_year = 2001 AND d_moy = 1))
 |
 14:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
 ====
 # TPCDS-Q66
@@ -5669,6 +5807,8 @@ from
    and   d_moy  = 11) all_sales
 order by promotions, total
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=111.39MB Threads=14
+Per-Host Resource Estimates: Memory=703MB
 PLAN-ROOT SINK
 |
 27:SORT
@@ -5719,7 +5859,7 @@ PLAN-ROOT SINK
 |  |     predicates: d_year = 2000, d_moy = 11
 |  |
 |  14:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF020 -> ss_sold_date_sk, RF018 -> ss_item_sk, RF014 -> ss_customer_sk
 |
 13:AGGREGATE [FINALIZE]
@@ -5774,9 +5914,11 @@ PLAN-ROOT SINK
 |     predicates: d_year = 2000, d_moy = 11
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF010 -> ss_sold_date_sk, RF008 -> ss_item_sk, RF006 -> ss_promo_sk, RF002 -> ss_customer_sk, RF004 -> ss_store_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=121.39MB Threads=30
+Per-Host Resource Estimates: Memory=753MB
 PLAN-ROOT SINK
 |
 27:SORT
@@ -5846,7 +5988,7 @@ PLAN-ROOT SINK
 |  |     predicates: d_year = 2000, d_moy = 11
 |  |
 |  14:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF020 -> ss_sold_date_sk, RF018 -> ss_item_sk, RF014 -> ss_customer_sk
 |
 36:AGGREGATE [FINALIZE]
@@ -5920,9 +6062,11 @@ PLAN-ROOT SINK
 |     predicates: d_year = 2000, d_moy = 11
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF010 -> ss_sold_date_sk, RF008 -> ss_item_sk, RF006 -> ss_promo_sk, RF002 -> ss_customer_sk, RF004 -> ss_store_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=236.78MB Threads=32
+Per-Host Resource Estimates: Memory=617MB
 PLAN-ROOT SINK
 |
 27:SORT
@@ -6016,7 +6160,7 @@ PLAN-ROOT SINK
 |  |     predicates: d_year = 2000, d_moy = 11
 |  |
 |  14:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF020 -> ss_sold_date_sk, RF018 -> ss_item_sk, RF014 -> ss_customer_sk
 |
 36:AGGREGATE [FINALIZE]
@@ -6114,7 +6258,7 @@ PLAN-ROOT SINK
 |     predicates: d_year = 2000, d_moy = 11
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF010 -> ss_sold_date_sk, RF008 -> ss_item_sk, RF006 -> ss_promo_sk, RF002 -> ss_customer_sk, RF004 -> ss_store_sk
 ====
 # TPCDS-Q88
@@ -6209,6 +6353,8 @@ from
           (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2))
      and store.s_store_name = 'ese') s8
 ---- PLAN
+Max Per-Host Resource Reservation: Memory=186.56MB Threads=33
+Per-Host Resource Estimates: Memory=1.81GB
 PLAN-ROOT SINK
 |
 70:NESTED LOOP JOIN [CROSS JOIN]
@@ -6239,7 +6385,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 12, time_dim.t_minute < 30
 |  |
 |  56:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF046 -> ss_sold_time_sk
 |
 69:NESTED LOOP JOIN [CROSS JOIN]
@@ -6270,7 +6416,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute >= 30
 |  |
 |  48:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF040 -> ss_sold_time_sk
 |
 68:NESTED LOOP JOIN [CROSS JOIN]
@@ -6301,7 +6447,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute < 30
 |  |
 |  40:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF034 -> ss_sold_time_sk
 |
 67:NESTED LOOP JOIN [CROSS JOIN]
@@ -6332,7 +6478,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute >= 30
 |  |
 |  32:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF028 -> ss_sold_time_sk
 |
 66:NESTED LOOP JOIN [CROSS JOIN]
@@ -6363,7 +6509,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute < 30
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF022 -> ss_sold_time_sk
 |
 65:NESTED LOOP JOIN [CROSS JOIN]
@@ -6394,7 +6540,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute >= 30
 |  |
 |  16:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF016 -> ss_sold_time_sk
 |
 64:NESTED LOOP JOIN [CROSS JOIN]
@@ -6426,7 +6572,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute < 30
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> ss_sold_time_sk, RF008 -> ss_hdemo_sk
 |
 07:AGGREGATE [FINALIZE]
@@ -6456,9 +6602,11 @@ PLAN-ROOT SINK
 |     predicates: time_dim.t_hour = 8, time_dim.t_minute >= 30
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> ss_sold_time_sk, RF002 -> ss_hdemo_sk
 ---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=186.56MB Threads=72
+Per-Host Resource Estimates: Memory=1.96GB
 PLAN-ROOT SINK
 |
 70:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -6502,7 +6650,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 12, time_dim.t_minute < 30
 |  |
 |  56:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF046 -> ss_sold_time_sk
 |
 69:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -6546,7 +6694,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute >= 30
 |  |
 |  48:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF040 -> ss_sold_time_sk
 |
 68:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -6590,7 +6738,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute < 30
 |  |
 |  40:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF034 -> ss_sold_time_sk
 |
 67:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -6634,7 +6782,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute >= 30
 |  |
 |  32:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF028 -> ss_sold_time_sk
 |
 66:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -6678,7 +6826,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute < 30
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF022 -> ss_sold_time_sk
 |
 65:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -6722,7 +6870,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute >= 30
 |  |
 |  16:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF016 -> ss_sold_time_sk
 |
 64:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -6767,7 +6915,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute < 30
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> ss_sold_time_sk, RF008 -> ss_hdemo_sk
 |
 75:AGGREGATE [FINALIZE]
@@ -6808,9 +6956,11 @@ PLAN-ROOT SINK
 |     predicates: time_dim.t_hour = 8, time_dim.t_minute >= 30
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> ss_sold_time_sk, RF002 -> ss_hdemo_sk
 ---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=373.12MB Threads=72
+Per-Host Resource Estimates: Memory=1.34GB
 PLAN-ROOT SINK
 |
 70:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -6870,7 +7020,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 12, time_dim.t_minute < 30
 |  |
 |  56:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF046 -> ss_sold_time_sk
 |
 69:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -6930,7 +7080,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute >= 30
 |  |
 |  48:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF040 -> ss_sold_time_sk
 |
 68:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -6990,7 +7140,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 11, time_dim.t_minute < 30
 |  |
 |  40:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF034 -> ss_sold_time_sk
 |
 67:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -7050,7 +7200,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute >= 30
 |  |
 |  32:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF028 -> ss_sold_time_sk
 |
 66:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -7110,7 +7260,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 10, time_dim.t_minute < 30
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF022 -> ss_sold_time_sk
 |
 65:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -7170,7 +7320,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute >= 30
 |  |
 |  16:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF016 -> ss_sold_time_sk
 |
 64:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -7231,7 +7381,7 @@ PLAN-ROOT SINK
 |  |     predicates: time_dim.t_hour = 9, time_dim.t_minute < 30
 |  |
 |  08:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=326.32MB
+|     partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF010 -> ss_sold_time_sk, RF008 -> ss_hdemo_sk
 |
 75:AGGREGATE [FINALIZE]
@@ -7284,6 +7434,6 @@ PLAN-ROOT SINK
 |     predicates: time_dim.t_hour = 8, time_dim.t_minute >= 30
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=326.32MB
+   partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF004 -> ss_sold_time_sk, RF002 -> ss_hdemo_sk
 ====

@@ -23,7 +23,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -58,7 +57,6 @@ import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.THdfsScanNode;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TLineageGraph;
-import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
 import org.apache.impala.thrift.TPlanNode;
@@ -522,9 +520,8 @@ public class PlannerTestBase extends FrontendTestBase {
     if (execRequest == null) return null;
 
     String explainStr = explainBuilder.toString();
-    if (!testOptions.contains(PlannerTestOption.INCLUDE_EXPLAIN_HEADER)) {
-      explainStr = removeExplainHeader(explainStr);
-    }
+    explainStr = removeExplainHeader(explainBuilder.toString(), testOptions);
+
     actualOutput.append(explainStr);
     LOG.info(section.toString() + ":" + explainStr);
     if (expectedErrorMsg != null) {
@@ -569,8 +566,8 @@ public class PlannerTestBase extends FrontendTestBase {
       queryCtx.client_request.getQuery_options().setExplain_level(origExplainLevel);
     }
     Preconditions.checkNotNull(execRequest);
-    String explainStr = removeExplainHeader(explainBuilder.toString());
-    return explainStr;
+    return removeExplainHeader(
+        explainBuilder.toString(), Collections.<PlannerTestOption>emptySet());
   }
 
   private void checkScanRangeLocations(TestCase testCase, TExecRequest execRequest,
@@ -747,20 +744,28 @@ public class PlannerTestBase extends FrontendTestBase {
   }
 
   /**
-   * Strips out the header containing resource estimates and the warning about missing
-   * stats from the given explain plan, because the estimates can change easily with
-   * stats/cardinality.
+   * If required by 'testOptions', strip out all or part of the the header containing
+   * resource estimates and the warning about missing stats from the given explain plan.
    */
-  private String removeExplainHeader(String explain) {
-    String[] lines = explain.split("\n");
-    // Find the first empty line - the end of the header.
-    for (int i = 0; i < lines.length - 1; ++i) {
-      if (lines[i].isEmpty()) {
-        return Joiner.on("\n").join(Arrays.copyOfRange(lines, i + 1 , lines.length))
-            + "\n";
+  private String removeExplainHeader(String explain, Set<PlannerTestOption> testOptions) {
+    if (testOptions.contains(PlannerTestOption.INCLUDE_EXPLAIN_HEADER)) return explain;
+    boolean keepResources =
+        testOptions.contains(PlannerTestOption.INCLUDE_RESOURCE_HEADER);
+    StringBuilder builder = new StringBuilder();
+    boolean inHeader = true;
+    for (String line: explain.split("\n")) {
+      if (inHeader) {
+        // The first empty line indicates the end of the header.
+        if (line.isEmpty()) {
+          inHeader = false;
+        } else if (keepResources && line.contains("Resource")) {
+          builder.append(line).append("\n");
+        }
+      } else {
+        builder.append(line).append("\n");
       }
     }
-    return explain;
+    return builder.toString();
   }
 
   /**
@@ -772,8 +777,12 @@ public class PlannerTestBase extends FrontendTestBase {
     EXTENDED_EXPLAIN,
     // Include the header of the explain plan (default is to strip the explain header).
     INCLUDE_EXPLAIN_HEADER,
-    // Validate the values of resource requirements (default is to ignore differences
-    // in resource values).
+    // Include the part of the explain header that has top-level resource consumption.
+    // If INCLUDE_EXPLAIN_HEADER is enabled, these are already included.
+    INCLUDE_RESOURCE_HEADER,
+    // Validate the values of resource requirement values within the plan (default is to
+    // ignore differences in resource values). Operator- and fragment-level resource
+    // requirements are only included if EXTENDED_EXPLAIN is also enabled.
     VALIDATE_RESOURCES,
   }
 
@@ -790,6 +799,11 @@ public class PlannerTestBase extends FrontendTestBase {
   protected void runPlannerTestFile(
       String testFile, Set<PlannerTestOption> testOptions) {
     runPlannerTestFile(testFile, "default", defaultQueryOptions(), testOptions);
+  }
+
+  protected void runPlannerTestFile(
+      String testFile, String dbName, Set<PlannerTestOption> testOptions) {
+    runPlannerTestFile(testFile, dbName, defaultQueryOptions(), testOptions);
   }
 
   private void runPlannerTestFile(String testFile, String dbName, TQueryOptions options,
