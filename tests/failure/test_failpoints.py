@@ -136,6 +136,16 @@ class TestFailpoints(ImpalaTestSuite):
         node_ids.append(int(match.group('node_id')))
     return node_ids
 
+  def test_lifecycle_failures(self):
+    """Test that targeted failure injections in the query lifecycle do not cause crashes
+    or hangs"""
+    query = "select * from tpch.lineitem limit 10000"
+
+    # Fail the Prepare() phase of all fragment instances.
+    debug_action = 'FIS_IN_PREPARE:FAIL@1.0'
+    self.execute_query_expect_failure(self.client, query,
+        query_options={'debug_action':debug_action})
+
   def __execute_fail_action(self, query, vector):
     try:
       self.execute_query(query, vector.get_value('exec_option'),
