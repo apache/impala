@@ -22,12 +22,9 @@ import java.util.Set;
 import org.apache.sentry.core.common.exception.SentryAccessDeniedException;
 import org.apache.sentry.core.common.exception.SentryAlreadyExistsException;
 import org.apache.sentry.core.common.exception.SentryGroupNotFoundException;
-import org.apache.sentry.provider.db.service.thrift.SentryPolicyServiceClient;
-import org.apache.sentry.provider.db.service.thrift.TSentryRole;
-// See IMPALA-5540. Sentry over-shades itself (to avoid leaking Thrift),
-// causing this unusual package name. In the code below, we typically
-// check for either variant when it's available in the classpath.
-import sentry.org.apache.sentry.core.common.exception.SentryUserException;
+import org.apache.sentry.api.service.thrift.SentryPolicyServiceClient;
+import org.apache.sentry.api.service.thrift.TSentryRole;
+import org.apache.sentry.core.common.exception.SentryUserException;
 
 /**
  * Wrapper to facilitate differences in Sentry APIs across Sentry versions.
