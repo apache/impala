@@ -51,7 +51,7 @@
 </property>
 <property>
  <name>sentry.store.jdbc.url</name>
- <value>jdbc:postgresql://localhost:5432/sentry_policy/;create=true</value>
+ <value>jdbc:postgresql://localhost:5432/${SENTRY_POLICY_DB}/;create=true</value>
 </property>
 <property>
  <name>sentry.store.jdbc.user</name>

@@ -105,8 +105,8 @@ fi
 
 if [ $CREATE_SENTRY_POLICY_DB -eq 1 ]; then
   echo "Creating Sentry Policy Server DB"
-  dropdb -U hiveuser sentry_policy 2> /dev/null || true
-  createdb -U hiveuser sentry_policy
+  dropdb -U hiveuser $SENTRY_POLICY_DB 2> /dev/null || true
+  createdb -U hiveuser $SENTRY_POLICY_DB
 fi
 
 # Perform search-replace on $1, output to $2.

@@ -319,7 +319,9 @@ export ISILON_NAMENODE="${ISILON_NAMENODE-}"
 export DEFAULT_FS="${DEFAULT_FS-hdfs://localhost:20500}"
 export WAREHOUSE_LOCATION_PREFIX="${WAREHOUSE_LOCATION_PREFIX-}"
 export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
-export METASTORE_DB="hive_impala"
+ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
+export METASTORE_DB=${METASTORE_DB-$(cut -c-63 <<< HMS$ESCAPED_IMPALA_HOME)}
+export SENTRY_POLICY_DB=${SENTRY_POLICY_DB-$(cut -c-63 <<< SP$ESCAPED_IMPALA_HOME)}
 
 # Environment variables carrying AWS security credentials are prepared
 # according to the following rules:
