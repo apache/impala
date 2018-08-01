@@ -65,7 +65,8 @@ can do so through the environment variables and scripts listed below.
 | IMPALA_HOME          |               | Top level Impala directory |
 | IMPALA_TOOLCHAIN     | "${IMPALA_HOME}/toolchain" | Native toolchain directory (for compilers, libraries, etc.) |
 | SKIP_TOOLCHAIN_BOOTSTRAP | "false" | Skips downloading the toolchain any python dependencies if "true" |
-| CDH_COMPONENTS_HOME | "${IMPALA_HOME}/toolchain/cdh_components" OR "${IMPALA_HOME}/thirdparty" (if detected) | If a thirdparty directory is present, components found here will override anything in IMPALA_TOOLCHAIN. |
+| CDH_BUILD_NUMBER | | Identifier to indicate the CDH build number
+| CDH_COMPONENTS_HOME | "${IMPALA_HOME}/toolchain/cdh_components-${CDH_BUILD_NUMBER}" OR "${IMPALA_HOME}/thirdparty" (if detected) | If a thirdparty directory is present, components found here will override anything in IMPALA_TOOLCHAIN. |
 | CDH_MAJOR_VERSION | "5" | Identifier used to uniqueify paths for potentially incompatible component builds. |
 | IMPALA_CONFIG_SOURCED | "1" |  Set by ${IMPALA_HOME}/bin/impala-config.sh (internal use) |
 | JAVA_HOME | "/usr/lib/jvm/${JAVA_VERSION}" | Used to locate Java |

@@ -475,7 +475,7 @@ export PATH="$IMPALA_HOME/bin:$IMPALA_TOOLCHAIN/cmake-$IMPALA_CMAKE_VERSION/bin/
 
 # The directory in which all the thirdparty CDH components live.
 if [ "${DOWNLOAD_CDH_COMPONENTS}" = true ]; then
-  export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components"
+  export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components-$CDH_BUILD_NUMBER"
 else
   export CDH_COMPONENTS_HOME="$IMPALA_HOME/thirdparty"
 fi

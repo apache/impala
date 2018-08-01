@@ -13,6 +13,7 @@ org.eclipse.jdt.ui.prefs
 load-*-generated.sql
 bin/version.info
 bin/impala-config-local.sh
+.cdh
 
 # distcc options
 .impala_compiler_opts
