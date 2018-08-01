@@ -35,6 +35,7 @@ class TestWebPage(ImpalaTestSuite):
   QUERY_FINSTANCES_URL = "http://localhost:{0}/query_finstances"
   RPCZ_URL = "http://localhost:{0}/rpcz"
   THREAD_GROUP_URL = "http://localhost:{0}/thread-group"
+  METRICS_URL = "http://localhost:{0}/metrics"
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
   # log level endpoints, one without the statestore port and the
@@ -77,12 +78,24 @@ class TestWebPage(ImpalaTestSuite):
   def get_debug_page(self, page_url):
     """Returns the content of the debug page 'page_url' as json."""
     response = self.get_and_check_status(page_url + "?json", ports_to_test=[25000])
+    assert "application/json" in response.headers['Content-Type']
     return json.loads(response)
 
   def get_and_check_status_jvm(self, url, string_to_search = ""):
     """Calls get_and_check_status() for impalad and catalogd only"""
     return self.get_and_check_status(url, string_to_search,
                                      ports_to_test=self.TEST_PORTS_WITHOUT_SS)
+
+  def test_content_type(self):
+    """Checks that an appropriate content-type is set for various types of pages."""
+    # Mapping from each page to its MIME type.
+    page_to_mime =\
+        {"?json": "application/json", "?raw": "text/plain; charset=UTF-8",
+        "": "text/html; charset=UTF-8"}
+    for port in self.TEST_PORTS_WITH_SS:
+      for page, content_type in page_to_mime.items():
+        url = self.METRICS_URL.format(port) + page
+        assert content_type == requests.get(url).headers['Content-Type']
 
   def test_log_level(self):
     """Test that the /log_level page outputs are as expected and work well on basic and

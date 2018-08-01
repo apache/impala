@@ -33,8 +33,14 @@ namespace impala {
 
 /// Supported HTTP content types
 enum ContentType {
+  /// Corresponds to text/html content-type and used for rendering HTML webpages.
   HTML,
-  PLAIN
+  /// Following two are used for rendering text-only pages and correspond to text/plain
+  /// and application/json content-types respectively. JSON type additionally pretty
+  /// prints the underlying JSON content. They are primarily used for debugging and for
+  /// integration with third-party tools that can consume the text format easily.
+  PLAIN,
+  JSON
 };
 
 /// Wrapper class for the Squeasel web server library. Clients may register callback
@@ -93,6 +99,9 @@ class Webserver {
   /// Returns the URL to the webserver as a string.
   string Url();
 
+  /// Returns the appropriate MIME type for a given ContentType.
+  static const std::string GetMimeType(const ContentType& content_type);
+
  private:
   /// Contains all information relevant to rendering one Url. Each Url has one callback
   /// that produces the output to render. The callback either produces a Json document
@@ -147,6 +156,10 @@ class Webserver {
       struct sq_request_info* request_info);
 
   /// Renders URLs through the Mustache templating library.
+  /// - Default ContentType is HTML.
+  /// - Argument 'raw' renders the page with PLAIN ContentType.
+  /// - Argument 'json' renders the page with JSON ContentType. The underlying JSON is
+  ///   pretty-printed.
   void RenderUrlWithTemplate(const ArgumentMap& arguments, const UrlHandler& url_handler,
       std::stringstream* output, ContentType* content_type);
 

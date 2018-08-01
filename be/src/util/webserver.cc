@@ -148,14 +148,13 @@ enum ResponseCode {
 // Builds a valid HTTP header given the response code and a content type.
 string BuildHeaderString(ResponseCode response, ContentType content_type) {
   static const string RESPONSE_TEMPLATE = "HTTP/1.1 $0 $1\r\n"
-      "Content-Type: text/$2\r\n"
+      "Content-Type: $2\r\n"
       "Content-Length: %d\r\n"
       "X-Frame-Options: $3\r\n"
       "\r\n";
 
   return Substitute(RESPONSE_TEMPLATE, response, response == OK ? "OK" : "Not found",
-      content_type == HTML ? "html" : "plain",
-      FLAGS_webserver_x_frame_options.c_str());
+      Webserver::GetMimeType(content_type), FLAGS_webserver_x_frame_options.c_str());
 }
 
 Webserver::Webserver()
@@ -445,7 +444,7 @@ void Webserver::RenderUrlWithTemplate(const ArgumentMap& arguments,
     PrettyWriter<StringBuffer> writer(strbuf);
     document.Accept(writer);
     (*output) << strbuf.GetString();
-    *content_type = PLAIN;
+    *content_type = JSON;
   } else {
     if (arguments.find("raw") != arguments.end()) {
       document.AddMember(ENABLE_RAW_JSON_KEY, "true", document.GetAllocator());
@@ -490,4 +489,12 @@ void Webserver::RegisterUrlCallback(const string& path, const RawUrlCallback& ca
   url_handlers_.insert(make_pair(path, UrlHandler(callback)));
 }
 
+const string Webserver::GetMimeType(const ContentType& content_type) {
+  switch (content_type) {
+    case HTML: return "text/html; charset=UTF-8";
+    case PLAIN: return "text/plain; charset=UTF-8";
+    case JSON: return "application/json";
+    default: DCHECK(false) << "Invalid content_type: " << content_type;
+  }
+}
 }
