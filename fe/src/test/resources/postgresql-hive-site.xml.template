@@ -142,12 +142,6 @@
   <value>${KRB5_KTNAME}</value>
 </property>
 
-<property>
-  <name>hive.server2.enable.impersonation</name>
-  <description>Enable user impersonation for HiveServer2</description>
-  <value>true</value>
-</property>
-
 <!-- Having problems getting the metastore up with Kerberos.  Defer for now.
 <property>
   <name>hive.metastore.sasl.enabled</name>
@@ -195,6 +189,15 @@
 </property>
 
 <!-- END Kerberos settings -->
+
+<property>
+  <name>hive.server2.enable.doAs</name>
+  <description>
+    Disable user impersonation for HiveServer2 to avoid launch failure
+    if username contains dots (IMPALA-6789)
+  </description>
+  <value>false</value>
+</property>
 
 <property>
   <!--  TODO: Remove this once Hive has changed their default back to ColumnarSerDe -->

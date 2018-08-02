@@ -135,6 +135,15 @@
 </property>
 
 <property>
+  <name>hive.server2.enable.doAs</name>
+  <description>
+    Disable user impersonation for HiveServer2 to avoid launch failure
+    if username contains dots (IMPALA-6789)
+  </description>
+  <value>false</value>
+</property>
+
+<property>
   <!--  TODO: Remove this once Hive has changed their default back to ColumnarSerDe -->
   <name>hive.default.rcfile.serde</name>
   <value>org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe</value>

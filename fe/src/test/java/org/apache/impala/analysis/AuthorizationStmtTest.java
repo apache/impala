@@ -960,7 +960,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     authorize("show roles").ok();
 
     // Show role grant group should always be allowed.
-    authorize(String.format("show role grant group %s", USER.getName())).ok();
+    authorize(String.format("show role grant group `%s`", USER.getName())).ok();
 
     // Show grant role should always be allowed.
     authorize(String.format("show grant role authz_test_role")).ok();
