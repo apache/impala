@@ -66,15 +66,16 @@ const TProtocolVersion::type MAX_SUPPORTED_HS2_VERSION =
 #define HS2_RETURN_ERROR(return_val, error_msg, error_state) \
   do { \
     return_val.status.__set_statusCode(thrift::TStatusCode::ERROR_STATUS); \
-    return_val.status.__set_errorMessage(error_msg); \
-    return_val.status.__set_sqlState(error_state); \
+    return_val.status.__set_errorMessage((error_msg)); \
+    return_val.status.__set_sqlState((error_state)); \
     return; \
   } while (false)
 
 #define HS2_RETURN_IF_ERROR(return_val, status, error_state) \
   do { \
-    if (UNLIKELY(!status.ok())) { \
-      HS2_RETURN_ERROR(return_val, status.GetDetail(), error_state); \
+    const Status& _status = (status); \
+    if (UNLIKELY(!_status.ok())) { \
+      HS2_RETURN_ERROR(return_val, _status.GetDetail(), (error_state)); \
       return; \
     } \
   } while (false)

@@ -28,29 +28,29 @@
 
 #define THROW_IF_ERROR_WITH_LOGGING(stmt, env, adaptor) \
   do { \
-    Status status = (stmt); \
-    if (!status.ok()) { \
+    const Status& _status = (stmt); \
+    if (!_status.ok()) { \
       (adaptor)->WriteErrorLog(); \
       (adaptor)->WriteFileErrors(); \
-      (env)->ThrowNew((adaptor)->impala_exc_cl(), status.GetDetail().c_str()); \
+      (env)->ThrowNew((adaptor)->impala_exc_cl(), _status.GetDetail().c_str()); \
       return; \
     } \
   } while (false)
 
 #define THROW_IF_ERROR(stmt, env, impala_exc_cl) \
   do { \
-    Status status = (stmt); \
-    if (!status.ok()) { \
-      (env)->ThrowNew((impala_exc_cl), status.GetDetail().c_str()); \
+    const Status& _status = (stmt); \
+    if (!_status.ok()) { \
+      (env)->ThrowNew((impala_exc_cl), _status.GetDetail().c_str()); \
       return; \
     } \
   } while (false)
 
 #define THROW_IF_ERROR_RET(stmt, env, impala_exc_cl, ret) \
   do { \
-    Status status = (stmt); \
-    if (!status.ok()) { \
-      (env)->ThrowNew((impala_exc_cl), status.GetDetail().c_str()); \
+    const Status& _status = (stmt); \
+    if (!_status.ok()) { \
+      (env)->ThrowNew((impala_exc_cl), _status.GetDetail().c_str()); \
       return (ret); \
     } \
   } while (false)

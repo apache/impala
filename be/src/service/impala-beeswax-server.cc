@@ -42,9 +42,9 @@ using namespace beeswax;
 
 #define RAISE_IF_ERROR(stmt, ex_type)                           \
   do {                                                          \
-    Status __status__ = (stmt);                                 \
-    if (UNLIKELY(!__status__.ok())) {                           \
-      RaiseBeeswaxException(__status__.GetDetail(), ex_type);   \
+    const Status& _status = (stmt);                          \
+    if (UNLIKELY(!_status.ok())) {                           \
+      RaiseBeeswaxException(_status.GetDetail(), ex_type);   \
     }                                                           \
   } while (false)
 

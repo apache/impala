@@ -288,8 +288,8 @@ std::ostream& operator<<(std::ostream& os, const Status& status);
 /// some generally useful macros
 #define RETURN_IF_ERROR(stmt)                          \
   do {                                                 \
-    ::impala::Status __status__ = (stmt);              \
-    if (UNLIKELY(!__status__.ok())) return __status__; \
+    const ::impala::Status& _status = (stmt);       \
+    if (UNLIKELY(!_status.ok())) return _status; \
   } while (false)
 
 #define RETURN_VOID_IF_ERROR(stmt)                     \
@@ -299,9 +299,9 @@ std::ostream& operator<<(std::ostream& os, const Status& status);
 
 #define ABORT_IF_ERROR(stmt) \
   do { \
-    ::impala::Status __status__ = (stmt); \
-    if (UNLIKELY(!__status__.ok())) { \
-      ABORT_WITH_ERROR(__status__.GetDetail()); \
+    const ::impala::Status& _status = (stmt); \
+    if (UNLIKELY(!_status.ok())) { \
+      ABORT_WITH_ERROR(_status.GetDetail()); \
     } \
   } while (false)
 
