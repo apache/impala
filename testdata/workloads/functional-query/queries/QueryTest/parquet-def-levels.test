@@ -54,14 +54,14 @@ INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT
 ---- QUERY
 # IMPALA-6077: unsupported BIT_PACKED encoding fails when materializing columns.
 select id
-from alltypesagg_bitpacked
+from alltypes_agg_bitpacked_def_levels
 ---- CATCH
 deprecated BIT_PACKED encoding for rep or def levels.
 ====
 ---- QUERY
 # IMPALA-6077: do not need to decode BIT_PACKED encoding when not materializing columns.
 select count(*)
-from alltypesagg_bitpacked
+from alltypes_agg_bitpacked_def_levels
 ---- RESULTS
 11000
 ---- TYPES
@@ -72,7 +72,7 @@ BIGINT
 # case it should either work or fail gracefully. For now it still requires materialising
 # levels.
 select count(id)
-from alltypesagg_bitpacked
+from alltypes_agg_bitpacked_def_levels
 ---- CATCH
 deprecated BIT_PACKED encoding for rep or def levels.
 ====
@@ -81,7 +81,7 @@ deprecated BIT_PACKED encoding for rep or def levels.
 # case it should either work or fail gracefully. For now it still requires materialising
 # levels.
 select min(int_col)
-from alltypesagg_bitpacked
+from alltypes_agg_bitpacked_def_levels
 ---- CATCH
 deprecated BIT_PACKED encoding for rep or def levels.
 ====
