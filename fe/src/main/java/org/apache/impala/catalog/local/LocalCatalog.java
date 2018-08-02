@@ -72,7 +72,7 @@ public class LocalCatalog implements FeCatalog {
   private final String defaultKuduMasterHosts_;
 
   public static LocalCatalog create(String defaultKuduMasterHosts) {
-    return new LocalCatalog(new DirectMetaProvider(), defaultKuduMasterHosts);
+    return new LocalCatalog(new CatalogdMetaProvider(), defaultKuduMasterHosts);
   }
 
   private LocalCatalog(MetaProvider metaProvider, String defaultKuduMasterHosts) {

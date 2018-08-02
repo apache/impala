@@ -99,6 +99,34 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     }
 
     /**
+     * Clone the descriptor, but change the replica indexes to reference the new host
+     * index 'dstIndex' instead of the original index 'origIndex'.
+     */
+    public FileDescriptor cloneWithNewHostIndex(List<TNetworkAddress> origIndex,
+        ListMap<TNetworkAddress> dstIndex) {
+      // First clone the flatbuffer with no changes.
+      ByteBuffer oldBuf = fbFileDescriptor_.getByteBuffer();
+      ByteBuffer newBuf = ByteBuffer.allocate(oldBuf.remaining());
+      newBuf.put(oldBuf.array(), oldBuf.position(), oldBuf.remaining());
+      newBuf.rewind();
+      FbFileDesc cloned = FbFileDesc.getRootAsFbFileDesc(newBuf);
+
+      // Now iterate over the blocks in the new flatbuffer and mutate the indexes.
+      FbFileBlock it = new FbFileBlock();
+      for (int i = 0; i < cloned.fileBlocksLength(); i++) {
+        it = cloned.fileBlocks(it, i);
+        for (int j = 0; j < it.replicaHostIdxsLength(); j++) {
+          int origHostIdx = FileBlock.getReplicaHostIdx(it, j);
+          boolean isCached = FileBlock.isReplicaCached(it, j);
+          TNetworkAddress origHost = origIndex.get(origHostIdx);
+          int newHostIdx = dstIndex.getIndex(origHost);
+          it.mutateReplicaHostIdxs(j, FileBlock.makeReplicaIdx(isCached, newHostIdx));
+        }
+      }
+      return new FileDescriptor(cloned);
+    }
+
+    /**
      * Creates the file descriptor of a file represented by 'fileStatus' with blocks
      * stored in 'blockLocations'. 'fileSystem' is the filesystem where the
      * file resides and 'hostIndex' stores the network addresses of the hosts that store
@@ -316,8 +344,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
         TNetworkAddress networkAddress = BlockReplica.parseLocation(loc.getNames()[i]);
         short replicaIdx = (short) hostIndex.getIndex(networkAddress);
         boolean isReplicaCached = cachedHosts.contains(loc.getHosts()[i]);
-        replicaIdx = isReplicaCached ?
-            (short) (replicaIdx | ~REPLICA_HOST_IDX_MASK) : replicaIdx;
+        replicaIdx = makeReplicaIdx(isReplicaCached, replicaIdx);
         fbb.addShort(replicaIdx);
       }
       int fbReplicaHostIdxOffset = fbb.endVector();
@@ -332,6 +359,13 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       FbFileBlock.addReplicaHostIdxs(fbb, fbReplicaHostIdxOffset);
       FbFileBlock.addDiskIds(fbb, fbDiskIdsOffset);
       return FbFileBlock.endFbFileBlock(fbb);
+    }
+
+    private static short makeReplicaIdx(boolean isReplicaCached, int hostIdx) {
+      Preconditions.checkArgument((hostIdx & REPLICA_HOST_IDX_MASK) == hostIdx,
+          "invalid hostIdx: %s", hostIdx);
+      return isReplicaCached ? (short) (hostIdx | ~REPLICA_HOST_IDX_MASK)
+          : (short)hostIdx;
     }
 
     /**

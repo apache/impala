@@ -44,6 +44,9 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PrunablePartition;
+import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
+import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
+import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.THdfsPartition;
@@ -108,7 +111,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
    */
   private final String avroSchema_;
 
-  public static LocalFsTable load(LocalDb db, Table msTbl) {
+  public static LocalFsTable load(LocalDb db, Table msTbl, TableMetaRef ref) {
     String fullName = msTbl.getDbName() + "." + msTbl.getTableName();
 
     // Set Avro schema if necessary.
@@ -141,16 +144,16 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
         cmap = ColumnMap.fromMsTable(msTbl);
       }
 
-      return new LocalFsTable(db, msTbl, cmap, avroSchema);
+      return new LocalFsTable(db, msTbl, ref, cmap, avroSchema);
     } catch (AnalysisException e) {
       throw new LocalCatalogException("Failed to load Avro schema for table "
           + fullName);
     }
   }
 
-  private LocalFsTable(LocalDb db, Table msTbl, ColumnMap cmap,
+  private LocalFsTable(LocalDb db, Table msTbl, TableMetaRef ref, ColumnMap cmap,
       String explicitAvroSchema) {
-    super(db, msTbl, cmap);
+    super(db, msTbl, ref, cmap);
 
     // set NULL indicator string from table properties
     String tableNullFormat =
@@ -178,11 +181,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
    */
   public static LocalFsTable createCtasTarget(LocalDb db,
       Table msTbl) throws CatalogException {
-    // TODO(todd): set a member variable indicating this is a CTAS target
-    // so we can checkState() against it in various other methods and make
-    // sure we don't try to do something like load partitions for a not-yet-created
-    // table.
-    return new LocalFsTable(db, msTbl, ColumnMap.fromMsTable(msTbl),
+    return new LocalFsTable(db, msTbl, /*ref=*/null, ColumnMap.fromMsTable(msTbl),
         /*explicitAvroSchema=*/null);
   }
 
@@ -240,7 +239,13 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   public Set<HdfsFileFormat> getFileFormats() {
     // TODO(todd): can we avoid loading all partitions here? this is called
     // for any INSERT query, even if the partition is specified.
-    Collection<? extends FeFsPartition> parts = FeCatalogUtils.loadAllPartitions(this);
+    Collection<? extends FeFsPartition> parts;
+    if (ref_ != null) {
+      parts = FeCatalogUtils.loadAllPartitions(this);
+    } else {
+      // If this is a CTAS target, we don't want to try to load the partition list.
+      parts = Collections.emptyList();
+    }
     // In the case that we have no partitions added to the table yet, it's
     // important to add the "prototype" partition as a fallback.
     Iterable<FeFsPartition> partitionsToConsider = Iterables.concat(
@@ -329,9 +334,9 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
     protoMsPartition.setParameters(Collections.<String, String>emptyMap());
     LocalPartitionSpec spec = new LocalPartitionSpec(
-        this, "", CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
+        this, CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
     LocalFsPartition prototypePartition = new LocalFsPartition(
-        this, spec, protoMsPartition);
+        this, spec, protoMsPartition, /*fileDescriptors=*/null);
     return prototypePartition;
   }
 
@@ -374,29 +379,17 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     // Possible in the case that all partitions were pruned.
     if (ids.isEmpty()) return Collections.emptyList();
 
-    List<String> names = Lists.newArrayList();
+    List<PartitionRef> refs = Lists.newArrayList();
     for (Long id : ids) {
       LocalPartitionSpec spec = partitionSpecs_.get(id);
       Preconditions.checkArgument(spec != null, "Invalid partition ID for table %s: %s",
           getFullName(), id);
-      String name = spec.getName();
-      if (name.isEmpty()) {
-        // Unpartitioned tables don't need to fetch partitions from the metadata
-        // provider. Rather, we just create a partition on the fly.
-        Preconditions.checkState(getNumClusteringCols() == 0,
-            "Cannot fetch empty partition name from a partitioned table");
-        Preconditions.checkArgument(ids.size() == 1,
-            "Expected to only fetch one partition for unpartitioned table %s",
-            getFullName());
-        return Lists.newArrayList(createUnpartitionedPartition(spec));
-      } else {
-        names.add(name);
-      }
+      refs.add(Preconditions.checkNotNull(spec.getRef()));
     }
-    Map<String, Partition> partsByName;
+    Map<String, PartitionMetadata> partsByName;
     try {
-      partsByName = db_.getCatalog().getMetaProvider().loadPartitionsByNames(
-          db_.getName(), name_, getClusteringColumnNames(), names);
+      partsByName = db_.getCatalog().getMetaProvider().loadPartitionsByRefs(
+          ref_, getClusteringColumnNames(), hostIndex_, refs);
     } catch (TException e) {
       throw new LocalCatalogException(
           "Could not load partitions for table " + getFullName(), e);
@@ -404,16 +397,19 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     List<FeFsPartition> ret = Lists.newArrayListWithCapacity(ids.size());
     for (Long id : ids) {
       LocalPartitionSpec spec = partitionSpecs_.get(id);
-      Partition p = partsByName.get(spec.getName());
+      PartitionMetadata p = partsByName.get(spec.getRef().getName());
       if (p == null) {
         // TODO(todd): concurrent drop partition could result in this error.
         // Should we recover in a more graceful way from such an unexpected event?
         throw new LocalCatalogException(
             "Could not load expected partitions for table " + getFullName() +
-            ": missing expected partition with name '" + spec.getName() +
+            ": missing expected partition with name '" + spec.getRef().getName() +
             "' (perhaps it was concurrently dropped by another process)");
       }
-      ret.add(new LocalFsPartition(this, spec, p));
+
+      LocalFsPartition part = new LocalFsPartition(this, spec, p.getHmsPartition(),
+          p.getFileDescriptors());
+      ret.add(part);
     }
     return ret;
   }
@@ -424,23 +420,6 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
       names.add(c.getName());
     }
     return names;
-  }
-
-  /**
-   * Create a partition which represents the main partition of an unpartitioned
-   * table.
-   */
-  private LocalFsPartition createUnpartitionedPartition(LocalPartitionSpec spec) {
-    Preconditions.checkArgument(spec.getName().isEmpty());
-    Partition msp = new Partition();
-    msp.setSd(getMetaStoreTable().getSd());
-    msp.setParameters(getMetaStoreTable().getParameters());
-    msp.setValues(Collections.<String>emptyList());
-    return new LocalFsPartition(this, spec, msp);
-  }
-
-  private LocalPartitionSpec createUnpartitionedPartitionSpec() {
-    return new LocalPartitionSpec(this, "", /*id=*/0);
   }
 
   private void loadPartitionValueMap() {
@@ -478,28 +457,23 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
   private void loadPartitionSpecs() {
     if (partitionSpecs_ != null) return;
-
-    if (getNumClusteringCols() == 0) {
-      // Unpartitioned table.
-      // This table has no partition key, which means it has no declared partitions.
-      // We model partitions slightly differently to Hive - every file must exist in a
-      // partition, so add a single partition with no keys which will get all the
-      // files in the table's root directory.
-      partitionSpecs_ = ImmutableMap.of(0L, createUnpartitionedPartitionSpec());
+    if (ref_ == null) {
+      // This is a CTAS target. Don't try to load metadata.
+      partitionSpecs_ = ImmutableMap.of();
       return;
     }
-    List<String> partNames;
+
+    List<PartitionRef> partList;
     try {
-      partNames = db_.getCatalog().getMetaProvider().loadPartitionNames(
-          db_.getName(), name_);
+      partList = db_.getCatalog().getMetaProvider().loadPartitionList(ref_);
     } catch (TException e) {
       throw new LocalCatalogException("Could not load partition names for table " +
           getFullName(), e);
     }
     ImmutableMap.Builder<Long, LocalPartitionSpec> b = new ImmutableMap.Builder<>();
     long id = 0;
-    for (String partName : partNames) {
-      b.put(id, new LocalPartitionSpec(this, partName, id));
+    for (PartitionRef part: partList) {
+      b.put(id, new LocalPartitionSpec(this, part, id));
       id++;
     }
     partitionSpecs_ = b.build();

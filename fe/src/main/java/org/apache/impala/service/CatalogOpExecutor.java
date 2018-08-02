@@ -58,6 +58,7 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnNotFoundException;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalogUtils;
@@ -901,8 +902,10 @@ public class CatalogOpExecutor {
       Column tableCol = table.getColumn(entry.getKey());
       // Ignore columns that were dropped in the meantime.
       if (tableCol == null) continue;
-      ColumnStatisticsData colStatsData =
-          createHiveColStatsData(params, entry.getValue(), tableCol.getType());
+      // If we know the number of rows in the table, cap NDV of the column appropriately.
+      long ndvCap = params.isSetTable_stats() ? params.table_stats.num_rows : -1;
+      ColumnStatisticsData colStatsData = ColumnStats.createHiveColStatsData(
+              ndvCap, entry.getValue(), tableCol.getType());
       if (colStatsData == null) continue;
       if (LOG.isTraceEnabled()) {
         LOG.trace(String.format("Updating column stats for %s: numDVs=%s numNulls=%s " +
@@ -915,57 +918,6 @@ public class CatalogOpExecutor {
       colStats.addToStatsObj(colStatsObj);
     }
     return colStats;
-  }
-
-  private static ColumnStatisticsData createHiveColStatsData(
-      TAlterTableUpdateStatsParams params, TColumnStats colStats, Type colType) {
-    ColumnStatisticsData colStatsData = new ColumnStatisticsData();
-    long ndv = colStats.getNum_distinct_values();
-    // Cap NDV at row count if available.
-    if (params.isSetTable_stats()) ndv = Math.min(ndv, params.table_stats.num_rows);
-
-    long numNulls = colStats.getNum_nulls();
-    switch(colType.getPrimitiveType()) {
-      case BOOLEAN:
-        colStatsData.setBooleanStats(new BooleanColumnStatsData(1, -1, numNulls));
-        break;
-      case TINYINT:
-        ndv = Math.min(ndv, LongMath.pow(2, Byte.SIZE));
-        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
-        break;
-      case SMALLINT:
-        ndv = Math.min(ndv, LongMath.pow(2, Short.SIZE));
-        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
-        break;
-      case INT:
-        ndv = Math.min(ndv, LongMath.pow(2, Integer.SIZE));
-        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
-        break;
-      case BIGINT:
-      case TIMESTAMP: // Hive and Impala use LongColumnStatsData for timestamps.
-        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
-        break;
-      case FLOAT:
-      case DOUBLE:
-        colStatsData.setDoubleStats(new DoubleColumnStatsData(numNulls, ndv));
-        break;
-      case CHAR:
-      case VARCHAR:
-      case STRING:
-        long maxStrLen = colStats.getMax_size();
-        double avgStrLen = colStats.getAvg_size();
-        colStatsData.setStringStats(
-            new StringColumnStatsData(maxStrLen, avgStrLen, numNulls, ndv));
-        break;
-      case DECIMAL:
-        double decMaxNdv = Math.pow(10, colType.getPrecision());
-        ndv = (long) Math.min(ndv, decMaxNdv);
-        colStatsData.setDecimalStats(new DecimalColumnStatsData(numNulls, ndv));
-        break;
-      default:
-        return null;
-    }
-    return colStatsData;
   }
 
   /**

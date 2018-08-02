@@ -55,6 +55,14 @@ class CatalogServiceClientWrapper : public CatalogServiceClient {
     recv_GetCatalogObject(_return);
   }
 
+  void GetPartialCatalogObject(TGetPartialCatalogObjectResponse& _return,
+      const TGetPartialCatalogObjectRequest& req, bool* send_done) {
+    DCHECK(!*send_done);
+    send_GetPartialCatalogObject(req);
+    *send_done = true;
+    recv_GetPartialCatalogObject(_return);
+  }
+
   void ResetMetadata(TResetMetadataResponse& _return, const TResetMetadataRequest& req,
       bool* send_done) {
     DCHECK(!*send_done);

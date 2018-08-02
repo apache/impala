@@ -33,6 +33,7 @@ import org.apache.impala.thrift.TColumnStats;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
+import com.google.common.math.LongMath;
 
 /**
  * Statistics for a single column.
@@ -246,6 +247,68 @@ public class ColumnStats {
         break;
     }
     return isCompatible;
+  }
+
+  /**
+   * Convert the statistics back into an HMS-compatible ColumnStatisticsData object.
+   * This is essentially the inverse of {@link #update(Type, ColumnStatisticsData)
+   * above.
+   *
+   * Returns null if statistics for the specified type are not supported.
+   */
+  public static ColumnStatisticsData createHiveColStatsData(
+      long capNdv, TColumnStats colStats, Type colType) {
+    ColumnStatisticsData colStatsData = new ColumnStatisticsData();
+    long ndv = colStats.getNum_distinct_values();
+    // Cap NDV at row count if available.
+    if (capNdv >= 0) ndv = Math.min(ndv, capNdv);
+
+    long numNulls = colStats.getNum_nulls();
+    switch(colType.getPrimitiveType()) {
+      case BOOLEAN:
+        colStatsData.setBooleanStats(new BooleanColumnStatsData(1, -1, numNulls));
+        break;
+      case TINYINT:
+        ndv = Math.min(ndv, LongMath.pow(2, Byte.SIZE));
+        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        break;
+      case SMALLINT:
+        ndv = Math.min(ndv, LongMath.pow(2, Short.SIZE));
+        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        break;
+      case INT:
+        ndv = Math.min(ndv, LongMath.pow(2, Integer.SIZE));
+        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        break;
+      case BIGINT:
+      case TIMESTAMP: // Hive and Impala use LongColumnStatsData for timestamps.
+        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        break;
+      case FLOAT:
+      case DOUBLE:
+        colStatsData.setDoubleStats(new DoubleColumnStatsData(numNulls, ndv));
+        break;
+      case CHAR:
+      case VARCHAR:
+      case STRING:
+        long maxStrLen = colStats.getMax_size();
+        double avgStrLen = colStats.getAvg_size();
+        colStatsData.setStringStats(
+            new StringColumnStatsData(maxStrLen, avgStrLen, numNulls, ndv));
+        break;
+      case DECIMAL:
+        double decMaxNdv = Math.pow(10, colType.getPrecision());
+        ndv = (long) Math.min(ndv, decMaxNdv);
+        colStatsData.setDecimalStats(new DecimalColumnStatsData(numNulls, ndv));
+        break;
+      default:
+        return null;
+    }
+    return colStatsData;
+  }
+
+  public ColumnStatisticsData toHmsCompatibleThrift(Type colType) {
+    return createHiveColStatsData(-1, toThrift(), colType);
   }
 
   /**

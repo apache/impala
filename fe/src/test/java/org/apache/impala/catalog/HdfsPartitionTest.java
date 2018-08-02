@@ -17,19 +17,37 @@
 
 package org.apache.impala.catalog;
 
-import static org.junit.Assert.assertTrue;
+import static org.apache.impala.catalog.HdfsPartition.comparePartitionKeyValues;
+import static org.junit.Assert.*;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
-import java.lang.*;
 
-import org.apache.impala.analysis.*;
-import com.google.common.collect.Lists;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.impala.analysis.BoolLiteral;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.StringLiteral;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsTable.FileMetadataLoadStats;
+import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.util.ListMap;
 import org.junit.Test;
 
-import static org.apache.impala.catalog.HdfsPartition.comparePartitionKeyValues;
+import com.google.common.collect.Lists;
 
 public class HdfsPartitionTest {
+
+  static {
+    FeSupport.loadLibrary();
+  }
 
   private List<LiteralExpr> valuesNull_= Lists.newArrayList();
   private List<LiteralExpr> valuesDecimal_ = Lists.newArrayList();
@@ -111,5 +129,46 @@ public class HdfsPartitionTest {
       assertTrue(Integer.signum(comparePartitionKeyValues(o1, o3)) ==
           Integer.signum(comparePartitionKeyValues(o2, o3)));
     }
+  }
+
+  /**
+   * Get the list of all locations of blocks from the given file descriptor.
+   */
+  private static List<TNetworkAddress> getAllReplicaAddresses(FileDescriptor fd,
+      ListMap<TNetworkAddress> hostIndex) {
+    List<TNetworkAddress> ret = new ArrayList<>();
+    for (int i = 0; i < fd.getNumFileBlocks(); i++) {
+      for (int j = 0; j < fd.getFbFileBlock(i).replicaHostIdxsLength(); j++) {
+        int idx = fd.getFbFileBlock(i).replicaHostIdxs(j);
+        ret.add(hostIndex.getEntry(idx));
+      }
+    }
+    return ret;
+  }
+
+  @Test
+  public void testCloneWithNewHostIndex() throws Exception {
+    // Fetch some metadata from a directory in HDFS.
+    Path p = new Path("hdfs://localhost:20500/test-warehouse/schemas");
+    FileSystem fs = p.getFileSystem(new Configuration());
+    RemoteIterator<LocatedFileStatus> iter = fs.listLocatedStatus(p);
+    ListMap<TNetworkAddress> origIndex = new ListMap<>();
+    List<FileDescriptor> fileDescriptors = HdfsTable.createFileDescriptors(fs, iter,
+        origIndex, new FileMetadataLoadStats(p));
+    assertTrue(!fileDescriptors.isEmpty());
+
+    FileDescriptor fd = fileDescriptors.get(0);
+    // Get the list of locations, using the original host index.
+    List<TNetworkAddress> origAddresses = getAllReplicaAddresses(fd, origIndex);
+
+    // Make a new host index with the hosts in the opposite order.
+    ListMap<TNetworkAddress> newIndex = new ListMap<>();
+    newIndex.populate(Lists.reverse(origIndex.getList()));
+
+    // Clone the FD over to the reversed index. The actual addresses should be the same.
+    FileDescriptor cloned = fd.cloneWithNewHostIndex(origIndex.getList(), newIndex);
+    List<TNetworkAddress> newAddresses = getAllReplicaAddresses(cloned, newIndex);
+
+    assertEquals(origAddresses, newAddresses);
   }
 }

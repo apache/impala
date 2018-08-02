@@ -31,6 +31,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TKuduTable;
 import org.apache.impala.thrift.TTableDescriptor;
@@ -55,7 +56,7 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
    * Create a new instance based on the table metadata 'msTable' stored
    * in the metastore.
    */
-  static LocalTable loadFromKudu(LocalDb db, Table msTable) {
+  static LocalTable loadFromKudu(LocalDb db, Table msTable, TableMetaRef ref) {
     Preconditions.checkNotNull(db);
     Preconditions.checkNotNull(msTable);
     String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
@@ -82,7 +83,7 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
     List<KuduPartitionParam> partitionBy = Utils.loadPartitionByParams(kuduTable);
 
     ColumnMap cmap = new ColumnMap(cols, /*numClusteringCols=*/0, fullTableName);
-    return new LocalKuduTable(db, msTable, cmap, pkNames, partitionBy);
+    return new LocalKuduTable(db, msTable, ref, cmap, pkNames, partitionBy);
   }
 
 
@@ -104,7 +105,9 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
     }
 
     ColumnMap cmap = new ColumnMap(columns, /*numClusteringCols=*/0, fullTableName);
-    return new LocalKuduTable(db, msTable, cmap, pkNames, kuduPartitionParams);
+
+    return new LocalKuduTable(db, msTable, /*ref=*/null, cmap, pkNames,
+        kuduPartitionParams);
   }
 
   private static void convertColsFromKudu(Schema schema, List<Column> cols,
@@ -128,10 +131,10 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
     }
   }
 
-  private LocalKuduTable(LocalDb db, Table msTable, ColumnMap cmap,
+  private LocalKuduTable(LocalDb db, Table msTable, TableMetaRef ref, ColumnMap cmap,
       List<String> primaryKeyColumnNames,
       List<KuduPartitionParam> partitionBy)  {
-    super(db, msTable, cmap);
+    super(db, msTable, ref, cmap);
     tableParams_ = new TableParams(msTable);
     partitionBy_ = ImmutableList.copyOf(partitionBy);
     primaryKeyColumnNames_ = ImmutableList.copyOf(primaryKeyColumnNames);

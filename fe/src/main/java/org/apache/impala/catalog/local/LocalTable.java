@@ -20,6 +20,8 @@ package org.apache.impala.catalog.local;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -36,6 +38,8 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.log4j.Logger;
@@ -66,22 +70,36 @@ abstract class LocalTable implements FeTable {
 
   private final TTableStats tableStats_;
 
+  /**
+   * Table reference as provided by the initial call to the metadata provider.
+   * This must be passed back to any further calls to the metadata provider
+   * in order to verify consistency.
+   *
+   * In the case of CTAS target tables, this may be null. Since the tables don't
+   * exist yet in any metadata storage, it would be invalid to try to load any metadata
+   * about them.
+   */
+  @Nullable
+  protected final TableMetaRef ref_;
+
   public static LocalTable load(LocalDb db, String tblName) {
     // In order to know which kind of table subclass to instantiate, we need
     // to eagerly grab and parse the top-level Table object from the HMS.
     LocalTable t = null;
-    Table msTbl = loadMsTable(db, tblName);
+    Pair<Table, TableMetaRef> tableMeta = loadTableMetadata(db, tblName);
+    Table msTbl = tableMeta.first;
+    TableMetaRef ref = tableMeta.second;
     if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
-      t = new LocalView(db, msTbl);
+      t = new LocalView(db, msTbl, ref);
     } else if (HBaseTable.isHBaseTable(msTbl)) {
-      t = LocalHbaseTable.loadFromHbase(db, msTbl);
+      t = LocalHbaseTable.loadFromHbase(db, msTbl, ref);
     } else if (KuduTable.isKuduTable(msTbl)) {
-      t = LocalKuduTable.loadFromKudu(db, msTbl);
+      t = LocalKuduTable.loadFromKudu(db, msTbl, ref);
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
       // TODO(todd) support datasource table
     } else if (HdfsFileFormat.isHdfsInputFormatClass(
         msTbl.getSd().getInputFormat())) {
-      t = LocalFsTable.load(db, msTbl);
+      t = LocalFsTable.load(db, msTbl, ref);
     }
 
     if (t == null) {
@@ -101,7 +119,7 @@ abstract class LocalTable implements FeTable {
   /**
    * Load the Table instance from the metastore.
    */
-  private static Table loadMsTable(LocalDb db, String tblName) {
+  private static Pair<Table, TableMetaRef> loadTableMetadata(LocalDb db, String tblName) {
     Preconditions.checkArgument(tblName.toLowerCase().equals(tblName));
 
     try {
@@ -113,11 +131,11 @@ abstract class LocalTable implements FeTable {
     }
   }
 
-  public LocalTable(LocalDb db, Table msTbl, ColumnMap cols) {
+  public LocalTable(LocalDb db, Table msTbl, TableMetaRef ref, ColumnMap cols) {
     this.db_ = Preconditions.checkNotNull(db);
     this.name_ = msTbl.getTableName();
     this.cols_ = cols;
-
+    this.ref_ = ref;
     this.msTable_ = msTbl;
 
     tableStats_ = new TTableStats(
@@ -126,8 +144,8 @@ abstract class LocalTable implements FeTable {
         FeCatalogUtils.getTotalSize(msTable_.getParameters()));
   }
 
-  public LocalTable(LocalDb db, Table msTbl) {
-    this(db, msTbl, ColumnMap.fromMsTable(msTbl));
+  public LocalTable(LocalDb db, Table msTbl, TableMetaRef ref) {
+    this(db, msTbl, ref, ColumnMap.fromMsTable(msTbl));
   }
 
   @Override
@@ -232,7 +250,7 @@ abstract class LocalTable implements FeTable {
   protected void loadColumnStats() {
     try {
       List<ColumnStatisticsObj> stats = db_.getCatalog().getMetaProvider()
-          .loadTableColumnStatistics(db_.getName(), getName(), getColumnNames());
+          .loadTableColumnStatistics(ref_, getColumnNames());
       FeCatalogUtils.injectColumnStats(stats, this);
     } catch (TException e) {
       LOG.warn("Could not load column statistics for: " + getFullName(), e);

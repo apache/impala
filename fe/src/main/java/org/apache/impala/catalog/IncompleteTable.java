@@ -26,10 +26,13 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.JniUtil;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
+import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import com.google.common.base.Joiner;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 
 /**
@@ -128,5 +131,12 @@ public class IncompleteTable extends Table {
   public static IncompleteTable createFailedMetadataLoadTable(Db db, String name,
       ImpalaException e) {
     return new IncompleteTable(db, name, e);
+  }
+
+  @Override
+  public TGetPartialCatalogObjectResponse getPartialInfo(
+      TGetPartialCatalogObjectRequest req) throws TableLoadingException {
+    Throwables.propagateIfPossible(cause_, TableLoadingException.class);
+    throw new TableLoadingException(cause_.getMessage());
   }
 }

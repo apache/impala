@@ -67,9 +67,12 @@ import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
+import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
@@ -1680,6 +1683,59 @@ public class HdfsTable extends Table implements FeFsTable {
     table.setTable_type(TTableType.HDFS_TABLE);
     table.setHdfs_table(getTHdfsTable(ThriftObjectType.FULL, null));
     return table;
+  }
+
+  @Override
+  public TGetPartialCatalogObjectResponse getPartialInfo(
+      TGetPartialCatalogObjectRequest req) throws TableLoadingException {
+    TGetPartialCatalogObjectResponse resp = super.getPartialInfo(req);
+
+    boolean wantPartitionInfo = req.table_info_selector.want_partition_files ||
+        req.table_info_selector.want_partition_metadata ||
+        req.table_info_selector.want_partition_names;
+
+    Collection<Long> partIds = req.table_info_selector.partition_ids;
+    if (partIds == null && wantPartitionInfo) {
+      // Caller specified at least one piece of partition info but didn't specify
+      // any partition IDs. That means they want the info for all partitions.
+      partIds = partitionMap_.keySet();
+    }
+
+    if (partIds != null) {
+      resp.table_info.partitions = Lists.newArrayListWithCapacity(partIds.size());
+      for (long partId : partIds) {
+        HdfsPartition part = partitionMap_.get(partId);
+        Preconditions.checkArgument(part != null, "Partition id %s does not exist",
+            partId);
+        TPartialPartitionInfo partInfo = new TPartialPartitionInfo(partId);
+
+        if (req.table_info_selector.want_partition_names) {
+          partInfo.setName(part.getPartitionName());
+        }
+
+        if (req.table_info_selector.want_partition_metadata) {
+          partInfo.hms_partition = part.toHmsPartition();
+        }
+
+        if (req.table_info_selector.want_partition_files) {
+          List<FileDescriptor> fds = part.getFileDescriptors();
+          partInfo.file_descriptors = Lists.newArrayListWithCapacity(fds.size());
+          for (FileDescriptor fd: fds) {
+            partInfo.file_descriptors.add(fd.toThrift());
+          }
+        }
+
+        resp.table_info.partitions.add(partInfo);
+      }
+    }
+
+    if (req.table_info_selector.want_partition_files) {
+      // TODO(todd) we are sending the whole host index even if we returned only
+      // one file -- maybe not so efficient, but the alternative is to do a bunch
+      // of cloning of file descriptors which might increase memory pressure.
+      resp.table_info.setNetwork_addresses(hostIndex_.getList());
+    }
+    return resp;
   }
 
   /**

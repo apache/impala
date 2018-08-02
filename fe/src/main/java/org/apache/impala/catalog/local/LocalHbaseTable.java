@@ -24,6 +24,7 @@ import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TTableDescriptor;
@@ -44,19 +45,20 @@ public class LocalHbaseTable extends LocalTable implements FeHBaseTable {
   // TODO: revisit after caching is implemented for local catalog
   private HColumnDescriptor[] columnFamilies_ = null;
 
-  private LocalHbaseTable(LocalDb db, Table msTbl, ColumnMap cols) {
-    super(db, msTbl, cols);
+  private LocalHbaseTable(LocalDb db, Table msTbl, TableMetaRef ref, ColumnMap cols) {
+    super(db, msTbl, ref, cols);
     hbaseTableName_ = Util.getHBaseTableName(msTbl);
   }
 
-  static LocalHbaseTable loadFromHbase(LocalDb db, Table msTable) {
+  static LocalHbaseTable loadFromHbase(LocalDb db, Table msTable, TableMetaRef ref) {
     try {
       // Warm up the connection and verify the table exists.
       Util.getHBaseTable(Util.getHBaseTableName(msTable)).close();
       // since we don't support composite hbase rowkeys yet, all hbase tables have a
       // single clustering col
-      return new LocalHbaseTable(db, msTable, new ColumnMap(Util.loadColumns(msTable), 1,
-          msTable.getDbName() + "." + msTable.getTableName()));
+      ColumnMap cmap = new ColumnMap(Util.loadColumns(msTable), 1,
+          msTable.getDbName() + "." + msTable.getTableName());
+      return new LocalHbaseTable(db, msTable, ref, cmap);
     } catch (IOException | MetaException | SerDeException e) {
       throw new LocalCatalogException(e);
     }

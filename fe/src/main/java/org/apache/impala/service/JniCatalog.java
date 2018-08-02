@@ -45,6 +45,7 @@ import org.apache.impala.thrift.TGetDbsParams;
 import org.apache.impala.thrift.TGetDbsResult;
 import org.apache.impala.thrift.TGetFunctionsRequest;
 import org.apache.impala.thrift.TGetFunctionsResponse;
+import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetTablesParams;
 import org.apache.impala.thrift.TGetTableMetricsParams;
 import org.apache.impala.thrift.TGetTablesResult;
@@ -214,6 +215,15 @@ public class JniCatalog {
     JniUtil.deserializeThrift(protocolFactory_, objectDescription, thriftParams);
     TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(catalog_.getTCatalogObject(objectDescription));
+  }
+
+  public byte[] getPartialCatalogObject(byte[] thriftParams) throws ImpalaException,
+      TException {
+    TGetPartialCatalogObjectRequest req =
+        new TGetPartialCatalogObjectRequest();
+    JniUtil.deserializeThrift(protocolFactory_, req, thriftParams);
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    return serializer.serialize(catalog_.getPartialCatalogObject(req));
   }
 
   /**

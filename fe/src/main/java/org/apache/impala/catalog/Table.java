@@ -27,6 +27,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.analysis.TableName;
@@ -39,8 +40,12 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnDescriptor;
+import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
+import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
+import org.apache.impala.thrift.TPartialTableInfo;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
+import org.apache.impala.thrift.TTableInfoSelector;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.log4j.Logger;
@@ -373,6 +378,49 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     return catalogObject;
   }
 
+  /**
+   * Return partial info about this table. This is called only on the catalogd to
+   * service GetPartialCatalogObject RPCs.
+   */
+  public TGetPartialCatalogObjectResponse getPartialInfo(
+      TGetPartialCatalogObjectRequest req) throws TableLoadingException {
+    Preconditions.checkState(isLoaded(), "unloaded table: %s", getFullName());
+    TTableInfoSelector selector = Preconditions.checkNotNull(req.table_info_selector,
+        "no table_info_selector");
+
+    TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
+    resp.setObject_version_number(getCatalogVersion());
+    resp.table_info = new TPartialTableInfo();
+    if (selector.want_hms_table) {
+      // TODO(todd): the deep copy could be a bit expensive. Unfortunately if we took
+      // a reference to this object, and let it escape out of the lock, it would be
+      // racy since the TTable is modified in place by some DDLs (eg 'dropTableStats').
+      // We either need to ensure that TTable is cloned on every write, or we need to
+      // ensure that serialization of the GetPartialCatalogObjectResponse object
+      // is done while we continue to hold the table lock.
+      resp.table_info.setHms_table(getMetaStoreTable().deepCopy());
+    }
+    if (selector.want_stats_for_column_names != null) {
+      List<ColumnStatisticsObj> statsList = Lists.newArrayListWithCapacity(
+          selector.want_stats_for_column_names.size());
+      for (String colName: selector.want_stats_for_column_names) {
+        Column col = getColumn(colName);
+        if (col == null) continue;
+        // Ugly hack: if the catalogd has never gotten any stats from HMS, numDVs will
+        // be -1, and we'll have to send no stats to the impalad.
+        if (!col.getStats().hasNumDistinctValues()) continue;
+
+        ColumnStatisticsData tstats = col.getStats().toHmsCompatibleThrift(col.getType());
+        if (tstats == null) continue;
+        // TODO(todd): it seems like the column type is not used? maybe worth not
+        // setting it here to save serialization.
+        statsList.add(new ColumnStatisticsObj(colName, col.getType().toString(), tstats));
+      }
+      resp.table_info.setColumn_stats(statsList);
+    }
+
+    return resp;
+  }
   /**
    * @see FeCatalogUtils#parseColumnType(FieldSchema, String)
    */

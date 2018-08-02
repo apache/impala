@@ -30,6 +30,9 @@ class Frontend;
 class Status;
 class RuntimeProfile;
 
+class TGetPartialCatalogObjectRequest;
+class TGetPartialCatalogObjectResponse;
+
 /// The CatalogOpExecutor is responsible for executing catalog operations.
 /// This includes DDL statements such as CREATE and ALTER as well as statements such
 /// as INVALIDATE METADATA. One CatalogOpExecutor is typically created per catalog
@@ -46,6 +49,10 @@ class CatalogOpExecutor {
   /// server. If the catalog server does not have the object cached, its metadata will
   /// be loaded.
   Status GetCatalogObject(const TCatalogObject& object_desc, TCatalogObject* result);
+
+  /// Fetch partial information about a specific TCatalogObject from the catalog server.
+  Status GetPartialCatalogObject(const TGetPartialCatalogObjectRequest& req,
+      TGetPartialCatalogObjectResponse* resp);
 
   /// Translates the given compute stats request and its child-query results into
   /// a new table alteration request for updating the stats metadata, and executes

@@ -157,6 +157,24 @@ public class LocalCatalogTest {
       }
     }
     assertEquals(24, totalFds);
+    assertTrue(t.getHostIndex().size() > 0);
+  }
+
+
+  @Test
+  public void testLoadFileDescriptorsUnpartitioned() throws Exception {
+    FeFsTable t = (FeFsTable) catalog_.getTable("tpch",  "region");
+    int totalFds = 0;
+    for (FeFsPartition p: FeCatalogUtils.loadAllPartitions(t)) {
+      List<FileDescriptor> fds = p.getFileDescriptors();
+      totalFds += fds.size();
+      for (FileDescriptor fd : fds) {
+        assertTrue(fd.getFileLength() > 0);
+        assertEquals(fd.getNumFileBlocks(), 1);
+        assertEquals(3, fd.getFbFileBlock(0).diskIdsLength());
+      }
+    }
+    assertEquals(1, totalFds);
   }
 
   @Test

@@ -43,6 +43,7 @@ public class RuntimeEnv {
    */
   public void reset() {
     numCores_ = Runtime.getRuntime().availableProcessors();
+    isTestEnv_ = false;
   }
 
   public int getNumCores() { return numCores_; }

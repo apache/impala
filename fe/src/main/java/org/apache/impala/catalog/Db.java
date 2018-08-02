@@ -35,8 +35,12 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDatabase;
+import org.apache.impala.thrift.TDbInfoSelector;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TFunctionCategory;
+import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
+import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
+import org.apache.impala.thrift.TPartialDbInfo;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
 
@@ -434,5 +438,29 @@ public class Db extends CatalogObjectImpl implements FeDb {
         new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
     catalogObj.setDb(toThrift());
     return catalogObj;
+  }
+
+  /**
+   * Get partial information about this DB in order to service CatalogdMetaProvider
+   * running in a remote impalad.
+   */
+  public TGetPartialCatalogObjectResponse getPartialInfo(
+      TGetPartialCatalogObjectRequest req) {
+    TDbInfoSelector selector = Preconditions.checkNotNull(req.db_info_selector,
+        "no db_info_selector");
+
+    TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
+    resp.setObject_version_number(getCatalogVersion());
+    resp.db_info = new TPartialDbInfo();
+    if (selector.want_hms_database) {
+      // TODO(todd): we need to deep-copy here because 'addFunction' other DDLs
+      // modify the parameter map in place. We need to change those to copy-on-write
+      // instead to avoid this copy.
+      resp.db_info.hms_database = getMetaStoreDb().deepCopy();
+    }
+    if (selector.want_table_names) {
+      resp.db_info.table_names = getAllTableNames();
+    }
+    return resp;
   }
 }

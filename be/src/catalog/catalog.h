@@ -72,6 +72,12 @@ class Catalog {
   /// information on the error will be returned.
   Status GetCatalogObject(const TCatalogObject& request, TCatalogObject* response);
 
+  /// Return partial information about a Catalog object.
+  /// Returns OK if the operation was successful, otherwise a Status object with
+  /// information on the error will be returned.
+  Status GetPartialCatalogObject(const TGetPartialCatalogObjectRequest& request,
+      TGetPartialCatalogObjectResponse* response);
+
   /// Return all databases matching the optional argument 'pattern'.
   /// If pattern is NULL, match all databases otherwise match only those databases that
   /// match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
@@ -121,6 +127,7 @@ class Catalog {
   jmethodID exec_ddl_id_;  // JniCatalog.execDdl()
   jmethodID reset_metadata_id_;  // JniCatalog.resetMetdata()
   jmethodID get_catalog_object_id_;  // JniCatalog.getCatalogObject()
+  jmethodID get_partial_catalog_object_id_;  // JniCatalog.getPartialCatalogObject()
   jmethodID get_catalog_delta_id_;  // JniCatalog.getCatalogDelta()
   jmethodID get_catalog_version_id_;  // JniCatalog.getCatalogVersion()
   jmethodID get_catalog_usage_id_; // JniCatalog.getCatalogUsage()

@@ -25,6 +25,7 @@ import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.View;
+import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableDescriptor;
 
@@ -37,8 +38,8 @@ import org.apache.impala.thrift.TTableDescriptor;
 public class LocalView extends LocalTable implements FeView {
   private final QueryStmt queryStmt_;
 
-  public LocalView(LocalDb db, Table msTbl) {
-    super(db, msTbl);
+  public LocalView(LocalDb db, Table msTbl, TableMetaRef ref) {
+    super(db, msTbl, ref);
 
     try {
       queryStmt_ = View.parseViewDef(this);

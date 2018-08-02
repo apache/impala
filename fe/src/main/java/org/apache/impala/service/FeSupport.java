@@ -103,6 +103,9 @@ public class FeSupport {
   // using Java Thrift bindings.
   public native static byte[] NativePrioritizeLoad(byte[] thriftReq);
 
+  public native static byte[] NativeGetPartialCatalogObject(byte[] thriftReq)
+      throws InternalException;
+
   // Parses a string of comma-separated key=value query options ('csvQueryOptions'),
   // updates the existing query options ('queryOptions') with them and returns the
   // resulting serialized TQueryOptions object.
@@ -348,6 +351,17 @@ public class FeSupport {
     }
     return MinLogSpaceForBloomFilter(ndv, fpp);
   }
+
+  public static byte[] GetPartialCatalogObject(byte[] thriftReq)
+      throws InternalException {
+    try {
+      return NativeGetPartialCatalogObject(thriftReq);
+    } catch (UnsatisfiedLinkError e) {
+      loadLibrary();
+    }
+    return NativeGetPartialCatalogObject(thriftReq);
+  }
+
 
   /**
    * This function should be called explicitly by the FeSupport to ensure that

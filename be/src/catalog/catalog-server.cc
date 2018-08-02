@@ -124,6 +124,24 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     VLOG_RPC << "GetCatalogObject(): response=" << ThriftDebugString(resp);
   }
 
+  virtual void GetPartialCatalogObject(TGetPartialCatalogObjectResponse& resp,
+      const TGetPartialCatalogObjectRequest& req) {
+    // TODO(todd): capture detailed metrics on the types of inbound requests, lock
+    // wait times, etc.
+    // TODO(todd): add some kind of limit on the number of concurrent requests here
+    // to avoid thread exhaustion -- eg perhaps it would be best to use a trylock
+    // on the catalog locks, or defer these calls to a separate (bounded) queue,
+    // so a heavy query workload against a table undergoing a slow refresh doesn't
+    // end up taking down the catalog by creating thousands of threads.
+    VLOG_RPC << "GetPartialCatalogObject(): request=" << ThriftDebugString(req);
+    Status status = catalog_server_->catalog()->GetPartialCatalogObject(req, &resp);
+    if (!status.ok()) LOG(ERROR) << status.GetDetail();
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    resp.__set_status(thrift_status);
+    VLOG_RPC << "GetPartialCatalogObject(): response=" << ThriftDebugString(resp);
+  }
+
   // Prioritizes the loading of metadata for one or more catalog objects. Currently only
   // used for loading tables/views because they are the only type of object that is loaded
   // lazily.

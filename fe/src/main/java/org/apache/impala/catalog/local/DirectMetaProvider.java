@@ -17,7 +17,10 @@
 
 package org.apache.impala.catalog.local;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,17 +39,25 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.errorprone.annotations.Immutable;
 
 /**
  * Metadata provider which calls out directly to the source systems
@@ -93,11 +104,14 @@ class DirectMetaProvider implements MetaProvider {
   }
 
   @Override
-  public Table loadTable(String dbName, String tableName)
+  public Pair<Table, TableMetaRef> loadTable(String dbName, String tableName)
       throws MetaException, NoSuchObjectException, TException {
+    Table msTable;
     try (MetaStoreClient c = msClientPool_.getClient()) {
-      return c.getHiveClient().getTable(dbName, tableName);
+      msTable = c.getHiveClient().getTable(dbName, tableName);
     }
+    TableMetaRef ref = new TableMetaRefImpl(dbName, tableName, msTable);
+    return Pair.create(msTable, ref);
   }
 
   @Override
@@ -108,39 +122,71 @@ class DirectMetaProvider implements MetaProvider {
   }
 
   @Override
-  public List<String> loadPartitionNames(String dbName, String tableName)
+  public List<PartitionRef> loadPartitionList(TableMetaRef table)
       throws MetaException, TException {
-    try (MetaStoreClient c = msClientPool_.getClient()) {
-      return c.getHiveClient().listPartitionNames(dbName, tableName,
-          /*max_parts=*/(short)-1);
+    Preconditions.checkArgument(table instanceof TableMetaRefImpl);
+    TableMetaRefImpl ref = (TableMetaRefImpl)table;
+
+    // If the table isn't partitioned, just return a single partition with no name.
+    // In loadPartitionsByRefs() below, we'll detect this case and load the special
+    // unpartitioned table.
+    if (!ref.isPartitioned()) {
+      return ImmutableList.of((PartitionRef)new PartitionRefImpl(
+          PartitionRefImpl.UNPARTITIONED_NAME));
     }
+
+    List<String> partNames;
+    try (MetaStoreClient c = msClientPool_.getClient()) {
+      partNames = c.getHiveClient().listPartitionNames(
+          ref.dbName_, ref.tableName_, /*max_parts=*/(short)-1);
+    }
+    List<PartitionRef> partRefs = Lists.newArrayListWithCapacity(partNames.size());
+    for (String name: partNames) {
+      partRefs.add(new PartitionRefImpl(name));
+    }
+    return partRefs;
   }
 
   @Override
-  public Map<String, Partition> loadPartitionsByNames(
-      String dbName, String tableName, List<String> partitionColumnNames,
-      List<String> partitionNames) throws MetaException, TException {
-    Preconditions.checkNotNull(dbName);
-    Preconditions.checkNotNull(tableName);
+  public Map<String, PartitionMetadata> loadPartitionsByRefs(
+      TableMetaRef table, List<String> partitionColumnNames,
+      ListMap<TNetworkAddress> hostIndex,
+      List<PartitionRef> partitionRefs) throws MetaException, TException {
+    Preconditions.checkNotNull(table);
+    Preconditions.checkArgument(table instanceof TableMetaRefImpl);
     Preconditions.checkArgument(!partitionColumnNames.isEmpty());
-    Preconditions.checkNotNull(partitionNames);
+    Preconditions.checkNotNull(partitionRefs);
 
-    Map<String, Partition> ret = Maps.newHashMapWithExpectedSize(
-        partitionNames.size());
-    if (partitionNames.isEmpty()) return ret;
+    TableMetaRefImpl tableImpl = (TableMetaRefImpl)table;
+
+    String fullTableName = tableImpl.dbName_ + "." + tableImpl.tableName_;
+
+    if (!((TableMetaRefImpl)table).isPartitioned()) {
+      return loadUnpartitionedPartition((TableMetaRefImpl)table, partitionRefs,
+          hostIndex);
+    }
+
+    Map<String, PartitionMetadata> ret = Maps.newHashMapWithExpectedSize(
+        partitionRefs.size());
+    if (partitionRefs.isEmpty()) return ret;
 
     // Fetch the partitions.
+    List<String> partNames = Lists.newArrayListWithCapacity(partitionRefs.size());
+    for (PartitionRef ref: partitionRefs) {
+      partNames.add(ref.getName());
+    }
+
     List<Partition> parts;
     try (MetaStoreClient c = msClientPool_.getClient()) {
       parts = MetaStoreUtil.fetchPartitionsByName(
-          c.getHiveClient(), partitionNames, dbName, tableName);
+          c.getHiveClient(), partNames, tableImpl.dbName_, tableImpl.tableName_);
     }
 
     // HMS may return fewer partition objects than requested, and the
     // returned partition objects don't carry enough information to get their
     // names. So, we map the returned partitions back to the requested names
     // using the passed-in partition column names.
-    Set<String> namesSet = ImmutableSet.copyOf(partitionNames);
+    Set<String> namesSet = ImmutableSet.copyOf(partNames);
     for (Partition p: parts) {
       List<String> vals = p.getValues();
       if (vals.size() != partitionColumnNames.size()) {
@@ -152,14 +198,48 @@ class DirectMetaProvider implements MetaProvider {
         throw new MetaException("HMS returned unexpected partition " + partName +
             " which was not requested. Requested: " + namesSet);
       }
-      Partition existing = ret.put(partName, p);
+
+      ImmutableList<FileDescriptor> fds = loadFileMetadata(
+          fullTableName, partName, p, hostIndex);
+
+      PartitionMetadata existing = ret.put(partName, new PartitionMetadataImpl(p, fds));
       if (existing != null) {
         throw new MetaException("HMS returned multiple partitions with name " +
             partName);
       }
     }
 
+
     return ret;
+  }
+
+  /**
+   * We model partitions slightly differently to Hive. So, in the case of an
+   * unpartitioned table, we have to create a fake Partition object which has the
+   * metadata of the table.
+   */
+  private Map<String, PartitionMetadata> loadUnpartitionedPartition(
+      TableMetaRefImpl table, List<PartitionRef> partitionRefs,
+      ListMap<TNetworkAddress> hostIndex) {
+    Preconditions.checkArgument(partitionRefs.size() == 1,
+        "Expected exactly one partition to load for unpartitioned table");
+    PartitionRef ref = partitionRefs.get(0);
+    Preconditions.checkArgument(ref.getName().isEmpty(),
+        "Expected empty partition name for unpartitioned table");
+    Partition msPartition = msTableToPartition(table.msTable_);
+    String fullName = table.dbName_ + "." + table.tableName_;
+    ImmutableList<FileDescriptor> fds = loadFileMetadata(fullName,
+        "default",  msPartition, hostIndex);
+    return ImmutableMap.of("", (PartitionMetadata)new PartitionMetadataImpl(
+        msPartition, fds));
+  }
+
+  static Partition msTableToPartition(Table msTable) {
+    Partition msp = new Partition();
+    msp.setSd(msTable.getSd());
+    msp.setParameters(msTable.getParameters());
+    msp.setValues(Collections.<String>emptyList());
+    return msp;
   }
 
   @Override
@@ -183,22 +263,125 @@ class DirectMetaProvider implements MetaProvider {
   }
 
   @Override
-  public List<ColumnStatisticsObj> loadTableColumnStatistics(String dbName,
-      String tblName, List<String> colNames) throws TException {
+  public List<ColumnStatisticsObj> loadTableColumnStatistics(TableMetaRef table,
+      List<String> colNames) throws TException {
+    Preconditions.checkArgument(table instanceof TableMetaRefImpl);
     try (MetaStoreClient c = msClientPool_.getClient()) {
-      return c.getHiveClient().getTableColumnStatistics(dbName, tblName, colNames);
+      return c.getHiveClient().getTableColumnStatistics(
+          ((TableMetaRefImpl)table).dbName_,
+          ((TableMetaRefImpl)table).tableName_,
+          colNames);
     }
   }
 
-  @Override
-  public List<LocatedFileStatus> loadFileMetadata(Path dir) throws IOException {
-    Preconditions.checkNotNull(dir);
-    Preconditions.checkArgument(dir.isAbsolute(),
-        "Must pass absolute path: %s", dir);
-    FileSystem fs = dir.getFileSystem(CONF);
-    RemoteIterator<LocatedFileStatus> it = fs.listFiles(dir, /*recursive=*/false);
-    ImmutableList.Builder<LocatedFileStatus> b = new ImmutableList.Builder<>();
-    while (it.hasNext()) b.add(it.next());
-    return b.build();
+  private ImmutableList<FileDescriptor> loadFileMetadata(String fullTableName,
+      String partName, Partition msPartition, ListMap<TNetworkAddress> hostIndex) {
+    Path partDir = new Path(msPartition.getSd().getLocation());
+
+    List<LocatedFileStatus> stats = Lists.newArrayList();
+    try {
+      FileSystem fs = partDir.getFileSystem(CONF);
+      RemoteIterator<LocatedFileStatus> it = fs.listFiles(partDir, /*recursive=*/false);
+      while (it.hasNext()) stats.add(it.next());
+    } catch (FileNotFoundException fnf) {
+      // If the partition directory isn't found, this is treated as having no
+      // files.
+      return ImmutableList.of();
+    } catch (IOException ioe) {
+      throw new LocalCatalogException(String.format(
+          "Could not load files for partition %s of table %s",
+          partName, fullTableName), ioe);
+    }
+
+    HdfsTable.FileMetadataLoadStats loadStats =
+        new HdfsTable.FileMetadataLoadStats(partDir);
+
+    try {
+      FileSystem fs = partDir.getFileSystem(CONF);
+      return ImmutableList.copyOf(
+          HdfsTable.createFileDescriptors(fs, new FakeRemoteIterator<>(stats),
+              hostIndex, loadStats));
+    } catch (IOException e) {
+        throw new LocalCatalogException(String.format(
+            "Could not convert files to descriptors for partition %s of table %s",
+            partName, fullTableName), e);
+    }
+  }
+
+  @Immutable
+  private static class PartitionRefImpl implements PartitionRef {
+    private static final String UNPARTITIONED_NAME = "";
+    private final String name_;
+
+    public PartitionRefImpl(String name) {
+      this.name_ = name;
+    }
+
+    @Override
+    public String getName() {
+      return name_;
+    }
+  }
+
+  private static class PartitionMetadataImpl implements PartitionMetadata {
+    private final Partition msPartition_;
+    private final ImmutableList<FileDescriptor> fds_;
+
+    public PartitionMetadataImpl(Partition msPartition,
+        ImmutableList<FileDescriptor> fds) {
+      this.msPartition_ = msPartition;
+      this.fds_ = fds;
+    }
+
+    @Override
+    public Partition getHmsPartition() {
+      return msPartition_;
+    }
+
+    @Override
+    public ImmutableList<FileDescriptor> getFileDescriptors() {
+      return fds_;
+    }
+  }
+
+  private class TableMetaRefImpl implements TableMetaRef {
+
+    private final String dbName_;
+    private final String tableName_;
+    private final Table msTable_;
+
+    public TableMetaRefImpl(String dbName, String tableName, Table msTable) {
+      this.dbName_ = dbName;
+      this.tableName_ = tableName;
+      this.msTable_ = msTable;
+    }
+
+    private boolean isPartitioned() {
+      return msTable_.getPartitionKeysSize() != 0;
+    }
+  }
+
+
+  /**
+   * Wrapper for a normal Iterable<T> to appear like a Hadoop RemoteIterator<T>.
+   * This is necessary because the existing code to convert file statuses to
+   * descriptors consumes the remote iterator directly and thus avoids materializing
+   * all of the LocatedFileStatus objects in memory at the same time.
+   */
+  private static class FakeRemoteIterator<T> implements RemoteIterator<T> {
+    private final Iterator<T> it_;
+
+    FakeRemoteIterator(Iterable<T> it) {
+      this.it_ = it.iterator();
+    }
+    @Override
+    public boolean hasNext() throws IOException {
+      return it_.hasNext();
+    }
+
+    @Override
+    public T next() throws IOException {
+      return it_.next();
+    }
   }
 }
