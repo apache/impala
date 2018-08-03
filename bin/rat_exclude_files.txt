@@ -19,6 +19,8 @@ testdata/__init__.py
 tests/__init__.py
 bin/diagnostics/__init__.py
 www/index.html
+lib/python/impala_py_lib/__init__.py
+lib/python/impala_py_lib/jenkins/__init__.py
 
 # See $IMPALA_HOME/LICENSE.txt
 be/src/gutil/*
