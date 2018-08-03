@@ -265,7 +265,6 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
       Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME, name, fn, &t, true);
     if (!status.ok()) {
       ReturnReservationFromScannerThread(lock, scanner_thread_reservation);
-      thread_state_.DecrementNumActive();
       // Release the token and skip running callbacks to find a replacement. Skipping
       // serves two purposes. First, it prevents a mutual recursion between this function
       // and ReleaseThreadToken()->InvokeCallbacks(). Second, Thread::Create() failed and

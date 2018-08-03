@@ -651,8 +651,10 @@ Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
 }
 
 Status ClientRequestState::WaitAsync() {
+  // TODO: IMPALA-7396: thread creation fault inject is disabled because it is not
+  // handled correctly.
   return Thread::Create("query-exec-state", "wait-thread",
-      &ClientRequestState::Wait, this, &wait_thread_, true);
+      &ClientRequestState::Wait, this, &wait_thread_, false);
 }
 
 void ClientRequestState::BlockOnWait() {
