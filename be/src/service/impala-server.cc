@@ -1942,7 +1942,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
             session_state.second->inflight_queries.end());
       }
       // Unregister all open queries from this session.
-      Status status("Session expired due to inactivity");
+      Status status = Status::Expected("Session expired due to inactivity");
       for (const TUniqueId& query_id: inflight_queries) {
         cancellation_thread_pool_->Offer(CancellationWork(query_id, status, true));
       }
