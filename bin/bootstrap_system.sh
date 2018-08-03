@@ -184,8 +184,27 @@ cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
 echo "NoHostAuthenticationForLocalhost yes" >> ~/.ssh/config
 ssh localhost whoami
 
-# Workarounds for HDFS networking issues
+# Workarounds for HDFS networking issues: On the minicluster, tests that rely
+# on WebHDFS may fail with "Connection refused" errors because the namenode
+# will return a "Location:" redirect to the hostname, but the datanode is only
+# listening on localhost. See also HDFS-13797. To reproduce this, the following
+# snippet may be useful:
+#
+#  $impala-python
+#  >>> import logging
+#  >>> logging.basicConfig(level=logging.DEBUG)
+#  >>> logging.getLogger("requests.packages.urllib3").setLevel(logging.DEBUG)
+#  >>> from pywebhdfs.webhdfs import PyWebHdfsClient
+#  >>> PyWebHdfsClient(host='localhost',port='5070', user_name='hdfs').read_file(
+#         "/test-warehouse/tpch.region/region.tbl")
+#  INFO:...:Starting new HTTP connection (1): localhost
+#  DEBUG:...:"GET /webhdfs/v1//t....tbl?op=OPEN&user.name=hdfs HTTP/1.1" 307 0
+#  INFO:...:Starting new HTTP connection (1): HOSTNAME.DOMAIN
+#  Traceback (most recent call last):
+#    ...
+#  ...ConnectionError: ('Connection aborted.', error(111, 'Connection refused'))
 echo "127.0.0.1 $(hostname -s) $(hostname)" | sudo tee -a /etc/hosts
+#
 # In Docker, one can change /etc/hosts as above but not with sed -i. The error message is
 # "sed: cannot rename /etc/sedc3gPj8: Device or resource busy". The following lines are
 # basically sed -i but with cp instead of mv for -i part.

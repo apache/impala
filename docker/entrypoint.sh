@@ -95,10 +95,13 @@ function boot_container() {
   # Update /etc/hosts to remove the entry for the unique docker hostname,
   # and instead point it to 127.0.0.1. Otherwise, HttpFS returns Location:
   # redirects to said hostname, but the relevant datanode isn't listening
-  # on the wildcard address.
-  sed -e /$(hostname)/d /etc/hosts -e /127.0.0.1/s,localhost,"localhost $(hostname)," \
-    > /tmp/hosts
+  # on the wildcard address. bootstrap_system.sh does this as well, but
+  # Docker creates a new /etc/hosts every time a container is created, so
+  # this needs to be done here as well.
+  #
   # "sed -i" in place doesn't work on Docker, because /etc/hosts is a bind mount.
+  sed -e /$(hostname)/d /etc/hosts > /tmp/hosts
+  echo "127.0.0.1 $(hostname -s) $(hostname)" >> /tmp/hosts
   sudo cp /tmp/hosts /etc/hosts
 
   echo Hostname: $(hostname)
