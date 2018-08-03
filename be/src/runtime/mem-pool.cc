@@ -186,8 +186,10 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
 
   src->mem_tracker_->TransferTo(mem_tracker_, total_transfered_bytes);
 
-  // insert new chunks after current_chunk_idx_
-  vector<ChunkInfo>::iterator insert_chunk = chunks_.begin() + current_chunk_idx_ + 1;
+  // insert new chunks after current_chunk_idx_. We must calculate current_chunk_idx_ + 1
+  // before finding the offset from chunks_.begin() because current_chunk_idx_ can be -1
+  // and adding a negative number to chunks_.begin() is undefined behavior in C++.
+  vector<ChunkInfo>::iterator insert_chunk = chunks_.begin() + (current_chunk_idx_ + 1);
   chunks_.insert(insert_chunk, src->chunks_.begin(), end_chunk);
   src->chunks_.erase(src->chunks_.begin(), end_chunk);
   current_chunk_idx_ += num_acquired_chunks;
