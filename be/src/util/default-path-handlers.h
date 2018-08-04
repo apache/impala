@@ -19,9 +19,10 @@
 #define IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
 
 #include <stdio.h>
+#include <rapidjson/document.h>
+#include <rapidjson/error/en.h>
 
 #include "util/webserver.h"
-#include "rapidjson/document.h"
 
 namespace impala {
 

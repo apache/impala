@@ -18,6 +18,7 @@
 #include "kudu/util/jsonreader.h"
 
 #include <utility>
+#include <rapidjson/error/en.h>
 
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/strings/substitute.h"
@@ -37,7 +38,8 @@ JsonReader::~JsonReader() {
 Status JsonReader::Init() {
   document_.Parse<0>(text_.c_str());
   if (document_.HasParseError()) {
-    return Status::Corruption("JSON text is corrupt", document_.GetParseError());
+    return Status::Corruption("JSON text is corrupt",
+        GetParseError_En(document_.GetParseError()));
   }
   return Status::OK();
 }

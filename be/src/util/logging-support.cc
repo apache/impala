@@ -92,8 +92,9 @@ static jmethodID reset_log_levels_method; // GlogAppender.resetLogLevels()
 // Helper method to set a message into a member in the document
 void AddDocumentMember(const string& message, const char* member,
     Document* document) {
+  Value key(member, document->GetAllocator());
   Value output(message.c_str(), document->GetAllocator());
-  document->AddMember(member, output, document->GetAllocator());
+  document->AddMember(key, output, document->GetAllocator());
 }
 
 template<class F>

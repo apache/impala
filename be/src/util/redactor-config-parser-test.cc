@@ -42,7 +42,7 @@ TEST(ParserTest, EmptyFile) {
 
   rules_file.OverwriteContents(" \t\n ");
   error = SetRedactionRulesFromFile(rules_file.name());
-  ASSERT_ERROR_MESSAGE_CONTAINS(error, "Text only contains white space");
+  ASSERT_ERROR_MESSAGE_CONTAINS(error, "The document is empty");
 }
 
 TEST(ParserTest, DescriptionPropertyIgnored) {
@@ -65,7 +65,8 @@ TEST(ParserTest, InvalidJson) {
       "  {\"search\": \"[0-9]\", \"replace\": \"#\"}"
       "]");
   string error = SetRedactionRulesFromFile(rules_file.name());
-  ASSERT_ERROR_MESSAGE_CONTAINS(error, "either an object or array at root");
+  ASSERT_ERROR_MESSAGE_CONTAINS(error,
+      "The document root must not be followed by other values");
 
   rules_file.OverwriteContents(
       "[{"
@@ -99,7 +100,7 @@ TEST(ParserTest, InvalidJson) {
 
   rules_file.OverwriteContents("{!@#$}");
   error = SetRedactionRulesFromFile(rules_file.name());
-  ASSERT_ERROR_MESSAGE_CONTAINS(error, "Name of an object member must be a string");
+  ASSERT_ERROR_MESSAGE_CONTAINS(error, "Missing a name for object member");
 }
 
 TEST(ParserTest, BadVersion) {

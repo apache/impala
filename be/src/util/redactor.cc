@@ -27,9 +27,8 @@
 
 #include <gutil/strings/substitute.h>
 #include <rapidjson/document.h>
-#include <rapidjson/filestream.h>
-#include <rapidjson/rapidjson.h>
-#include <rapidjson/reader.h>
+#include <rapidjson/filereadstream.h>
+#include <rapidjson/error/en.h>
 #include <re2/re2.h>
 #include <re2/stringpiece.h>
 
@@ -236,15 +235,20 @@ string SetRedactionRulesFromFile(const string& rules_file_path) {
     return "";
   }
 
-  rapidjson::FileStream stream(rules_file);
+  char readBuffer[65536];
+  rapidjson::FileReadStream stream(rules_file, readBuffer, sizeof(readBuffer));
   Document rules_doc;
-  rules_doc.ParseStream<rapidjson::kParseDefaultFlags>(stream);
+  rules_doc.ParseStream(stream);
   fclose(rules_file);
   if (rules_doc.HasParseError()) {
-    return Substitute("Error parsing redaction rules; $0", rules_doc.GetParseError());
+    return Substitute("Error parsing redaction rules; $0",
+        GetParseError_En(rules_doc.GetParseError()));
   }
   if (!rules_doc.IsObject()) {
     return "Error parsing redaction rules; root element must be a JSON Object.";
+  }
+  if (!rules_doc.HasMember("version")) {
+    return "Error parsing redaction rules; a document version is required.";
   }
   const Value& version = rules_doc["version"];
   if (version.IsNull()) {

@@ -340,21 +340,27 @@ void Webserver::Stop() {
 void Webserver::GetCommonJson(Document* document) {
   DCHECK(document != nullptr);
   Value obj(kObjectType);
-  obj.AddMember("process-name", google::ProgramInvocationShortName(),
+  obj.AddMember("process-name",
+      rapidjson::StringRef(google::ProgramInvocationShortName()),
       document->GetAllocator());
 
   Value lst(kArrayType);
   for (const UrlHandlerMap::value_type& handler: url_handlers_) {
     if (handler.second.is_on_nav_bar()) {
-      Value obj(kObjectType);
-      obj.AddMember("link", handler.first.c_str(), document->GetAllocator());
-      obj.AddMember("title", handler.first.c_str(), document->GetAllocator());
-      lst.PushBack(obj, document->GetAllocator());
+      Value hdl(kObjectType);
+      // Though we set link and title the same value, be careful with RapidJSON's MOVE
+      // semantic. We create the values by deep-copy here.
+      Value link(handler.first.c_str(), document->GetAllocator());
+      Value title(handler.first.c_str(), document->GetAllocator());
+      hdl.AddMember("link", link, document->GetAllocator());
+      hdl.AddMember("title", title, document->GetAllocator());
+      lst.PushBack(hdl, document->GetAllocator());
     }
   }
 
   obj.AddMember("navbar", lst, document->GetAllocator());
-  document->AddMember(COMMON_JSON_KEY, obj, document->GetAllocator());
+  document->AddMember(rapidjson::StringRef(COMMON_JSON_KEY), obj,
+      document->GetAllocator());
 }
 
 int Webserver::LogMessageCallbackStatic(const struct sq_connection* connection,
@@ -450,7 +456,8 @@ void Webserver::RenderUrlWithTemplate(const ArgumentMap& arguments,
     *content_type = JSON;
   } else {
     if (arguments.find("raw") != arguments.end()) {
-      document.AddMember(ENABLE_RAW_HTML_KEY, "true", document.GetAllocator());
+      document.AddMember(rapidjson::StringRef(ENABLE_RAW_HTML_KEY), "true",
+          document.GetAllocator());
     }
     if (document.HasMember(ENABLE_RAW_HTML_KEY)) {
       *content_type = PLAIN;

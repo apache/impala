@@ -180,7 +180,8 @@ void MetricGroup::ToJson(bool include_children, Document* document, Value* out_v
 
   Value container(kObjectType);
   container.AddMember("metrics", metric_list, document->GetAllocator());
-  container.AddMember("name", name_.c_str(), document->GetAllocator());
+  Value name(name_.c_str(), document->GetAllocator());
+  container.AddMember("name", name, document->GetAllocator());
   if (include_children) {
     Value child_groups(kArrayType);
     for (const ChildGroupMap::value_type& child: children_) {

@@ -228,7 +228,8 @@ void ThreadMgr::GetThreadOverview(Document* document) {
   Value lst(kArrayType);
   for (const ThreadCategoryMap::value_type& category: thread_categories_) {
     Value val(kObjectType);
-    val.AddMember("name", category.first.c_str(), document->GetAllocator());
+    Value name(category.first.c_str(), document->GetAllocator());
+    val.AddMember("name", name, document->GetAllocator());
     val.AddMember("size", static_cast<uint64_t>(category.second.threads_by_id.size()),
         document->GetAllocator());
     val.AddMember("num_created",
@@ -254,7 +255,8 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
     }
     categories_to_print.push_back(&category->second);
     Value val(kObjectType);
-    val.AddMember("category", category->first.c_str(), document->GetAllocator());
+    Value name(category->first.c_str(), document->GetAllocator());
+    val.AddMember("category", name, document->GetAllocator());
     val.AddMember("size", static_cast<uint64_t>(category->second.threads_by_id.size()),
         document->GetAllocator());
     document->AddMember("thread-group", val, document->GetAllocator());
@@ -268,7 +270,8 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
   for (const ThreadCategory* category: categories_to_print) {
     for (const auto& thread : category->threads_by_id) {
       Value val(kObjectType);
-      val.AddMember("name", thread.second.name().c_str(), document->GetAllocator());
+      Value name(thread.second.name().c_str(), document->GetAllocator());
+      val.AddMember("name", name, document->GetAllocator());
       val.AddMember("id", thread.second.thread_id(), document->GetAllocator());
       ThreadStats stats;
       Status status = GetThreadStats(thread.second.thread_id(), &stats);

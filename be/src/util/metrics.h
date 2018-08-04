@@ -166,7 +166,8 @@ class ScalarMetric: public Metric {
   virtual void ToLegacyJson(rapidjson::Document* document) override {
     rapidjson::Value val;
     ToJsonValue(GetValue(), TUnit::NONE, document, &val);
-    document->AddMember(key_.c_str(), val, document->GetAllocator());
+    rapidjson::Value key(key_.c_str(), document->GetAllocator());
+    document->AddMember(key, val, document->GetAllocator());
   }
 
   TUnit::type unit() const { return unit_; }

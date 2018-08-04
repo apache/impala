@@ -195,7 +195,8 @@ void MemUsageHandler(MemTracker* mem_tracker, MetricGroup* metric_group,
 }
 
 void JmxHandler(const Webserver::ArgumentMap& args, Document* document) {
-  document->AddMember(Webserver::ENABLE_PLAIN_JSON_KEY, true, document->GetAllocator());
+  document->AddMember(rapidjson::StringRef(Webserver::ENABLE_PLAIN_JSON_KEY), true,
+      document->GetAllocator());
   TGetJMXJsonResponse result;
   Status status = JniUtil::GetJMXJson(&result);
   if (!status.ok()) {
@@ -211,14 +212,15 @@ void JmxHandler(const Webserver::ArgumentMap& args, Document* document) {
   Document doc(&document->GetAllocator());
   doc.Parse<kParseDefaultFlags>(result.jmx_json.c_str());
   if (doc.HasParseError()) {
-    Value error(doc.GetParseError(), document->GetAllocator());
+    Value error(GetParseError_En(doc.GetParseError()), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     VLOG(1) << "Error fetching JMX metrics: " << doc.GetParseError();
     return;
   }
-  // Populate the members in the document.
+  // Populate the members in the document. Due to MOVE semantic of RapidJSON,
+  // the ownership will be transferred to the target document.
   for (Value::MemberIterator it = doc.MemberBegin(); it != doc.MemberEnd(); ++it) {
-    document->AddMember(it->name.GetString(), it->value, document->GetAllocator());
+    document->AddMember(it->name, it->value, document->GetAllocator());
   }
 }
 

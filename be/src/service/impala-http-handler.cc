@@ -223,8 +223,8 @@ void ImpalaHttpHandler::QueryProfileHandler(const Webserver::ArgumentMap& args,
 
   Value profile(ss.str().c_str(), document->GetAllocator());
   document->AddMember("profile", profile, document->GetAllocator());
-  document->AddMember("query_id", args.find("query_id")->second.c_str(),
-      document->GetAllocator());
+  Value query_id(args.find("query_id")->second.c_str(), document->GetAllocator());
+  document->AddMember("query_id", query_id, document->GetAllocator());
 }
 
 void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::ArgumentMap& args,
@@ -240,7 +240,8 @@ void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::ArgumentMap&
       ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }
   }
-  document->AddMember(Webserver::ENABLE_RAW_HTML_KEY, true, document->GetAllocator());
+  document->AddMember(rapidjson::StringRef(Webserver::ENABLE_RAW_HTML_KEY), true,
+      document->GetAllocator());
   Value profile(ss.str().c_str(), document->GetAllocator());
   document->AddMember("contents", profile, document->GetAllocator());
 }
@@ -252,7 +253,8 @@ void ImpalaHttpHandler::InflightQueryIdsHandler(const Webserver::ArgumentMap& ar
       [&](const std::shared_ptr<ClientRequestState>& request_state) {
           ss << PrintId(request_state->query_id()) << "\n";
       });
-  document->AddMember(Webserver::ENABLE_RAW_HTML_KEY, true, document->GetAllocator());
+  document->AddMember(rapidjson::StringRef(Webserver::ENABLE_RAW_HTML_KEY), true,
+      document->GetAllocator());
   Value query_ids(ss.str().c_str(), document->GetAllocator());
   document->AddMember("contents", query_ids, document->GetAllocator());
 }
@@ -278,8 +280,8 @@ void ImpalaHttpHandler::QueryMemoryHandler(const Webserver::ArgumentMap& args,
 
   Value mem_usage(mem_usage_text.c_str(), document->GetAllocator());
   document->AddMember("mem_usage", mem_usage, document->GetAllocator());
-  document->AddMember("query_id", args.find("query_id")->second.c_str(),
-      document->GetAllocator());
+  Value query_id(args.find("query_id")->second.c_str(), document->GetAllocator());
+  document->AddMember("query_id", query_id, document->GetAllocator());
 }
 
 void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& record,
@@ -577,7 +579,8 @@ void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
     const vector<TPlanNode>& nodes,
     vector<TPlanNode>::const_iterator* it, rapidjson::Document* document, Value* value) {
   Value children(kArrayType);
-  value->AddMember("label", (*it)->label.c_str(), document->GetAllocator());
+  Value label((*it)->label.c_str(), document->GetAllocator());
+  value->AddMember("label", label, document->GetAllocator());
   // Node "details" may contain exprs which should be redacted.
   Value label_detail(RedactCopy((*it)->label_detail).c_str(), document->GetAllocator());
   value->AddMember("label_detail", label_detail, document->GetAllocator());
@@ -680,8 +683,9 @@ void PlanToJson(const vector<TPlanFragment>& fragments, const TExecSummary& summ
     if (fragment.__isset.output_sink) {
       const TDataSink& sink = fragment.output_sink;
       if (sink.__isset.stream_sink) {
-        plan_fragment.AddMember("data_stream_target",
-            label_map[sink.stream_sink.dest_node_id].c_str(), document->GetAllocator());
+        Value target(label_map[sink.stream_sink.dest_node_id].c_str(),
+            document->GetAllocator());
+        plan_fragment.AddMember("data_stream_target", target, document->GetAllocator());
       }
     }
     nodes.PushBack(plan_fragment, document->GetAllocator());
