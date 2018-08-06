@@ -38,7 +38,11 @@ AggregationNode::AggregationNode(
   : ExecNode(pool, tnode, descs) {}
 
 Status AggregationNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
+  // The conjuncts will be evaluated in the Aggregator, so don't pass them to the
+  // ExecNode. TODO: remove this once we assign conjuncts directly to Aggregators.
+  TPlanNode tnode_no_conjuncts(tnode);
+  tnode_no_conjuncts.__set_conjuncts(std::vector<TExpr>());
+  RETURN_IF_ERROR(ExecNode::Init(tnode_no_conjuncts, state));
   if (tnode.agg_node.grouping_exprs.empty()) {
     aggregator_.reset(new NonGroupingAggregator(this, pool_, tnode, state->desc_tbl()));
   } else {

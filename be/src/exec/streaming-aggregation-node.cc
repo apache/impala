@@ -33,7 +33,7 @@ namespace impala {
 StreamingAggregationNode::StreamingAggregationNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs), child_eos_(false) {
-  DCHECK(conjunct_evals_.empty()) << "Preaggs have no conjuncts";
+  DCHECK(tnode.conjuncts.empty()) << "Preaggs have no conjuncts";
   DCHECK(!tnode.agg_node.grouping_exprs.empty()) << "Streaming preaggs do grouping";
   DCHECK(limit_ == -1) << "Preaggs have no limits";
 }

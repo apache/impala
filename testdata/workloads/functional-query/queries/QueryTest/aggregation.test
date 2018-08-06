@@ -1370,3 +1370,11 @@ from x
 ---- TYPES
 DOUBLE,DOUBLE,DOUBLE,DOUBLE
 ====
+---- QUERY
+# IMPALA-7397: conjunct that makes allocations in Prepare (extract) assigned to agg node
+select timestamp_col, count(int_col) from alltypesagg group by timestamp_col, int_col
+having extract(hour from timestamp_col) = int_col
+---- TYPES
+TIMESTAMP,BIGINT
+---- RESULTS
+====
