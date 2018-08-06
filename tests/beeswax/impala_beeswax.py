@@ -25,6 +25,7 @@
 #   client.connect()
 #   result = client.execute(query_string)
 #   where result is an object of the class ImpalaBeeswaxResult.
+import logging
 import time
 import shlex
 import getpass
@@ -43,6 +44,8 @@ from tests.util.thrift_util import create_transport
 from thrift.transport.TTransport import TTransportException
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
+
+LOG = logging.getLogger('impala_beeswax')
 
 # Custom exception wrapper.
 # All exceptions coming from thrift/beeswax etc. go through this wrapper.
@@ -336,7 +339,9 @@ class ImpalaBeeswaxClient(object):
     query.query = query_string
     query.hadoop_user = user if user is not None else getpass.getuser()
     query.configuration = self.__options_to_string_list()
-    return self.__do_rpc(lambda: self.imp_service.query(query,))
+    handle = self.__do_rpc(lambda: self.imp_service.query(query,))
+    LOG.info("Started query {0}".format(handle.id))
+    return handle
 
   def __execute_query(self, query_string, user=None):
     """Executes a query and waits for completion"""
