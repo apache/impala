@@ -630,7 +630,7 @@ Status BufferPool::Client::CleanPages(unique_lock<mutex>* client_lock, int64_t l
   // Wait until enough writes have finished so that we can make the allocation without
   // violating the eviction policy. I.e. so that other clients can immediately get the
   // memory they're entitled to without waiting for this client's write to complete.
-  DCHECK_GE(in_flight_write_pages_.bytes(), min_bytes_to_write);
+  DCHECK_GE(in_flight_write_pages_.bytes(), min_bytes_to_write) << DebugStringLocked();
   while (dirty_unpinned_pages_.bytes() + in_flight_write_pages_.bytes()
       > target_dirty_bytes) {
     SCOPED_TIMER(counters().write_wait_time);
@@ -641,8 +641,8 @@ Status BufferPool::Client::CleanPages(unique_lock<mutex>* client_lock, int64_t l
 }
 
 void BufferPool::Client::WriteDirtyPagesAsync(int64_t min_bytes_to_write) {
-  DCHECK_GE(min_bytes_to_write, 0);
-  DCHECK_LE(min_bytes_to_write, dirty_unpinned_pages_.bytes());
+  DCHECK_GE(min_bytes_to_write, 0) << DebugStringLocked();
+  DCHECK_LE(min_bytes_to_write, dirty_unpinned_pages_.bytes()) << DebugStringLocked();
   if (file_group_ == NULL) {
     // Spilling disabled - there should be no unpinned pages to write.
     DCHECK_EQ(0, min_bytes_to_write);
@@ -698,7 +698,7 @@ void BufferPool::Client::WriteCompleteCallback(Page* page, const Status& write_s
 #endif
   {
     unique_lock<mutex> cl(lock_);
-    DCHECK(in_flight_write_pages_.Contains(page));
+    DCHECK(in_flight_write_pages_.Contains(page)) << DebugStringLocked();
     // The status should always be propagated.
     // TODO: if we add cancellation support to TmpFileMgr, consider cancellation path.
     if (!write_status.ok()) write_status_.MergeStatus(write_status);
@@ -732,6 +732,10 @@ void BufferPool::Client::WaitForAllWrites() {
 
 string BufferPool::Client::DebugString() {
   lock_guard<mutex> lock(lock_);
+  return DebugStringLocked();
+}
+
+string BufferPool::Client::DebugStringLocked() {
   stringstream ss;
   ss << Substitute("<BufferPool::Client> $0 name: $1 write_status: $2 "
                    "buffers allocated $3 num_pages: $4 pinned_bytes: $5 "

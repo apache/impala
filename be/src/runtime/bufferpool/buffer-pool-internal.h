@@ -289,22 +289,23 @@ class BufferPool::Client {
     return pinned_pages_.size() < num_pages_;
   }
 
+  /// Print debugging info about the state of the client. Caller must not hold 'lock_'.
   std::string DebugString();
 
  private:
   // Check consistency of client, DCHECK if inconsistent. 'lock_' must be held.
   void DCheckConsistency() {
-    DCHECK_GE(buffers_allocated_bytes_, 0);
+    DCHECK_GE(buffers_allocated_bytes_, 0) << DebugStringLocked();
     pinned_pages_.DCheckConsistency();
     dirty_unpinned_pages_.DCheckConsistency();
     in_flight_write_pages_.DCheckConsistency();
     DCHECK_LE(pinned_pages_.size() + dirty_unpinned_pages_.size()
             + in_flight_write_pages_.size(),
-        num_pages_);
+        num_pages_) << DebugStringLocked();
     // Check that we flushed enough pages to disk given our eviction policy.
     DCHECK_GE(reservation_.GetReservation(), buffers_allocated_bytes_
             + pinned_pages_.bytes() + dirty_unpinned_pages_.bytes()
-            + in_flight_write_pages_.bytes());
+            + in_flight_write_pages_.bytes()) << DebugStringLocked();
   }
 
   /// Must be called once before allocating or reclaiming a buffer of 'len'. Ensures that
@@ -329,6 +330,9 @@ class BufferPool::Client {
   /// 'client_lock' is released then reacquired.
   Status StartMoveEvictedToPinned(
       boost::unique_lock<boost::mutex>* client_lock, ClientHandle* client, Page* page);
+
+  /// Same as DebugString() except the caller must already hold 'lock_'.
+  std::string DebugStringLocked();
 
   /// The buffer pool that owns the client.
   BufferPool* const pool_;
