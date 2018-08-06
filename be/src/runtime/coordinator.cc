@@ -730,13 +730,35 @@ void Coordinator::ComputeQuerySummary() {
     fragment_stats->AddExecStats();
   }
 
-  stringstream info;
+  stringstream mem_info, cpu_user_info, cpu_system_info, bytes_read_info;
+  ResourceUtilization total_utilization;
   for (BackendState* backend_state: backend_states_) {
-    info << TNetworkAddressToString(backend_state->impalad_address()) << "("
-         << PrettyPrinter::Print(backend_state->GetPeakConsumption(), TUnit::BYTES)
-         << ") ";
+    ResourceUtilization utilization = backend_state->ComputeResourceUtilization();
+    total_utilization.Merge(utilization);
+    string network_address = TNetworkAddressToString(
+        backend_state->impalad_address());
+    mem_info << network_address << "("
+             << PrettyPrinter::Print(utilization.peak_per_host_mem_consumption,
+                 TUnit::BYTES) << ") ";
+    bytes_read_info << network_address << "("
+                    << PrettyPrinter::Print(utilization.bytes_read, TUnit::BYTES) << ") ";
+    cpu_user_info << network_address << "("
+                  << PrettyPrinter::Print(utilization.cpu_user_ns, TUnit::TIME_NS)
+                  << ") ";
+    cpu_system_info << network_address << "("
+                    << PrettyPrinter::Print(utilization.cpu_sys_ns, TUnit::TIME_NS)
+                    << ") ";
   }
-  query_profile_->AddInfoString("Per Node Peak Memory Usage", info.str());
+
+  COUNTER_SET(ADD_COUNTER(query_profile_, "TotalBytesRead", TUnit::BYTES),
+      total_utilization.bytes_read);
+  COUNTER_SET(ADD_COUNTER(query_profile_, "TotalCpuTime", TUnit::TIME_NS),
+      total_utilization.cpu_user_ns + total_utilization.cpu_sys_ns);
+
+  query_profile_->AddInfoString("Per Node Peak Memory Usage", mem_info.str());
+  query_profile_->AddInfoString("Per Node Bytes Read", bytes_read_info.str());
+  query_profile_->AddInfoString("Per Node User Time", cpu_user_info.str());
+  query_profile_->AddInfoString("Per Node System Time", cpu_system_info.str());
 }
 
 string Coordinator::GetErrorLog() {
@@ -773,6 +795,14 @@ void Coordinator::ReleaseAdmissionControlResources() {
   DCHECK(admission_controller != nullptr);
   admission_controller->ReleaseQuery(schedule_);
   query_events_->MarkEvent("Released admission control resources");
+}
+
+Coordinator::ResourceUtilization Coordinator::ComputeQueryResourceUtilization() {
+  ResourceUtilization query_resource_utilization;
+  for (BackendState* backend_state: backend_states_) {
+    query_resource_utilization.Merge(backend_state->ComputeResourceUtilization());
+  }
+  return query_resource_utilization;
 }
 
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {

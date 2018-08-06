@@ -210,9 +210,35 @@ Status Coordinator::BackendState::GetStatus(bool* is_fragment_failure,
   return status_;
 }
 
-int64_t Coordinator::BackendState::GetPeakConsumption() {
+Coordinator::ResourceUtilization Coordinator::BackendState::ComputeResourceUtilization() {
   lock_guard<mutex> l(lock_);
-  return peak_consumption_;
+  return ComputeResourceUtilizationLocked();
+}
+
+Coordinator::ResourceUtilization
+Coordinator::BackendState::ComputeResourceUtilizationLocked() {
+  ResourceUtilization result;
+  for (const auto& entry : instance_stats_map_) {
+    RuntimeProfile* profile = entry.second->profile_;
+    ResourceUtilization instance_utilization;
+    // Update resource utilization and apply delta.
+    RuntimeProfile::Counter* user_time = profile->GetCounter("TotalThreadsUserTime");
+    if (user_time != nullptr) instance_utilization.cpu_user_ns = user_time->value();
+
+    RuntimeProfile::Counter* system_time = profile->GetCounter("TotalThreadsSysTime");
+    if (system_time != nullptr) instance_utilization.cpu_sys_ns = system_time->value();
+
+    for (RuntimeProfile::Counter* c : entry.second->bytes_read_counters_) {
+      instance_utilization.bytes_read += c->value();
+    }
+
+    RuntimeProfile::Counter* peak_mem =
+        profile->GetCounter(FragmentInstanceState::PER_HOST_PEAK_MEM_COUNTER);
+    if (peak_mem != nullptr)
+      instance_utilization.peak_per_host_mem_consumption = peak_mem->value();
+    result.Merge(instance_utilization);
+  }
+  return result;
 }
 
 void Coordinator::BackendState::MergeErrorLog(ErrorLogMap* merged) {
@@ -258,11 +284,6 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     if (instance_stats->done_) continue;
 
     instance_stats->Update(instance_exec_status, exec_summary, scan_range_progress);
-    if (instance_stats->peak_mem_counter_ != nullptr) {
-      // protect against out-of-order status updates
-      peak_consumption_ =
-        max(peak_consumption_, instance_stats->peak_mem_counter_->value());
-    }
 
     // If a query is aborted due to an error encountered by a single fragment instance,
     // all other fragment instances will report a cancelled status; make sure not to mask
@@ -445,15 +466,17 @@ void Coordinator::BackendState::InstanceStats::InitCounters() {
     RuntimeProfile::Counter* c =
         p->GetCounter(ScanNode::SCAN_RANGES_COMPLETE_COUNTER);
     if (c != nullptr) scan_ranges_complete_counters_.push_back(c);
+
+    RuntimeProfile::Counter* bytes_read =
+        p->GetCounter(ScanNode::BYTES_READ_COUNTER);
+    if (bytes_read != nullptr) bytes_read_counters_.push_back(bytes_read);
   }
 
-  peak_mem_counter_ =
-      profile_->GetCounter(FragmentInstanceState::PER_HOST_PEAK_MEM_COUNTER);
 }
 
 void Coordinator::BackendState::InstanceStats::Update(
-    const TFragmentInstanceExecStatus& exec_status,
-    ExecSummary* exec_summary, ProgressUpdater* scan_range_progress) {
+    const TFragmentInstanceExecStatus& exec_status, ExecSummary* exec_summary,
+    ProgressUpdater* scan_range_progress) {
   last_report_time_ms_ = MonotonicMillis();
   if (exec_status.done) stopwatch_.Stop();
   profile_->Update(exec_status.profile);
@@ -579,10 +602,17 @@ void Coordinator::FragmentStats::AddExecStats() {
 
 void Coordinator::BackendState::ToJson(Value* value, Document* document) {
   lock_guard<mutex> l(lock_);
+  ResourceUtilization resource_utilization = ComputeResourceUtilizationLocked();
   value->AddMember("num_instances", fragments_.size(), document->GetAllocator());
   value->AddMember("done", IsDone(), document->GetAllocator());
-  value->AddMember(
-      "peak_mem_consumption", peak_consumption_, document->GetAllocator());
+  value->AddMember("peak_per_host_mem_consumption",
+      resource_utilization.peak_per_host_mem_consumption, document->GetAllocator());
+  value->AddMember("bytes_read", resource_utilization.bytes_read,
+      document->GetAllocator());
+  value->AddMember("cpu_user_s", resource_utilization.cpu_user_ns / 1e9,
+      document->GetAllocator());
+  value->AddMember("cpu_sys_s", resource_utilization.cpu_sys_ns / 1e9,
+      document->GetAllocator());
 
   string host = TNetworkAddressToString(impalad_address());
   Value val(host.c_str(), document->GetAllocator());

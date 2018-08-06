@@ -36,7 +36,10 @@ under the License.
       <th>Num. instances</th>
       <th>Num. remaining instances</th>
       <th>Done</th>
-      <th>Peak mem. consumption</th>
+      <th>Peak per-host mem. consumption</th>
+      <th>Scan bytes read</th>
+      <th>User CPU(s)</th>
+      <th>Kernel CPU(s)</th>
       <th>Time since last report (ms)</th>
     </tr>
   </thead>
@@ -64,7 +67,10 @@ $(document).ready(function() {
                      {data: 'num_instances'},
                      {data: 'num_remaining_instances'},
                      {data: 'done'},
-                     {data: 'peak_mem_consumption', render: renderSize},
+                     {data: 'peak_per_host_mem_consumption', render: renderSize},
+                     {data: 'bytes_read', render: renderSize},
+                     {data: 'cpu_user_s'},
+                     {data: 'cpu_sys_s'},
                      {data: 'time_since_last_heard_from'}],
         "order": [[ 0, "desc" ]],
         "pageLength": 100

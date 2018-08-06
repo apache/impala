@@ -331,6 +331,14 @@ enum TImpalaQueryOptions {
   // The timezone used in UTC<->localtime conversions. The default is the OS's timezone
   // at the coordinator, which can be overridden by environment variable $TZ.
   TIMEZONE,
+
+  // Scan bytes limit, after which a query will be terminated with an error.
+  SCAN_BYTES_LIMIT,
+
+  // CPU time limit in seconds, after which a query will be terminated with an error.
+  // Note that until IMPALA-7318 is fixed, CPU usage can be very stale and this may not
+  // terminate queries soon enough.
+  CPU_LIMIT_S,
 }
 
 // The summary of a DML statement.

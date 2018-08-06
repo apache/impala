@@ -38,3 +38,7 @@ class TestResourceLimits(ImpalaTestSuite):
     # Remove option from vector to allow test file to override it per query.
     del vector.get_value('exec_option')['num_nodes']
     self.run_test_case('QueryTest/thread-limits', vector)
+
+  @SkipIfLocal.multiple_impalad
+  def test_resource_limits(self, vector):
+    self.run_test_case('QueryTest/query-resource-limits', vector)

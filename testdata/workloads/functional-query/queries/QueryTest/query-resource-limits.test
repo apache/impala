@@ -1,0 +1,75 @@
+====
+---- QUERY
+# Query should succeed.
+set CPU_LIMIT_S=10000;
+set SCAN_BYTES_LIMIT="10G";
+select id from functional.alltypessmall  order by 1 limit 1
+---- TYPES
+INT
+---- RESULTS
+0
+====
+---- QUERY
+# Query should fail due to exceeding scan bytes limit.
+set SCAN_BYTES_LIMIT="100M";
+select count(*) from tpch.lineitem l1,tpch.lineitem l2, tpch.lineitem l3 where
+            l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey and
+            l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment
+            having count(*) = 99
+---- CATCH
+row_regex:.*terminated due to scan bytes limit of 100.00 M.*
+====
+---- QUERY
+# Query should fail due to CPU time limit.
+set CPU_LIMIT_S=1;
+select count(*) from tpch.lineitem l1,tpch.lineitem l2, tpch.lineitem l3 where
+            l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey and
+            l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment
+            having count(*) = 99
+---- CATCH
+row_regex:.*terminated due to CPU limit of 1s000ms.*
+====
+---- QUERY
+# Query should fail due to CPU time limit.
+set CPU_LIMIT_S=1;
+set SCAN_BYTES_LIMIT="100G";
+select count(*) from tpch.lineitem l1,tpch.lineitem l2, tpch.lineitem l3 where
+            l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey and
+            l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment
+            having count(*) = 99
+---- CATCH
+row_regex:.*terminated due to CPU limit of 1s000ms.*
+====
+---- QUERY
+# Query should fail due to exceeding time limit.
+set EXEC_TIME_LIMIT_S=2;
+set CPU_LIMIT_S=10000;
+set SCAN_BYTES_LIMIT="100G";
+select count(*) from tpch.lineitem l1,tpch.lineitem l2, tpch.lineitem l3 where
+            l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey and
+            l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment
+            having count(*) = 99
+---- CATCH
+row_regex:.*expired due to execution time limit of 2s000ms.*
+====
+---- QUERY
+# Bytes limit not enforced for Kudu yet.
+set SCAN_BYTES_LIMIT="1k";
+select min(l_orderkey) from tpch_kudu.lineitem
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====
+---- QUERY
+# Bytes limit enforced for HBase.
+# Add a sleep to slow down query and avoid race with bytes check.
+set SCAN_BYTES_LIMIT="1k";
+select count(*)
+from (
+  select distinct *
+  from functional_hbase.alltypesagg
+  where sleep(100) = id) v
+---- CATCH
+row_regex:.*terminated due to scan bytes limit of 1.00 K.*
+====

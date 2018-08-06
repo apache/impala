@@ -167,6 +167,38 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// instances running on each backend in a member named 'backend_instances'.
   void FInstanceStatsToJson(rapidjson::Document* document);
 
+  /// Struct to aggregate resource usage information at the finstance, backend and
+  /// query level.
+  struct ResourceUtilization {
+    /// Peak memory used for this query (value of the query memtracker's
+    /// peak_consumption()). At the finstance or backend level, this is the
+    /// peak value for that backend or if at the query level, this is the max
+    /// peak value from any backend.
+    int64_t peak_per_host_mem_consumption = 0;
+
+    /// Total bytes read across all scan nodes.
+    int64_t bytes_read = 0;
+
+    /// Total user cpu consumed.
+    int64_t cpu_user_ns = 0;
+
+    /// Total system cpu consumed.
+    int64_t cpu_sys_ns = 0;
+
+    /// Merge utilization from 'other' into this.
+    void Merge(const ResourceUtilization& other) {
+      peak_per_host_mem_consumption =
+          std::max(peak_per_host_mem_consumption, other.peak_per_host_mem_consumption);
+      bytes_read += other.bytes_read;
+      cpu_user_ns += other.cpu_user_ns;
+      cpu_sys_ns += other.cpu_sys_ns;
+    }
+  };
+
+  /// Aggregate resource utilization for the query (i.e. across all backends based on the
+  /// latest status reports received from those backends).
+  ResourceUtilization ComputeQueryResourceUtilization();
+
  private:
   class BackendState;
   struct FilterTarget;

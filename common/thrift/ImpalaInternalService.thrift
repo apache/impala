@@ -298,6 +298,12 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift.
   70: optional string timezone = ""
+
+  // See comment in ImpalaService.thrift.
+  71: optional i64 scan_bytes_limit = 0;
+
+  // See comment in ImpalaService.thrift.
+  72: optional i64 cpu_limit_s = 0;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

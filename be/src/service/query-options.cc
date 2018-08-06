@@ -674,7 +674,8 @@ Status impala::SetQueryOption(const string& key, const string& value,
           query_options->__set_kudu_read_mode(TKuduReadMode::READ_AT_SNAPSHOT);
         } else {
           return Status(Substitute("Invalid kudu_read_mode '$0'. Valid values are "
-              "DEFAULT, READ_LATEST, and READ_AT_SNAPSHOT.", value));
+                                   "DEFAULT, READ_LATEST, and READ_AT_SNAPSHOT.",
+              value));
         }
         break;
       }
@@ -693,6 +694,24 @@ Status impala::SetQueryOption(const string& key, const string& value,
           return Status(Substitute("Invalid timezone name '$0'.", timezone));
         }
         query_options->__set_timezone(timezone);
+        break;
+      }
+      case TImpalaQueryOptions::SCAN_BYTES_LIMIT: {
+        int64_t bytes_limit;
+        RETURN_IF_ERROR(ParseMemValue(value, "query scan bytes limit", &bytes_limit));
+        query_options->__set_scan_bytes_limit(bytes_limit);
+        break;
+      }
+      case TImpalaQueryOptions::CPU_LIMIT_S: {
+        StringParser::ParseResult result;
+        const int64_t cpu_limit_s =
+            StringParser::StringToInt<int64_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || cpu_limit_s < 0) {
+          return Status(
+              Substitute("Invalid CPU limit: '$0'. "
+                         "Only non-negative numbers are allowed.", value));
+        }
+        query_options->__set_cpu_limit_s(cpu_limit_s);
         break;
       }
       default:

@@ -53,6 +53,9 @@ WAIT_ACTIONS = [None, '0:GETNEXT:WAIT']
 # Verify that failed CancelFInstances() RPCs don't lead to hung queries
 FAIL_RPC_ACTIONS = [None, 'COORD_CANCEL_QUERY_FINSTANCES_RPC:FAIL']
 
+# Test cancelling when there is a resource limit.
+CPU_LIMIT_S = [0, 100000]
+
 # Verify close rpc running concurrently with fetch rpc. The two cases verify:
 # False: close and fetch rpc run concurrently.
 # True: cancel rpc is enough to ensure that the fetch rpc is unblocked.
@@ -85,6 +88,8 @@ class TestCancellation(ImpalaTestSuite):
         ImpalaTestDimension('join_before_close', *JOIN_BEFORE_CLOSE))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('buffer_pool_limit', 0))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('cpu_limit_s', *CPU_LIMIT_S))
 
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('query_type') != 'CTAS' or (\
@@ -138,6 +143,7 @@ class TestCancellation(ImpalaTestSuite):
 
     vector.get_value('exec_option')['buffer_pool_limit'] =\
         vector.get_value('buffer_pool_limit')
+    vector.get_value('exec_option')['cpu_limit_s'] = vector.get_value('cpu_limit_s')
 
     # Execute the query multiple times, cancelling it each time.
     for i in xrange(NUM_CANCELATION_ITERATIONS):

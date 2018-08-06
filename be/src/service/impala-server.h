@@ -831,6 +831,12 @@ class ImpalaServer : public ImpalaServiceIf,
   /// FLAGS_idle_query_timeout seconds.
   [[noreturn]] void ExpireQueries();
 
+  /// Called from ExpireQueries() to check query resource limits for 'crs'. If the query
+  /// exceeded a resource limit, returns a non-OK status with information about what
+  /// limit was exceeded. Returns OK if the query will continue running and expiration
+  /// check should be rescheduled for a later time.
+  Status CheckResourceLimits(ClientRequestState* crs);
+
   /// Expire 'crs' and cancel it with status 'status'.
   void ExpireQuery(ClientRequestState* crs, const Status& status);
 
@@ -1065,7 +1071,10 @@ class ImpalaServer : public ImpalaServiceIf,
     IDLE_TIMEOUT,
     // A hard time limit on query execution. The query is cancelled if this event occurs
     // before the query finishes.
-    EXEC_TIME_LIMIT
+    EXEC_TIME_LIMIT,
+    // A hard limit on cpu and scanned bytes. The query is cancelled if this event occurs
+    // before the query finishes.
+    RESOURCE_LIMIT,
   };
 
   // Describes a query expiration event where the query identified by 'query_id' is

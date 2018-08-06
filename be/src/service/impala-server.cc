@@ -240,6 +240,9 @@ const char* ImpalaServer::SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION = "42000";
 const char* ImpalaServer::SQLSTATE_GENERAL_ERROR = "HY000";
 const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 
+// Interval between checks for query expiration.
+const int64_t EXPIRATION_CHECK_INTERVAL_MS = 1000L;
+
 // Work item for ImpalaServer::cancellation_thread_pool_.
 class CancellationWork {
  public:
@@ -1061,7 +1064,10 @@ Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
     idle_timeout_s = max(FLAGS_idle_query_timeout, idle_timeout_s);
   }
   int32_t exec_time_limit_s = request_state->query_options().exec_time_limit_s;
-  if (idle_timeout_s > 0 || exec_time_limit_s > 0) {
+  int64_t cpu_limit_s = request_state->query_options().cpu_limit_s;
+  int64_t scan_bytes_limit = request_state->query_options().scan_bytes_limit;
+  if (idle_timeout_s > 0 || exec_time_limit_s > 0 ||
+        cpu_limit_s > 0 || scan_bytes_limit > 0) {
     lock_guard<mutex> l2(query_expiration_lock_);
     int64_t now = UnixMillis();
     if (idle_timeout_s > 0) {
@@ -1075,6 +1081,18 @@ Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
                  << PrettyPrinter::Print(exec_time_limit_s, TUnit::TIME_S);
       queries_by_timestamp_.emplace(ExpirationEvent{
           now + (1000L * exec_time_limit_s), query_id, ExpirationKind::EXEC_TIME_LIMIT});
+    }
+    if (cpu_limit_s > 0 || scan_bytes_limit > 0) {
+      if (cpu_limit_s > 0) {
+        VLOG_QUERY << "Query " << PrintId(query_id) << " has CPU limit of "
+                   << PrettyPrinter::Print(cpu_limit_s, TUnit::TIME_S);
+      }
+      if (scan_bytes_limit > 0) {
+        VLOG_QUERY << "Query " << PrintId(query_id) << " has scan bytes limit of "
+                   << PrettyPrinter::Print(scan_bytes_limit, TUnit::BYTES);
+      }
+      queries_by_timestamp_.emplace(ExpirationEvent{
+          now + EXPIRATION_CHECK_INTERVAL_MS, query_id, ExpirationKind::RESOURCE_LIMIT});
     }
   }
   return Status::OK();
@@ -1952,7 +1970,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
 
 [[noreturn]] void ImpalaServer::ExpireQueries() {
   while (true) {
-    // The following block accomplishes three things:
+    // The following block accomplishes four things:
     //
     // 1. Update the ordered list of queries by checking the 'idle_time' parameter in
     // client_request_state. We are able to avoid doing this for *every* query in flight
@@ -1967,6 +1985,8 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
     // 3. Compute the next time a query *might* expire, so that the sleep at the end of
     // this loop has an accurate duration to wait. If the list of queries is empty, the
     // default sleep duration is half the idle query timeout.
+    //
+    // 4. Cancel queries with CPU and scan bytes constraints if limit is exceeded
     int64_t now;
     {
       lock_guard<mutex> l(query_expiration_lock_);
@@ -1976,24 +1996,38 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
         // 'queries_by_timestamp_' is stored in ascending order of deadline so we can
         // break out of the loop and sleep as soon as we see a deadline in the future.
         if (expiration_event->deadline > now) break;
-        shared_ptr<ClientRequestState> query_state =
+        shared_ptr<ClientRequestState> crs =
             GetClientRequestState(expiration_event->query_id);
-        if (query_state == nullptr || query_state->is_expired()) {
+        if (crs == nullptr || crs->is_expired()) {
           // Query was deleted or expired already from a previous expiration event.
+          expiration_event = queries_by_timestamp_.erase(expiration_event);
+          continue;
+        }
+
+        // Check for CPU and scanned bytes limits
+        if (expiration_event->kind == ExpirationKind::RESOURCE_LIMIT) {
+          Status resource_status = CheckResourceLimits(crs.get());
+          if (resource_status.ok()) {
+            queries_by_timestamp_.emplace(
+                ExpirationEvent{now + EXPIRATION_CHECK_INTERVAL_MS,
+                    expiration_event->query_id, ExpirationKind::RESOURCE_LIMIT});
+          } else {
+            ExpireQuery(crs.get(), resource_status);
+          }
           expiration_event = queries_by_timestamp_.erase(expiration_event);
           continue;
         }
 
         // If the query time limit expired, we must cancel the query.
         if (expiration_event->kind == ExpirationKind::EXEC_TIME_LIMIT) {
-          int32_t exec_time_limit_s = query_state->query_options().exec_time_limit_s;
+          int32_t exec_time_limit_s = crs->query_options().exec_time_limit_s;
           VLOG_QUERY << "Expiring query " << PrintId(expiration_event->query_id)
                      << " due to execution time limit of " << exec_time_limit_s << "s.";
           const string& err_msg = Substitute(
               "Query $0 expired due to execution time limit of $1",
               PrintId(expiration_event->query_id),
               PrettyPrinter::Print(exec_time_limit_s, TUnit::TIME_S));
-          ExpireQuery(query_state.get(), Status::Expected(err_msg));
+          ExpireQuery(crs.get(), Status::Expected(err_msg));
           expiration_event = queries_by_timestamp_.erase(expiration_event);
           continue;
         }
@@ -2003,14 +2037,14 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
         // Now check to see if the idle timeout has expired. We must check the actual
         // expiration time in case the query has updated 'last_active_ms' since the last
         // time we looked.
-        int32_t idle_timeout_s = query_state->query_options().query_timeout_s;
+        int32_t idle_timeout_s = crs->query_options().query_timeout_s;
         if (FLAGS_idle_query_timeout > 0 && idle_timeout_s > 0) {
           idle_timeout_s = min(FLAGS_idle_query_timeout, idle_timeout_s);
         } else {
           // Use a non-zero timeout, if one exists
           idle_timeout_s = max(FLAGS_idle_query_timeout, idle_timeout_s);
         }
-        int64_t expiration = query_state->last_active_ms() + (idle_timeout_s * 1000L);
+        int64_t expiration = crs->last_active_ms() + (idle_timeout_s * 1000L);
         if (now < expiration) {
           // If the real expiration date is in the future we may need to re-insert the
           // query's expiration event at its correct location.
@@ -2026,17 +2060,17 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
             queries_by_timestamp_.emplace(ExpirationEvent{
                 expiration, query_id, ExpirationKind::IDLE_TIMEOUT});
           }
-        } else if (!query_state->is_active()) {
+        } else if (!crs->is_active()) {
           // Otherwise time to expire this query
           VLOG_QUERY
               << "Expiring query due to client inactivity: "
               << PrintId(expiration_event->query_id) << ", last activity was at: "
-              << ToStringFromUnixMillis(query_state->last_active_ms());
+              << ToStringFromUnixMillis(crs->last_active_ms());
           const string& err_msg = Substitute(
               "Query $0 expired due to client inactivity (timeout is $1)",
               PrintId(expiration_event->query_id),
               PrettyPrinter::Print(idle_timeout_s, TUnit::TIME_S));
-          ExpireQuery(query_state.get(), Status::Expected(err_msg));
+          ExpireQuery(crs.get(), Status::Expected(err_msg));
           expiration_event = queries_by_timestamp_.erase(expiration_event);
         } else {
           // Iterator is moved on in every other branch.
@@ -2048,8 +2082,38 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
     // could expire is in 1s time. An existing query may expire sooner, but we are
     // comfortable with a maximum error of 1s as a trade-off for not frequently waking
     // this thread.
-    SleepForMs(1000L);
+    SleepForMs(EXPIRATION_CHECK_INTERVAL_MS);
   }
+}
+
+Status ImpalaServer::CheckResourceLimits(ClientRequestState* crs) {
+  Coordinator* coord = crs->GetCoordinator();
+  // Coordinator may be null if query has not started executing, check again later.
+  if (coord == nullptr) return Status::OK();
+  Coordinator::ResourceUtilization utilization = coord->ComputeQueryResourceUtilization();
+
+  // CPU time consumed by the query so far
+  int64_t cpu_time_ns = utilization.cpu_sys_ns + utilization.cpu_user_ns;
+  int64_t cpu_limit_s = crs->query_options().cpu_limit_s;
+  int64_t cpu_limit_ns = cpu_limit_s * 1000'000'000L;
+  if (cpu_limit_ns > 0 && cpu_time_ns > cpu_limit_ns) {
+    const string& err_msg = Substitute("Query $0 terminated due to CPU limit of $1",
+        PrintId(crs->query_id()), PrettyPrinter::Print(cpu_limit_s, TUnit::TIME_S));
+    VLOG_QUERY << err_msg;
+    return Status::Expected(err_msg);
+  }
+
+  int64_t scan_bytes = utilization.bytes_read;
+  int64_t scan_bytes_limit = crs->query_options().scan_bytes_limit;
+  if (scan_bytes_limit > 0 && scan_bytes > scan_bytes_limit) {
+    const string& err_msg = Substitute(
+        "Query $0 terminated due to scan bytes limit of $1", PrintId(crs->query_id()),
+        PrettyPrinter::Print(scan_bytes_limit, TUnit::BYTES));
+    VLOG_QUERY << err_msg;
+    return Status::Expected(err_msg);
+  }
+  // Query is within the resource limits, check again later.
+  return Status::OK();
 }
 
 void ImpalaServer::ExpireQuery(ClientRequestState* crs, const Status& status) {

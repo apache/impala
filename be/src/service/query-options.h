@@ -41,7 +41,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // the DCHECK.
 #define QUERY_OPTS_TABLE\
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),\
-      TImpalaQueryOptions::TIMEZONE + 1);\
+      TImpalaQueryOptions::CPU_LIMIT_S + 1);\
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED)\
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)\
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)\
@@ -140,6 +140,9 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
   QUERY_OPT_FN(allow_erasure_coded_files, ALLOW_ERASURE_CODED_FILES,\
       TQueryOptionLevel::DEVELOPMENT)\
   QUERY_OPT_FN(timezone, TIMEZONE, TQueryOptionLevel::REGULAR)\
+  QUERY_OPT_FN(scan_bytes_limit, SCAN_BYTES_LIMIT,\
+      TQueryOptionLevel::ADVANCED)\
+  QUERY_OPT_FN(cpu_limit_s, CPU_LIMIT_S, TQueryOptionLevel::DEVELOPMENT)\
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.
