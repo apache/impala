@@ -179,8 +179,14 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
   @Override
   public Set<HdfsFileFormat> getFileFormats() {
-    // Needed by HdfsTableSink.
-    throw new UnsupportedOperationException("TODO: implement me");
+    // TODO(todd): can we avoid loading all partitions here? this is called
+    // for any INSERT query, even if the partition is specified.
+    Collection<? extends FeFsPartition> parts = FeCatalogUtils.loadAllPartitions(this);
+    // In the case that we have no partitions added to the table yet, it's
+    // important to add the "prototype" partition as a fallback.
+    Iterable<FeFsPartition> partitionsToConsider = Iterables.concat(
+        parts, Collections.singleton(createPrototypePartition()));
+    return FeCatalogUtils.getFileFormats(partitionsToConsider);
   }
 
   @Override

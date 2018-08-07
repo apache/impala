@@ -25,7 +25,6 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
@@ -90,7 +89,7 @@ public class HdfsTableSink extends TableSink {
       numPartitionsPerInstance = DEFAULT_NUM_PARTITIONS;
     }
 
-    HdfsTable table = (HdfsTable) targetTable_;
+    FeFsTable table = (FeFsTable) targetTable_;
     // TODO: Estimate the memory requirements more accurately by partition type.
     Set<HdfsFileFormat> formats = table.getFileFormats();
     long perPartitionMemReq = getPerPartitionMemReq(formats);
