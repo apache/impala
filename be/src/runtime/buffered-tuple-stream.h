@@ -93,9 +93,12 @@ class TupleRow;
 /// buffer is needed to keep the row being processed in-memory, but only default-sized
 /// buffers are needed for the other streams being written.
 ///
-/// The tuple stream also supports a 'attach_on_read' mode, enabled by passing a flag
-/// to PrepareForRead() which attaches the stream's pages to the output batch as it
-/// does a final destructive read pass over the stream.
+/// The tuple stream also supports a 'delete_on_read' mode, enabled by passing a flag
+/// to PrepareForRead() which deletes the stream's pages as it does a final read
+/// pass over the stream.
+///
+/// TODO: IMPALA-4179: the buffer management can be simplified once we can attach
+/// buffers to RowBatches.
 ///
 /// Page layout:
 /// Rows are stored back to back starting at the first byte of each page's buffer, with
@@ -159,11 +162,11 @@ class TupleRow;
 /// Read:
 ///   1. Unpinned: Only a single read page is pinned at a time. This means that only
 ///     enough reservation to pin a single page is needed to read the stream, regardless
-///     of the stream's size. Each page is attached or unpinned (if attach on read is true
+///     of the stream's size. Each page is deleted or unpinned (if delete on read is true
 ///     or false respectively) before advancing to the next page.
 ///   2. Pinned: All pages in the stream are pinned so do not need to be pinned or
-///     unpinned when reading from the stream. If attach on read is true, pages are
-///     attached after being read. If the stream was previously unpinned, the page's data
+///     unpinned when reading from the stream. If delete on read is true, pages are
+///     deleted after being read. If the stream was previously unpinned, the page's data
 ///     may not yet be in memory - reading from the stream can block on I/O or fail with
 ///     an I/O error.
 /// Write:
@@ -176,17 +179,12 @@ class TupleRow;
 ///     or free up other memory before retrying.
 ///
 /// Memory lifetime of rows read from stream:
-/// There are several cases.
-/// 1. If the stream is pinned and attach on read is false, it is valid to access any
-///    tuples returned via GetNext() until the stream is unpinned.
-/// 2. If the stream is in attach on read mode, all buffers referenced by returned rows
-///    are attached to the batches by that GetNext() call or a subsequent one. The
-///    caller is responsible for managing the lifetime of those buffers.
-/// 3. If the stream is unpinned and not in attach on read mode, then the batch returned
-///    from GetNext() may have the FLUSH_RESOURCES flag set, which means that any tuple
-///    memory returned so far from the stream may be freed on the next call to GetNext().
-///    It is *not* safe to return references to rows returned in this mode outside of
-///    the ExecNode.
+/// If the stream is pinned and delete on read is false, it is valid to access any tuples
+/// returned via GetNext() until the stream is unpinned. If the stream is unpinned or
+/// delete on read is true, then the batch returned from GetNext() may have the
+/// needs_deep_copy flag set, which means that any tuple memory returned so far from the
+/// stream may be freed on the next call to GetNext().
+/// TODO: IMPALA-4179, instead of needs_deep_copy, attach the pages' buffers to the batch.
 ///
 /// Manual construction of rows with AddRowCustomBegin()/AddRowCustomEnd():
 /// The BufferedTupleStream supports allocation of uninitialized rows with
@@ -199,7 +197,8 @@ class TupleRow;
 /// will not be modified until the stream is read via GetNext().
 /// TODO: IMPALA-5007: try to remove AddRowCustom*() by unifying with AddRow().
 ///
-/// TODO: prefetching for pages could speed up iteration over unpinned streams.
+/// TODO: we need to be able to do read ahead for pages. We need some way to indicate a
+/// page will need to be pinned soon.
 class BufferedTupleStream {
  public:
   /// A pointer to the start of a flattened TupleRow in the stream.
@@ -214,7 +213,7 @@ class BufferedTupleStream {
       int64_t max_page_len,
       const std::set<SlotId>& ext_varlen_slots = std::set<SlotId>());
 
-  ~BufferedTupleStream() { DCHECK(closed_); }
+  virtual ~BufferedTupleStream();
 
   /// Initializes the tuple stream object on behalf of node 'node_id'. Must be called
   /// once before any of the other APIs.
@@ -234,23 +233,23 @@ class BufferedTupleStream {
   /// Prepares the stream for interleaved reads and writes by saving enough reservation
   /// for default-sized read and write pages. Called after Init() and before the first
   /// AddRow() or AddRowCustomBegin() call.
-  /// 'attach_on_read': Pages are attached to the output batch after they are read.
+  /// 'delete_on_read': Pages are deleted after they are read.
   /// 'got_reservation': set to true if there was enough reservation to initialize the
   ///     read and write pages and false if there was not enough reservation and no other
   ///     error was encountered. Undefined if an error status is returned.
   Status PrepareForReadWrite(
-      bool attach_on_read, bool* got_reservation) WARN_UNUSED_RESULT;
+      bool delete_on_read, bool* got_reservation) WARN_UNUSED_RESULT;
 
   /// Prepares the stream for reading, invalidating the write iterator (if there is one).
   /// Therefore must be called after the last AddRow() or AddRowCustomEnd() and before
   /// GetNext(). PrepareForRead() can be called multiple times to do multiple read passes
   /// over the stream, unless rows were read from the stream after PrepareForRead() or
-  /// PrepareForReadWrite() was called with attach_on_read = true.
-  /// 'attach_on_read': Pages are attached to the output batch after they are read.
+  /// PrepareForReadWrite() was called with delete_on_read = true.
+  /// 'delete_on_read': Pages are deleted after they are read.
   /// 'got_reservation': set to true if there was enough reservation to initialize the
   ///     first read page and false if there was not enough reservation and no other
   ///     error was encountered. Undefined if an error status is returned.
-  Status PrepareForRead(bool attach_on_read, bool* got_reservation) WARN_UNUSED_RESULT;
+  Status PrepareForRead(bool delete_on_read, bool* got_reservation) WARN_UNUSED_RESULT;
 
   /// Adds a single row to the stream. There are three possible outcomes:
   /// a) The append succeeds. True is returned.
@@ -304,10 +303,7 @@ class BufferedTupleStream {
   enum UnpinMode {
     /// All pages in the stream are unpinned and the read/write positions in the stream
     /// are reset. No more rows can be written to the stream after this. The stream can
-    /// be re-read from the beginning by calling PrepareForRead(). It in invalid to call
-    /// UnpinStream(UNPIN_ALL) if the stream is in 'attach_on_read' mode and >= 1 row has
-    /// been read from the stream, because this would leave the stream in limbo where it
-    /// still has unpinned pages but it cannot be read or written to.
+    /// be re-read from the beginning by calling PrepareForRead().
     UNPIN_ALL,
     /// All pages are unpinned aside from the current read and write pages (if any),
     /// which is left in the same state. The unpinned stream can continue being read
@@ -319,21 +315,14 @@ class BufferedTupleStream {
   void UnpinStream(UnpinMode mode);
 
   /// Get the next batch of output rows, which are backed by the stream's memory.
+  /// If the stream is unpinned or 'delete_on_read' is true, the 'needs_deep_copy'
+  /// flag may be set on 'batch' to signal that memory will be freed on the next
+  /// call to GetNext() and that the caller should copy out any data it needs from
+  /// rows in 'batch' or in previous batches returned from GetNext().
   ///
-  /// If the stream is in 'attach_on_read' mode then buffers are attached to 'batch'
-  /// when the last row referencing the buffer is returned. The FLUSH_RESOURCES flag
-  /// is always set when attaching such a buffer.
-  /// TODO: always flushing for pinned streams is overkill since we may not need
-  /// to reuse the reservation immediately. Changing this may require modifying
-  /// callers of this class.
-  ///
-  /// If the stream is unpinned and not in 'attach_on_read' mode, the FLUSH_RESOURCES
-  /// flag may be set on the batch to signal that memory will be freed on the next call
-  /// to GetNext() and that the caller should copy out any data it needs from rows in
-  /// 'batch' or in previous batches returned from GetNext().
-  ///
-  /// If the stream is pinned and 'attach_on_read' is false, the memory backing the
+  /// If the stream is pinned and 'delete_on_read' is false, the memory backing the
   /// rows will remain valid until the stream is unpinned, destroyed, etc.
+  /// TODO: IMPALA-4179: update when we simplify the memory transfer model.
   Status GetNext(RowBatch* batch, bool* eos) WARN_UNUSED_RESULT;
 
   /// Same as above, but populate 'flat_rows' with a pointer to the flat version of
@@ -381,6 +370,8 @@ class BufferedTupleStream {
 
   /// Wrapper around BufferPool::PageHandle that tracks additional info about the page.
   struct Page {
+    Page() : num_rows(0), retrieved_buffer(true) {}
+
     inline int len() const { return handle.len(); }
     inline bool is_pinned() const { return handle.is_pinned(); }
     inline int pin_count() const { return handle.pin_count(); }
@@ -389,27 +380,17 @@ class BufferedTupleStream {
       retrieved_buffer = true;
       return Status::OK();
     }
-
-    /// Attach the buffer from this page to 'batch'. Only valid to call if the page is
-    /// pinned and 'retrieved_buffer' is true. Decrements parent->bytes_pinned_.
-    void AttachBufferToBatch(
-        BufferedTupleStream* parent, RowBatch* batch, RowBatch::FlushMode flush);
-
     std::string DebugString() const;
 
     BufferPool::PageHandle handle;
 
     /// Number of rows written to the page.
-    int num_rows = 0;
+    int num_rows;
 
     /// Whether we called GetBuffer() on the page since it was last pinned. This means
     /// that GetBuffer() and ExtractBuffer() cannot fail and that GetNext() may have
     /// returned rows referencing the page's buffer.
-    bool retrieved_buffer = true;
-
-    /// If the page was just attached to the output batch on the last GetNext() call while
-    /// in attach_on_read mode. If true, then 'handle' is closed.
-    bool attached_to_output_batch = false;
+    bool retrieved_buffer;
   };
 
   /// Runtime state instance used to check for cancellation. Not owned.
@@ -419,7 +400,7 @@ class BufferedTupleStream {
   const RowDescriptor* desc_;
 
   /// Plan node ID, used for error reporting.
-  int node_id_ = -1;
+  int node_id_;
 
   /// The size of the fixed length portion for each tuple in the row.
   std::vector<int> fixed_tuple_sizes_;
@@ -439,18 +420,18 @@ class BufferedTupleStream {
   /// List of pages in the stream.
   /// Empty iff one of two cases applies:
   /// * before the first row has been added with AddRow() or AddRowCustom().
-  /// * after the stream has been destructively read in 'attach_on_read' mode
+  /// * after the stream has been destructively read in 'delete_on_read' mode
   std::list<Page> pages_;
   // IMPALA-5629: avoid O(n) list.size() call by explicitly tracking the number of pages.
   // TODO: remove when we switch to GCC5+, where list.size() is O(1). See GCC bug #49561.
-  int64_t num_pages_ = 0;
+  int64_t num_pages_;
 
-  /// Total size of pages_, including any pages already deleted in 'attach_on_read'
+  /// Total size of pages_, including any pages already deleted in 'delete_on_read'
   /// mode.
-  int64_t total_byte_size_ = 0;
+  int64_t total_byte_size_;
 
   /// True if there is currently an active read iterator for the stream.
-  bool has_read_iterator_ = false;
+  bool has_read_iterator_;
 
   /// The current page being read. When no read iterator is active, equal to list.end().
   /// When a read iterator is active, either points to the current read page, or equals
@@ -466,31 +447,31 @@ class BufferedTupleStream {
   BufferPool::SubReservation read_page_reservation_;
 
   /// Number of rows returned from the current read_page_.
-  uint32_t read_page_rows_returned_ = -1;
+  uint32_t read_page_rows_returned_;
 
   /// Pointer into read_page_ to the byte after the last row read.
-  uint8_t* read_ptr_ = nullptr;
+  uint8_t* read_ptr_;
 
   /// Pointer to one byte past the end of read_page_. Used to detect overruns.
-  const uint8_t* read_end_ptr_ = nullptr;
+  const uint8_t* read_end_ptr_;
 
   /// Pointer into write_page_ to the byte after the last row written.
-  uint8_t* write_ptr_ = nullptr;
+  uint8_t* write_ptr_;
 
   /// Pointer to one byte past the end of write_page_. Cached to speed up computation
-  const uint8_t* write_end_ptr_ = nullptr;
+  const uint8_t* write_end_ptr_;
 
   /// Number of rows returned to the caller from GetNext() since the last
   /// PrepareForRead() call.
-  int64_t rows_returned_ = 0;
+  int64_t rows_returned_;
 
   /// True if there is currently an active write iterator into the stream.
-  bool has_write_iterator_ = false;
+  bool has_write_iterator_;
 
   /// The current page for writing. NULL if there is no write iterator or no current
   /// write page. Always pinned. Size is 'default_page_len_', except temporarily while
   /// appending a larger row between AddRowCustomBegin() and AddRowCustomEnd().
-  Page* write_page_ = nullptr;
+  Page* write_page_;
 
   /// Saved reservation for write iterator. 'default_page_len_' reservation is saved if
   /// there is a write iterator, no page currently pinned for writing and the possibility
@@ -503,11 +484,11 @@ class BufferedTupleStream {
 
   /// Total bytes of pinned pages in pages_, stored to avoid iterating over the list
   /// to compute it.
-  int64_t bytes_pinned_ = 0;
+  int64_t bytes_pinned_;
 
   /// Number of rows stored in the stream. Includes rows that were already deleted during
-  /// a destructive 'attach_on_read' pass over the stream.
-  int64_t num_rows_ = 0;
+  /// a destructive 'delete_on_read' pass over the stream.
+  int64_t num_rows_;
 
   /// The default length in bytes of pages used to store the stream's rows. All rows that
   /// fit in a default-sized page are stored in default-sized page.
@@ -522,14 +503,14 @@ class BufferedTupleStream {
   const bool has_nullable_tuple_;
 
   /// If true, pages are deleted after they are read during this read pass. Once rows
-  /// have been read from a stream with 'attach_on_read_' true, this is always true.
-  bool attach_on_read_ = false;
+  /// have been read from a stream with 'delete_on_read_' true, this is always true.
+  bool delete_on_read_;
 
-  bool closed_ = false; // Used for debugging.
+  bool closed_; // Used for debugging.
 
   /// If true, this stream has been explicitly pinned by the caller and all pages are
   /// kept pinned until the caller calls UnpinStream().
-  bool pinned_ = true;
+  bool pinned_;
 
   bool is_read_page(const Page* page) const {
     return read_page_ != pages_.end() && &*read_page_ == page;
@@ -604,7 +585,7 @@ class BufferedTupleStream {
 
   /// Same as PrepareForRead(), except the iterators are not invalidated and
   /// the caller is assumed to have checked there is sufficient unused reservation.
-  Status PrepareForReadInternal(bool attach_on_read) WARN_UNUSED_RESULT;
+  Status PrepareForReadInternal(bool delete_on_read) WARN_UNUSED_RESULT;
 
   /// Pins the next read page. This blocks reading from disk if necessary to bring the
   /// page's data into memory. Updates read_page_, read_ptr_, and
@@ -612,9 +593,7 @@ class BufferedTupleStream {
   Status NextReadPage() WARN_UNUSED_RESULT;
 
   /// Invalidate the read iterator, and release any resources associated with the active
-  /// iterator. Invalid to call if 'attach_on_read_' is true and >= 1 rows have been read,
-  /// because that would leave the stream in limbo where it still has pages but it is
-  /// invalid to read or write from in future.
+  /// iterator.
   void InvalidateReadIterator();
 
   /// Returns the total additional bytes that this row will consume in write_page_ if
@@ -639,8 +618,7 @@ class BufferedTupleStream {
   void UnpinPageIfNeeded(Page* page, bool stream_pinned);
 
   /// Return the expected pin count for 'page' in the current stream based on the current
-  /// read and write pages and whether the stream is pinned. Not valid to call if
-  /// the page was just deleted, i.e. page->attached_to_output_batch == false.
+  /// read and write pages and whether the stream is pinned.
   int ExpectedPinCount(bool stream_pinned, const Page* page) const;
 
   /// Return true if the stream in its current state needs to have a reservation for

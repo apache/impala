@@ -247,10 +247,6 @@ class Tuple {
     return static_cast<bool*>(GetSlot(offset));
   }
 
-  int32_t* GetIntSlot(int offset) {
-    return static_cast<int32_t*>(GetSlot(offset));
-  }
-
   int64_t* GetBigIntSlot(int offset) {
     return static_cast<int64_t*>(GetSlot(offset));
   }
