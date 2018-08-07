@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-# Analyic function with no partition
+# Analytic function with no partition
 select i_item_sk, i_current_price,
    SUM (i_current_price)
   OVER (ORDER BY i_item_sk) running_total
@@ -72,7 +72,7 @@ limit 10
 BIGINT, STRING, DECIMAL, DECIMAL
 ====
 ---- QUERY
-# Nested analyic functions
+# Nested analytic functions
 select i_item_sk, i_brand, running_total,
    SUM (running_total)
   OVER (partition by i_manufact_id ORDER BY running_total) running_total2
@@ -104,7 +104,7 @@ limit 10
 BIGINT, STRING, DECIMAL, DECIMAL
 ====
 ---- QUERY
-# 2 analyic functions on different partition and order by columns
+# 2 analytic functions on different partition and order by columns
 select i_item_sk, i_brand, i_current_price, i_manufact_id,
    SUM (i_current_price)
   OVER (partition by i_brand ORDER BY i_current_price) running_total,
@@ -173,4 +173,42 @@ from (
 2815.26
 ---- TYPES
 DECIMAL
+====
+---- QUERY
+# Regression test for IMPALA-7403 that reproduces a memory management bug.
+# The plan has two analytic operators with no intervening sort. A low NDV
+# sort key seems to help with reproducing the bug.
+SELECT c_birth_country, a, b, count(*)
+FROM (
+  SELECT c_birth_country,
+         LAG(c_birth_country) OVER (ORDER BY c_birth_country) a,
+         MIN(c_birth_country) OVER (ORDER BY c_birth_country) b
+  FROM customer
+) v
+GROUP BY c_birth_country, a, b
+ORDER BY count(*), c_birth_country, a, b
+LIMIT 20
+---- RESULTS
+'AFGHANISTAN','NULL','AFGHANISTAN',1
+'ALAND ISLANDS','AFGHANISTAN','AFGHANISTAN',1
+'ALBANIA','ALAND ISLANDS','AFGHANISTAN',1
+'ALGERIA','ALBANIA','AFGHANISTAN',1
+'AMERICAN SAMOA','ALGERIA','AFGHANISTAN',1
+'ANDORRA','AMERICAN SAMOA','AFGHANISTAN',1
+'ANGOLA','ANDORRA','AFGHANISTAN',1
+'ANGUILLA','ANGOLA','AFGHANISTAN',1
+'ANTARCTICA','ANGUILLA','AFGHANISTAN',1
+'ANTIGUA AND BARBUDA','ANTARCTICA','AFGHANISTAN',1
+'ARGENTINA','ANTIGUA AND BARBUDA','AFGHANISTAN',1
+'ARMENIA','ARGENTINA','AFGHANISTAN',1
+'ARUBA','ARMENIA','AFGHANISTAN',1
+'AUSTRALIA','ARUBA','AFGHANISTAN',1
+'AUSTRIA','AUSTRALIA','AFGHANISTAN',1
+'AZERBAIJAN','AUSTRIA','AFGHANISTAN',1
+'BAHAMAS','AZERBAIJAN','AFGHANISTAN',1
+'BAHRAIN','BAHAMAS','AFGHANISTAN',1
+'BANGLADESH','BAHRAIN','AFGHANISTAN',1
+'BARBADOS','BANGLADESH','AFGHANISTAN',1
+---- TYPES
+STRING,STRING,STRING,BIGINT
 ====

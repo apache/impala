@@ -151,17 +151,17 @@ class ScalarExprEvaluator {
 
   /// Evaluates the expression of this evaluator on tuple row 'row' and returns
   /// the results. One function for each data type implemented.
-  BooleanVal GetBooleanVal(TupleRow* row);
-  TinyIntVal GetTinyIntVal(TupleRow* row);
-  SmallIntVal GetSmallIntVal(TupleRow* row);
-  IntVal GetIntVal(TupleRow* row);
-  BigIntVal GetBigIntVal(TupleRow* row);
-  FloatVal GetFloatVal(TupleRow* row);
-  DoubleVal GetDoubleVal(TupleRow* row);
-  StringVal GetStringVal(TupleRow* row);
-  CollectionVal GetCollectionVal(TupleRow* row);
-  TimestampVal GetTimestampVal(TupleRow* row);
-  DecimalVal GetDecimalVal(TupleRow* row);
+  BooleanVal GetBooleanVal(const TupleRow* row);
+  TinyIntVal GetTinyIntVal(const TupleRow* row);
+  SmallIntVal GetSmallIntVal(const TupleRow* row);
+  IntVal GetIntVal(const TupleRow* row);
+  BigIntVal GetBigIntVal(const TupleRow* row);
+  FloatVal GetFloatVal(const TupleRow* row);
+  DoubleVal GetDoubleVal(const TupleRow* row);
+  StringVal GetStringVal(const TupleRow* row);
+  CollectionVal GetCollectionVal(const TupleRow* row);
+  TimestampVal GetTimestampVal(const TupleRow* row);
+  DecimalVal GetDecimalVal(const TupleRow* row);
 
   /// Returns an error status if there was any error in evaluating the expression
   /// or its sub-expressions. 'start_idx' and 'end_idx' correspond to the range

@@ -18,6 +18,8 @@
 #ifndef IMPALA_EXEC_ANALYTIC_EVAL_NODE_H
 #define IMPALA_EXEC_ANALYTIC_EVAL_NODE_H
 
+#include <memory>
+
 #include "exec/exec-node.h"
 #include "runtime/buffered-tuple-stream.h"
 #include "runtime/tuple.h"
@@ -128,19 +130,20 @@ class AnalyticEvalNode : public ExecNode {
   /// Adds the row to the evaluators and the tuple stream.
   Status AddRow(int64_t stream_idx, TupleRow* row);
 
-  /// Determines if there is a window ending at the previous row, and if so, calls
-  /// AddResultTuple() with the index of the previous row in 'input_stream_'.
-  /// 'next_partition' indicates if the current row is the start of a new partition.
-  /// 'stream_idx' is the index of the current input row from 'input_stream_'.
-  /// Returns an error when memory limit is exceeded.
-  Status TryAddResultTupleForPrevRow(bool next_partition, int64_t stream_idx,
-      TupleRow* row);
+  /// Determines if there is a window ending at the previous row by evaluating
+  /// 'child_tuple_cmp_row', and if so, calls AddResultTuple() with the index
+  /// of the previous row in 'input_stream_'. 'next_partition' indicates if
+  /// the current row is the start of a new partition. 'stream_idx' is the
+  /// index of the current input row from 'input_stream_'.  Returns an error
+  /// when memory limit is exceeded.
+  Status TryAddResultTupleForPrevRow(
+      const TupleRow* child_tuple_cmp_row, bool next_partition, int64_t stream_idx);
 
   /// Determines if there is a window ending at the current row, and if so, calls
   /// AddResultTuple() with the index of the current row in 'input_stream_'.
   /// 'stream_idx' is the index of the current input row from 'input_stream_'.
   /// Returns an error when memory limit is exceeded.
-  Status TryAddResultTupleForCurrRow(int64_t stream_idx, TupleRow* row);
+  Status TryAddResultTupleForCurrRow(int64_t stream_idx);
 
   /// Adds additional result tuples at the end of a partition, e.g. if the end bound is
   /// FOLLOWING. partition_idx is the index into input_stream_ of the new partition,
@@ -172,10 +175,17 @@ class AnalyticEvalNode : public ExecNode {
   /// This is necessary to produce the default value (set by Init()).
   void ResetLeadFnSlots();
 
-  /// Evaluates the predicate pred_eval over child_tuple_cmp_row_, which is
-  /// a TupleRow* containing the previous row and the current row set during
-  /// ProcessChildBatch().
-  bool PrevRowCompare(ScalarExprEvaluator* pred_eval);
+  /// Evaluates the predicate pred_eval over child_tuple_cmp_row, which is
+  /// a TupleRow* containing the previous row and the current row.
+  bool PrevRowCompare(
+      ScalarExprEvaluator* pred_eval, const TupleRow* child_tuple_cmp_row);
+
+  /// Return true if there are partition or order by expression evaluators. These
+  /// evaluators are created in Prepare() if PARTITION BY or ORDER BY clauses exist
+  /// for the analytics.
+  bool has_partition_or_order_by_expr_eval() const {
+    return partition_by_eq_expr_eval_ != nullptr || order_by_eq_expr_eval_ != nullptr;
+  }
 
   /// Debug string containing current state. If 'detailed', per-row state is included.
   std::string DebugStateString(bool detailed) const;
@@ -252,11 +262,6 @@ class AnalyticEvalNode : public ExecNode {
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
-  /// TupleRow* composed of the first child tuple and the buffered tuple, used by
-  /// partition_by_eq_expr_eval_ and order_by_eq_expr_eval_. Set in Open() if
-  /// buffered_tuple_desc_ is not NULL, allocated from mem_pool_.
-  TupleRow* child_tuple_cmp_row_ = nullptr;
-
   /// Queue of tuples which are ready to be set in output rows, with the index into
   /// the input_stream_ stream of the last TupleRow that gets the Tuple, i.e. this is a
   /// sparse structure. For example, if result_tuples_ contains tuples with indexes x1 and
@@ -308,17 +313,17 @@ class AnalyticEvalNode : public ExecNode {
   /// Index of the row in input_stream_ at which the current partition started.
   int64_t curr_partition_idx_;
 
-  /// Previous input row used to compare partition boundaries and to determine when the
-  /// order-by expressions change.
-  TupleRow* prev_input_row_ = nullptr;
+  /// Previous input tuple used to compare partition boundaries and to determine when the
+  /// order-by expressions change. We only need to store the first tuple of the row
+  /// because all the partitioning and ordering columns are in the first tuple. Initially
+  /// this points to the first tuple of the last row processed from 'curr_child_batch_',
+  /// but it is later deep copied into 'prev_input_tuple_pool_' before 'curr_child_batch_'
+  /// is reset.
+  Tuple* prev_input_tuple_ = nullptr;
+  std::unique_ptr<MemPool> prev_input_tuple_pool_;
 
-  /// Current and previous input row batches from the child. RowBatches are allocated
-  /// once and reused. Previous input row batch owns prev_input_row_ between calls to
-  /// ProcessChildBatch(). The prev batch is Reset() after calling ProcessChildBatch()
-  /// and then swapped with the curr batch so the RowBatch owning prev_input_row_ is
-  /// stored in prev_child_batch_ for the next call to ProcessChildBatch().
-  boost::scoped_ptr<RowBatch> prev_child_batch_;
-  boost::scoped_ptr<RowBatch> curr_child_batch_;
+  /// Current input row batch from the child. Allocated once and reused.
+  std::unique_ptr<RowBatch> curr_child_batch_;
 
   /// Buffers input rows added in ProcessChildBatch() until enough rows are able to
   /// be returned by GetNextOutputBatch(), in which case row batches are returned from

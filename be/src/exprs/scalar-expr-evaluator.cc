@@ -364,47 +364,47 @@ void ScalarExprEvaluator::PrintValue(const TupleRow* row, stringstream* stream) 
   RawValue::PrintValue(GetValue(row), root_.type(), output_scale_, stream);
 }
 
-BooleanVal ScalarExprEvaluator::GetBooleanVal(TupleRow* row) {
+BooleanVal ScalarExprEvaluator::GetBooleanVal(const TupleRow* row) {
   return root_.GetBooleanVal(this, row);
 }
 
-TinyIntVal ScalarExprEvaluator::GetTinyIntVal(TupleRow* row) {
+TinyIntVal ScalarExprEvaluator::GetTinyIntVal(const TupleRow* row) {
   return root_.GetTinyIntVal(this, row);
 }
 
-SmallIntVal ScalarExprEvaluator::GetSmallIntVal(TupleRow* row) {
+SmallIntVal ScalarExprEvaluator::GetSmallIntVal(const TupleRow* row) {
   return root_.GetSmallIntVal(this, row);
 }
 
-IntVal ScalarExprEvaluator::GetIntVal(TupleRow* row) {
+IntVal ScalarExprEvaluator::GetIntVal(const TupleRow* row) {
   return root_.GetIntVal(this, row);
 }
 
-BigIntVal ScalarExprEvaluator::GetBigIntVal(TupleRow* row) {
+BigIntVal ScalarExprEvaluator::GetBigIntVal(const TupleRow* row) {
   return root_.GetBigIntVal(this, row);
 }
 
-FloatVal ScalarExprEvaluator::GetFloatVal(TupleRow* row) {
+FloatVal ScalarExprEvaluator::GetFloatVal(const TupleRow* row) {
   return root_.GetFloatVal(this, row);
 }
 
-DoubleVal ScalarExprEvaluator::GetDoubleVal(TupleRow* row) {
+DoubleVal ScalarExprEvaluator::GetDoubleVal(const TupleRow* row) {
   return root_.GetDoubleVal(this, row);
 }
 
-StringVal ScalarExprEvaluator::GetStringVal(TupleRow* row) {
+StringVal ScalarExprEvaluator::GetStringVal(const TupleRow* row) {
   return root_.GetStringVal(this, row);
 }
 
-CollectionVal ScalarExprEvaluator::GetCollectionVal(TupleRow* row) {
+CollectionVal ScalarExprEvaluator::GetCollectionVal(const TupleRow* row) {
   return root_.GetCollectionVal(this, row);
 }
 
-TimestampVal ScalarExprEvaluator::GetTimestampVal(TupleRow* row) {
+TimestampVal ScalarExprEvaluator::GetTimestampVal(const TupleRow* row) {
   return root_.GetTimestampVal(this, row);
 }
 
-DecimalVal ScalarExprEvaluator::GetDecimalVal(TupleRow* row) {
+DecimalVal ScalarExprEvaluator::GetDecimalVal(const TupleRow* row) {
   return root_.GetDecimalVal(this, row);
 }
 
