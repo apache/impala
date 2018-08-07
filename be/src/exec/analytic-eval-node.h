@@ -18,6 +18,7 @@
 #ifndef IMPALA_EXEC_ANALYTIC_EVAL_NODE_H
 #define IMPALA_EXEC_ANALYTIC_EVAL_NODE_H
 
+#include <deque>
 #include <memory>
 
 #include "exec/exec-node.h"
@@ -274,7 +275,7 @@ class AnalyticEvalNode : public ExecNode {
   /// output row and result_tuples_.size() may be one less than the row batch size, in
   /// which case we will process another input row batch (inserting one result tuple per
   /// input row) before returning a row batch.
-  std::list<std::pair<int64_t, Tuple*>> result_tuples_;
+  std::deque<std::pair<int64_t, Tuple*>> result_tuples_;
 
   /// Index in input_stream_ of the most recently added result tuple.
   int64_t last_result_idx_;
@@ -284,7 +285,7 @@ class AnalyticEvalNode : public ExecNode {
   /// or FOLLOWING. Tuples in this list are deep copied and owned by
   /// curr_window_tuple_pool_.
   /// TODO: Remove and use BufferedTupleStream (needs support for multiple readers).
-  std::list<std::pair<int64_t, Tuple*>> window_tuples_;
+  std::deque<std::pair<int64_t, Tuple*>> window_tuples_;
 
   /// The index of the last row from input_stream_ associated with output row containing
   /// resources in prev_tuple_pool_. -1 when the pool is empty. Resources from

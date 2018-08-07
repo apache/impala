@@ -295,18 +295,16 @@ string AnalyticEvalNode::DebugStateString(bool detailed = false) const {
      << " last_result_idx=" << last_result_idx_;
   if (detailed) {
     ss << " result_tuples idx: [";
-    for (list<pair<int64_t, Tuple*>>::const_iterator it = result_tuples_.begin();
-        it != result_tuples_.end(); ++it) {
-      ss << it->first;
-      if (*it != result_tuples_.back()) ss << ", ";
+    for (const pair<int64_t, Tuple*>& result_tuple : result_tuples_) {
+      ss << result_tuple.first;
+      if (&result_tuple != &result_tuples_.back()) ss << ", ";
     }
     ss << "]";
     if (fn_scope_ == ROWS && window_.__isset.window_start) {
       ss << " window_tuples idx: [";
-      for (list<pair<int64_t, Tuple*>>::const_iterator it = window_tuples_.begin();
-          it != window_tuples_.end(); ++it) {
-        ss << it->first;
-        if (*it != window_tuples_.back()) ss << ", ";
+    for (const pair<int64_t, Tuple*>& window_tuple : window_tuples_) {
+        ss << window_tuple.first;
+        if (&window_tuple != &window_tuples_.back()) ss << ", ";
       }
       ss << "]";
     }
@@ -338,7 +336,7 @@ inline Status AnalyticEvalNode::AddRow(int64_t stream_idx, TupleRow* row) {
       VLOG_ROW << id() << " Adding tuple to window at idx=" << stream_idx;
       Tuple* tuple = row->GetTuple(0)->DeepCopy(
           *child(0)->row_desc()->tuple_descriptors()[0], curr_tuple_pool_.get());
-      window_tuples_.push_back(pair<int64_t, Tuple*>(stream_idx, tuple));
+      window_tuples_.emplace_back(stream_idx, tuple);
     }
   }
 
@@ -388,7 +386,7 @@ Status AnalyticEvalNode::AddResultTuple(int64_t stream_idx) {
   }
 
   DCHECK_GT(stream_idx, last_result_idx_);
-  result_tuples_.push_back(pair<int64_t, Tuple*>(stream_idx, result_tuple));
+  result_tuples_.emplace_back(stream_idx, result_tuple);
   last_result_idx_ = stream_idx;
   VLOG_ROW << id() << " Added result tuple, final state: " << DebugStateString(true);
   return Status::OK();
@@ -520,8 +518,8 @@ inline Status AnalyticEvalNode::InitNextPartition(RuntimeState* state,
       // prev_partition_last_result_tuple was the last result tuple in the partition, add
       // it back with the index of the last row in the partition so that all output rows
       // in this partition get the correct value.
-      result_tuples_.push_back(pair<int64_t, Tuple*>(curr_partition_idx_ - 1,
-          prev_partition_last_result_tuple));
+      result_tuples_.emplace_back(
+          curr_partition_idx_ - 1, prev_partition_last_result_tuple);
     }
     DCHECK(!result_tuples_.empty());
     last_result_idx_ = result_tuples_.back().first;
