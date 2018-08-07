@@ -234,8 +234,8 @@ class AnalyticEvalNode : public ExecNode {
   /// Offset from the current row for ROWS windows with start or end bounds specified
   /// with offsets. Is positive if the offset is FOLLOWING, negative if PRECEDING, and 0
   /// if type is CURRENT ROW or UNBOUNDED PRECEDING/FOLLOWING.
-  int64_t rows_start_offset_;
-  int64_t rows_end_offset_;
+  int64_t rows_start_offset_ = 0;
+  int64_t rows_end_offset_ = 0;
 
   /// Analytic functions and their evaluators. 'analytic_fns_' live in the query-state's
   /// objpool while the evaluators live in the exec node's objpool.
@@ -248,8 +248,8 @@ class AnalyticEvalNode : public ExecNode {
 
   /// If true, evaluating FIRST_VALUE requires special null handling when initializing new
   /// partitions determined by the offset. Set in Open() by inspecting the agg fns.
-  bool has_first_val_null_offset_;
-  long first_val_null_offset_;
+  bool has_first_val_null_offset_ = false;
+  long first_val_null_offset_ = 0;
 
   /// Pools used to allocate result tuples (added to result_tuples_ and later returned)
   /// and window tuples (added to window_tuples_ to buffer the current window). Resources
@@ -259,6 +259,12 @@ class AnalyticEvalNode : public ExecNode {
   /// window tuples it contains are no longer needed, or upon eos.
   boost::scoped_ptr<MemPool> curr_tuple_pool_;
   boost::scoped_ptr<MemPool> prev_tuple_pool_;
+
+  /// A tuple described by result_tuple_desc_ used when calling Finalize() on the
+  /// analytic_fn_evals_ to release resources between partitions; the value is never used.
+  /// Owned by expr_perm_pool_ and allocated in Prepare()
+  /// TODO: Remove when agg fns implement a separate Close() method to release resources.
+  Tuple* dummy_result_tuple_ = nullptr;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
@@ -278,7 +284,7 @@ class AnalyticEvalNode : public ExecNode {
   std::deque<std::pair<int64_t, Tuple*>> result_tuples_;
 
   /// Index in input_stream_ of the most recently added result tuple.
-  int64_t last_result_idx_;
+  int64_t last_result_idx_ = -1;
 
   /// Child tuples that are currently within the window and the index into input_stream_
   /// of the row they're associated with. Only used when window start bound is PRECEDING
@@ -291,28 +297,28 @@ class AnalyticEvalNode : public ExecNode {
   /// resources in prev_tuple_pool_. -1 when the pool is empty. Resources from
   /// prev_tuple_pool_ can only be transferred to an output batch once all rows containing
   /// these tuples have been returned.
-  int64_t prev_pool_last_result_idx_;
+  int64_t prev_pool_last_result_idx_ = -1;
 
   /// The index of the last row from input_stream_ associated with window tuples
   /// containing resources in prev_tuple_pool_. -1 when the pool is empty. Resources from
   /// prev_tuple_pool_ can only be transferred to an output batch once all rows containing
   /// these tuples are no longer needed (removed from the window_tuples_).
-  int64_t prev_pool_last_window_idx_;
+  int64_t prev_pool_last_window_idx_ = -1;
 
   /// The tuple described by intermediate_tuple_desc_ storing intermediate state for the
   /// analytic_eval_fns_. When enough input rows have been consumed to produce the
   /// analytic function results, a result tuple (described by result_tuple_desc_) is
   /// created and the agg fn results are written to that tuple by calling Finalize()/
-  /// GetValue() on the evaluators with curr_tuple_ as the source tuple.
+  /// GetValue() on the evaluators with curr_tuple_ as the source tuple. Owned by
+  /// expr_perm_pool_, allocated in Prepare() and initialized in Open().
   Tuple* curr_tuple_ = nullptr;
 
-  /// A tuple described by result_tuple_desc_ used when calling Finalize() on the
-  /// analytic_fn_evals_ to release resources between partitions; the value is never used.
-  /// TODO: Remove when agg fns implement a separate Close() method to release resources.
-  Tuple* dummy_result_tuple_ = nullptr;
+  /// True if AggFnEvaluator::Init() was called on 'curr_tuple_', which means that
+  /// AggFnEvaluator::Finalize() needs to be called on it.
+  bool curr_tuple_init_ = false;
 
   /// Index of the row in input_stream_ at which the current partition started.
-  int64_t curr_partition_idx_;
+  int64_t curr_partition_idx_ = -1;
 
   /// Previous input tuple used to compare partition boundaries and to determine when the
   /// order-by expressions change. We only need to store the first tuple of the row
@@ -339,19 +345,14 @@ class AnalyticEvalNode : public ExecNode {
   /// TODO: Consider re-pinning unpinned streams when possible.
   boost::scoped_ptr<BufferedTupleStream> input_stream_;
 
-  /// Pool used for O(1) allocations that live until Close() or Reset().
-  /// Does not own data backing tuples returned in GetNext(), so it does not
-  /// need to be transferred to an output batch.
-  boost::scoped_ptr<MemPool> mem_pool_;
-
   /// True when there are no more input rows to consume from our child.
-  bool input_eos_;
+  bool input_eos_ = false;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
 
   /// Time spent processing the child rows.
-  RuntimeProfile::Counter* evaluation_timer_;
+  RuntimeProfile::Counter* evaluation_timer_ = nullptr;
 };
 
 }
