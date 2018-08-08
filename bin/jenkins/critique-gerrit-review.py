@@ -66,6 +66,8 @@ EXCLUDE_FILE_PATTERNS = [
     re.compile(r".*be/src/kudu.*"),  # Kudu source code may have different rules.
     re.compile(r".*-benchmark.cc"),  # Benchmark files tend to have long lines.
     re.compile(r".*/function-registry/impala_functions.py"),  # Many long strings.
+    re.compile(r".*/catalog/BuiltinsDb.java"),  # Many long strings.
+    re.compile(r".*/codegen/gen_ir_descriptions.py"),  # Many long strings.
     re.compile(r".*/shell/ext-py/*")  # Third-party code.
 ]
 
