@@ -252,7 +252,6 @@ ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
 STORED AS INPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'
           OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('numFilesErasureCoded'='0')
 ====
 ---- QUERY
 SHOW CREATE TABLE functional.allcomplextypes
