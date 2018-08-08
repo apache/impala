@@ -295,7 +295,8 @@ class TestParquet(ImpalaTestSuite):
     local_file = os.path.join(os.environ['IMPALA_HOME'],
                               'testdata/data/%s' % filename)
     assert os.path.isfile(local_file)
-    hdfs_file = '/test-warehouse/{0}.db/{1}'.format(unique_database, filename)
+    hdfs_file = get_fs_path('/test-warehouse/{0}.db/{1}'.format(
+        unique_database, filename))
     check_call(['hdfs', 'dfs', '-copyFromLocal', '-f', local_file, hdfs_file])
 
     qualified_table_name = '%s.%s' % (unique_database, table_name)

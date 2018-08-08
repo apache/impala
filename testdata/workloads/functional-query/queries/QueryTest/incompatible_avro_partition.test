@@ -47,7 +47,8 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, char, strin
 ====
 ---- QUERY
 # Add incompatible data in the avro partition.
-alter table mixed partition (part = 2) set location '/test-warehouse/alltypes_avro/year=2009/month=1';
+alter table mixed partition (part = 2)
+  set location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_avro/year=2009/month=1';
 refresh mixed;
 ====
 ---- QUERY
