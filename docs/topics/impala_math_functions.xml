@@ -1665,6 +1665,79 @@ select trunc(d) from dbl order by d;
         </dd>
 
       </dlentry>
+      <dlentry>
+        <dt>
+          <codeph>width_bucket(decimal expr, decimal min_value, decimal
+            max_value, int num_buckets)</codeph>
+        </dt>
+        <dd>
+          <b>Purpose:</b> Returns the bucket number in which the
+            <codeph>expr</codeph> value would fall in the histogram where its
+          range between <codeph>min_value</codeph> and
+            <codeph>max_value</codeph> is divided into
+            <codeph>num_buckets</codeph> buckets of identical sizes. </dd>
+        <dd>The function returns: <ul>
+            <li><codeph>NULL</codeph> if any argument is
+              <codeph>NULL</codeph>.</li>
+            <li><codeph>0</codeph> if <codeph>expr</codeph> &lt;
+                <codeph>min_value</codeph>.</li>
+            <li><codeph>num_buckets + 1</codeph> if <codeph>expr</codeph> >=
+                <codeph>max_val</codeph>.</li>
+            <li>If none of the above, the bucket number where
+                <codeph>expr</codeph> falls.</li>
+          </ul>
+          <p>
+            <b>Arguments:</b>The following rules apply to the arguments. <ul>
+              <li>
+                <codeph>min_val</codeph> is the minimum value of the histogram
+                range. </li>
+              <li>
+                <codeph>max_val</codeph> is the maximum value of the histogram
+                range. </li>
+              <li>
+                <codeph>num_buckets</codeph> must be greater than
+                  <codeph>0</codeph>. </li>
+              <li>
+                <codeph>min_value</codeph> must be less than
+                  <codeph>max_value</codeph>. </li>
+            </ul>
+          </p>
+          <p>
+            <b>Usage notes:</b></p><p>Each bucket contains values equal to or
+            greater than the base value of that bucket and less than the base
+            value of the next bucket. For example, with <codeph>width_bucket(8,
+              1, 10, 3)</codeph>, the bucket ranges are actually the 0th
+            "underflow bucket" with the range (-infinity to 0.999...), (1 to
+            3.999...), (4, to 6.999...), (7 to 9.999...), and the "overflow
+            bucket" with the range (10 to infinity).</p>
+          <p>
+            <b>Return type:</b>
+            <codeph>bigint</codeph>
+          </p>
+          <p>
+            <b>Added in:</b>
+            <keyword keyref="impala31"/>. </p>
+          <p>
+            <b>Examples:</b>
+          </p>
+          <p> The below function creates <codeph>3</codeph> buckets between the
+            range of <codeph>1</codeph> and <codeph>20</codeph> with the bucket
+            width of 6.333, and returns <codeph>2</codeph> for the bucket #2
+            where the value <codeph>8</codeph> falls
+            in:<codeblock>width_bucket(8, 1, 20, 3)</codeblock>
+          </p>
+          <p> The below statement returns a list of accounts with the energy
+            spending and the spending bracket each account falls in, between 0
+            and 11. Bucket 0 (underflow bucket) will be assigned to the accounts
+            whose energy spendings are less than $50. Bucket 11 (overflow
+            bucket) will be assigned to the accounts whose energy spendings are
+            more than or equal to $1000.
+          </p>
+<codeblock>SELECT account, invoice_amount, WIDTH_BUCKET(invoice_amount,50,1000,10)
+FROM invoices_june2018
+ORDER BY 3;</codeblock>
+        </dd>
+      </dlentry>
     </dl>
   </conbody>
 </concept>
