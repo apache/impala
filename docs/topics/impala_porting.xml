@@ -40,13 +40,11 @@ under the License.
 
   <conbody>
 
-    <p>
-      <indexterm audience="hidden">porting</indexterm>
-      Although Impala uses standard SQL for queries, you might need to modify SQL source when bringing applications
-      to Impala, due to variations in data types, built-in functions, vendor language extensions, and
-      Hadoop-specific syntax. Even when SQL is working correctly, you might make further minor modifications for
-      best performance.
-    </p>
+    <p> Although Impala uses standard SQL for queries, you might need to modify
+      SQL source when bringing applications to Impala, due to variations in data
+      types, built-in functions, vendor language extensions, and Hadoop-specific
+      syntax. Even when SQL is working correctly, you might make further minor
+      modifications for best performance. </p>
 
     <p outputclass="toc inpage"/>
   </conbody>
@@ -351,152 +349,130 @@ select count(*) from (select * from t1);
 
     <conbody>
 
-      <p>
-        Some SQL statements or clauses that you might be familiar with are not currently supported in Impala:
-      </p>
+      <p> The following SQL statements or clauses are not currently supported or
+        supported with limitations in Impala: </p>
 
       <ul>
         <li>
-          <p>
-            Impala has no <codeph>DELETE</codeph> statement. Impala is intended for data warehouse-style operations
-            where you do bulk moves and transforms of large quantities of data. Instead of using
-            <codeph>DELETE</codeph>, use <codeph>INSERT OVERWRITE</codeph> to entirely replace the contents of a
-            table or partition, or use <codeph>INSERT ... SELECT</codeph> to copy a subset of data (everything but
-            the rows you intended to delete) from one table to another. See <xref href="impala_dml.xml#dml"/> for
-            an overview of Impala DML statements.
+          <p> Impala supports the <codeph>DELETE</codeph> statement only for
+            Kudu tables. </p>
+          <p>Impala is intended for data warehouse-style operations where you do
+            bulk moves and transforms of large quantities of data. When not
+            using Kudu tables, instead of <codeph>DELETE</codeph>, use
+              <codeph>INSERT OVERWRITE</codeph> to entirely replace the contents
+            of a table or partition, or use <codeph>INSERT ... SELECT</codeph>
+            to copy a subset of data (everything but the rows you intended to
+            delete) from one table to another. See <xref
+              href="impala_dml.xml#dml"/> for an overview of Impala DML
+            statements. </p>
+        </li>
+        <li>
+          <p> Impala supports the <codeph>UPDATE</codeph> statement only for
+            Kudu tables.</p>
+          <p>When not using Kudu tables, instead of <codeph>UPDATE</codeph>, do
+            all necessary transformations early in the ETL process, such as in
+            the job that generates the original data, or when copying from one
+            table to another to convert to a particular file format or
+            partitioning scheme. See <xref href="impala_dml.xml#dml"/> for an
+            overview of Impala DML statements. </p>
+        </li>
+        <li>
+          <p> Impala has no transactional statements, such as
+              <codeph>COMMIT</codeph> or <codeph>ROLLBACK</codeph>. </p>
+          <p>Impala effectively works like the <codeph>AUTOCOMMIT</codeph> mode
+            in some database systems, where changes take effect as soon as they
+            are made. </p>
+        </li>
+        <li>
+          <p> If your database, table, column, or other names conflict with
+            Impala reserved words, use different names or quote the names with
+            backticks. </p>
+          <p>See <xref href="impala_reserved_words.xml#reserved_words"/> for the
+            current list of Impala reserved words. </p>
+          <p> Conversely, if you use a keyword that Impala does not recognize,
+            it might be interpreted as a table or column alias. </p>
+          <p>For example, in <codeph>SELECT * FROM t1 NATURAL JOIN t2</codeph>,
+            Impala does not recognize the <codeph>NATURAL</codeph> keyword and
+            interprets it as an alias for the table <codeph>t1</codeph>. If you
+            experience any unexpected behavior with queries, check the list of
+            reserved words to make sure all keywords in join and
+              <codeph>WHERE</codeph> clauses are supported keywords in Impala.
           </p>
         </li>
-
         <li>
-          <p>
-            Impala has no <codeph>UPDATE</codeph> statement. Impala is intended for data warehouse-style operations
-            where you do bulk moves and transforms of large quantities of data. Instead of using
-            <codeph>UPDATE</codeph>, do all necessary transformations early in the ETL process, such as in the job
-            that generates the original data, or when copying from one table to another to convert to a particular
-            file format or partitioning scheme. See <xref href="impala_dml.xml#dml"/> for an overview of Impala DML
-            statements.
+          <p>Impala has some restrictions on subquery support. See <keyword
+              keyref="subqueries"/> for the current details.</p>
+        </li>
+        <li>
+          <p> Impala supports <codeph>UNION</codeph> and <codeph>UNION
+              ALL</codeph> set operators, but not <codeph>INTERSECT</codeph>. </p>
+          <p><ph conref="../shared/impala_common.xml#common/union_all_vs_union"
+            />
           </p>
         </li>
-
+        <li><p>Impala requires query aliases for the subqueries used as inline
+            views in the <codeph>FROM</codeph> clause. </p><p>For example,
+            without the alias <codeph>contents_of_t1</codeph> at the end, the
+            following query gives a syntax
+            error:<codeblock>SELECT COUNT(*) FROM (SELECT * FROM t1) contents_of_t1;</codeblock></p>Aliases
+          are not required for the subqueries used in other parts of queries.
+          For
+          example:<codeblock>SELECT * FROM functional.alltypes WHERE id = (SELECT MIN(id) FROM functional.alltypes);
+</codeblock></li>
         <li>
-          <p>
-            Impala has no transactional statements, such as <codeph>COMMIT</codeph> or <codeph>ROLLBACK</codeph>.
-            Impala effectively works like the <codeph>AUTOCOMMIT</codeph> mode in some database systems, where
-            changes take effect as soon as they are made.
-          </p>
+          <p> When an alias is declared for an expression in a query, that alias
+            cannot be referenced again within the same <codeph>SELECT</codeph>
+            list.</p>
+          <p>For example, the <codeph>average</codeph> alias cannot be
+            referenced twice in the <codeph>SELECT</codeph> list as below. You
+            will receive an error:</p>
+          <codeblock>SELECT AVG(x) AS average, average+1 FROM t1 GROUP BY x;</codeblock>
+          <p>An alias can be referenced again in the same query if not in the
+              <codeph>SELECT</codeph> list. For example, the
+              <codeph>average</codeph> alias can be referenced twice as shown
+            below:<codeblock>SELECT AVG(x) AS average FROM t1 GROUP BY x HAVING average &gt; 3;</codeblock></p>
         </li>
-
         <li>
-          <p>
-            If your database, table, column, or other names conflict with Impala reserved words, use different
-            names or quote the names with backticks. See <xref href="impala_reserved_words.xml#reserved_words"/>
-            for the current list of Impala reserved words.
-          </p>
-          <p>
-            Conversely, if you use a keyword that Impala does not recognize, it might be interpreted as a table or
-            column alias. For example, in <codeph>SELECT * FROM t1 NATURAL JOIN t2</codeph>, Impala does not
-            recognize the <codeph>NATURAL</codeph> keyword and interprets it as an alias for the table
-            <codeph>t1</codeph>. If you experience any unexpected behavior with queries, check the list of reserved
-            words to make sure all keywords in join and <codeph>WHERE</codeph> clauses are recognized.
-          </p>
+          <p> Impala does not support <codeph>NATURAL JOIN</codeph>, and it does
+            not support the <codeph>USING</codeph> clause in joins. See <xref
+              href="impala_joins.xml#joins"/> for details on the syntax for
+            Impala join clauses. </p>
         </li>
-
         <li>
-          <p>
-            Impala supports subqueries only in the <codeph>FROM</codeph> clause of a query, not within the
-            <codeph>WHERE</codeph> clauses. Therefore, you cannot use clauses such as <codeph>WHERE
-            <varname>column</varname> IN (<varname>subquery</varname>)</codeph>. Also, Impala does not allow
-            <codeph>EXISTS</codeph> or <codeph>NOT EXISTS</codeph> clauses (although <codeph>EXISTS</codeph> is a
-            reserved keyword).
-          </p>
+          <p> Impala supports a limited choice of partitioning types. </p>
+          <p>Partitions are defined based on each distinct combination of values
+            for one or more partition key columns. Impala does not redistribute
+            or check data to create evenly distributed partitions. You must
+            choose partition key columns based on your knowledge of the data
+            volume and distribution. Adapt any tables that use range, list,
+            hash, or key partitioning to use the Impala partition syntax for
+              <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph>
+            statements. </p>
+          <p>Impala partitioning is similar to range partitioning where every
+            range has exactly one value, or key partitioning where the hash
+            function produces a separate bucket for every combination of key
+            values. See <xref href="impala_partitioning.xml#partitioning"/> for
+            usage details, and <xref href="impala_create_table.xml#create_table"
+            /> and <xref href="impala_alter_table.xml#alter_table"/> for syntax. </p>
+          <note> Because the number of separate partitions is potentially higher
+            than in other database systems, keep a close eye on the number of
+            partitions and the volume of data in each one; scale back the number
+            of partition key columns if you end up with too many partitions with
+            a small volume of data in each one. <p>To distribute work for a
+              query across a cluster, you need at least one HDFS block per node.
+              HDFS blocks are typically multiple megabytes, <ph
+                rev="parquet_block_size">especially</ph> for Parquet files.
+              Therefore, if each partition holds only a few megabytes of data,
+              you are unlikely to see much parallelism in the query because such
+              a small amount of data is typically processed by a single node.
+            </p></note>
         </li>
-
         <li>
-          <p>
-            Impala supports <codeph>UNION</codeph> and <codeph>UNION ALL</codeph> set operators, but not
-            <codeph>INTERSECT</codeph>. <ph conref="../shared/impala_common.xml#common/union_all_vs_union"/>
-          </p>
-        </li>
-
-        <li>
-          <p>
-            Within queries, Impala requires query aliases for any subqueries:
-          </p>
-<codeblock>-- Without the alias 'contents_of_t1' at the end, query gives syntax error.
-select count(*) from (select * from t1) contents_of_t1;</codeblock>
-        </li>
-
-        <li>
-          <p>
-            When an alias is declared for an expression in a query, that alias cannot be referenced again within
-            the same query block:
-          </p>
-<codeblock>-- Can't reference AVERAGE twice in the SELECT list where it's defined.
-select avg(x) as average, average+1 from t1 group by x;
-ERROR: AnalysisException: couldn't resolve column reference: 'average'
-
--- Although it can be referenced again later in the same query.
-select avg(x) as average from t1 group by x having average &gt; 3;</codeblock>
-          <p>
-            For Impala, either repeat the expression again, or abstract the expression into a <codeph>WITH</codeph>
-            clause, creating named columns that can be referenced multiple times anywhere in the base query:
-          </p>
-<codeblock>-- The following 2 query forms are equivalent.
-select avg(x) as average, avg(x)+1 from t1 group by x;
-with avg_t as (select avg(x) average from t1 group by x) select average, average+1 from avg_t;</codeblock>
-<!-- An alternative bunch of queries to use in the example above.
-[localhost:21000] > select x*x as x_squared from t1;
-
-[localhost:21000] > select x*x as x_squared from t1 where x_squared < 100;
-ERROR: AnalysisException: couldn't resolve column reference: 'x_squared'
-[localhost:21000] > select x*x as x_squared, x_squared * pi() as pi_x_squared from t1;
-ERROR: AnalysisException: couldn't resolve column reference: 'x_squared'
-[localhost:21000] > select x*x as x_squared from t1 group by x_squared;
-
-[localhost:21000] > select x*x as x_squared from t1 group by x_squared having x_squared < 100;
--->
-        </li>
-
-        <li>
-          <p>
-            Impala does not support certain rarely used join types that are less appropriate for high-volume tables
-            used for data warehousing. In some cases, Impala supports join types but requires explicit syntax to
-            ensure you do not do inefficient joins of huge tables by accident. For example, Impala does not support
-            natural joins or anti-joins, and requires the <codeph>CROSS JOIN</codeph> operator for Cartesian
-            products. See <xref href="impala_joins.xml#joins"/> for details on the syntax for Impala join clauses.
-          </p>
-        </li>
-
-        <li>
-          <p>
-            Impala has a limited choice of partitioning types. Partitions are defined based on each distinct
-            combination of values for one or more partition key columns. Impala does not redistribute or check data
-            to create evenly distributed partitions; you must choose partition key columns based on your knowledge
-            of the data volume and distribution. Adapt any tables that use range, list, hash, or key partitioning
-            to use the Impala partition syntax for <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph>
-            statements. Impala partitioning is similar to range partitioning where every range has exactly one
-            value, or key partitioning where the hash function produces a separate bucket for every combination of
-            key values. See <xref href="impala_partitioning.xml#partitioning"/> for usage details, and
-            <xref href="impala_create_table.xml#create_table"/> and
-            <xref href="impala_alter_table.xml#alter_table"/> for syntax.
-          </p>
-          <note>
-            Because the number of separate partitions is potentially higher than in other database systems, keep a
-            close eye on the number of partitions and the volume of data in each one; scale back the number of
-            partition key columns if you end up with too many partitions with a small volume of data in each one.
-            Remember, to distribute work for a query across a cluster, you need at least one HDFS block per node.
-            HDFS blocks are typically multiple megabytes, <ph rev="parquet_block_size">especially</ph> for Parquet
-            files. Therefore, if each partition holds only a few megabytes of data, you are unlikely to see much
-            parallelism in the query because such a small amount of data is typically processed by a single node.
-          </note>
-        </li>
-
-        <li>
-          <p>
-            For <q>top-N</q> queries, Impala uses the <codeph>LIMIT</codeph> clause rather than comparing against a
-            pseudocolumn named <codeph>ROWNUM</codeph> or <codeph>ROW_NUM</codeph>. See
-            <xref href="impala_limit.xml#limit"/> for details.
-          </p>
+          <p> For the <q>top-N</q> queries, Impala uses the
+              <codeph>LIMIT</codeph> clause rather than comparing against a
+            pseudo column named <codeph>ROWNUM</codeph> or
+              <codeph>ROW_NUM</codeph>. </p>
+          <p>See <xref href="impala_limit.xml#limit"/> for details. </p>
         </li>
       </ul>
     </conbody>
@@ -504,16 +480,15 @@ ERROR: AnalysisException: couldn't resolve column reference: 'x_squared'
 
   <concept id="porting_antipatterns">
 
-    <title>SQL Constructs to Doublecheck</title>
+    <title>SQL Constructs to Double-check</title>
 
     <conbody>
 
-      <p>
-        Some SQL constructs that are supported have behavior or defaults more oriented towards convenience than
-        optimal performance. Also, sometimes machine-generated SQL, perhaps issued through JDBC or ODBC
-        applications, might have inefficiencies or exceed internal Impala limits. As you port SQL code, be alert
-        and change these things where appropriate:
-      </p>
+      <p> Some SQL constructs that are supported have behavior or defaults more
+        oriented towards convenience than optimal performance. Also, sometimes
+        machine-generated SQL, perhaps issued through JDBC or ODBC applications,
+        might have inefficiencies or exceed internal Impala limits. As you port
+        SQL code, examine and possibly update the following where appropriate: </p>
 
       <ul>
         <li>
@@ -528,16 +503,10 @@ ERROR: AnalysisException: couldn't resolve column reference: 'x_squared'
         </li>
 
         <li>
-          <p>
-            A <codeph>CREATE TABLE</codeph> statement with no <codeph>PARTITIONED BY</codeph> clause stores all the
-            data files in the same physical location, which can lead to scalability problems when the data volume
-            becomes large.
-          </p>
-          <p>
-            On the other hand, adapting tables that were already partitioned in a different database system could
-            produce an Impala table with a high number of partitions and not enough data in each one, leading to
-            underutilization of Impala's parallel query features.
-          </p>
+          <p> Adapting tables that were already partitioned in a different
+            database system could produce an Impala table with a high number of
+            partitions and not enough data in each one, leading to
+            underutilization of Impala's parallel query features. </p>
           <p>
             See <xref href="impala_partitioning.xml#partitioning"/> for details about setting up partitioning and
             tuning the performance of queries on partitioned tables.
@@ -545,17 +514,22 @@ ERROR: AnalysisException: couldn't resolve column reference: 'x_squared'
         </li>
 
         <li>
-          <p>
-            The <codeph>INSERT ... VALUES</codeph> syntax is suitable for setting up toy tables with a few rows for
-            functional testing, but because each such statement creates a separate tiny file in HDFS, it is not a
-            scalable technique for loading megabytes or gigabytes (let alone petabytes) of data. Consider revising
-            your data load process to produce raw data files outside of Impala, then setting up Impala external
-            tables or using the <codeph>LOAD DATA</codeph> statement to use those data files instantly in Impala
-            tables, with no conversion or indexing stage. See <xref href="impala_tables.xml#external_tables"/> and
-            <xref href="impala_load_data.xml#load_data"/> for details about the Impala techniques for working with
-            data files produced outside of Impala; see <xref href="impala_tutorial.xml#tutorial_etl"/> for examples
-            of ETL workflow for Impala.
-          </p>
+          <p> The <codeph>INSERT ... VALUES</codeph> syntax is suitable for
+            setting up toy tables with a few rows for functional testing when
+            used with HDFS. Each such statement creates a separate tiny file in
+            HDFS, and it is not a scalable technique for loading megabytes or
+            gigabytes (let alone petabytes) of data. </p>
+          <p>Consider revising your data load process to produce raw data files
+            outside of Impala, then setting up Impala external tables or using
+            the <codeph>LOAD DATA</codeph> statement to use those data files
+            instantly in Impala tables, with no conversion or indexing stage.
+            See <xref href="impala_tables.xml#external_tables"/> and <xref
+              href="impala_load_data.xml#load_data"/> for details about the
+            Impala techniques for working with data files produced outside of
+            Impala; see <xref href="impala_tutorial.xml#tutorial_etl"/> for
+            examples of ETL workflow for Impala. </p>
+          <p><codeph>INSERT</codeph> works fine for Kudu tables even though not
+            particularly fast.</p>
         </li>
 
         <li>
@@ -566,22 +540,18 @@ ERROR: AnalysisException: couldn't resolve column reference: 'x_squared'
             new table and reorganize into a more efficient layout in the same operation. See
             <xref href="impala_insert.xml#insert"/> for details about the <codeph>INSERT</codeph> statement.
           </p>
-          <p>
-            You can do <codeph>INSERT ... SELECT</codeph> into a table with a more efficient file format (see
-            <xref href="impala_file_formats.xml#file_formats"/>) or from an unpartitioned table into a partitioned
-            one (see <xref href="impala_partitioning.xml#partitioning"/>).
-          </p>
+          <p> You can do <codeph>INSERT ... SELECT</codeph> into a table with a
+            more efficient file format (see <xref
+              href="impala_file_formats.xml#file_formats"/>) or from an
+            unpartitioned table into a partitioned one. See <xref
+              href="impala_partitioning.xml#partitioning"/>. </p>
         </li>
 
         <li>
-          <p>
-            The number of expressions allowed in an Impala query might be smaller than for some other database
-            systems, causing failures for very complicated queries (typically produced by automated SQL
-            generators). Where practical, keep the number of expressions in the <codeph>WHERE</codeph> clauses to
-            approximately 2000 or fewer. As a workaround, set the query option
-            <codeph>DISABLE_CODEGEN=true</codeph> if queries fail for this reason. See
-            <xref href="impala_disable_codegen.xml#disable_codegen"/> for details.
-          </p>
+          <p> Complex queries may have high codegen time. As a workaround, set
+            the query option <codeph>DISABLE_CODEGEN=true</codeph> if queries
+            fail for this reason. See <xref
+              href="impala_disable_codegen.xml#disable_codegen"/> for details. </p>
         </li>
 
         <li>
@@ -600,42 +570,31 @@ ERROR: AnalysisException: couldn't resolve column reference: 'x_squared'
 
     <conbody>
 
-      <p>
-        Throughout this section, some of the decisions you make during the porting process also have a substantial
-        impact on performance. After your SQL code is ported and working correctly, doublecheck the
-        performance-related aspects of your schema design, physical layout, and queries to make sure that the
-        ported application is taking full advantage of Impala's parallelism, performance-related SQL features, and
-        integration with Hadoop components.
-      </p>
+      <p> Some of the decisions you make during the porting process can have an
+        impact on performance. After your SQL code is ported and working
+        correctly, examine the performance-related aspects of your schema
+        design, physical layout, and queries to make sure that the ported
+        application is taking full advantage of Impala's parallelism,
+        performance-related SQL features, and integration with Hadoop
+        components. The following are a few of the areas you should examine:</p>
 
       <ul>
-        <li>
-          Have you run the <codeph>COMPUTE STATS</codeph> statement on each table involved in join queries? Have
-          you also run <codeph>COMPUTE STATS</codeph> for each table used as the source table in an <codeph>INSERT
-          ... SELECT</codeph> or <codeph>CREATE TABLE AS SELECT</codeph> statement?
-        </li>
+        <li> For the optimal performance, we recommend that you run
+            <codeph>COMPUTE STATS</codeph> on all tables.</li>
 
-        <li>
-          Are you using the most efficient file format for your data volumes, table structure, and query
-          characteristics?
-        </li>
+        <li> Use the most efficient file format for your data volumes, table
+          structure, and query characteristics.</li>
 
-        <li>
-          Are you using partitioning effectively? That is, have you partitioned on columns that are often used for
-          filtering in <codeph>WHERE</codeph> clauses? Have you partitioned at the right granularity so that there
-          is enough data in each partition to parallelize the work for each query?
-        </li>
+        <li> Partition on columns that are often used for filtering in
+            <codeph>WHERE</codeph> clauses.</li>
 
-        <li>
-          Does your ETL process produce a relatively small number of multi-megabyte data files (good) rather than a
-          huge number of small files (bad)?
-        </li>
+        <li> Your ETL process should produce a relatively small number of
+          multi-megabyte data files rather than a huge number of small
+          files.</li>
       </ul>
 
-      <p>
-        See <xref href="impala_performance.xml#performance"/> for details about the whole performance tuning
-        process.
-      </p>
+      <p> See <xref href="impala_performance.xml#performance"/> for details
+        about the performance tuning process. </p>
     </conbody>
   </concept>
 </concept>
