@@ -500,6 +500,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           "node is greater than process mem limit 2.00 GB of \S+", str(e)), str(e)
     # Exercise queuing checks in admission controller.
     try:
+      # Wait for previous queries to finish to avoid flakiness.
+      for impalad in self.cluster.impalads:
+        impalad.service.wait_for_metric_value("impala-server.num-fragments-in-flight", 0)
       impalad_with_2g_mem = self.cluster.impalads[2].service.create_beeswax_client()
       impalad_with_2g_mem.set_configuration_option('mem_limit', '1G')
       impalad_with_2g_mem.execute_async("select sleep(1000)")
