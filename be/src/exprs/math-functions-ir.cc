@@ -457,57 +457,32 @@ DoubleVal MathFunctions::FmodDouble(FunctionContext* ctx, const DoubleVal& a,
 
 // The bucket_number is evaluated using the following formula:
 //
-//   bucket_number = dist_from_min * num_buckets / range_size
+//   bucket_number = dist_from_min * num_buckets / range_size + 1
 //      where -
 //        dist_from_min = expr - min_range
 //        range_size = max_range - min_range
-//        buckets = number of buckets
+//        num_buckets = number of buckets
 //
-// The results of the above subtractions are stored in Decimal16Value to avoid an overflow
-// in the following cases:
-//   case 1:
-//      T1 is decimal8Value
-//         When evaluating this particular expression
-//            dist_from_min = expr - min_range
-//         If expr is a max positive value which can be represented in decimal8Value and
-//         min_range < 0 the resulting dist_from_min can be represented in decimal16Val
-//         without overflowing
-//   case 2:
-//      T1 is decimal16Value
-//         Subtracting a negative min_range from expr can result in an overflow in which
-//         case the function errors out. There is no decimal32Val to handle this. So
-//         storing it in decimal16Value.
-//   case 3:
-//      T1 is decimal4Value
-//         We can store the results in a decimal8Value. But this change hard codes to
-//         store the result in decimal16Val for now to be compatible with the other
-//         decimal*Vals
+// Since expr, min_range, and max_range are all decimals with the same
+// byte size, precision, and scale we can interpret them as plain integers
+// and still calculate the proper bucket.
 //
-// The result of this multiplication dist_from_min * buckets is stored as a int256_t
-// if storing it in a int128_t would overflow.
+// There are some possibilities of overflowing during the calculation:
+// range_size = max_range - min_range
+// dist_from_min = expr - min_range
+// dist_from_min * num_buckets
 //
-// To perform the division, range_size is scaled up. The scale and precision of the
-// numerator and denominator are adjusted to be the same. This avoids the need to compute
-// the resulting scale and precision.
+// For all the above cases we use a bigger integer type provided by the
+// BitUtil::DoubleWidth<> metafunction.
 template <class  T1>
 BigIntVal MathFunctions::WidthBucketImpl(FunctionContext* ctx,
     const T1& expr, const T1& min_range,
     const T1& max_range, const IntVal& num_buckets) {
-  // FE casts expr, min_range and max_range to be of the scale and precision
-  int input_scale = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SCALE, 1);
-  int input_precision = ctx->impl()->GetConstFnAttr(
-      FunctionContextImpl::ARG_TYPE_PRECISION, 1);
-
-  bool overflow = false;
-  Decimal16Value range_size = max_range.template Subtract<int128_t>(input_scale,
-      min_range, input_scale, input_precision, input_scale, false, &overflow);
-  if (UNLIKELY(overflow)) {
-    ostringstream error_msg;
-    error_msg << "Overflow while evaluating the difference between min_range: " <<
-        min_range.value() << " and max_range: " << max_range.value();
-    ctx->SetError(error_msg.str().c_str());
-    return BigIntVal::null();
-  }
+  auto expr_val = expr.value();
+  using ActualType = decltype(expr_val);
+  auto min_range_val = min_range.value();
+  auto max_range_val = max_range.value();
+  auto num_buckets_val = static_cast<ActualType>(num_buckets.val);
 
   if (UNLIKELY(num_buckets.val <= 0)) {
     ostringstream error_msg;
@@ -516,73 +491,61 @@ BigIntVal MathFunctions::WidthBucketImpl(FunctionContext* ctx,
     return BigIntVal::null();
   }
 
-  if (UNLIKELY(min_range >= max_range)) {
+  if (UNLIKELY(min_range_val >= max_range_val)) {
     ctx->SetError("Lower bound cannot be greater than or equal to the upper bound");
     return BigIntVal::null();
   }
 
-  if (UNLIKELY(expr < min_range)) return 0;
-
-  if (UNLIKELY(expr >= max_range)) {
-    BigIntVal result;
-    result.val = num_buckets.val;
-    ++result.val;
-    return result;
+  if (expr_val < min_range_val) return 0;
+  if (expr_val >= max_range_val) {
+    return BigIntVal(static_cast<int64_t>(num_buckets.val) + 1);
   }
 
-  Decimal16Value dist_from_min = expr.template Subtract<int128_t>(input_scale,
-      min_range, input_scale, input_precision, input_scale, false, &overflow);
-  DCHECK_EQ(overflow, false);
-
-  Decimal16Value buckets = Decimal16Value::FromInt(input_precision, input_scale,
-      num_buckets.val, &overflow);
-
-  if (UNLIKELY(overflow)) {
-    stringstream error_msg;
-    error_msg << "Overflow while representing the num_buckets:" << num_buckets.val
-        << " as a DecimalVal";
-    ctx->SetError(error_msg.str().c_str());
-    return BigIntVal::null();
-  }
-  bool needs_int256 = false;
-  // Check if dist_from_min * buckets would overflow and if there is a need to
-  // store the intermediate results in int256_t to avoid an overflows
-  // Check if scaling up range size overflows and if there is a need to store the
-  // intermediate results in int256_t to avoid the overflow
-  if (UNLIKELY(BitUtil::CountLeadingZeros(abs(buckets.value())) +
-      BitUtil::CountLeadingZeros(abs(dist_from_min.value())) <= 128 ||
-      BitUtil::CountLeadingZeros(range_size.value()) +
-      detail::MinLeadingZerosAfterScaling(BitUtil::CountLeadingZeros(
-      range_size.value()), input_scale) <= 128)) {
-    needs_int256 = true;
+  bool bigger_type_needed = false;
+  // It is likely that this if stmt can be evaluated during codegen because
+  // 'max_range' and 'min_range' are almost certainly constant expressions:
+  if (max_range_val >= 0 && min_range_val < 0) {
+    if (static_cast<UnsignedType<ActualType>>(max_range_val) +
+        static_cast<UnsignedType<ActualType>>(abs(min_range_val)) >=
+        static_cast<UnsignedType<ActualType>>(BitUtil::Max<ActualType>())) {
+      bigger_type_needed = true;
+    }
   }
 
-  int128_t result;
-  if (needs_int256) {
-    // resulting scale should be 2 * input_scale as per multiplication rules
-    int256_t x = ConvertToInt256(buckets.value()) * ConvertToInt256(
-        dist_from_min.value());
+  auto MultiplicationOverflows = [](ActualType lhs, ActualType rhs) {
+    DCHECK(lhs > 0 && rhs > 0);
+    using ActualType = decltype(lhs);
+    return BitUtil::CountLeadingZeros(lhs) + BitUtil::CountLeadingZeros(rhs) <=
+        BitUtil::UnsignedWidth<ActualType>() + 1;
+  };
 
-    // Since "range_size" and "x" have different scales, the divison would require
-    // evaluating the resulting scale. To avoid this we scale up the denominator to
-    // match the scale of the numerator.
-    int256_t y = DecimalUtil::MultiplyByScale<int256_t>(ConvertToInt256(
-        range_size.value()), input_scale, false);
-    result = ConvertToInt128(x / y, DecimalUtil::MAX_UNSCALED_DECIMAL16,
-        &overflow);
-    DCHECK_EQ(overflow, false);
+  // It is likely that this can be evaluated during codegen:
+  bool multiplication_can_overflow = bigger_type_needed ||  MultiplicationOverflows(
+      max_range_val - min_range_val, num_buckets_val);
+  // 'expr_val' is not likely to be a constant expression, so this almost certainly
+  // needs runtime evaluation if 'bigger_type_needed' is false and
+  // 'multiplication_can_overflow' is true:
+  bigger_type_needed = bigger_type_needed || (
+      multiplication_can_overflow &&
+      expr_val != min_range_val &&
+      MultiplicationOverflows(expr_val - min_range_val, num_buckets_val));
+
+  auto BucketFunc = [](auto element, auto min_rng, auto max_rng, auto buckets) {
+    auto range_size = max_rng - min_rng;
+    auto dist_from_min = element - min_rng;
+    auto ret = dist_from_min * buckets / range_size;
+    return BigIntVal(static_cast<int64_t>(ret) + 1);
+  };
+
+  if (bigger_type_needed) {
+    using BiggerType = typename DoubleWidth<ActualType>::type;
+
+    return BucketFunc(static_cast<BiggerType>(expr_val),
+        static_cast<BiggerType>(min_range_val), static_cast<BiggerType>(max_range_val),
+        static_cast<BiggerType>(num_buckets.val));
   } else {
-    // resulting scale should be 2 * input_scale as per multiplication rules
-    int128_t x = buckets.value() * dist_from_min.value();
-
-    // Since "range_size" and "x" have different scales, the divison would require
-    // evaluating the resulting scale. To avoid this we scale up the denominator to
-    // match the scale of the numerator.
-    int128_t y = DecimalUtil::MultiplyByScale<int128_t>(range_size.value(),
-        input_scale, false);
-    result = x / y; // NOLINT: clang-tidy thinks y may equal zero here.
+    return BucketFunc(expr_val, min_range_val, max_range_val, num_buckets.val);
   }
-  return (BigIntVal(abs(result) + 1));
 }
 
 BigIntVal MathFunctions::WidthBucket(FunctionContext* ctx, const DecimalVal& expr,

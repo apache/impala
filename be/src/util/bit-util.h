@@ -28,8 +28,7 @@
 #include <climits>
 #include <limits>
 #include <typeinfo>
-
-#include <boost/type_traits/make_unsigned.hpp>
+#include <type_traits>
 
 #include "common/compiler-util.h"
 #include "gutil/bits.h"
@@ -39,7 +38,40 @@
 
 namespace impala {
 
-using boost::make_unsigned;
+/// Nested 'type' corresponds to the unsigned version of T.
+template <typename T>
+struct MakeUnsigned {
+  using type = std::make_unsigned_t<T>;
+};
+
+template <>
+struct MakeUnsigned<int128_t> {
+  using type = __uint128_t;
+};
+
+template <typename T>
+using UnsignedType = typename MakeUnsigned<T>::type;
+
+// Doubles the width of integer types (e.g. int32_t -> int64_t).
+// Currently only works with a few signed types.
+// Feel free to extend it to other types as well.
+template <typename T>
+struct DoubleWidth {};
+
+template <>
+struct DoubleWidth<int32_t> {
+  using type = int64_t;
+};
+
+template <>
+struct DoubleWidth<int64_t> {
+  using type = int128_t;
+};
+
+template <>
+struct DoubleWidth<int128_t> {
+  using type = int256_t;
+};
 
 /// Utility class to do standard bit tricks
 /// TODO: is this in boost or something else like that?
@@ -57,6 +89,17 @@ class BitUtil {
         std::numeric_limits<CVR_REMOVED>::digits :
         std::is_same<CVR_REMOVED, unsigned __int128>::value ? 128 :
         std::is_same<CVR_REMOVED, __int128>::value ? 127 : -1;
+  }
+
+  /// Returns the max value that can be represented in T.
+  template<typename T, typename CVR_REMOVED = typename std::decay<T>::type,
+      typename std::enable_if<std::is_integral<CVR_REMOVED> {}||
+                              std::is_same<CVR_REMOVED, __int128> {}, int>::type = 0>
+  constexpr static inline CVR_REMOVED Max() {
+    return std::is_integral<CVR_REMOVED>::value ?
+        std::numeric_limits<CVR_REMOVED>::max() :
+        std::is_same<CVR_REMOVED, __int128>::value ?
+            static_cast<UnsignedType<CVR_REMOVED>>(-1) / 2 : -1;
   }
 
   /// Return an integer signifying the sign of the value, returning +1 for
@@ -168,7 +211,7 @@ class BitUtil {
   template<typename T>
   static inline int PopcountSigned(T v) {
     // Converting to same-width unsigned then extending preserves the bit pattern.
-    return BitUtil::Popcount(static_cast<typename make_unsigned<T>::type>(v));
+    return BitUtil::Popcount(static_cast<UnsignedType<T>>(v));
   }
 
   /// Returns the 'num_bits' least-significant bits of 'v'.
@@ -249,7 +292,7 @@ class BitUtil {
   template <typename T>
   constexpr static T ShiftRightLogical(T v, int shift) {
     // Conversion to unsigned ensures most significant bits always filled with 0's
-    return static_cast<typename make_unsigned<T>::type>(v) >> shift;
+    return static_cast<UnsignedType<T>>(v) >> shift;
   }
 
   /// Get an specific bit of a numeric type

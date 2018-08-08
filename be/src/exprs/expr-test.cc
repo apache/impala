@@ -5348,16 +5348,11 @@ TEST_F(ExprTest, MathFunctions) {
   // Test when min > max
   TestErrorString("width_bucket(22, 50, 5, 4)",
       "UDF ERROR: Lower bound cannot be greater than or equal to the upper bound\n");
-  // Test max - min will overflow during width_bucket evaluation
-  TestErrorString("width_bucket(11, -9, 99999999999999999999999999999999999999, 4000)",
-      "UDF ERROR: Overflow while evaluating the difference between min_range: -9 and "
-      "max_range: 99999999999999999999999999999999999999\n");
-  // If expr - min overflows during width_bucket evaluation, max - min will also
-  // overflow. Since we evaluate max - min before evaluating expr - min, we will never
-  // end up overflowing expr - min.
-  TestErrorString("width_bucket(1, -99999999999999999999999999999999999999, 9, 40)",
-      "UDF ERROR: Overflow while evaluating the difference between min_range: "
-      "-99999999999999999999999999999999999999 and max_range: 9\n");
+  // IMPALA-7412: Test max - min should not overflow anymore
+  TestValue("width_bucket(11, -9, 99999999999999999999999999999999999999, 4000)",
+      TYPE_BIGINT, 1);
+  TestValue("width_bucket(1, -99999999999999999999999999999999999999, 9, 40)",
+      TYPE_BIGINT, 40);
   // Test when dist_from_min * buckets cannot be stored in a int128_t (overflows)
   // and needs to be stored in a int256_t
   TestValue("width_bucket(8000000000000000000000000000000000000,"
@@ -5380,16 +5375,34 @@ TEST_F(ExprTest, MathFunctions) {
   // max and min value that would require int256_t for evalation
   TestValue("width_bucket(10000000000000000000000000000000000000, 1,"
             "99999999999999999999999999999999999999, 15)", TYPE_BIGINT, 2);
-  // IMPALA-7242/IMPALA-7243: check for overflow when converting IntVal to DecimalValue
-  TestErrorString("width_bucket(cast(-0.10 as decimal(37,30)), cast(-0.36028797018963968 "
+  // IMPALA-7412: These should not overflow anymore
+  TestValue("width_bucket(cast(-0.10 as decimal(37,30)), cast(-0.36028797018963968 "
       "as decimal(25,25)), cast(9151517.4969773200562764155787276999832"
-      "as decimal(38,31)), 1328180220)",
-      "UDF ERROR: Overflow while representing the num_buckets:1328180220 as a "
-      "DecimalVal\n");
-  TestErrorString("width_bucket(cast(9 as decimal(10,7)), cast(-60000 as decimal(11,6)), "
-      "cast(10 as decimal(7,5)), 249895273);",
-      "UDF ERROR: Overflow while representing the num_buckets:249895273 as a "
-      "DecimalVal\n");
+      "as decimal(38,31)), 1328180220)", TYPE_BIGINT, 38);
+  TestValue("width_bucket(cast(9 as decimal(10,7)), cast(-60000 as decimal(11,6)), "
+      "cast(10 as decimal(7,5)), 249895273);", TYPE_BIGINT, 249891109);
+  // max - min and expr - min needs bigger type than the underlying type of
+  // the deduced decimal. The calculation must succeed by using a bigger type.
+  TestValue("width_bucket(cast(0.9999 as decimal(35,35)), cast(-0.705408425140 as "
+      "decimal(23,23)), cast(0.999999999999999999999 as decimal(38,38)), 699997927)",
+      TYPE_BIGINT, 699956882ll);
+  // max - min needs bigger type, but expr - min and (expr - min) * num_buckets fits
+  // into deduced decimal
+  TestValue("width_bucket(cast(-0.7054084251 as decimal(23,23)), cast(-0.705408425140 "
+      "as decimal(23,23)), cast(0.999999999999999999999 as decimal(38,38)), 10)",
+      TYPE_BIGINT, 1);
+  // max - min fits into deduced decimal, (max - min) * num_buckets needs bigger type,
+  // but expr == min
+  TestValue("width_bucket(cast(1 as decimal(9,0)), cast(1 as decimal(9,0)), "
+      "cast(100000000 as decimal(9,0)), 100)", TYPE_BIGINT, 1);
+  // max - min fits into deduced decimal, (max - min) * num_buckets needs bigger type,
+  // but (expr - min) * num_buckets fits
+  TestValue("width_bucket(cast(2 as decimal(9,0)), cast(1 as decimal(9,0)), "
+      "cast(100000000 as decimal(9,0)), 100)", TYPE_BIGINT, 1);
+  // max - min fits into deduced decimal, but (expr - min) * num_buckets needs bigger type
+  TestValue("width_bucket(cast(100000000 as decimal(9,0)), cast(1 as decimal(9,0)), "
+      "cast(100000001 as decimal(9,0)), 100)", TYPE_BIGINT, 100);
+
   // Run twice to test deterministic behavior.
   for (uint32_t seed : {0, 1234}) {
     stringstream rand, random;
