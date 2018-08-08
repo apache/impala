@@ -459,7 +459,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
    * we. We should therefore treat mixing formats inside one partition as user error.
    * It's easy to add per-file metadata to FileDescriptor if this changes.
    */
-  private final HdfsStorageDescriptor fileFormatDescriptor_;
+  private HdfsStorageDescriptor fileFormatDescriptor_;
 
   /**
    * The file descriptors of this partition, encoded as flatbuffers. Storing the raw
@@ -563,7 +563,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
    * format classes.
    */
   public void setFileFormat(HdfsFileFormat fileFormat) {
-    fileFormatDescriptor_.setFileFormat(fileFormat);
+    fileFormatDescriptor_ = fileFormatDescriptor_.cloneWithChangedFileFormat(
+        fileFormat);
     cachedMsPartitionDescriptor_.sdInputFormat = fileFormat.inputFormat();
     cachedMsPartitionDescriptor_.sdOutputFormat = fileFormat.outputFormat();
     cachedMsPartitionDescriptor_.sdSerdeInfo.setSerializationLib(
@@ -811,15 +812,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
 
   public static HdfsPartition fromThrift(HdfsTable table,
       long id, THdfsPartition thriftPartition) {
-    HdfsStorageDescriptor storageDesc = new HdfsStorageDescriptor(table.getName(),
-        HdfsFileFormat.fromThrift(thriftPartition.getFileFormat()),
-        thriftPartition.lineDelim,
-        thriftPartition.fieldDelim,
-        thriftPartition.collectionDelim,
-        thriftPartition.mapKeyDelim,
-        thriftPartition.escapeChar,
-        (byte) '"', // TODO: We should probably add quoteChar to THdfsPartition.
-        thriftPartition.blockSize);
+    HdfsStorageDescriptor storageDesc = HdfsStorageDescriptor.fromThriftPartition(
+        thriftPartition, table.getName());
 
     List<LiteralExpr> literalExpr = Lists.newArrayList();
     if (id != CatalogObjectsConstants.PROTOTYPE_PARTITION_ID) {

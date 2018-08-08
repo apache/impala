@@ -22,8 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.annotation.concurrent.Immutable;
-
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.ColumnDef;
@@ -46,6 +44,7 @@ import org.apache.kudu.client.KuduException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.errorprone.annotations.Immutable;
 
 public class LocalKuduTable extends LocalTable implements FeKuduTable {
   private final TableParams tableParams_;

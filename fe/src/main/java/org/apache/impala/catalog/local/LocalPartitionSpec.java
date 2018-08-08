@@ -19,8 +19,6 @@ package org.apache.impala.catalog.local;
 
 import java.util.List;
 
-import javax.annotation.concurrent.Immutable;
-
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.catalog.CatalogException;
@@ -30,6 +28,7 @@ import org.apache.impala.util.MetaStoreUtil;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.errorprone.annotations.Immutable;
 
 /**
  * Specification of a partition of a {@link LocalFsTable} containing
@@ -39,6 +38,9 @@ import com.google.common.collect.ImmutableList;
 class LocalPartitionSpec implements PrunablePartition {
   private final long id_;
   private final String name_;
+
+  // LiteralExprs are technically mutable prior to analysis.
+  @SuppressWarnings("Immutable")
   private final ImmutableList<LiteralExpr> partitionValues_;
 
   LocalPartitionSpec(LocalFsTable table, String partName, long id) {

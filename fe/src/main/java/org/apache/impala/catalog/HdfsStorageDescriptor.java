@@ -17,22 +17,32 @@
 
 package org.apache.impala.catalog;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.impala.thrift.THdfsPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Interner;
+import com.google.common.collect.Interners;
 import com.google.common.collect.Maps;
+import com.google.errorprone.annotations.Immutable;
 
 /**
  * Represents the file format metadata for files stored in a table or partition.
+ *
+ * This class is immutable, and instances are stored in a global interner, since
+ * the number of distinct combinations of file formats and other parameters
+ * is typically quite low relative to the total number of partitions (e.g. almost
+ * all partitions will use the default quoting).
  */
+@Immutable
 public class HdfsStorageDescriptor {
   public static final char DEFAULT_LINE_DELIM = '\n';
   // hive by default uses ctrl-a as field delim
@@ -46,14 +56,14 @@ public class HdfsStorageDescriptor {
   // Important: don't change the ordering of these keys - if e.g. FIELD_DELIM is not
   // found, the value of LINE_DELIM is used, so LINE_DELIM must be found first.
   // Package visible for testing.
-  final static List<String> DELIMITER_KEYS = ImmutableList.of(
+  final static ImmutableList<String> DELIMITER_KEYS = ImmutableList.of(
       serdeConstants.LINE_DELIM, serdeConstants.FIELD_DELIM,
       serdeConstants.COLLECTION_DELIM, serdeConstants.MAPKEY_DELIM,
       serdeConstants.ESCAPE_CHAR, serdeConstants.QUOTE_CHAR);
 
   // The Parquet serde shows up multiple times as the location of the implementation
   // has changed between Impala versions.
-  final static List<String> COMPATIBLE_SERDES = ImmutableList.of(
+  final static ImmutableList<String> COMPATIBLE_SERDES = ImmutableList.of(
       "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", // (seq / text / parquet)
       "org.apache.hadoop.hive.serde2.avro.AvroSerDe", // (avro)
       "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe", // (rc)
@@ -65,7 +75,10 @@ public class HdfsStorageDescriptor {
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
 
-  private HdfsFileFormat fileFormat_;
+  private final static Interner<HdfsStorageDescriptor> INTERNER =
+      Interners.newWeakInterner();
+
+  private final HdfsFileFormat fileFormat_;
   private final byte lineDelim_;
   private final byte fieldDelim_;
   private final byte collectionDelim_;
@@ -73,10 +86,6 @@ public class HdfsStorageDescriptor {
   private final byte escapeChar_;
   private final byte quoteChar_;
   private final int blockSize_;
-
-  public void setFileFormat(HdfsFileFormat fileFormat) {
-    fileFormat_ = fileFormat;
-  }
 
   /**
    * Returns a map from delimiter key to a single delimiter character,
@@ -151,7 +160,7 @@ public class HdfsStorageDescriptor {
     return null;
   }
 
-  public HdfsStorageDescriptor(String tblName, HdfsFileFormat fileFormat, byte lineDelim,
+  private HdfsStorageDescriptor(String tblName, HdfsFileFormat fileFormat, byte lineDelim,
       byte fieldDelim, byte collectionDelim, byte mapKeyDelim, byte escapeChar,
       byte quoteChar, int blockSize) {
     this.fileFormat_ = fileFormat;
@@ -216,7 +225,7 @@ public class HdfsStorageDescriptor {
     }
 
     try {
-      return new HdfsStorageDescriptor(tblName,
+      return INTERNER.intern(new HdfsStorageDescriptor(tblName,
           HdfsFileFormat.fromJavaClassName(sd.getInputFormat()),
           delimMap.get(serdeConstants.LINE_DELIM),
           delimMap.get(serdeConstants.FIELD_DELIM),
@@ -224,11 +233,28 @@ public class HdfsStorageDescriptor {
           delimMap.get(serdeConstants.MAPKEY_DELIM),
           delimMap.get(serdeConstants.ESCAPE_CHAR),
           delimMap.get(serdeConstants.QUOTE_CHAR),
-          blockSize);
+          blockSize));
     } catch (IllegalArgumentException ex) {
       // Thrown by fromJavaClassName
       throw new InvalidStorageDescriptorException(ex);
     }
+  }
+
+  public static HdfsStorageDescriptor fromThriftPartition(THdfsPartition thriftPartition,
+      String tableName) {
+    return INTERNER.intern(new HdfsStorageDescriptor(tableName,
+        HdfsFileFormat.fromThrift(thriftPartition.getFileFormat()),
+        thriftPartition.lineDelim, thriftPartition.fieldDelim,
+        thriftPartition.collectionDelim, thriftPartition.mapKeyDelim,
+        thriftPartition.escapeChar,
+        (byte) '"', // TODO: We should probably add quoteChar to THdfsPartition.
+        thriftPartition.blockSize));
+  }
+
+  public HdfsStorageDescriptor cloneWithChangedFileFormat(HdfsFileFormat newFormat) {
+    return INTERNER.intern(new HdfsStorageDescriptor(
+        "<unknown>", newFormat, lineDelim_, fieldDelim_, collectionDelim_, mapKeyDelim_,
+        escapeChar_, quoteChar_, blockSize_));
   }
 
   public byte getLineDelim() { return lineDelim_; }
@@ -238,4 +264,27 @@ public class HdfsStorageDescriptor {
   public byte getEscapeChar() { return escapeChar_; }
   public HdfsFileFormat getFileFormat() { return fileFormat_; }
   public int getBlockSize() { return blockSize_; }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(blockSize_, collectionDelim_, escapeChar_, fieldDelim_,
+        fileFormat_, lineDelim_, mapKeyDelim_, quoteChar_);
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) return true;
+    if (obj == null) return false;
+    if (getClass() != obj.getClass()) return false;
+    HdfsStorageDescriptor other = (HdfsStorageDescriptor) obj;
+    if (blockSize_ != other.blockSize_) return false;
+    if (collectionDelim_ != other.collectionDelim_) return false;
+    if (escapeChar_ != other.escapeChar_) return false;
+    if (fieldDelim_ != other.fieldDelim_) return false;
+    if (fileFormat_ != other.fileFormat_) return false;
+    if (lineDelim_ != other.lineDelim_) return false;
+    if (mapKeyDelim_ != other.mapKeyDelim_) return false;
+    if (quoteChar_ != other.quoteChar_) return false;
+    return true;
+  }
 }

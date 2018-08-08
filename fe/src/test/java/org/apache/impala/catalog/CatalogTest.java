@@ -27,8 +27,10 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -359,6 +361,8 @@ public class CatalogTest {
     // check that partition keys cover the date range 1/1/2009-12/31/2010
     // and that we have one file per partition.
     assertEquals(24, partitions.size());
+    Set<HdfsStorageDescriptor> uniqueSds = Collections.newSetFromMap(
+        new IdentityHashMap<HdfsStorageDescriptor, Boolean>());
     Set<Long> months = Sets.newHashSet();
     for (FeFsPartition p: partitions) {
       assertEquals(2, p.getPartitionValues().size());
@@ -380,8 +384,14 @@ public class CatalogTest {
         // no need for this boolean anymore.
         assertEquals(p.getFileDescriptors().size(), 1);
       }
+
+      uniqueSds.add(p.getInputFormatDescriptor());
     }
     assertEquals(months.size(), 24);
+
+    // We intern storage descriptors, so we should only have a single instance across
+    // all of the partitions.
+    assertEquals(1, uniqueSds.size());
   }
 
   // TODO: All Hive-stats related tests are temporarily disabled because of an unknown,
