@@ -1211,7 +1211,8 @@ public class HdfsTable extends Table implements FeFsTable {
       try {
         if (loadTableSchema) {
             // set nullPartitionKeyValue from the hive conf.
-            nullPartitionKeyValue_ = MetaStoreUtil.getNullPartitionKeyValue(client);
+            nullPartitionKeyValue_ =
+                MetaStoreUtil.getNullPartitionKeyValue(client).intern();
             loadSchema(msTbl);
             loadAllColumnStats(client);
         }

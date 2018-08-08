@@ -305,7 +305,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       String[] ip_port = location.split(":");
       if (ip_port.length != 2) return null;
       try {
-        return new TNetworkAddress(ip_port[0], Integer.parseInt(ip_port[1]));
+        return CatalogInterners.internNetworkAddress(
+            new TNetworkAddress(ip_port[0], Integer.parseInt(ip_port[1])));
       } catch (NumberFormatException e) {
         return null;
       }
@@ -765,6 +766,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       org.apache.hadoop.hive.metastore.api.StorageDescriptor sd = null;
       if (msPartition != null) {
         sd = msPartition.getSd();
+        CatalogInterners.internFieldsInPlace(sd);
         msCreateTime = msPartition.getCreateTime();
         msLastAccessTime = msPartition.getLastAccessTime();
       } else {
@@ -778,7 +780,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
         sdSerdeInfo = sd.getSerdeInfo();
         sdBucketCols = ImmutableList.copyOf(sd.getBucketCols());
         sdSortCols = ImmutableList.copyOf(sd.getSortCols());
-        sdParameters = ImmutableMap.copyOf(sd.getParameters());
+        sdParameters = ImmutableMap.copyOf(CatalogInterners.internParameters(
+            sd.getParameters()));
       } else {
         sdInputFormat = "";
         sdOutputFormat = "";
@@ -857,6 +860,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       hmsParameters_ = new HashMap<>();
     }
     extractAndCompressPartStats();
+    // Intern parameters after removing the incremental stats
+    hmsParameters_ = CatalogInterners.internParameters(hmsParameters_);
   }
 
   public HdfsPartition(HdfsTable table,
@@ -951,7 +956,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     }
 
     if (thriftPartition.isSetHms_parameters()) {
-      partition.hmsParameters_ = thriftPartition.getHms_parameters();
+      partition.hmsParameters_ = CatalogInterners.internParameters(
+          thriftPartition.getHms_parameters());
     } else {
       partition.hmsParameters_ = new HashMap<>();
     }

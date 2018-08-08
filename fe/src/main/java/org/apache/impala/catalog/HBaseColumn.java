@@ -31,7 +31,7 @@ public class HBaseColumn extends Column implements Comparable<HBaseColumn> {
   public HBaseColumn(String name, String columnFamily, String columnQualifier,
       boolean binaryEncoded, Type type, String comment, int position) {
     super(name, type, comment, position);
-    columnFamily_ = columnFamily;
+    columnFamily_ = CatalogInterners.internString(columnFamily);
     columnQualifier_ = columnQualifier;
     binaryEncoded_ = binaryEncoded;
   }

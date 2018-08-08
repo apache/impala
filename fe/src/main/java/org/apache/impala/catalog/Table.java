@@ -251,8 +251,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    */
   public static Table fromMetastoreTable(Db db,
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    // Create a table of appropriate type
+    CatalogInterners.internFieldsInPlace(msTbl);
     Table table = null;
+    // Create a table of appropriate type
     if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
       table = new View(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (HBaseTable.isHBaseTable(msTbl)) {
@@ -277,6 +278,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    */
   public static Table fromThrift(Db parentDb, TTable thriftTable)
       throws TableLoadingException {
+    CatalogInterners.internFieldsInPlace(thriftTable);
     Table newTable;
     if (!thriftTable.isSetLoad_status() && thriftTable.isSetMetastore_table())  {
       newTable = Table.fromMetastoreTable(parentDb, thriftTable.getMetastore_table());
@@ -501,6 +503,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   public void setMetaStoreTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
     msTable_ = msTbl;
+    CatalogInterners.internFieldsInPlace(msTable_);
   }
 
   @Override // FeTable
