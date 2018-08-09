@@ -330,6 +330,14 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
 
     if (!status.ok()) {
       unique_lock<mutex> l(lock_);
+#ifndef NDEBUG
+      // TODO (IMPALA-7430): Remove the log message once the causes of IMPALA-7335 and
+      // IMPALA-7418 are determined.
+      VLOG_QUERY << "Non-ok status returned by ProcessSplit = " << status.msg().msg()
+                 << " for Scan node (id=" << id()
+                 << ", status_ = " << (status_.ok() ? "ok" : status_.msg().msg())
+                 << ", done_ = " << (done_ ? "1" : "0") << ")";
+#endif
       // If there was already an error, the main thread will do the cleanup
       if (!status_.ok()) break;
 
