@@ -1,3 +1,5 @@
+#!/usr/bin/python
+#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -29,7 +31,6 @@ import sys
 import tarfile
 import time
 import tempfile
-import traceback
 
 from collections import namedtuple
 from contextlib import closing
@@ -503,9 +504,11 @@ class ImpalaDiagnosticsHandler(object):
 
 def get_args_parser():
   """Creates the argument parser and adds the flags"""
-  parser = argparse.ArgumentParser(description="Impala diagnostics collection")
-  parser.add_argument("--pid", action="store", dest="pid", type=int, default=0,
-      help="PID of the Impala process for which diagnostics should be collected.")
+  parser = argparse.ArgumentParser(
+      description="Impala diagnostics collection",
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+  parser.add_argument("--pid", required=True, action="store", dest="pid", type=int,
+      default=0, help="PID of the Impala process for which to collect diagnostics.")
   parser.add_argument("--java_home", action="store", dest="java_home", default="",
       help="If not set, it is set to the JAVA_HOME from the pid's environment.")
   parser.add_argument("--timeout", action="store", dest="timeout", default=300,
@@ -527,9 +530,8 @@ def get_args_parser():
   parser.add_argument("--profiles_dir", action="store", dest="profiles_dir", default="",
       help="Path of the profiles directory to be included in the diagnostics output.")
   parser.add_argument("--profiles_max_size_limit", action="store",
-      dest="profiles_max_size_limit", default=3*1024*1024*1024,
-      type=float, help="Uncompressed limit (in Bytes) on profile logs collected from\
-      --profiles_dir. Defaults to 3GB.")
+      dest="profiles_max_size_limit", default=3 * 1024 * 1024 * 1024, type=float,
+      help="Uncompressed limit (in Bytes) on profile logs collected from --profiles_dir.")
   parser.add_argument("--output_dir", action="store", dest="output_dir",
       default = tempfile.gettempdir(), help="Output directory that contains the final "
       "diagnostics data. Defaults to %s" % tempfile.gettempdir())
@@ -537,9 +539,6 @@ def get_args_parser():
 
 if __name__ == "__main__":
   parser = get_args_parser()
-  if len(sys.argv) == 1:
-    parser.print_usage()
-    sys.exit(1)
   logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, datefmt="%Y-%m-%d %H:%M:%S",
       format="%(asctime)s %(levelname)-8s %(message)s")
   diagnostics_handler = ImpalaDiagnosticsHandler(parser.parse_args())
