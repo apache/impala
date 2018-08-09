@@ -76,9 +76,12 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
     // IMPALA-5125: We can't eliminate aggregates as this may change the meaning of the
     // query, for example:
     // 'select if (true, 0, sum(id)) from alltypes' != 'select 0 from alltypes'
-    if (expr != simplified && expr.contains(Expr.isAggregatePredicate())
-        && !simplified.contains(Expr.isAggregatePredicate())) {
-      return expr;
+    if (expr != simplified) {
+      simplified.analyze(analyzer);
+      if (expr.contains(Expr.isAggregatePredicate())
+          && !simplified.contains(Expr.isAggregatePredicate())) {
+        return expr;
+      }
     }
     return simplified;
   }

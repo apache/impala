@@ -447,6 +447,9 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     // Don't rewrite based on nullability of slots. TODO (IMPALA-5753).
     RewritesOk("coalesce(year, id)", rule, null);
     RewritesOk("functional_kudu.alltypessmall", "coalesce(id, year)", rule, null);
+    // IMPALA-7419: coalesce that gets simplified and contains an aggregate
+    RewritesOk("coalesce(null, min(distinct tinyint_col), 42)", rule,
+        "coalesce(min(tinyint_col), 42)");
   }
 
   @Test
