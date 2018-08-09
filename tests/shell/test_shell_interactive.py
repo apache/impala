@@ -302,14 +302,15 @@ class TestImpalaShellInteractive(object):
     for query, _ in queries:
       child_proc.expect(PROMPT_REGEX)
       child_proc.sendline(query)
-      child_proc.expect("Fetched 1 row\(s\) in .*s")
+      child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline('quit;')
     p = ImpalaShell()
     p.send_cmd('history')
     result = p.get_result()
     for _, history_entry in queries:
-      assert history_entry in result.stderr, "'%s' not in '%s'" % (history_entry, result.stderr)
+      assert history_entry in result.stderr, "'%s' not in '%s'" % (history_entry,
+                                                                   result.stderr)
 
   def test_history_file_option(self, tmp_history_file):
     """
@@ -341,11 +342,11 @@ class TestImpalaShellInteractive(object):
     self._expect_with_cmd(child_proc, "select 'second_command'", ("second_command"))
     child_proc.sendline('history;')
     child_proc.expect(":21000] default>")
-    assert '[1]: select \'first_command\';' in child_proc.before;
-    assert '[2]: select \'second_command\';' in child_proc.before;
-    assert '[3]: history;' in child_proc.before;
+    assert '[1]: select \'first_command\';' in child_proc.before
+    assert '[2]: select \'second_command\';' in child_proc.before
+    assert '[3]: history;' in child_proc.before
     # Rerunning command should not add an entry into history.
-    assert '[4]' not in child_proc.before;
+    assert '[4]' not in child_proc.before
     self._expect_with_cmd(child_proc, "@0", ("Command index out of range"))
     self._expect_with_cmd(child_proc, "rerun   4", ("Command index out of range"))
     self._expect_with_cmd(child_proc, "@-4", ("Command index out of range"))
@@ -396,7 +397,8 @@ class TestImpalaShellInteractive(object):
       # Change working dir so that SOURCE command in shell.cmds can find shell2.cmds.
       os.chdir("%s/tests/shell/" % os.environ['IMPALA_HOME'])
       # IMPALA-5416: Test that a command following 'source' won't be run twice.
-      result = run_impala_shell_interactive("source shell.cmds;select \"second command\";")
+      result = run_impala_shell_interactive("source shell.cmds;select \"second "
+                                            "command\";")
       assert "Query: USE FUNCTIONAL" in result.stderr
       assert "Query: SHOW TABLES" in result.stderr
       assert "alltypes" in result.stdout
@@ -452,8 +454,8 @@ class TestImpalaShellInteractive(object):
     # Development, deprecated and removed options should not be shown.
     # Note: there are currently no deprecated options
     assert "Development Query Options:" not in result.stdout
-    assert "DEBUG_ACTION" not in result.stdout # Development option.
-    assert "MAX_IO_BUFFERS" not in result.stdout # Removed option.
+    assert "DEBUG_ACTION" not in result.stdout  # Development option.
+    assert "MAX_IO_BUFFERS" not in result.stdout  # Removed option.
 
     shell2 = ImpalaShell()
     shell2.send_cmd("set all")
@@ -729,6 +731,7 @@ class TestImpalaShellInteractive(object):
     assert "Fetched 1 row" not in results.stderr
     assert "ERROR: Errors parsing query options" in results.stderr
     assert "Invalid timezone name 'BLA'" in results.stderr
+
 
 def run_impala_shell_interactive(input_lines, shell_args=None):
   """Runs a command in the Impala shell interactively."""
