@@ -255,9 +255,9 @@ class ScanRange : public RequestRange {
   /// Cancel this scan range. This waits for any in-flight read operations to complete,
   /// cleans up all buffers owned by the scan range (i.e. queued or unused buffers)
   /// and wakes up any threads blocked on GetNext(). Status is a non-ok status with the
-  /// reason the range was cancelled, e.g. CANCELLED if the range was cancelled because
-  /// it was not needed, or another error if an error was encountered while scanning the
-  /// range. Status is returned to the any callers of GetNext().
+  /// reason the range was cancelled, e.g. CANCELLED_INTERNALLY if the range was cancelled
+  /// because it was not needed, or another error if an error was encountered while
+  /// scanning the range. Status is returned to the any callers of GetNext().
   void Cancel(const Status& status);
 
   /// return a descriptive string for debug.
@@ -522,10 +522,10 @@ class ScanRange : public RequestRange {
   boost::mutex hdfs_lock_;
 
   /// If non-OK, this scan range has been cancelled. This status is the reason for
-  /// cancellation - CANCELLED if cancelled without error, or another status if an
-  /// error caused cancellation. Note that a range can be cancelled without cancelling
-  /// the owning context. This means that ranges can be cancelled or hit errors without
-  /// aborting all scan ranges.
+  /// cancellation - CANCELLED_INTERNALLY if cancelled without error, or another status
+  /// if an error caused cancellation. Note that a range can be cancelled without
+  /// cancelling the owning context. This means that ranges can be cancelled or hit errors
+  /// without aborting all scan ranges.
   //
   /// Writers must hold both 'lock_' and 'hdfs_lock_'. Readers must hold either 'lock_'
   /// or 'hdfs_lock_'. This prevents the range from being cancelled while any thread
@@ -542,10 +542,10 @@ class WriteRange : public RequestRange {
   /// This callback is invoked on each WriteRange after the write is complete or the
   /// context is cancelled. The status returned by the callback parameter indicates
   /// if the write was successful (i.e. Status::OK), if there was an error
-  /// TStatusCode::RUNTIME_ERROR) or if the context was cancelled
-  /// (TStatusCode::CANCELLED). The callback is only invoked if this WriteRange was
-  /// successfully added (i.e. AddWriteRange() succeeded). No locks are held while
-  /// the callback is invoked.
+  /// TErrorCode::RUNTIME_ERROR) or if the context was cancelled
+  /// (TErrorCode::CANCELLED_INTERNALLY). The callback is only invoked if this
+  /// WriteRange was successfully added (i.e. AddWriteRange() succeeded). No locks are
+  /// held while the callback is invoked.
   typedef std::function<void(const Status&)> WriteDoneCallback;
   WriteRange(const std::string& file, int64_t file_offset, int disk_id,
       WriteDoneCallback callback);

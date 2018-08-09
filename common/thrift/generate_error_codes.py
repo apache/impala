@@ -32,7 +32,7 @@ error_codes = (
 
   ("GENERAL", 2, "$0"),
 
-  ("CANCELLED", 3, "$0"),
+  ("CANCELLED", 3, "Cancelled"),
 
   ("ANALYSIS_ERROR", 4, "$0"),
 
@@ -363,6 +363,7 @@ error_codes = (
   ("SCRATCH_READ_VERIFY_FAILED", 118, "Error reading $0 bytes from scratch file '$1' "
    "on backend $2 at offset $3: verification of read data failed."),
 
+  ("CANCELLED_INTERNALLY", 119, "Cancelled in $0"),
 )
 
 import sys

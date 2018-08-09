@@ -34,10 +34,10 @@ const char* Status::LLVM_CLASS_NAME = "class.impala::Status";
 // functions these constructors call.  In particular, we cannot call
 // glog functions which also rely on static initializations.
 // TODO: is there a more controlled way to do this.
-const Status Status::CANCELLED(ErrorMsg::Init(TErrorCode::CANCELLED, "Cancelled"));
+const Status Status::CANCELLED(ErrorMsg::Init(TErrorCode::CANCELLED));
 
-const Status Status::DEPRECATED_RPC(ErrorMsg::Init(TErrorCode::NOT_IMPLEMENTED_ERROR,
-    "Deprecated RPC; please update your client"));
+const Status Status::DEPRECATED_RPC(ErrorMsg::Init(
+    TErrorCode::NOT_IMPLEMENTED_ERROR, "Deprecated RPC; please update your client"));
 
 Status Status::MemLimitExceeded() {
   return Status(ErrorMsg(TErrorCode::MEM_LIMIT_EXCEEDED, "Memory limit exceeded"), true);
@@ -46,6 +46,10 @@ Status Status::MemLimitExceeded() {
 Status Status::MemLimitExceeded(const std::string& details) {
   return Status(ErrorMsg(TErrorCode::MEM_LIMIT_EXCEEDED,
       Substitute("Memory limit exceeded: $0", details)), true);
+}
+
+Status Status::CancelledInternal(const char* subsystem) {
+  return Status(ErrorMsg::Init(TErrorCode::CANCELLED_INTERNALLY, subsystem));
 }
 
 Status::Status(TErrorCode::type code)

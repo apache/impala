@@ -460,7 +460,7 @@ TEST_F(TmpFileMgrTest, TestProcessMemLimitExceeded) {
       bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
   unique_ptr<TmpFileMgr::WriteHandle> handle;
   Status status = file_group.Write(MemRange(data.data(), DATA_SIZE), callback, &handle);
-  EXPECT_EQ(TErrorCode::CANCELLED, status.code());
+  EXPECT_EQ(TErrorCode::CANCELLED_INTERNALLY, status.code());
   file_group.Close();
   test_env_->TearDownQueries();
 }

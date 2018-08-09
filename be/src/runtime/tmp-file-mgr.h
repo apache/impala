@@ -322,8 +322,8 @@ class TmpFileMgr {
 
     /// Cancels any in-flight writes or reads. Reads are cancelled synchronously and
     /// writes are cancelled asynchronously. After Cancel() is called, writes are not
-    /// retried. The write callback may be called with a CANCELLED status (unless
-    /// it succeeded or encountered a different error first).
+    /// retried. The write callback may be called with a CANCELLED_INTERNALLY status
+    /// (unless it succeeded or encountered a different error first).
     void Cancel();
 
     /// Blocks until the write completes either successfully or unsuccessfully.

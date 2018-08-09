@@ -76,7 +76,7 @@ void TestCallStaticError(int batch_size, void*) {
   BODY_1K( global = CallStaticError(); );
 }
 
-Status CallCreateError() { return Status(TErrorCode::CANCELLED, "Some Error"); }
+Status CallCreateError() { return Status(TErrorCode::GENERAL, "Some Error"); }
 
 void TestCallCreateError(int batch_size, void*) {
   BODY_1K( global = CallCreateError(); );
@@ -93,7 +93,7 @@ void TestCallAssignment(int batch_size, void*) {
 
 Status CallCondBranch(bool good) {
   Status s = Status::OK();
-  if (!good) s = Status(TErrorCode::CANCELLED, "Some Error");
+  if (!good) s = Status(TErrorCode::GENERAL, "Some Error");
   return s;
 }
 

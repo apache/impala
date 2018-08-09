@@ -211,11 +211,12 @@ Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
   DCHECK_NE(message.error(), TErrorCode::OK);
   // If either abort_on_error=true or the error necessitates execution stops
   // immediately, return an error status.
-  if (abort_on_error() ||
-      message.error() == TErrorCode::CANCELLED ||
-      message.error() == TErrorCode::MEM_LIMIT_EXCEEDED ||
-      message.error() == TErrorCode::INTERNAL_ERROR ||
-      message.error() == TErrorCode::DISK_IO_ERROR) {
+  if (abort_on_error()
+      || message.error() == TErrorCode::CANCELLED
+      || message.error() == TErrorCode::CANCELLED_INTERNALLY
+      || message.error() == TErrorCode::MEM_LIMIT_EXCEEDED
+      || message.error() == TErrorCode::INTERNAL_ERROR
+      || message.error() == TErrorCode::DISK_IO_ERROR) {
     return Status(message);
   }
   // Otherwise, add the error to the error log and continue.

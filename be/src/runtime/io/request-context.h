@@ -104,10 +104,10 @@ class RequestContext {
 
   /// Tries to get an unstarted scan range that was added to this context with
   /// AddScanRanges(). On success, returns OK and returns the range in '*range'.
-  /// If this context was cancelled, returns CANCELLED. If another error is encountered,
-  /// an error status is returned. Otherwise, if error or cancellation wasn't encountered
-  /// and there are no unstarted ranges for this context, returns OK and sets '*range' to
-  /// nullptr.
+  /// If this context was cancelled, returns CANCELLED_INTERNALLY. If another error is
+  /// encountered, an error status is returned. Otherwise, if error or cancellation wasn't
+  /// encountered and there are no unstarted ranges for this context, returns OK and sets
+  /// '*range' to nullptr.
   ///
   /// If '*needs_buffers' is returned as true, the caller must call
   /// AllocateBuffersForRange() to add buffers for the data to be read into before the
@@ -135,8 +135,8 @@ class RequestContext {
   /// Cancel the context asynchronously. All outstanding requests are cancelled
   /// asynchronously. This does not need to be called if the context finishes normally.
   /// Calling GetNext() on any scan ranges belonging to this RequestContext will return
-  /// CANCELLED (or another error, if an error was encountered for that scan range before
-  /// it is cancelled).
+  /// CANCELLED_INTERNALLY (or another error, if an error was encountered for that scan
+  /// range before it is cancelled).
   void Cancel();
 
   bool IsCancelled() {
@@ -347,7 +347,7 @@ class RequestContext {
   /// Scan ranges that have been added to the IO mgr for this context. Ranges can only
   /// be added when 'state_' is Active. When this context is cancelled, Cancel() is
   /// called for all the active ranges. If a client attempts to add a range while
-  /// 'state_' is Cancelled, the range is not added to this list and Status::CANCELLED
+  /// 'state_' is Cancelled, the range is not added to this list and CANCELLED_INTERNALLY
   /// is returned to the client. This ensures that all active ranges are cancelled as a
   /// result of RequestContext cancellation.
   /// Ranges can be cancelled or hit eos non-atomically with their removal from this set,

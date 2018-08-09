@@ -468,7 +468,7 @@ Status TmpFileMgr::FileGroup::RecoverWriteError(
   handle->file_->Blacklist(write_status.msg());
 
   // Do not retry cancelled writes or propagate the error, simply return CANCELLED.
-  if (handle->is_cancelled_) return Status::CANCELLED;
+  if (handle->is_cancelled_) return Status::CancelledInternal("TmpFileMgr write");
 
   TmpFileMgr::File* tmp_file;
   int64_t file_offset;
@@ -593,7 +593,7 @@ void TmpFileMgr::WriteHandle::Cancel() {
 
 void TmpFileMgr::WriteHandle::CancelRead() {
   if (read_range_ != nullptr) {
-    read_range_->Cancel(Status::CANCELLED);
+    read_range_->Cancel(Status::CancelledInternal("TmpFileMgr read"));
     read_range_ = nullptr;
   }
 }

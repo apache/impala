@@ -993,7 +993,7 @@ Status HdfsParquetScanner::CommitRows(RowBatch* dst_batch, int num_rows) {
   DCHECK(dst_batch != nullptr);
   dst_batch->CommitRows(num_rows);
 
-  if (context_->cancelled()) return Status::CANCELLED;
+  if (context_->cancelled()) return Status::CancelledInternal("Parquet scanner");
   // TODO: It's a really bad idea to propagate UDF error via the global RuntimeState.
   // Store UDF error in thread local storage or make UDF return status so it can merge
   // with parse_status_.

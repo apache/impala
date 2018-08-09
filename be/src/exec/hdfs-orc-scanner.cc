@@ -531,7 +531,7 @@ Status HdfsOrcScanner::NextStripe() {
 
 Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
   bool continue_execution = !scan_node_->ReachedLimit() && !context_->cancelled();
-  if (!continue_execution)  return Status::CANCELLED;
+  if (!continue_execution) return Status::CancelledInternal("ORC scanner");
 
   scratch_batch_tuple_idx_ = 0;
   scratch_batch_ = row_reader_->createRowBatch(row_batch->capacity());

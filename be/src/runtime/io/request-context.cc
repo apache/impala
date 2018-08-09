@@ -24,6 +24,10 @@
 using namespace impala;
 using namespace impala::io;
 
+// Cancelled status with an error message to distinguish from user-initiated cancellation.
+static const Status& CONTEXT_CANCELLED =
+    Status::CancelledInternal("IoMgr RequestContext");
+
 /// Struct containing state per disk. See comments in the disk read loop on how
 /// they are used.
 class RequestContext::PerDiskState {
@@ -249,8 +253,8 @@ void RequestContext::WriteDone(WriteRange* write_range, const Status& write_stat
 // check the state before doing so), or any write ranges to the context.
 // 2. Cancel() will call Cancel() on each ScanRange that is not yet complete, unblocking
 // any threads in GetNext(). If there was no prior error for a scan range, any reads from
-// that scan range will return a CANCELLED Status. Cancel() also invokes callbacks for
-// all WriteRanges with a CANCELLED Status.
+// that scan range will return a CANCELLED_INTERNALLY Status. Cancel() also invokes
+// callbacks for all WriteRanges with a CANCELLED_INTERNALLY Status.
 // 3. Disk threads notice the context is cancelled either when picking the next context
 // to process or when they try to enqueue a ready buffer. Upon noticing the cancelled
 // state, removes the context from the disk queue. The last thread per disk then calls
@@ -272,7 +276,7 @@ void RequestContext::Cancel() {
     // Clear out all request ranges from queues for this reader. Cancel the scan
     // ranges and invoke the write range callbacks to propagate the cancellation.
     for (ScanRange* range : active_scan_ranges_) {
-      range->CancelInternal(Status::CANCELLED, false);
+      range->CancelInternal(CONTEXT_CANCELLED, false);
     }
     active_scan_ranges_.clear();
     for (PerDiskState& disk_state : disk_states_) {
@@ -301,7 +305,7 @@ void RequestContext::Cancel() {
   }
 
   for (const WriteRange::WriteDoneCallback& write_callback: write_callbacks) {
-    write_callback(Status::CANCELLED);
+    write_callback(CONTEXT_CANCELLED);
   }
 
   // Signal reader and unblock the GetNext/Read thread.  That read will fail with
@@ -380,7 +384,7 @@ Status RequestContext::AddScanRanges(const vector<ScanRange*>& ranges) {
   unique_lock<mutex> lock(lock_);
   DCHECK(Validate()) << endl << DebugString();
 
-  if (state_ == RequestContext::Cancelled) return Status::CANCELLED;
+  if (state_ == RequestContext::Cancelled) return CONTEXT_CANCELLED;
 
   // Add each range to the queue of the disk the range is on
   for (ScanRange* range : ranges) {
@@ -408,7 +412,7 @@ Status RequestContext::GetNextUnstartedRange(ScanRange** range, bool* needs_buff
   unique_lock<mutex> lock(lock_);
   DCHECK(Validate()) << endl << DebugString();
   while (true) {
-    if (state_ == RequestContext::Cancelled) return Status::CANCELLED;
+    if (state_ == RequestContext::Cancelled) return CONTEXT_CANCELLED;
 
     if (num_unstarted_scan_ranges_.Load() == 0 && ready_to_start_ranges_.empty()
         && cached_ranges_.empty()) {
@@ -463,7 +467,7 @@ Status RequestContext::StartScanRange(ScanRange* range, bool* needs_buffers) {
 
   unique_lock<mutex> lock(lock_);
   DCHECK(Validate()) << endl << DebugString();
-  if (state_ == RequestContext::Cancelled) return Status::CANCELLED;
+  if (state_ == RequestContext::Cancelled) return CONTEXT_CANCELLED;
 
   DCHECK_NE(range->len(), 0);
   if (range->try_cache()) {
@@ -489,7 +493,7 @@ Status RequestContext::StartScanRange(ScanRange* range, bool* needs_buffers) {
 
 Status RequestContext::AddWriteRange(WriteRange* write_range) {
   unique_lock<mutex> lock(lock_);
-  if (state_ == RequestContext::Cancelled) return Status::CANCELLED;
+  if (state_ == RequestContext::Cancelled) return CONTEXT_CANCELLED;
   AddRangeToDisk(lock, write_range, ScheduleMode::IMMEDIATELY);
   return Status::OK();
 }

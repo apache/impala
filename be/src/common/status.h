@@ -98,6 +98,12 @@ class NODISCARD Status {
   static const Status CANCELLED;
   static const Status DEPRECATED_RPC;
 
+  /// Return a CANCELLED_INTERNALLY error. This should be used for "internal"
+  /// cancellation messages that were not user-initiated and are not expected to be shown
+  /// to the client. 'subsystem' is the name of the subsystem in which the cancellation
+  /// occurred, so that we can determine where the cancellation came from.
+  static Status CancelledInternal(const char* subsystem);
+
   /// Copy c'tor makes copy of error detail so Status can be returned by value.
   ALWAYS_INLINE Status(const Status& status) : msg_(NULL) {
     if (UNLIKELY(status.msg_ != NULL)) CopyMessageFrom(status);
@@ -198,8 +204,10 @@ class NODISCARD Status {
 
   bool ALWAYS_INLINE ok() const { return msg_ == NULL; }
 
+  /// Return true if this is a user-initiated or internal cancellation.
   bool IsCancelled() const {
-    return msg_ != NULL && msg_->error() == TErrorCode::CANCELLED;
+    return msg_ != NULL && (msg_->error() == TErrorCode::CANCELLED
+                               || msg_->error() == TErrorCode::CANCELLED_INTERNALLY);
   }
 
   bool IsMemLimitExceeded() const {

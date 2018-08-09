@@ -472,7 +472,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
 
   if (!PartitionPassesFilters(partition_id, FilterStats::SPLITS_KEY, filter_ctxs)) {
     // Avoid leaking unread buffers in scan_range.
-    scan_range->Cancel(Status::CANCELLED);
+    scan_range->Cancel(Status::CancelledInternal("HDFS partition pruning"));
     HdfsFileDesc* desc = GetFileDesc(partition_id, *scan_range->file_string());
     if (metadata->is_sequence_header) {
       // File ranges haven't been issued yet, skip entire file

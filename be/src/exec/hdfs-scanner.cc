@@ -203,7 +203,7 @@ Status HdfsScanner::CommitRows(int num_rows, RowBatch* row_batch) {
   row_batch->CommitRows(num_rows);
   tuple_mem_ += static_cast<int64_t>(scan_node_->tuple_desc()->byte_size()) * num_rows;
   tuple_ = reinterpret_cast<Tuple*>(tuple_mem_);
-  if (context_->cancelled()) return Status::CANCELLED;
+  if (context_->cancelled()) return Status::CancelledInternal("HDFS scanner");
   // Check for UDF errors.
   RETURN_IF_ERROR(state_->GetQueryStatus());
   // Clear expr result allocations for this thread to avoid accumulating too much

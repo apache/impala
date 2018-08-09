@@ -42,10 +42,11 @@ static const int64_t INIT_READ_PAST_SIZE_BYTES = 64 * 1024;
 
 const int64_t ScannerContext::Stream::OUTPUT_BUFFER_BYTES_LEFT_INIT;
 
+static const Status& CONTEXT_CANCELLED = Status::CancelledInternal("ScannerContext");
+
 ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNodeBase* scan_node,
     BufferPool::ClientHandle* bp_client, int64_t total_reservation,
-    HdfsPartitionDescriptor* partition_desc,
-    const vector<FilterContext>& filter_ctxs,
+    HdfsPartitionDescriptor* partition_desc, const vector<FilterContext>& filter_ctxs,
     MemPool* expr_results_pool)
   : state_(state),
     scan_node_(scan_node),
@@ -53,8 +54,7 @@ ScannerContext::ScannerContext(RuntimeState* state, HdfsScanNodeBase* scan_node,
     total_reservation_(total_reservation),
     partition_desc_(partition_desc),
     filter_ctxs_(filter_ctxs),
-    expr_results_pool_(expr_results_pool) {
-}
+    expr_results_pool_(expr_results_pool) {}
 
 ScannerContext::~ScannerContext() {
   DCHECK(streams_.empty());
@@ -96,7 +96,7 @@ ScannerContext::Stream* ScannerContext::AddStream(ScanRange* range, int64_t rese
 void ScannerContext::Stream::ReleaseCompletedResources(bool done) {
   if (done) {
     // Cancel the underlying scan range to clean up any queued buffers there
-    scan_range_->Cancel(Status::CANCELLED);
+    scan_range_->Cancel(CONTEXT_CANCELLED);
     boundary_pool_->FreeAll();
 
     // Reset variables - the stream is no longer valid.
@@ -113,7 +113,7 @@ void ScannerContext::Stream::ReleaseCompletedResources(bool done) {
 Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
   DCHECK_EQ(0, io_buffer_bytes_left_);
   DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
-  if (UNLIKELY(parent_->cancelled())) return Status::CANCELLED;
+  if (UNLIKELY(parent_->cancelled())) return CONTEXT_CANCELLED;
   if (io_buffer_ != nullptr) ReturnIoBuffer();
 
   // Nothing to do if we're at the end of the file - return leaving io_buffer_ == nullptr.
@@ -202,7 +202,7 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int64_
 
   if (UNLIKELY(parent_->cancelled())) {
     DCHECK(*out_buffer == nullptr);
-    return Status::CANCELLED;
+    return CONTEXT_CANCELLED;
   }
 
   if (boundary_buffer_bytes_left_ > 0) {
@@ -266,7 +266,7 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
     }
     int64_t remaining_requested_len = requested_len - boundary_buffer_bytes_left_;
     RETURN_IF_ERROR(GetNextBuffer(remaining_requested_len));
-    if (UNLIKELY(parent_->cancelled())) return Status::CANCELLED;
+    if (UNLIKELY(parent_->cancelled())) return CONTEXT_CANCELLED;
     // No more bytes (i.e. EOF).
     if (io_buffer_bytes_left_ == 0) break;
   }
