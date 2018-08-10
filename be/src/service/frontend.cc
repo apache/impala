@@ -224,23 +224,9 @@ Status Frontend::GetExplainPlan(
 Status Frontend::ValidateSettings() {
   // Use FE to check Hadoop config setting
   // TODO: check OS setting
-  stringstream ss;
-  JNIEnv* jni_env = getJNIEnv();
-  JniLocalFrame jni_frame;
-  RETURN_IF_ERROR(jni_frame.push(jni_env));
-  jstring error_string =
-      static_cast<jstring>(jni_env->CallObjectMethod(fe_, check_config_id_));
-  RETURN_ERROR_IF_EXC(jni_env);
-  jboolean is_copy;
-  const char *str = jni_env->GetStringUTFChars(error_string, &is_copy);
-  RETURN_ERROR_IF_EXC(jni_env);
-  ss << str;
-  jni_env->ReleaseStringUTFChars(error_string, str);
-  RETURN_ERROR_IF_EXC(jni_env);
-
-  if (ss.str().size() > 0) {
-    return Status(ss.str());
-  }
+  string err;
+  RETURN_IF_ERROR(JniCall::instance_method(fe_, check_config_id_).Call(&err));
+  if (!err.empty()) return Status(err);
   return Status::OK();
 }
 

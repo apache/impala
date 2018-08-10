@@ -220,13 +220,9 @@ Status JniUtil::InitJvmPauseMonitor() {
   JniMethodDescriptor init_jvm_pm_desc = {
       "initPauseMonitor", "(J)V", &init_jvm_pm_method};
   RETURN_IF_ERROR(JniUtil::LoadStaticJniMethod(env, jni_util_cl_, &init_jvm_pm_desc));
-  JNIEnv* jni_env = getJNIEnv();
-  JniLocalFrame jni_frame;
-  RETURN_IF_ERROR(jni_frame.push(jni_env));
-  jni_env->CallObjectMethod(
-      jni_util_cl_, init_jvm_pm_method, FLAGS_jvm_deadlock_detector_interval_s);
-  RETURN_ERROR_IF_EXC(jni_env);
-  return Status::OK();
+  return JniCall::static_method(jni_util_cl_, init_jvm_pm_method)
+      .with_primitive_arg(FLAGS_jvm_deadlock_detector_interval_s)
+      .Call();
 }
 
 Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& prefix) {
@@ -266,16 +262,18 @@ Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& pr
 
 Status JniUtil::GetJvmMemoryMetrics(const TGetJvmMemoryMetricsRequest& request,
     TGetJvmMemoryMetricsResponse* result) {
-  return JniUtil::CallJniMethod(jni_util_class(), get_jvm_metrics_id_, request, result);
+  return JniCall::static_method(jni_util_class(), get_jvm_metrics_id_)
+      .with_thrift_arg(request).Call(result);
 }
 
 Status JniUtil::GetJvmThreadsInfo(const TGetJvmThreadsInfoRequest& request,
     TGetJvmThreadsInfoResponse* result) {
-  return JniUtil::CallJniMethod(jni_util_class(), get_jvm_threads_id_, request, result);
+  return JniCall::static_method(jni_util_class(), get_jvm_threads_id_)
+      .with_thrift_arg(request).Call(result);
 }
 
 Status JniUtil::GetJMXJson(TGetJMXJsonResponse* result) {
-  return JniUtil::CallJniMethod(jni_util_class(), get_jmx_json_, result);
+  return JniCall::static_method(jni_util_class(), get_jmx_json_).Call(result);
 }
 
 Status JniUtil::LoadJniMethod(JNIEnv* env, const jclass& jni_class,

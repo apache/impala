@@ -42,7 +42,8 @@ Status ZipUtil::ExtractFiles(const string& archive_file, const string& destinati
   TExtractFromZipParams params;
   params.archive_file = archive_file;
   params.destination_dir = destination_dir;
-  return JniUtil::CallJniMethod(zip_util_class_, extract_files_method, params);
+  return JniCall::static_method(zip_util_class_, extract_files_method)
+      .with_thrift_arg(params).Call();
 }
 
 }

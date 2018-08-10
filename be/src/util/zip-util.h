@@ -20,7 +20,8 @@
 
 #include <string>
 
-#include "util/jni-util.h"
+#include <jni.h>
+
 #include "common/status.h"
 
 namespace impala {

@@ -18,8 +18,6 @@
 #ifndef IMPALA_SERVICE_FE_SUPPORT_H
 #define IMPALA_SERVICE_FE_SUPPORT_H
 
-#include "util/jni-util.h"
-
 namespace impala {
 
 /// InitFeSupport registers native functions with JNI. When the java

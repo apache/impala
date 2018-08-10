@@ -24,6 +24,7 @@
 
 #include "common/logging.h"
 #include "rpc/jni-thrift-util.h"
+#include "util/jni-util.h"
 #include "util/webserver.h"
 
 #include "common/names.h"
@@ -134,15 +135,12 @@ void InitDynamicLoggingSupport() {
 // Helper method to get the log level of given Java class. It is a JNI wrapper around
 // GlogAppender.getLogLevel().
 Status GetJavaLogLevel(const TGetJavaLogLevelParams& params, string* result) {
-  RETURN_IF_ERROR(
-      JniUtil::CallJniMethod(log4j_logger_class_, get_log_level_method, params, result));
-  return Status::OK();
+  return JniCall::static_method(log4j_logger_class_, get_log_level_method)
+      .with_thrift_arg(params).Call(result);
 }
 
 Status ResetJavaLogLevels() {
-  RETURN_IF_ERROR(
-      JniUtil::CallJniMethod(log4j_logger_class_, reset_log_levels_method));
-  return Status::OK();
+  return JniCall::static_method(log4j_logger_class_, reset_log_levels_method).Call();
 }
 
 // Callback handler for /get_java_loglevel.
@@ -181,8 +179,8 @@ void SetJavaLogLevelCallback(const Webserver::ArgumentMap& args, Document* docum
   string result;
   params.__set_class_name(classname->second);
   params.__set_log_level(level->second);
-  Status status =
-      JniUtil::CallJniMethod(log4j_logger_class_, set_log_level_method, params, &result);
+  Status status = JniCall::static_method(log4j_logger_class_, set_log_level_method)
+    .with_thrift_arg(params).Call(&result);
   if (!status.ok()) {
     AddDocumentMember(status.GetDetail(), "error", document);
     return;

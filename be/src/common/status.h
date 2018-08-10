@@ -105,7 +105,7 @@ class NODISCARD Status {
 
   /// Move constructor that moves the error message (if any) and resets 'other' to the
   /// default OK Status.
-  ALWAYS_INLINE Status(Status&& other) : msg_(other.msg_) { other.msg_ = NULL; }
+  ALWAYS_INLINE Status(Status&& other) noexcept : msg_(other.msg_) { other.msg_ = NULL; }
 
   /// Status using only the error code as a parameter. This can be used for error messages
   /// that don't take format parameters.

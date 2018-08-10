@@ -18,8 +18,9 @@
 #ifndef UTIL_BACKEND_CONFIG_H_
 #define UTIL_BACKEND_CONFIG_H_
 
+#include <jni.h>
+
 #include "common/status.h"
-#include "util/jni-util.h"
 
 namespace impala {
 

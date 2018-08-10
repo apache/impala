@@ -41,6 +41,7 @@
 #include "util/debug-util.h"
 #include "util/decimal-util.h"
 #include "util/disk-info.h"
+#include "util/jni-util.h"
 #include "util/logging-support.h"
 #include "util/mem-info.h"
 #include "util/memory-metrics.h"

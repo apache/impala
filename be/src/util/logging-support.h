@@ -18,7 +18,6 @@
 #ifndef IMPALA_UTIL_LOGGING_SUPPORT_H
 #define IMPALA_UTIL_LOGGING_SUPPORT_H
 
-#include "util/jni-util.h"
 #include "gen-cpp/Logging_types.h"
 
 namespace impala {

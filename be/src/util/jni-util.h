@@ -25,6 +25,7 @@
 
 #include "common/status.h"
 #include "gen-cpp/Frontend_types.h"
+#include "gutil/macros.h"
 
 #define THROW_IF_ERROR_WITH_LOGGING(stmt, env, adaptor) \
   do { \
@@ -120,6 +121,11 @@ class JniLocalFrame {
   JniLocalFrame(): env_(NULL) {}
   ~JniLocalFrame() { if (env_ != NULL) env_->PopLocalFrame(NULL); }
 
+  JniLocalFrame(JniLocalFrame&& other) noexcept
+    : env_(other.env_) {
+    other.env_ = nullptr;
+  }
+
   /// Pushes a new JNI local frame. The frame can support max_local_ref local references.
   /// The number of local references created inside the frame might exceed max_local_ref,
   /// but there is no guarantee that memory will be available.
@@ -127,6 +133,8 @@ class JniLocalFrame {
   Status push(JNIEnv* env, int max_local_ref = 10) WARN_UNUSED_RESULT;
 
  private:
+  DISALLOW_COPY_AND_ASSIGN(JniLocalFrame);
+
   JNIEnv* env_;
 };
 
@@ -195,6 +203,86 @@ class JniScopedArrayCritical {
   uint8_t* arr_;
   int size_;
   DISALLOW_COPY_AND_ASSIGN(JniScopedArrayCritical);
+};
+
+/// Utility class for making JNI calls, with various types of argument
+/// or response.
+///
+/// Example usages:
+///
+/// 1) Static call taking a Thrift struct and returning a string:
+///
+///   string s;
+///   RETURN_IF_ERROR(JniCall::static_method(my_jclass, my_method)
+///       .with_thrift_arg(foo).Call(&s));
+///
+/// 2) Non-static call taking no arguments and returning a Thrift struct:
+///
+///   TMyObject result;
+///   RETURN_IF_ERROR(JniCall::instance_method(my_jobject, my_method).Call(&result);
+class JniCall {
+ public:
+   JniCall(JniCall&& other) noexcept = default;
+
+   static JniCall static_method(jclass clazz, jmethodID method) WARN_UNUSED_RESULT {
+     return JniCall(method, clazz);
+   }
+
+   static JniCall instance_method(jobject obj, jmethodID method) WARN_UNUSED_RESULT {
+     return JniCall(method, obj);
+   }
+
+  /// Pass a Thrift-encoded argument. The JNI method should take a byte[] for the
+  /// Thrift-serialized data. Multiple arguments may be passed by repeated calls.
+  template<class T>
+  JniCall& with_thrift_arg(const T& arg) WARN_UNUSED_RESULT;
+
+  /// Pass a primitive arg (eg an integer).
+  /// Multiple arguments may be passed by repeated calls.
+  template<class T>
+  JniCall& with_primitive_arg(T arg) WARN_UNUSED_RESULT;
+
+  /// Call the method expecting no result.
+  Status Call() WARN_UNUSED_RESULT {
+    return Call(static_cast<void*>(nullptr));
+  }
+
+  /// Call the method and return a result (either std::string or a Thrift struct).
+  template<class T>
+  Status Call(T* result) WARN_UNUSED_RESULT;
+
+ private:
+  explicit JniCall(jmethodID method)
+    : method_(method),
+      env_(getJNIEnv()) {
+    status_ = frame_.push(env_);
+  }
+
+  explicit JniCall(jmethodID method, jclass cls) : JniCall(method) {
+    class_ = DCHECK_NOTNULL(cls);
+  }
+
+  explicit JniCall(jmethodID method, jobject instance) : JniCall(method) {
+    instance_ = DCHECK_NOTNULL(instance);
+  }
+
+  template<class T>
+  Status ObjectToResult(jobject obj, T* result) WARN_UNUSED_RESULT;
+
+  Status ObjectToResult(jobject obj, void* no_result) WARN_UNUSED_RESULT;
+
+  Status ObjectToResult(jobject obj, std::string* result) WARN_UNUSED_RESULT;
+
+  const jmethodID method_;
+  JNIEnv* const env_;
+  JniLocalFrame frame_;
+
+  jclass class_ = nullptr;
+  jobject instance_ = nullptr;
+  std::vector<jvalue> args_;
+  Status status_;
+
+  DISALLOW_COPY_AND_ASSIGN(JniCall);
 };
 
 
@@ -306,74 +394,28 @@ class JniUtil {
       JniMethodDescriptor* descriptor) WARN_UNUSED_RESULT;
 
   /// Utility methods to avoid repeating lots of the JNI call boilerplate.
+  /// New code should prefer using JniCall() directly for better clarity.
   static Status CallJniMethod(
       const jobject& obj, const jmethodID& method) WARN_UNUSED_RESULT {
-    JNIEnv* jni_env = getJNIEnv();
-    JniLocalFrame jni_frame;
-    RETURN_IF_ERROR(jni_frame.push(jni_env));
-    jni_env->CallObjectMethod(obj, method);
-    RETURN_ERROR_IF_EXC(jni_env);
-    return Status::OK();
+    return JniCall::instance_method(obj, method).Call();
+  }
+
+  static Status CallStaticJniMethod(
+      const jclass& cls, const jmethodID& method) WARN_UNUSED_RESULT {
+    return JniCall::static_method(cls, method).Call();
   }
 
   template <typename T>
-  static Status CallJniMethod(const jobject& obj, const jmethodID& method, const T& arg) {
-    JNIEnv* jni_env = getJNIEnv();
-    jbyteArray request_bytes;
-    JniLocalFrame jni_frame;
-    RETURN_IF_ERROR(jni_frame.push(jni_env));
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
-    jni_env->CallObjectMethod(obj, method, request_bytes);
-    RETURN_ERROR_IF_EXC(jni_env);
-    return Status::OK();
-  }
-
-  template <typename R>
-  static Status CallJniMethod(const jobject& obj, const jmethodID& method, R* response) {
-    JNIEnv* jni_env = getJNIEnv();
-    JniLocalFrame jni_frame;
-    RETURN_IF_ERROR(jni_frame.push(jni_env));
-    jbyteArray result_bytes = static_cast<jbyteArray>(
-        jni_env->CallObjectMethod(obj, method));
-    RETURN_ERROR_IF_EXC(jni_env);
-    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
-    return Status::OK();
-  }
+  static Status CallJniMethod(const jobject& obj, const jmethodID& method,
+      const T& arg) WARN_UNUSED_RESULT;
 
   template <typename T, typename R>
   static Status CallJniMethod(const jobject& obj, const jmethodID& method,
-      const T& arg, R* response) {
-    JNIEnv* jni_env = getJNIEnv();
-    jbyteArray request_bytes;
-    JniLocalFrame jni_frame;
-    RETURN_IF_ERROR(jni_frame.push(jni_env));
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
-    jbyteArray result_bytes = static_cast<jbyteArray>(
-        jni_env->CallObjectMethod(obj, method, request_bytes));
-    RETURN_ERROR_IF_EXC(jni_env);
-    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
-    return Status::OK();
-  }
+      const T& arg, R* response) WARN_UNUSED_RESULT;
 
-  template <typename T>
+  template <typename R>
   static Status CallJniMethod(const jobject& obj, const jmethodID& method,
-      const T& arg, std::string* response) {
-    JNIEnv* jni_env = getJNIEnv();
-    jbyteArray request_bytes;
-    JniLocalFrame jni_frame;
-    RETURN_IF_ERROR(jni_frame.push(jni_env));
-    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
-    jstring java_response_string = static_cast<jstring>(
-        jni_env->CallObjectMethod(obj, method, request_bytes));
-    RETURN_ERROR_IF_EXC(jni_env);
-    jboolean is_copy;
-    const char *str = jni_env->GetStringUTFChars(java_response_string, &is_copy);
-    RETURN_ERROR_IF_EXC(jni_env);
-    *response = str;
-    jni_env->ReleaseStringUTFChars(java_response_string, str);
-    RETURN_ERROR_IF_EXC(jni_env);
-    return Status::OK();
-  }
+      R* response) WARN_UNUSED_RESULT;
 
  private:
   // Set in Init() once the JVM is initialized.
@@ -386,6 +428,105 @@ class JniUtil {
   static jmethodID get_jvm_threads_id_;
   static jmethodID get_jmx_json_;
 };
+
+/// Convert a C++ primitive to a JNI 'jvalue' union.
+/// See https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/types.html
+/// for reference on the union members.
+template<typename T>
+jvalue PrimitiveToValue(T cpp_val);
+
+#define SPECIALIZE_PRIMITIVE_TO_VALUE(cpp_type, union_field)    \
+  template<> inline jvalue PrimitiveToValue(cpp_type cpp_val) { \
+    jvalue v;                                                   \
+    memset(&v, 0, sizeof(v));                                    \
+    v.union_field = cpp_val;                                    \
+    return v;                                                   \
+  }
+SPECIALIZE_PRIMITIVE_TO_VALUE(bool, z);
+SPECIALIZE_PRIMITIVE_TO_VALUE(int8_t, b);
+SPECIALIZE_PRIMITIVE_TO_VALUE(char, c);
+SPECIALIZE_PRIMITIVE_TO_VALUE(int16_t, s);
+SPECIALIZE_PRIMITIVE_TO_VALUE(int32_t, i);
+SPECIALIZE_PRIMITIVE_TO_VALUE(int64_t, j);
+SPECIALIZE_PRIMITIVE_TO_VALUE(float, f);
+SPECIALIZE_PRIMITIVE_TO_VALUE(double, d);
+#undef SPECIALIZE_PRIMITIVE_TO_VALUE
+
+template <typename T>
+inline Status JniUtil::CallJniMethod(const jobject& obj, const jmethodID& method,
+    const T& arg) {
+  return JniCall::instance_method(obj, method).with_thrift_arg(arg).Call();
+}
+
+template <typename T, typename R>
+inline Status JniUtil::CallJniMethod(const jobject& obj, const jmethodID& method,
+    const T& arg, R* response) {
+  return JniCall::instance_method(obj, method).with_thrift_arg(arg).Call(response);
+}
+
+template <typename R>
+inline Status JniUtil::CallJniMethod(const jobject& obj, const jmethodID& method,
+    R* response) {
+  return JniCall::instance_method(obj, method).Call(response);
+}
+
+template<class T>
+inline JniCall& JniCall::with_thrift_arg(const T& arg) {
+  if (!status_.ok()) return *this;
+  jbyteArray bytes;
+  status_ = SerializeThriftMsg(env_, &arg, &bytes);
+  if (status_.ok()) {
+    jvalue arg;
+    memset(&arg, 0, sizeof(arg));
+    arg.l = bytes;
+    args_.emplace_back(arg);
+  }
+  return *this;
+}
+template<class T>
+inline JniCall& JniCall::with_primitive_arg(T arg) {
+  if (!status_.ok()) return *this;
+  args_.emplace_back(PrimitiveToValue(arg));
+  return *this;
+}
+
+template<class T>
+inline Status JniCall::Call(T* result) {
+  RETURN_IF_ERROR(status_);
+  DCHECK((instance_ != nullptr) ^ (class_ != nullptr));
+
+  // Even if the function takes no arguments, it's OK to pass an array here.
+  // The JNI API doesn't take a length and just assumes that you've passed
+  // an appropriate number of elements.
+  jobject ret;
+  if (class_) {
+    ret = env_->CallStaticObjectMethodA(class_, method_, args_.data());
+  } else {
+    ret = env_->CallObjectMethodA(instance_, method_, args_.data());
+  }
+  RETURN_ERROR_IF_EXC(env_);
+  RETURN_IF_ERROR(ObjectToResult(ret, result));
+  return Status::OK();
+}
+
+template<class T>
+inline Status JniCall::ObjectToResult(jobject obj, T* result) {
+  DCHECK(obj) << "Call returned unexpected null Thrift object";
+  RETURN_IF_ERROR(DeserializeThriftMsg(env_, static_cast<jbyteArray>(obj), result));
+  return Status::OK();
+}
+
+inline Status JniCall::ObjectToResult(jobject obj, void* no_result) {
+  return Status::OK();
+}
+
+inline Status JniCall::ObjectToResult(jobject obj, std::string* result) {
+  DCHECK(obj) << "Call returned unexpected null String instance";
+  JniUtfCharGuard utf;
+  RETURN_IF_ERROR(JniUtfCharGuard::create(env_, static_cast<jstring>(obj), &utf));
+  *result = utf.get();;
+  return Status::OK();
+}
 
 }
 
