@@ -21,9 +21,14 @@
 # and IMPALA_TOOLCHAIN. IMPALA_HOME indicates that the environment is correctly setup and
 # that we can deduce the version settings of the dependencies from the environment.
 # IMPALA_TOOLCHAIN indicates the location where the prebuilt artifacts should be extracted
-# to. If DOWNLOAD_CDH_COMPONENTS is set to true, this script will also download and extract
-# the CDH components (i.e. Hadoop, Hive, HBase and Sentry) into
+# to. If DOWNLOAD_CDH_COMPONENTS is set to true, this script will also download and
+# extract the CDH components (i.e. Hadoop, Hive, HBase and Sentry) into
 # CDH_COMPONENTS_HOME.
+#
+# Kudu can be downloaded either from the toolchain or as a CDH component, depending on the
+# value of USE_CDH_KUDU. If KUDU_IS_SUPPORTED is false, we download the toolchain Kudu and
+# use the symbols to compile a non-functional stub library so that Impala has something to
+# link against.
 #
 # By default, packages are downloaded from an S3 bucket named native-toolchain.
 # The exact URL is based on IMPALA_<PACKAGE>_VERSION environment variables
@@ -46,27 +51,32 @@ import sys
 import tempfile
 import time
 
+from collections import namedtuple
+
 TOOLCHAIN_HOST = "https://native-toolchain.s3.amazonaws.com/build"
 
-OS_MAPPING = {
-  "centos6" : "ec2-package-centos-6",
-  "centos5" : "ec2-package-centos-5",
-  "centos7" : "ec2-package-centos-7",
-  "redhatenterpriseserver5" :  "ec2-package-centos-5",
-  "redhatenterpriseserver6" :  "ec2-package-centos-6",
-  "redhatenterpriseserver7" :  "ec2-package-centos-7",
-  "debian6" : "ec2-package-debian-6",
-  "debian7" : "ec2-package-debian-7",
-  "debian8" : "ec2-package-debian-8",
-  "suselinux11": "ec2-package-sles-11",
-  "suselinux12": "ec2-package-sles-12",
-  "suse12.2": "ec2-package-sles-12",
-  "ubuntu12.04" : "ec2-package-ubuntu-12-04",
-  "ubuntu14.04" : "ec2-package-ubuntu-14-04",
-  "ubuntu15.04" : "ec2-package-ubuntu-14-04",
-  "ubuntu15.10" : "ec2-package-ubuntu-14-04",
-  "ubuntu16.04" : "ec2-package-ubuntu-16-04",
-}
+# Maps return values from 'lsb_release -irs' to the corresponding OS labels for both the
+# toolchain and the CDH components.
+OsMapping = namedtuple('OsMapping', ['lsb_release', 'toolchain', 'cdh'])
+OS_MAPPING = [
+  OsMapping("centos5", "ec2-package-centos-5", None),
+  OsMapping("centos6", "ec2-package-centos-6", "redhat6"),
+  OsMapping("centos7", "ec2-package-centos-7", "redhat7"),
+  OsMapping("redhatenterpriseserver5", "ec2-package-centos-5", None),
+  OsMapping("redhatenterpriseserver6", "ec2-package-centos-6", "redhat6"),
+  OsMapping("redhatenterpriseserver7", "ec2-package-centos-7", "redhat7"),
+  OsMapping("debian6", "ec2-package-debian-6", None),
+  OsMapping("debian7", "ec2-package-debian-7", None),
+  OsMapping("debian8", "ec2-package-debian-8", "debian8"),
+  OsMapping("suselinux11", "ec2-package-sles-11", None),
+  OsMapping("suselinux12", "ec2-package-sles-12", "sles12"),
+  OsMapping("suse12.2", "ec2-package-sles-12", "sles12"),
+  OsMapping("ubuntu12.04", "ec2-package-ubuntu-12-04", None),
+  OsMapping("ubuntu14.04", "ec2-package-ubuntu-14-04", None),
+  OsMapping("ubuntu15.04", "ec2-package-ubuntu-14-04", None),
+  OsMapping("ubuntu15.10", "ec2-package-ubuntu-14-04", None),
+  OsMapping('ubuntu16.04', "ec2-package-ubuntu-16-04", "ubuntu1604")
+]
 
 class Package(object):
   """
@@ -90,16 +100,21 @@ class Package(object):
       url_env_var = "IMPALA_{0}_URL".format(package_env_name)
       self.url = os.environ.get(url_env_var)
 
+
 def try_get_platform_release_label():
-  """Gets the right package label from the OS version. Return None if not found."""
+  """Gets the right package label from the OS version. Returns an OsMapping with both
+     'toolchain' and 'cdh' labels. Return None if not found.
+  """
   try:
     return get_platform_release_label()
-  except:
+  except Exception:
     return None
+
 
 # Cache "lsb_release -irs" to avoid excessive logging from sh, and
 # to shave a little bit of time.
 lsb_release_cache = None
+
 
 def get_platform_release_label(release=None):
   """Gets the right package label from the OS version. Raise exception if not found.
@@ -117,9 +132,9 @@ def get_platform_release_label(release=None):
           release = release.split('.')[0]
           break
       lsb_release_cache = release
-  for k, v in OS_MAPPING.iteritems():
-    if re.search(k, release):
-      return v
+  for mapping in OS_MAPPING:
+    if re.search(mapping.lsb_release, release):
+      return mapping
 
   raise Exception("Could not find package label for OS version: {0}.".format(release))
 
@@ -148,7 +163,7 @@ def download_package(destination, package, compiler, platform_release=None):
   remove_existing_package(destination, package.name, package.version)
 
   toolchain_build_id = os.environ["IMPALA_TOOLCHAIN_BUILD_ID"]
-  label = get_platform_release_label(release=platform_release)
+  label = get_platform_release_label(release=platform_release).toolchain
   format_params = {'product': package.name, 'version': package.version,
       'compiler': compiler, 'label': label, 'toolchain_build_id': toolchain_build_id}
   file_name = "{product}-{version}-{compiler}-{label}.tar.gz".format(**format_params)
@@ -166,7 +181,8 @@ def bootstrap(toolchain_root, packages):
   """Downloads and unpacks each package in the list `packages` into `toolchain_root` if it
   doesn't exist already.
   """
-  if not try_get_platform_release_label():
+  if not try_get_platform_release_label() \
+     or not try_get_platform_release_label().toolchain:
     check_custom_toolchain(toolchain_root, packages)
     return
 
@@ -181,7 +197,7 @@ def bootstrap(toolchain_root, packages):
     else:
       build_kudu_stub(toolchain_root, p.version, compiler)
     write_version_file(toolchain_root, p.name, p.version, compiler,
-        get_platform_release_label())
+        get_platform_release_label().toolchain)
   execute_many(handle_package, packages)
 
 def check_output(cmd_args):
@@ -229,7 +245,7 @@ def check_for_existing_package(toolchain_root, pkg_name, pkg_version, compiler):
   if not os.path.exists(version_file):
     return False
 
-  label = get_platform_release_label()
+  label = get_platform_release_label().toolchain
   pkg_version_string = "{0}-{1}-{2}-{3}".format(pkg_name, pkg_version, compiler, label)
   with open(version_file) as f:
     return f.read().strip() == pkg_version_string
@@ -340,7 +356,9 @@ extern "C" void %s() {
 
     # Compile the library.
     stub_client_lib_path = os.path.join(stub_build_dir, "libkudu_client.so")
-    subprocess.check_call(["g++", stub_client_src_file.name, "-shared", "-fPIC",
+    gpp = os.path.join(
+        toolchain_root, "gcc-%s" % os.environ.get("IMPALA_GCC_VERSION"), "bin", "g++")
+    subprocess.check_call([gpp, stub_client_src_file.name, "-shared", "-fPIC",
         "-Wl,-soname,%s" % so_name, "-o", stub_client_lib_path])
 
     # Replace the real libs with the stub.
@@ -377,8 +395,14 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
     if os.path.isdir(pkg_directory):
       return
 
+    platform_label = ""
+    # Kudu is the only component that's platform dependent.
+    if component.name == "kudu":
+      platform_label = "-%s" % get_platform_release_label().cdh
     # Download the package if it doesn't exist
-    file_name = "{0}-{1}.tar.gz".format(component.name, component.version)
+    file_name = "{0}-{1}{2}.tar.gz".format(
+        component.name, component.version, platform_label)
+
     if component.url is None:
       download_path = url_prefix + file_name
     else:
@@ -422,9 +446,18 @@ if __name__ == "__main__":
   if not os.path.exists(toolchain_root):
     os.makedirs(toolchain_root)
 
+  use_cdh_kudu = os.getenv("USE_CDH_KUDU") == "true"
+  if os.environ["KUDU_IS_SUPPORTED"] != "true":
+    # We need gcc to build the Kudu stub, so download it first, and we also
+    # need the toolchain Kudu.
+    bootstrap(toolchain_root, [Package("gcc")])
+    use_cdh_kudu = False
+
   # LLVM and Kudu are the largest packages. Sort them first so that
   # their download starts as soon as possible.
-  packages = map(Package, ["llvm", "kudu",
+  packages = []
+  if not use_cdh_kudu: packages += [Package("kudu")]
+  packages += map(Package, ["llvm",
       "avro", "binutils", "boost", "breakpad", "bzip2", "cctz", "cmake", "crcutil",
       "flatbuffers", "gcc", "gdb", "gflags", "glog", "gperftools", "gtest", "libev",
       "libunwind", "lz4", "openldap", "openssl", "orc", "protobuf",
@@ -444,6 +477,12 @@ if __name__ == "__main__":
   cdh_build_number = os.environ.get("CDH_BUILD_NUMBER")
 
   cdh_components = map(Package, ["hadoop", "hbase", "hive", "sentry"])
+  if use_cdh_kudu:
+    if not try_get_platform_release_label() or not try_get_platform_release_label().cdh:
+      logging.error("CDH Kudu is not supported on this platform. Set USE_CDH_KUDU=false "
+                    "to use the toolchain Kudu.")
+      sys.exit(1)
+    cdh_components += [Package("kudu")]
   download_path_prefix= \
       "https://{0}/build/cdh_components/{1}/tarballs/".format(cdh_host,
                                                               cdh_build_number)

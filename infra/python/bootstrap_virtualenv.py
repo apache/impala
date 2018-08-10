@@ -273,12 +273,9 @@ def install_kudu_client_if_possible():
   if os.environ["KUDU_IS_SUPPORTED"] != "true":
     LOG.debug("Skipping Kudu: Kudu is not supported")
     return
-  if not have_toolchain():
-    LOG.debug("Skipping Kudu: IMPALA_TOOLCHAIN not set")
-    return
-  toolchain_kudu_dir = toolchain_pkg_dir("kudu")
-  if not os.path.exists(toolchain_kudu_dir):
-    LOG.debug("Skipping Kudu: %s doesn't exist" % toolchain_kudu_dir)
+  kudu_base_dir = os.environ["IMPALA_KUDU_HOME"]
+  if not os.path.exists(kudu_base_dir):
+    LOG.debug("Skipping Kudu: %s doesn't exist" % kudu_base_dir)
     return
 
   LOG.info("Installing Kudu into the virtualenv")
@@ -316,8 +313,7 @@ def find_kudu_client_install_dir():
     # If the toolchain appears to have been setup already, then the Kudu client is
     # required to exist. It's possible that the toolchain won't be setup yet though
     # since the toolchain bootstrap script depends on the virtualenv.
-    kudu_base_dir = os.path.join(os.environ["IMPALA_TOOLCHAIN"],
-        "kudu-%s" % os.environ["IMPALA_KUDU_VERSION"])
+    kudu_base_dir = os.environ["IMPALA_KUDU_HOME"]
     install_dir = os.path.join(kudu_base_dir, "debug")
     if os.path.exists(kudu_base_dir):
       error_if_kudu_client_not_found(install_dir)

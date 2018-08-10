@@ -155,10 +155,6 @@ if [[ $OSTYPE == "darwin"* ]]; then
   unset IMPALA_OPENSSL_URL
 fi
 
-# Kudu version in the toolchain; provides libkudu_client.so and minicluster binaries.
-export IMPALA_KUDU_VERSION=5211897
-unset IMPALA_KUDU_URL
-
 : ${CDH_DOWNLOAD_HOST:=native-toolchain.s3.amazonaws.com}
 export CDH_DOWNLOAD_HOST
 export CDH_MAJOR_VERSION=6
@@ -251,59 +247,6 @@ fi
 export DOWNLOAD_CDH_COMPONENTS=${DOWNLOAD_CDH_COMPONENTS-"$NO_THIRDPARTY"}
 
 export IS_OSX="$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)"
-
-# To use a local build of Kudu, set KUDU_BUILD_DIR to the path Kudu was built in and
-# set KUDU_CLIENT_DIR to the path KUDU was installed in.
-# Example:
-#   git clone https://github.com/cloudera/kudu.git
-#   ...build 3rd party etc...
-#   mkdir -p $KUDU_BUILD_DIR
-#   cd $KUDU_BUILD_DIR
-#   cmake <path to Kudu source dir>
-#   make
-#   DESTDIR=$KUDU_CLIENT_DIR make install
-export KUDU_BUILD_DIR=${KUDU_BUILD_DIR-}
-export KUDU_CLIENT_DIR=${KUDU_CLIENT_DIR-}
-if [[ -n "$KUDU_BUILD_DIR" && -z "$KUDU_CLIENT_DIR" ]]; then
-  echo When KUDU_BUILD_DIR is set KUDU_CLIENT_DIR must also be set. 1>&2
-  return 1
-fi
-if [[ -z "$KUDU_BUILD_DIR" && -n "$KUDU_CLIENT_DIR" ]]; then
-  echo When KUDU_CLIENT_DIR is set KUDU_BUILD_DIR must also be set. 1>&2
-  return 1
-fi
-
-# Only applies when using Kudu from the toolchain
-export USE_KUDU_DEBUG_BUILD=${USE_KUDU_DEBUG_BUILD-false}
-
-# Kudu doesn't compile on some old Linux distros. KUDU_IS_SUPPORTED enables building Kudu
-# into the backend. The frontend build is OS independent since it is Java.
-if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
-  if [[ -n "$KUDU_BUILD_DIR" ]]; then
-    KUDU_IS_SUPPORTED=true
-  else
-    KUDU_IS_SUPPORTED=false
-    if ! $IS_OSX; then
-      if ! which lsb_release &>/dev/null; then
-        echo Unable to find the 'lsb_release' command. \
-            Please ensure it is available in your PATH. 1>&2
-        return 1
-      fi
-      DISTRO_VERSION="$(lsb_release -sir 2>&1)"
-      if [[ $? -ne 0 ]]; then
-        echo lsb_release command failed, output was: "$DISTRO_VERSION" 1>&2
-        return 1
-      fi
-      # Remove spaces, trim minor versions, and convert to lowercase.
-      DISTRO_VERSION="$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")"
-      case "$DISTRO_VERSION" in
-        centos6 | centos7 | debian7 | debian8 | suselinux12 | suse12 | ubuntu* )
-            KUDU_IS_SUPPORTED=true;;
-      esac
-    fi
-  fi
-fi
-export KUDU_IS_SUPPORTED
 
 export HADOOP_LZO="${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}"
 export IMPALA_LZO="${IMPALA_LZO-$IMPALA_HOME/../Impala-lzo}"
@@ -560,6 +503,78 @@ export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-protocol-${IMPALA_HBA
 export AUX_CLASSPATH="$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-hadoop-compat-${IMPALA_HBASE_VERSION}.jar"
 
 export HBASE_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
+
+# To use a local build of Kudu, set KUDU_BUILD_DIR to the path Kudu was built in and
+# set KUDU_CLIENT_DIR to the path KUDU was installed in.
+# Example:
+#   git clone https://github.com/cloudera/kudu.git
+#   ...build 3rd party etc...
+#   mkdir -p $KUDU_BUILD_DIR
+#   cd $KUDU_BUILD_DIR
+#   cmake <path to Kudu source dir>
+#   make
+#   DESTDIR=$KUDU_CLIENT_DIR make install
+export KUDU_BUILD_DIR=${KUDU_BUILD_DIR-}
+export KUDU_CLIENT_DIR=${KUDU_CLIENT_DIR-}
+if [[ -n "$KUDU_BUILD_DIR" && -z "$KUDU_CLIENT_DIR" ]]; then
+  echo When KUDU_BUILD_DIR is set KUDU_CLIENT_DIR must also be set. 1>&2
+  return 1
+fi
+if [[ -z "$KUDU_BUILD_DIR" && -n "$KUDU_CLIENT_DIR" ]]; then
+  echo When KUDU_CLIENT_DIR is set KUDU_BUILD_DIR must also be set. 1>&2
+  return 1
+fi
+
+# Only applies to the minicluster Kudu (we always link against the libkudu_client for the
+# overall build type) and does not apply when using a local Kudu build.
+export USE_KUDU_DEBUG_BUILD=${USE_KUDU_DEBUG_BUILD-false}
+
+# Kudu doesn't compile on some old Linux distros. KUDU_IS_SUPPORTED enables building Kudu
+# into the backend. We prefer to pull Kudu in from CDH, but will fall back to using the
+# toolchain Kudu for distros where the CDH tarballs are not provided by setting
+# USE_CDH_KUDU to false.
+# The frontend build is OS independent since it is Java.
+export USE_CDH_KUDU=${USE_CDH_KUDU-true}
+if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
+  if [[ -n "$KUDU_BUILD_DIR" ]]; then
+    KUDU_IS_SUPPORTED=true
+  else
+    KUDU_IS_SUPPORTED=false
+    USE_CDH_KUDU=false
+    if ! $IS_OSX; then
+      if ! which lsb_release &>/dev/null; then
+        echo Unable to find the 'lsb_release' command. \
+            Please ensure it is available in your PATH. 1>&2
+        return 1
+      fi
+      DISTRO_VERSION="$(lsb_release -sir 2>&1)"
+      if [[ $? -ne 0 ]]; then
+        echo lsb_release command failed, output was: "$DISTRO_VERSION" 1>&2
+        return 1
+      fi
+      # Remove spaces, trim minor versions, and convert to lowercase.
+      DISTRO_VERSION="$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")"
+      case "$DISTRO_VERSION" in
+        centos6 | centos7 | debian8 | suselinux12 | suse12 | ubuntu16 )
+          USE_CDH_KUDU=true
+          KUDU_IS_SUPPORTED=true;;
+        ubuntu14 )
+          USE_CDH_KUDU=false
+          KUDU_IS_SUPPORTED=true;;
+      esac
+    fi
+  fi
+fi
+export KUDU_IS_SUPPORTED
+
+if $USE_CDH_KUDU; then
+  export IMPALA_KUDU_VERSION=1.8.0-cdh6.x-SNAPSHOT
+  export IMPALA_KUDU_HOME=${CDH_COMPONENTS_HOME}/kudu-$IMPALA_KUDU_VERSION
+else
+  export IMPALA_KUDU_VERSION=5211897
+  export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN}/kudu-$IMPALA_KUDU_VERSION
+fi
+unset IMPALA_KUDU_URL
 
 # Set $THRIFT_HOME to the Thrift directory in toolchain.
 export THRIFT_HOME="${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}"
