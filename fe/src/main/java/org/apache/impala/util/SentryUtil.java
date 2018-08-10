@@ -31,13 +31,11 @@ import org.apache.sentry.core.common.exception.SentryUserException;
  */
 public class SentryUtil {
   static boolean isSentryAlreadyExists(Exception e) {
-    return e instanceof SentryAlreadyExistsException || e instanceof
-      sentry.org.apache.sentry.core.common.exception.SentryAlreadyExistsException;
+    return e instanceof SentryAlreadyExistsException;
   }
 
   static boolean isSentryAccessDenied(Exception e) {
-    return e instanceof SentryAccessDeniedException || e instanceof
-      sentry.org.apache.sentry.core.common.exception.SentryAccessDeniedException;
+    return e instanceof SentryAccessDeniedException;
   }
 
   public static boolean isSentryGroupNotFound(Exception e) {
