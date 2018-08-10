@@ -29,7 +29,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
-#include "runtime/timestamp-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "runtime/tuple-row.h"
 #include "util/jni-util.h"
 #include "util/periodic-counter-updater.h"

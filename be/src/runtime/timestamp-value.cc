@@ -140,7 +140,7 @@ void TimestampValue::LocalToUtc(const Timezone& local_tz) {
     SetToInvalidDateTime();
   } else {
     int64_t nanos = time_.fractional_seconds();
-    *this = UnixTimeToUtcPtime(TimePointToUnixTime(from_cl.pre));
+    *this = UtcFromUnixTimeTicks<1>(TimePointToUnixTime(from_cl.pre));
     // Time-zone conversion rules don't affect fractional seconds, leave them intact.
     time_ += nanoseconds(nanos);
   }
@@ -150,10 +150,8 @@ ostream& operator<<(ostream& os, const TimestampValue& timestamp_value) {
   return os << timestamp_value.ToString();
 }
 
-/// Return a ptime representation of the given Unix time (seconds since the Unix epoch).
-/// The time zone of the resulting ptime is 'local_tz'. This is called by UnixTimeToPtime.
-ptime TimestampValue::UnixTimeToLocalPtime(time_t unix_time,
-    const Timezone& local_tz) {
+TimestampValue TimestampValue::UnixTimeToLocal(
+    time_t unix_time, const Timezone& local_tz) {
   cctz::time_point<cctz::sys_seconds> from_tp = UnixTimeToTimePoint(unix_time);
   cctz::civil_second to_cs = cctz::convert(from_tp, local_tz);
   // boost::gregorian::date() throws boost::gregorian::bad_year if year is not in the
@@ -161,44 +159,17 @@ ptime TimestampValue::UnixTimeToLocalPtime(time_t unix_time,
   if (UNLIKELY(IsDateOutOfRange(to_cs))) {
     return ptime(not_a_date_time);
   } else {
-    return ptime(
+    return TimestampValue(
         boost::gregorian::date(to_cs.year(), to_cs.month(), to_cs.day()),
         boost::posix_time::time_duration(to_cs.hour(), to_cs.minute(), to_cs.second()));
   }
 }
 
-/// Return a ptime representation of the given Unix time (seconds since the Unix epoch).
-/// The time zone of the resulting ptime is UTC.
-/// In order to avoid a serious performance degredation using CCTZ, this function uses
-/// boost to convert the time_t to a ptime. Unfortunately, because the boost conversion
-/// relies on time_duration to represent the time_t and internally
-/// time_duration stores nanosecond precision ticks, the 'fast path' conversion using
-/// boost can only handle a limited range of dates (appx years 1677-2622, while Impala
-/// supports years 1400-9999). For dates outside this range, the conversion will instead
-/// use the CCTZ function convert which supports those dates. This is called by
-/// UnixTimeToPtime.
-ptime TimestampValue::UnixTimeToUtcPtime(time_t unix_time) {
-  // Minimum Unix time that can be converted with from_time_t: 1677-Sep-21 00:12:44
-  const int64_t MIN_BOOST_CONVERT_UNIX_TIME = -9223372036;
-  // Maximum Unix time that can be converted with from_time_t: 2262-Apr-11 23:47:16
-  const int64_t MAX_BOOST_CONVERT_UNIX_TIME = 9223372036;
-  if (LIKELY(unix_time >= MIN_BOOST_CONVERT_UNIX_TIME &&
-             unix_time <= MAX_BOOST_CONVERT_UNIX_TIME)) {
-    try {
-      return from_time_t(unix_time);
-    } catch (std::exception&) {
-      return ptime(not_a_date_time);
-    }
-  }
-
-  return UnixTimeToLocalPtime(unix_time, TimezoneDatabase::GetUtcTimezone());
-}
-
-ptime TimestampValue::UnixTimeToPtime(time_t unix_time, const Timezone& local_tz) {
+TimestampValue TimestampValue::FromUnixTime(time_t unix_time, const Timezone& local_tz) {
   if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
-    return UnixTimeToLocalPtime(unix_time, local_tz);
+    return UnixTimeToLocal(unix_time, local_tz);
   } else {
-    return UnixTimeToUtcPtime(unix_time);
+    return UtcFromUnixTimeTicks<1>(unix_time);
   }
 }
 

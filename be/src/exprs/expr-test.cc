@@ -170,13 +170,15 @@ class ScopedTimeZoneOverride {
 
 // Enable FLAGS_use_local_tz_for_unix_timestamp_conversions for the duration of the scope.
 class ScopedLocalUnixTimestampConversionOverride {
+ bool original_;
  public:
   ScopedLocalUnixTimestampConversionOverride() {
+    original_ = FLAGS_use_local_tz_for_unix_timestamp_conversions;
     FLAGS_use_local_tz_for_unix_timestamp_conversions = true;
   }
 
   ~ScopedLocalUnixTimestampConversionOverride() {
-    FLAGS_use_local_tz_for_unix_timestamp_conversions = false;
+    FLAGS_use_local_tz_for_unix_timestamp_conversions = original_;
   }
 };
 
@@ -6520,6 +6522,7 @@ TEST_F(ExprTest, TimestampFunctions) {
   // Test that now() and current_timestamp() are reasonable.
   {
     ScopedTimeZoneOverride time_zone("PST8PDT");
+    ScopedLocalUnixTimestampConversionOverride use_local;
     const Timezone& local_tz = time_zone.GetTimezone();
 
     const TimestampValue start_time =
@@ -6545,6 +6548,7 @@ TEST_F(ExprTest, TimestampFunctions) {
   // Test cast(unix_timestamp() as timestamp).
   {
     ScopedTimeZoneOverride time_zone("PST8PDT");
+    ScopedLocalUnixTimestampConversionOverride use_local;
     const Timezone& local_tz = time_zone.GetTimezone();
 
     // UNIX_TIMESTAMP() has second precision so the comparison start time is shifted back
