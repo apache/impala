@@ -32,6 +32,13 @@ class Ubsan {
     }
     return std::memset(s, c, n);
   }
+  static void* MemCpy(void* dest, const void* src, size_t n) {
+    if (dest == nullptr || src == nullptr) {
+      DCHECK_EQ(n, 0);
+      return dest;
+    }
+    return std::memcpy(dest, src, n);
+  }
 };
 
 #endif // UTIL_UBSAN_H_

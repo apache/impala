@@ -36,6 +36,7 @@
 #include "util/pretty-printer.h"
 #include "util/redactor.h"
 #include "util/scope-exit-trigger.h"
+#include "util/ubsan.h"
 
 #include "common/names.h"
 
@@ -1114,7 +1115,7 @@ void RuntimeProfile::TimeSeriesCounter::ToThrift(TTimeSeriesCounter* counter) {
   SpinLock* lock;
   const int64_t* samples = samples_.GetSamples(&num, &period, &lock);
   counter->values.resize(num);
-  memcpy(&counter->values[0], samples, num * sizeof(int64_t));
+  Ubsan::MemCpy(counter->values.data(), samples, num * sizeof(int64_t));
   lock->unlock();
   counter->period_ms = period;
 }
