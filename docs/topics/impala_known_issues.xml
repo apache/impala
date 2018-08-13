@@ -319,6 +319,15 @@ under the License.
         redaction.
     </p>
   </conbody>
+    <concept id="impala-7072">
+      <title>Impala does not support Heimdal Kerberos </title>
+      <conbody>
+        <p>Heimdal Kerberos is not supported in Impala.</p>
+        <p><b>Bug:</b>
+          <xref keyref="IMPALA-7072">IMPALA-7072</xref></p>
+        <p><b>Affected Versions:</b> All versions of Impala</p>
+      </conbody>
+    </concept>
 
   <concept id="id_p1n_tbx_22b">
     <title>Impala does not allow the use of insecure clusters with public IPs</title>
