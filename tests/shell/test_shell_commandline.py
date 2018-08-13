@@ -676,33 +676,27 @@ class TestImpalaShell(ImpalaTestSuite):
     assert "Encountered: Unexpected character" in result.stderr
 
   def test_large_sql(self, unique_database):
+    # In this test, we are only interested in the performance of Impala shell and not
+    # the performance of Impala in general. So, this test will execute a large query
+    # from a non-existent table since this will make the query execution time negligible.
     sql_file, sql_path = tempfile.mkstemp()
-    os.write(sql_file, "create table large_table (\n")
-    num_cols = 4000
-    for i in xrange(num_cols):
-      os.write(sql_file, "col_{0} int".format(i))
-      if i < num_cols - 1:
-        os.write(sql_file, ",")
-      os.write(sql_file, "\n")
-    os.write(sql_file, ");")
+    num_cols = 10000
     os.write(sql_file, "select \n")
-
     for i in xrange(num_cols):
       if i < num_cols:
-        os.write(sql_file, 'col_{0} as a{1},\n'.format(i, i))
-        os.write(sql_file, 'col_{0} as b{1},\n'.format(i, i))
-        os.write(sql_file, 'col_{0} as c{1}{2}\n'.format(i, i,
-                                                     ',' if i < num_cols - 1 else ''))
-    os.write(sql_file, 'from large_table;')
+        os.write(sql_file, "col_{0} as a{1},\n".format(i, i))
+        os.write(sql_file, "col_{0} as b{1},\n".format(i, i))
+        os.write(sql_file, "col_{0} as c{1}{2}\n".format(
+            i, i, "," if i < num_cols - 1 else ""))
+    os.write(sql_file, "from non_existence_large_table;")
     os.close(sql_file)
 
     try:
-      args = "-f {0} -d {1}".format(sql_path, unique_database)
+      args = "-q -f {0} -d {1}".format(sql_path, unique_database)
       start_time = time()
-      result = run_impala_shell_cmd(args)
+      run_impala_shell_cmd(args, False)
       end_time = time()
-      assert "Fetched 0 row(s)" in result.stderr
-      time_limit_s = 30
+      time_limit_s = 10
       actual_time_s = end_time - start_time
       assert actual_time_s <= time_limit_s, (
           "It took {0} seconds to execute the query. Time limit is {1} seconds.".format(
