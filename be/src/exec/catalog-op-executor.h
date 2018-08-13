@@ -74,6 +74,11 @@ class CatalogOpExecutor {
   Status GetPartitionStats(
       const TGetPartitionStatsRequest& req, TGetPartitionStatsResponse* result);
 
+  /// Makes an RPC to the catalog server to report recently used tables and their use
+  /// counts in this impalad since the last report.
+  Status UpdateTableUsage(const TUpdateTableUsageRequest& req,
+      TUpdateTableUsageResponse* resp);
+
   /// Makes an RPC to the CatalogServer to verify whether the specified user has privileges
   /// to access the Sentry Policy Service. Returns OK if the user has privileges or
   /// a bad status if the user does not have privileges (or if there was an error).

@@ -524,6 +524,31 @@ Java_org_apache_impala_service_FeSupport_NativePrioritizeLoad(
   return result_bytes;
 }
 
+// Calls in to the catalog server to report recently used table names and the number of
+// their usages in this impalad.
+extern "C"
+JNIEXPORT jbyteArray JNICALL
+Java_org_apache_impala_service_FeSupport_NativeUpdateTableUsage(
+    JNIEnv* env, jclass caller_class, jbyteArray thrift_struct) {
+  TUpdateTableUsageRequest request;
+  THROW_IF_ERROR_RET(DeserializeThriftMsg(env, thrift_struct, &request), env,
+      JniUtil::internal_exc_class(), nullptr);
+
+  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), nullptr, nullptr);
+  TUpdateTableUsageResponse result;
+  Status status = catalog_op_executor.UpdateTableUsage(request, &result);
+  if (!status.ok()) {
+    LOG(ERROR) << status.GetDetail();
+    status.AddDetail("Error making an RPC call to Catalog server.");
+    status.ToThrift(&result.status);
+  }
+
+  jbyteArray result_bytes = nullptr;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
+                     JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
+
 // Calls in to the catalog server to request partial information about a
 // catalog object.
 extern "C"
@@ -629,9 +654,13 @@ static JNINativeMethod native_methods[] = {
       (void*)::Java_org_apache_impala_service_FeSupport_NativeGetPartialCatalogObject
   },
   {
-      const_cast<char*>("NativeGetPartitionStats"),
+      const_cast<char*>("NativeGetPartitionStats"), const_cast<char*>("([B)[B"),
+     (void*) ::Java_org_apache_impala_service_FeSupport_NativeGetPartitionStats
+  },
+  {
+      const_cast<char*>("NativeUpdateTableUsage"),
       const_cast<char*>("([B)[B"),
-      (void*)::Java_org_apache_impala_service_FeSupport_NativeGetPartitionStats
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeUpdateTableUsage
   },
   {
       const_cast<char*>("NativeParseQueryOptions"),

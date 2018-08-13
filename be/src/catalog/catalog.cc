@@ -68,7 +68,9 @@ Catalog::Catalog() {
     {"getCatalogUsage", "()[B", &get_catalog_usage_id_},
     {"getCatalogVersion", "()J", &get_catalog_version_id_},
     {"prioritizeLoad", "([B)V", &prioritize_load_id_},
-    {"getPartitionStats", "([B)[B", &get_partition_stats_id_}};
+    {"getPartitionStats", "([B)[B", &get_partition_stats_id_},
+    {"updateTableUsage", "([B)V", &update_table_usage_id_},
+  };
 
   JNIEnv* jni_env = getJNIEnv();
   // Create an instance of the java class JniCatalog
@@ -172,4 +174,8 @@ Status Catalog::GetPartitionStats(
 
 Status Catalog::SentryAdminCheck(const TSentryAdminCheckRequest& req) {
   return JniUtil::CallJniMethod(catalog_, sentry_admin_check_id_, req);
+}
+
+Status Catalog::UpdateTableUsage(const TUpdateTableUsageRequest& req) {
+  return JniUtil::CallJniMethod(catalog_, update_table_usage_id_, req);
 }

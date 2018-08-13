@@ -145,6 +145,7 @@ public class StmtMetadataLoader {
         timeline_.markEvent(
             String.format("Metadata of all %d tables cached", loadedTbls_.size()));
       }
+      fe_.getImpaladTableUsageTracker().recordTableUsage(loadedTbls_.keySet());
       return new StmtTableCache(catalog, dbs_, loadedTbls_);
     }
 
@@ -227,7 +228,7 @@ public class StmtMetadataLoader {
           requestedTbls.size(), loadedTbls_.size(), numLoadRequestsSent_,
           numCatalogUpdatesReceived_));
     }
-
+    fe_.getImpaladTableUsageTracker().recordTableUsage(loadedTbls_.keySet());
     return new StmtTableCache(catalog, dbs_, loadedTbls_);
   }
 

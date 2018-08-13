@@ -216,6 +216,29 @@ DEFINE_bool(pull_incremental_statistics, false,
     "coordinators. If used, the flag must be set on both catalogd and all impalad "
     "coordinators.");
 
+DEFINE_int32(invalidate_tables_timeout_s, 0, "If a table has not been referenced in a "
+    "SQL statement for more than the configured amount of time, the catalog server will "
+    "automatically evict its cached metadata about this table. This has the same effect "
+    "as a user-initiated \"INVALIDATE METADATA\" statement on the table. Configuring "
+    "this to 0 disables time-based automatic invalidation of tables. This is independent "
+    "from memory-based invalidation configured by invalidate_tables_on_memory_pressure. "
+    "To enable this feature, a non-zero flag must be applied to both catalogd and "
+    "impalad.");
+
+DEFINE_bool(invalidate_tables_on_memory_pressure, false, "Configure catalogd to "
+    "invalidate recently unused tables when the old GC generation is almost full. This "
+    "is independent from time-based invalidation configured by "
+    "invalidate_table_timeout_s. To enable this feature, a true flag must be applied to "
+    "both catalogd and impalad.");
+
+DEFINE_double_hidden(invalidate_tables_gc_old_gen_full_threshold, 0.6, "The threshold "
+    "above which CatalogdTableInvalidator would consider the old generation to be almost "
+    "full and trigger an invalidation on recently unused tables");
+
+DEFINE_double_hidden(invalidate_tables_fraction_on_memory_pressure, 0.1,
+    "The fraction of tables to invalidate when CatalogdTableInvalidator considers the "
+    "old GC generation to be almost full.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

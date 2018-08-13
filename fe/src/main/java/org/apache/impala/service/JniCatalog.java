@@ -65,6 +65,7 @@ import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.thrift.TException;
@@ -312,5 +313,11 @@ public class JniCatalog {
   public byte[] getCatalogUsage() throws ImpalaException, TException {
     TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(catalog_.getCatalogUsage());
+  }
+
+  public void updateTableUsage(byte[] req) throws ImpalaException {
+    TUpdateTableUsageRequest thriftReq = new TUpdateTableUsageRequest();
+    JniUtil.deserializeThrift(protocolFactory_, thriftReq, req);
+    catalog_.updateTableUsage(thriftReq);
   }
 }

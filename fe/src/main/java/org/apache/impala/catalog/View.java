@@ -100,6 +100,7 @@ public class View extends Table implements FeView {
       tableStats_ = new TTableStats(-1);
       tableStats_.setTotal_file_bytes(-1);
       queryStmt_ = parseViewDef(this);
+      refreshLastUsedTime();
     } catch (TableLoadingException e) {
       throw e;
     } catch (Exception e) {

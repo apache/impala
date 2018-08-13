@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
@@ -66,9 +67,11 @@ import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TTableUsage;
 import org.apache.impala.thrift.TTableUsageMetrics;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.FunctionUtils;
+import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.SentryProxy;
 import org.apache.log4j.Logger;
@@ -82,6 +85,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
 
 /**
  * Specialized Catalog that implements the CatalogService specific Catalog
@@ -217,6 +221,8 @@ public class CatalogServiceCatalog extends Catalog {
 
   private final String localLibraryPath_;
 
+  private CatalogdTableInvalidator catalogdTableInvalidator_;
+
   /**
    * See the gflag definition in be/.../catalog-server.cc for details on these modes.
    */
@@ -260,6 +266,8 @@ public class CatalogServiceCatalog extends Catalog {
     deleteLog_ = new CatalogDeltaLog();
     topicMode_ = TopicMode.valueOf(
         BackendConfig.INSTANCE.getBackendCfg().catalog_topic_mode.toUpperCase());
+    catalogdTableInvalidator_ = CatalogdTableInvalidator.create(this,
+        BackendConfig.INSTANCE);
   }
 
   // Timeout for acquiring a table lock
@@ -633,7 +641,7 @@ public class CatalogServiceCatalog extends Catalog {
   /**
    * Get a snapshot view of all the databases in the catalog.
    */
-  private List<Db> getAllDbs() {
+  List<Db> getAllDbs() {
     versionLock_.readLock().lock();
     try {
       return ImmutableList.copyOf(dbCache_.get().values());
@@ -715,7 +723,7 @@ public class CatalogServiceCatalog extends Catalog {
   /**
    * Get a snapshot view of all the tables in a database.
    */
-  private List<Table> getAllTables(Db db) {
+  List<Table> getAllTables(Db db) {
     Preconditions.checkNotNull(db);
     versionLock_.readLock().lock();
     try {
@@ -2143,5 +2151,30 @@ public class CatalogServiceCatalog extends Catalog {
     }
     // TODO(todd) implement data sources and other global information.
     return resp;
+  }
+
+  /**
+   * Set the last used time of specified tables to now.
+   * TODO: Make use of TTableUsage.num_usages.
+   */
+  public void updateTableUsage(TUpdateTableUsageRequest req) {
+    for (TTableUsage usage : req.usages) {
+      Table table = null;
+      try {
+        table = getTable(usage.table_name.db_name, usage.table_name.table_name);
+      } catch (DatabaseNotFoundException e) {
+        // do nothing
+      }
+      if (table != null) table.refreshLastUsedTime();
+    }
+  }
+
+  CatalogdTableInvalidator getCatalogdTableInvalidator() {
+    return catalogdTableInvalidator_;
+  }
+
+  @VisibleForTesting
+  void setCatalogdTableInvalidator(CatalogdTableInvalidator cleaner) {
+    catalogdTableInvalidator_ = cleaner;
   }
 }

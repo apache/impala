@@ -335,3 +335,15 @@ Status CatalogOpExecutor::SentryAdminCheck(const TSentryAdminCheckRequest& req) 
       client.DoRpc(&CatalogServiceClientWrapper::SentryAdminCheck, req, &resp));
   return Status(resp.status);
 }
+
+Status CatalogOpExecutor::UpdateTableUsage(const TUpdateTableUsageRequest& req,
+  TUpdateTableUsageResponse* resp) {
+  const TNetworkAddress& address =
+      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
+  Status cnxn_status;
+  CatalogServiceConnection client(env_->catalogd_client_cache(), address, &cnxn_status);
+  RETURN_IF_ERROR(cnxn_status);
+  RETURN_IF_ERROR(
+      client.DoRpc(&CatalogServiceClientWrapper::UpdateTableUsage, req, resp));
+  return Status::OK();
+}

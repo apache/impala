@@ -111,6 +111,13 @@ class CatalogServiceClientWrapper : public CatalogServiceClient {
     recv_SentryAdminCheck(_return);
   }
 
+  void UpdateTableUsage(TUpdateTableUsageResponse& _return,
+      const TUpdateTableUsageRequest& req, bool* send_done) {
+    DCHECK(!*send_done);
+    send_UpdateTableUsage(req);
+    *send_done = true;
+    recv_UpdateTableUsage(_return);
+  }
 #pragma clang diagnostic pop
 };
 

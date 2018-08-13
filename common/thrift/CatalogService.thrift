@@ -461,6 +461,21 @@ struct TSentryAdminCheckResponse {
   1: optional Status.TStatus status
 }
 
+struct TTableUsage {
+  1: required CatalogObjects.TTableName table_name
+  // count of usages since the last report
+  2: required i32 num_usages
+}
+
+struct TUpdateTableUsageRequest {
+  1: required list<TTableUsage> usages
+}
+
+struct TUpdateTableUsageResponse {
+  // The operation may fail if the catalogd is in a bad state or if there is a bug.
+  1: optional Status.TStatus status
+}
+
 // The CatalogService API
 service CatalogService {
   // Executes a DDL request and returns details on the result of the operation.
@@ -498,4 +513,8 @@ service CatalogService {
   // Fetch partial information about some object in the catalog.
   TGetPartialCatalogObjectResponse GetPartialCatalogObject(
       1: TGetPartialCatalogObjectRequest req);
+
+  // Update recently used tables and their usage counts in an impalad since the last
+  // report.
+  TUpdateTableUsageResponse UpdateTableUsage(1: TUpdateTableUsageRequest req);
 }

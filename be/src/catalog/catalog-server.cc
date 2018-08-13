@@ -88,7 +88,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   }
 
   // Executes a TDdlExecRequest and returns details on the result of the operation.
-  virtual void ExecDdl(TDdlExecResponse& resp, const TDdlExecRequest& req) {
+  void ExecDdl(TDdlExecResponse& resp, const TDdlExecRequest& req) override {
     VLOG_RPC << "ExecDdl(): request=" << ThriftDebugString(req);
     Status status = catalog_server_->catalog()->ExecDdl(req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
@@ -99,8 +99,8 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   }
 
   // Executes a TResetMetadataRequest and returns details on the result of the operation.
-  virtual void ResetMetadata(TResetMetadataResponse& resp,
-      const TResetMetadataRequest& req) {
+  void ResetMetadata(TResetMetadataResponse& resp, const TResetMetadataRequest& req)
+      override {
     VLOG_RPC << "ResetMetadata(): request=" << ThriftDebugString(req);
     Status status = catalog_server_->catalog()->ResetMetadata(req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
@@ -112,8 +112,8 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
 
   // Executes a TUpdateCatalogRequest and returns details on the result of the
   // operation.
-  virtual void UpdateCatalog(TUpdateCatalogResponse& resp,
-      const TUpdateCatalogRequest& req) {
+  void UpdateCatalog(TUpdateCatalogResponse& resp, const TUpdateCatalogRequest& req)
+      override {
     VLOG_RPC << "UpdateCatalog(): request=" << ThriftDebugString(req);
     Status status = catalog_server_->catalog()->UpdateCatalog(req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
@@ -125,8 +125,8 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
 
   // Gets functions in the Catalog based on the parameters of the
   // TGetFunctionsRequest.
-  virtual void GetFunctions(TGetFunctionsResponse& resp,
-      const TGetFunctionsRequest& req) {
+  void GetFunctions(TGetFunctionsResponse& resp, const TGetFunctionsRequest& req)
+      override {
     VLOG_RPC << "GetFunctions(): request=" << ThriftDebugString(req);
     Status status = catalog_server_->catalog()->GetFunctions(req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
@@ -137,8 +137,8 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   }
 
   // Gets a TCatalogObject based on the parameters of the TGetCatalogObjectRequest.
-  virtual void GetCatalogObject(TGetCatalogObjectResponse& resp,
-      const TGetCatalogObjectRequest& req) {
+  void GetCatalogObject(TGetCatalogObjectResponse& resp,
+      const TGetCatalogObjectRequest& req) override {
     VLOG_RPC << "GetCatalogObject(): request=" << ThriftDebugString(req);
     Status status = catalog_server_->catalog()->GetCatalogObject(req.object_desc,
         &resp.catalog_object);
@@ -146,8 +146,8 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     VLOG_RPC << "GetCatalogObject(): response=" << ThriftDebugString(resp);
   }
 
-  virtual void GetPartialCatalogObject(TGetPartialCatalogObjectResponse& resp,
-      const TGetPartialCatalogObjectRequest& req) {
+  void GetPartialCatalogObject(TGetPartialCatalogObjectResponse& resp,
+      const TGetPartialCatalogObjectRequest& req) override {
     // TODO(todd): capture detailed metrics on the types of inbound requests, lock
     // wait times, etc.
     // TODO(todd): add some kind of limit on the number of concurrent requests here
@@ -164,8 +164,8 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     VLOG_RPC << "GetPartialCatalogObject(): response=" << ThriftDebugString(resp);
   }
 
-  virtual void GetPartitionStats(
-      TGetPartitionStatsResponse& resp, const TGetPartitionStatsRequest& req) {
+  void GetPartitionStats(TGetPartitionStatsResponse& resp,
+      const TGetPartitionStatsRequest& req) override {
     VLOG_RPC << "GetPartitionStats(): request=" << ThriftDebugString(req);
     Status status = catalog_server_->catalog()->GetPartitionStats(req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
@@ -178,8 +178,8 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   // Prioritizes the loading of metadata for one or more catalog objects. Currently only
   // used for loading tables/views because they are the only type of object that is loaded
   // lazily.
-  virtual void PrioritizeLoad(TPrioritizeLoadResponse& resp,
-      const TPrioritizeLoadRequest& req) {
+  void PrioritizeLoad(TPrioritizeLoadResponse& resp, const TPrioritizeLoadRequest& req)
+      override {
     VLOG_RPC << "PrioritizeLoad(): request=" << ThriftDebugString(req);
     Status status = catalog_server_->catalog()->PrioritizeLoad(req);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
@@ -189,8 +189,8 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     VLOG_RPC << "PrioritizeLoad(): response=" << ThriftDebugString(resp);
   }
 
-  virtual void SentryAdminCheck(TSentryAdminCheckResponse& resp,
-      const TSentryAdminCheckRequest& req) {
+  void SentryAdminCheck(TSentryAdminCheckResponse& resp,
+      const TSentryAdminCheckRequest& req) override {
     VLOG_RPC << "SentryAdminCheck(): request=" << ThriftDebugString(req);
     Status status = catalog_server_->catalog()->SentryAdminCheck(req);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
@@ -198,6 +198,13 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     status.ToThrift(&thrift_status);
     resp.__set_status(thrift_status);
     VLOG_RPC << "SentryAdminCheck(): response=" << ThriftDebugString(resp);
+  }
+
+  void UpdateTableUsage(TUpdateTableUsageResponse& resp,
+      const TUpdateTableUsageRequest& req) override {
+    VLOG_RPC << "UpdateTableUsage(): request=" << ThriftDebugString(req);
+    Status status = catalog_server_->catalog()->UpdateTableUsage(req);
+    if (!status.ok()) LOG(WARNING) << status.GetDetail();
   }
 
  private:

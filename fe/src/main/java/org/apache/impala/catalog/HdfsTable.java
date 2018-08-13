@@ -1229,6 +1229,7 @@ public class HdfsTable extends Table implements FeFsTable {
         if (loadTableSchema) setAvroSchema(client, msTbl);
         setTableStats(msTbl);
         fileMetadataStats_.unset();
+        refreshLastUsedTime();
       } catch (TableLoadingException e) {
         throw e;
       } catch (Exception e) {

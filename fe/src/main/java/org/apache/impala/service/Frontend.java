@@ -86,6 +86,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
@@ -179,6 +180,8 @@ public class Frontend {
   private final ScheduledExecutorService policyReader_ =
       Executors.newScheduledThreadPool(1);
 
+  private final ImpaladTableUsageTracker impaladTableUsageTracker_;
+
   public Frontend(AuthorizationConfig authorizationConfig) {
     this(authorizationConfig, FeCatalogManager.createFromBackendConfig());
   }
@@ -214,6 +217,8 @@ public class Frontend {
       policyReader_.scheduleAtFixedRate(policyReaderTask,
           delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
     }
+    impaladTableUsageTracker_ = ImpaladTableUsageTracker.createFromConfig(
+        BackendConfig.INSTANCE);
   }
 
   /**
@@ -241,6 +246,10 @@ public class Frontend {
   public FeCatalog getCatalog() { return catalogManager_.getOrCreateCatalog(); }
 
   public AuthorizationChecker getAuthzChecker() { return authzChecker_.get(); }
+
+  public ImpaladTableUsageTracker getImpaladTableUsageTracker() {
+    return impaladTableUsageTracker_;
+  }
 
   public TUpdateCatalogCacheResponse updateCatalogCache(
       TUpdateCatalogCacheRequest req) throws CatalogException, TException {

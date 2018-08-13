@@ -122,6 +122,10 @@ class Catalog {
   /// was an error executing the request.
   Status SentryAdminCheck(const TSentryAdminCheckRequest& req);
 
+  /// Update recently used table names and their use counts in an impalad since the last
+  /// report.
+  Status UpdateTableUsage(const TUpdateTableUsageRequest& req);
+
  private:
   /// Descriptor of Java Catalog class itself, used to create a new instance.
   jclass catalog_class_;
@@ -143,6 +147,7 @@ class Catalog {
   jmethodID prioritize_load_id_; // JniCatalog.prioritizeLoad()
   jmethodID sentry_admin_check_id_; // JniCatalog.checkUserSentryAdmin()
   jmethodID catalog_ctor_;
+  jmethodID update_table_usage_id_;
 };
 
 }

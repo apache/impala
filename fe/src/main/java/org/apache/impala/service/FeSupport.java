@@ -114,6 +114,8 @@ public class FeSupport {
   // Does an RPC to the Catalog Server to fetch specified table partition statistics.
   public native static byte[] NativeGetPartitionStats(byte[] thriftReq);
 
+  public native static byte[] NativeUpdateTableUsage(byte[] thriftReq);
+
   // Parses a string of comma-separated key=value query options ('csvQueryOptions'),
   // updates the existing query options ('queryOptions') with them and returns the
   // resulting serialized TQueryOptions object.

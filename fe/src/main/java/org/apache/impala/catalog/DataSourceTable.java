@@ -190,6 +190,7 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
 
       // Set table stats.
       setTableStats(msTable_);
+      refreshLastUsedTime();
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for data source table: " +
           name_, e);

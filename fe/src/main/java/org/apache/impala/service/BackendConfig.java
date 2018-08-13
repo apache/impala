@@ -95,6 +95,22 @@ public class BackendConfig {
     return backendCfg_.pull_incremental_statistics;
   }
 
+  public int getInvalidateTablesTimeoutS() {
+    return backendCfg_.invalidate_tables_timeout_s;
+  }
+
+  public boolean invalidateTablesOnMemoryPressure() {
+    return backendCfg_.invalidate_tables_on_memory_pressure;
+  }
+
+  public double getInvalidateTablesGcOldGenFullThreshold() {
+    return backendCfg_.invalidate_tables_gc_old_gen_full_threshold;
+  }
+
+  public double getInvalidateTablesFractionOnMemoryPressure() {
+    return backendCfg_.invalidate_tables_fraction_on_memory_pressure;
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

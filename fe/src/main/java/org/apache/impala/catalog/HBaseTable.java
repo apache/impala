@@ -115,6 +115,7 @@ public class HBaseTable extends Table implements FeHBaseTable {
       // single clustering col
       numClusteringCols_ = 1;
       loadAllColumnStats(client);
+      refreshLastUsedTime();
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for HBase table: " + name_,
           e);

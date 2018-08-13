@@ -195,7 +195,7 @@ public class KuduTable extends Table implements FeKuduTable {
         throw new TableLoadingException("Error loading metadata for Kudu table " +
             kuduTableName_, e);
       }
-
+      refreshLastUsedTime();
       // Avoid updating HMS if the schema didn't change.
       if (msTable_.equals(msTbl)) return;
 
