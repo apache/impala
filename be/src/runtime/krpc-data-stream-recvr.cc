@@ -555,9 +555,9 @@ void KrpcDataStreamRecvr::SenderQueue::Cancel() {
       DequeueDeferredRpc();
     }
   }
-  VLOG_QUERY << "cancelled stream: fragment_instance_id="
-             << PrintId(recvr_->fragment_instance_id())
-             << " node_id=" << recvr_->dest_node_id();
+  VLOG(2) << "cancelled stream: fragment_instance_id="
+          << PrintId(recvr_->fragment_instance_id())
+          << " node_id=" << recvr_->dest_node_id();
   // Wake up all threads waiting to produce/consume batches. They will all
   // notice that the stream is cancelled and handle it.
   data_arrival_cv_.notify_all();

@@ -182,7 +182,7 @@ bool ScanNode::WaitForRuntimeFilters() {
   if (arrived_filter_ids.size() == filter_ctxs_.size()) {
     runtime_profile()->AddInfoString("Runtime filters",
         Substitute("All filters arrived. Waited $0", wait_time));
-    VLOG_QUERY << "Filters arrived. Waited " << wait_time;
+    VLOG(2) << "Filters arrived. Waited " << wait_time;
     return true;
   }
 
@@ -190,7 +190,7 @@ bool ScanNode::WaitForRuntimeFilters() {
       "Not all filters arrived (arrived: [$0], missing [$1]), waited for $2",
       join(arrived_filter_ids, ", "), join(missing_filter_ids, ", "), wait_time);
   runtime_profile()->AddInfoString("Runtime filters", filter_str);
-  VLOG_QUERY << filter_str;
+  VLOG(2) << filter_str;
   return false;
 }
 
@@ -248,9 +248,9 @@ void ScanNode::ScannerThreadState::Open(
     // the producer/consumer.
     max_row_batches = max(2, max_row_batches / state->query_options().mt_dop);
   }
-  VLOG_QUERY << "Max row batch queue size for scan node '" << parent->id()
-      << "' in fragment instance '" << PrintId(state->fragment_instance_id())
-      << "': " << max_row_batches;
+  VLOG(2) << "Max row batch queue size for scan node '" << parent->id()
+          << "' in fragment instance '" << PrintId(state->fragment_instance_id())
+          << "': " << max_row_batches;
   batch_queue_.reset(
       new RowBatchQueue(max_row_batches, FLAGS_max_queued_row_batch_bytes));
 

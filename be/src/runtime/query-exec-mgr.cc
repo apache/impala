@@ -43,8 +43,8 @@ DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory
 
 Status QueryExecMgr::StartQuery(const TExecQueryFInstancesParams& params) {
   TUniqueId query_id = params.query_ctx.query_id;
-  VLOG_QUERY << "StartQueryFInstances() query_id=" << PrintId(query_id)
-             << " coord=" << TNetworkAddressToString(params.query_ctx.coord_address);
+  VLOG(2) << "StartQueryFInstances() query_id=" << PrintId(query_id)
+          << " coord=" << TNetworkAddressToString(params.query_ctx.coord_address);
 
   bool dummy;
   QueryState* qs = GetOrCreateQueryState(params.query_ctx, &dummy);
@@ -152,8 +152,8 @@ void QueryExecMgr::ReleaseQueryState(QueryState* qs) {
   // don't reference anything from 'qs' beyond this point, 'qs' might get
   // gc'd out from under us
   qs = nullptr;
-  VLOG_QUERY << "ReleaseQueryState(): query_id=" << PrintId(query_id)
-             << " refcnt=" << cnt + 1;
+  VLOG(2) << "ReleaseQueryState(): query_id=" << PrintId(query_id)
+          << " refcnt=" << cnt + 1;
   DCHECK_GE(cnt, 0);
   if (cnt > 0) return;
 
@@ -176,4 +176,5 @@ void QueryExecMgr::ReleaseQueryState(QueryState* qs) {
   }
   // TODO: send final status report during gc, but do this from a different thread
   delete qs_from_map;
+  VLOG(1) << "ReleaseQueryState(): deleted query_id=" << PrintId(query_id);
 }

@@ -160,8 +160,8 @@ void QueryState::InitMemTrackers() {
   int64_t bytes_limit = -1;
   if (query_options().__isset.mem_limit && query_options().mem_limit > 0) {
     bytes_limit = query_options().mem_limit;
-    VLOG_QUERY << "Using query memory limit from query options: "
-               << PrettyPrinter::Print(bytes_limit, TUnit::BYTES);
+    VLOG(2) << "Using query memory limit from query options: "
+            << PrettyPrinter::Print(bytes_limit, TUnit::BYTES);
   }
   query_mem_tracker_ =
       MemTracker::CreateQueryMemTracker(query_id(), query_options(), pool, &obj_pool_);
@@ -182,7 +182,7 @@ Status QueryState::InitBufferPoolState() {
     DCHECK_GE(mem_limit, 0);
     max_reservation = ReservationUtil::GetReservationLimitFromMemLimit(mem_limit);
   }
-  VLOG_QUERY << "Buffer pool limit for " << PrintId(query_id()) << ": " << max_reservation;
+  VLOG(2) << "Buffer pool limit for " << PrintId(query_id()) << ": " << max_reservation;
 
   buffer_reservation_ = obj_pool_.Add(new ReservationTracker);
   buffer_reservation_->InitChildTracker(
@@ -353,8 +353,8 @@ Status QueryState::WaitForFinish() {
 }
 
 void QueryState::StartFInstances() {
-  VLOG_QUERY << "StartFInstances(): query_id=" << PrintId(query_id())
-      << " #instances=" << rpc_params_.fragment_instance_ctxs.size();
+  VLOG(2) << "StartFInstances(): query_id=" << PrintId(query_id())
+          << " #instances=" << rpc_params_.fragment_instance_ctxs.size();
   DCHECK_GT(refcnt_.Load(), 0);
   DCHECK_GT(exec_resource_refcnt_.Load(), 0) << "Should have been taken in Init()";
 
@@ -371,8 +371,8 @@ void QueryState::StartFInstances() {
     ReportExecStatusAux(true, status, nullptr, false);
     return;
   }
-  VLOG_QUERY << "descriptor table for query=" << PrintId(query_id())
-             << "\n" << desc_tbl_->DebugString();
+  VLOG(2) << "descriptor table for query=" << PrintId(query_id())
+          << "\n" << desc_tbl_->DebugString();
 
   Status thread_create_status;
   DCHECK_GT(rpc_params_.fragment_ctxs.size(), 0);

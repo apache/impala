@@ -84,7 +84,7 @@ RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filte
     if (consumed_filters_.find(filter_desc.filter_id) == consumed_filters_.end()) {
       ret = obj_pool_.Add(new RuntimeFilter(filter_desc, filter_desc.filter_size_bytes));
       consumed_filters_[filter_desc.filter_id] = ret;
-      VLOG_QUERY << "registered consumer filter " << filter_desc.filter_id;
+      VLOG(2) << "registered consumer filter " << filter_desc.filter_id;
     } else {
       // The filter has already been registered in this filter bank by another
       // target node.

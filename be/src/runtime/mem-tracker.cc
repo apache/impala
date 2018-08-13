@@ -220,8 +220,8 @@ MemTracker* MemTracker::CreateQueryMemTracker(const TUniqueId& id,
                    << " exceeds physical memory of "
                    << PrettyPrinter::Print(MemInfo::physical_mem(), TUnit::BYTES);
     }
-    VLOG_QUERY << "Using query memory limit: "
-               << PrettyPrinter::Print(byte_limit, TUnit::BYTES);
+    VLOG(2) << "Using query memory limit: "
+            << PrettyPrinter::Print(byte_limit, TUnit::BYTES);
   }
 
   MemTracker* pool_tracker =

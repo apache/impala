@@ -60,9 +60,9 @@ Status InitialReservations::Init(
         PrettyPrinter::Print(query_min_reservation, TUnit::BYTES), FLAGS_hostname,
         FLAGS_be_port, PrintId(query_id), reservation_status.GetDetail());
   }
-  VLOG_QUERY << "Successfully claimed initial reservations ("
-            << PrettyPrinter::Print(query_min_reservation, TUnit::BYTES) << ") for"
-            << " query " << PrintId(query_id);
+  VLOG(2) << "Successfully claimed initial reservations ("
+          << PrettyPrinter::Print(query_min_reservation, TUnit::BYTES) << ") for"
+          << " query " << PrintId(query_id);
   return Status::OK();
 }
 
