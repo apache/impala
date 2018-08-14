@@ -27,6 +27,8 @@
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
+export IMPALA_MAVEN_OPTIONS="-U"
+
 . bin/impala-config.sh
 
 # These are configurations for buildall:
