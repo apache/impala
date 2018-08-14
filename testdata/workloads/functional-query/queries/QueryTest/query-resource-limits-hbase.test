@@ -1,0 +1,13 @@
+====
+---- QUERY
+# Bytes limit enforced for HBase.
+# Add a sleep to slow down query and avoid race with bytes check.
+set SCAN_BYTES_LIMIT="1k";
+select count(*)
+from (
+  select distinct *
+  from functional_hbase.alltypesagg
+  where sleep(100) = id) v
+---- CATCH
+row_regex:.*terminated due to scan bytes limit of 1.00 K.*
+====

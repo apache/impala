@@ -16,8 +16,9 @@
 # under the License.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfEC, SkipIfLocal
+from tests.common.skip import SkipIfEC, SkipIfKudu, SkipIfLocal, SkipIfS3
 from tests.common.test_dimensions import create_parquet_dimension
+
 
 class TestResourceLimits(ImpalaTestSuite):
   """Test resource limit functionality."""
@@ -42,3 +43,13 @@ class TestResourceLimits(ImpalaTestSuite):
   @SkipIfLocal.multiple_impalad
   def test_resource_limits(self, vector):
     self.run_test_case('QueryTest/query-resource-limits', vector)
+
+  @SkipIfS3.hbase
+  @SkipIfLocal.multiple_impalad
+  def test_resource_limits_hbase(self, vector):
+    self.run_test_case('QueryTest/query-resource-limits-hbase', vector)
+
+  @SkipIfKudu.unsupported_env
+  @SkipIfLocal.multiple_impalad
+  def test_resource_limits_kudu(self, vector):
+    self.run_test_case('QueryTest/query-resource-limits-kudu', vector)

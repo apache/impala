@@ -1,0 +1,10 @@
+====
+---- QUERY
+# Bytes limit not enforced for Kudu yet.
+set SCAN_BYTES_LIMIT="1k";
+select min(l_orderkey) from tpch_kudu.lineitem
+---- TYPES
+BIGINT
+---- RESULTS
+1
+====

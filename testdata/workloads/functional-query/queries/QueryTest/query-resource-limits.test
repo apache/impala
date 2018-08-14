@@ -52,24 +52,3 @@ select count(*) from tpch.lineitem l1,tpch.lineitem l2, tpch.lineitem l3 where
 ---- CATCH
 row_regex:.*expired due to execution time limit of 2s000ms.*
 ====
----- QUERY
-# Bytes limit not enforced for Kudu yet.
-set SCAN_BYTES_LIMIT="1k";
-select min(l_orderkey) from tpch_kudu.lineitem
----- TYPES
-BIGINT
----- RESULTS
-1
-====
----- QUERY
-# Bytes limit enforced for HBase.
-# Add a sleep to slow down query and avoid race with bytes check.
-set SCAN_BYTES_LIMIT="1k";
-select count(*)
-from (
-  select distinct *
-  from functional_hbase.alltypesagg
-  where sleep(100) = id) v
----- CATCH
-row_regex:.*terminated due to scan bytes limit of 1.00 K.*
-====
