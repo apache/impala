@@ -187,6 +187,7 @@ under the License.
           <topicref rev="2.5.0" href="topics/impala_disable_row_runtime_filtering.xml"/>
           <topicref rev="2.5.0" href="topics/impala_disable_streaming_preaggregations.xml"/>
           <topicref href="topics/impala_disable_unsafe_spills.xml"/>
+          <topicref href="topics/impala_enable_expr_rewrites.xml"/>
           <topicref href="topics/impala_exec_single_node_rows_threshold.xml"/>
           <topicref href="topics/impala_exec_time_limit_s.xml"/>
           <topicref href="topics/impala_explain_level.xml"/>

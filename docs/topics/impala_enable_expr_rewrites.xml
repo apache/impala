@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="enable_expr_rewrites">
+
+  <title>ENABLE_EXPR_REWRITES Query Option</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>ENABLE_EXPR_REWRITES</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Performance"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>ENABLE_EXPR_REWRITES</codeph> query option controls whether to enable or
+      disable the query compile time optimizations that rewrite the expression trees to a more
+      compact and optimized form that helps avoid redundant expression evaluation at run time.
+      Performance optimizations controlled by this query option include:
+    </p>
+
+    <ul>
+      <li>
+        Constant folding (added in <keyword keyref="impala28">)</keyword>
+      </li>
+
+      <li>
+        Extracting common conjuncts from disjunctions (added in
+        <keyword
+          keyref="impala28">)</keyword>
+      </li>
+
+      <li>
+        Simplify conditionals with constant conditions (added in
+        <keyword
+          keyref="impala29">)</keyword>
+      </li>
+    </ul>
+
+    <p>
+      Set the option to <codeph>false</codeph> or <codeph>0</codeph> to disable the performance
+      optimizations.
+    </p>
+
+    <p>
+      <b>Type: </b><codeph>boolean</codeph>
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>true</codeph> (<codeph>1</codeph>)
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala28"/>
+    </p>
+
+  </conbody>
+
+</concept>
