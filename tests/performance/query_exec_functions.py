@@ -31,7 +31,6 @@ DEFAULT_BEESWAX_PORT = 21000
 DEFAULT_HS2_PORT = 21050
 DEFAULT_HIVE_HS2_PORT = 10000
 
-logging.basicConfig(level=logging.INFO, format='[%(name)s] %(threadName)s: %(message)s')
 LOG = logging.getLogger('query_exec_functions')
 
 def get_hs2_hive_cursor(hiveserver, user=None, use_kerberos=False,

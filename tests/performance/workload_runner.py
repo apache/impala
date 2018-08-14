@@ -34,8 +34,6 @@ from tests.performance.query_exec_functions import (
     execute_using_jdbc)
 from tests.performance.scheduler import Scheduler
 
-# Setup Logging
-logging.basicConfig(level=logging.INFO, format='[%(name)s]: %(message)s')
 LOG = logging.getLogger('workload_runner')
 
 

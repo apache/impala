@@ -22,7 +22,6 @@ import pkgutil
 PLUGIN_DIR = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'benchmark', 'plugins')
 
 # Setup logging for this module.
-logging.basicConfig(level=logging.INFO, format='%(filename)s: %(message)s')
 LOG = logging.getLogger('plugin_runner')
 LOG.setLevel(level=logging.INFO)
 

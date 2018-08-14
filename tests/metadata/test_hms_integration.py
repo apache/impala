@@ -36,11 +36,6 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension)
 from tests.util.hive_utils import HiveDbWrapper, HiveTableWrapper
 
-import logging
-
-logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
-LOG = logging.getLogger('test_configuration')
-
 @SkipIfS3.hive
 @SkipIfADLS.hive
 @SkipIfIsilon.hive

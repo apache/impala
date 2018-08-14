@@ -26,7 +26,6 @@ from tests.util.test_file_parser import (join_section_lines, remove_comments,
     split_section_lines)
 from tests.util.hdfs_util import NAMENODE
 
-logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('test_result_verfier')
 
 # Special prefix for column values that indicates the actual column value

@@ -79,7 +79,6 @@ from thrift.protocol import TBinaryProtocol
 
 # Initializing the logger before conditional imports, since we will need it
 # for them.
-logging.basicConfig(level=logging.INFO, format='-- %(message)s')
 LOG = logging.getLogger('impala_test_suite')
 
 # The ADLS python client isn't downloaded when ADLS isn't the target FS, so do a

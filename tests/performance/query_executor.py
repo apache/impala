@@ -36,7 +36,6 @@ import re
 from tests.performance.query import Query
 
 # Setup logging for this module.
-logging.basicConfig(level=logging.INFO, format='[%(name)s] %(threadName)s: %(message)s')
 LOG = logging.getLogger('query_executor')
 LOG.setLevel(level=logging.INFO)
 

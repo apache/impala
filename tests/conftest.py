@@ -32,8 +32,8 @@ from tests.common.patterns import is_valid_impala_identifier
 from tests.comparison.db_connection import ImpalaConnection
 from tests.util.filesystem_utils import FILESYSTEM, ISILON_WEBHDFS_PORT
 
-logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('test_configuration')
+LOG_FORMAT = "-- %(asctime)s %(levelname)-8s %(threadName)s: %(message)s"
 
 DEFAULT_CONN_TIMEOUT = 45
 DEFAULT_EXPLORATION_STRATEGY = 'core'
@@ -48,6 +48,18 @@ DEFAULT_NAMENODE_ADDR = None
 if FILESYSTEM == 'isilon':
   DEFAULT_NAMENODE_ADDR = "{node}:{port}".format(node=os.getenv("ISILON_NAMENODE"),
                                                  port=ISILON_WEBHDFS_PORT)
+
+
+def pytest_configure(config):
+  """ Hook startup of pytest to set up log format. """
+  configure_logging()
+
+
+def configure_logging():
+  # Use a "--" since most of our tests output SQL commands, and it's nice to
+  # be able to copy-paste directly from the test output back into a shell to
+  # try to reproduce a failure.
+  logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
 def pytest_addoption(parser):

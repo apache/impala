@@ -32,7 +32,6 @@ from tests.common.impala_service import (
     StateStoredService)
 from tests.util.shell_util import exec_process, exec_process_async
 
-logging.basicConfig(level=logging.ERROR, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('impala_cluster')
 LOG.setLevel(level=logging.DEBUG)
 

@@ -28,10 +28,8 @@ from sys import exit
 from threading import Lock, Thread, Event
 import threading
 
-logging.basicConfig(level=logging.INFO, format='%(name)s %(threadName)s: %(message)s')
 LOG = logging.getLogger('scheduler')
 LOG.setLevel(level=logging.DEBUG)
-
 
 class Scheduler(object):
   """Schedules the submission of workloads across one of more clients.
