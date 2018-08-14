@@ -60,6 +60,11 @@ interface MetaProvider {
   String loadNullPartitionKeyValue()
       throws MetaException, TException;
 
+  /**
+   * Load the list of partitions for the given table. Each returned partition
+   * acts as a reference which can later be passed to 'loadPartitionsByRefs' in order
+   * to fetch more detailed metadata (e.g. after partition pruning has completed).
+   */
   List<PartitionRef> loadPartitionList(TableMetaRef table)
       throws MetaException, TException;
 

@@ -372,6 +372,9 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
   @Override
   public List<? extends FeFsPartition> loadPartitions(Collection<Long> ids) {
+    // TODO(todd) it seems like some queries actually call this multiple times.
+    // Perhaps we should store the result in this class, instead of relying on
+    // catalog-layer caching?
     Preconditions.checkState(partitionSpecs_ != null,
         "Cannot load partitions without having fetched partition IDs " +
         "from the same LocalFsTable instance");

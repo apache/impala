@@ -71,8 +71,10 @@ public class LocalCatalog implements FeCatalog {
   private String nullPartitionKeyValue_;
   private final String defaultKuduMasterHosts_;
 
+  private static MetaProvider PROVIDER = new CatalogdMetaProvider();
+
   public static LocalCatalog create(String defaultKuduMasterHosts) {
-    return new LocalCatalog(new CatalogdMetaProvider(), defaultKuduMasterHosts);
+    return new LocalCatalog(PROVIDER, defaultKuduMasterHosts);
   }
 
   private LocalCatalog(MetaProvider metaProvider, String defaultKuduMasterHosts) {
