@@ -10,6 +10,7 @@
 */rat_exclude_files.txt
 be/src/testutil/htpasswd
 be/src/testutil/*.key
+bin/generate_junitxml.py
 tests/*/__init__.py
 testdata/common/__init__.py
 fe/src/test/resources/regionservers
@@ -85,6 +86,7 @@ tests/comparison/POSTGRES.txt
 docs/README.md
 docker/README.md
 be/src/thirdparty/pcg-cpp-0.98/README.md
+lib/python/README.md
 
 # http://www.apache.org/legal/src-headers.html: "Test data for which the addition of a
 # source header would cause the tests to fail."

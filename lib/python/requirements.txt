@@ -15,6 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.
 
-junit-xml==1.8
-pytz==2018.5
-six==1.11.0
+# List thirdparty python dependencies for impala_py_lib here
