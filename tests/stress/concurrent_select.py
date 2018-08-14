@@ -62,7 +62,7 @@ import sys
 import threading
 import traceback
 from Queue import Empty   # Must be before Queue below
-from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace, SUPPRESS
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime
@@ -2051,10 +2051,7 @@ def main():
   parser.add_argument(
       "--cancel-probability", type=float, default=0.1,
       help="The probability a query will be cancelled.")
-  parser.add_argument(
-      "--nlj-filter", choices=("in", "out", None),
-      help="'in' means only nested-loop queries will be used, 'out' means no NLJ queries"
-      " will be used. The default is to not filter either way.")
+  parser.add_argument("--nlj-filter", help=SUPPRESS) # Made a no-op by IMPALA-7440.
   parser.add_argument(
       "--common-query-options", default=None, nargs="*",
       help="Space-delimited string of query options and values. This is a freeform "
@@ -2211,29 +2208,6 @@ def main():
             > args.filter_query_mem_ratio:
       LOG.debug("Filtering query that exceeds --filter-query-mem-ratio: " + query.sql)
       del queries[idx]
-
-  # Remove queries that have a nested loop join in the plan.
-  if args.nlj_filter:
-    with impala.cursor(db_name=args.random_db) as cursor:
-      for idx in xrange(len(queries) - 1, -1, -1):
-        query = queries[idx]
-        if query.db_name:
-          cursor.execute("USE %s" % query.db_name)
-        cursor.execute("EXPLAIN " + query.sql)
-        for row in cursor.fetchall():
-          found_nlj = False
-          for col in row:
-            col = str(col).lower()
-            if "nested loop join" in col:
-              found_nlj = True
-              if args.nlj_filter == "out":
-                del queries[idx]
-              break
-          if found_nlj:
-            break
-        else:
-          if args.nlj_filter == "in":
-            del queries[idx]
 
   if len(queries) == 0:
     raise Exception("All queries were filtered")
