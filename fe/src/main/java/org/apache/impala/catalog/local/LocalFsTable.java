@@ -520,7 +520,8 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
       ColumnStats stats = getColumns().get(i).getStats();
       int nonNullParts = partitionValueMap_.get(i).size();
       int nullParts = nullPartitionIds_.get(i).size();
-      stats.setNumDistinctValues(nonNullParts + nullParts);
+      stats.setNumDistinctValues(nonNullParts + (nullParts > 0 ? 1 : 0));
+
       // TODO(todd): this calculation ends up setting the num_nulls stat
       // to the number of partitions with null rows, not the number of rows.
       // However, it maintains the existing behavior from HdfsTable.
