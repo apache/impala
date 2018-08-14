@@ -12,6 +12,25 @@ show databases like "$DATABASE_2"
 STRING, STRING
 ====
 ---- QUERY
+# Test that DESCRIBE shows the proper database location
+# for a newly created database (regression test for IMPALA-7439)
+describe database $DATABASE_2
+---- RESULTS
+'$DATABASE_2','$NAMENODE/test-warehouse/$DATABASE_2.db','For testing'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test that DESCRIBE EXTENDED also has all of the necessary info.
+describe database extended $DATABASE_2
+---- RESULTS
+'$DATABASE_2','$NAMENODE/test-warehouse/$DATABASE_2.db','For testing'
+'Owner: ','',''
+'','$USER','USER'
+---- TYPES
+string, string, string
+====
+---- QUERY
 # Make sure creating a database with the same name doesn't throw an error when
 # IF NOT EXISTS is specified.
 create database if not exists $DATABASE_2

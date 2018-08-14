@@ -21,8 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.AuthorizationPolicy;
 import org.apache.impala.catalog.BuiltinsDb;
@@ -202,18 +200,6 @@ public class LocalCatalog implements FeCatalog {
   @Override
   public void waitForCatalogUpdate(long timeoutMs) {
     // No-op for local catalog.
-  }
-
-  @Override
-  public Path getTablePath(Table msTbl) {
-    // If the table did not have its path set, build the path based on the
-    // location property of the parent database.
-    if (msTbl.getSd().getLocation() == null || msTbl.getSd().getLocation().isEmpty()) {
-      String dbLocation = getDb(msTbl.getDbName()).getMetaStoreDb().getLocationUri();
-      return new Path(dbLocation, msTbl.getTableName().toLowerCase());
-    } else {
-      return new Path(msTbl.getSd().getLocation());
-    }
   }
 
   @Override

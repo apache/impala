@@ -19,15 +19,12 @@ package org.apache.impala.catalog;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
-import org.apache.thrift.TException;
 
 /**
  * Interface between the front-end (analysis and planning) classes and the Catalog.
@@ -80,17 +77,6 @@ public interface FeCatalog {
    * wait. Does not protect against spurious wakeups, so this should be called in a loop.
    */
   void waitForCatalogUpdate(long timeoutMs);
-
-  /**
-   * Returns the FS path where the metastore would create the given table. If the table
-   * has a "location" set, that will be returned. Otherwise the path will be resolved
-   * based on the location of the parent database. The metastore folder hierarchy is:
-   * <warehouse directory>/<db name>.db/<table name>
-   * Except for items in the default database which will be:
-   * <warehouse directory>/<table name>
-   * This method handles both of these cases.
-   */
-  public Path getTablePath(Table msTbl) throws TException;
 
   /**
    * @return the ID of the catalog service from which this catalog most recently

@@ -231,23 +231,6 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
     }
   }
 
-
-  @Override // FeCatalog
-  public Path getTablePath(org.apache.hadoop.hive.metastore.api.Table msTbl)
-      throws TException {
-    try (MetaStoreClient msClient = getMetaStoreClient()) {
-      // If the table did not have its path set, build the path based on the the
-      // location property of the parent database.
-      if (msTbl.getSd().getLocation() == null || msTbl.getSd().getLocation().isEmpty()) {
-        String dbLocation =
-            msClient.getHiveClient().getDatabase(msTbl.getDbName()).getLocationUri();
-        return new Path(dbLocation, msTbl.getTableName().toLowerCase());
-      } else {
-        return new Path(msTbl.getSd().getLocation());
-      }
-    }
-  }
-
   /**
    *  Adds the given TCatalogObject to the catalog cache. The update may be ignored
    *  (considered out of date) if:

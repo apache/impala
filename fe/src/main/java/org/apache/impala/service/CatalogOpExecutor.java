@@ -1009,6 +1009,11 @@ public class CatalogOpExecutor {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         try {
           msClient.getHiveClient().createDatabase(db);
+          // Load the database back from the HMS. It's unfortunate we need two
+          // RPCs here, but otherwise we can't populate the location field of the
+          // DB properly. We'll take the slight chance of a race over the incorrect
+          // behavior of showing no location in 'describe database' (IMPALA-7439).
+          db = msClient.getHiveClient().getDatabase(dbName);
           newDb = catalog_.addDb(dbName, db);
           addSummary(resp, "Database has been created.");
         } catch (AlreadyExistsException e) {
