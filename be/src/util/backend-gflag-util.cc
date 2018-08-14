@@ -29,6 +29,8 @@ DECLARE_bool(load_auth_to_local_rules);
 DECLARE_bool(enable_stats_extrapolation);
 DECLARE_bool(enable_orc_scanner);
 DECLARE_bool(use_local_catalog);
+DECLARE_int32(local_catalog_cache_expiration_s);
+DECLARE_int32(local_catalog_cache_mb);
 DECLARE_int32(non_impala_java_vlog);
 DECLARE_int32(num_metadata_loading_threads);
 DECLARE_int32(max_hdfs_partitions_parallel_load);
@@ -63,6 +65,9 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_load_catalog_in_background(FLAGS_load_catalog_in_background);
   cfg.__set_enable_orc_scanner(FLAGS_enable_orc_scanner);
   cfg.__set_use_local_catalog(FLAGS_use_local_catalog);
+  cfg.__set_local_catalog_cache_mb(FLAGS_local_catalog_cache_mb);
+  cfg.__set_local_catalog_cache_expiration_s(
+    FLAGS_local_catalog_cache_expiration_s);
   cfg.__set_server_name(FLAGS_server_name);
   cfg.__set_sentry_config(FLAGS_sentry_config);
   cfg.__set_authorization_policy_provider_class(

@@ -17,18 +17,20 @@
 
 package org.apache.impala.catalog.local;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.impala.catalog.local.CatalogdMetaProvider.SizeOfWeigher;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
 import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;
 import org.junit.Test;
@@ -53,7 +55,11 @@ public class CatalogdMetaProviderTest {
   }
 
   public CatalogdMetaProviderTest() throws Exception {
-    provider_ = new CatalogdMetaProvider();
+    // Set sufficient expiration/capacity for the test to not evict.
+    TBackendGflags flags = new TBackendGflags();
+    flags.setLocal_catalog_cache_expiration_s(3600);
+    flags.setLocal_catalog_cache_mb(100);
+    provider_ = new CatalogdMetaProvider(flags);
     Pair<Table, TableMetaRef> tablePair = provider_.loadTable("functional", "alltypes");
     tableRef_ = tablePair.second;
     prevStats_ = provider_.getCacheStats();
@@ -138,4 +144,19 @@ public class CatalogdMetaProviderTest {
     assertEquals(2, stats.hitCount());
     assertEquals(0, stats.missCount());
   }
+
+  @Test
+  public void testWeights() throws Exception {
+    List<PartitionRef> refs = provider_.loadPartitionList(tableRef_);
+    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
+    provider_.loadPartitionsByRefs(tableRef_, /* ignored */null, hostIndex , refs);
+
+    // Unfortunately Guava doesn't provide a statistic on the total weight of cached
+    // elements. So, we'll just instantiate the weigher directly and sanity check
+    // the size loosely.
+    SizeOfWeigher weigher = new SizeOfWeigher();
+    assertTrue(weigher.weigh(refs, null) > 3000);
+    assertTrue(weigher.weigh(refs, null) < 4000);
+  }
+
 }

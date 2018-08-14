@@ -40,6 +40,7 @@ import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PrunablePartition;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TUniqueId;
@@ -71,7 +72,8 @@ public class LocalCatalog implements FeCatalog {
   private String nullPartitionKeyValue_;
   private final String defaultKuduMasterHosts_;
 
-  private static MetaProvider PROVIDER = new CatalogdMetaProvider();
+  private static MetaProvider PROVIDER = new CatalogdMetaProvider(
+      BackendConfig.INSTANCE.getBackendCfg());
 
   public static LocalCatalog create(String defaultKuduMasterHosts) {
     return new LocalCatalog(PROVIDER, defaultKuduMasterHosts);

@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.local;
 
+import java.lang.management.ManagementFactory;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -55,15 +57,18 @@ import org.apache.impala.util.ListMap;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
+import org.ehcache.sizeof.SizeOf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheStats;
+import com.google.common.cache.Weigher;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -121,13 +126,34 @@ public class CatalogdMetaProvider implements MetaProvider {
   // to the "direct" provider for now and circumvent catalogd.
   private DirectMetaProvider directProvider_ = new DirectMetaProvider();
 
-  // TODO(todd): hard-coded TTL is not the final solution here. We should implement
-  // memory estimation for all cached objects, and evict based on a configurable
-  // memory pressure.
-  final Cache<Object,Object> cache_ = CacheBuilder.newBuilder()
-      .expireAfterAccess(1, TimeUnit.HOURS)
-      .recordStats()
-      .build();
+
+  final Cache<Object,Object> cache_;
+
+  public CatalogdMetaProvider(TBackendGflags flags) {
+    Preconditions.checkArgument(flags.isSetLocal_catalog_cache_expiration_s());
+    Preconditions.checkArgument(flags.isSetLocal_catalog_cache_mb());
+
+    long cacheSizeBytes;
+    if (flags.local_catalog_cache_mb < 0) {
+      long maxHeapBytes = ManagementFactory.getMemoryMXBean()
+          .getHeapMemoryUsage().getMax();
+      cacheSizeBytes = (long)(maxHeapBytes * 0.6);
+    } else {
+      cacheSizeBytes = flags.local_catalog_cache_mb * 1024 * 1024;
+    }
+    int expirationSecs = flags.local_catalog_cache_expiration_s;
+    LOG.info("Metadata cache configuration: capacity={} MB, expiration={} sec",
+        cacheSizeBytes/1024/1024, expirationSecs);
+
+    // TODO(todd) add end-to-end test cases which stress cache eviction (both time
+    // and size-triggered) and make sure results are still correct.
+    cache_ = CacheBuilder.newBuilder()
+        .maximumWeight(cacheSizeBytes)
+        .expireAfterAccess(expirationSecs, TimeUnit.SECONDS)
+        .weigher(new SizeOfWeigher())
+        .recordStats()
+        .build();
+  }
 
   public CacheStats getCacheStats() {
     return cache_.stats();
@@ -727,6 +753,32 @@ public class CatalogdMetaProvider implements MetaProvider {
       }
       PartitionCacheKey other = (PartitionCacheKey)obj;
       return super.equals(obj) && partId_ == other.partId_;
+    }
+  }
+
+  @VisibleForTesting
+  static class SizeOfWeigher implements Weigher<Object, Object> {
+    // Bypass flyweight objects like small boxed integers, Boolean.TRUE, enums, etc.
+    private static final boolean BYPASS_FLYWEIGHT = true;
+    // Cache the reflected sizes of classes seen.
+    private static final boolean CACHE_SIZES = true;
+
+    private static SizeOf SIZEOF = SizeOf.newInstance(BYPASS_FLYWEIGHT, CACHE_SIZES);
+
+    private static final int BYTES_PER_WORD = 8; // Assume 64-bit VM.
+    // Guava cache overhead based on:
+    // http://code-o-matic.blogspot.com/2012/02/updated-memory-cost-per-javaguava.html
+    private static final int OVERHEAD_PER_ENTRY =
+        12 * BYTES_PER_WORD + // base cost per entry
+        4 * BYTES_PER_WORD;  // for use of 'maximumSize()'
+
+    @Override
+    public int weigh(Object key, Object value) {
+      long size = SIZEOF.deepSizeOf(key, value) + OVERHEAD_PER_ENTRY;
+      if (size > Integer.MAX_VALUE) {
+        return Integer.MAX_VALUE;
+      }
+      return (int)size;
     }
   }
 }

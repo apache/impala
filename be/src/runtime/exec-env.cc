@@ -81,8 +81,19 @@ DEFINE_int32(num_hdfs_worker_threads, 16,
     "(Advanced) The number of threads in the global HDFS operation pool");
 
 DEFINE_bool_hidden(use_local_catalog, false,
-  "Use experimental implementation of a local catalog. If this is set, "
-  "the catalog service is not used and does not need to be started.");
+    "Use experimental implementation of a local catalog. If this is set, "
+    "the catalog service is not used and does not need to be started.");
+DEFINE_int32_hidden(local_catalog_cache_mb, -1,
+    "If --use_local_catalog is enabled, configures the size of the catalog "
+    "cache within each impalad. If this is set to -1, the cache is auto-"
+    "configured to 60% of the configured Java heap size. Note that the Java "
+    "heap size is distinct from and typically smaller than the overall "
+    "Impala memory limit.");
+DEFINE_int32_hidden(local_catalog_cache_expiration_s, 60 * 60,
+    "If --use_local_catalog is enabled, configures the expiration time "
+    "of the catalog cache within each impalad. Even if the configured "
+    "cache capacity has not been reached, items are removed from the cache "
+    "if they have not been accessed in this amount of time.");
 
 DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);

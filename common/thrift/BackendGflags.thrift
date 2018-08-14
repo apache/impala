@@ -81,4 +81,8 @@ struct TBackendGflags {
   27: required bool use_local_catalog
 
   28: required bool disable_catalog_data_ops_debug_only
+
+  29: required i32 local_catalog_cache_mb
+
+  30: required i32 local_catalog_cache_expiration_s
 }
