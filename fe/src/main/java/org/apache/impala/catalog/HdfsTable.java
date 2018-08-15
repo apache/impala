@@ -561,11 +561,17 @@ public class HdfsTable extends Table implements FeFsTable {
       throws CatalogException {
     try {
       Path partDir = partition.getLocationPath();
-      FileMetadataLoadStats stats = refreshFileMetadata(partDir,
-          Lists.newArrayList(partition));
+      // If there are no existing files in the partition, use the non-incremental path.
+      boolean useExistingFds = partition.hasFileDescriptors();
+      FileMetadataLoadStats stats;
+      if (useExistingFds) {
+        stats = refreshFileMetadata(partDir, Collections.singletonList(partition));
+      } else {
+        stats = resetAndLoadFileMetadata(partDir, Collections.singletonList(partition));
+      }
       if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("Refreshed file metadata for %s %s",
-              getFullName(), stats.debugString()));
+        LOG.debug("{} file metadata for {} {}", useExistingFds ? "Refreshed" : "Loaded",
+            getFullName(), stats.debugString());
       }
     } catch (IOException e) {
       throw new CatalogException("Encountered invalid partition path", e);
@@ -852,9 +858,10 @@ public class HdfsTable extends Table implements FeFsTable {
     if (numPathsToLoad == 0) return;
 
     int threadPoolSize = getLoadingThreadPoolSize(numPathsToLoad);
-    LOG.info(String.format("Loading file and block metadata for %s paths for table %s " +
-        "using a thread pool of size %s", numPathsToLoad, getFullName(),
-        threadPoolSize));
+    LOG.info("{} file and block metadata for {} paths for table {} " +
+        "using a thread pool of size {}",
+        reuseFileMd ? "Refreshing" : "Loading", numPathsToLoad, getFullName(),
+        threadPoolSize);
     ExecutorService partitionLoadingPool = Executors.newFixedThreadPool(threadPoolSize);
     try {
       List<Future<FileMetadataLoadStats>> pendingMdLoadTasks = Lists.newArrayList();
@@ -1262,18 +1269,30 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * Updates the file metadata of an unpartitioned HdfsTable.
+   * Incrementally updates the file metadata of an unpartitioned HdfsTable.
+   *
+   * This is optimized for the case where few files have changed. See
+   * {@link #refreshFileMetadata()} above for details.
    */
   private void updateUnpartitionedTableFileMd() throws CatalogException {
     Preconditions.checkState(getNumClusteringCols() == 0);
     if (LOG.isTraceEnabled()) {
       LOG.trace("update unpartitioned table: " + getFullName());
     }
+    HdfsPartition oldPartition = Iterables.getOnlyElement(partitionMap_.values());
+
+    // Instead of updating the existing partition in place, we create a new one
+    // so that we reflect any changes in the msTbl object and also assign a new
+    // ID. This is one step towards eventually implementing IMPALA-7533.
     resetPartitions();
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
     setPrototypePartition(msTbl.getSd());
     HdfsPartition part = createPartition(msTbl.getSd(), null, new FsPermissionCache());
+    // Copy over the FDs from the old partition to the new one, so that
+    // 'refreshPartitionFileMetadata' below can compare modification times and
+    // reload the locations only for those that changed.
+    part.setFileDescriptors(oldPartition.getFileDescriptors());
     addPartition(part);
     if (isMarkedCached_) part.markCached();
     refreshPartitionFileMetadata(part);
@@ -2138,11 +2157,17 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   public void reloadPartition(HdfsPartition oldPartition, Partition hmsPartition)
       throws CatalogException {
+    // Instead of updating the existing partition in place, we create a new one
+    // so that we reflect any changes in the hmsPartition object and also assign a new
+    // ID. This is one step towards eventually implementing IMPALA-7533.
     HdfsPartition refreshedPartition = createPartition(
         hmsPartition.getSd(), hmsPartition, new FsPermissionCache());
-    refreshPartitionFileMetadata(refreshedPartition);
     Preconditions.checkArgument(oldPartition == null
         || HdfsPartition.KV_COMPARATOR.compare(oldPartition, refreshedPartition) == 0);
+    if (oldPartition != null) {
+      refreshedPartition.setFileDescriptors(oldPartition.getFileDescriptors());
+    }
+    refreshPartitionFileMetadata(refreshedPartition);
     dropPartition(oldPartition, false);
     addPartition(refreshedPartition);
   }

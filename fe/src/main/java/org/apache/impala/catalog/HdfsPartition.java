@@ -730,6 +730,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     return encodedFileDescriptors_.size();
   }
 
+  @Override
   public boolean hasFileDescriptors() { return !encodedFileDescriptors_.isEmpty(); }
 
   // Struct-style class for caching all the information we need to reconstruct an

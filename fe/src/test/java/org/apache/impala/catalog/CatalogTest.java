@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.hdfs.DFSOpsCountStatistics;
+import org.apache.hadoop.hdfs.DFSOpsCountStatistics.OpType;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.impala.analysis.FunctionName;
@@ -56,6 +57,7 @@ import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TGetPartitionStatsRequest;
+import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
@@ -66,6 +68,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -312,9 +315,20 @@ public class CatalogTest {
         catalog_.getOrLoadTable("functional", "AllTypes"));
   }
 
+  // Count of listFiles (list status + blocks) calls
+  private static final String LIST_LOCATED_STATUS =
+      OpType.LIST_LOCATED_STATUS.getSymbol();
+  // Count of listStatus calls
+  private static final String LIST_STATUS = OpType.LIST_STATUS.getSymbol();
+  // Count of getStatus calls
+  private static final String GET_FILE_STATUS = OpType.GET_FILE_STATUS.getSymbol();
+  // Count of getFileBlockLocations() calls
+  private static final String GET_FILE_BLOCK_LOCS =
+      OpType.GET_FILE_BLOCK_LOCATIONS.getSymbol();
+
   /**
-   * Regression test for IMPALA-7320: we should use batch APIs to fetch
-   * file permissions for partitions.
+   * Regression test for IMPALA-7320 and IMPALA-7047: we should use batch APIs to fetch
+   * file permissions for partitions when loading or reloading.
    */
   @Test
   public void testNumberOfGetFileStatusCalls() throws CatalogException, IOException {
@@ -337,25 +351,65 @@ public class CatalogTest {
     // Due to HDFS-13747, the listStatus calls are incorrectly accounted as
     // op_list_located_status. So, we'll just add up the two to make our
     // assertion resilient to this bug.
-    long seenCalls = opsCounts.getLong("op_list_located_status") +
-        opsCounts.getLong("op_list_status");
+    long seenCalls = opsCounts.getLong(LIST_LOCATED_STATUS) +
+        opsCounts.getLong(LIST_STATUS);
     assertEquals(expectedCalls, seenCalls);
 
     // We expect only one getFileStatus call, for the top-level directory.
-    assertEquals(1L, (long)opsCounts.getLong("op_get_file_status"));
+    assertEquals(1L, (long)opsCounts.getLong(GET_FILE_STATUS));
+
+    // None of the underlying files changed so we should not do any ops for the files.
+    assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
 
     // Now test REFRESH on the table...
     stats.reset();
     catalog_.reloadTable(table);
 
     // Again, we expect only one getFileStatus call, for the top-level directory.
-    assertEquals(1L, (long)opsCounts.getLong("op_get_file_status"));
+    assertEquals(1L, (long)opsCounts.getLong(GET_FILE_STATUS));
     // REFRESH calls listStatus on each of the partitions, but doesn't re-check
     // the permissions of the partition directories themselves.
     assertEquals(table.getPartitionIds().size(),
-        (long)opsCounts.getLong("op_list_status"));
-  }
+        (long)opsCounts.getLong(LIST_STATUS));
+    // None of the underlying files changed so we should not do any ops for the files.
+    assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
 
+    // Reloading a specific partition should not make an RPC per file
+    // (regression test for IMPALA-7047).
+    stats.reset();
+    List<TPartitionKeyValue> partitionSpec = ImmutableList.of(
+        new TPartitionKeyValue("year", "2010"),
+        new TPartitionKeyValue("month", "10"));
+    catalog_.reloadPartition(table, partitionSpec);
+    assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
+
+    // Loading or reloading an unpartitioned table with some files in it should not make
+    // an RPC per file.
+    stats.reset();
+    HdfsTable unpartTable = (HdfsTable)catalog_.getOrLoadTable(
+        "functional", "alltypesaggmultifilesnopart");
+    assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
+    stats.reset();
+    catalog_.reloadTable(unpartTable);
+    assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
+
+    // Simulate an empty partition, which will trigger the full
+    // reload path. Since we can't modify HDFS itself via these tests, we
+    // do the next best thing: modify the metadata to revise history as
+    // though the partition used above were actually empty.
+    HdfsPartition hdfsPartition = table
+        .getPartitionFromThriftPartitionSpec(partitionSpec);
+    hdfsPartition.setFileDescriptors(new ArrayList<>());
+    stats.reset();
+    catalog_.reloadPartition(table, partitionSpec);
+
+    // Should not scan the directory file-by-file, should use a single
+    // listLocatedStatus() to get the whole directory (partition)
+    assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
+    seenCalls = opsCounts.getLong(LIST_LOCATED_STATUS) +
+        opsCounts.getLong(LIST_STATUS);
+    assertEquals(1, seenCalls);
+  }
 
   @Test
   public void TestPartitions() throws CatalogException {
