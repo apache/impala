@@ -221,6 +221,7 @@ under the License.
           <topicref rev="2.5.0" href="topics/impala_runtime_filter_mode.xml"/>
           <topicref rev="2.5.0" href="topics/impala_runtime_filter_wait_time_ms.xml"/>
           <topicref rev="2.6.0" href="topics/impala_s3_skip_insert_staging.xml"/>
+          <topicref rev="3.1" href="topics/impala_scan_bytes_limit.xml"/>
           <topicref rev="2.5.0" href="topics/impala_schedule_random_replica.xml"/>
           <topicref rev="2.8.0 IMPALA-3671" href="topics/impala_scratch_limit.xml"/>
           <!-- This option is for internal use only and might go away without ever being documented. -->

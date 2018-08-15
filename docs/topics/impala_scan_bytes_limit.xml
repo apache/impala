@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="scan_bytes_limit">
+
+  <title>SCAN_BYTES_LIMIT Query Option (<keyword keyref="impala31"/> or higher
+    only)</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>SCAN_BYTES_LIMIT</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Scalability"/>
+      <data name="Category" value="Memory"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>SCAN_BYTES_LIMIT</codeph> query option sets a time limit on the bytes scanned
+      by HDFS and HBase SCAN operations. If a query is still executing when the query’s
+      coordinator detects that it has exceeded the limit, the query is terminated with an error.
+      The option is intended to prevent runaway queries that scan more data than is intended.
+    </p>
+
+    <p>
+      For example, an Impala administrator could set a default value of
+      <codeph>SCAN_BYTES_LIMIT=100GB</codeph> for a resource pool to automatically kill queries
+      that scan more than 100 GB of data (see
+      <xref
+        href="https://impala.apache.org/docs/build/html/topics/impala_admission.html"
+        format="html" scope="external">Impala
+      Admission Control and Query Queuing</xref> for information about default query options).
+      If a user accidentally omits a partition filter in a <codeph>WHERE</codeph> clause and
+      runs a large query that scans a lot of data, the query will be automatically terminated
+      after the time limit expires to free up resources.
+    </p>
+
+    <p>
+      You can override the default value per-query or per-session, in the same way as other
+      query options, if you do not want the default <codeph>SCAN_BYTES_LIMIT</codeph> value to
+      apply to a specific query or session.
+      <note>
+        <ul>
+          <li dir="ltr">
+            <p dir="ltr">
+              Only data actually read from the underlying storage layer is counted towards the
+              limit. E.g. Impala’s Parquet scanner employs several techniques to skip over
+              data in a file that is not relevant to a specific query, so often only a fraction
+              of the file size is counted towards <codeph>SCAN_BYTES_LIMIT</codeph>.
+            </p>
+          </li>
+
+          <li dir="ltr">
+            <p dir="ltr">
+              As of Impala 3.1, bytes scanned by Kudu tablet servers are not counted towards the
+              limit.
+            </p>
+          </li>
+        </ul>
+      </note>
+    </p>
+
+    <p>
+      <b>Syntax:</b> <codeph>SET SCAN_BYTES_LIMIT=bytes;</codeph>
+    </p>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p>
+      <b>Units:</b>
+      <ul>
+        <li>
+          A numeric argument represents memory size in bytes.
+        </li>
+
+        <li>
+          Specify a suffix of <codeph>m</codeph> or <codeph>mb</codeph> for megabytes.
+        </li>
+
+        <li>
+          Specify a suffix of <codeph>g</codeph> or <codeph>gb</codeph> for gigabytes.
+        </li>
+
+        <li>
+          If you specify a suffix with unrecognized formats, subsequent queries fail with an
+          error.
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>0</codeph> (no limit)
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala31"/>
+    </p>
+
+  </conbody>
+
+</concept>
