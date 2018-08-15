@@ -266,9 +266,6 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
 // HiveServer2 API
 void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     const TOpenSessionReq& request) {
-  // DO NOT log this Thrift struct in its entirety, in case a bad client sets the
-  // password.
-  VLOG_QUERY << "OpenSession(): username=" << request.username;
 
   // Generate session ID and the secret
   TUniqueId session_id;
@@ -284,6 +281,12 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     return_val.__isset.sessionHandle = true;
     UUIDToTUniqueId(session_uuid, &session_id);
   }
+
+  // DO NOT log this Thrift struct in its entirety, in case a bad client sets the
+  // password.
+  VLOG_QUERY << "Opening session: " << PrintId(session_id) << " username: "
+             << request.username;
+
   // create a session state: initialize start time, session type, database and default
   // query options.
   // TODO: put secret in session state map and check it
@@ -329,7 +332,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
             &state->set_query_options_mask);
         if (status.ok() && iequals(v.first, "idle_session_timeout")) {
           state->session_timeout = state->set_query_options.idle_session_timeout;
-          VLOG_QUERY << "OpenSession(): idle_session_timeout="
+          VLOG_QUERY << "OpenSession(): session: " << PrintId(session_id)
+                     <<" idle_session_timeout="
                      << PrettyPrinter::Print(state->session_timeout, TUnit::TIME_S);
         }
       }
@@ -360,6 +364,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   return_val.__isset.configuration = true;
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
   return_val.serverProtocolVersion = state->hs2_version;
+  VLOG_QUERY << "Opened session: " << PrintId(session_id) << " username: "
+             << request.username;
 }
 
 void ImpalaServer::CloseSession(TCloseSessionResp& return_val,

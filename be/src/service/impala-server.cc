@@ -1191,6 +1191,8 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id, bool check_inflig
 
 Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     bool ignore_if_absent) {
+  VLOG_QUERY << "Closing session: " << PrintId(session_id);
+
   // Find the session_state and remove it from the map.
   shared_ptr<SessionState> session_state;
   {
@@ -1231,6 +1233,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
   }
   // Reconfigure the poll period of session_timeout_thread_ if necessary.
   UnregisterSessionTimeout(session_state->session_timeout);
+  VLOG_QUERY << "Closed session: " << PrintId(session_id);
   return Status::OK();
 }
 
@@ -1932,39 +1935,44 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
       }
     }
 
-    lock_guard<mutex> map_lock(session_state_map_lock_);
     int64_t now = UnixMillis();
+    int expired_cnt = 0;
     VLOG(3) << "Session expiration thread waking up";
-    // TODO: If holding session_state_map_lock_ for the duration of this loop is too
-    // expensive, consider a priority queue.
-    for (SessionStateMap::value_type& session_state: session_state_map_) {
-      unordered_set<TUniqueId> inflight_queries;
-      {
-        lock_guard<mutex> state_lock(session_state.second->lock);
-        if (session_state.second->ref_count > 0) continue;
-        // A session closed by other means is in the process of being removed, and it's
-        // best not to interfere.
-        if (session_state.second->closed || session_state.second->expired) continue;
-        if (session_state.second->session_timeout == 0) continue;
+    {
+      // TODO: If holding session_state_map_lock_ for the duration of this loop is too
+      // expensive, consider a priority queue.
+      lock_guard<mutex> map_lock(session_state_map_lock_);
+      for (SessionStateMap::value_type& session_state: session_state_map_) {
+        unordered_set<TUniqueId> inflight_queries;
+        {
+          lock_guard<mutex> state_lock(session_state.second->lock);
+          if (session_state.second->ref_count > 0) continue;
+          // A session closed by other means is in the process of being removed, and it's
+          // best not to interfere.
+          if (session_state.second->closed || session_state.second->expired) continue;
+          if (session_state.second->session_timeout == 0) continue;
 
-        int64_t last_accessed_ms = session_state.second->last_accessed_ms;
-        int64_t session_timeout_ms = session_state.second->session_timeout * 1000;
-        if (now - last_accessed_ms <= session_timeout_ms) continue;
-        LOG(INFO) << "Expiring session: " << PrintId(session_state.first) << ", user:"
-                  << session_state.second->connected_user << ", last active: "
-                  << ToStringFromUnixMillis(last_accessed_ms);
-        session_state.second->expired = true;
-        ImpaladMetrics::NUM_SESSIONS_EXPIRED->Increment(1L);
-        // Since expired is true, no more queries will be added to the inflight list.
-        inflight_queries.insert(session_state.second->inflight_queries.begin(),
-            session_state.second->inflight_queries.end());
-      }
-      // Unregister all open queries from this session.
-      Status status = Status::Expected("Session expired due to inactivity");
-      for (const TUniqueId& query_id: inflight_queries) {
-        cancellation_thread_pool_->Offer(CancellationWork(query_id, status, true));
+          int64_t last_accessed_ms = session_state.second->last_accessed_ms;
+          int64_t session_timeout_ms = session_state.second->session_timeout * 1000;
+          if (now - last_accessed_ms <= session_timeout_ms) continue;
+          LOG(INFO) << "Expiring session: " << PrintId(session_state.first) << ", user: "
+                    << session_state.second->connected_user << ", last active: "
+                    << ToStringFromUnixMillis(last_accessed_ms);
+          session_state.second->expired = true;
+          ++expired_cnt;
+          ImpaladMetrics::NUM_SESSIONS_EXPIRED->Increment(1L);
+          // Since expired is true, no more queries will be added to the inflight list.
+          inflight_queries.insert(session_state.second->inflight_queries.begin(),
+              session_state.second->inflight_queries.end());
+        }
+        // Unregister all open queries from this session.
+        Status status = Status::Expected("Session expired due to inactivity");
+        for (const TUniqueId& query_id: inflight_queries) {
+          cancellation_thread_pool_->Offer(CancellationWork(query_id, status, true));
+        }
       }
     }
+    LOG_IF(INFO, expired_cnt > 0) << "Expired sessions. Count: " << expired_cnt;
   }
 }
 
