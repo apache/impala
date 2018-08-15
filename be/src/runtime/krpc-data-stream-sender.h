@@ -207,13 +207,10 @@ class KrpcDataStreamSender : public DataSink {
   /// Total number of rows sent.
   RuntimeProfile::Counter* total_sent_rows_counter_ = nullptr;
 
-  /// Approximate network throughput for sending row batches.
-  RuntimeProfile::Counter* network_throughput_counter_ = nullptr;
-
-  /// Aggregated time spent in network (including queuing time in KRPC transfer queue)
-  /// for transmitting the RPC requests and receiving the responses. Used for computing
-  /// 'network_throughput_'. Not too meaningful by itself so not shown in profile.
-  RuntimeProfile::Counter total_network_timer_;
+  /// Summary of network throughput for sending row batches. Network time also includes
+  /// queuing time in KRPC transfer queue for transmitting the RPC requests and receiving
+  /// the responses.
+  RuntimeProfile::SummaryStatsCounter* network_throughput_counter_ = nullptr;
 
   /// Identifier of the destination plan node.
   PlanNodeId dest_node_id_;
