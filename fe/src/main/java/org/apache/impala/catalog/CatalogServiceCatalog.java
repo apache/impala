@@ -83,10 +83,12 @@ import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
-import org.slf4j.Logger;
+import org.apache.impala.util.ThreadNameAnnotator;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
@@ -94,7 +96,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -357,28 +358,31 @@ public class CatalogServiceCatalog extends Catalog {
    * when the function returns. Returns false otherwise and no lock is held in this case.
    */
   public boolean tryLockTable(Table tbl) {
-    long begin = System.currentTimeMillis();
-    long end;
-    do {
-      versionLock_.writeLock().lock();
-      if (tbl.getLock().tryLock()) {
-        if (LOG.isTraceEnabled()) {
-          end = System.currentTimeMillis();
-          LOG.trace(String.format("Lock for table %s was acquired in %d msec",
-              tbl.getFullName(), end - begin));
+    try (ThreadNameAnnotator tna = new ThreadNameAnnotator(
+        "Attempting to lock table " + tbl.getFullName())) {
+      long begin = System.currentTimeMillis();
+      long end;
+      do {
+        versionLock_.writeLock().lock();
+        if (tbl.getLock().tryLock()) {
+          if (LOG.isTraceEnabled()) {
+            end = System.currentTimeMillis();
+            LOG.trace(String.format("Lock for table %s was acquired in %d msec",
+                tbl.getFullName(), end - begin));
+          }
+          return true;
         }
-        return true;
-      }
-      versionLock_.writeLock().unlock();
-      try {
-        // Sleep to avoid spinning and allow other operations to make progress.
-        Thread.sleep(TBL_LOCK_RETRY_MS);
-      } catch (InterruptedException e) {
-        // ignore
-      }
-      end = System.currentTimeMillis();
-    } while (end - begin < TBL_LOCK_TIMEOUT_MS);
-    return false;
+        versionLock_.writeLock().unlock();
+        try {
+          // Sleep to avoid spinning and allow other operations to make progress.
+          Thread.sleep(TBL_LOCK_RETRY_MS);
+        } catch (InterruptedException e) {
+          // ignore
+        }
+        end = System.currentTimeMillis();
+      } while (end - begin < TBL_LOCK_TIMEOUT_MS);
+      return false;
+    }
   }
 
   /**
@@ -1305,14 +1309,20 @@ public class CatalogServiceCatalog extends Catalog {
       Map<String, Db> newDbCache = new ConcurrentHashMap<String, Db>();
       List<TTableName> tblsToBackgroundLoad = new ArrayList<>();
       try (MetaStoreClient msClient = getMetaStoreClient()) {
-        for (String dbName: msClient.getHiveClient().getAllDatabases()) {
-          dbName = dbName.toLowerCase();
-          Db oldDb = oldDbCache.get(dbName);
-          Pair<Db, List<TTableName>> invalidatedDb = invalidateDb(msClient,
-              dbName, oldDb);
-          if (invalidatedDb == null) continue;
-          newDbCache.put(dbName, invalidatedDb.first);
-          tblsToBackgroundLoad.addAll(invalidatedDb.second);
+        List<String> allDbs = msClient.getHiveClient().getAllDatabases();
+        int numComplete = 0;
+        for (String dbName: allDbs) {
+          String annotation = String.format("invalidating metadata - %s/%s dbs complete",
+              numComplete++, allDbs.size());
+          try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
+            dbName = dbName.toLowerCase();
+            Db oldDb = oldDbCache.get(dbName);
+            Pair<Db, List<TTableName>> invalidatedDb = invalidateDb(msClient,
+                dbName, oldDb);
+            if (invalidatedDb == null) continue;
+            newDbCache.put(dbName, invalidatedDb.first);
+            tblsToBackgroundLoad.addAll(invalidatedDb.second);
+          }
         }
       }
       dbCache_.set(newDbCache);
@@ -2428,7 +2438,9 @@ public class CatalogServiceCatalog extends Catalog {
       // the timeout exception and the user can monitor the queue metric to see that it
       // is full, so the issue should be easy to diagnose.
       // TODO: Figure out if such a race is possible.
-      try {
+      try (ThreadNameAnnotator tna = new ThreadNameAnnotator(
+            "Get Partial Catalog Object - " +
+            Catalog.toCatalogObjectKey(req.object_desc))) {
         return doGetPartialCatalogObject(req);
       } finally {
         partialObjectFetchAccess_.release();

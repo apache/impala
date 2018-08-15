@@ -91,6 +91,7 @@ import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.TAccessLevelUtil;
 import org.apache.impala.util.TResultRowBuilder;
+import org.apache.impala.util.ThreadNameAnnotator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -338,14 +339,16 @@ public class HdfsTable extends Table implements FeFsTable {
 
     @Override
     public FileMetadataLoadStats call() throws IOException {
-      FileMetadataLoadStats loadingStats =
-          reuseFileMd_ ? refreshFileMetadata(hdfsPath_, partitionList_) :
-          resetAndLoadFileMetadata(hdfsPath_, partitionList_);
-      return loadingStats;
+      try (ThreadNameAnnotator tna = new ThreadNameAnnotator(debugString())) {
+        FileMetadataLoadStats loadingStats =
+            reuseFileMd_ ? refreshFileMetadata(hdfsPath_, partitionList_) :
+            resetAndLoadFileMetadata(hdfsPath_, partitionList_);
+        return loadingStats;
+      }
     }
 
-    public String debugString() {
-      String loadType = reuseFileMd_ ? "Refreshed" : "Loaded";
+    private String debugString() {
+      String loadType = reuseFileMd_ ? "Refreshing" : "Loading";
       return String.format("%s file metadata for path: %s", loadType,
           hdfsPath_.toString());
     }
@@ -560,7 +563,9 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   private void refreshPartitionFileMetadata(HdfsPartition partition)
       throws CatalogException {
-    try {
+    String annotation = String.format("refreshing table %s partition %s",
+        getFullName(), partition.getPartitionName());
+    try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
       Path partDir = partition.getLocationPath();
       // If there are no existing files in the partition, use the non-incremental path.
       boolean useExistingFds = partition.hasFileDescriptors();
@@ -1205,7 +1210,11 @@ public class HdfsTable extends Table implements FeFsTable {
       Set<String> partitionsToUpdate) throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
-    try {
+    String annotation = String.format("%s metadata for %s partition(s) of %s.%s",
+        reuseMetadata ? "Reloading" : "Loading",
+        partitionsToUpdate == null ? "all" : String.valueOf(partitionsToUpdate.size()),
+        msTbl.getDbName(), msTbl.getTableName());
+    try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
       // turn all exceptions into TableLoadingException
       msTable_ = msTbl;
       try {
