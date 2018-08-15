@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="thread_reservation_aggregate_limit">
+
+  <title>THREAD_RESERVATION_AGGREGATE_LIMIT Query Option (<keyword
+      keyref="impala31"/>or higher only)</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>THREAD_RESERVATION_AGGREGATE_LIMIT</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Scalability"/>
+      <data name="Category" value="Memory"/>
+      <data name="Category" value="Troubleshooting"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>THREAD_RESERVATION_AGGREGATE_LIMIT</codeph> query option limits the number of
+      reserved threads for a query across all nodes on which it is executing. The option is
+      intended to prevent execution of complex queries that can consume excessive CPU or
+      operating system resources on a cluster. Queries that have more threads than this
+      threshold are rejected by Impala’s admission controller before they start executing.
+    </p>
+
+    <p>
+      For example, an Impala administrator could set a default value of
+      <codeph>THREAD_RESERVATION_AGGREGATE_LIMIT=2000</codeph> for a resource pool on a 100 node
+      where they expect only relatively simple queries with less than 20 threads per node to
+      run. This will reject queries that require more than 2000 reserved threads across all
+      nodes, for example a query with 21 fragments running on all 100 nodes of the cluster.
+    </p>
+
+    <p>
+      You can override the default value per-query or per-session, in the same way as other
+      query options, if you do not want the default
+      <codeph>THREAD_RESERVATION_AGGREGATE_LIMIT</codeph> value to apply to a specific query or
+      session.
+    </p>
+
+    <p>
+      <b>Syntax:</b> <codeph>SET THREAD_RESERVATION_AGGREGATE_LIMIT=number;</codeph>
+    </p>
+
+    <p>
+      <b>Type:</b> numeric
+    </p>
+
+    <p>
+      <b>Default:</b> 0 (no limit)
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala31"/>
+    </p>
+
+  </conbody>
+
+</concept>

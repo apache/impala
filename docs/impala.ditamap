@@ -228,6 +228,8 @@ under the License.
           <topicref href="topics/impala_shuffle_distinct_exprs.xml"/>
           <topicref href="topics/impala_support_start_over.xml"/>
           <topicref href="topics/impala_sync_ddl.xml"/>
+          <topicref href="topics/impala_thread_reservation_aggregate_limit.xml"/>
+          <topicref href="topics/impala_thread_reservation_limit.xml"/>
         </topicref>
       </topicref>
       <topicref href="topics/impala_show.xml"/>
