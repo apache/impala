@@ -64,7 +64,8 @@ public enum Privilege {
         ALTER.getCode() |
         CREATE.getCode() |
         DROP.getCode() |
-        REFRESH.getCode());
+        REFRESH.getCode()),
+    OWNER("owner", ALL.getCode());
 
     private final BitFieldAction bitFieldAction_;
 

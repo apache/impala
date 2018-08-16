@@ -57,7 +57,8 @@ public class ImpalaActionFactoryTest {
          ImpalaAction.CREATE,
          ImpalaAction.DROP,
          ImpalaAction.REFRESH,
-         ImpalaAction.ALL);
+         ImpalaAction.ALL,
+         ImpalaAction.OWNER);
      assertBitFieldActions(expected, actual);
 
     actual = factory.getActionsByCode(ImpalaAction.ALL.getCode());
@@ -68,7 +69,8 @@ public class ImpalaActionFactoryTest {
         ImpalaAction.CREATE,
         ImpalaAction.DROP,
         ImpalaAction.REFRESH,
-        ImpalaAction.ALL);
+        ImpalaAction.ALL,
+        ImpalaAction.OWNER);
     assertBitFieldActions(expected, actual);
 
     try {
