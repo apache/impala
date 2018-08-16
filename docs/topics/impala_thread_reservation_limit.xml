@@ -20,7 +20,8 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept id="thread_reservation_limit">
 
-  <title>THREAD_RESERVATION_LIMIT Query Option (<keyword keyref="impala31"/>or higher only)</title>
+  <title>THREAD_RESERVATION_LIMIT Query Option (<keyword keyref="impala31"/> or
+    higher only)</title>
 
   <titlealts audience="PDF">
 

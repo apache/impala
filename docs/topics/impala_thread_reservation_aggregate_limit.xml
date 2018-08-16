@@ -21,7 +21,7 @@ under the License.
 <concept id="thread_reservation_aggregate_limit">
 
   <title>THREAD_RESERVATION_AGGREGATE_LIMIT Query Option (<keyword
-      keyref="impala31"/>or higher only)</title>
+      keyref="impala31"/> or higher only)</title>
 
   <titlealts audience="PDF">
 
