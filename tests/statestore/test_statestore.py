@@ -378,6 +378,55 @@ class TestStatestore():
          .wait_for_update(topic_name, 3)
     )
 
+  def test_filter_prefix(self):
+    topic_name = "topic_delta_%s" % uuid.uuid1()
+
+    def topic_update_correct(sub, args):
+      foo_delta = self.make_topic_update(topic_name, num_updates=1)
+      bar_delta = self.make_topic_update(topic_name, num_updates=2, key_template='bar')
+
+      update_count = sub.update_counts[topic_name]
+      if topic_name not in args.topic_deltas:
+        # The update doesn't contain our topic.
+        pass
+      elif update_count == 1:
+        # Send some values with both prefixes.
+        return TUpdateStateResponse(status=STATUS_OK,
+                                    topic_updates=[foo_delta, bar_delta],
+                                    skipped=False)
+      elif update_count == 2:
+        # We should only get the 'bar' entries back.
+        assert len(args.topic_deltas) == 1, args.topic_deltas
+        assert args.topic_deltas[topic_name].topic_entries == bar_delta.topic_entries
+        assert args.topic_deltas[topic_name].topic_name == bar_delta.topic_name
+      elif update_count == 3:
+        # Send some more updates that only have 'foo' prefixes.
+        return TUpdateStateResponse(status=STATUS_OK,
+                                    topic_updates=[foo_delta],
+                                    skipped=False)
+      elif update_count == 4:
+        # We shouldn't see any entries from the above update, but we should still see
+        # the version number change due to the new entries in the topic.
+        assert len(args.topic_deltas[topic_name].topic_entries) == 0
+        assert args.topic_deltas[topic_name].from_version == 3
+        assert args.topic_deltas[topic_name].to_version == 4
+      elif update_count == 5:
+        # After the content-bearing update was processed, the next delta should be empty
+        assert len(args.topic_deltas[topic_name].topic_entries) == 0
+        assert args.topic_deltas[topic_name].from_version == 4
+        assert args.topic_deltas[topic_name].to_version == 4
+
+      return DEFAULT_UPDATE_STATE_RESPONSE
+
+    sub = StatestoreSubscriber(update_cb=topic_update_correct)
+    reg = TTopicRegistration(topic_name=topic_name, is_transient=False,
+                             filter_prefix="bar")
+    (
+      sub.start()
+         .register(topics=[reg])
+         .wait_for_update(topic_name, 5)
+    )
+
   def test_update_is_delta(self):
     """Test that the 'is_delta' flag is correctly set. The first update for a topic should
     always not be a delta, and so should all subsequent updates until the subscriber says

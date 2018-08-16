@@ -112,7 +112,8 @@ class StatestoreSubscriber {
   /// Must be called before Start(), in which case it will return
   /// Status::OK. Otherwise an error will be returned.
   Status AddTopic(const Statestore::TopicId& topic_id, bool is_transient,
-      bool populate_min_subscriber_topic_version, const UpdateCallback& callback);
+      bool populate_min_subscriber_topic_version, std::string filter_prefix,
+      const UpdateCallback& callback);
 
   /// Registers this subscriber with the statestore, and starts the
   /// heartbeat service, as well as a thread to check for failure and
@@ -219,6 +220,9 @@ class StatestoreSubscriber {
     /// Whether this subscriber needs the min_subscriber_topic_version field to be filled
     /// in on updates.
     bool populate_min_subscriber_topic_version = false;
+
+    /// Only subscribe to keys with the provided prefix.
+    string filter_prefix;
 
     /// The last version of the topic this subscriber processed.
     /// -1 if no updates have been processed yet.

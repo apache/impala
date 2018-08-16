@@ -204,7 +204,14 @@ Status CatalogServer::Start() {
 
   StatestoreSubscriber::UpdateCallback cb =
       bind<void>(mem_fn(&CatalogServer::UpdateCatalogTopicCallback), this, _1, _2);
-  status = statestore_subscriber_->AddTopic(IMPALA_CATALOG_TOPIC, false, false, cb);
+  // The catalogd never needs to read any entries from the topic. It only publishes
+  // entries. So, we set a prefix to some random character that we know won't be a
+  // prefix of any key. This saves a bit of network communication from the statestore
+  // back to the catalog.
+  string filter_prefix = "!";
+  status = statestore_subscriber_->AddTopic(IMPALA_CATALOG_TOPIC,
+      /* is_transient=*/ false, /* populate_min_subscriber_topic_version=*/ false,
+      filter_prefix, cb);
   if (!status.ok()) {
     status.AddDetail("CatalogService failed to start");
     return status;

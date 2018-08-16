@@ -84,7 +84,9 @@ Status Scheduler::Init(const TNetworkAddress& backend_address,
     StatestoreSubscriber::UpdateCallback cb =
         bind<void>(mem_fn(&Scheduler::UpdateMembership), this, _1, _2);
     Status status = statestore_subscriber_->AddTopic(
-        Statestore::IMPALA_MEMBERSHIP_TOPIC, true, false, cb);
+        Statestore::IMPALA_MEMBERSHIP_TOPIC, /* is_transient=*/ true,
+        /* populate_min_subscriber_topic_version=*/ false,
+        /* filter_prefix= */"", cb);
     if (!status.ok()) {
       status.AddDetail("Scheduler failed to register membership topic");
       return status;

@@ -43,6 +43,8 @@ using boost::posix_time::seconds;
 using boost::shared_lock;
 using boost::shared_mutex;
 using boost::try_to_lock;
+using std::string;
+
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
 using namespace strings;
@@ -105,7 +107,7 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
   StatestoreSubscriber* subscriber_;
 };
 
-StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
+StatestoreSubscriber::StatestoreSubscriber(const string& subscriber_id,
     const TNetworkAddress& heartbeat_address, const TNetworkAddress& statestore_address,
     MetricGroup* metrics)
     : subscriber_id_(subscriber_id),
@@ -139,7 +141,7 @@ StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
 
 Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
     bool is_transient, bool populate_min_subscriber_topic_version,
-    const UpdateCallback& callback) {
+    string filter_prefix, const UpdateCallback& callback) {
   lock_guard<shared_mutex> exclusive_lock(lock_);
   if (is_registered_) return Status("Subscriber already started, can't add new topic");
   TopicRegistration& registration = topic_registrations_[topic_id];
@@ -154,6 +156,7 @@ Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
   registration.is_transient = is_transient;
   registration.populate_min_subscriber_topic_version =
       populate_min_subscriber_topic_version;
+  registration.filter_prefix = std::move(filter_prefix);
   return Status::OK();
 }
 
@@ -169,6 +172,7 @@ Status StatestoreSubscriber::Register() {
     thrift_topic.is_transient = registration.second.is_transient;
     thrift_topic.populate_min_subscriber_topic_version =
         registration.second.populate_min_subscriber_topic_version;
+    thrift_topic.__set_filter_prefix(registration.second.filter_prefix);
     request.topic_registrations.push_back(thrift_topic);
   }
 

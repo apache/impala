@@ -97,6 +97,13 @@ typedef TUniqueId RegistrationId;
 /// subscriber, rather than all items in the topic.  For non-delta updates, the statestore
 /// will send an update that includes all values in the topic.
 ///
+/// Subscribers may filter the keys within a subscribed topic by an optional prefix. If
+/// a key filter prefix is specified, only entries matching that prefix will be sent to
+/// the subscriber in updates. Note that this may result in empty updates being sent
+/// to subscribers in the case that all updated keys have been excluded by the filter.
+/// These empty updates are important so that subscribers can keep track of the current
+/// version number and report back their progress in receiving the topic contents.
+///
 /// +================+
 /// | Implementation |
 /// +================+
@@ -262,12 +269,14 @@ class Statestore : public CacheLineAligned {
     void DeleteIfVersionsMatch(TopicEntry::Version version, const TopicEntryKey& key);
 
     /// Build a delta update to send to 'subscriber_id' including the deltas greater
-    /// than 'last_processed_version' (not inclusive).
+    /// than 'last_processed_version' (not inclusive). Only those items whose keys
+    /// start with 'filter_prefix' are included in the update.
     ///
     /// Safe to call concurrently from multiple threads (for different subscribers).
     /// Acquires a shared read lock for the topic.
     void BuildDelta(const SubscriberId& subscriber_id,
-        TopicEntry::Version last_processed_version, TTopicDelta* delta);
+        TopicEntry::Version last_processed_version, const std::string& filter_prefix,
+        TTopicDelta* delta);
 
     /// Adds entries representing the current topic state to 'topic_json'.
     void ToJson(rapidjson::Document* document, rapidjson::Value* topic_json);
@@ -335,9 +344,11 @@ class Statestore : public CacheLineAligned {
 
     /// Information about a subscriber's subscription to a specific topic.
     struct TopicSubscription {
-      TopicSubscription(bool is_transient, bool populate_min_subscriber_topic_version)
+      TopicSubscription(bool is_transient, bool populate_min_subscriber_topic_version,
+          std::string filter_prefix)
         : is_transient(is_transient),
-          populate_min_subscriber_topic_version(populate_min_subscriber_topic_version) {}
+          populate_min_subscriber_topic_version(populate_min_subscriber_topic_version),
+          filter_prefix(std::move(filter_prefix)) {}
 
       /// Whether entries written by this subscriber should be considered transient.
       const bool is_transient;
@@ -345,6 +356,9 @@ class Statestore : public CacheLineAligned {
       /// Whether min_subscriber_topic_version needs to be filled in for this
       /// subscription.
       const bool populate_min_subscriber_topic_version;
+
+      /// The prefix for which the subscriber wants to see updates.
+      const std::string filter_prefix;
 
       /// The last topic entry version successfully processed by this subscriber. Only
       /// written by a single thread at a time but can be read concurrently.

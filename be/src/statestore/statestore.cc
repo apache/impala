@@ -25,6 +25,7 @@
 #include <boost/thread.hpp>
 #include <thrift/Thrift.h>
 #include <gutil/strings/substitute.h>
+#include <gutil/strings/util.h>
 
 #include "common/status.h"
 #include "gen-cpp/StatestoreService_types.h"
@@ -232,7 +233,8 @@ void Statestore::Topic::ClearAllEntries() {
 }
 
 void Statestore::Topic::BuildDelta(const SubscriberId& subscriber_id,
-    TopicEntry::Version last_processed_version, TTopicDelta* delta) {
+    TopicEntry::Version last_processed_version,
+    const string& filter_prefix, TTopicDelta* delta) {
   // If the subscriber version is > 0, send this update as a delta. Otherwise, this is
   // a new subscriber so send them a non-delta update that includes all entries in the
   // topic.
@@ -253,6 +255,9 @@ void Statestore::Topic::BuildDelta(const SubscriberId& subscriber_id,
       if (!delta->is_delta && topic_entry.is_deleted()) {
         continue;
       }
+      // Skip any entries that don't match the requested prefix.
+      if (!HasPrefixString(itr->first, filter_prefix)) continue;
+
       delta->topic_entries.push_back(TTopicItem());
       TTopicItem& delta_entry = delta->topic_entries.back();
       delta_entry.key = itr->first;
@@ -314,7 +319,8 @@ Statestore::Subscriber::Subscriber(const SubscriberId& subscriber_id,
     GetTopicsMapForId(topic.topic_name)
         ->emplace(piecewise_construct, forward_as_tuple(topic.topic_name),
             forward_as_tuple(
-                topic.is_transient, topic.populate_min_subscriber_topic_version));
+                topic.is_transient, topic.populate_min_subscriber_topic_version,
+                topic.filter_prefix));
   }
 }
 
@@ -752,7 +758,8 @@ void Statestore::GatherTopicUpdates(const Subscriber& subscriber, UpdateKind upd
       TTopicDelta& topic_delta =
           update_state_request->topic_deltas[subscribed_topic.first];
       topic_delta.topic_name = subscribed_topic.first;
-      topic_it->second.BuildDelta(subscriber.id(), last_processed_version, &topic_delta);
+      topic_it->second.BuildDelta(subscriber.id(), last_processed_version,
+          subscribed_topic.second.filter_prefix, &topic_delta);
       if (subscribed_topic.second.populate_min_subscriber_topic_version) {
         deltas_needing_min_version.push_back(&topic_delta);
       }

@@ -246,7 +246,9 @@ Status AdmissionController::Init() {
       const StatestoreSubscriber::TopicDeltaMap& state,
       vector<TTopicDelta>* topic_updates) { UpdatePoolStats(state, topic_updates); };
   Status status =
-      subscriber_->AddTopic(Statestore::IMPALA_REQUEST_QUEUE_TOPIC, true, false, cb);
+      subscriber_->AddTopic(Statestore::IMPALA_REQUEST_QUEUE_TOPIC,
+          /* is_transient=*/ true, /* populate_min_subscriber_topic_version=*/ false,
+          /* filter_prefix=*/"", cb);
   if (!status.ok()) {
     status.AddDetail("AdmissionController failed to register request queue topic");
   }

@@ -145,6 +145,12 @@ struct TTopicRegistration {
   // actually required - computing the version is relatively expensive compared to
   // other aspects of preparing topic updates - see IMPALA-6816.
   3: required bool populate_min_subscriber_topic_version = false;
+
+  // Restrict the items to receive on this subscription to only those items
+  // starting with the given prefix.
+  //
+  // If this is not specified, all items will be subscribed to.
+  4: optional string filter_prefix
 }
 
 struct TRegisterSubscriberRequest {

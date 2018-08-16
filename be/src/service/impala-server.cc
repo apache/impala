@@ -362,15 +362,19 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       this->MembershipCallback(state, topic_updates);
     };
     ABORT_IF_ERROR(exec_env->subscriber()->AddTopic(
-        Statestore::IMPALA_MEMBERSHIP_TOPIC, true, false, cb));
+        Statestore::IMPALA_MEMBERSHIP_TOPIC, /* is_transient=*/ true,
+        /* populate_min_subscriber_topic_version=*/ false,
+        /* filter_prefix=*/"", cb));
 
-    if (FLAGS_is_coordinator && !FLAGS_use_local_catalog) {
+    if (FLAGS_is_coordinator) {
       auto catalog_cb = [this] (const StatestoreSubscriber::TopicDeltaMap& state,
           vector<TTopicDelta>* topic_updates) {
         this->CatalogUpdateCallback(state, topic_updates);
       };
       ABORT_IF_ERROR(exec_env->subscriber()->AddTopic(
-          CatalogServer::IMPALA_CATALOG_TOPIC, true, true, catalog_cb));
+          CatalogServer::IMPALA_CATALOG_TOPIC, /* is_transient=*/ true,
+          /* populate_min_subscriber_topic_version=*/ true, /* filter_prefix=*/ "",
+          catalog_cb));
     }
   }
 
