@@ -303,6 +303,11 @@ under the License.
           <groupId>org.apache.logging.log4j</groupId>
           <artifactId>log4j-slf4j-impl</artifactId>
         </exclusion>
+        <!-- Similarly, avoid pulling in the "Log4j 1.2 Bridge" -->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-1.2-api</artifactId>
+        </exclusion>
         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
         <exclusion>
           <groupId>net.minidev</groupId>
@@ -320,6 +325,11 @@ under the License.
         <exclusion>
           <groupId>org.apache.logging.log4j</groupId>
           <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
+        <!-- Similarly, avoid pulling in the "Log4j 1.2 Bridge" -->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-1.2-api</artifactId>
         </exclusion>
         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
         <exclusion>
@@ -695,6 +705,7 @@ under the License.
                 <bannedDependencies>
                   <excludes>
                     <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
+                    <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
                     <!-- Assert that we only use artifacts from only the specified
                          version of these components. -->
                     <exclude>org.apache.hadoop:*</exclude>
