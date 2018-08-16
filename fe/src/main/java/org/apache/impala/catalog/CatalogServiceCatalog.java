@@ -1628,6 +1628,16 @@ public class CatalogServiceCatalog extends Catalog {
     return removePrincipalPrivilege(roleName, thriftPriv, TPrincipalType.ROLE);
   }
 
+  /**
+   * Removes a PrincipalPrivilege from the given user name. Returns the removed
+   * PrincipalPrivilege with an incremented catalog version or null if no matching
+   * privilege was found. Throws a CatalogException if no user exists with this name.
+   */
+  public PrincipalPrivilege removeUserPrivilege(String userName, TPrivilege thriftPriv)
+      throws CatalogException {
+    return removePrincipalPrivilege(userName, thriftPriv, TPrincipalType.USER);
+  }
+
   private PrincipalPrivilege removePrincipalPrivilege(String principalName,
       TPrivilege privilege, TPrincipalType type) throws CatalogException {
     versionLock_.writeLock().lock();

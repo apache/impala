@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.impala.catalog.AuthorizationException;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.thrift.TPrincipalType;
@@ -117,87 +118,151 @@ public class SentryProxy {
 
     public void run() {
       synchronized (SentryProxy.this) {
-        // Assume all roles should be removed. Then query the Policy Service and remove
-        // roles from this set that actually exist.
-        Set<String> rolesToRemove = catalog_.getAuthPolicy().getAllRoleNames();
+        Set<String> rolesToRemove;
+        Set<String> usersToRemove;
+        long startTime = System.currentTimeMillis();
         try {
-          // Read the full policy, adding new/modified roles to "updatedRoles".
-          for (TSentryRole sentryRole:
-              sentryPolicyService_.listAllRoles(processUser_)) {
-            // This role exists and should not be removed, delete it from the
-            // rolesToRemove set.
-            rolesToRemove.remove(sentryRole.getRoleName().toLowerCase());
-
-            Set<String> grantGroups = Sets.newHashSet();
-            for (TSentryGroup group: sentryRole.getGroups()) {
-              grantGroups.add(group.getGroupName());
-            }
-            Role existingRole =
-                catalog_.getAuthPolicy().getRole(sentryRole.getRoleName());
-            Role role;
-            // These roles are the same, use the current role.
-            if (existingRole != null &&
-                existingRole.getGrantGroups().equals(grantGroups)) {
-              role = existingRole;
-              if (resetVersions_) {
-                role.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
-              }
-            } else {
-              role = catalog_.addRole(sentryRole.getRoleName(), grantGroups);
-            }
-            // Assume all privileges should be removed. Privileges that still exist are
-            // deleted from this set and we are left with the set of privileges that need
-            // to be removed.
-            Set<String> privilegesToRemove = role.getPrivilegeNames();
-            List<TSentryPrivilege> sentryPrivlist = Lists.newArrayList();
-
-            try {
-              sentryPrivlist =
-                sentryPolicyService_.listRolePrivileges(processUser_, role.getName());
-            } catch (ImpalaException e) {
-              String roleName = role.getName() != null ? role.getName(): "null";
-              LOG.error("Error listing the role name: " + roleName, e);
-            }
-
-            // Check all the privileges that are part of this role.
-            for (TSentryPrivilege sentryPriv: sentryPrivlist) {
-              TPrivilege thriftPriv =
-                  SentryPolicyService.sentryPrivilegeToTPrivilege(sentryPriv);
-              thriftPriv.setPrincipal_id(role.getId());
-              thriftPriv.setPrincipal_type(TPrincipalType.ROLE);
-
-              privilegesToRemove.remove(thriftPriv.getPrivilege_name().toLowerCase());
-
-              PrincipalPrivilege existingRolePriv =
-                  role.getPrivilege(thriftPriv.getPrivilege_name());
-              // We already know about this privilege (privileges cannot be modified).
-              if (existingRolePriv != null &&
-                  existingRolePriv.getCreateTimeMs() == sentryPriv.getCreateTime()) {
-                if (resetVersions_) {
-                  existingRolePriv.setCatalogVersion(
-                      catalog_.incrementAndGetCatalogVersion());
-                }
-                continue;
-              }
-              catalog_.addRolePrivilege(role.getName(), thriftPriv);
-            }
-
-            // Remove the privileges that no longer exist.
-            for (String privilegeName: privilegesToRemove) {
-              TPrivilege privilege = new TPrivilege();
-              privilege.setPrivilege_name(privilegeName);
-              catalog_.removeRolePrivilege(role.getName(), privilege);
-            }
-          }
+          rolesToRemove = refreshRolePrivileges();
+          usersToRemove = refreshUserPrivileges();
         } catch (Exception e) {
           LOG.error("Error refreshing Sentry policy: ", e);
           return;
+        } finally {
+          LOG.debug("Refreshing Sentry policy took " +
+              (System.currentTimeMillis() - startTime) + "ms");
         }
 
         // Remove all the roles, incrementing the catalog version to indicate
         // a change.
         for (String roleName: rolesToRemove) {
           catalog_.removeRole(roleName);
+        }
+        // Remove all the users, incrementing the catalog version to indicate
+        // a change.
+        for (String userName: usersToRemove) {
+          catalog_.removeUser(userName);
+        }
+      }
+    }
+
+    /**
+     * Updates all roles and their associated privileges in the catalog by adding,
+     * removing, and replacing the catalog objects to match those in Sentry since
+     * the last sentry sync update. This method returns a list of roles to be removed.
+     */
+    private Set<String> refreshRolePrivileges() throws ImpalaException {
+      // Assume all roles should be removed. Then query the Policy Service and remove
+      // roles from this set that actually exist.
+      Set<String> rolesToRemove = catalog_.getAuthPolicy().getAllRoleNames();
+      Map<String, Set<TSentryPrivilege>> allRolesPrivileges =
+          sentryPolicyService_.listAllRolesPrivileges(processUser_);
+      // Read the full policy, adding new/modified roles to "updatedRoles".
+      for (TSentryRole sentryRole:
+          sentryPolicyService_.listAllRoles(processUser_)) {
+        // This role exists and should not be removed, delete it from the
+        // rolesToRemove set.
+        rolesToRemove.remove(sentryRole.getRoleName().toLowerCase());
+
+        Set<String> grantGroups = Sets.newHashSet();
+        for (TSentryGroup group: sentryRole.getGroups()) {
+          grantGroups.add(group.getGroupName());
+        }
+        Role existingRole =
+            catalog_.getAuthPolicy().getRole(sentryRole.getRoleName());
+        Role role;
+        // These roles are the same, use the current role.
+        if (existingRole != null &&
+            existingRole.getGrantGroups().equals(grantGroups)) {
+          role = existingRole;
+          if (resetVersions_) {
+            role.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
+          }
+        } else {
+          role = catalog_.addRole(sentryRole.getRoleName(), grantGroups);
+        }
+        refreshPrivilegesInCatalog(role, allRolesPrivileges);
+      }
+      return rolesToRemove;
+    }
+
+    /**
+     * Updates all users and their associated privileges in the catalog by adding,
+     * removing, and replacing the catalog objects to match those in Sentry since the
+     * last Sentry sync update. Take note that we only store the users with privileges
+     * stored in Sentry and not all available users in the system. This method returns a
+     * list of users to be removed. User privileges do not support grant groups.
+     */
+    private Set<String> refreshUserPrivileges() throws ImpalaException {
+      // Assume all users should be removed. Then query the Policy Service and remove
+      // roles from this set that actually exist.
+      Set<String> usersToRemove = catalog_.getAuthPolicy().getAllUserNames();
+      Map<String, Set<TSentryPrivilege>> allUsersPrivileges =
+          sentryPolicyService_.listAllUsersPrivileges(processUser_);
+      for (Map.Entry<String, Set<TSentryPrivilege>> userPrivilegesEntry:
+          allUsersPrivileges.entrySet()) {
+        String userName = userPrivilegesEntry.getKey();
+        // This user exists and should not be removed so remove it from the
+        // usersToRemove set.
+        usersToRemove.remove(userName);
+
+        org.apache.impala.catalog.User existingUser =
+            catalog_.getAuthPolicy().getUser(userName);
+        org.apache.impala.catalog.User user;
+        if (existingUser != null) {
+          user = existingUser;
+          if (resetVersions_) {
+            user.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
+          }
+        } else {
+          user = catalog_.addUser(userName);
+        }
+        refreshPrivilegesInCatalog(user, allUsersPrivileges);
+      }
+      return usersToRemove;
+    }
+
+    /**
+     * Updates the privileges for a given principal in the catalog since the last Sentry
+     * sync update.
+     */
+    private void refreshPrivilegesInCatalog(Principal principal,
+        Map<String, Set<TSentryPrivilege>> allPrincipalPrivileges)
+        throws CatalogException {
+      // Assume all privileges should be removed. Privileges that still exist are
+      // deleted from this set and we are left with the set of privileges that need
+      // to be removed.
+      Set<String> privilegesToRemove = principal.getPrivilegeNames();
+      // Check all the privileges that are part of this principal.
+      for (TSentryPrivilege sentryPriv: allPrincipalPrivileges.get(principal.getName())) {
+        TPrivilege thriftPriv =
+            SentryPolicyService.sentryPrivilegeToTPrivilege(sentryPriv, principal);
+        privilegesToRemove.remove(thriftPriv.getPrivilege_name().toLowerCase());
+        PrincipalPrivilege existingPrincipalPriv =
+            principal.getPrivilege(thriftPriv.getPrivilege_name());
+        // We already know about this privilege (privileges cannot be modified).
+        if (existingPrincipalPriv != null &&
+            existingPrincipalPriv.getCreateTimeMs() == sentryPriv.getCreateTime()) {
+          if (resetVersions_) {
+            existingPrincipalPriv.setCatalogVersion(
+                catalog_.incrementAndGetCatalogVersion());
+          }
+          continue;
+        }
+        if (principal.getPrincipalType() == TPrincipalType.ROLE) {
+          catalog_.addRolePrivilege(principal.getName(), thriftPriv);
+        } else {
+          catalog_.addUserPrivilege(principal.getName(), thriftPriv);
+        }
+      }
+
+      // Remove the privileges that no longer exist.
+      for (String privilegeName: privilegesToRemove) {
+        TPrivilege privilege = new TPrivilege();
+        privilege.setPrivilege_name(privilegeName);
+        if (principal.getPrincipalType() == TPrincipalType.ROLE) {
+          catalog_.removeRolePrivilege(principal.getName(), privilege);
+        } else {
+          catalog_.removeUserPrivilege(principal.getName(), privilege);
         }
       }
     }

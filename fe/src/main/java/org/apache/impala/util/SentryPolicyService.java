@@ -18,8 +18,12 @@
 package org.apache.impala.util;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
+import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.sentry.api.service.thrift.SentryPolicyServiceClient;
 import org.apache.sentry.api.service.thrift.TSentryGrantOption;
 import org.apache.sentry.api.service.thrift.TSentryPrivilege;
@@ -429,9 +433,50 @@ public class SentryPolicyService {
   }
 
   /**
+   * Returns a map of all roles with their associated privileges.
+   */
+  public Map<String, Set<TSentryPrivilege>> listAllRolesPrivileges(User requestingUser)
+      throws ImpalaException {
+    return listAllPrincipalsPrivileges(requestingUser, TPrincipalType.ROLE);
+  }
+
+  /**
+   * Returns a map of all users with their associated privileges.
+   */
+  public Map<String, Set<TSentryPrivilege>> listAllUsersPrivileges(User requestingUser)
+      throws ImpalaException {
+    return listAllPrincipalsPrivileges(requestingUser, TPrincipalType.USER);
+  }
+
+  private Map<String, Set<TSentryPrivilege>> listAllPrincipalsPrivileges(
+      User requestingUser, TPrincipalType type) throws ImpalaException {
+    SentryServiceClient client = new SentryServiceClient();
+    try {
+      return type == TPrincipalType.ROLE ?
+          client.get().listAllRolesPrivileges(requestingUser.getShortName()) :
+          client.get().listAllUsersPrivileges(requestingUser.getShortName());
+    } catch (Exception e) {
+      if (SentryUtil.isSentryAccessDenied(e)) {
+        throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,
+            requestingUser.getName(),
+            type == TPrincipalType.ROLE ?
+                "LIST_ALL_ROLES_PRIVILEGES" : "LIST_ALL_USERS_PRIVILEGES"));
+      }
+      throw new InternalException(String.format("Error making '%s' RPC to " +
+          "Sentry Service: ",
+          type == TPrincipalType.ROLE ?
+              "listAllRolesPrivileges" :
+              "listAllUsersPrivileges"), e);
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
    * Utility function that converts a TSentryPrivilege to an Impala TPrivilege object.
    */
-  public static TPrivilege sentryPrivilegeToTPrivilege(TSentryPrivilege sentryPriv) {
+  public static TPrivilege sentryPrivilegeToTPrivilege(TSentryPrivilege sentryPriv,
+      Principal principal) {
     TPrivilege privilege = new TPrivilege();
     privilege.setServer_name(sentryPriv.getServerName());
     if (sentryPriv.isSetDbName()) privilege.setDb_name(sentryPriv.getDbName());
@@ -456,6 +501,8 @@ public class SentryPolicyService {
     } else {
       privilege.setHas_grant_opt(false);
     }
+    privilege.setPrincipal_id(principal.getId());
+    privilege.setPrincipal_type(principal.getPrincipalType());
     return privilege;
   }
 }
