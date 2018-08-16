@@ -38,7 +38,5 @@ class TestDisableCatalogDataOps(CustomClusterTestSuite):
 
     # Indirectly issues a load to a single avro table. Expects to skip the schema load.
     self.client.execute("select count(*) from functional_avro.tinytable")
-    self.assert_catalogd_log_contains(
-      'INFO', "Avro schema, "
-      "hdfs://localhost:20500//test-warehouse/avro_schemas/functional/tinytable.json"
-      ", not loaded from fs: catalog data ops disabled.")
+    self.assert_catalogd_log_contains('INFO',
+      "Avro schema, .*://.*.json, not loaded from fs: catalog data ops disabled.")
