@@ -18,6 +18,8 @@
 # under the License.
 
 set -euo pipefail
+. $IMPALA_HOME/bin/report_build_error.sh
+setup_report_build_error
 
 # run buildall.sh -help to see options
 ROOT=`dirname "$0"`
@@ -28,8 +30,6 @@ then
    echo "IMPALA_HOME cannot have spaces in the path"
    exit 1
 fi
-
-trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 # Grab this *before* we source impala-config.sh to see if the caller has
 # kerberized environment variables already or not.

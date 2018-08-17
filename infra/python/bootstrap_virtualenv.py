@@ -140,29 +140,37 @@ def exec_pip_install(args, cc="no-cc-available", env=None):
   # Don't call the virtualenv pip directly, it uses a hashbang to to call the python
   # virtualenv using an absolute path. If the path to the virtualenv is very long, the
   # hashbang won't work.
-  #
+  impala_pip_base_cmd = [os.path.join(ENV_DIR, "bin", "python"),
+                         os.path.join(ENV_DIR, "bin", "pip"), "install", "-v"]
+
   # Passes --no-binary for IMPALA-3767: without this, Cython (and
   # several other packages) fail download.
   #
   # --no-cache-dir is used to prevent caching of compiled artifacts, which may be built
   # with different compilers or settings.
-  cmd = [os.path.join(ENV_DIR, "bin", "python"), os.path.join(ENV_DIR, "bin", "pip"),
-      "install", "-v", "--no-binary", ":all:", "--no-cache-dir"]
+  third_party_pkg_install_cmd = \
+      impala_pip_base_cmd[:] + ["--no-binary", ":all:", "--no-cache-dir"]
 
   # When using a custom mirror, we also must use the index of that mirror.
   if "PYPI_MIRROR" in os.environ:
-    cmd.extend(["--index-url", "%s/simple" % os.environ["PYPI_MIRROR"]])
+    third_party_pkg_install_cmd.extend(["--index-url",
+                                        "%s/simple" % os.environ["PYPI_MIRROR"]])
   else:
     # Prevent fetching additional packages from the index. If we forget to add a package
     # to one of the requirements.txt files, this should trigger an error. However, we will
     # still access the index for version/dependency resolution, hence we need to change it
     # when using a private mirror.
-    cmd.append("--no-index")
+    third_party_pkg_install_cmd.append("--no-index")
 
-  cmd.extend(["--find-links",
+  third_party_pkg_install_cmd.extend(["--find-links",
       "file://%s" % urllib.pathname2url(os.path.abspath(DEPS_DIR))])
-  cmd.extend(args)
-  exec_cmd(cmd, env=env)
+  third_party_pkg_install_cmd.extend(args)
+  exec_cmd(third_party_pkg_install_cmd, env=env)
+
+  # Finally, we want to install the packages from our own internal python lib
+  local_package_install_cmd = impala_pip_base_cmd + \
+      ['-e', os.path.join(os.getenv('IMPALA_HOME'), 'lib', 'python')]
+  exec_cmd(local_package_install_cmd)
 
 
 def find_file(*paths):

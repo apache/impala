@@ -22,8 +22,8 @@
 # branch to a non-toolchain branch due to caching in CMake generated files.
 
 set -euo pipefail
-trap 'echo Error in ${0} at line ${LINENO}: $(cd "'${PWD}'" && awk "NR == ${LINENO}" \
-  ${0})' ERR
+. $IMPALA_HOME/bin/report_build_error.sh
+setup_report_build_error
 
 # If the project was never build, no Makefile will exist and thus make clean will fail.
 # Combine the make command with the bash noop to always return true.

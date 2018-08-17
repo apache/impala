@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -17,14 +17,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-set -euo pipefail
-. $IMPALA_HOME/bin/report_build_error.sh
-setup_report_build_error
+report_build_error() {
+  ERROR_MSG=$(cd "$PWD" && awk "NR == $1" $0)
+  FILENAME=$(basename -- "$0")
+  echo ERROR in $0 at line $1: $ERROR_MSG
+  $IMPALA_HOME/bin/generate_junitxml.py --step "${FILENAME%.*}" \
+    --error "Error in $0 at line $1: $ERROR_MSG"
+}
 
-DIR=$(dirname "$0")
-echo Stopping Hbase
-# Kill region server first, then hmaster, and zookeeper.
-"$DIR"/kill-java-service.sh -c HRegionServer -c HMaster -c HQuorumPeer -s 2
-
-# Clear up data so that zookeeper/hbase won't do recovery when it starts.
-rm -rf /tmp/hbase-*
+setup_report_build_error() {
+  trap 'report_build_error $LINENO' ERR
+}

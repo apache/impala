@@ -19,7 +19,8 @@
 # Run all Impala tests.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
+. $IMPALA_HOME/bin/report_build_error.sh
+setup_report_build_error
 
 cd "${IMPALA_HOME}"
 

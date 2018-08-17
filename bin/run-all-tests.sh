@@ -22,7 +22,8 @@
 
 # Exit on reference to uninitialized variables and non-zero exit codes
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
+. $IMPALA_HOME/bin/report_build_error.sh
+setup_report_build_error
 
 . "$IMPALA_HOME/bin/set-pythonpath.sh"
 

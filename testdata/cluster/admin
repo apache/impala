@@ -28,7 +28,8 @@
 # TODO: Run each node on its own IP address, e.g. 127.0.0.1, 127.0.0.2, and so on.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(awk "NR == $LINENO" $0)' ERR
+. $IMPALA_HOME/bin/report_build_error.sh
+setup_report_build_error
 
 : ${IMPALA_KERBERIZE=}
 : ${INCLUDE_YARN=}

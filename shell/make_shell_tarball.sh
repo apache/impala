@@ -23,7 +23,8 @@
 # ${IMPALA_HOME}/shell/build.
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
+. $IMPALA_HOME/bin/report_build_error.sh
+setup_report_build_error
 
 if [ "x${IMPALA_HOME}" == "x" ]; then
   echo "\$IMPALA_HOME must be set"

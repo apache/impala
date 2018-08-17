@@ -39,7 +39,8 @@
 # CCACHE_DIR: directory to use for distccd's ccache.
 # CCACHE_SIZE: size of ccache, passed to ccache's -M option
 set -eu -o pipefail
-trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
+. $IMPALA_HOME/bin/report_build_error.sh
+setup_report_build_error
 
 if [[ $# != 1 ]]; then
   echo "Usage: $0 <allowed IP address range>"

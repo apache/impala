@@ -29,7 +29,8 @@
 # bin/load-data.py
 
 set -euo pipefail
-trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
+. $IMPALA_HOME/bin/report_build_error.sh
+setup_report_build_error
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 . ${IMPALA_HOME}/testdata/bin/run-step.sh

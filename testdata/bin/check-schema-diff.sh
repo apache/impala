@@ -24,6 +24,10 @@
 #  - 1 implies that the schemas have changed.
 
 set -euo pipefail
+
+# We don't want to generate a junit xml report for errors generated here,
+# since exit code 1 here denotes something useful. So in the case of this
+# script, we don't call setup_report_build_error.
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1

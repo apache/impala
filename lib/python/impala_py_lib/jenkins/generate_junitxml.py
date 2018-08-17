@@ -32,18 +32,30 @@ from datetime import datetime as dt
 
 IMPALA_HOME = os.getenv('IMPALA_HOME', '.')
 SCRIPT_NAME, _ = os.path.splitext(os.path.basename(__file__))
+JUNITXML_LOGDIR = os.path.join(os.getenv("IMPALA_LOGS_DIR", "."), 'extra_junit_xml_logs')
 
 
 class JunitReport(object):
   """A Junit XML style report parseable by Jenkins for reporting build status.
 
-  Generally, a caller who invokes this script doesn't need to do anything
+  Generally, a caller who invokes this script from bash doesn't need to do
   more than supply the necessary command line parameters. The JunitReport
   class is instantiated using those initial inputs, and a timestamped XML
   file is output to the $IMPALA_HOME/logs/extra_junit_xml_logs/.
 
   Log files are timestamped, so they will not overwrite previous files containing
   output of the same step.
+
+  For use from within a python script (must be invoked with impala-python), an
+  example might look like:
+
+  >>> from impala_py_lib.jenkins.generate_junitxml import JunitReport
+  >>> report = JunitReport(phase='load_data', step='load_hbase', error_msg='oops')
+  >>> report.tofile()
+
+  For now, the class does not support adding more than one step (analogous to a
+  test case) to the same phase (analogous to a test suite). Each report should
+  be unique for a given junit XML file. This may be enhanced at some point.
   """
 
   def __init__(self, phase, step, error_msg=None, stdout=None, stderr=None,
@@ -124,7 +136,7 @@ class JunitReport(object):
     output = ET.SubElement(self.testcase_element, "system-{}".format(output_type))
     output.text = JunitReport.get_xml_content(file_or_string)
 
-  def to_file(self, junitxml_logdir='.'):
+  def to_file(self, junitxml_logdir=JUNITXML_LOGDIR):
     """
     Create a timestamped XML report file.
 
@@ -134,6 +146,15 @@ class JunitReport(object):
     Return:
       junit_log_file: path to the generated file
     """
+    # The equivalent of mkdir -p
+    try:
+      os.makedirs(junitxml_logdir)
+    except OSError as e:
+      if e.errno == errno.EEXIST and os.path.isdir(junitxml_logdir):
+        pass
+      else:
+        raise
+
     filename = '{}.{}.xml'.format(
         self.testsuite_element.attrib['name'],
         self.utc_time.strftime('%Y%m%d_%H_%M_%S')
@@ -226,17 +247,6 @@ def main():
   Phase can be repeated in a given test run, but the step leaf node, which is
   equivalent to a "test case", must be unique within each phase.
   """
-  junitxml_logdir = os.path.join(IMPALA_HOME, 'logs', 'extra_junit_xml_logs')
-
-  # The equivalent of mkdir -p
-  try:
-    os.makedirs(junitxml_logdir)
-  except OSError as e:
-    if e.errno == errno.EEXIST and os.path.isdir(junitxml_logdir):
-      pass
-    else:
-      raise
-
   options = get_options()
 
   junit_report = JunitReport(phase=options.phase,
@@ -246,8 +256,8 @@ def main():
                              stderr=options.stderr,
                              elapsed_time=options.time)
 
-  xml_report = junit_report.to_file(junitxml_logdir)
-  print("Generated: {}".format(xml_report))
+  junit_log_file = junit_report.to_file()
+  print("Generated: {0}".format(junit_log_file))
 
 
 if "__main__" == __name__:
