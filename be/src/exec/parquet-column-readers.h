@@ -145,6 +145,13 @@ class ParquetColumnReader {
   /// false if it reads one value per item).  The reader is added to the runtime state's
   /// object pool. Does not create child readers for collection readers; these must be
   /// added by the caller.
+  ///
+  /// It supports the following primitive type widening that does not have any loss of
+  /// precision.
+  /// - tinyint (INT32) -> smallint (INT32), int (INT32), bigint (INT64), double (DOUBLE)
+  /// - smallint (INT32) -> int (INT32), bigint (INT64), double (DOUBLE)
+  /// - int (INT32) -> bigint (INT64), double (DOUBLE)
+  /// - float (FLOAT) -> double (DOUBLE)
   static ParquetColumnReader* Create(const SchemaNode& node, bool is_collection_field,
       const SlotDescriptor* slot_desc, HdfsParquetScanner* parent);
 

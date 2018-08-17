@@ -249,6 +249,34 @@ inline int ParquetPlainEncoder::ByteSize(const TimestampValue& v) {
   return 12;
 }
 
+template <typename From, typename To>
+inline int DecodeWithConversion(const uint8_t* buffer, const uint8_t* buffer_end, To* v) {
+  int byte_size = sizeof(From);
+  if (UNLIKELY(buffer_end - buffer < byte_size)) return -1;
+  From dest;
+  memcpy(&dest, buffer, byte_size);
+  *v = dest;
+  return byte_size;
+}
+
+template <>
+inline int ParquetPlainEncoder::Decode<int64_t, parquet::Type::INT32>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, int64_t* v) {
+  return DecodeWithConversion<int32_t, int64_t>(buffer, buffer_end, v);
+}
+
+template <>
+inline int ParquetPlainEncoder::Decode<double, parquet::Type::INT32>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, double* v) {
+  return DecodeWithConversion<int32_t, double>(buffer, buffer_end, v);
+}
+
+template <>
+inline int ParquetPlainEncoder::Decode<double, parquet::Type::FLOAT>(
+    const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, double* v) {
+  return DecodeWithConversion<float, double>(buffer, buffer_end, v);
+}
+
 template <>
 inline int ParquetPlainEncoder::Decode<int8_t, parquet::Type::INT32>(
     const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, int8_t* v) {

@@ -1573,16 +1573,36 @@ ParquetColumnReader* ParquetColumnReader::Create(const SchemaNode& node,
             slot_desc);
         break;
       case TYPE_BIGINT:
-        reader = new ScalarColumnReader<int64_t, parquet::Type::INT64, true>(parent, node,
-            slot_desc);
+        switch (node.element->type) {
+          case parquet::Type::INT32:
+            reader = new ScalarColumnReader<int64_t, parquet::Type::INT32, true>(parent,
+                node, slot_desc);
+            break;
+          default:
+            reader = new ScalarColumnReader<int64_t, parquet::Type::INT64, true>(parent,
+                node, slot_desc);
+            break;
+        }
         break;
       case TYPE_FLOAT:
         reader = new ScalarColumnReader<float, parquet::Type::FLOAT, true>(parent, node,
             slot_desc);
         break;
       case TYPE_DOUBLE:
-        reader = new ScalarColumnReader<double, parquet::Type::DOUBLE, true>(parent, node,
-            slot_desc);
+        switch (node.element->type) {
+          case parquet::Type::INT32:
+            reader = new ScalarColumnReader<double , parquet::Type::INT32, true>(parent,
+                node, slot_desc);
+            break;
+          case parquet::Type::FLOAT:
+            reader = new ScalarColumnReader<double, parquet::Type::FLOAT, true>(parent,
+                node, slot_desc);
+            break;
+          default:
+            reader = new ScalarColumnReader<double, parquet::Type::DOUBLE, true>(parent,
+                node, slot_desc);
+            break;
+        }
         break;
       case TYPE_TIMESTAMP:
         reader = new ScalarColumnReader<TimestampValue, parquet::Type::INT96, true>(

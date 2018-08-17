@@ -663,6 +663,17 @@ class TestParquet(ImpalaTestSuite):
         "select * from {0}.{1}".format(unique_database, TABLE_NAME))
     assert(len(result.data) == 33)
 
+  def test_type_widening(self, vector, unique_database):
+    """IMPALA-6373: Test that Impala can read parquet file with column types smaller than
+       the schema with larger types"""
+    TABLE_NAME = "primitive_type_widening"
+    create_table_and_copy_files(self.client, """CREATE TABLE {db}.{tbl} (
+        a smallint, b int, c bigint, d double, e int, f bigint, g double, h int,
+        i double, j double) STORED AS PARQUET""", unique_database, TABLE_NAME,
+        ["/testdata/data/{0}.parquet".format(TABLE_NAME)])
+
+    self.run_test_case("QueryTest/parquet-type-widening", vector, unique_database)
+
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
 # 1. default scan range

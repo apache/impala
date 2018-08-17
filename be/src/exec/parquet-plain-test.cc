@@ -97,6 +97,27 @@ void TestTruncate(const InternalType& v, int expected_byte_size) {
   }
 }
 
+template <typename InternalType, typename WidenInternalType,
+    parquet::Type::type PARQUET_TYPE>
+void TestTruncate(const InternalType& v, int expected_byte_size) {
+  uint8_t buffer[expected_byte_size];
+  int encoded_size = Encode(v, expected_byte_size, buffer, PARQUET_TYPE);
+  EXPECT_EQ(encoded_size, expected_byte_size);
+
+  // Check all possible truncations of the buffer.
+  for (int truncated_size = encoded_size - 1; truncated_size >= 0; --truncated_size) {
+    WidenInternalType result;
+    /// Copy to heap-allocated buffer so that ASAN can detect buffer overruns.
+    uint8_t* truncated_buffer = new uint8_t[truncated_size];
+    memcpy(truncated_buffer, buffer, truncated_size);
+    int decoded_size = ParquetPlainEncoder::Decode<WidenInternalType, PARQUET_TYPE>(
+        truncated_buffer, truncated_buffer + truncated_size, expected_byte_size,
+        &result);
+    EXPECT_EQ(-1, decoded_size);
+    delete[] truncated_buffer;
+  }
+}
+
 template <typename InternalType, parquet::Type::type PARQUET_TYPE>
 void TestType(const InternalType& v, int expected_byte_size) {
   uint8_t buffer[expected_byte_size];
@@ -110,6 +131,23 @@ void TestType(const InternalType& v, int expected_byte_size) {
   EXPECT_EQ(result, v);
 
   TestTruncate<InternalType, PARQUET_TYPE>(v, expected_byte_size);
+}
+
+template <typename InternalType, typename WidenInternalType,
+    parquet::Type::type PARQUET_TYPE>
+void TestTypeWidening(const InternalType& v, int expected_byte_size) {
+  uint8_t buffer[expected_byte_size];
+  int encoded_size = Encode(v, expected_byte_size, buffer, PARQUET_TYPE);
+  EXPECT_EQ(encoded_size, expected_byte_size);
+
+  WidenInternalType result;
+  int decoded_size = ParquetPlainEncoder::Decode<WidenInternalType, PARQUET_TYPE>(
+      buffer, buffer + expected_byte_size, expected_byte_size, &result);
+  EXPECT_EQ(decoded_size, expected_byte_size);
+  EXPECT_EQ(v, result);
+
+  TestTruncate<InternalType, WidenInternalType, PARQUET_TYPE>(
+      v, expected_byte_size);
 }
 
 TEST(PlainEncoding, Basic) {
@@ -130,6 +168,11 @@ TEST(PlainEncoding, Basic) {
   TestType<double, parquet::Type::DOUBLE>(d, sizeof(double));
   TestType<StringValue, parquet::Type::BYTE_ARRAY>(sv, sizeof(int32_t) + sv.len);
   TestType<TimestampValue, parquet::Type::INT96>(tv, 12);
+
+  // Test type widening.
+  TestTypeWidening<int32_t, int64_t, parquet::Type::INT32>(i32, sizeof(int32_t));
+  TestTypeWidening<int32_t, double, parquet::Type::INT32>(i32, sizeof(int32_t));
+  TestTypeWidening<float, double, parquet::Type::FLOAT>(f, sizeof(float));
 
   int test_val = 1234;
   int var_len_decimal_size = sizeof(int32_t)
