@@ -408,6 +408,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
         if (col == null) continue;
         // Ugly hack: if the catalogd has never gotten any stats from HMS, numDVs will
         // be -1, and we'll have to send no stats to the impalad.
+        // TODO(todd): this breaks test_ddl.test_alter_set_column_stats.
         if (!col.getStats().hasNumDistinctValues()) continue;
 
         ColumnStatisticsData tstats = col.getStats().toHmsCompatibleThrift(col.getType());

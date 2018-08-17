@@ -31,6 +31,15 @@ enum CatalogServiceVersion {
   V1
 }
 
+// Prefix used on statestore topic entry keys to indicate that the entry
+// should be sent to "v1" impalads that receive all of their metadata
+// via the topic itself.
+const string CATALOG_TOPIC_V1_PREFIX = "1:";
+
+// Prefix used on statestore topic entry keys to indicate that the entry
+// should be sent to "v2" impalads that fetch metadata on demand.
+const string CATALOG_TOPIC_V2_PREFIX = "2:";
+
 // Common header included in all CatalogService requests.
 // TODO: The CatalogServiceVersion/protocol version should be part of the header.
 // This would require changes in BDR and break their compatibility story. We should

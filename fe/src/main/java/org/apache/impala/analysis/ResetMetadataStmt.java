@@ -23,6 +23,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TTableName;
 
@@ -118,6 +119,11 @@ public class ResetMetadataStmt extends StatementBase {
           .onDb(database_).allOf(Privilege.REFRESH).toRequest());
     } else {
       analyzer.registerPrivReq(new PrivilegeRequest(Privilege.REFRESH));
+
+      if (BackendConfig.INSTANCE.getBackendCfg().use_local_catalog) {
+        throw new AnalysisException("Global INVALIDATE METADATA is not supported " +
+            "when --use_local_catalog is configured.");
+      }
     }
   }
 

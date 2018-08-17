@@ -40,6 +40,28 @@ using namespace rapidjson;
 using namespace strings;
 
 DEFINE_int32(catalog_service_port, 26000, "port where the CatalogService is running");
+DEFINE_string(catalog_topic_mode, "full",
+    "The type of data that the catalog service will publish into the Catalog "
+    "StateStore topic. Valid values are 'full', 'mixed', or 'minimal'.\n"
+    "\n"
+    "In 'full' mode, complete catalog objects are published any time a new "
+    "version is available. In 'minimal' mode, only a minimal object is published "
+    "when a new version of a catalog object is available. In 'mixed' mode, both types "
+    "of topic entries are published.\n"
+    "\n"
+    "When all impalad coordinators are configured with --use_local_catalog disabled "
+    "(the default), 'full' mode should be used. If all impalad coordinators are "
+    "configured with --use_local_catalog enabled, 'minimal' mode should be used. "
+    "When some impalads are configured with --use_local_catalog disabled and others "
+    "configured with it enabled, then 'mixed' mode is required.");
+
+DEFINE_validator(catalog_topic_mode, [](const char* name, const string& val) {
+  if (val == "full" || val == "mixed" || val == "minimal") return true;
+  LOG(ERROR) << "Invalid value for --" << name << ": must be one of "
+      << "'full', 'mixed', or 'minimal'";
+  return false;
+});
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);

@@ -33,6 +33,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TResultSet;
@@ -48,13 +49,14 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 public class LocalCatalogTest {
-
+  private CatalogdMetaProvider provider_;
   private LocalCatalog catalog_;
 
   @Before
   public void setupCatalog() {
     FeSupport.loadLibrary();
-    catalog_ = LocalCatalog.create(/*defaultKuduMasterHosts=*/null);
+    provider_ = new CatalogdMetaProvider(BackendConfig.INSTANCE.getBackendCfg());
+    catalog_ = new LocalCatalog(provider_, /*defaultKuduMasterHosts=*/null);
   }
 
   @Test

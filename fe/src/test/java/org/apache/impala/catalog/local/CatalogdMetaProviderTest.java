@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.catalog.local.CatalogdMetaProvider.SizeOfWeigher;
 import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
@@ -31,7 +32,11 @@ import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TTable;
 import org.apache.impala.util.ListMap;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -159,4 +164,61 @@ public class CatalogdMetaProviderTest {
     assertTrue(weigher.weigh(refs, null) < 4000);
   }
 
+  @Test
+  public void testCacheAndEvictDatabase() throws Exception {
+    // Load a database.
+    Database db = provider_.loadDb("functional");
+    CacheStats stats = diffStats();
+    assertEquals(1, stats.missCount());
+
+    // ... and the table names for it.
+    ImmutableList<String> tableNames = provider_.loadTableNames("functional");
+    stats = diffStats();
+    assertEquals(1, stats.missCount());
+
+    // Load them again, should hit cache.
+    Database dbHit = provider_.loadDb("functional");
+    assertEquals(db, dbHit);
+    ImmutableList<String> tableNamesHit = provider_.loadTableNames("functional");
+    assertEquals(tableNames, tableNamesHit);
+
+    stats = diffStats();
+    assertEquals(2, stats.hitCount());
+    assertEquals(0, stats.missCount());
+
+    // Invalidate the DB.
+    TCatalogObject obj = new TCatalogObject(TCatalogObjectType.DATABASE, 0);
+    obj.setDb(new TDatabase("functional"));
+    provider_.invalidateCacheForObject(obj);
+
+    // Load another time, should miss cache.
+    Database dbMiss = provider_.loadDb("functional");
+    assertEquals(db, dbMiss);
+    ImmutableList<String> tableNamesMiss = provider_.loadTableNames("functional");
+    assertEquals(tableNames, tableNamesMiss);
+    stats = diffStats();
+    assertEquals(0, stats.hitCount());
+    assertEquals(2, stats.missCount());
+  }
+
+  @Test
+  public void testCacheAndEvictTable() throws Exception {
+    // 'alltypes' was already loaded in the setup function, so we should get a hit
+    // if we load it again.
+    provider_.loadTable("functional", "alltypes");
+    CacheStats stats = diffStats();
+    assertEquals(1, stats.hitCount());
+    assertEquals(0, stats.missCount());
+
+    // Invalidate it.
+    TCatalogObject obj = new TCatalogObject(TCatalogObjectType.TABLE, 0);
+    obj.setTable(new TTable("functional", "alltypes"));
+    provider_.invalidateCacheForObject(obj);
+
+    // Should get a miss if we re-load it.
+    provider_.loadTable("functional", "alltypes");
+    stats = diffStats();
+    assertEquals(0, stats.hitCount());
+    assertEquals(1, stats.missCount());
+  }
 }

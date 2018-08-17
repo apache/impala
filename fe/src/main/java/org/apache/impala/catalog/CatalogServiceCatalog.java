@@ -47,6 +47,7 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.CatalogServiceConstants;
 import org.apache.impala.thrift.TCatalog;
 import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
@@ -64,7 +65,6 @@ import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
-import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTableUsageMetrics;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.FunctionUtils;
@@ -217,6 +217,16 @@ public class CatalogServiceCatalog extends Catalog {
   private final String localLibraryPath_;
 
   /**
+   * See the gflag definition in be/.../catalog-server.cc for details on these modes.
+   */
+  private static enum TopicMode {
+    FULL,
+    MIXED,
+    MINIMAL
+  };
+  final TopicMode topicMode_;
+
+  /**
    * Initialize the CatalogServiceCatalog. If 'loadInBackground' is true, table metadata
    * will be loaded in the background. 'initialHmsCnxnTimeoutSec' specifies the time (in
    * seconds) CatalogServiceCatalog will wait to establish an initial connection to the
@@ -247,6 +257,8 @@ public class CatalogServiceCatalog extends Catalog {
     }
     localLibraryPath_ = localLibraryPath;
     deleteLog_ = new CatalogDeltaLog();
+    topicMode_ = TopicMode.valueOf(
+        BackendConfig.INSTANCE.getBackendCfg().catalog_topic_mode.toUpperCase());
   }
 
   // Timeout for acquiring a table lock
@@ -477,12 +489,63 @@ public class CatalogServiceCatalog extends Catalog {
       }
       // TODO: TSerializer.serialize() returns a copy of the internal byte array, which
       // could be elided.
-      byte[] data = serializer.serialize(obj);
-      if (!FeSupport.NativeAddPendingTopicItem(nativeCatalogServerPtr, key,
-          obj.catalog_version, data, delete)) {
-        LOG.error("NativeAddPendingTopicItem failed in BE. key=" + key + ", delete="
-            + delete + ", data_size=" + data.length);
+      if (topicMode_ == TopicMode.FULL || topicMode_ == TopicMode.MIXED) {
+        String v1Key = CatalogServiceConstants.CATALOG_TOPIC_V1_PREFIX + key;
+        byte[] data = serializer.serialize(obj);
+        if (!FeSupport.NativeAddPendingTopicItem(nativeCatalogServerPtr, v1Key,
+            obj.catalog_version, data, delete)) {
+          LOG.error("NativeAddPendingTopicItem failed in BE. key=" + v1Key + ", delete="
+              + delete + ", data_size=" + data.length);
+        }
       }
+
+      if (topicMode_ == TopicMode.MINIMAL || topicMode_ == TopicMode.MIXED) {
+        // Serialize a minimal version of the object that can be used by impalads
+        // that are running in 'local-catalog' mode. This is used by those impalads
+        // to invalidate their local cache.
+        TCatalogObject minimalObject = getMinimalObjectForV2(obj);
+        if (minimalObject != null) {
+          byte[] data = serializer.serialize(minimalObject);
+          String v2Key = CatalogServiceConstants.CATALOG_TOPIC_V2_PREFIX + key;
+          if (!FeSupport.NativeAddPendingTopicItem(nativeCatalogServerPtr, v2Key,
+              obj.catalog_version, data, delete)) {
+            LOG.error("NativeAddPendingTopicItem failed in BE. key=" + v2Key + ", delete="
+                + delete + ", data_size=" + data.length);
+          }
+        }
+      }
+    }
+
+    private TCatalogObject getMinimalObjectForV2(TCatalogObject obj) {
+      Preconditions.checkState(topicMode_ == TopicMode.MINIMAL ||
+          topicMode_ == TopicMode.MIXED);
+      TCatalogObject min = new TCatalogObject(obj.type, obj.catalog_version);
+      switch (obj.type) {
+      case DATABASE:
+        min.setDb(new TDatabase(obj.db.db_name));
+        break;
+      case TABLE:
+      case VIEW:
+        min.setTable(new TTable(obj.table.db_name, obj.table.tbl_name));
+        break;
+      case CATALOG:
+        // Sending the top-level catalog version is important for implementing SYNC_DDL.
+        // This also allows impalads to detect a catalogd restart and invalidate the
+        // whole catalog.
+        // TODO(todd) ensure that the impalad does this invalidation as required.
+        return obj;
+      case DATA_SOURCE:
+      case FUNCTION:
+      case HDFS_CACHE_POOL:
+      case PRIVILEGE:
+      case PRINCIPAL:
+        // These are currently not cached by v2 impalad.
+        // TODO(todd): handle these items.
+        return null;
+      default:
+        throw new AssertionError("Unexpected catalog object type: " + obj.type);
+      }
+      return min;
     }
   }
 

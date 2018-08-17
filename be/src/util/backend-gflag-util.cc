@@ -50,6 +50,7 @@ DECLARE_string(authorized_proxy_user_config);
 DECLARE_string(authorized_proxy_user_config_delimiter);
 DECLARE_string(authorized_proxy_group_config);
 DECLARE_string(authorized_proxy_group_config_delimiter);
+DECLARE_string(catalog_topic_mode);
 DECLARE_string(kudu_master_hosts);
 DECLARE_string(reserved_words_version);
 DECLARE_string(sentry_config);
@@ -105,6 +106,7 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_disable_catalog_data_ops_debug_only(
       FLAGS_disable_catalog_data_ops_debug_only);
   cfg.__set_pull_incremental_statistics(FLAGS_pull_incremental_statistics);
+  cfg.__set_catalog_topic_mode(FLAGS_catalog_topic_mode);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }

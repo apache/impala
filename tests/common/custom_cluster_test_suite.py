@@ -147,6 +147,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
     if pytest.config.option.use_local_catalog:
       cmd.append("--impalad_args=--use_local_catalog=1")
+      cmd.append("--catalogd_args=--catalog_topic_mode=minimal")
 
     if pytest.config.option.pull_incremental_statistics:
       cmd.append("--impalad_args=%s --catalogd_args=%s" %

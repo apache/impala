@@ -21,8 +21,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.ImpaladCatalog;
+import org.apache.impala.catalog.local.CatalogdMetaProvider;
 import org.apache.impala.catalog.local.LocalCatalog;
-import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.thrift.TException;
@@ -67,8 +67,15 @@ public abstract class FeCatalogManager {
   abstract FeCatalog getOrCreateCatalog();
 
   /**
-   * Update the Catalog based on an update from the state store. Only supported
-   * by the catalogd-based implementation.
+   * Update the Catalog based on an update from the state store.
+   *
+   * This can be called either in response to a DDL statement (in which case the update
+   * may include just the changed objects related to that DDL) or due to data being
+   * published by the state store.
+   *
+   * In the case of the DDL-triggered update, the return value is ignored. In the case
+   * of the statestore update, the return value is passed back to the C++ code to
+   * indicate the last applied catalog update and used to implement SYNC_DDL.
    */
   abstract TUpdateCatalogCacheResponse updateCatalogCache(
       TUpdateCatalogCacheRequest req) throws CatalogException, TException;
@@ -121,17 +128,17 @@ public abstract class FeCatalogManager {
    * created for each request or query.
    */
   private static class LocalImpl extends FeCatalogManager {
+    private static CatalogdMetaProvider PROVIDER = new CatalogdMetaProvider(
+        BackendConfig.INSTANCE.getBackendCfg());
+
     @Override
     FeCatalog getOrCreateCatalog() {
-      return LocalCatalog.create(DEFAULT_KUDU_MASTER_HOSTS);
+      return new LocalCatalog(PROVIDER, DEFAULT_KUDU_MASTER_HOSTS);
     }
 
     @Override
     TUpdateCatalogCacheResponse updateCatalogCache(TUpdateCatalogCacheRequest req) {
-      // TODO(todd) upon implementing caching, probably want to invalidate appropriate
-      // pieces of cached info. For now, this fake response seems enough to make
-      // the backend call site happy.
-      return new TUpdateCatalogCacheResponse(new TUniqueId(), -1, -1);
+      return PROVIDER.updateCatalogCache(req);
     }
   }
 

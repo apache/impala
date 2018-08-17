@@ -76,10 +76,9 @@ import com.google.common.base.Preconditions;
  */
 public class ImpaladCatalog extends Catalog implements FeCatalog {
   private static final Logger LOG = Logger.getLogger(ImpaladCatalog.class);
-  private static final TUniqueId INITIAL_CATALOG_SERVICE_ID = new TUniqueId(0L, 0L);
   // The last known Catalog Service ID. If the ID changes, it indicates the CatalogServer
   // has restarted.
-  private TUniqueId catalogServiceId_ = INITIAL_CATALOG_SERVICE_ID;
+  private TUniqueId catalogServiceId_ = Catalog.INITIAL_CATALOG_SERVICE_ID;
 
   // The catalog version received in the last StateStore heartbeat. It is guaranteed
   // all objects in the catalog have at a minimum, this version. Because updates may

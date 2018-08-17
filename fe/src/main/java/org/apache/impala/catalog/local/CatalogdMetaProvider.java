@@ -18,6 +18,7 @@
 package org.apache.impala.catalog.local;
 
 import java.lang.management.ManagementFactory;
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -34,6 +36,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
@@ -53,10 +56,15 @@ import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableInfoSelector;
+import org.apache.impala.thrift.TUniqueId;
+import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
+import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.util.ListMap;
+import org.apache.impala.util.TByteBuffer;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TBinaryProtocol;
 import org.ehcache.sizeof.SizeOf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,12 +81,54 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.errorprone.annotations.Immutable;
+import com.google.errorprone.annotations.concurrent.GuardedBy;
 
 /**
  * MetaProvider which fetches metadata in a granular fashion from the catalogd.
  *
- * Automatically partially caches metadata to avoid fetching too much data from the
- * catalogd on every query.
+ * When pieces of metadata are requested, a local LRU cache is first queried. If the
+ * metadata is present in the cache, it will be returned. Otherwise, an RPC is made
+ * to the catalogd to fetch the metadata and the metadata is written back into the cache
+ * before being returned.
+ *
+ * The implementation subscribes to a "minimal" subset of the Catalog statestore topic
+ * in order to be notified about changes to objects stored within the catalogd. We
+ * use the notifications from this topic to perform cache invalidation. The invalidation
+ * strategy is slightly different depending on the specific piece of metadata:
+ *
+ * Strategy 1): small objects, cached coarse-grained
+ * ---------------------------
+ * For objects which we know to be small (eg database metadata, lists of table names,
+ * etc) we simply invalidate our local cache whenever we see any change that indicates
+ * our data might be stale. For example, when we see any change of a table, we invalidate
+ * the list of tables in the associated database. This is simpler than tracking whether
+ * the table is an addition or just an updated version of an already-existing entity,
+ * and in most cases we aim for simplicity even if it means occasional over-invalidation.
+ *
+ * As another example, when we see a new version of a database object, we invalidate
+ * the list of databases as well as the cached information for that specific database.
+ *
+ * Strategy 2): granular information about tables
+ * -----------------------------------------------
+ * The metadata associated with tables is large enough that, instead of caching it as
+ * a single coarse-grained entry, we use separate cache entries for more fine-grained
+ * pieces of metadata (eg lists of partitions, individual partitions, etc). Thus, when
+ * we see a notification indicating that a table has changed versions in the catalogd,
+ * it would be difficult to evict all of the associated items from the cache. The cache
+ * implementation does not support "prefix search" or "tag-based invalidation" of any
+ * kind, so we would need to scan through all of the cached items in order to invalidate
+ * all of the data referring to a table.
+ *
+ * Instead, we use a different strategy: all of the granular metadata associated with a
+ * particular version of a table includes the _version number_ of the table as part of
+ * its cache key. When we are notified that the table has changed version numbers, we
+ * simply invalidate the top-level table entry, and allow other information to remain
+ * in the cache. When we next load this table, we will load a new version of the top-level
+ * table entry, including its new version number. Thus, the requests for granular
+ * information pertaining to the new version will not include the old version number
+ * in cache keys anymore. The old metadata is essentially invalidated by the fact that
+ * it is no longer "linked". Over time, the old entries will naturally age out of the
+ * cache.
  *
  * TODO(todd): expose statistics on a per-query and per-daemon level about cache
  * hit rates, number of outbound RPCs, etc.
@@ -103,9 +153,15 @@ public class CatalogdMetaProvider implements MetaProvider {
 
   /**
    * Used as a cache key for caching the "null partition key value", which is a global
-   * Hive configuration.
+   * Hive configuration. Value is a String.
    */
   private static final Object NULL_PARTITION_KEY_VALUE_CACHE_KEY = new Object();
+
+  /**
+   * Used as a cache key for caching the global list of database names. Value is
+   * an ImmutableList<String>.
+   */
+  private static final Object DB_LIST_CACHE_KEY = new Object();
 
   /**
    * File descriptors store replicas using a compressed format that references hosts
@@ -128,6 +184,28 @@ public class CatalogdMetaProvider implements MetaProvider {
 
 
   final Cache<Object,Object> cache_;
+
+  /**
+   * The last catalog version seen in an update from the catalogd.
+   *
+   * This is used to implement SYNC_DDL: when a SYNC_DDL operation is done, the catalog
+   * responds to the DDL with the version of the catalog at which the DDL has been
+   * applied. The backend then waits until this 'lastSeenCatalogVersion' advances past
+   * the version where the DDL was applied, and correlates that with the corresponding
+   * statestore topic version. It then waits until the statestore reports that this topic
+   * version has been distributed to all coordinators before proceeding.
+   */
+  private final AtomicLong lastSeenCatalogVersion_ = new AtomicLong(
+      Catalog.INITIAL_CATALOG_VERSION);
+
+  /**
+   * The last known Catalog Service ID. If the ID changes, it indicates the CatalogServer
+   * has restarted.
+   */
+  @GuardedBy("catalogServiceIdLock_")
+  private TUniqueId catalogServiceId_ = Catalog.INITIAL_CATALOG_SERVICE_ID;
+  private final Object catalogServiceIdLock_ = new Object();
+
 
   public CatalogdMetaProvider(TBackendGflags flags) {
     Preconditions.checkArgument(flags.isSetLocal_catalog_cache_expiration_s());
@@ -190,6 +268,7 @@ public class CatalogdMetaProvider implements MetaProvider {
     if (req.object_desc.isSetCatalog_version() &&
         resp.isSetObject_version_number() &&
         req.object_desc.catalog_version != resp.object_version_number) {
+      invalidateCacheForObject(req.object_desc);
       throw new InconsistentMetadataFetchException(String.format(
           "Catalog object %s changed version from %s to %s while fetching metadata",
           req.object_desc.toString(),
@@ -199,14 +278,45 @@ public class CatalogdMetaProvider implements MetaProvider {
     return resp;
   }
 
+  @SuppressWarnings("unchecked")
+  private <CacheKeyType, ValueType> ValueType loadWithCaching(String itemString,
+      CacheKeyType key, final Callable<ValueType> loadCallable) throws TException {
+    // TODO(todd): there a race here if an invalidation comes in while we are
+    // fetching here. Perhaps we need some locking, or need to remember the
+    // version numbers of the invalidation messages and ensure that we don't
+    // 'put' an element with a too-old version? See:
+    // https://softwaremill.com/race-condition-cache-guava-caffeine/
+    final Reference<Boolean> hit = new Reference<>(true);
+    try {
+      return (ValueType)cache_.get(key, new Callable<ValueType>() {
+        @Override
+        public ValueType call() throws Exception {
+          hit.setRef(false);
+          return loadCallable.call();
+        }
+      });
+    } catch (ExecutionException e) {
+      Throwables.propagateIfPossible(e.getCause(), TException.class);
+      throw new RuntimeException(e);
+    } finally {
+      LOG.trace("Request for {}: {}", itemString, hit.getRef() ? "hit" : "miss");
+    }
+  }
+
   @Override
   public ImmutableList<String> loadDbList() throws TException {
-    TGetPartialCatalogObjectRequest req = newReqForCatalog();
-    req.catalog_info_selector.want_db_names = true;
-    TGetPartialCatalogObjectResponse resp = sendRequest(req);
-    checkResponse(resp.catalog_info != null && resp.catalog_info.db_names != null, req,
-        "missing table names");
-    return ImmutableList.copyOf(resp.catalog_info.db_names);
+    return loadWithCaching("database list", DB_LIST_CACHE_KEY,
+        new Callable<ImmutableList<String>>() {
+          @Override
+          public ImmutableList<String> call() throws Exception {
+            TGetPartialCatalogObjectRequest req = newReqForCatalog();
+            req.catalog_info_selector.want_db_names = true;
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.catalog_info != null && resp.catalog_info.db_names != null,
+                req, "missing table names");
+            return ImmutableList.copyOf(resp.catalog_info.db_names);
+          }
+    });
   }
 
   private TGetPartialCatalogObjectRequest newReqForCatalog() {
@@ -227,26 +337,38 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   @Override
-  public Database loadDb(String dbName) throws TException {
-    TGetPartialCatalogObjectRequest req = newReqForDb(dbName);
-    req.db_info_selector.want_hms_database = true;
-    TGetPartialCatalogObjectResponse resp = sendRequest(req);
-    checkResponse(resp.db_info != null && resp.db_info.hms_database != null,
-        req, "missing expected HMS database");
-    return resp.db_info.hms_database;
+  public Database loadDb(final String dbName) throws TException {
+    return loadWithCaching("database metadata for " + dbName,
+        new DbCacheKey(dbName, DbCacheKey.DbInfoType.HMS_METADATA),
+        new Callable<Database>() {
+          @Override
+          public Database call() throws Exception {
+            TGetPartialCatalogObjectRequest req = newReqForDb(dbName);
+            req.db_info_selector.want_hms_database = true;
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.db_info != null && resp.db_info.hms_database != null,
+                req, "missing expected HMS database");
+            return resp.db_info.hms_database;
+          }
+      });
   }
 
   @Override
-  public ImmutableList<String> loadTableNames(String dbName)
+  public ImmutableList<String> loadTableNames(final String dbName)
       throws MetaException, UnknownDBException, TException {
-    // TODO(todd): do we ever need to fetch the DB without the table names
-    // or vice versa?
-    TGetPartialCatalogObjectRequest req = newReqForDb(dbName);
-    req.db_info_selector.want_table_names = true;
-    TGetPartialCatalogObjectResponse resp = sendRequest(req);
-    checkResponse(resp.db_info != null && resp.db_info.table_names != null,
-        req, "missing expected HMS table");
-    return ImmutableList.copyOf(resp.db_info.table_names);
+    return loadWithCaching("table names for database " + dbName,
+        new DbCacheKey(dbName, DbCacheKey.DbInfoType.TABLE_NAMES),
+        new Callable<ImmutableList<String>>() {
+          @Override
+          public ImmutableList<String> call() throws Exception {
+            TGetPartialCatalogObjectRequest req = newReqForDb(dbName);
+            req.db_info_selector.want_table_names = true;
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.db_info != null && resp.db_info.table_names != null,
+                req, "missing expected table names");
+            return ImmutableList.copyOf(resp.db_info.table_names);
+          }
+      });
   }
 
   private TGetPartialCatalogObjectRequest newReqForTable(String dbName,
@@ -270,24 +392,35 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   @Override
-  public Pair<Table, TableMetaRef> loadTable(String dbName, String tableName)
+  public Pair<Table, TableMetaRef> loadTable(final String dbName, final String tableName)
       throws NoSuchObjectException, MetaException, TException {
-    TGetPartialCatalogObjectRequest req = newReqForTable(dbName, tableName);
-    req.table_info_selector.want_hms_table = true;
-    TGetPartialCatalogObjectResponse resp = sendRequest(req);
-    checkResponse(resp.table_info != null && resp.table_info.hms_table != null,
-        req, "missing expected HMS table");
-    TableMetaRef ref = new TableMetaRefImpl(dbName, tableName, resp.table_info.hms_table,
-        resp.object_version_number);
-    return Pair.create(resp.table_info.hms_table, ref);
+    // TODO(todd) need to lower case?
+    TableCacheKey cacheKey = new TableCacheKey(dbName, tableName);
+    TableMetaRefImpl ref = loadWithCaching(
+        "table metadata for " + dbName + "." + tableName,
+        cacheKey,
+        new Callable<TableMetaRefImpl>() {
+          @Override
+          public TableMetaRefImpl call() throws Exception {
+            TGetPartialCatalogObjectRequest req = newReqForTable(dbName, tableName);
+            req.table_info_selector.want_hms_table = true;
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.table_info != null && resp.table_info.hms_table != null,
+                req, "missing expected HMS table");
+            return new TableMetaRefImpl(
+                dbName, tableName, resp.table_info.hms_table, resp.object_version_number);
+           }
+      });
+    return Pair.create(ref.msTable_, (TableMetaRef)ref);
   }
 
   @Override
   public List<ColumnStatisticsObj> loadTableColumnStatistics(final TableMetaRef table,
       List<String> colNames) throws TException {
     List<ColumnStatisticsObj> ret = Lists.newArrayListWithCapacity(colNames.size());
-
     // Look up in cache first, keeping track of which ones are missing.
+    // We can't use 'loadWithCaching' since we need to fetch several entries batched
+    // in a single RPC to the catalog.
     int negativeHitCount = 0;
     List<String> missingCols = Lists.newArrayListWithCapacity(colNames.size());
     for (String colName: colNames) {
@@ -541,13 +674,179 @@ public class CatalogdMetaProvider implements MetaProvider {
 
   @Override
   public List<String> loadFunctionNames(String dbName) throws MetaException, TException {
+    LOG.trace("loadFunctionNames({}): not cached yet", dbName);
     return directProvider_.loadFunctionNames(dbName);
   }
 
   @Override
   public Function getFunction(String dbName, String functionName)
       throws MetaException, TException {
+    LOG.trace("getFunction({}, {}): not cached yet", dbName, functionName);
     return directProvider_.getFunction(dbName, functionName);
+  }
+
+  /**
+   * Invalidate portions of the cache as indicated by the provided request.
+   *
+   * This is called in two scenarios:
+   *
+   * 1) after a user DDL, the catalog returns a list of updated objects. This ensures
+   * that the impalad that issued the DDL can immediately invalidate its cache for the
+   * modified objects and will see the effects immediately.
+   *
+   * 2) catalog topic updates are received via the statestore. These topic updates
+   * indicate that the catalogd representation of the object has changed and therefore
+   * needs to be invalidated in the impalad.
+   */
+  public TUpdateCatalogCacheResponse updateCatalogCache(TUpdateCatalogCacheRequest req) {
+    if (req.isSetCatalog_service_id()) {
+      witnessCatalogServiceId(req.catalog_service_id);
+    }
+
+    Pair<Boolean, ByteBuffer> update;
+    while ((update = FeSupport.NativeGetNextCatalogObjectUpdate(req.native_iterator_ptr))
+        != null) {
+      TCatalogObject obj = new TCatalogObject();
+      try {
+        obj.read(new TBinaryProtocol(new TByteBuffer(update.second)));
+      } catch (TException e) {
+        // TODO(todd) include the bad key here! currently the JNI bridge doesn't expose
+        // the key in any way.
+        LOG.warn("Unable to deserialize updated catalog info. Skipping cache " +
+            "invalidation which may result in stale metadata being used at this " +
+            "coordinator.", e);
+        continue;
+      }
+      invalidateCacheForObject(obj);
+
+      // Handle CATALOG objects. These are sent only via the updates published via
+      // the statestore topic, and not via the synchronous updates returned from DDLs.
+      if (obj.type == TCatalogObjectType.CATALOG) {
+        // The top-level CATALOG object version is used to implement SYNC_DDL. We need
+        // to keep track of this and pass it back to the C++ code in the return value
+        // of this call.
+        lastSeenCatalogVersion_.set(obj.catalog_version);
+        witnessCatalogServiceId(obj.catalog.catalog_service_id);
+      }
+    }
+    // TODO(IMPALA-7506) 'minVersion' here should be the minimum version of any object
+    // that we have in our cache. This is used to make global INVALIDATE METADATA'
+    // operations synchronous. The flow is as follows for v1 impalads:
+    //
+    // 1. catalogd records the current version number *before* invalidating anything
+    // 2. catalogd invalidates all DBs/tables
+    // 3. catalogd returns the version number calculated in step 1
+    // 4. impalad waits until it sees that the minVersion in its cache is greater than
+    //    the value above (i.e. that all objects known at the time the invalidation
+    //    was issued have been removed/updated
+    //
+    // This is difficult to implement with partial caching: we don't want to have to track
+    // the minimum version of all cached data. We should figure out some other way of
+    // detecting the completion of the invalidation.
+    //
+    // For now, we return -1 as an invalid version number and disallow running
+    // INVALIDATE METADATA in local-catalog mode. This return value is not used by
+    // any other operations. See IMPALA-7506.
+    long minVersion = -1;
+
+    // NOTE: the return value is ignored when this function is called by a DDL
+    // operation.
+    synchronized (catalogServiceIdLock_) {
+      return new TUpdateCatalogCacheResponse(catalogServiceId_,
+          minVersion, lastSeenCatalogVersion_.get());
+    }
+  }
+
+  /**
+   * Witness a service ID received from the catalog. We can see the service IDs
+   * either from a DDL response (in which case the service ID is part of the RPC
+   * response object) or from a statestore topic update (in which case the service ID
+   * is part of the published CATALOG object).
+   *
+   * If we notice the service ID changed, we need to invalidate our cache.
+   */
+  private void witnessCatalogServiceId(TUniqueId serviceId) {
+    synchronized (catalogServiceIdLock_) {
+      if (!catalogServiceId_.equals(serviceId)) {
+        if (!catalogServiceId_.equals(Catalog.INITIAL_CATALOG_SERVICE_ID)) {
+          LOG.warn("Detected catalog service restart: service ID changed from " +
+              "{} to {}. Invalidating all cached metadata on this coordinator.",
+              catalogServiceId_, serviceId);
+        }
+        catalogServiceId_ = serviceId;
+        cache_.invalidateAll();
+        // TODO(todd): slight race here: a concurrent request from the old catalog
+        // could theoretically be just about to write something back into the cache
+        // after we do the above invalidate. Maybe we would be better off replacing
+        // the whole cache object, or doing a soft barrier here to wait for any
+        // concurrent cache accessors to cycle out. Another option is to associate
+        // the catalog service ID as part of all of the cache keys.
+        //
+        // This is quite unlikely to be an issue in practice, so deferring it to later
+        // clean-up.
+      }
+    }
+  }
+
+  /**
+   * Invalidate items from the cache in response to seeing an updated catalog object
+   * from the catalogd.
+   */
+  @VisibleForTesting
+  void invalidateCacheForObject(TCatalogObject obj) {
+    List<String> invalidated = Lists.newArrayList();
+    switch (obj.type) {
+    case TABLE:
+    case VIEW:
+      invalidateCacheForTable(obj.table.db_name, obj.table.tbl_name, invalidated);
+
+      // Currently adding or dropping a table doesn't send an invalidation for the
+      // DB, so we'll be coarse-grained here and invalidate the DB table list when
+      // any table change happens. It's relatively cheap to re-fetch this.
+      invalidateCacheForDb(obj.table.db_name, DbCacheKey.DbInfoType.TABLE_NAMES,
+          invalidated);
+      break;
+    case DATABASE:
+      if (cache_.asMap().remove(DB_LIST_CACHE_KEY) != null) {
+        invalidated.add("list of database names");
+      }
+      invalidateCacheForDb(obj.db.db_name, DbCacheKey.DbInfoType.TABLE_NAMES,
+          invalidated);
+      invalidateCacheForDb(obj.db.db_name, DbCacheKey.DbInfoType.HMS_METADATA,
+          invalidated);
+      break;
+
+    default:
+      break;
+    }
+    if (!invalidated.isEmpty()) {
+      LOG.debug("Invalidated objects in cache: {}", invalidated);
+    }
+  }
+
+  /**
+   * Invalidate cached metadata of the given type for the given database. If anything
+   * was invalidated, adds a human-readable string to 'invalidated' indicating the
+   * invalidated metadata.
+   */
+  private void invalidateCacheForDb(String dbName, DbCacheKey.DbInfoType type,
+      List<String> invalidated) {
+    DbCacheKey key = new DbCacheKey(dbName, type);
+    if (cache_.asMap().remove(key) != null) {
+      invalidated.add(type + " for DB " + dbName);
+    }
+  }
+
+  /**
+   * Invalidate cached metadata for the given table. If anything was invalidated, adds
+   * a human-readable string to 'invalidated' indicating the invalidated metadata.
+   */
+  private void invalidateCacheForTable(String dbName, String tblName,
+      List<String> invalidated) {
+    TableCacheKey key = new TableCacheKey(dbName, tblName);
+    if (cache_.asMap().remove(key) != null) {
+      invalidated.add("table " + dbName + "." + tblName);
+    }
   }
 
   /**
@@ -659,41 +958,65 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   /**
-   * Base class for cache keys related to a specific table.
+   * Base class for cache keys related to a specific table. Such keys are explicitly
+   * invalidated by 'invalidateCacheForTable' above.
    */
   private static class TableCacheKey {
     final String dbName_;
     final String tableName_;
-    /**
-     * The catalog version number of the Table object. Including the version number in
-     * the cache key ensures that, if the version number changes, any dependent entities
-     * are "automatically" invalidated.
-     *
-     * TODO(todd): need to handle the case of a catalogd restarting and reloading metadata
-     * for a table reusing a previously-used version number.
-     */
-    final long version_;
 
-    TableCacheKey(TableMetaRefImpl table) {
-      dbName_ = table.dbName_;
-      tableName_ = table.tableName_;
-      version_ = table.catalogVersion_;
+    TableCacheKey(String dbName, String tableName) {
+      this.dbName_ = dbName;
+      this.tableName_ = tableName;
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(dbName_, tableName_, version_, getClass());
+      return Objects.hashCode(dbName_, tableName_, getClass());
     }
-
     @Override
     public boolean equals(Object obj) {
       if (obj == null || !obj.getClass().equals(getClass())) {
         return false;
       }
       TableCacheKey other = (TableCacheKey)obj;
-      return version_ == other.version_ &&
-          tableName_.equals(other.tableName_) &&
+      return tableName_.equals(other.tableName_) &&
           dbName_.equals(other.dbName_);
+    }
+  }
+
+  /**
+   * Base class for cache keys that are tied to a particular version of a table.
+   * These keys are never explicitly invalidated. Instead, we rely on the fact that,
+   * when the table is updated, it has a new version number. This results in making
+   * previous entries for earlier versions of the table essentially unreachable in the
+   * cache. They will age out over time as no queries access them.
+   */
+  private static class VersionedTableCacheKey extends TableCacheKey {
+    /**
+     * The catalog version number of the Table object. Including the version number in
+     * the cache key ensures that, if the version number changes, any dependent entities
+     * are "automatically" invalidated.
+     */
+    final long version_;
+
+    VersionedTableCacheKey(TableMetaRefImpl table) {
+      super(table.dbName_, table.tableName_);
+      version_ = table.catalogVersion_;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(super.hashCode(), version_);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj == null || !(obj.getClass().equals(getClass()))) {
+        return false;
+      }
+      VersionedTableCacheKey other = (VersionedTableCacheKey)obj;
+      return super.equals(obj) && version_ == other.version_;
     }
   }
 
@@ -702,7 +1025,7 @@ public class CatalogdMetaProvider implements MetaProvider {
    *
    * Values for these keys are 'ColumnStatisticsObj' objects.
    */
-  private static class ColStatsCacheKey extends TableCacheKey {
+  private static class ColStatsCacheKey extends VersionedTableCacheKey {
     private final String colName_;
 
     public ColStatsCacheKey(TableMetaRefImpl table, String colName) {
@@ -730,7 +1053,7 @@ public class CatalogdMetaProvider implements MetaProvider {
    *
    * Values for these keys are 'List<PartitionRefImpl>'.
    */
-  private static class PartitionListCacheKey extends TableCacheKey {
+  private static class PartitionListCacheKey extends VersionedTableCacheKey {
     PartitionListCacheKey(TableMetaRefImpl table) {
       super(table);
     }
@@ -739,15 +1062,15 @@ public class CatalogdMetaProvider implements MetaProvider {
   /**
    * Key for caching information about a single partition.
    *
-   * TODO(todd): currently this inherits from TableCacheKey. This means that, if a
-   * table's version number changes, all of its partitions must be reloaded. However,
+   * TODO(todd): currently this inherits from VersionedTableCacheKey. This means that, if
+   * a table's version number changes, all of its partitions must be reloaded. However,
    * since partition IDs are globally unique within a catalogd instance, we could
    * optimize this to just key based on the partition ID. However, currently, there are
    * some cases where partitions are mutated in place rather than replaced with a new ID.
    * We need to eliminate those or add a partition sequence number before we can make
    * this optimization.
    */
-  private static class PartitionCacheKey extends TableCacheKey {
+  private static class PartitionCacheKey extends VersionedTableCacheKey {
     private final long partId_;
 
     PartitionCacheKey(TableMetaRefImpl table, long partId) {
@@ -767,6 +1090,39 @@ public class CatalogdMetaProvider implements MetaProvider {
       }
       PartitionCacheKey other = (PartitionCacheKey)obj;
       return super.equals(obj) && partId_ == other.partId_;
+    }
+  }
+
+  /**
+   * Cache key for metadata about databases.
+   */
+  private static class DbCacheKey {
+    static enum DbInfoType {
+      /** Cache the HMS Database object */
+      HMS_METADATA,
+      /** Cache an ImmutableList<String> for table names within the DB */
+      TABLE_NAMES
+    }
+    private final String dbName_;
+    private final DbInfoType type_;
+
+    DbCacheKey(String dbName, DbInfoType type) {
+      dbName_ = Preconditions.checkNotNull(dbName);
+      type_ = Preconditions.checkNotNull(type);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(getClass(), dbName_, type_);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) return true;
+      if (obj == null) return false;
+      if (getClass() != obj.getClass()) return false;
+      DbCacheKey other = (DbCacheKey) obj;
+      return dbName_.equals(other.dbName_) && type_ == other.type_;
     }
   }
 

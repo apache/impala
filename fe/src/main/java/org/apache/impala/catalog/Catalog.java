@@ -30,6 +30,7 @@ import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.PatternMatcher;
 
 import com.google.common.base.Joiner;
@@ -55,8 +56,9 @@ import com.google.common.collect.Lists;
  * Builtins are populated on startup in initBuiltins().
  */
 public abstract class Catalog {
-  // Initial catalog version.
+  // Initial catalog version and ID.
   public final static long INITIAL_CATALOG_VERSION = 0L;
+  public static final TUniqueId INITIAL_CATALOG_SERVICE_ID = new TUniqueId(0L, 0L);
   public static final String DEFAULT_DB = "default";
 
   protected final MetaStoreClientPool metaStoreClientPool_ =

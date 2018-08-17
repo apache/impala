@@ -16,11 +16,13 @@
 # under the License.
 
 import getpass
+import itertools
 import pytest
 import re
 import time
 
 from test_ddl_base import TestDdlBase
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIf, SkipIfADLS, SkipIfLocal
@@ -515,36 +517,63 @@ class TestDdlStatements(TestDdlBase):
 |  01:SCAN HDFS [functional.alltypes b]
 00:SCAN HDFS [functional.alltypestiny a]""" in '\n'.join(plan.data)
 
+  def _verify_describe_view(self, vector, view_name, expected_substr):
+    """
+    Verify across all impalads that the view 'view_name' has the given substring in its
+    expanded SQL.
+
+    If SYNC_DDL is enabled, the verification should complete immediately. Otherwise,
+    loops waiting for the expected condition to pass.
+    """
+    if vector.get_value('exec_option')['sync_ddl']:
+      num_attempts = 1
+    else:
+      num_attempts = 60
+    for impalad in ImpalaCluster().impalads:
+      client = impalad.service.create_beeswax_client()
+      try:
+        for attempt in itertools.count(start=1):
+          assert attempt <= num_attempts, "ran out of attempts"
+          try:
+            result = self.execute_query_expect_success(
+                client, "describe formatted %s" % view_name)
+            exp_line = [l for l in result.data if 'View Expanded' in l][0]
+          except ImpalaBeeswaxException, e:
+            # In non-SYNC_DDL tests, it's OK to get a "missing view" type error
+            # until the metadata propagates.
+            exp_line = "Exception: %s" % e
+          if expected_substr in exp_line.lower():
+            return
+          time.sleep(1)
+      finally:
+        client.close()
+
+
   def test_views_describe(self, vector, unique_database):
     # IMPALA-6896: Tests that altered views can be described by all impalads.
     impala_cluster = ImpalaCluster()
     impalads = impala_cluster.impalads
+    view_name = "%s.test_describe_view" % unique_database
+    query_opts = vector.get_value('exec_option')
     first_client = impalads[0].service.create_beeswax_client()
     try:
+      # Create a view and verify it's visible.
       self.execute_query_expect_success(first_client,
-                                        "create view {0}.test_describe_view as "
+                                        "create view {0} as "
                                         "select * from functional.alltypes"
-                                        .format(unique_database), {'sync_ddl': 1})
+                                        .format(view_name), query_opts)
+      self._verify_describe_view(vector, view_name, "select * from functional.alltypes")
+
+      # Alter the view and verify the alter is visible.
       self.execute_query_expect_success(first_client,
-                                        "alter view {0}.test_describe_view as "
+                                        "alter view {0} as "
                                         "select * from functional.alltypesagg"
-                                        .format(unique_database))
+                                        .format(view_name), query_opts)
+      self._verify_describe_view(vector, view_name,
+                                 "select * from functional.alltypesagg")
     finally:
       first_client.close()
 
-    for impalad in impalads:
-      client = impalad.service.create_beeswax_client()
-      try:
-        while True:
-          result = self.execute_query_expect_success(
-              client, "describe formatted {0}.test_describe_view"
-              .format(unique_database))
-          if any("select * from functional.alltypesagg" in s.lower()
-                 for s in result.data):
-            break
-          time.sleep(1)
-      finally:
-        client.close()
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_functions_ddl(self, vector, unique_database):
