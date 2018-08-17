@@ -30,9 +30,6 @@ from tests.common.test_vector import ImpalaTestDimension, ImpalaTestMatrix
 
 class TestDecimalFuzz(ImpalaTestSuite):
 
-  # Impala's max precision for decimals is 38, so we should have the same in the tests
-  decimal.getcontext().prec = 38
-
   @classmethod
   def get_workload(cls):
     return 'functional-query'
@@ -203,7 +200,7 @@ class TestDecimalFuzz(ImpalaTestSuite):
         return True
     return False
 
-  def execute_one_decimal_op(self):
+  def execute_one(self):
     '''Executes a single query and compares the result to a result that we computed in
     Python.'''
     op = random.choice(['+', '-', '*', '/', '%'])
@@ -246,60 +243,6 @@ class TestDecimalFuzz(ImpalaTestSuite):
         expected_result = None
       assert self.result_equals(expected_result, result)
 
-  def test_decimal_ops(self, vector):
+  def test_fuzz(self, vector):
     for _ in xrange(self.iterations):
-      self.execute_one_decimal_op()
-
-  def width_bucket(self, val, min_range, max_range, num_buckets):
-    # Multiplying the values by 10**40 guarantees that the numbers can be converted
-    # to int without losing information.
-    val_int = int(decimal.Decimal(val) * 10**40)
-    min_range_int = int(decimal.Decimal(min_range) * 10**40)
-    max_range_int = int(decimal.Decimal(max_range) * 10**40)
-
-    if min_range_int >= max_range_int:
-      return None
-    if val_int < min_range_int:
-      return 0
-    if val_int > max_range_int:
-      return num_buckets + 1
-
-    range_size = max_range_int - min_range_int
-    dist_from_min = val_int - min_range_int
-    return (num_buckets * dist_from_min) / range_size + 1
-
-  def execute_one_width_bucket(self):
-    val, val_prec, val_scale = self.get_decimal()
-    min_range, min_range_prec, min_range_scale = self.get_decimal()
-    max_range, max_range_prec, max_range_scale = self.get_decimal()
-    num_buckets = random.randint(1, 2147483647)
-
-    query = ('select width_bucket('
-        'cast({val} as decimal({val_prec},{val_scale})), '
-        'cast({min_range} as decimal({min_range_prec},{min_range_scale})), '
-        'cast({max_range} as decimal({max_range_prec},{max_range_scale})), '
-        '{num_buckets})')
-
-    query = query.format(val=val, val_prec=val_prec, val_scale=val_scale,
-        min_range=min_range, min_range_prec=min_range_prec,
-        min_range_scale=min_range_scale,
-        max_range=max_range, max_range_prec=max_range_prec,
-        max_range_scale=max_range_scale,
-        num_buckets=num_buckets)
-
-    expected_result = self.width_bucket(val, min_range, max_range, num_buckets)
-    if not expected_result:
-      return
-
-    try:
-      result = self.execute_scalar(query, query_options={'decimal_v2': 'true'})
-      assert int(result) == expected_result
-    except ImpalaBeeswaxException as e:
-      if "You need to wrap the arguments in a CAST" not in str(e):
-        # Sometimes the decimal inputs are incompatible with each other, so it's ok
-        # to ignore this error.
-        raise e
-
-  def test_width_bucket(self, vector):
-    for _ in xrange(self.iterations):
-      self.execute_one_width_bucket()
+      self.execute_one()
