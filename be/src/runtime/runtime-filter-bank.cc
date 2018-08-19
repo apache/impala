@@ -61,7 +61,7 @@ Status RuntimeFilterBank::ClaimBufferReservation() {
   DCHECK(!buffer_pool_client_.is_registered());
   string filter_bank_name = Substitute(
       "RuntimeFilterBank (Fragment Id: $0)", PrintId(state_->fragment_instance_id()));
-  RETURN_IF_ERROR(state_->exec_env()->buffer_pool()->RegisterClient(filter_bank_name,
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->buffer_pool()->RegisterClient(filter_bank_name,
       state_->query_state()->file_group(), state_->instance_buffer_reservation(),
       filter_mem_tracker_.get(), total_bloom_filter_mem_required_,
       state_->runtime_profile(), &buffer_pool_client_));
@@ -268,7 +268,7 @@ void RuntimeFilterBank::Close() {
               << ") returning reservation " << total_bloom_filter_mem_required_;
     state_->query_state()->initial_reservations()->Return(
         &buffer_pool_client_, total_bloom_filter_mem_required_);
-    state_->exec_env()->buffer_pool()->DeregisterClient(&buffer_pool_client_);
+    ExecEnv::GetInstance()->buffer_pool()->DeregisterClient(&buffer_pool_client_);
   }
   DCHECK_EQ(filter_mem_tracker_->consumption(), 0);
   filter_mem_tracker_->Close();

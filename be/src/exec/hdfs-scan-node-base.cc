@@ -340,7 +340,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   }
 
   RETURN_IF_ERROR(ClaimBufferReservation(state));
-  reader_context_ = runtime_state_->io_mgr()->RegisterContext();
+  reader_context_ = ExecEnv::GetInstance()->disk_io_mgr()->RegisterContext();
 
   // Initialize HdfsScanNode specific counters
   hdfs_read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_READ_TIMER);
@@ -392,7 +392,8 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
       "MaxCompressedTextFileLength", TUnit::BYTES);
 
   hdfs_read_thread_concurrency_bucket_ = runtime_profile()->AddBucketingCounters(
-      &active_hdfs_read_thread_counter_, state->io_mgr()->num_total_disks() + 1);
+      &active_hdfs_read_thread_counter_,
+      ExecEnv::GetInstance()->disk_io_mgr()->num_total_disks() + 1);
 
   counters_running_ = true;
 
@@ -413,7 +414,7 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
   if (reader_context_ != nullptr) {
     // Need to wait for all the active scanner threads to finish to ensure there is no
     // more memory tracked by this scan node's mem tracker.
-    state->io_mgr()->UnregisterContext(reader_context_.get());
+    ExecEnv::GetInstance()->disk_io_mgr()->UnregisterContext(reader_context_.get());
   }
 
   StopAndFinalizeCounters();
@@ -569,7 +570,8 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
   DCHECK_GE(len, 0);
   DCHECK_LE(offset + len, GetFileDesc(metadata->partition_id, file)->file_length)
       << "Scan range beyond end of file (offset=" << offset << ", len=" << len << ")";
-  disk_id = runtime_state_->io_mgr()->AssignQueue(file, disk_id, expected_local);
+  disk_id = ExecEnv::GetInstance()->disk_io_mgr()->AssignQueue(
+      file, disk_id, expected_local);
 
   ScanRange* range = runtime_state_->obj_pool()->Add(new ScanRange);
   range->Reset(fs, file, len, offset, disk_id, expected_local, buffer_opts, metadata);

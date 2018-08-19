@@ -23,6 +23,7 @@
 #include "common/logging.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "runtime/exec-env.h"
 #include "runtime/hbase-table-factory.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
@@ -53,7 +54,7 @@ HBaseTableWriter::HBaseTableWriter(HBaseTableDescriptor* table_desc,
     runtime_profile_(profile) { }
 
 Status HBaseTableWriter::Init(RuntimeState* state) {
-  RETURN_IF_ERROR(state->htable_factory()->GetTable(table_desc_->name(),
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->htable_factory()->GetTable(table_desc_->name(),
       &table_));
   encoding_timer_ = ADD_TIMER(runtime_profile_, "EncodingTimer");
   htable_put_timer_ = ADD_TIMER(runtime_profile_, "HTablePutTimer");

@@ -54,7 +54,7 @@ BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     int64_t default_page_len, int64_t max_page_len, const set<SlotId>& ext_varlen_slots)
   : state_(state),
     desc_(row_desc),
-    buffer_pool_(state->exec_env()->buffer_pool()),
+    buffer_pool_(ExecEnv::GetInstance()->buffer_pool()),
     buffer_pool_client_(buffer_pool_client),
     read_page_reservation_(buffer_pool_client_),
     write_page_reservation_(buffer_pool_client_),

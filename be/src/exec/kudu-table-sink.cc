@@ -120,8 +120,8 @@ Status KuduTableSink::Open(RuntimeState* state) {
   }
   client_tracked_bytes_ = required_mem;
 
-  RETURN_IF_ERROR(
-      state->exec_env()->GetKuduClient(table_desc_->kudu_master_addresses(), &client_));
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->GetKuduClient(
+      table_desc_->kudu_master_addresses(), &client_));
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc_->table_name(), &table_),
       "Unable to open Kudu table");
 

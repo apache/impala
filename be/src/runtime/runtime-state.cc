@@ -73,7 +73,6 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
     utc_timestamp_(new TimestampValue(TimestampValue::Parse(
         query_state->query_ctx().utc_timestamp_string))),
     local_time_zone_(&TimezoneDatabase::GetUtcTimezone()),
-    exec_env_(exec_env),
     profile_(RuntimeProfile::Create(
           obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id))),
     instance_buffer_reservation_(new ReservationTracker) {
@@ -91,7 +90,6 @@ RuntimeState::RuntimeState(
     now_(new TimestampValue(TimestampValue::Parse(qctx.now_string))),
     utc_timestamp_(new TimestampValue(TimestampValue::Parse(qctx.utc_timestamp_string))),
     local_time_zone_(&TimezoneDatabase::GetUtcTimezone()),
-    exec_env_(exec_env),
     profile_(RuntimeProfile::Create(obj_pool(), "<unnamed>")) {
   // We may use execution resources while evaluating exprs, etc. Decremented in
   // ReleaseResources() to release resources.
@@ -111,7 +109,7 @@ void RuntimeState::Init() {
   SCOPED_TIMER(profile_->total_time_counter());
 
   // Register with the thread mgr
-  resource_pool_ = exec_env_->thread_mgr()->CreatePool();
+  resource_pool_ = ExecEnv::GetInstance()->thread_mgr()->CreatePool();
   DCHECK(resource_pool_ != nullptr);
   if (fragment_ctx_ != nullptr) {
     // Ensure that the planner correctly determined the required threads.
@@ -265,7 +263,7 @@ void RuntimeState::ReleaseResources() {
   DCHECK(!released_resources_);
   if (filter_bank_ != nullptr) filter_bank_->Close();
   if (resource_pool_ != nullptr) {
-    exec_env_->thread_mgr()->DestroyPool(move(resource_pool_));
+    ExecEnv::GetInstance()->thread_mgr()->DestroyPool(move(resource_pool_));
   }
   // Release any memory associated with codegen.
   if (codegen_ != nullptr) codegen_->Close();
@@ -288,26 +286,6 @@ void RuntimeState::ReleaseResources() {
 
 const std::string& RuntimeState::GetEffectiveUser() const {
   return impala::GetEffectiveUser(query_ctx().session);
-}
-
-ImpalaBackendClientCache* RuntimeState::impalad_client_cache() {
-  return exec_env_->impalad_client_cache();
-}
-
-CatalogServiceClientCache* RuntimeState::catalogd_client_cache() {
-  return exec_env_->catalogd_client_cache();
-}
-
-io::DiskIoMgr* RuntimeState::io_mgr() {
-  return exec_env_->disk_io_mgr();
-}
-
-KrpcDataStreamMgr* RuntimeState::stream_mgr() {
-  return exec_env_->stream_mgr();
-}
-
-HBaseTableFactory* RuntimeState::htable_factory() {
-  return exec_env_->htable_factory();
 }
 
 ObjectPool* RuntimeState::obj_pool() const {

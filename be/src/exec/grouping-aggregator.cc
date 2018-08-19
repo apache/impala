@@ -210,7 +210,7 @@ Status GroupingAggregator::Open(RuntimeState* state) {
 
   if (ht_allocator_ == nullptr) {
     // Allocate 'serialize_stream_' and 'ht_allocator_' on the first Open() call.
-    ht_allocator_.reset(new Suballocator(state_->exec_env()->buffer_pool(),
+    ht_allocator_.reset(new Suballocator(ExecEnv::GetInstance()->buffer_pool(),
         buffer_pool_client(), resource_profile_.spillable_buffer_size));
 
     if (!is_streaming_preagg_ && needs_serialize_) {

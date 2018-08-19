@@ -44,7 +44,7 @@ void ReservationManager::Close(RuntimeState* state) {
     VLOG_FILE << name_ << " returning reservation " << resource_profile_.min_reservation;
     state->query_state()->initial_reservations()->Return(
         &buffer_pool_client_, resource_profile_.min_reservation);
-    state->exec_env()->buffer_pool()->DeregisterClient(&buffer_pool_client_);
+    ExecEnv::GetInstance()->buffer_pool()->DeregisterClient(&buffer_pool_client_);
   }
 }
 

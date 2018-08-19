@@ -21,6 +21,7 @@
 
 #include <orc/OrcFile.hh>
 
+#include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/runtime-state.h"
 #include "exec/hdfs-scanner.h"
@@ -81,7 +82,7 @@ class HdfsOrcScanner : public HdfsScanner {
     }
 
     uint64_t getNaturalReadSize() const {
-      return scanner_->state_->io_mgr()->max_buffer_size();
+      return ExecEnv::GetInstance()->disk_io_mgr()->max_buffer_size();
     }
 
     void read(void* buf, uint64_t length, uint64_t offset);

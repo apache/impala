@@ -149,8 +149,8 @@ Status PhjBuilder::Open(RuntimeState* state) {
   }
   if (ht_allocator_ == nullptr) {
     // Create 'ht_allocator_' on the first call to Open().
-    ht_allocator_.reset(new Suballocator(
-        state->exec_env()->buffer_pool(), buffer_pool_client_, spillable_buffer_size_));
+    ht_allocator_.reset(new Suballocator(ExecEnv::GetInstance()->buffer_pool(),
+        buffer_pool_client_, spillable_buffer_size_));
   }
   RETURN_IF_ERROR(CreateHashPartitions(0));
   AllocateRuntimeFilters();

@@ -106,12 +106,6 @@ class RuntimeState {
         ? instance_ctx_->fragment_instance_id
         : no_instance_id_;
   }
-  ExecEnv* exec_env() { return exec_env_; }
-  KrpcDataStreamMgr* stream_mgr();
-  HBaseTableFactory* htable_factory();
-  ImpalaBackendClientCache* impalad_client_cache();
-  CatalogServiceClientCache* catalogd_client_cache();
-  io::DiskIoMgr* io_mgr();
   MemTracker* instance_mem_tracker() { return instance_mem_tracker_.get(); }
   MemTracker* query_mem_tracker();  // reference to the query_state_'s memtracker
   ReservationTracker* instance_buffer_reservation() {
@@ -327,8 +321,6 @@ class RuntimeState {
   /// Owned by a static storage member of TimezoneDatabase class. It cannot be nullptr.
   const Timezone* local_time_zone_;
 
-  /// TODO: get rid of this and use ExecEnv::GetInstance() instead
-  ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
 
   /// Contains all ScalarFnCall expressions which need to be codegen'd.

@@ -19,6 +19,7 @@
 
 #include <algorithm>
 
+#include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
@@ -60,7 +61,8 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
   hbase_read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HBASE_READ_TIMER);
   AddBytesReadCounters();
 
-  hbase_scanner_.reset(new HBaseTableScanner(this, state->htable_factory(), state));
+  hbase_scanner_.reset(
+      new HBaseTableScanner(this, ExecEnv::GetInstance()->htable_factory(), state));
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   if (tuple_desc_ == NULL) {
