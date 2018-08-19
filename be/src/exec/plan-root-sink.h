@@ -118,10 +118,6 @@ class PlanRootSink : public DataSink {
 
   /// Set by GetNext() to indicate to Send() how many rows it should write to results_.
   int num_rows_requested_ = 0;
-
-  /// Writes a single row into 'result' and 'scales' by evaluating
-  /// output_expr_evals_ over 'row'.
-  void GetRowValue(TupleRow* row, std::vector<void*>* result, std::vector<int>* scales);
 };
 }
 

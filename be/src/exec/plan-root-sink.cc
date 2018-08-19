@@ -79,22 +79,11 @@ Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
 
     // Otherwise the consumer is ready. Fill out the rows.
     DCHECK(results_ != nullptr);
-    // List of expr values to hold evaluated rows from the query
-    vector<void*> result_row;
-    result_row.resize(output_exprs_.size());
-
-    // List of scales for floating point values in result_row
-    vector<int> scales;
-    scales.resize(result_row.size());
-
     int num_to_fetch = batch->num_rows() - current_batch_row;
     if (num_rows_requested_ > 0) num_to_fetch = min(num_to_fetch, num_rows_requested_);
-    for (int i = 0; i < num_to_fetch; ++i) {
-      TupleRow* row = batch->GetRow(current_batch_row);
-      GetRowValue(row, &result_row, &scales);
-      RETURN_IF_ERROR(results_->AddOneRow(result_row, scales));
-      ++current_batch_row;
-    }
+    RETURN_IF_ERROR(
+        results_->AddRows(output_expr_evals_, batch, current_batch_row, num_to_fetch));
+    current_batch_row += num_to_fetch;
     // Prevent expr result allocations from accumulating.
     expr_results_pool_->Clear();
     // Signal the consumer.
@@ -145,14 +134,5 @@ Status PlanRootSink::GetNext(
 
   *eos = sender_state_ == SenderState::EOS;
   return state->GetQueryStatus();
-}
-
-void PlanRootSink::GetRowValue(
-    TupleRow* row, vector<void*>* result, vector<int>* scales) {
-  DCHECK_GE(result->size(), output_expr_evals_.size());
-  for (int i = 0; i < output_expr_evals_.size(); ++i) {
-    (*result)[i] = output_expr_evals_[i]->GetValue(row);
-    (*scales)[i] = output_expr_evals_[i]->output_scale();
-  }
 }
 }
