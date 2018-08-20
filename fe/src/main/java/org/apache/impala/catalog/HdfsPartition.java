@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +37,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.fb.FbCompression;
@@ -517,9 +519,26 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
   private boolean isMarkedCached_ = false;
   private final TAccessLevel accessLevel_;
 
-  // (k,v) pairs of parameters for this partition, stored in the HMS. Used by Impala to
-  // store intermediate state for statistics computations.
+  // (k,v) pairs of parameters for this partition, stored in the HMS.
   private Map<String, String> hmsParameters_;
+
+  // Binary representation of the TPartitionStats for this partition. Populated
+  // when the partition is loaded and updated using setPartitionStatsBytes().
+  private byte[] partitionStats_ = null;
+
+  // True if partitionStats_ has intermediate_col_stats populated.
+  private boolean hasIncrementalStats_ = false;
+
+  // A predicate for checking if a given string is a key used for serializing
+  // TPartitionStats to HMS parameters.
+  private static Predicate<String> IS_INCREMENTAL_STATS_KEY =
+      new Predicate<String>() {
+        @Override
+        public boolean apply(String key) {
+          return key.startsWith(PartitionStatsUtil.INCREMENTAL_STATS_NUM_CHUNKS)
+              || key.startsWith(PartitionStatsUtil.INCREMENTAL_STATS_CHUNK_PREFIX);
+        }
+      };
 
   @Override // FeFsPartition
   public HdfsStorageDescriptor getInputFormatDescriptor() {
@@ -623,22 +642,63 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     return PartitionStatsUtil.getPartStatsOrWarn(this);
   }
 
-  @Override // FeFsPartition
-  public boolean hasIncrementalStats() {
-    // TODO: performance of this could improve substantially, since
-    // getPartitionStats() performs a bunch of expensive deserialization,
-    // only to end up throwing away the result.
-    TPartitionStats partStats = getPartitionStats();
-    return partStats != null && partStats.intermediate_col_stats != null;
+  public byte[] getPartitionStatsCompressed() {
+    return partitionStats_;
   }
+
+  public void setPartitionStatsBytes(byte[] partitionStats, boolean hasIncrStats) {
+    if (hasIncrStats) Preconditions.checkNotNull(partitionStats);
+    partitionStats_ = partitionStats;
+    hasIncrementalStats_ = hasIncrStats;
+  }
+
+  /**
+   * Helper method that removes the partition stats from hmsParameters_, compresses them
+   * and updates partitionsStats_.
+   */
+  private void extractAndCompressPartStats() {
+    try {
+      // Convert the stats stored in the hmsParams map to a deflate-compressed in-memory
+      // byte array format. After conversion, delete the entries in the hmsParams map
+      // as they are not needed anymore.
+      Reference<Boolean> hasIncrStats = new Reference(false);
+      byte[] partitionStats =
+          PartitionStatsUtil.partStatsBytesFromParameters(hmsParameters_, hasIncrStats);
+      setPartitionStatsBytes(partitionStats, hasIncrStats.getRef());
+    } catch (ImpalaException e) {
+      LOG.warn(String.format("Failed to set partition stats for table %s partition %s",
+          getTable().getFullName(), getPartitionName()), e);
+    } finally {
+      // Delete the incremental stats entries. Cleared even on error conditions so that
+      // we do not persist the corrupt entries in the hmsParameters_ map when it is
+      // flushed to the HMS.
+      Maps.filterKeys(hmsParameters_, IS_INCREMENTAL_STATS_KEY).clear();
+    }
+  }
+
+  public void dropPartitionStats() { setPartitionStatsBytes(null, false); }
+
+  @Override // FeFsPartition
+  public boolean hasIncrementalStats() { return hasIncrementalStats_; }
 
   @Override // FeFsPartition
   public TAccessLevel getAccessLevel() { return accessLevel_; }
 
   @Override // FeFsPartition
-  public Map<String, String> getParameters() { return hmsParameters_; }
+  public Map<String, String> getParameters() {
+    // Once the TPartitionStats in the parameters map are converted to a compressed
+    // format, the hmsParameters_ map should not contain any partition stats keys.
+    // Even though filterKeys() is O(n), we are not worried about the performance here
+    // since hmsParameters_ should be pretty small once the partition stats are removed.
+    Preconditions.checkState(
+        Maps.filterKeys(hmsParameters_, IS_INCREMENTAL_STATS_KEY).isEmpty());
+    return hmsParameters_;
+  }
 
-  public void putToParameters(String k, String v) { hmsParameters_.put(k, v); }
+  public void putToParameters(String k, String v) {
+    Preconditions.checkArgument(!IS_INCREMENTAL_STATS_KEY.apply(k));
+    hmsParameters_.put(k, v);
+  }
   public void putToParameters(Pair<String, String> kv) {
     putToParameters(kv.first, kv.second);
   }
@@ -754,12 +814,16 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
             cachedMsPartitionDescriptor_.sdBucketCols,
             cachedMsPartitionDescriptor_.sdSortCols,
             cachedMsPartitionDescriptor_.sdParameters);
+    // Make a copy so that the callers do not need to delete the incremental stats
+    // strings from the hmsParams_ map later.
+    Map<String, String> hmsParams = Maps.newHashMap(getParameters());
+    PartitionStatsUtil.partStatsToParams(this, hmsParams);
     org.apache.hadoop.hive.metastore.api.Partition partition =
         new org.apache.hadoop.hive.metastore.api.Partition(
             getPartitionValuesAsStrings(true), getTable().getDb().getName(),
             getTable().getName(), cachedMsPartitionDescriptor_.msCreateTime,
             cachedMsPartitionDescriptor_.msLastAccessTime, storageDescriptor,
-            getParameters());
+            hmsParams);
     return partition;
   }
 
@@ -788,6 +852,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     } else {
       hmsParameters_ = Maps.newHashMap();
     }
+    extractAndCompressPartStats();
   }
 
   public HdfsPartition(HdfsTable table,
@@ -828,20 +893,6 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     return Objects.toStringHelper(this)
       .add("fileDescriptors", getFileDescriptors())
       .toString();
-  }
-
-  public static Predicate<String> IS_NOT_INCREMENTAL_STATS_KEY =
-      new Predicate<String>() {
-        @Override
-        public boolean apply(String key) {
-          return !(key.startsWith(PartitionStatsUtil.INCREMENTAL_STATS_NUM_CHUNKS)
-              || key.startsWith(PartitionStatsUtil.INCREMENTAL_STATS_CHUNK_PREFIX));
-        }
-      };
-
-  @Override
-  public Map<String, String> getFilteredHmsParameters() {
-    return Maps.filterKeys(hmsParameters_, IS_NOT_INCREMENTAL_STATS_KEY);
   }
 
   public static HdfsPartition fromThrift(HdfsTable table,
@@ -899,6 +950,11 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       partition.hmsParameters_ = thriftPartition.getHms_parameters();
     } else {
       partition.hmsParameters_ = Maps.newHashMap();
+    }
+
+    partition.hasIncrementalStats_ = thriftPartition.has_incremental_stats;
+    if (thriftPartition.isSetPartition_stats()) {
+      partition.partitionStats_ = thriftPartition.getPartition_stats();
     }
 
     return partition;

@@ -856,7 +856,7 @@ public class CatalogOpExecutor {
         LOG.trace(String.format("Updating stats for partition %s: numRows=%s",
             partition.getValuesAsString(), numRows));
       }
-      PartitionStatsUtil.partStatsToParameters(partitionStats, partition);
+      PartitionStatsUtil.partStatsToPartition(partitionStats, partition);
       partition.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
       // HMS requires this param for stats changes to take effect.
       partition.putToParameters(MetastoreShim.statsGeneratedViaStatsTaskParam());
@@ -1146,8 +1146,8 @@ public class CatalogOpExecutor {
         }
 
         for(HdfsPartition partition : partitions) {
-          if (partition.getPartitionStats() != null) {
-            PartitionStatsUtil.deletePartStats(partition);
+          if (partition.getPartitionStatsCompressed() != null) {
+            partition.dropPartitionStats();
             try {
               applyAlterPartition(table, partition);
             } finally {
@@ -1233,8 +1233,8 @@ public class CatalogOpExecutor {
       // TODO(todd): avoid downcast
       HdfsPartition part = (HdfsPartition) fePart;
       boolean isModified = false;
-      if (part.getPartitionStats() != null) {
-        PartitionStatsUtil.deletePartStats(part);
+      if (part.getPartitionStatsCompressed() != null) {
+        part.dropPartitionStats();
         isModified = true;
       }
 

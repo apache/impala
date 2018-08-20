@@ -441,11 +441,7 @@ public class ComputeStatsStmt extends StatementBase {
         Collection<? extends FeFsPartition> allPartitions =
             FeCatalogUtils.loadAllPartitions(hdfsTable);
         for (FeFsPartition p: allPartitions) {
-          TPartitionStats partStats = p.getPartitionStats();
           if (!p.hasIncrementalStats() || tableIsMissingColStats) {
-            if (partStats == null) {
-              if (LOG.isTraceEnabled()) LOG.trace(p.toString() + " does not have stats");
-            }
             if (!tableIsMissingColStats) filterPreds.add(p.getConjunctSql());
             List<String> partValues = Lists.newArrayList();
             for (LiteralExpr partValue: p.getPartitionValues()) {
@@ -454,8 +450,7 @@ public class ComputeStatsStmt extends StatementBase {
             }
             expectedPartitions_.add(partValues);
           } else {
-            if (LOG.isTraceEnabled()) LOG.trace(p.toString() + " does have statistics");
-            validPartStats_.add(partStats);
+            validPartStats_.add(p.getPartitionStats());
           }
         }
         if (expectedPartitions_.size() == hdfsTable.getPartitions().size()) {

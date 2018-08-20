@@ -1692,7 +1692,8 @@ public class HdfsTable extends Table implements FeFsTable {
 
     boolean wantPartitionInfo = req.table_info_selector.want_partition_files ||
         req.table_info_selector.want_partition_metadata ||
-        req.table_info_selector.want_partition_names;
+        req.table_info_selector.want_partition_names ||
+        req.table_info_selector.want_partition_stats;
 
     Collection<Long> partIds = req.table_info_selector.partition_ids;
     if (partIds == null && wantPartitionInfo) {
@@ -1715,6 +1716,7 @@ public class HdfsTable extends Table implements FeFsTable {
 
         if (req.table_info_selector.want_partition_metadata) {
           partInfo.hms_partition = part.toHmsPartition();
+          partInfo.setHas_incremental_stats(part.hasIncrementalStats());
         }
 
         if (req.table_info_selector.want_partition_files) {
@@ -1723,6 +1725,10 @@ public class HdfsTable extends Table implements FeFsTable {
           for (FileDescriptor fd: fds) {
             partInfo.file_descriptors.add(fd.toThrift());
           }
+        }
+
+        if (req.table_info_selector.want_partition_stats) {
+          partInfo.setPartition_stats(part.getPartitionStatsCompressed());
         }
 
         resp.table_info.partitions.add(partInfo);
@@ -1762,6 +1768,8 @@ public class HdfsTable extends Table implements FeFsTable {
     int numPartitions =
         (refPartitions == null) ? partitionMap_.values().size() : refPartitions.size();
     memUsageEstimate += numPartitions * PER_PARTITION_MEM_USAGE_BYTES;
+    // TODO(bharath): Revisit the constant STATS_SIZE_PER_COLUMN_BYTES after the
+    // new incremental stats in-memory representation changes.
     long statsSizeEstimate =
         numPartitions * getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
     boolean includeIncrementalStats =
@@ -1773,8 +1781,7 @@ public class HdfsTable extends Table implements FeFsTable {
       if (refPartitions == null || refPartitions.contains(id)) {
         THdfsPartition tHdfsPartition = FeCatalogUtils.fsPartitionToThrift(
             partition, type, includeIncrementalStats);
-        if (tHdfsPartition.isSetHas_incremental_stats() &&
-            tHdfsPartition.isHas_incremental_stats()) {
+        if (partition.hasIncrementalStats()) {
           memUsageEstimate += getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
           hasIncrementalStats_ = true;
         }

@@ -294,8 +294,13 @@ struct THdfsPartition {
   // Total file size in bytes of this partition.
   17: optional i64 total_file_size_bytes
 
-  // True, if this partition has incremental stats
-  18: optional bool has_incremental_stats
+  // byte[] representation of TPartitionStats for this partition that is compressed using
+  // 'deflate-compression'.
+  18: optional binary partition_stats
+
+  // Set to true if partition_stats contain intermediate column stats computed via
+  // incremental statistics, false otherwise.
+  19: optional bool has_incremental_stats
 }
 
 // Constant partition ID used for THdfsPartition.prototype_partition below.

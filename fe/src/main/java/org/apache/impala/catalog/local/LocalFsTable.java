@@ -336,7 +336,8 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     LocalPartitionSpec spec = new LocalPartitionSpec(
         this, CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
     LocalFsPartition prototypePartition = new LocalFsPartition(
-        this, spec, protoMsPartition, /*fileDescriptors=*/null);
+        this, spec, protoMsPartition, /*fileDescriptors=*/null, /*partitionStats=*/null,
+        /*hasIncrementalStats=*/false);
     return prototypePartition;
   }
 
@@ -411,7 +412,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
       }
 
       LocalFsPartition part = new LocalFsPartition(this, spec, p.getHmsPartition(),
-          p.getFileDescriptors());
+          p.getFileDescriptors(), p.getPartitionStats(), p.hasIncrementalStats());
       ret.add(part);
     }
     return ret;

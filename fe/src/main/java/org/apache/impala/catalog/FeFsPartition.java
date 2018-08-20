@@ -116,6 +116,13 @@ public interface FeFsPartition {
   boolean hasIncrementalStats();
 
   /**
+   * @return the byte array representation of TPartitionStats for this partition. They
+   * are stored as a deflate-compressed byte array to reduce memory footprint. Use
+   * 'getPartitionStats()' to get the corresponding TPartitionStats object.
+   */
+  byte[] getPartitionStatsCompressed();
+
+ /**
    * @return the size (in bytes) of all the files inside this partition
    */
   long getSize();
@@ -149,17 +156,9 @@ public interface FeFsPartition {
   LiteralExpr getPartitionValue(int pos);
 
   /**
-   * @return the HMS parameters stored for this partition
+   * @return the HMS parameters stored for this partition. Keys that store chunked
+   * TPartitionStats for this partition are not included. To access partition stats, use
+   * getPartitionStatsCompressed().
    */
   Map<String, String> getParameters();
-
-  /**
-   * Returns the HMS partition parameters after filtering out all the partition
-   * incremental stats information.
-   *
-   * TODO(todd): consider _always_ filtering the parameters to remove incremental
-   * stats, and having a different getter which returns the already-decoded stats
-   * which are more memory-efficient anyway.
-   */
-  Map<String, String> getFilteredHmsParameters();
 }

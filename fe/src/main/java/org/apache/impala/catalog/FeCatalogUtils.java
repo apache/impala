@@ -308,7 +308,7 @@ public abstract class FeCatalogUtils {
   }
 
   public static THdfsPartition fsPartitionToThrift(FeFsPartition part,
-      ThriftObjectType type, boolean includeIncrementalStats) {
+      ThriftObjectType type, boolean includePartitionStats) {
     HdfsStorageDescriptor sd = part.getInputFormatDescriptor();
     THdfsPartition thriftHdfsPart = new THdfsPartition(
         sd.getLineDelim(),
@@ -325,13 +325,15 @@ public abstract class FeCatalogUtils {
       thriftHdfsPart.setStats(new TTableStats(part.getNumRows()));
       thriftHdfsPart.setAccess_level(part.getAccessLevel());
       thriftHdfsPart.setIs_marked_cached(part.isMarkedCached());
-      thriftHdfsPart.setHas_incremental_stats(part.hasIncrementalStats());
       // IMPALA-4902: Shallow-clone the map to avoid concurrent modifications. One thread
       // may try to serialize the returned THdfsPartition after releasing the table's lock,
       // and another thread doing DDL may modify the map.
-      thriftHdfsPart.setHms_parameters(Maps.newHashMap(
-          includeIncrementalStats ? part.getParameters() :
-            part.getFilteredHmsParameters()));
+      thriftHdfsPart.setHms_parameters(Maps.newHashMap(part.getParameters()));
+      thriftHdfsPart.setHas_incremental_stats(part.hasIncrementalStats());
+      if (includePartitionStats && part.getPartitionStatsCompressed() != null) {
+        thriftHdfsPart.setPartition_stats(
+            Preconditions.checkNotNull(part.getPartitionStatsCompressed()));
+      }
 
       // Add block location information
       long numBlocks = 0;

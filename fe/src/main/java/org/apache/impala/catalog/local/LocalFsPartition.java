@@ -47,18 +47,28 @@ public class LocalFsPartition implements FeFsPartition {
   private final LocalFsTable table_;
   private final LocalPartitionSpec spec_;
   private final Partition msPartition_;
+
   /**
    * Null in the case of a 'prototype partition'.
    */
   @Nullable
   private final ImmutableList<FileDescriptor> fileDescriptors_;
 
+  @Nullable
+  private final byte[] partitionStats_;
+
+  // True if partitionStats_ has intermediate_col_stats populated.
+  private final boolean hasIncrementalStats_;
+
   public LocalFsPartition(LocalFsTable table, LocalPartitionSpec spec,
-      Partition msPartition, ImmutableList<FileDescriptor> fileDescriptors) {
+      Partition msPartition, ImmutableList<FileDescriptor> fileDescriptors,
+      byte [] partitionStats, boolean hasIncrementalStats) {
     table_ = Preconditions.checkNotNull(table);
     spec_ = Preconditions.checkNotNull(spec);
     msPartition_ = Preconditions.checkNotNull(msPartition);
     fileDescriptors_ = fileDescriptors;
+    partitionStats_ = partitionStats;
+    hasIncrementalStats_ = hasIncrementalStats;
   }
 
   @Override
@@ -158,13 +168,10 @@ public class LocalFsPartition implements FeFsPartition {
   }
 
   @Override
-  public boolean hasIncrementalStats() {
-    // TODO(todd): copy-paste from HdfsPartition
-    // TODO(todd): as in the equivalent method in HdfsPartition, this is
-    // expensive because it deserializes the stats completely.
-    TPartitionStats partStats = getPartitionStats();
-    return partStats != null && partStats.intermediate_col_stats != null;
-  }
+  public boolean hasIncrementalStats() { return hasIncrementalStats_; }
+
+  @Override // FeFsPartition
+  public byte[] getPartitionStatsCompressed() { return partitionStats_; }
 
   @Override
   public long getSize() {
@@ -203,14 +210,5 @@ public class LocalFsPartition implements FeFsPartition {
   @Override
   public Map<String, String> getParameters() {
     return msPartition_.getParameters();
-  }
-
-  @Override
-  public Map<String, String> getFilteredHmsParameters() {
-    // TODO(todd): for now, copied from HdfsPartition. Eventually we would want to
-    // lazy-fetch these parameters separately for only the cases that require them,
-    // since they are quite large.
-    return Maps.filterKeys(getParameters(),
-        HdfsPartition.IS_NOT_INCREMENTAL_STATS_KEY);
   }
 }

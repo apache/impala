@@ -123,7 +123,6 @@ public class PartialCatalogInfoTest {
     // TODO(todd): we should probably transfer a compressed descriptor instead
     // and refactor the MetaProvider interface to expose those since there is
     // a lot of redundant info in partition descriptors.
-    // TODO(todd): should also filter out the incremental stats.
   }
 
   @Test

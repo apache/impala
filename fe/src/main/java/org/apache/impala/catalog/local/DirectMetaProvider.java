@@ -342,6 +342,17 @@ class DirectMetaProvider implements MetaProvider {
     public ImmutableList<FileDescriptor> getFileDescriptors() {
       return fds_;
     }
+
+    @Override
+    public boolean hasIncrementalStats() {
+      return false; /* Incremental stats not supported in direct mode */
+    }
+
+    @Override
+    public byte[] getPartitionStats() {
+      throw new UnsupportedOperationException("Incremental stats not supported with " +
+          "DirectMetaProvider implementation.");
+    }
   }
 
   private class TableMetaRefImpl implements TableMetaRef {

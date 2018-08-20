@@ -279,6 +279,10 @@ struct TTableInfoSelector {
 
   // List of columns to fetch stats for.
   6: optional list<string> want_stats_for_column_names
+
+  // ... each partition should include the partition stats serialized as a byte[]
+  // and that is deflate-compressed.
+  7: bool want_partition_stats
 }
 
 // Returned information about a particular partition.
@@ -293,6 +297,17 @@ struct TPartialPartitionInfo {
 
   // Set if 'want_partition_files' was set in TTableInfoSelector.
   4: optional list<CatalogObjects.THdfsFileDesc> file_descriptors
+
+  // Deflate-compressed byte[] representation of TPartitionStats for this partition.
+  // Set if 'want_partition_stats' was set in TTableInfoSelector. Not set if the
+  // partition does not have stats.
+  5: optional binary partition_stats
+
+  // Set to true if the partition contains intermediate column stats computed via
+  // incremental statistics. Set when 'want_partition_metadata' is true in
+  // TTableInfoSelector. Incremental stats data can be fetched by setting
+  // 'want_partition_stats' in TTableInfoSelector.
+  6: optional bool has_incremental_stats
 }
 
 // Returned information about a Table, as selected by TTableInfoSelector.

@@ -119,5 +119,7 @@ interface MetaProvider {
   interface PartitionMetadata {
     Partition getHmsPartition();
     ImmutableList<FileDescriptor> getFileDescriptors();
+    byte[] getPartitionStats();
+    boolean hasIncrementalStats();
   }
 }
