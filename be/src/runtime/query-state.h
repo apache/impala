@@ -29,7 +29,6 @@
 #include "gen-cpp/Types_types.h"
 #include "runtime/tmp-file-mgr.h"
 #include "util/counting-barrier.h"
-#include "util/promise.h"
 #include "util/uid-util.h"
 
 namespace impala {
@@ -341,12 +340,15 @@ class QueryState {
   std::unique_ptr<CountingBarrier> instances_finished_barrier_;
 
   /// map from instance id to its state (owned by obj_pool_), populated in
-  /// StartFInstances(); not valid to read from until instances_prepare_promise_
-  /// is set
+  /// StartFInstances(); Not valid to read from until 'instances_prepared_barrier_'
+  /// is set (i.e. readers should always call WaitForPrepare()).
   std::unordered_map<TUniqueId, FragmentInstanceState*> fis_map_;
 
   /// map from fragment index to its instances (owned by obj_pool_), populated in
-  /// StartFInstances()
+  /// StartFInstances(). Only written by the query state thread (i.e. the thread
+  /// which executes StartFInstances()). Not valid to read from until
+  /// 'instances_prepared_barrier_' is set (i.e. accessor should always call
+  /// WaitForPrepare()).
   std::unordered_map<int, std::vector<FragmentInstanceState*>> fragment_map_;
 
   ObjectPool obj_pool_;

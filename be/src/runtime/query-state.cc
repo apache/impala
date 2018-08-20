@@ -396,8 +396,14 @@ void QueryState::StartFInstances() {
     refcnt_.Add(1); // decremented in ExecFInstance()
     AcquireExecResourceRefcount(); // decremented in ExecFInstance()
 
-    // Add the fragment instance ID to the 'fis_map_'.
+    // Add the fragment instance ID to the 'fis_map_'. Has to happen before the thread is
+    // spawned or we may race with users of 'fis_map_'.
     fis_map_.emplace(fis->instance_id(), fis);
+
+    // Update fragment_map_. Has to happen before the thread is spawned below or
+    // we may race with users of 'fragment_map_'.
+    vector<FragmentInstanceState*>& fis_list = fragment_map_[instance_ctx.fragment_idx];
+    fis_list.push_back(fis);
 
     string thread_name = Substitute("$0 (finst:$1)",
         FragmentInstanceState::FINST_THREAD_NAME_PREFIX,
@@ -412,6 +418,7 @@ void QueryState::StartFInstances() {
         debug_action_status;
     if (!thread_create_status.ok()) {
       fis_map_.erase(fis->instance_id());
+      fis_list.pop_back();
       // Undo refcnt increments done immediately prior to Thread::Create(). The
       // reference counts were both greater than zero before the increments, so
       // neither of these decrements will free any structures.
@@ -419,9 +426,6 @@ void QueryState::StartFInstances() {
       ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
       break;
     }
-    // update fragment_map_
-    vector<FragmentInstanceState*>& fis_list = fragment_map_[instance_ctx.fragment_idx];
-    fis_list.push_back(fis);
     t->Detach();
     --num_unstarted_instances;
   }
