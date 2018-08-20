@@ -1210,22 +1210,26 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     TDescribeOutputStyle style = TDescribeOutputStyle.MINIMAL;
     authzTest = authorize("describe functional.alltypes");
     for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
-      authzTest.okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onServer(privilege))
-          .okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onDatabase("functional",
-              privilege))
-          .okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onTable("functional",
-              "alltypes", privilege));
+      authzTest
+          .okDescribe(tableName, describeOutput(style).includeStrings(ALLTYPES_COLUMNS),
+              onServer(privilege))
+          .okDescribe(tableName, describeOutput(style).includeStrings(ALLTYPES_COLUMNS),
+              onDatabase("functional", privilege))
+          .okDescribe(tableName, describeOutput(style).includeStrings(ALLTYPES_COLUMNS),
+              onTable("functional", "alltypes", privilege));
     }
-    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onServer(
-        allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onDatabase("functional",
-            allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onTable("functional",
-            "alltypes", allExcept(viewMetadataPrivileges())))
+    authzTest
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onServer(allExcept(viewMetadataPrivileges())))
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onDatabase("functional",allExcept(viewMetadataPrivileges())))
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())))
         // In this test, since we only have column level privileges on "id", then
         // only the "id" column should show and the others should not.
-        .okDescribe(tableName, style, new String[]{"id"}, ALLTYPES_COLUMNS_WITHOUT_ID,
-            onColumn("functional", "alltypes", "id", TPrivilegeLevel.SELECT))
+        .okDescribe(tableName, describeOutput(style).includeStrings(new String[]{"id"})
+            .excludeStrings(ALLTYPES_COLUMNS_WITHOUT_ID), onColumn("functional",
+            "alltypes", "id", TPrivilegeLevel.SELECT))
         .error(accessError("functional.alltypes"));
 
     // Describe table extended.
@@ -1235,24 +1239,27 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         new String[]{"Location:"});
     authzTest = authorize("describe functional.alltypes");
     for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
-      authzTest.okDescribe(tableName, style, checkStrings, null, onServer(privilege))
-          .okDescribe(tableName, style, checkStrings, null, onDatabase("functional",
-              privilege))
-          .okDescribe(tableName, style, checkStrings, null, onTable("functional",
-              "alltypes", privilege));
+      authzTest
+          .okDescribe(tableName, describeOutput(style).includeStrings(checkStrings),
+              onServer(privilege))
+          .okDescribe(tableName, describeOutput(style).includeStrings(checkStrings),
+              onDatabase("functional", privilege))
+          .okDescribe(tableName, describeOutput(style).includeStrings(checkStrings),
+              onTable("functional", "alltypes", privilege));
     }
     // Describe table without VIEW_METADATA privilege should not show all columns and
     // location.
-    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS,
+    authzTest
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
             onServer(allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, style, null, ALLTYPES_COLUMNS,
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
             onDatabase("functional", allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, style, null, ALLTYPES_COLUMNS,
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
             onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())))
         // Location should not appear with only column level auth.
-        .okDescribe(tableName, style, new String[]{"id"},
-            (String[]) ArrayUtils.addAll(ALLTYPES_COLUMNS_WITHOUT_ID,
-            new String[]{"Location:"}), onColumn("functional", "alltypes", "id",
+        .okDescribe(tableName, describeOutput(style).includeStrings(new String[]{"id"})
+            .excludeStrings((String[]) ArrayUtils.addAll(ALLTYPES_COLUMNS_WITHOUT_ID,
+            new String[]{"Location:"})), onColumn("functional", "alltypes", "id",
             TPrivilegeLevel.SELECT))
         .error(accessError("functional.alltypes"));
 
@@ -1261,16 +1268,19 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     style = TDescribeOutputStyle.MINIMAL;
     authzTest = authorize("describe functional.alltypes_view");
     for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
-      authzTest.okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onServer(privilege))
-          .okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onDatabase("functional",
-              privilege))
-          .okDescribe(tableName, style, ALLTYPES_COLUMNS, null, onTable("functional",
-              "alltypes_view", privilege));
+      authzTest
+          .okDescribe(tableName, describeOutput(style).includeStrings(ALLTYPES_COLUMNS),
+              onServer(privilege))
+          .okDescribe(tableName, describeOutput(style).includeStrings(ALLTYPES_COLUMNS),
+              onDatabase("functional", privilege))
+          .okDescribe(tableName, describeOutput(style).includeStrings(ALLTYPES_COLUMNS),
+              onTable("functional", "alltypes_view", privilege));
     }
-    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onServer(
-        allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onDatabase("functional",
-            allExcept(viewMetadataPrivileges())))
+    authzTest
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onServer(allExcept(viewMetadataPrivileges())))
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onDatabase("functional",allExcept(viewMetadataPrivileges())))
         .error(accessError("functional.alltypes_view"));
 
     // Describe view extended.
@@ -1281,16 +1291,19 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     checkStrings = (String[]) ArrayUtils.addAll(ALLTYPES_COLUMNS, viewStrings);
     authzTest = authorize("describe functional.alltypes_view");
     for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
-      authzTest.okDescribe(tableName, style, checkStrings, null, onServer(privilege))
-          .okDescribe(tableName, style, checkStrings, null, onDatabase("functional",
-              privilege))
-          .okDescribe(tableName, style, checkStrings, null, onTable("functional",
-              "alltypes_view", privilege));
+      authzTest
+          .okDescribe(tableName, describeOutput(style).includeStrings(checkStrings),
+              onServer(privilege))
+          .okDescribe(tableName, describeOutput(style).includeStrings(checkStrings),
+              onDatabase("functional", privilege))
+          .okDescribe(tableName, describeOutput(style).includeStrings(checkStrings),
+              onTable("functional", "alltypes_view", privilege));
     }
-    authzTest.okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onServer(
-        allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, style, null, ALLTYPES_COLUMNS, onDatabase("functional",
-            allExcept(viewMetadataPrivileges())))
+    authzTest
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onServer(allExcept(viewMetadataPrivileges())))
+        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+            onDatabase("functional",allExcept(viewMetadataPrivileges())))
         .error(accessError("functional.alltypes_view"));
 
     // Describe specific column on a table.
@@ -2677,6 +2690,63 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     public String getName() { return test_.role_; }
   }
 
+
+  private class DescribeOutput {
+    private String[] excludedStrings_ = new String[0];
+    private String[] includedStrings_ = new String[0];
+    private final TDescribeOutputStyle outputStyle_;
+
+    public DescribeOutput(TDescribeOutputStyle style) {
+      outputStyle_ = style;
+    }
+
+    /**
+     * Indicates which strings must not appear in the output of the describe statement.
+     * During validation, if one of these strings exists, an assertion is thrown.
+     *
+     * @param excluded - Array of strings that must not exist in the output.
+     * @return DescribeOutput instance.
+     */
+    public DescribeOutput excludeStrings(String[] excluded) {
+      excludedStrings_ = excluded;
+      return this;
+    }
+
+    /**
+     * Indicates which strings are required to appear in the output of the describe
+     * statement.  During validation, if any one of these strings does not exist, an
+     * assertion is thrown.
+     *
+     * @param included - Array of strings that must exist in the output.
+     * @return DescribeOutput instance.
+     */
+    public DescribeOutput includeStrings(String[] included) {
+      includedStrings_ = included;
+      return this;
+    }
+
+    public void validate(TTableName table) throws ImpalaException {
+      Preconditions.checkArgument(includedStrings_.length != 0 ||
+          excludedStrings_.length != 0,
+          "One or both of included or excluded strings must be defined.");
+      List<String> result = resultToStringList(authzFrontend_.describeTable(table,
+          outputStyle_, USER));
+      for (String str: includedStrings_) {
+        assertTrue(String.format("\"%s\" is not in the describe output.\n" +
+            "Expected : %s\n Actual   : %s", str, Arrays.toString(includedStrings_),
+            result), result.contains(str));
+      }
+      for (String str: excludedStrings_) {
+        assertTrue(String.format("\"%s\" should not be in the describe output.", str),
+            !result.contains(str));
+      }
+    }
+  }
+
+  private DescribeOutput describeOutput(TDescribeOutputStyle style) {
+    return new DescribeOutput(style);
+  }
+
   private class AuthzTest {
     private final AnalysisContext context_;
     private final String stmt_;
@@ -2756,9 +2826,8 @@ public class AuthorizationStmtTest extends FrontendTestBase {
      * into the new role/user. The new role/user will be dropped once this method
      * finishes.
      */
-    public AuthzTest okDescribe(TTableName table, TDescribeOutputStyle style,
-        String[] requiredStrings, String[] excludedStrings, TPrivilege[]... privileges)
-        throws ImpalaException {
+    public AuthzTest okDescribe(TTableName table, DescribeOutput output,
+        TPrivilege[]... privileges) throws ImpalaException {
       for (WithPrincipal withPrincipal: new WithPrincipal[]{
           new WithRole(this), new WithUser(this)}) {
         try {
@@ -2768,23 +2837,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
           } else {
             authzOk(stmt_, withPrincipal);
           }
-          List<String> result = resultToStringList(authzFrontend_.describeTable(table,
-              style, USER));
-          if (requiredStrings != null) {
-            for (String str : requiredStrings) {
-              assertTrue(String.format("\"%s\" is not in the describe output.\n" +
-                  "Expected : %s\n" +
-                  "Actual   : %s", str, Arrays.toString(requiredStrings), result),
-                  result.contains(str));
-            }
-          }
-          if (excludedStrings != null) {
-            for (String str : excludedStrings) {
-              assertTrue(String.format(
-                  "\"%s\" should not be in the describe output.", str),
-                  !result.contains(str));
-            }
-          }
+          output.validate(table);
         } finally {
           withPrincipal.drop();
         }
