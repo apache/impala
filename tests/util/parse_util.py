@@ -18,7 +18,20 @@
 import re
 from datetime import datetime
 
+# IMPALA-6715: Every so often the stress test or the TPC workload directories get
+# changed, and the stress test loses the ability to run the full set of queries. Set
+# these constants and assert that when a workload is used, all the queries we expect to
+# use are there.
+EXPECTED_TPCDS_QUERIES_COUNT = 71
+EXPECTED_TPCH_NESTED_QUERIES_COUNT = 22
+EXPECTED_TPCH_QUERIES_COUNT = 22
+# Regex to extract the estimated memory from an explain plan.
+# The unit prefixes can be found in
+# fe/src/main/java/org/apache/impala/common/PrintUtils.java
+MEM_ESTIMATE_PATTERN = re.compile(
+    r"Per-Host Resource Estimates: Memory=(\d+\.?\d*)(P|T|G|M|K)?B")
 NEW_GLOG_ENTRY_PATTERN = re.compile(r"[IWEF](?P<Time>\d{4} \d{2}:\d{2}:\d{2}\.\d{6}).*")
+
 
 def parse_glog(text, start_time=None):
   '''Parses the log 'text' and returns a list of log entries. If a 'start_time' is
@@ -71,6 +84,7 @@ def parse_mem_to_mb(mem, units):
     raise Exception('Unexpected memory unit "%s"' % units)
   return int(mem)
 
+
 def parse_duration_string_ms(duration):
   """Parses a duration string of the form 1h2h3m4s5.6ms4.5us7.8ns into milliseconds."""
   pattern = r'(?P<value>[0-9]+\.?[0-9]*?)(?P<units>\D+)'
@@ -83,3 +97,31 @@ def parse_duration_string_ms(duration):
     times[parsed['units']] = float(parsed['value'])
 
   return (times['h'] * 60 * 60 + times['m'] * 60 + times['s']) * 1000 + times['ms']
+
+
+def match_memory_estimate(explain_lines):
+  """
+  Given a list of strings from EXPLAIN output, find the estimated memory needed. This is
+  used as a binary search start point.
+
+  Params:
+    explain_lines: list of str
+
+  Returns:
+    2-tuple str of memory limit in decimal string and units (one of 'P', 'T', 'G', 'M',
+    'K', '' bytes)
+
+  Raises:
+    Exception if no match found
+  """
+  # IMPALA-6441: This method is a public, first class method so it can be importable and
+  # tested with actual EXPLAIN output to make sure we always find the start point.
+  mem_limit, units = None, None
+  for line in explain_lines:
+    regex_result = MEM_ESTIMATE_PATTERN.search(line)
+    if regex_result:
+      mem_limit, units = regex_result.groups()
+      break
+  if None in (mem_limit, units):
+    raise Exception('could not parse explain string:\n' + '\n'.join(explain_lines))
+  return mem_limit, units

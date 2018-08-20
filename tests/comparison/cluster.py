@@ -48,7 +48,6 @@ from zipfile import ZipFile
 from db_connection import HiveConnection, ImpalaConnection
 from tests.common.errors import Timeout
 from tests.util.shell_util import shell as local_shell
-from tests.util.ssh_util import SshClient
 from tests.util.parse_util import parse_glog, parse_mem_to_mb
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
@@ -292,6 +291,9 @@ class CmCluster(Cluster):
       if clients:
         client = clients.pop()
       else:
+        # IMPALA-7460: Insulate this import away from the global context so as to avoid
+        # requiring Paramiko unless it's absolutely needed.
+        from tests.util.ssh_util import SshClient
         LOG.debug("Creating new SSH client for %s", host_name)
         client = SshClient()
         client.connect(host_name, username=self.ssh_user, key_filename=self.ssh_key_file)

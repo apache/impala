@@ -85,24 +85,12 @@ from tests.comparison.db_types import Int, TinyInt, SmallInt, BigInt
 from tests.comparison.model_translator import SqlWriter
 from tests.comparison.query_generator import QueryGenerator
 from tests.comparison.query_profile import DefaultProfile
-from tests.util.parse_util import parse_mem_to_mb
+from tests.util.parse_util import (
+    EXPECTED_TPCDS_QUERIES_COUNT, EXPECTED_TPCH_NESTED_QUERIES_COUNT,
+    EXPECTED_TPCH_QUERIES_COUNT, match_memory_estimate, parse_mem_to_mb)
 from tests.util.thrift_util import op_handle_to_query_id
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
-
-# IMPALA-6715: Every so often the stress test or the TPC workload directories get
-# changed, and the stress test loses the ability to run the full set of queries. Set
-# these constants and assert that when a workload is used, all the queries we expect to
-# use are there.
-EXPECTED_TPCDS_QUERIES_COUNT = 71
-EXPECTED_TPCH_NESTED_QUERIES_COUNT = 22
-EXPECTED_TPCH_QUERIES_COUNT = 22
-
-# Regex to extract the estimated memory from an explain plan.
-# The unit prefixes can be found in
-# fe/src/main/java/org/apache/impala/common/PrintUtils.java
-MEM_ESTIMATE_PATTERN = re.compile(
-    r"Per-Host Resource Estimates: Memory=(\d+\.?\d*)(P|T|G|M|K)?B")
 
 PROFILES_DIR = "profiles"
 RESULT_HASHES_DIR = "result_hashes"
@@ -1230,25 +1218,10 @@ class QueryRunner(object):
 def load_tpc_queries(workload):
   """Returns a list of TPC queries. 'workload' should either be 'tpch' or 'tpcds'."""
   LOG.info("Loading %s queries", workload)
-  queries = list()
-  query_dir = os.path.join(
-      os.path.dirname(__file__), "..", "..", "testdata", "workloads", workload, "queries")
-  # IMPALA-6715 and others from the past: This pattern enforces the queries we actually
-  # find. Both workload directories contain other queries that are not part of the TPC
-  # spec.
-  file_name_pattern = re.compile(r"^{0}-(q.*).test$".format(workload))
-  for query_file in os.listdir(query_dir):
-    match = file_name_pattern.search(query_file)
-    if not match:
-      continue
-    file_path = os.path.join(query_dir, query_file)
-    file_queries = load_queries_from_test_file(file_path)
-    if len(file_queries) != 1:
-      raise Exception(
-          "Expected exactly 1 query to be in file %s but got %s"
-          % (file_path, len(file_queries)))
-    query = file_queries[0]
-    query.name = match.group(1)
+  queries = []
+  for query_text in test_file_parser.load_tpc_queries(workload):
+    query = Query()
+    query.sql = query_text
     queries.append(query)
   return queries
 
@@ -1535,34 +1508,6 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
     query.solo_runtime_secs_with_spilling = query.solo_runtime_secs_without_spilling
     query.solo_runtime_profile_with_spilling = query.solo_runtime_profile_without_spilling
   LOG.debug("Query after populating runtime info: %s", query)
-
-
-def match_memory_estimate(explain_lines):
-  """
-  Given a list of strings from EXPLAIN output, find the estimated memory needed. This is
-  used as a binary search start point.
-
-  Params:
-    explain_lines: list of str
-
-  Returns:
-    2-tuple str of memory limit in decimal string and units (one of 'P', 'T', 'G', 'M',
-    'K', '' bytes)
-
-  Raises:
-    Exception if no match found
-  """
-  # IMPALA-6441: This method is a public, first class method so it can be importable and
-  # tested with actual EXPLAIN output to make sure we always find the start point.
-  mem_limit, units = None, None
-  for line in explain_lines:
-    regex_result = MEM_ESTIMATE_PATTERN.search(line)
-    if regex_result:
-      mem_limit, units = regex_result.groups()
-      break
-  if None in (mem_limit, units):
-    raise Exception('could not parse explain string:\n' + '\n'.join(explain_lines))
-  return mem_limit, units
 
 
 def estimate_query_mem_mb_usage(query, query_runner):

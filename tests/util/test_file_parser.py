@@ -20,9 +20,11 @@
 import codecs
 import collections
 import logging
+import os
+import os.path
 import re
+
 from collections import defaultdict
-from os.path import isfile
 from textwrap import dedent
 
 LOG = logging.getLogger('impala_test_suite')
@@ -102,7 +104,7 @@ def parse_table_constraints(constraints_file):
   schema_include = defaultdict(list)
   schema_exclude = defaultdict(list)
   schema_only = defaultdict(list)
-  if not isfile(constraints_file):
+  if not os.path.isfile(constraints_file):
     LOG.info('No schema constraints file file found')
   else:
     with open(constraints_file, 'rb') as constraints_file:
@@ -313,3 +315,31 @@ def write_test_file(test_file_name, test_file_sections, encoding=None):
           test_file_text.append(section_value)
     test_file_text.append(SECTION_DELIMITER)
     test_file.write(('\n').join(test_file_text))
+
+
+def load_tpc_queries(workload):
+  """Returns a list of TPC queries. 'workload' should either be 'tpch' or 'tpcds'."""
+  LOG.info("Loading %s queries", workload)
+  queries = list()
+  query_dir = os.path.join(
+      os.environ['IMPALA_HOME'], "testdata", "workloads", workload, "queries")
+  # IMPALA-6715 and others from the past: This pattern enforces the queries we actually
+  # find. Both workload directories contain other queries that are not part of the TPC
+  # spec.
+  file_name_pattern = re.compile(r"^{0}-(q.*).test$".format(workload))
+  for query_file in os.listdir(query_dir):
+    match = file_name_pattern.search(query_file)
+    if not match:
+      continue
+    file_path = os.path.join(query_dir, query_file)
+    test_cases = parse_query_test_file(file_path)
+    file_queries = list()
+    for test_case in test_cases:
+      query_sql = remove_comments(test_case["QUERY"])
+      file_queries.append(query_sql)
+    if len(file_queries) != 1:
+      raise Exception(
+          "Expected exactly 1 query to be in file %s but got %s"
+          % (file_path, len(file_queries)))
+    queries.append(file_queries[0])
+  return queries

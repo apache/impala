@@ -24,12 +24,10 @@ import pytest
 from decimal import Decimal
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.stress.concurrent_select import (
-    EXPECTED_TPCDS_QUERIES_COUNT,
-    EXPECTED_TPCH_NESTED_QUERIES_COUNT,
-    EXPECTED_TPCH_QUERIES_COUNT,
-    load_tpc_queries,
-    match_memory_estimate)
+from tests.util.parse_util import (
+    EXPECTED_TPCDS_QUERIES_COUNT, EXPECTED_TPCH_NESTED_QUERIES_COUNT,
+    EXPECTED_TPCH_QUERIES_COUNT, match_memory_estimate)
+from tests.util.test_file_parser import load_tpc_queries
 
 
 class TestStressInfra(ImpalaTestSuite):

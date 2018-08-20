@@ -18,7 +18,12 @@
 '''This module generates a docker environment for a job'''
 
 from __future__ import division
-from fabric.api import sudo, run, settings
+try:
+  from fabric.api import sudo, run, settings
+except ImportError as e:
+  raise Exception(
+      "Please run impala-pip install -r $IMPALA_HOME/infra/python/deps/extended-test-"
+      "requirements.txt:\n{0}".format(str(e)))
 from logging import getLogger
 from os.path import (
     join as join_path,

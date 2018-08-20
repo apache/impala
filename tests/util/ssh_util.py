@@ -18,13 +18,19 @@
 import atexit
 import logging
 import os
-import paramiko
+try:
+  import paramiko
+except ImportError as e:
+  raise Exception(
+      "Please run impala-pip install -r $IMPALA_HOME/infra/python/deps/extended-test-"
+      "requirements.txt:\n{0}".format(str(e)))
 import textwrap
 import time
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
-from tests.common.errors import Timeout
+from tests.common.errors import Timeout  # noqa:E402
+
 
 class SshClient(paramiko.SSHClient):
   """A paramiko SSH client modified to:

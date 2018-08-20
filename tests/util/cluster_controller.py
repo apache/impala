@@ -15,16 +15,22 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import fabric.decorators
+try:
+  import fabric.decorators
+  from fabric.context_managers import hide, settings
+  from fabric.operations import local, run, sudo
+  from fabric.tasks import execute
+except ImportError as e:
+  raise Exception(
+      "Please run impala-pip install -r $IMPALA_HOME/infra/python/deps/extended-test-"
+      "requirements.txt:\n{0}".format(str(e)))
 import logging
 import os
 from contextlib import contextmanager
-from fabric.context_managers import hide, settings
-from fabric.operations import local, run, sudo
-from fabric.tasks import execute
 from textwrap import dedent
 
 LOG = logging.getLogger('cluster_controller')
+
 
 class ClusterController(object):
   """A convenience wrapper around fabric."""
