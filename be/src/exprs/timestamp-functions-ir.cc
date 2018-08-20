@@ -329,6 +329,8 @@ StringVal TimestampFunctions::ToDate(FunctionContext* context,
   // our built-in functions might incorrectly return such a malformed timestamp.
   if (!ts_value.HasDate()) return StringVal::null();
   StringVal result(context, 10);
+  // Return NULL if 'result' allocation fails inside of the StringVal constructor.
+  if (UNLIKELY(result.is_null)) return StringVal::null();
   result.len = 10;
   // Fill in year, month, and day.
   IntToChar(result.ptr, ts_value.date().year(), 4);
