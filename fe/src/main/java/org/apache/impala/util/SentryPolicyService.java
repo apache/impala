@@ -493,7 +493,6 @@ public class SentryPolicyService {
       privilege.setPrivilege_level(Enum.valueOf(TPrivilegeLevel.class,
           sentryPriv.getAction().toUpperCase()));
     }
-    privilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(privilege));
     privilege.setCreate_time_ms(sentryPriv.getCreateTime());
     if (sentryPriv.isSetGrantOption() &&
         sentryPriv.getGrantOption() == TSentryGrantOption.TRUE) {
@@ -501,6 +500,7 @@ public class SentryPolicyService {
     } else {
       privilege.setHas_grant_opt(false);
     }
+    privilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(privilege));
     privilege.setPrincipal_id(principal.getId());
     privilege.setPrincipal_type(principal.getPrincipalType());
     return privilege;

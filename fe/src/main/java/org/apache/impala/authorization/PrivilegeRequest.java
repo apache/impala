@@ -19,6 +19,8 @@ package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
 
+import java.util.Objects;
+
 /**
  * Represents a privilege request in the context of an Authorizeable object. If no
  * Authorizeable object is provided, it represents a privilege request on the server.
@@ -27,18 +29,26 @@ import com.google.common.base.Preconditions;
 public class PrivilegeRequest {
   private final Authorizeable authorizeable_;
   private final Privilege privilege_;
+  private final boolean grantOption_;
 
   public PrivilegeRequest(Authorizeable authorizeable, Privilege privilege) {
+    this(authorizeable, privilege, false);
+  }
+
+  public PrivilegeRequest(Authorizeable authorizeable, Privilege privilege,
+      boolean grantOption) {
     Preconditions.checkNotNull(authorizeable);
     Preconditions.checkNotNull(privilege);
     authorizeable_ = authorizeable;
     privilege_ = privilege;
+    grantOption_ = grantOption;
   }
 
   public PrivilegeRequest(Privilege privilege) {
     Preconditions.checkNotNull(privilege);
     authorizeable_ = null;
     privilege_ = privilege;
+    grantOption_ = false;
   }
 
   /*
@@ -53,25 +63,28 @@ public class PrivilegeRequest {
    */
   public Privilege getPrivilege() { return privilege_; }
 
-
   /*
    * Returns Authorizeable object. Null if the request is for server-level permission.
    */
   public Authorizeable getAuthorizeable() { return authorizeable_; }
 
+  /**
+   * Returns whether the grant option is required or not.
+   */
+  public boolean hasGrantOption() { return grantOption_; }
+
   @Override
   public int hashCode() {
-    return (authorizeable_ == null ? 0 : authorizeable_.hashCode()) * 37 +
-        privilege_.hashCode();
+    return Objects.hash(authorizeable_, privilege_, grantOption_);
   }
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof PrivilegeRequest)) return false;
-    if (authorizeable_ == null) {
-      return ((PrivilegeRequest) o).getPrivilege().equals(privilege_);
-    }
-    return ((PrivilegeRequest) o).getAuthorizeable().equals(authorizeable_) &&
-        ((PrivilegeRequest) o).getPrivilege().equals(privilege_);
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    PrivilegeRequest that = (PrivilegeRequest) o;
+    return grantOption_ == that.grantOption_ &&
+        Objects.equals(authorizeable_, that.authorizeable_) &&
+        privilege_ == that.privilege_;
   }
 }

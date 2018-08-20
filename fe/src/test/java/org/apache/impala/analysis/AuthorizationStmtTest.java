@@ -1958,15 +1958,15 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             "delimited fields terminated by ' '"),
         authorize("alter table functional.alltypes add partition(year=1, month=1)"),
         authorize("alter table functional.alltypes drop partition(" +
-            "year=2009, month=1)"),
-        authorize("alter table functional.alltypes set owner user foo_owner"),
-        authorize("alter table functional.alltypes set owner role foo_owner")}) {
+            "year=2009, month=1)")}) {
       test.ok(onServer(TPrivilegeLevel.ALL))
           .ok(onServer(TPrivilegeLevel.OWNER))
           .ok(onServer(TPrivilegeLevel.ALTER))
           .ok(onDatabase("functional", TPrivilegeLevel.ALL))
           .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
           .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
+          .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALL))
+          .ok(onTable("functional", "alltypes", TPrivilegeLevel.OWNER))
           .ok(onTable("functional", "alltypes", TPrivilegeLevel.ALTER))
           .error(alterError("functional.alltypes"))
           .error(alterError("functional.alltypes"), onServer(allExcept(
@@ -1976,6 +1976,32 @@ public class AuthorizationStmtTest extends FrontendTestBase {
           .error(alterError("functional.alltypes"), onTable("functional", "alltypes",
               allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
               TPrivilegeLevel.ALTER)));
+    }
+
+    // Alter table set owner.
+    for (AuthzTest test: new AuthzTest[]{
+        authorize("alter table functional.alltypes set owner user foo_owner"),
+        authorize("alter table functional.alltypes set owner role foo_owner")}) {
+      test.ok(onServer(true, TPrivilegeLevel.ALL))
+          .ok(onServer(true, TPrivilegeLevel.OWNER))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.ALL))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
+          .ok(onTable(true, "functional", "alltypes", TPrivilegeLevel.ALL))
+          .ok(onTable(true, "functional", "alltypes", TPrivilegeLevel.OWNER))
+          .error(accessError(true, "functional.alltypes"), onServer(
+              TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes"), onDatabase("functional",
+              TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes"), onTable("functional",
+              "alltypes", TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes"))
+          .error(accessError(true, "functional.alltypes"), onServer(true, allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError(true, "functional.alltypes"), onDatabase(true, "functional",
+              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError(true, "functional.alltypes"),
+              onTable(true, "functional", "alltypes", allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
     }
 
     // Alter table rename.
@@ -2178,24 +2204,25 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     for (AuthzTest test: new AuthzTest[]{
         authorize("alter view functional.alltypes_view set owner user foo_owner"),
         authorize("alter view functional.alltypes_view set owner role foo_owner")}) {
-      test.ok(onServer(TPrivilegeLevel.ALL))
-          .ok(onServer(TPrivilegeLevel.OWNER))
-          .ok(onServer(TPrivilegeLevel.ALTER))
-          .ok(onDatabase("functional", TPrivilegeLevel.ALL))
-          .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
-          .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
-          .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.ALL))
-          .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.OWNER))
-          .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.ALTER))
-          .error(alterError("functional.alltypes_view"))
-          .error(alterError("functional.alltypes_view"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.ALTER)))
-          .error(alterError("functional.alltypes_view"), onDatabase("functional",
-              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
-              TPrivilegeLevel.ALTER)))
-          .error(alterError("functional.alltypes_view"), onTable("functional",
-              "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
-              TPrivilegeLevel.ALTER)));
+      test.ok(onServer(true, TPrivilegeLevel.ALL))
+          .ok(onServer(true, TPrivilegeLevel.OWNER))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.ALL))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
+          .ok(onTable(true, "functional", "alltypes_view", TPrivilegeLevel.ALL))
+          .ok(onTable(true, "functional", "alltypes_view", TPrivilegeLevel.OWNER))
+          .error(accessError(true, "functional.alltypes_view"), onServer(
+              TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes_view"), onDatabase("functional",
+              TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes_view"), onTable("functional",
+              "alltypes_view", TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes_view"))
+          .error(accessError(true, "functional.alltypes_view"), onServer(allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError(true, "functional.alltypes_view"), onDatabase("functional",
+              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError(true, "functional.alltypes_view"), onTable("functional",
+              "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
     }
 
     // Database does not exist.
@@ -2215,25 +2242,27 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
   @Test
   public void testAlterDatabase() throws ImpalaException {
+    // Alter database set owner.
     for (String ownerType: new String[]{"user", "role"}) {
       authorize(String.format("alter database functional set owner %s foo", ownerType))
-          .ok(onServer(TPrivilegeLevel.ALL))
-          .ok(onServer(TPrivilegeLevel.OWNER))
-          .ok(onServer(TPrivilegeLevel.ALTER))
-          .ok(onDatabase("functional", TPrivilegeLevel.ALL))
-          .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
-          .ok(onDatabase("functional", TPrivilegeLevel.ALTER))
-          .error(alterError("functional"))
-          .error(alterError("functional"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.ALTER)))
-          .error(alterError("functional"), onDatabase("functional", allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.ALTER)));
+          .ok(onServer(true, TPrivilegeLevel.ALL))
+          .ok(onServer(true, TPrivilegeLevel.OWNER))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.ALL))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
+          .error(accessError(true, "functional"), onServer(TPrivilegeLevel.values()))
+          .error(accessError(true, "functional"), onDatabase("functional",
+              TPrivilegeLevel.values()))
+          .error(accessError(true, "functional"))
+          .error(accessError(true, "functional"), onServer(true, allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError(true, "functional"), onDatabase(true, "functional",
+              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
 
       // Database does not exist.
       authorize(String.format("alter database nodb set owner %s foo", ownerType))
-          .error(alterError("nodb"))
-          .error(alterError("nodb"), onServer(allExcept(
-              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.ALTER)));
+          .error(accessError(true, "nodb"))
+          .error(accessError(true, "nodb"), onServer(true, allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
     }
   }
 
@@ -2580,7 +2609,12 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   }
 
   private static String accessError(String object) {
-    return "User '%s' does not have privileges to access: " + object;
+    return accessError(false, object);
+  }
+
+  private static String accessError(boolean grantOption, String object) {
+    return "User '%s' does not have privileges" +
+        (grantOption ? " with 'GRANT OPTION'" : "") + " to access: " + object;
   }
 
   private static String refreshError(String object) {
@@ -2880,10 +2914,15 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   }
 
   private TPrivilege[] onServer(TPrivilegeLevel... levels) {
+    return onServer(false, levels);
+  }
+
+  private TPrivilege[] onServer(boolean grantOption, TPrivilegeLevel... levels) {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
       privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.SERVER, false);
       privileges[i].setServer_name(SENTRY_SERVER);
+      privileges[i].setHas_grant_opt(grantOption);
       privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
           privileges[i]));
     }
@@ -2891,11 +2930,17 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   }
 
   private TPrivilege[] onDatabase(String db, TPrivilegeLevel... levels) {
+    return onDatabase(false, db, levels);
+  }
+
+  private TPrivilege[] onDatabase(boolean grantOption, String db,
+      TPrivilegeLevel... levels) {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
       privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.DATABASE, false);
       privileges[i].setServer_name(SENTRY_SERVER);
       privileges[i].setDb_name(db);
+      privileges[i].setHas_grant_opt(grantOption);
       privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
           privileges[i]));
     }
@@ -2903,12 +2948,18 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   }
 
   private TPrivilege[] onTable(String db, String table, TPrivilegeLevel... levels) {
+    return onTable(false, db, table, levels);
+  }
+
+  private TPrivilege[] onTable(boolean grantOption, String db, String table,
+      TPrivilegeLevel... levels) {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
       privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.TABLE, false);
       privileges[i].setServer_name(SENTRY_SERVER);
       privileges[i].setDb_name(db);
       privileges[i].setTable_name(table);
+      privileges[i].setHas_grant_opt(grantOption);
       privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
           privileges[i]));
     }
@@ -2920,8 +2971,18 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     return onColumn(db, table, new String[]{column}, levels);
   }
 
+  private TPrivilege[] onColumn(boolean grantOption, String db, String table,
+      String column, TPrivilegeLevel... levels) {
+    return onColumn(grantOption, db, table, new String[]{column}, levels);
+  }
+
   private TPrivilege[] onColumn(String db, String table, String[] columns,
       TPrivilegeLevel... levels) {
+    return onColumn(false, db, table, columns, levels);
+  }
+
+  private TPrivilege[] onColumn(boolean grantOption, String db, String table,
+      String[] columns, TPrivilegeLevel... levels) {
     int size = columns.length * levels.length;
     TPrivilege[] privileges = new TPrivilege[size];
     int idx = 0;
@@ -2932,6 +2993,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
         privileges[idx].setDb_name(db);
         privileges[idx].setTable_name(table);
         privileges[idx].setColumn_name(column);
+        privileges[idx].setHas_grant_opt(grantOption);
         privileges[idx].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
             privileges[idx]));
         idx++;
@@ -2941,11 +3003,16 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   }
 
   private TPrivilege[] onUri(String uri, TPrivilegeLevel... levels) {
+    return onUri(false, uri, levels);
+  }
+
+  private TPrivilege[] onUri(boolean grantOption, String uri, TPrivilegeLevel... levels) {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
       privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.URI, false);
       privileges[i].setServer_name(SENTRY_SERVER);
       privileges[i].setUri(uri);
+      privileges[i].setHas_grant_opt(grantOption);
       privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
           privileges[i]));
     }

@@ -60,7 +60,8 @@ public class BaseTableRef extends TableRef {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
-    analyzer.registerAuthAndAuditEvent(resolvedPath_.getRootTable(), priv_);
+    analyzer.registerAuthAndAuditEvent(resolvedPath_.getRootTable(), priv_,
+        requireGrantOption_);
     desc_ = analyzer.registerTableRef(this);
     isAnalyzed_ = true;
     analyzeTableSample(analyzer);

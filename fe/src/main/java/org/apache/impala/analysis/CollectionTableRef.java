@@ -103,7 +103,8 @@ public class CollectionTableRef extends TableRef {
       // Register a table-level privilege request as well as a column-level privilege request
       // for the collection-typed column.
       Preconditions.checkNotNull(resolvedPath_.getRootTable());
-      analyzer.registerAuthAndAuditEvent(resolvedPath_.getRootTable(), priv_);
+      analyzer.registerAuthAndAuditEvent(resolvedPath_.getRootTable(), priv_,
+          requireGrantOption_);
       analyzer.registerPrivReq(new PrivilegeRequestBuilder().
           allOf(Privilege.SELECT).onColumn(desc_.getTableName().getDb(),
           desc_.getTableName().getTbl(), desc_.getPath().getRawPath().get(0))

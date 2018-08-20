@@ -95,7 +95,7 @@ public class InlineViewRef extends TableRef {
    */
   public InlineViewRef(FeView view, TableRef origTblRef) {
     super(view.getTableName().toPath(), origTblRef.getExplicitAlias(),
-        origTblRef.getPrivilege());
+        origTblRef.getPrivilege(), origTblRef.requireGrantOption());
     queryStmt_ = view.getQueryStmt().clone();
     queryStmt_.reset();
     if (view.isLocalView()) queryStmt_.reset();
@@ -145,7 +145,7 @@ public class InlineViewRef extends TableRef {
     // Catalog views refs require special analysis settings for authorization.
     boolean isCatalogView = (view_ != null && !view_.isLocalView());
     if (isCatalogView) {
-      analyzer.registerAuthAndAuditEvent(view_, priv_);
+      analyzer.registerAuthAndAuditEvent(view_, priv_, requireGrantOption_);
       if (inlineViewAnalyzer_.isExplain()) {
         // If the user does not have privileges on the view's definition
         // then we report a masked authorization error so as not to reveal

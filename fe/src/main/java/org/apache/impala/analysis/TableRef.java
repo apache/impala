@@ -79,6 +79,7 @@ public class TableRef implements ParseNode {
 
   // Analysis registers privilege and/or audit requests based on this privilege.
   protected final Privilege priv_;
+  protected final boolean requireGrantOption_;
 
   // Optional TABLESAMPLE clause. Null if not specified.
   protected TableSampleClause sampleParams_;
@@ -135,15 +136,20 @@ public class TableRef implements ParseNode {
   }
 
   public TableRef(List<String> path, String alias, TableSampleClause tableSample) {
-    this(path, alias, tableSample, Privilege.SELECT);
+    this(path, alias, tableSample, Privilege.SELECT, false);
   }
 
   public TableRef(List<String> path, String alias, Privilege priv) {
-    this(path, alias, null, priv);
+    this(path, alias, null, priv, false);
+  }
+
+  public TableRef(List<String> path, String alias, Privilege priv,
+      boolean requireGrantOption) {
+    this(path, alias, null, priv, requireGrantOption);
   }
 
   public TableRef(List<String> path, String alias, TableSampleClause sampleParams,
-      Privilege priv) {
+      Privilege priv, boolean requireGrantOption) {
     rawPath_ = path;
     if (alias != null) {
       aliases_ = new String[] { alias.toLowerCase() };
@@ -153,6 +159,7 @@ public class TableRef implements ParseNode {
     }
     sampleParams_ = sampleParams;
     priv_ = priv;
+    requireGrantOption_ = requireGrantOption;
     isAnalyzed_ = false;
     replicaPreference_ = null;
     randomReplica_ = false;
@@ -168,6 +175,7 @@ public class TableRef implements ParseNode {
     hasExplicitAlias_ = other.hasExplicitAlias_;
     sampleParams_ = other.sampleParams_;
     priv_ = other.priv_;
+    requireGrantOption_ = other.requireGrantOption_;
     joinOp_ = other.joinOp_;
     joinHints_ = Lists.newArrayList(other.joinHints_);
     onClause_ = (other.onClause_ != null) ? other.onClause_.clone() : null;
@@ -274,6 +282,7 @@ public class TableRef implements ParseNode {
   }
   public TableSampleClause getSampleParams() { return sampleParams_; }
   public Privilege getPrivilege() { return priv_; }
+  public boolean requireGrantOption() { return requireGrantOption_; }
   public List<PlanHint> getJoinHints() { return joinHints_; }
   public List<PlanHint> getTableHints() { return tableHints_; }
   public Expr getOnClause() { return onClause_; }

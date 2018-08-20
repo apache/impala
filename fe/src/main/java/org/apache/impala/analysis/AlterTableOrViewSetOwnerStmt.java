@@ -46,7 +46,9 @@ public abstract class AlterTableOrViewSetOwnerStmt extends AlterTableStmt {
           MetaStoreUtil.MAX_OWNER_LENGTH, ownerName.length()));
     }
     tableName_ = analyzer.getFqTableName(tableName_);
-    TableRef tableRef = new TableRef(tableName_.toPath(), null, Privilege.ALTER);
+    // Require ALL with GRANT OPTION privilege.
+    TableRef tableRef = new TableRef(tableName_.toPath(), null, Privilege.ALL,
+        /* grant option */ true);
     tableRef = analyzer.resolveTableRef(tableRef);
     Preconditions.checkNotNull(tableRef);
     tableRef.analyze(analyzer);

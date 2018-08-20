@@ -35,6 +35,7 @@ import com.google.common.base.Preconditions;
 public class PrivilegeRequestBuilder {
   Authorizeable authorizeable_;
   Privilege privilege_;
+  boolean grantOption_ = false;
 
   /**
    * Sets the authorizeable object to be a column.
@@ -108,12 +109,20 @@ public class PrivilegeRequestBuilder {
   }
 
   /**
+   * Specifies that grant option is required.
+   */
+  public PrivilegeRequestBuilder grantOption() {
+    grantOption_ = true;
+    return this;
+  }
+
+  /**
    * Builds a PrivilegeRequest object based on the current Authorizeable object
    * and privilege settings.
    */
   public PrivilegeRequest toRequest() {
     Preconditions.checkNotNull(authorizeable_);
     Preconditions.checkNotNull(privilege_);
-    return new PrivilegeRequest(authorizeable_, privilege_);
+    return new PrivilegeRequest(authorizeable_, privilege_, grantOption_);
   }
 }

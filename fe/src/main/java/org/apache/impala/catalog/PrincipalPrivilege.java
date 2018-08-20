@@ -116,6 +116,7 @@ public class PrincipalPrivilege extends CatalogObjectImpl {
         authorizable.add(KV_JOINER.join("action",
             privilege.getPrivilege_level().toString()));
       }
+      authorizable.add(KV_JOINER.join("grantoption", privilege.isHas_grant_opt()));
       return AUTHORIZABLE_JOINER.join(authorizable);
     } catch (Exception e) {
       // Should never make it here unless the privilege is malformed.

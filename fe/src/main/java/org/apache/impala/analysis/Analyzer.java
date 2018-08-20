@@ -569,13 +569,21 @@ public class Analyzer {
       // an analysis error. We should not accidentally reveal the non-existence of a
       // table/database if the user is not authorized.
       if (rawPath.size() > 1) {
-        registerPrivReq(new PrivilegeRequestBuilder()
+        PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder()
             .onTable(rawPath.get(0), rawPath.get(1))
-            .allOf(tableRef.getPrivilege()).toRequest());
+            .allOf(tableRef.getPrivilege());
+        if (tableRef.requireGrantOption()) {
+          builder.grantOption();
+        }
+        registerPrivReq(builder.toRequest());
       }
-      registerPrivReq(new PrivilegeRequestBuilder()
+      PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder()
           .onTable(getDefaultDb(), rawPath.get(0))
-          .allOf(tableRef.getPrivilege()).toRequest());
+          .allOf(tableRef.getPrivilege());
+      if (tableRef.requireGrantOption()) {
+        builder.grantOption();
+      }
+      registerPrivReq(builder.toRequest());
       throw e;
     } catch (TableLoadingException e) {
       throw new AnalysisException(String.format(
@@ -2448,21 +2456,39 @@ public class Analyzer {
   }
 
   /**
+   * If the database does not exist in the catalog an AnalysisError is thrown.
+   * This method does not require the grant option permission.
+   */
+  public FeDb getDb(String dbName, Privilege privilege) throws AnalysisException {
+    return getDb(dbName, privilege, true);
+  }
+
+  /**
+   * This method does not require the grant option permission.
+   */
+  public FeDb getDb(String dbName, Privilege privilege, boolean throwIfDoesNotExist)
+      throws AnalysisException {
+    return getDb(dbName, privilege, throwIfDoesNotExist, false);
+  }
+
+  /**
    * Returns the Catalog Db object for the given database at the given
    * Privilege level. The privilege request is tracked in the analyzer
    * and authorized post-analysis.
    *
    * Registers a new access event if the catalog lookup was successful.
    *
-   * If the database does not exist in the catalog an AnalysisError is thrown.
+   * If throwIfDoesNotExist is set to true and the database does not exist in the catalog
+   * an AnalysisError is thrown.
+   * If requireGrantOption is set to true, the grant option permission is required for
+   * the specified privilege.
    */
-  public FeDb getDb(String dbName, Privilege privilege) throws AnalysisException {
-    return getDb(dbName, privilege, true);
-  }
-
-  public FeDb getDb(String dbName, Privilege privilege, boolean throwIfDoesNotExist)
-      throws AnalysisException {
+  public FeDb getDb(String dbName, Privilege privilege, boolean throwIfDoesNotExist,
+      boolean requireGrantOption) throws AnalysisException {
     PrivilegeRequestBuilder pb = new PrivilegeRequestBuilder();
+    if (requireGrantOption) {
+      pb.grantOption();
+    }
     if (privilege == Privilege.ANY) {
       registerPrivReq(
           pb.any().onAnyColumn(dbName, AuthorizeableTable.ANY_TABLE_NAME).toRequest());
@@ -2593,11 +2619,20 @@ public class Analyzer {
   }
 
   /**
-   * Registers a table-level privilege request and an access event for auditing
-   * for the given table and privilege. The table must be a base table or a
-   * catalog view (not a local view).
+   * This method does not require the grant option permission.
    */
   public void registerAuthAndAuditEvent(FeTable table, Privilege priv) {
+    registerAuthAndAuditEvent(table, priv, false);
+  }
+
+  /**
+   * Registers a table-level privilege request and an access event for auditing
+   * for the given table and privilege. The table must be a base table or a
+   * catalog view (not a local view). If requireGrantOption is set to true, the
+   * the grant option permission is required for the specified privilege.
+   */
+  public void registerAuthAndAuditEvent(FeTable table, Privilege priv,
+      boolean requireGrantOption) {
     // Add access event for auditing.
     if (table instanceof FeView) {
       FeView view = (FeView) table;
@@ -2612,8 +2647,12 @@ public class Analyzer {
     }
     // Add privilege request.
     TableName tableName = table.getTableName();
-    registerPrivReq(new PrivilegeRequestBuilder()
+    PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder()
         .onTable(tableName.getDb(), tableName.getTbl())
-        .allOf(priv).toRequest());
+        .allOf(priv);
+    if (requireGrantOption) {
+      builder.grantOption();
+    }
+    registerPrivReq(builder.toRequest());
   }
 }

@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
+import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TAlterDbSetOwnerParams;
@@ -38,7 +39,9 @@ public class AlterDbSetOwnerStmt extends AlterDbStmt {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    super.analyze(analyzer);
+    // Require ALL with GRANT OPTION privilege.
+    analyzer.getDb(dbName_, Privilege.ALL, /* throw if does not exist */ true,
+        /* grant option */ true);
     String ownerName = owner_.getOwnerName();
     if (ownerName.length() > MetaStoreUtil.MAX_OWNER_LENGTH) {
       throw new AnalysisException(String.format("Owner name exceeds maximum length of " +
