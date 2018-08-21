@@ -242,7 +242,8 @@ class ScanRange : public RequestRange {
   /// Returns the next buffer for this scan range. buffer is an output parameter.
   /// This function blocks until a buffer is ready or an error occurred. If this is
   /// called when all buffers have been returned, *buffer is set to nullptr and Status::OK
-  /// is returned.
+  /// is returned. If this returns buffer->eos() or an error status, then all buffers
+  /// owned by the scan range were either returned to callers of GetNext() or freed.
   /// Only one thread can be in GetNext() at any time.
   Status GetNext(std::unique_ptr<BufferDescriptor>* buffer) WARN_UNUSED_RESULT;
 

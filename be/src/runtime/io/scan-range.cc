@@ -82,14 +82,16 @@ Status ScanRange::GetNext(unique_ptr<BufferDescriptor>* buffer) {
   {
     unique_lock<mutex> scan_range_lock(lock_);
     DCHECK(Validate()) << DebugString();
-    // No more buffers to return - return the cancel status or OK if not cancelled.
-    if (all_buffers_returned(scan_range_lock)) return cancel_status_;
-
-    while (ready_buffers_.empty() && cancel_status_.ok()) {
+    while (!all_buffers_returned(scan_range_lock) && ready_buffers_.empty()) {
       buffer_ready_cv_.Wait(scan_range_lock);
     }
-    /// Propagate cancellation to the client if it happened while we were waiting.
-    RETURN_IF_ERROR(cancel_status_);
+    // No more buffers to return - return the cancel status or OK if not cancelled.
+    if (all_buffers_returned(scan_range_lock)) {
+      // Wait until read finishes to ensure buffers are freed.
+      while (read_in_flight_) buffer_ready_cv_.Wait(scan_range_lock);
+      DCHECK_EQ(0, ready_buffers_.size());
+      return cancel_status_;
+    }
 
     // Remove the first ready buffer from the queue and return it
     DCHECK(!ready_buffers_.empty());

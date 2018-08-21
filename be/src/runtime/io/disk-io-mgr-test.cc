@@ -1307,6 +1307,58 @@ TEST_F(DiskIoMgrTest, CancelReleasesResources) {
   io_mgr.UnregisterContext(reader.get());
 }
 
+// Regression test for IMPALA-7402 - RequestContext::Cancel() propagation via
+// ScanRange::GetNext() does not guarantee buffers are released.
+TEST_F(DiskIoMgrTest, FinalGetNextReleasesResources) {
+  InitRootReservation(LARGE_RESERVATION_LIMIT);
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "the quick brown fox jumped over the lazy dog";
+  int len = strlen(data);
+  const int64_t MIN_BUFFER_SIZE = 2;
+  const int64_t MAX_BUFFER_SIZE = 1024;
+  CreateTempFile(tmp_file, data);
+
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
+  const int NUM_DISK_THREADS = 20;
+  DiskIoMgr io_mgr(
+      1, NUM_DISK_THREADS, NUM_DISK_THREADS, MIN_BUFFER_SIZE, MAX_BUFFER_SIZE);
+#ifndef NDEBUG
+  auto s = ScopedFlagSetter<int32_t>::Make(&FLAGS_stress_disk_read_delay_ms, 5);
+#endif
+
+  ASSERT_OK(io_mgr.Init());
+  BufferPool::ClientHandle read_client;
+  RegisterBufferPoolClient(
+      LARGE_RESERVATION_LIMIT, LARGE_INITIAL_RESERVATION, &read_client);
+
+  for (int i = 0; i < 10; ++i) {
+    unique_ptr<RequestContext> reader = io_mgr.RegisterContext();
+    ScanRange* range = InitRange(&pool_, tmp_file, 0, len, 0, stat_val.st_mtime);
+    bool needs_buffers;
+    ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
+    EXPECT_TRUE(needs_buffers);
+    ASSERT_OK(io_mgr.AllocateBuffersForRange(&read_client, range, MAX_BUFFER_SIZE));
+    // Give disk I/O thread a chance to start read.
+    SleepForMs(1);
+
+    reader->Cancel();
+    // The scan range should hold no resources once ScanRange::GetNext() returns.
+    unique_ptr<BufferDescriptor> buffer;
+    Status status = range->GetNext(&buffer);
+    if (status.ok()) {
+      DCHECK(buffer->eosr());
+      range->ReturnBuffer(move(buffer));
+    }
+    EXPECT_EQ(0, read_client.GetUsedReservation()) << " iter " << i << ": "
+                                                   << status.GetDetail();
+    io_mgr.UnregisterContext(reader.get());
+  }
+  buffer_pool()->DeregisterClient(&read_client);
+}
+
 // Test reading into a client-allocated buffer.
 TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
