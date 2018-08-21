@@ -25,6 +25,7 @@ import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.authorization.User;
 import org.apache.impala.util.SentryPolicyService;
 import org.apache.log4j.Level;
+import org.apache.sentry.core.common.transport.SentryTransportFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +44,8 @@ public class SentryServicePinger {
   public static void main(String[] args) throws Exception {
     // Programmatically disable Sentry Thrift logging since Sentry error logging can be
     // pretty noisy and verbose.
-    org.apache.log4j.Logger logger4j = org.apache.log4j.Logger.getLogger("sentry");
+    org.apache.log4j.Logger logger4j = org.apache.log4j.Logger.getLogger(
+        SentryTransportFactory.class.getPackage().getName());
     logger4j.setLevel(Level.OFF);
 
     // Parse command line options to get config file path.
