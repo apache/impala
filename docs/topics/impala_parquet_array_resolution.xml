@@ -54,7 +54,7 @@ under the License.
       However, there is no reliable metadata within Parquet files to indicate
       which encoding was used. It is even possible to have mixed encodings within
       the same file if there are multiple arrays. The
-      <codeph>PARQUET_ARRAY_RESOLTUTION</codeph> option controls the process of
+      <codeph>PARQUET_ARRAY_RESOLUTION</codeph> option controls the process of
       resolution that is to match every column/field reference from a query to a
       column in the Parquet file.</p>
 
