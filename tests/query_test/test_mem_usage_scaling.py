@@ -353,6 +353,8 @@ class TestScanMemLimit(ImpalaTestSuite):
   def test_kudu_scan_mem_usage(self, vector):
     """Test that Kudu scans can stay within a low memory limit. Before IMPALA-7096 they
     were not aware of mem_limit and would start up too many scanner threads."""
+    # .test file overrides disable_codegen.
+    del vector.get_value('exec_option')['disable_codegen']
     self.run_test_case('QueryTest/kudu-scan-mem-usage', vector)
 
   def test_hdfs_scanner_thread_mem_scaling(self, vector):
