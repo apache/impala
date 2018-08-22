@@ -153,7 +153,7 @@ under the License.
     <dependency>
       <groupId>org.apache.parquet</groupId>
       <artifactId>parquet-avro</artifactId>
-      <version>1.8.0</version>
+      <version>${parquet.version}</version>
     </dependency>
 
     <dependency>
