@@ -541,6 +541,8 @@ class HdfsScanNodeBase : public ScanNode {
   /// Performs dynamic partition pruning, i.e., applies runtime filters to files, and
   /// issues initial ranges for all file types. Waits for runtime filters if necessary.
   /// Only valid to call if !initial_ranges_issued_. Sets initial_ranges_issued_ to true.
+  /// A non-ok status is returned only if it encounters an invalid scan range or if a
+  /// scanner thread cancels the scan when it runs into an error.
   Status IssueInitialScanRanges(RuntimeState* state) WARN_UNUSED_RESULT;
 
   /// Gets the next scan range to process and allocates buffer for it. 'reservation' is

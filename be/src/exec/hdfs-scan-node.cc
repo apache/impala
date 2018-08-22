@@ -84,7 +84,18 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     // so we need to tell them there is work to do.
     // TODO: This is probably not worth splitting the organisational cost of splitting
     // initialisation across two places. Move to before the scanner threads start.
-    RETURN_IF_ERROR(IssueInitialScanRanges(state));
+    Status status = IssueInitialScanRanges(state);
+    if (!status.ok()) {
+      // If the status returned is CANCELLED, it could be because the
+      // reader_context_ was cancelled by a scanner thread which hit an error. In this
+      // case, the scanner thread's error must take precedence. In other cases,
+      // the non-ok status represents the error in ValidateScanRange() or describes
+      // the unsupported compression formats. For such non-CANCELLED cases, the status
+      // returned by IssueInitialScanRanges() takes precedence.
+      unique_lock<mutex> l(lock_);
+      if (status.IsCancelled() && !status_.ok()) return status_;
+      return status;
+    }
 
     // Release the scanner threads
     discard_result(ranges_issued_barrier_.Notify());
