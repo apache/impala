@@ -16,9 +16,10 @@
 # under the License.
 
 # Requirements for use of test tooling (tests/comparison and tests/stress).
-
-# IMPALA-7460 TODO: upgrade Fabric and Paramiko
-Fabric == 1.10.2
-  paramiko == 1.15.2
-    ecdsa == 0.13
-  pycrypto == 2.6.1
+# The random query generator uses Fabric to interact with a remote host
+# running Docker.
+Fabric==1.14.0
+# Fabric depends on Paramiko. Additionally, the stress test uses
+# Paramiko directly to keep a persistent SSH connection open to each
+# Impalad host to run in-test monitoring.
+paramiko==2.4.1
