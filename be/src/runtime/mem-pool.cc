@@ -37,12 +37,13 @@ const char* MemPool::LLVM_CLASS_NAME = "class.impala::MemPool";
 const int MemPool::DEFAULT_ALIGNMENT;
 uint32_t MemPool::zero_length_region_ alignas(std::max_align_t) = MEM_POOL_POISON;
 
-MemPool::MemPool(MemTracker* mem_tracker)
+MemPool::MemPool(MemTracker* mem_tracker, bool enforce_binary_chunk_sizes)
   : current_chunk_idx_(-1),
     next_chunk_size_(INITIAL_CHUNK_SIZE),
     total_allocated_bytes_(0),
     total_reserved_bytes_(0),
-    mem_tracker_(mem_tracker) {
+    mem_tracker_(mem_tracker),
+    enforce_binary_chunk_sizes_(enforce_binary_chunk_sizes) {
   DCHECK(mem_tracker != NULL);
   DCHECK_EQ(zero_length_region_, MEM_POOL_POISON);
 }
@@ -128,6 +129,7 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) noexcept {
   DCHECK_LE(next_chunk_size_, MAX_CHUNK_SIZE);
   DCHECK_GE(next_chunk_size_, INITIAL_CHUNK_SIZE);
   chunk_size = max<int64_t>(min_size, next_chunk_size_);
+  if (enforce_binary_chunk_sizes_) chunk_size = BitUtil::RoundUpToPowerOfTwo(chunk_size);
   if (check_limits) {
     if (!mem_tracker_->TryConsume(chunk_size)) return false;
   } else {

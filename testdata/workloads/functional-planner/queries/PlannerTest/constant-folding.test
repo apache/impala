@@ -54,14 +54,14 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.98MB
+   partitions=1/1 files=4 size=289.00MB
    predicates: c_custkey > 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey = 4
    predicates on o_lineitems: 20 + l_linenumber < 0
    stored statistics:
-     table: rows=150000 size=288.98MB
+     table: rows=150000 size=289.00MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44229
+   extrapolated-rows=disabled max-scan-range-rows=44227
    parquet statistics predicates: c_custkey > 10
    parquet statistics predicates on o: o_orderkey = 4
    parquet dictionary predicates: c_custkey > 10
@@ -77,7 +77,7 @@ where string_col = cast(4 as string) and 2 + 3 = tinyint_col
   and id between concat('1', '0') and upper('20')
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=1.00GB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
@@ -89,7 +89,7 @@ PLAN-ROOT SINK
    stored statistics:
      table: rows=10000
      columns: all
-   mem-estimate=1.00GB mem-reservation=0B thread-reservation=0
+   mem-estimate=4.00KB mem-reservation=0B thread-reservation=0
    tuple-ids=0 row-size=119B cardinality=1
    in pipelines: 00(GETNEXT)
 ====

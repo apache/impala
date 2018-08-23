@@ -104,7 +104,7 @@ HBaseTableScanner::HBaseTableScanner(
     num_addl_requested_cols_(0),
     num_cells_(0),
     all_cells_present_(false),
-    value_pool_(new MemPool(scan_node_->mem_tracker())),
+    value_pool_(new MemPool(scan_node_->mem_tracker(), true)),
     scan_setup_timer_(ADD_TIMER(scan_node_->runtime_profile(),
       "HBaseTableScanner.ScanSetup")) {
   const TQueryOptions& query_option = state->query_options();

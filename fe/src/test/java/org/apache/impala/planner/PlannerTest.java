@@ -17,8 +17,15 @@
 
 package org.apache.impala.planner;
 
+import static org.junit.Assert.assertEquals;
+
+import java.util.ArrayList;
+
 import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.HBaseColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
@@ -632,5 +639,54 @@ public class PlannerTest extends PlannerTestBase {
         tblName, colDefs, storedAs, tblLocation, tblProps));
     query = "select id from functional_parquet.cardinality_overflow t, t.int_array";
     checkCardinality(query, 0, Long.MAX_VALUE);
+  }
+
+  @Test
+  public void testHBaseScanNodeMemEstimates() {
+    // Single key non-string column
+    HBaseColumn intCol = new HBaseColumn("", FeHBaseTable.Util.ROW_KEY_COLUMN_FAMILY, "",
+        false, Type.INT, "", 1);
+    assertEquals(
+        HBaseScanNode.memoryEstimateForFetchingColumns(Lists.newArrayList(intCol)), 8);
+
+    // Single key string column without max length stat.
+    HBaseColumn stringColWithoutStats = new HBaseColumn("",
+        FeHBaseTable.Util.ROW_KEY_COLUMN_FAMILY, "", false, Type.STRING, "", 1);
+    assertEquals(HBaseScanNode.memoryEstimateForFetchingColumns(Lists
+        .newArrayList(stringColWithoutStats)), 64 * 1024);
+
+    // Single key string column with max length stat.
+    HBaseColumn stringColwithSmallMaxSize = new HBaseColumn("",
+        FeHBaseTable.Util.ROW_KEY_COLUMN_FAMILY, "", false, Type.STRING, "", 1);
+    stringColwithSmallMaxSize.getStats().update(ColumnStats.StatsKey.MAX_SIZE,
+        Long.valueOf(50));
+    assertEquals(HBaseScanNode.memoryEstimateForFetchingColumns(Lists
+        .newArrayList(stringColwithSmallMaxSize)), 128);
+
+    // Case that triggers the upper bound if some columns have stats are missing.
+    HBaseColumn stringColwithLargeMaxSize = new HBaseColumn("",
+        FeHBaseTable.Util.ROW_KEY_COLUMN_FAMILY, "", false, Type.STRING, "", 1);
+    stringColwithLargeMaxSize.getStats().update(ColumnStats.StatsKey.MAX_SIZE,
+        Long.valueOf(128 * 1024 * 1024));
+    assertEquals(HBaseScanNode.memoryEstimateForFetchingColumns(Lists.newArrayList(
+        stringColwithLargeMaxSize, stringColWithoutStats)), 128 * 1024 * 1024);
+
+    // Single non-key non-string column.
+    HBaseColumn intNonKeyCol = new HBaseColumn("", "columnFamily", "columnQualifier",
+        false, Type.INT, "", 1);
+    assertEquals(
+        HBaseScanNode.memoryEstimateForFetchingColumns(Lists.newArrayList(intNonKeyCol)),
+        64);
+
+    // Case with a string key and non-key int column.
+    assertEquals(HBaseScanNode.memoryEstimateForFetchingColumns(Lists.newArrayList(
+        stringColwithLargeMaxSize, intNonKeyCol)), 512 * 1024 * 1024);
+
+    // Case with a huge number of string columns.
+    ArrayList<HBaseColumn> largeColumnList = new ArrayList<HBaseColumn>();
+    largeColumnList.add(stringColwithSmallMaxSize);
+    for (int i = 0; i < 100; i++) largeColumnList.add(stringColWithoutStats);
+    assertEquals(HBaseScanNode.memoryEstimateForFetchingColumns(largeColumnList),
+        8 * 1024 * 1024);
   }
 }

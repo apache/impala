@@ -49,7 +49,11 @@ class MemTracker;
 /// satisfy the allocation request, the free chunks are searched for one that is
 /// big enough otherwise a new chunk is added to the list.
 /// In order to keep allocation overhead low, chunk sizes double with each new one
-/// added, until they hit a maximum size.
+/// added, until they hit a maximum size. But if the required size is greater than the
+/// next chunk size, then a new chunk with the required size is allocated and the next
+/// chunk size is set to the min(2*(required size), max chunk size). However if the
+/// 'enforce_binary_chunk_sizes' flag passed to the c'tor is true, then all chunk sizes
+/// allocated will be rounded up to the next power of two.
 ///
 /// Allocated chunks can be reused for new allocations if Clear() is called to free
 /// all allocations or ReturnPartialAllocation() is called to return part of the last
@@ -88,7 +92,9 @@ class MemTracker;
 class MemPool {
  public:
   /// 'tracker' tracks the amount of memory allocated by this pool. Must not be NULL.
-  MemPool(MemTracker* mem_tracker);
+  /// If 'enforce_binary_chunk_sizes' is set to true then all chunk sizes
+  /// allocated will be rounded up to the next power of two.
+  MemPool(MemTracker* mem_tracker, bool enforce_binary_chunk_sizes = false);
 
   /// Frees all chunks of memory and subtracts the total allocated bytes
   /// from the registered limits.
@@ -224,6 +230,10 @@ class MemPool {
   /// The current and peak memory footprint of this pool. This is different from
   /// total allocated_bytes_ since it includes bytes in chunks that are not used.
   MemTracker* mem_tracker_;
+
+  /// If set to true, all chunk sizes allocated will be rounded up to the next power of
+  /// two.
+  const bool enforce_binary_chunk_sizes_;
 
   /// Find or allocated a chunk with at least min_size spare capacity and update
   /// current_chunk_idx_. Also updates chunks_, chunk_sizes_ and allocated_bytes_

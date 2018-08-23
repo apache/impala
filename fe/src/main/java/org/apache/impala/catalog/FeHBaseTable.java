@@ -91,7 +91,7 @@ public interface FeHBaseTable extends FeTable {
     public static final String HBASE_STORAGE_HANDLER =
         "org.apache.hadoop.hive.hbase.HBaseStorageHandler";
     // Column family of HBase row key
-    static final String ROW_KEY_COLUMN_FAMILY = ":key";
+    public static final String ROW_KEY_COLUMN_FAMILY = ":key";
     // Copied from Hive's HBaseStorageHandler.java.
     static final String DEFAULT_PREFIX = "default.";
     // Number of rows fetched during the row count estimation per region
