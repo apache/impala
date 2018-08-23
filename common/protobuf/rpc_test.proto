@@ -17,6 +17,8 @@
 //
 package impala;
 
+import "kudu/rpc/rpc_header.proto";
+
 // Definitions for service used for rpc-mgr-test.
 message PingRequestPB {
 }
@@ -26,6 +28,8 @@ message PingResponsePB {
 }
 
 service PingService {
+  option (kudu.rpc.default_authz_method) = "Authorize";
+
   rpc Ping(PingRequestPB) returns (PingResponsePB);
 }
 
@@ -38,5 +42,7 @@ message ScanMemResponsePB {
 }
 
 service ScanMemService {
+  option (kudu.rpc.default_authz_method) = "Authorize";
+
   rpc ScanMem(ScanMemRequestPB) returns (ScanMemResponsePB);
 }

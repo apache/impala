@@ -46,6 +46,12 @@ class DataStreamService : public DataStreamServiceIf {
   /// This mustn't be called until RPC manager has been initialized.
   Status Init();
 
+  /// Returns true iff the 'remote_user' in 'context' is authorized to access
+  /// DataStreamService. On denied access, the RPC is replied to with an error message.
+  /// Authorization is enforced only when Kerberos is enabled.
+  virtual bool Authorize(const google::protobuf::Message* req,
+      google::protobuf::Message* resp, kudu::rpc::RpcContext* context);
+
   /// Notifies the receiver to close the data stream specified in 'request'.
   /// The receiver replies to the client with a status serialized in 'response'.
   virtual void EndDataStream(const EndDataStreamRequestPB* request,

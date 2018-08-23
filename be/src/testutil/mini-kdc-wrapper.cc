@@ -32,11 +32,12 @@ using filesystem::path;
 
 DECLARE_string(keytab_file);
 DECLARE_string(krb5_conf);
+DECLARE_string(krb5_ccname);
 
 Status MiniKdcWrapper::StartKdc(string keytab_dir) {
   kudu::MiniKdcOptions options;
   options.realm = realm_;
-  options.data_root = keytab_dir;
+  options.data_root = move(keytab_dir);
   options.ticket_lifetime = ticket_lifetime_;
   options.renew_lifetime = renew_lifetime_;
   options.port = kdc_port_;
@@ -54,34 +55,42 @@ Status MiniKdcWrapper::StopKdc() {
   return Status::OK();
 }
 
+Status MiniKdcWrapper::Kinit(const string& username) {
+  KUDU_RETURN_IF_ERROR(kdc_->Kinit(username), "Failed to kinit.");
+  return Status::OK();
+}
+
+Status MiniKdcWrapper::CreateUserPrincipal(const string& username) {
+  KUDU_RETURN_IF_ERROR(kdc_->CreateUserPrincipal(username),
+      "Failed to create user principal.");
+  return Status::OK();
+}
+
 Status MiniKdcWrapper::CreateServiceKeytab(const string& spn, string* kt_path) {
   KUDU_RETURN_IF_ERROR(kdc_->CreateServiceKeytab(spn, kt_path),
       "Failed to create service keytab.");
   return Status::OK();
 }
 
-Status MiniKdcWrapper::SetupAndStartMiniKDC(string spn, string realm,
-    string ticket_lifetime, string renew_lifetime, int kdc_port,
-    unique_ptr<MiniKdcWrapper>* kdc_ptr) {
-  std::unique_ptr<MiniKdcWrapper> kdc(new MiniKdcWrapper(
-      spn, realm, ticket_lifetime, renew_lifetime, kdc_port));
+Status MiniKdcWrapper::SetupAndStartMiniKDC(string realm,
+    string ticket_lifetime, string renew_lifetime,
+    int kdc_port, unique_ptr<MiniKdcWrapper>* kdc_ptr) {
+  unique_ptr<MiniKdcWrapper> kdc(new MiniKdcWrapper(
+      move(realm), move(ticket_lifetime), move(renew_lifetime), kdc_port));
   DCHECK(kdc.get() != nullptr);
 
   // Enable the workaround for MIT krb5 1.10 bugs from krb5_realm_override.cc.
   setenv("KUDU_ENABLE_KRB5_REALM_FIX", "true", 0);
 
   // Check if the unique directory already exists, and create it if it doesn't.
-  RETURN_IF_ERROR(FileSystemUtil::RemoveAndCreateDirectory(kdc->unique_test_dir_.string()));
+  RETURN_IF_ERROR(
+      FileSystemUtil::RemoveAndCreateDirectory(kdc->unique_test_dir_.string()));
   string keytab_dir = kdc->unique_test_dir_.string() + "/krb5kdc";
 
   RETURN_IF_ERROR(kdc->StartKdc(keytab_dir));
 
-  string kt_path;
-  RETURN_IF_ERROR(kdc->CreateServiceKeytab(kdc->spn_, &kt_path));
-
   // Set the appropriate flags based on how we've set up the kerberos environment.
   FLAGS_krb5_conf = strings::Substitute("$0/$1", keytab_dir, "krb5.conf");
-  FLAGS_keytab_file = kt_path;
 
   *kdc_ptr = std::move(kdc);
   return Status::OK();
@@ -91,7 +100,6 @@ Status MiniKdcWrapper::TearDownMiniKDC() {
   RETURN_IF_ERROR(StopKdc());
 
   // Clear the flags so we don't step on other tests that may run in the same process.
-  FLAGS_keytab_file.clear();
   FLAGS_krb5_conf.clear();
 
   // Remove test directory.

@@ -107,6 +107,11 @@ class ImpalaKRPCTestBackend : public DataStreamServiceIf {
     return rpc_mgr_->RegisterService(CpuInfo::num_cores(), 1024, this, mem_tracker());
   }
 
+  virtual bool Authorize(const google::protobuf::Message* req,
+      google::protobuf::Message* resp, kudu::rpc::RpcContext* context) {
+    return true;
+  }
+
   virtual void TransmitData(const TransmitDataRequestPB* request,
       TransmitDataResponsePB* response, RpcContext* rpc_context) {
     stream_mgr_->AddData(request, response, rpc_context);

@@ -15,8 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "rpc/rpc-mgr-test-base.h"
+#include "rpc/rpc-mgr-test.h"
+
+#include "kudu/util/monotime.h"
 #include "service/fe-support.h"
+#include "testutil/mini-kdc-wrapper.h"
+#include "util/counting-barrier.h"
 
 using kudu::rpc::GeneratedServiceIf;
 using kudu::rpc::RpcController;
@@ -28,18 +32,8 @@ DECLARE_int32(num_acceptor_threads);
 DECLARE_int32(rpc_negotiation_timeout_ms);
 DECLARE_string(hostname);
 
-namespace impala {
-
 // For tests that do not require kerberized testing, we use RpcTest.
-class RpcMgrTest : public RpcMgrTestBase<testing::Test> {
-  virtual void SetUp() override {
-    RpcMgrTestBase::SetUp();
-  }
-
-  virtual void TearDown() override {
-    RpcMgrTestBase::TearDown();
-  }
-};
+namespace impala {
 
 TEST_F(RpcMgrTest, MultipleServicesTls) {
   // TODO: We're starting a seperate RpcMgr here instead of configuring
@@ -57,12 +51,12 @@ TEST_F(RpcMgrTest, MultipleServicesTls) {
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT);
   ASSERT_OK(tls_rpc_mgr.Init());
 
-  ASSERT_OK(RunMultipleServicesTestTemplate(this, &tls_rpc_mgr, tls_krpc_address));
+  ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
   tls_rpc_mgr.Shutdown();
 }
 
 TEST_F(RpcMgrTest, MultipleServices) {
-  ASSERT_OK(RunMultipleServicesTestTemplate(this, &rpc_mgr_, krpc_address_));
+  ASSERT_OK(RunMultipleServicesTest(&rpc_mgr_, krpc_address_));
 }
 
 // Test with a misconfigured TLS certificate and verify that an error is thrown.
@@ -112,7 +106,7 @@ TEST_F(RpcMgrTest, CorrectPasswordTls) {
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ASSERT_OK(tls_rpc_mgr.Init());
-  ASSERT_OK(RunMultipleServicesTestTemplate(this, &tls_rpc_mgr, tls_krpc_address));
+  ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
   tls_rpc_mgr.Shutdown();
 }
 
@@ -146,7 +140,7 @@ TEST_F(RpcMgrTest, ValidCiphersTls) {
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ASSERT_OK(tls_rpc_mgr.Init());
-  ASSERT_OK(RunMultipleServicesTestTemplate(this, &tls_rpc_mgr, tls_krpc_address));
+  ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
   tls_rpc_mgr.Shutdown();
 }
 
@@ -165,7 +159,7 @@ TEST_F(RpcMgrTest, ValidMultiCiphersTls) {
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ASSERT_OK(tls_rpc_mgr.Init());
-  ASSERT_OK(RunMultipleServicesTestTemplate(this, &tls_rpc_mgr, tls_krpc_address));
+  ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
   tls_rpc_mgr.Shutdown();
 }
 
@@ -179,8 +173,8 @@ TEST_F(RpcMgrTest, SlowCallback) {
   // Test a service which is slow to respond and has a short queue.
   // Set a timeout on the client side. Expect either a client timeout
   // or the service queue filling up.
-  GeneratedServiceIf* ping_impl = TakeOverService(make_unique<PingServiceImpl>(
-      rpc_mgr_.metric_entity(), rpc_mgr_.result_tracker(), slow_cb));
+  GeneratedServiceIf* ping_impl =
+      TakeOverService(make_unique<PingServiceImpl>(&rpc_mgr_, slow_cb));
   const int num_service_threads = 1;
   const int queue_size = 3;
   ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, ping_impl,
@@ -205,8 +199,8 @@ TEST_F(RpcMgrTest, SlowCallback) {
 }
 
 TEST_F(RpcMgrTest, AsyncCall) {
-  GeneratedServiceIf* scan_mem_impl = TakeOverService(make_unique<ScanMemServiceImpl>(
-      rpc_mgr_.metric_entity(), rpc_mgr_.result_tracker()));
+  GeneratedServiceIf* scan_mem_impl =
+      TakeOverService(make_unique<ScanMemServiceImpl>(&rpc_mgr_));
   ASSERT_OK(rpc_mgr_.RegisterService(10, 10, scan_mem_impl,
       static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker()));
 
@@ -252,8 +246,7 @@ TEST_F(RpcMgrTest, NegotiationTimeout) {
   secondary_krpc_address = MakeNetworkAddress(ip, secondary_service_port);
 
   ASSERT_OK(secondary_rpc_mgr.Init());
-  ASSERT_FALSE(RunMultipleServicesTestTemplate(
-      this, &secondary_rpc_mgr, secondary_krpc_address).ok());
+  ASSERT_FALSE(RunMultipleServicesTest(&secondary_rpc_mgr, secondary_krpc_address).ok());
   secondary_rpc_mgr.Shutdown();
 }
 

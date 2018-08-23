@@ -21,6 +21,8 @@ package impala;
 import "common.proto";
 import "row_batch.proto";
 
+import "kudu/rpc/rpc_header.proto";
+
 // All fields are required in V1.
 message TransmitDataRequestPB {
   // The fragment instance id of the receiver.
@@ -76,6 +78,9 @@ message EndDataStreamResponsePB {
 
 // Handles data transmission between fragment instances.
 service DataStreamService {
+  // Override the default authorization method.
+  option (kudu.rpc.default_authz_method) = "Authorize";
+
   // Called by sender to transmit a single row batch. Returns error indication
   // if params.fragmentId or params.destNodeId are unknown or if data couldn't
   // be read.

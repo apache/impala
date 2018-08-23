@@ -31,25 +31,25 @@ namespace impala {
 // Pattern for hostname substitution.
 static const string HOSTNAME_PATTERN = "_HOST";
 
-  const string& GetEffectiveUser(const TSessionState& session) {
-    if (session.__isset.delegated_user && !session.delegated_user.empty()) {
-      return session.delegated_user;
-    }
-    return session.connected_user;
+const string& GetEffectiveUser(const TSessionState& session) {
+  if (session.__isset.delegated_user && !session.delegated_user.empty()) {
+    return session.delegated_user;
   }
+  return session.connected_user;
+}
 
-  const string& GetEffectiveUser(const ImpalaServer::SessionState& session) {
-    return session.do_as_user.empty() ? session.connected_user : session.do_as_user;
-  }
+const string& GetEffectiveUser(const ImpalaServer::SessionState& session) {
+  return session.do_as_user.empty() ? session.connected_user : session.do_as_user;
+}
 
-  Status CheckProfileAccess(const string& user, const string& effective_user,
-      bool has_access) {
-    if (user.empty() || (user == effective_user && has_access)) return Status::OK();
-    stringstream ss;
-    ss << "User " << user << " is not authorized to access the runtime profile or "
-       << "execution summary.";
-    return Status(ss.str());
-  }
+Status CheckProfileAccess(const string& user, const string& effective_user,
+    bool has_access) {
+  if (user.empty() || (user == effective_user && has_access)) return Status::OK();
+  stringstream ss;
+  ss << "User " << user << " is not authorized to access the runtime profile or "
+     << "execution summary.";
+  return Status(ss.str());
+}
 
 // Replaces _HOST with the hostname if it occurs in the principal string.
 Status ReplacePrincipalHostFormat(string* out_principal) {
@@ -83,6 +83,7 @@ Status GetInternalKerberosPrincipal(string* out_principal) {
 
 Status ParseKerberosPrincipal(const string& principal, string* service_name,
     string* hostname, string* realm) {
+  // TODO: IMPALA-7504: replace this with krb5_parse_name().
   vector<string> names;
 
   split(names, principal, is_any_of("/"));
@@ -98,10 +99,6 @@ Status ParseKerberosPrincipal(const string& principal, string* service_name,
   *realm = names[1];
 
   return Status::OK();
-}
-
-bool IsKerberosEnabled() {
-  return !FLAGS_principal.empty();
 }
 
 }

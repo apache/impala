@@ -22,6 +22,8 @@
 #include <string>
 #include "service/impala-server.h"
 
+DECLARE_string(principal);
+
 namespace impala {
 
 class TSessionState;
@@ -63,7 +65,9 @@ Status ParseKerberosPrincipal(const std::string& principal, std::string* service
     std::string* hostname, std::string* realm);
 
 /// Returns true if kerberos is enabled.
-bool IsKerberosEnabled();
+inline bool IsKerberosEnabled() {
+  return !FLAGS_principal.empty();
+}
 
 } // namespace impala
 #endif

@@ -62,12 +62,13 @@ using boost::algorithm::trim;
 using boost::mt19937;
 using boost::uniform_int;
 using namespace apache::thrift;
-using namespace boost::filesystem;   // for is_regular()
+using namespace boost::filesystem;   // for is_regular(), is_absolute()
 using namespace strings;
 
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
 DECLARE_string(be_principal);
+DECLARE_string(krb5_ccname);
 DECLARE_string(krb5_conf);
 DECLARE_string(krb5_debug_file);
 
@@ -122,10 +123,6 @@ static vector<sasl_callback_t> LDAP_EXT_CALLBACKS;  // External LDAP connections
 // This is initialized the first time InitAuth() is called. Future call must pass
 // the same 'appname' or InitAuth() will fail.
 static string APP_NAME;
-
-// Path to the file based credential cache that we pass to the KRB5CCNAME environment
-// variable.
-static const string KRB5CCNAME_PATH = "/tmp/krb5cc_impala_internal";
 
 // Constants for the two Sasl mechanisms we support
 static const string KERBEROS_MECHANISM = "GSSAPI";
@@ -732,7 +729,12 @@ Status AuthManager::InitKerberosEnv() {
   // is normally fine, but if you're not running impala daemons as user
   // 'impala', the kinit we perform is going to blow away credentials for the
   // current user.  Not setting this isn't technically fatal, so ignore errors.
-  (void) setenv("KRB5CCNAME", "/tmp/krb5cc_impala_internal", 1);
+  const path krb5_ccname_path(FLAGS_krb5_ccname);
+  if (!krb5_ccname_path.is_absolute()) {
+    return Status(Substitute("Bad --krb5_ccname value: $0 is not an absolute file path",
+        FLAGS_krb5_ccname));
+  }
+  discard_result(setenv("KRB5CCNAME", FLAGS_krb5_ccname.c_str(), 1));
 
   // If an alternate krb5_conf location is supplied, set both KRB5_CONFIG and
   // JAVA_TOOL_OPTIONS in the environment.
@@ -785,7 +787,7 @@ Status SaslAuthProvider::Start() {
     // Starts a thread that periodically does a 'kinit'. The thread lives as long as the
     // process does.
     KUDU_RETURN_IF_ERROR(kudu::security::InitKerberosForServer(principal_, keytab_file_,
-        KRB5CCNAME_PATH, false), "Could not init kerberos");
+        FLAGS_krb5_ccname, false), "Could not init kerberos");
     LOG(INFO) << "Kerberos ticket granted to " << principal_;
   }
 

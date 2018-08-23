@@ -15,6 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#ifndef IMPALA_RPC_RPC_MGR_TEST_H
+#define IMPALA_RPC_RPC_MGR_TEST_H
+
 #include "rpc/rpc-mgr.inline.h"
 
 #include "common/init.h"
@@ -23,15 +26,11 @@
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_header.pb.h"
 #include "kudu/rpc/rpc_sidecar.h"
-#include "kudu/util/monotime.h"
 #include "kudu/util/status.h"
-#include "rpc/auth-provider.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "testutil/gtest-util.h"
-#include "testutil/mini-kdc-wrapper.h"
 #include "testutil/scoped-flag-setter.h"
-#include "util/counting-barrier.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/test-info.h"
@@ -110,7 +109,7 @@ const string TLS1_0_COMPATIBLE_CIPHER_2 = "RC4-MD5";
 
 #define PAYLOAD_SIZE (4096)
 
-template <class T> class RpcMgrTestBase : public T {
+class RpcMgrTest : public testing::Test {
  public:
   // Utility function to initialize the parameter for ScanMem RPC.
   // Picks a random value and fills 'payload_' with it. Adds 'payload_' as a sidecar
@@ -126,18 +125,14 @@ template <class T> class RpcMgrTestBase : public T {
     request->set_sidecar_idx(idx);
   }
 
-  // Takes over ownership of the newly created 'service' which needs to have a lifetime
-  // as long as 'rpc_mgr_' as RpcMgr::Shutdown() will call Shutdown() of 'service'.
-  GeneratedServiceIf* TakeOverService(std::unique_ptr<GeneratedServiceIf> service) {
-    services_.emplace_back(move(service));
-    return services_.back().get();
-  }
+  // Utility function which alternately makes requests to PingService and ScanMemService.
+  Status RunMultipleServicesTest(RpcMgr* rpc_mgr, const TNetworkAddress& krpc_address);
 
  protected:
   TNetworkAddress krpc_address_;
   RpcMgr rpc_mgr_;
 
-  virtual void SetUp() override {
+  virtual void SetUp() {
     IpAddr ip;
     ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
     krpc_address_ = MakeNetworkAddress(ip, SERVICE_PORT);
@@ -145,8 +140,15 @@ template <class T> class RpcMgrTestBase : public T {
     ASSERT_OK(rpc_mgr_.Init());
   }
 
-  virtual void TearDown() override {
+  virtual void TearDown() {
     rpc_mgr_.Shutdown();
+  }
+
+  // Takes over ownership of the newly created 'service' which needs to have a lifetime
+  // as long as 'rpc_mgr_' as RpcMgr::Shutdown() will call Shutdown() of 'service'.
+  GeneratedServiceIf* TakeOverService(std::unique_ptr<GeneratedServiceIf> service) {
+    services_.emplace_back(move(service));
+    return services_.back().get();
   }
 
  private:
@@ -164,10 +166,17 @@ typedef std::function<void(RpcContext*)> ServiceCB;
 class PingServiceImpl : public PingServiceIf {
  public:
   // 'cb' is a callback used by tests to inject custom behaviour into the RPC handler.
-  PingServiceImpl(const scoped_refptr<kudu::MetricEntity>& entity,
-      const scoped_refptr<kudu::rpc::ResultTracker> tracker,
+  PingServiceImpl(RpcMgr* rpc_mgr,
       ServiceCB cb = [](RpcContext* ctx) { ctx->RespondSuccess(); })
-    : PingServiceIf(entity, tracker), mem_tracker_(-1, "Ping Service"), cb_(cb) {}
+    : PingServiceIf(rpc_mgr->metric_entity(), rpc_mgr->result_tracker()),
+      rpc_mgr_(rpc_mgr),
+      mem_tracker_(-1, "Ping Service"),
+      cb_(cb) {}
+
+  virtual bool Authorize(const google::protobuf::Message* req,
+      google::protobuf::Message* resp, RpcContext* context) override {
+    return rpc_mgr_->Authorize("PingService", context, mem_tracker());
+  }
 
   virtual void Ping(const PingRequestPB* request, PingResponsePB* response, RpcContext*
       context) override {
@@ -180,15 +189,22 @@ class PingServiceImpl : public PingServiceIf {
   MemTracker* mem_tracker() { return &mem_tracker_; }
 
  private:
+  RpcMgr* rpc_mgr_;
   MemTracker mem_tracker_;
   ServiceCB cb_;
 };
 
 class ScanMemServiceImpl : public ScanMemServiceIf {
  public:
-  ScanMemServiceImpl(const scoped_refptr<kudu::MetricEntity>& entity,
-      const scoped_refptr<kudu::rpc::ResultTracker> tracker)
-    : ScanMemServiceIf(entity, tracker), mem_tracker_(-1, "ScanMem Service") {
+  ScanMemServiceImpl(RpcMgr* rpc_mgr)
+    : ScanMemServiceIf(rpc_mgr->metric_entity(), rpc_mgr->result_tracker()),
+      mem_tracker_(-1, "ScanMem Service") {
+  }
+
+  // A no-op authorization function.
+  virtual bool Authorize(const google::protobuf::Message* req,
+      google::protobuf::Message* resp, RpcContext* context) override {
+    return true;
   }
 
   // The request comes with an int 'pattern' and a payload of int array sent with
@@ -224,20 +240,19 @@ class ScanMemServiceImpl : public ScanMemServiceIf {
 
 };
 
-template <class T>
-Status RunMultipleServicesTestTemplate(RpcMgrTestBase<T>* test_base,
+Status RpcMgrTest::RunMultipleServicesTest(
     RpcMgr* rpc_mgr, const TNetworkAddress& krpc_address) {
   // Test that a service can be started, and will respond to requests.
-  GeneratedServiceIf* ping_impl = test_base->TakeOverService(make_unique<PingServiceImpl>(
-      rpc_mgr->metric_entity(), rpc_mgr->result_tracker()));
+  GeneratedServiceIf* ping_impl = TakeOverService(
+      make_unique<PingServiceImpl>(rpc_mgr));
   RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, ping_impl,
       static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
 
   // Test that a second service, that verifies the RPC payload is not corrupted,
   // can be started.
-  GeneratedServiceIf* scan_mem_impl = test_base->TakeOverService(
-      make_unique<ScanMemServiceImpl>(rpc_mgr->metric_entity(),
-      rpc_mgr->result_tracker()));
+  GeneratedServiceIf* scan_mem_impl =
+      TakeOverService(make_unique<ScanMemServiceImpl>(rpc_mgr));
+
   RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, scan_mem_impl,
       static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker()));
 
@@ -272,13 +287,14 @@ Status RunMultipleServicesTestTemplate(RpcMgrTestBase<T>* test_base,
     } else {
       ScanMemRequestPB request;
       ScanMemResponsePB response;
-      test_base->SetupScanMemRequest(&request, &controller);
+      SetupScanMemRequest(&request, &controller);
       KUDU_RETURN_IF_ERROR(scan_mem_proxy->ScanMem(request, &response, &controller),
           "unable to execute ScanMem() RPC.");
     }
   }
-
   return Status::OK();
 }
 
 } // namespace impala
+
+#endif

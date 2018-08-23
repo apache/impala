@@ -133,6 +133,16 @@ class RpcMgr {
       kudu::rpc::GeneratedServiceIf* service_ptr, MemTracker* service_mem_tracker)
       WARN_UNUSED_RESULT;
 
+  /// Returns true if the given 'remote_user' in RpcContext 'context' is authorized to
+  /// access 'service_name' registered with this RpcMgr. Authorization is only enforced
+  /// when Kerberos is enabled.
+  ///
+  /// If authorization is denied, the RPC is responded to with an error message. Memory
+  /// of RPC payloads accounted towards 'mem_tracker', the service's MemTracker, is also
+  /// released.
+  bool Authorize(const string& service_name, kudu::rpc::RpcContext* context,
+      MemTracker* mem_tracker) const;
+
   /// Creates a new proxy for a remote service of type P at location 'address' with
   /// hostname 'hostname' and places it in 'proxy'. 'P' must descend from
   /// kudu::rpc::ServiceIf. Note that 'address' must be a resolved IP address.

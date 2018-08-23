@@ -19,11 +19,15 @@
 
 #include "exec/kudu-util.h"
 #include "kudu/rpc/acceptor_pool.h"
+#include "kudu/rpc/remote_user.h"
+#include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_introspection.pb.h"
 #include "kudu/rpc/service_if.h"
+#include "kudu/security/init.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/net_util.h"
+#include "runtime/mem-tracker.h"
 #include "util/auth-util.h"
 #include "util/cpu-info.h"
 #include "util/network-util.h"
@@ -39,11 +43,13 @@ using kudu::MonoDelta;
 using kudu::rpc::AcceptorPool;
 using kudu::rpc::DumpRunningRpcsRequestPB;
 using kudu::rpc::DumpRunningRpcsResponsePB;
+using kudu::rpc::GeneratedServiceIf;
 using kudu::rpc::MessengerBuilder;
 using kudu::rpc::Messenger;
+using kudu::rpc::RemoteUser;
 using kudu::rpc::RpcConnectionPB;
+using kudu::rpc::RpcContext;
 using kudu::rpc::RpcController;
-using kudu::rpc::GeneratedServiceIf;
 using kudu::Sockaddr;
 
 DECLARE_string(hostname);
@@ -107,7 +113,6 @@ Status RpcMgr::Init() {
   if (IsKerberosEnabled()) {
     string internal_principal;
     RETURN_IF_ERROR(GetInternalKerberosPrincipal(&internal_principal));
-
     string service_name, unused_hostname, unused_realm;
     RETURN_IF_ERROR(ParseKerberosPrincipal(internal_principal, &service_name,
         &unused_hostname, &unused_realm));
@@ -149,6 +154,30 @@ Status RpcMgr::RegisterService(int32_t num_service_threads, int32_t service_queu
   service_pools_.push_back(std::move(service_pool));
 
   return Status::OK();
+}
+
+bool RpcMgr::Authorize(const string& service_name, RpcContext* context,
+    MemTracker* mem_tracker) const {
+  // Authorization is enforced iff Kerberos is enabled.
+  if (!IsKerberosEnabled()) return true;
+
+  // Check if the mapped username matches that of the kinit'ed principal.
+  const RemoteUser& remote_user = context->remote_user();
+  const string& logged_in_username =
+      kudu::security::GetLoggedInUsernameFromKeytab().value_or("");
+  DCHECK(!logged_in_username.empty());
+  bool authorized = remote_user.username() == logged_in_username &&
+      remote_user.authenticated_by() == RemoteUser::Method::KERBEROS;
+  if (UNLIKELY(!authorized)) {
+    LOG(ERROR) << Substitute("Rejecting unauthorized access to $0 from $1. Expected "
+        "user $2", service_name, context->requestor_string(), logged_in_username);
+    mem_tracker->Release(context->GetTransferSize());
+    context->RespondFailure(kudu::Status::NotAuthorized(
+        Substitute("$0 is not allowed to access $1",
+            remote_user.ToString(), service_name)));
+    return false;
+  }
+  return true;
 }
 
 Status RpcMgr::StartServices(const TNetworkAddress& address) {
