@@ -48,6 +48,9 @@ public class DropTableOrViewStmt extends StatementBase {
   // Set during analysis
   protected String dbName_;
 
+  // Server name needed for privileges. Set during analysis.
+  private String serverName_;
+
   /**
    * Constructor for building the DROP TABLE/VIEW statement
    */
@@ -77,6 +80,7 @@ public class DropTableOrViewStmt extends StatementBase {
     params.setIf_exists(ifExists_);
     params.setPurge(purgeTable_);
     params.setIs_table(dropTable_);
+    params.setServer_name(serverName_);
     return params;
   }
 
@@ -106,6 +110,10 @@ public class DropTableOrViewStmt extends StatementBase {
         throw new AnalysisException(String.format(
             "DROP VIEW not allowed on a table: %s.%s", dbName_, getTbl()));
       }
+      // Set the servername here if authorization is enabled because analyzer_ is not
+      // available in the toThrift() method.
+      serverName_ = analyzer.getServerName();
+
     } catch (TableLoadingException e) {
       // We should still try to DROP tables that failed to load, so that tables that are
       // in a bad state, eg. deleted externally from Kudu, can be dropped.

@@ -30,6 +30,9 @@ public class DropDbStmt extends StatementBase {
   private final boolean ifExists_;
   private final boolean cascade_;
 
+  // Server name needed for privileges. Set during analysis.
+  private String serverName_;
+
   /**
    * Constructor for building the drop statement. If ifExists is true, an error will not
    * be thrown if the database does not exist. If cascade is true, all the tables in the
@@ -59,6 +62,7 @@ public class DropDbStmt extends StatementBase {
     params.setDb(getDb());
     params.setIf_exists(getIfExists());
     params.setCascade(getCascade());
+    params.setServer_name(serverName_);
     return params;
   }
 
@@ -75,5 +79,8 @@ public class DropDbStmt extends StatementBase {
     if (db != null && db.numFunctions() > 0 && !cascade_) {
       throw new AnalysisException("Cannot drop non-empty database: " + dbName_);
     }
+    // Set the servername here if authorization is enabled because analyzer_ is not
+    // available in the toThrift() method.
+    serverName_ = analyzer.getServerName();
   }
 }

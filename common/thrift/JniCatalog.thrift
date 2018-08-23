@@ -73,6 +73,10 @@ struct TAlterDbSetOwnerParams {
 
   // The owner name.
   2: required string owner_name
+
+  // The server name for security privileges when authorization is enabled.
+  // TODO: Need to cleanup:IMPALA-7553
+  3: optional string server_name
 }
 
 struct TAlterDbParams {
@@ -124,6 +128,10 @@ struct TCreateDbParams {
 
   // Owner of the database
   5: required string owner
+
+  // The server name for security privileges when authorization is enabled.
+  // TODO: Need to cleanup:IMPALA-7553
+  6: optional string server_name
 }
 
 // Parameters of CREATE DATA SOURCE commands
@@ -325,6 +333,10 @@ struct TAlterTableOrViewSetOwnerParams {
 
   // The owner name.
   2: required string owner_name
+
+  // The server name for security privileges when authorization is enabled.
+  // TODO: Need to cleanup:IMPALA-7553
+  3: optional string server_name
 }
 
 // Parameters for updating the table and/or column statistics
@@ -444,6 +456,10 @@ struct TCreateTableLikeParams {
   // any such columns of the source table. If unspecified, the destination table will
   // inherit the sort columns of the source table.
   9: optional list<string> sort_columns
+
+  // The server name for security privileges when authorization is enabled.
+  // TODO: Need to cleanup:IMPALA-7553
+  10: optional string server_name
 }
 
 // Parameters of CREATE TABLE commands
@@ -498,6 +514,10 @@ struct TCreateTableParams {
 
   // Optional list of sort columns for the new table.
   16: optional list<string> sort_columns
+
+  // The server name for security privileges when authorization is enabled.
+  // TODO: Need to cleanup:IMPALA-7553
+  17: optional string server_name
 }
 
 // Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command
@@ -522,6 +542,10 @@ struct TCreateOrAlterViewParams {
 
   // Do not throw an error if a table or view of the same name already exists
   7: optional bool if_not_exists
+
+  // The server name for security privileges when authorization is enabled.
+  // TODO: Need to cleanup:IMPALA-7553
+  8: optional string server_name
 }
 
 // Parameters of a COMPUTE STATS command
@@ -611,6 +635,10 @@ struct TDropDbParams {
 
   // If true, drops all tables of the database
   3: required bool cascade
+
+  // The server name for security privileges when authorization is enabled.
+  // TODO: Need to cleanup:IMPALA-7553
+  4: optional string server_name
 }
 
 // Parameters of DROP TABLE/VIEW commands
@@ -626,6 +654,10 @@ struct TDropTableOrViewParams {
 
   // Set to true for tables and false for views
   4: optional bool is_table
+
+  // The server name for security privileges when authorization is enabled.
+  // TODO: Need to cleanup:IMPALA-7553
+  5: optional string server_name
 }
 
 // Parameters of TRUNCATE commands

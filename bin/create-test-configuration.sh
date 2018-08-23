@@ -165,6 +165,9 @@ generate_config hive-log4j2.properties.template hive-log4j2.properties
 generate_config hbase-site.xml.template hbase-site.xml
 generate_config authz-policy.ini.template authz-policy.ini
 generate_config sentry-site.xml.template sentry-site.xml
+generate_config sentry-site_oo.xml.template sentry-site_oo.xml
+generate_config sentry-site_oo_nogrant.xml.template sentry-site_oo_nogrant.xml
+generate_config sentry-site_no_oo.xml.template sentry-site_no_oo.xml
 
 if [ ! -z "${IMPALA_KERBERIZE}" ]; then
   generate_config hbase-jaas-server.conf.template hbase-jaas-server.conf

@@ -36,6 +36,9 @@ public class CreateDbStmt extends StatementBase {
   // Database owner. Set during analysis.
   private String owner_;
 
+  // Server name needed for privileges. Set during analysis.
+  private String serverName_;
+
   /**
    * Creates a database with the given name.
    */
@@ -78,6 +81,7 @@ public class CreateDbStmt extends StatementBase {
     params.setLocation(location_ == null ? null : location_.toString());
     params.setIf_not_exists(getIfNotExists());
     params.setOwner(getOwner());
+    params.setServer_name(serverName_);
     return params;
   }
 
@@ -101,6 +105,9 @@ public class CreateDbStmt extends StatementBase {
       location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
     }
     owner_ = analyzer.getUser().getName();
+    // Set the servername here if authorization is enabled because analyzer_ is not
+    // available in the toThrift() method.
+    serverName_ = analyzer.getServerName();
   }
 
   /**

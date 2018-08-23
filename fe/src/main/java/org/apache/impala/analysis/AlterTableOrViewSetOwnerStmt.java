@@ -23,6 +23,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableOrViewSetOwnerParams;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.thrift.TOwnerType;
 import org.apache.impala.util.MetaStoreUtil;
 
 /**
@@ -30,6 +31,9 @@ import org.apache.impala.util.MetaStoreUtil;
  */
 public abstract class AlterTableOrViewSetOwnerStmt extends AlterTableStmt {
   protected final Owner owner_;
+
+  // Server name needed for privileges. Set during analysis.
+  private String serverName_;
 
   public AlterTableOrViewSetOwnerStmt(TableName tableName, Owner owner) {
     super(tableName);
@@ -45,6 +49,14 @@ public abstract class AlterTableOrViewSetOwnerStmt extends AlterTableStmt {
           "%d characters. The given owner name has %d characters.",
           MetaStoreUtil.MAX_OWNER_LENGTH, ownerName.length()));
     }
+    // We don't allow assigning to a non-existent role because Sentry should know about
+    // all roles. Sentry does not track all users so we allow assigning to a user
+    // that Sentry doesn't know about yet.
+    if (analyzer.getAuthzConfig().isEnabled() && owner_.getOwnerType() == TOwnerType.ROLE
+        && analyzer.getCatalog().getAuthPolicy().getRole(ownerName) == null) {
+      throw new AnalysisException(String.format("Role '%s' does not exist.", ownerName));
+    }
+
     tableName_ = analyzer.getFqTableName(tableName_);
     // Require ALL with GRANT OPTION privilege.
     TableRef tableRef = new TableRef(tableName_.toPath(), null, Privilege.ALL,
@@ -53,6 +65,9 @@ public abstract class AlterTableOrViewSetOwnerStmt extends AlterTableStmt {
     Preconditions.checkNotNull(tableRef);
     tableRef.analyze(analyzer);
     validateType(tableRef);
+    // Set the servername here if authorization is enabled because analyzer_ is not
+    // available in the toThrift() method.
+    serverName_ = analyzer.getServerName();
   }
 
   /**
@@ -67,6 +82,7 @@ public abstract class AlterTableOrViewSetOwnerStmt extends AlterTableStmt {
     TAlterTableOrViewSetOwnerParams ownerParams = new TAlterTableOrViewSetOwnerParams();
     ownerParams.setOwner_type(owner_.getOwnerType());
     ownerParams.setOwner_name(owner_.getOwnerName());
+    ownerParams.setServer_name(serverName_);
     params.setAlter_type(TAlterTableType.SET_OWNER);
     params.setSet_owner_params(ownerParams);
     return params;

@@ -24,6 +24,7 @@ import os.path
 import pipes
 import pytest
 import re
+import subprocess
 from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.impala_cluster import ImpalaCluster
@@ -40,6 +41,7 @@ STATESTORED_ARGS = 'state_store_args'
 CATALOGD_ARGS = 'catalogd_args'
 # Additional args passed to the start-impala-cluster script.
 START_ARGS = 'start_args'
+SENTRY_CONFIG = 'sentry_config'
 
 # Run with fast topic updates by default to reduce time to first query running.
 DEFAULT_STATESTORE_ARGS = '--statestore_update_frequency_ms=50 \
@@ -89,7 +91,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     pass
 
   @staticmethod
-  def with_args(impalad_args=None, statestored_args=None, catalogd_args=None, start_args=None):
+  def with_args(impalad_args=None, statestored_args=None, catalogd_args=None,
+      start_args=None, sentry_config=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -104,6 +107,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[CATALOGD_ARGS] = catalogd_args
       if start_args is not None:
         func.func_dict[START_ARGS] = start_args
+      if sentry_config is not None:
+        func.func_dict[SENTRY_CONFIG] = sentry_config
       return func
     return decorate
 
@@ -115,6 +120,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if START_ARGS in method.func_dict:
       cluster_args.append(method.func_dict[START_ARGS])
 
+    if SENTRY_CONFIG in method.func_dict:
+      self._start_sentry_service(method.func_dict[SENTRY_CONFIG])
     # Start a clean new cluster before each test
     self._start_impala_cluster(cluster_args)
     super(CustomClusterTestSuite, self).setup_class()
@@ -129,6 +136,21 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     sleep(2)
     check_call([os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'), '--kill_only'])
     sleep(2)
+
+  @classmethod
+  def _start_sentry_service(cls, sentry_service_config):
+    sentry_env = dict(os.environ)
+    sentry_env['SENTRY_SERVICE_CONFIG'] = sentry_service_config
+    call = subprocess.Popen(
+        [os.path.join(IMPALA_HOME, 'testdata/bin/run-sentry-service.sh')],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        stdin=file("/dev/null"),
+        env=sentry_env)
+    (stdout, stderr) = call.communicate()
+    call.wait()
+    if call.returncode != 0:
+      raise RuntimeError("unable to start sentry")
 
   @classmethod
   def _start_impala_cluster(cls, options, log_dir=os.getenv('LOG_DIR', "/tmp/"),
