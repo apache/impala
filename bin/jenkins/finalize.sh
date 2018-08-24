@@ -16,22 +16,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Run all Impala tests.
+# Do some error checking and generate junit symptoms after running a build.
 
 set -euo pipefail
-. $IMPALA_HOME/bin/report_build_error.sh
-setup_report_build_error
+trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
-cd "${IMPALA_HOME}"
+rm -rf "${IMPALA_HOME}"/logs_system
+mkdir -p "${IMPALA_HOME}"/logs_system
+dmesg > "${IMPALA_HOME}"/logs_system/dmesg
 
-export IMPALA_MAVEN_OPTIONS="-U"
-
-source bin/bootstrap_development.sh
-
-RET_CODE=0
-if ! bin/run-all-tests.sh; then
-  RET_CODE=1
+# Check dmesg for OOMs and generate a symptom if present.
+if [[ $(grep "Out of memory" "${IMPALA_HOME}"/logs_system/dmesg) ]]; then
+  "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize --step dmesg \
+      --stdout "${IMPALA_HOME}"/logs_system/dmesg --error "Process was OOM killed."
 fi
-
-bin/jenkins/finalize.sh
-exit $RET_CODE
