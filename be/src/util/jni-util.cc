@@ -25,6 +25,10 @@
 
 #include "common/names.h"
 
+DEFINE_int64(jvm_deadlock_detector_interval_s, 60,
+    "(Advanced) Interval between JVM deadlock checks. If set to 0 or a negative value, "
+    "deadlock checks are disabled.");
+
 namespace impala {
 
 Status JniUtfCharGuard::create(JNIEnv* env, jstring jstr, JniUtfCharGuard* out) {
@@ -213,9 +217,15 @@ Status JniUtil::InitJvmPauseMonitor() {
   if (!env) return Status("Failed to get/create JVM.");
   if (!jni_util_cl_) return Status("JniUtil::Init() not called.");
   jmethodID init_jvm_pm_method;
-  JniMethodDescriptor init_jvm_pm_desc = {"initPauseMonitor", "()V", &init_jvm_pm_method};
+  JniMethodDescriptor init_jvm_pm_desc = {
+      "initPauseMonitor", "(J)V", &init_jvm_pm_method};
   RETURN_IF_ERROR(JniUtil::LoadStaticJniMethod(env, jni_util_cl_, &init_jvm_pm_desc));
-  RETURN_IF_ERROR(JniUtil::CallJniMethod(jni_util_cl_, init_jvm_pm_method));
+  JNIEnv* jni_env = getJNIEnv();
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
+  jni_env->CallObjectMethod(
+      jni_util_cl_, init_jvm_pm_method, FLAGS_jvm_deadlock_detector_interval_s);
+  RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK();
 }
 

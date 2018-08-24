@@ -19,6 +19,8 @@ package org.apache.impala.util;
 
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,6 +47,10 @@ public class JvmPauseMonitor {
   // The target sleep time.
   private static final long SLEEP_INTERVAL_MS = 500;
 
+  // Check for Java deadlocks at this interval. Set by init(). 0 or negative means that
+  // the deadlock checks are disabled.
+  private long deadlockCheckIntervalS_ = 0;
+
   // log WARN if we detect a pause longer than this threshold.
   private long warnThresholdMs_;
   private static final long WARN_THRESHOLD_MS = 10000;
@@ -61,9 +67,9 @@ public class JvmPauseMonitor {
   public static JvmPauseMonitor INSTANCE = new JvmPauseMonitor();
 
   // Initializes the pause monitor. No-op if called multiple times.
-  public static void initPauseMonitor() {
+  public static void initPauseMonitor(long deadlockCheckIntervalS) {
     if (INSTANCE.isStarted()) return;
-    INSTANCE.init();
+    INSTANCE.init(deadlockCheckIntervalS);
   }
 
   private JvmPauseMonitor() {
@@ -75,7 +81,8 @@ public class JvmPauseMonitor {
     this.warnThresholdMs_ = warnThresholdMs;
   }
 
-  protected void init() {
+  protected void init(long deadlockCheckIntervalS) {
+    deadlockCheckIntervalS_ = deadlockCheckIntervalS;
     monitorThread_ = new Thread(new Monitor(), "JVM pause monitor");
     monitorThread_.setDaemon(true);
     monitorThread_.start();
@@ -158,6 +165,7 @@ public class JvmPauseMonitor {
     @Override
     public void run() {
       Stopwatch sw = new Stopwatch();
+      Stopwatch timeSinceDeadlockCheck = new Stopwatch().start();
       Map<String, GcTimes> gcTimesBeforeSleep = getGcTimes();
       LOG.info("Starting JVM pause monitor");
       while (shouldRun) {
@@ -165,6 +173,7 @@ public class JvmPauseMonitor {
         try {
           Thread.sleep(SLEEP_INTERVAL_MS);
         } catch (InterruptedException ie) {
+          LOG.error("JVM pause monitor interrupted", ie);
           return;
         }
         sw.stop();
@@ -179,27 +188,108 @@ public class JvmPauseMonitor {
               extraSleepTime, gcTimesAfterSleep, gcTimesBeforeSleep));
         }
         gcTimesBeforeSleep = gcTimesAfterSleep;
+
+        if (deadlockCheckIntervalS_ > 0 &&
+            timeSinceDeadlockCheck.elapsed(TimeUnit.SECONDS) >= deadlockCheckIntervalS_) {
+          checkForDeadlocks();
+          timeSinceDeadlockCheck.reset().start();
+        }
+      }
+    }
+
+    /**
+     * Check for deadlocks between Java threads using the JVM's deadlock detector.
+     * If a deadlock is found, log info about the deadlocked threads and exit the
+     * process.
+     *
+     * We choose to exit the process this situation because the deadlock will likely
+     * cause hangs and other forms of service unavailability and there is no way to
+     * recover from the deadlock except by restarting the process.
+     */
+    private void checkForDeadlocks() {
+      ThreadMXBean threadMx = ManagementFactory.getThreadMXBean();
+      long deadlockedTids[] = threadMx.findDeadlockedThreads();
+      if (deadlockedTids != null) {
+        ThreadInfo deadlockedThreads[] =
+            threadMx.getThreadInfo(deadlockedTids, true, true);
+        // Log diagnostics with error before aborting the process with a FATAL log.
+        LOG.error("Found " + deadlockedThreads.length + " threads in deadlock: ");
+        for (ThreadInfo thread : deadlockedThreads) {
+          // Defensively check for null in case the thread somehow disappeared between
+          // findDeadlockedThreads() and getThreadInfo().
+          if (thread != null) LOG.error(thread.toString());
+        }
+        LOG.error("All threads:" );
+        for (ThreadInfo thread : threadMx.dumpAllThreads(true, true)) {
+          LOG.error(thread.toString());
+        }
+        // In the context of an Impala service, LOG.fatal calls glog's fatal, which
+        // aborts the process, which will produce a coredump if coredumps are enabled.
+        LOG.fatal("Aborting because of deadlocked threads in JVM.");
+        System.exit(1);
       }
     }
   }
 
   /**
-   * Simple 'main' to facilitate manual testing of the pause monitor.
-   *
-   * This main function just leaks memory into a list. Running this class
+   * Helper for manual testing that causes a deadlock between java threads.
+   */
+  private static void causeDeadlock() {
+    final Object obj1 = new Object();
+    final Object obj2 = new Object();
+
+    new Thread(new Runnable() {
+
+      @Override
+      public void run() {
+        while (true) {
+          synchronized(obj2) {
+            synchronized(obj1) {
+              System.err.println("Thread 1 got locks");
+            }
+          }
+        }
+      }
+    }).start();
+
+    while (true) {
+      synchronized(obj1) {
+        synchronized(obj2) {
+          System.err.println("Thread 2 got locks");
+        }
+      }
+    }
+  }
+
+  /**
+   * This function just leaks memory into a list. Running this function
    * with a 1GB heap will very quickly go into "GC hell" and result in
    * log messages about the GC pauses.
    */
-  @SuppressWarnings("resource")
-  public static void main(String []args) throws Exception {
-    JvmPauseMonitor monitor = new JvmPauseMonitor();
-    monitor.init();
+  private static void allocateMemory() {
     List<String> list = Lists.newArrayList();
     int i = 0;
     while (true) {
       list.add(String.valueOf(i++));
     }
   }
+
+  /**
+   * Simple 'main' to facilitate manual testing of the pause monitor.
+   */
+  @SuppressWarnings("resource")
+  public static void main(String []args) throws Exception {
+    JvmPauseMonitor monitor = new JvmPauseMonitor();
+    monitor.init(60);
+    if (args[0].equals("gc")) {
+      allocateMemory();
+    } else if (args[0].equals("deadlock")) {
+      causeDeadlock();
+    } else {
+      System.err.println("Unknown mode");
+    }
+  }
+
 }
 
 

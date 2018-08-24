@@ -64,8 +64,8 @@ public class JniUtil {
   /**
    * Initializes the JvmPauseMonitor instance.
    */
-  public static void initPauseMonitor() {
-    JvmPauseMonitor.INSTANCE.initPauseMonitor();
+  public static void initPauseMonitor(long deadlockCheckIntervalS) {
+    JvmPauseMonitor.INSTANCE.initPauseMonitor(deadlockCheckIntervalS);
   }
 
   /**
