@@ -27,8 +27,8 @@
 # By default in Python if you divide an int by another int (5 / 2), the result will also
 # be an int (2). The following line changes this behavior so that float will be returned
 # if necessary (2.5).
-from __future__ import division
 
+from __future__ import division
 import difflib
 import json
 import logging
@@ -130,21 +130,8 @@ parser.add_option("--allowed_latency_diff_secs",
                  dest="allowed_latency_diff_secs", default=0.0, type="float",
                  help="If specified, only a timing change that differs by more than\
                  this value will be considered significant.")
-
-# These parameters are specific to recording results in a database. This is optional
-parser.add_option("--save_to_db", dest="save_to_db", action="store_true",
-                 default=False, help='Saves results to the specified database.')
-parser.add_option("--is_official", dest="is_official", action="store_true",
-                 default=False, help='Indicates this is an official perf run result')
-parser.add_option("--db_host", dest="db_host", default='localhost',
-                 help="Machine hosting the database")
-parser.add_option("--db_port", dest="db_port", default='21050',
-                 help="Port on the machine hosting the database")
-parser.add_option("--db_name", dest="db_name", default='impala_perf_results',
-                 help="Name of the perf database.")
-parser.add_option("--use_secure_connection", dest="use_secure_connection",
-                 action='store_true', default=False, help="Connect using ssl + Kerberos.")
 options, args = parser.parse_args()
+
 
 def get_dict_from_json(filename):
   """Given a JSON file, return a nested dictionary.
@@ -728,6 +715,8 @@ class CombinedExecSummaries(object):
       return False, err + 'no exec summaries Found'
 
     first_exec_summary = exec_summaries[0]
+
+    # This check is for Metadata queries which don't have summaries
     if len(first_exec_summary) < 1:
       return False, err + 'exec summary contains no nodes'
 
@@ -741,6 +730,7 @@ class CombinedExecSummaries(object):
           return False, err + 'different operator'
 
     return True, str()
+
 
 class ExecSummaryComparison(object):
   """Represents a comparison between two CombinedExecSummaries.
@@ -1041,24 +1031,30 @@ def save_runtime_diffs(results, ref_results, change_significant, is_regression):
   with open(runtime_profile_file_path, 'w+') as f:
     f.write(runtime_profile_diff)
 
-def build_exec_summary_str(results, ref_results, for_variability = False):
+
+def build_exec_summary_str(results, ref_results, for_variability=False):
   # There is no summary available for Hive after query execution
-  if options.hive_results:
-    return ""
+  # Metadata queries don't have execution summary
   exec_summaries = [result[EXEC_SUMMARY] for result in results[RESULT_LIST]]
+
+  if options.hive_results or exec_summaries[0] is None:
+    return ""
+
   combined_summary = CombinedExecSummaries(exec_summaries)
 
   if ref_results is None:
     ref_exec_summaries = None
     ref_combined_summary = None
   else:
-    ref_exec_summaries = [result[EXEC_SUMMARY] for result in ref_results[RESULT_LIST]]
+    ref_exec_summaries = [result[EXEC_SUMMARY]
+                          for result in ref_results[RESULT_LIST]]
     ref_combined_summary = CombinedExecSummaries(ref_exec_summaries)
 
   comparison = ExecSummaryComparison(
       combined_summary, ref_combined_summary, for_variability)
 
   return str(comparison) + '\n'
+
 
 def build_summary_header(current_impala_version, ref_impala_version):
   summary = "Report Generated on {0}\n".format(date.today())
@@ -1073,41 +1069,6 @@ def build_summary_header(current_impala_version, ref_impala_version):
     summary += 'Baseline Impala Version: {0}\n'.format(ref_impala_version)
   return summary
 
-def write_results_to_datastore(grouped):
-  """ Saves results to a database """
-
-  from perf_result_datastore import PerfResultDataStore
-
-  LOG.info('Saving perf results to database')
-  run_date = str(datetime.now())
-
-  with PerfResultDataStore(
-      host=options.db_host,
-      port=options.db_port,
-      database_name=options.db_name,
-      use_secure_connection=options.use_secure_connection) as data_store:
-
-    for results in all_query_results(grouped):
-      for query_result in results[RESULT_LIST]:
-
-        data_store.insert_execution_result(
-             query_name=query_result[QUERY][NAME],
-             query_string=query_result[QUERY][QUERY_STR],
-             workload_name=query_result[QUERY][WORKLOAD_NAME],
-             scale_factor=query_result[QUERY][SCALE_FACTOR],
-             file_format=query_result[QUERY][TEST_VECTOR][FILE_FORMAT],
-             compression_codec=query_result[QUERY][TEST_VECTOR][COMPRESSION_CODEC],
-             compression_type=query_result[QUERY][TEST_VECTOR][COMPRESSION_TYPE],
-             num_clients=results[NUM_CLIENTS],
-             num_iterations=results[ITERATIONS],
-             cluster_name=options.cluster_name,
-             executor_name=query_result[EXECUTOR_NAME],
-             exec_time=query_result[TIME_TAKEN],
-             run_date=run_date,
-             version=options.build_version,
-             run_info=options.lab_run_info,
-             user_name=options.run_user_name,
-             runtime_profile = 'N/A' if options.hive_results else query_result[RUNTIME_PROFILE])
 
 if __name__ == "__main__":
   """Workflow:
@@ -1132,7 +1093,6 @@ if __name__ == "__main__":
     LOG.error('Could not read reference result file: {0}'.format(e))
     ref_grouped = None
 
-  if options.save_to_db: write_results_to_datastore(grouped)
   report = Report(grouped, ref_grouped)
 
   ref_impala_version = 'N/A'
