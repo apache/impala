@@ -548,7 +548,10 @@ class StressRunner(object):
               # Assume dequeued queries are stuck waiting for cluster resources so there
               # is no point in starting an additional runner.
               continue
-          impalad = impala.impalads[len(self._query_runners) % len(impala.impalads)]
+          num_coordinators = len(impala.impalads)
+          if self.max_coordinators > 0:
+            num_coordinators = min(num_coordinators, self.max_coordinators)
+          impalad = impala.impalads[len(self._query_runners) % num_coordinators]
           runner = Process(target=self._start_single_runner, args=(impalad, ))
           runner.daemon = True
           self._query_runners.append(runner)
@@ -2035,6 +2038,11 @@ def main():
       "out-of-memory errors are not expected in this mode so will fail the stress test "
       "if encountered. The stress runner still tracks the 'admitted' memory so that "
       "it can try to submit more queries than there is available memory for.")
+  parser.add_argument(
+      "--max-coordinators", default=0, type=int, metavar="max coordinators",
+      help="If > 0, submit queries to at most this number of coordinators."
+      "This is useful in conjunction with --test-admission-control to test behaviour "
+      "with a smaller number of admission controller instances.")
   args = parser.parse_args()
   converted_args = StressArgConverter(args)
 
@@ -2213,6 +2221,7 @@ def main():
   stress_runner.leak_check_interval_mins = args.mem_leak_check_interval_mins
   stress_runner.common_query_options = converted_args.common_query_options
   stress_runner.test_admission_control = converted_args.test_admission_control
+  stress_runner.max_coordinators = converted_args.max_coordinators
   stress_runner.run_queries(
       queries, impala, args.max_queries, args.mem_overcommit_pct,
       should_print_status=not args.no_status,
