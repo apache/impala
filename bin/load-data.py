@@ -195,6 +195,7 @@ def exec_impala_query_from_file(file_name):
   is_success = True
   impala_client = ImpalaBeeswaxClient(options.impalad, use_kerberos=options.use_kerberos)
   output_file = file_name + ".log"
+  query = None
   with open(output_file, 'w') as out_file:
     try:
       impala_client.connect()
@@ -206,7 +207,10 @@ def exec_impala_query_from_file(file_name):
             result = impala_client.execute(query)
             out_file.write("{0}\n{1}\n".format(query, result))
     except Exception as e:
-      out_file.write("ERROR: {0}\n".format(query))
+      if query:
+        out_file.write("ERROR: {0}\n".format(query))
+      else:
+        out_file.write("Encounter errors before parsing any queries.\n")
       traceback.print_exc(file=out_file)
       is_success = False
 
