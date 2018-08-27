@@ -57,7 +57,7 @@ QueryState::ScopedRef::~ScopedRef() {
 
 QueryState::QueryState(const TQueryCtx& query_ctx, const string& request_pool)
   : query_ctx_(query_ctx),
-    exec_resource_refcnt_(0),
+    backend_resource_refcnt_(0),
     refcnt_(0),
     is_cancelled_(0),
     query_spilled_(0) {
@@ -80,8 +80,8 @@ QueryState::QueryState(const TQueryCtx& query_ctx, const string& request_pool)
   InitMemTrackers();
 }
 
-void QueryState::ReleaseExecResources() {
-  DCHECK(!released_exec_resources_);
+void QueryState::ReleaseBackendResources() {
+  DCHECK(!released_backend_resources_);
   // Clean up temporary files.
   if (file_group_ != nullptr) file_group_->Close();
   // Release any remaining reservation.
@@ -94,13 +94,12 @@ void QueryState::ReleaseExecResources() {
   // At this point query execution should not be consuming any resources but some tracked
   // memory may still be used by the ClientRequestState for result caching. The query
   // MemTracker will be closed later when this QueryState is torn down.
-  released_exec_resources_ = true;
+  released_backend_resources_ = true;
 }
 
 QueryState::~QueryState() {
   DCHECK_EQ(refcnt_.Load(), 0);
-  DCHECK_EQ(exec_resource_refcnt_.Load(), 0);
-  DCHECK(released_exec_resources_);
+  DCHECK_EQ(backend_resource_refcnt_.Load(), 0);
   if (query_mem_tracker_ != nullptr) {
     // Disconnect the query MemTracker hierarchy from the global hierarchy. After this
     // point nothing must touch this query's MemTracker and all tracked memory associated
@@ -114,7 +113,7 @@ Status QueryState::Init(const TExecQueryFInstancesParams& rpc_params) {
   // Decremented in QueryExecMgr::StartQueryHelper() on success or by the caller of
   // Init() on failure. We need to do this before any returns because Init() always
   // returns a resource refcount to its caller.
-  AcquireExecResourceRefcount();
+  AcquireBackendResourceRefcount();
 
   // Starting a new query creates threads and consumes a non-trivial amount of memory.
   // If we are already starved for memory, fail as early as possible to avoid consuming
@@ -356,7 +355,7 @@ void QueryState::StartFInstances() {
   VLOG(2) << "StartFInstances(): query_id=" << PrintId(query_id())
           << " #instances=" << rpc_params_.fragment_instance_ctxs.size();
   DCHECK_GT(refcnt_.Load(), 0);
-  DCHECK_GT(exec_resource_refcnt_.Load(), 0) << "Should have been taken in Init()";
+  DCHECK_GT(backend_resource_refcnt_.Load(), 0) << "Should have been taken in Init()";
 
   // set up desc tbl
   DCHECK(query_ctx().__isset.desc_tbl);
@@ -394,7 +393,7 @@ void QueryState::StartFInstances() {
 
     // start new thread to execute instance
     refcnt_.Add(1); // decremented in ExecFInstance()
-    AcquireExecResourceRefcount(); // decremented in ExecFInstance()
+    AcquireBackendResourceRefcount(); // decremented in ExecFInstance()
 
     // Add the fragment instance ID to the 'fis_map_'. Has to happen before the thread is
     // spawned or we may race with users of 'fis_map_'.
@@ -422,7 +421,7 @@ void QueryState::StartFInstances() {
       // Undo refcnt increments done immediately prior to Thread::Create(). The
       // reference counts were both greater than zero before the increments, so
       // neither of these decrements will free any structures.
-      ReleaseExecResourceRefcount();
+      ReleaseBackendResourceRefcount();
       ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
       break;
     }
@@ -464,15 +463,15 @@ void QueryState::StartFInstances() {
       << BackendExecStateToString(backend_exec_state_);
 }
 
-void QueryState::AcquireExecResourceRefcount() {
-  DCHECK(!released_exec_resources_);
-  exec_resource_refcnt_.Add(1);
+void QueryState::AcquireBackendResourceRefcount() {
+  DCHECK(!released_backend_resources_);
+  backend_resource_refcnt_.Add(1);
 }
 
-void QueryState::ReleaseExecResourceRefcount() {
-  int32_t new_val = exec_resource_refcnt_.Add(-1);
+void QueryState::ReleaseBackendResourceRefcount() {
+  int32_t new_val = backend_resource_refcnt_.Add(-1);
   DCHECK_GE(new_val, 0);
-  if (new_val == 0) ReleaseExecResources();
+  if (new_val == 0) ReleaseBackendResources();
 }
 
 void QueryState::ExecFInstance(FragmentInstanceState* fis) {
@@ -495,7 +494,7 @@ void QueryState::ExecFInstance(FragmentInstanceState* fis) {
   // initiate cancellation if nobody has done so yet
   if (!status.ok()) Cancel();
   // decrement refcount taken in StartFInstances()
-  ReleaseExecResourceRefcount();
+  ReleaseBackendResourceRefcount();
   // decrement refcount taken in StartFInstances()
   ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
 }

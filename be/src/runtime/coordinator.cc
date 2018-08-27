@@ -108,7 +108,6 @@ Status Coordinator::Exec() {
   if (is_mt_execution) filter_mode_ = TRuntimeFilterMode::OFF;
 
   query_state_ = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(query_ctx());
-  query_state_->AcquireExecResourceRefcount(); // Decremented in ReleaseExecResources().
   filter_mem_tracker_ = query_state_->obj_pool()->Add(new MemTracker(
       -1, "Runtime Filter (Coordinator)", query_state_->query_mem_tracker(), false));
 
@@ -782,8 +781,6 @@ void Coordinator::ReleaseExecResources() {
   }
   // This may be NULL while executing UDFs.
   if (filter_mem_tracker_ != nullptr) filter_mem_tracker_->Close();
-  // Now that we've released our own resources, can release query-wide resources.
-  if (query_state_ != nullptr) query_state_->ReleaseExecResourceRefcount();
   // At this point some tracked memory may still be used in the coordinator for result
   // caching. The query MemTracker will be cleaned up later.
 }

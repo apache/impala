@@ -124,21 +124,41 @@ class QueryState {
   }
   MemTracker* query_mem_tracker() const { return query_mem_tracker_; }
 
-  // the following getters are only valid after Init()
-  ReservationTracker* buffer_reservation() const { return buffer_reservation_; }
-  InitialReservations* initial_reservations() const { return initial_reservations_; }
+  /// The following getters are only valid after Init().
   ScannerMemLimiter* scanner_mem_limiter() const { return scanner_mem_limiter_; }
-  TmpFileMgr::FileGroup* file_group() const { return file_group_; }
   const TExecQueryFInstancesParams& rpc_params() const { return rpc_params_; }
 
-  // the following getters are only valid after StartFInstances()
-  const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
+  /// The following getters are only valid after Init() and should be called only from
+  /// the backend execution (ie. not the coordinator side, since they require holding
+  /// an backend resource refcnt).
+  ReservationTracker* buffer_reservation() const {
+    DCHECK_GT(backend_resource_refcnt_.Load(), 0);
+    return buffer_reservation_;
+  }
+  InitialReservations* initial_reservations() const {
+    DCHECK_GT(backend_resource_refcnt_.Load(), 0);
+    return initial_reservations_;
+  }
+  TmpFileMgr::FileGroup* file_group() const {
+    DCHECK_GT(backend_resource_refcnt_.Load(), 0);
+    return file_group_;
+  }
+
+  /// The following getters are only valid after StartFInstances().
   int64_t fragment_events_start_time() const { return fragment_events_start_time_; }
 
-  /// Sets up state required for fragment execution: memory reservations, etc. Fails
-  /// if resources could not be acquired. Acquires a resource refcount and returns it
-  /// to the caller on both success and failure. The caller must release it by calling
-  /// ReleaseExecResourceRefcount().
+  /// The following getters are only valid after StartFInstances() and should be called
+  /// only from the backend execution (ie. not the coordinator side, since they require
+  /// holding an backend resource refcnt).
+  const DescriptorTbl& desc_tbl() const {
+    DCHECK_GT(backend_resource_refcnt_.Load(), 0);
+    return *desc_tbl_;
+  }
+
+  /// Sets up state required for fragment execution: memory reservations, etc. Fails if
+  /// resources could not be acquired. Acquires a backend resource refcount and returns
+  /// it to the caller on both success and failure. The caller must release it by
+  /// calling ReleaseExecResourceRefcount().
   ///
   /// Uses few cycles and never blocks. Not idempotent, not thread-safe.
   /// The remaining public functions must be called only after Init().
@@ -162,14 +182,14 @@ class QueryState {
 
   /// Increment the resource refcount. Must be decremented before the query state
   /// reference is released. A refcount should be held by a fragment or other entity
-  /// for as long as it is consuming query execution resources (e.g. memory).
-  void AcquireExecResourceRefcount();
+  /// for as long as it is consuming query backend execution resources (e.g. memory).
+  void AcquireBackendResourceRefcount();
 
   /// Decrement the execution resource refcount and release resources if it goes to zero.
   /// All resource refcounts must be released before query state references are released.
   /// Should be called by the owner of the refcount after it is done consuming query
   /// execution resources.
-  void ReleaseExecResourceRefcount();
+  void ReleaseBackendResourceRefcount();
 
   /// Sends a ReportExecStatus rpc to the coordinator. If fis == nullptr, the
   /// status must be an error. If fis is given, the content will depend on whether
@@ -315,10 +335,10 @@ class QueryState {
   /// this daemon. Owned by 'obj_pool_'. Set in Init().
   ScannerMemLimiter* scanner_mem_limiter_ = nullptr;
 
-  /// Number of active fragment instances and coordinators for this query that may consume
-  /// resources for query execution (i.e. threads, memory) on the Impala daemon.
-  /// Query-wide execution resources for this query are released once this goes to zero.
-  AtomicInt32 exec_resource_refcnt_;
+  /// Number of active fragment instances for this query that may consume resources for
+  /// query backend execution (i.e. threads, memory) on the Impala daemon.  Query-wide
+  /// backend execution resources for this query are released once this goes to zero.
+  AtomicInt32 backend_resource_refcnt_;
 
   /// Temporary files for this query (owned by obj_pool_). Non-null if spilling is
   /// enabled. Set in Prepare().
@@ -359,7 +379,7 @@ class QueryState {
   AtomicInt32 is_cancelled_;
 
   /// True if and only if ReleaseExecResources() has been called.
-  bool released_exec_resources_ = false;
+  bool released_backend_resources_ = false;
 
   /// Whether the query has spilled. 0 if the query has not spilled. Atomically set to 1
   /// when the query first starts to spill. Required to correctly maintain the
@@ -384,9 +404,10 @@ class QueryState {
   /// Called from Init() to set up buffer reservations and the file group.
   Status InitBufferPoolState() WARN_UNUSED_RESULT;
 
-  /// Releases resources used for query execution. Guaranteed to be called only once.
-  /// Must be called before destroying the QueryState. Not idempotent and not thread-safe.
-  void ReleaseExecResources();
+  /// Releases resources used for query backend execution. Guaranteed to be called only
+  /// once. Must be called before destroying the QueryState. Not idempotent and not
+  /// thread-safe.
+  void ReleaseBackendResources();
 
   /// Same behavior as ReportExecStatus().
   /// Cancel on error only if instances_started is true.

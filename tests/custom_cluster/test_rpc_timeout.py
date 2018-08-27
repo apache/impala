@@ -78,9 +78,18 @@ class TestRPCTimeout(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
+      " --fault_injection_rpc_delay_ms=1000 --fault_injection_rpc_type=1"
+      " --datastream_sender_timeout_ms=30000")
+  def test_execqueryfinstances_race(self, vector):
+    """ Test for IMPALA-7464, where the rpc times out while the rpc handler continues to
+        run simultaneously."""
+    self.execute_query_verify_metrics(self.TEST_QUERY)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=1000"
       " --fault_injection_rpc_delay_ms=3000 --fault_injection_rpc_type=1"
       " --datastream_sender_timeout_ms=30000")
-  def test_execplanfragment_timeout(self, vector):
+  def test_execqueryfinstances_timeout(self, vector):
     for i in range(3):
       ex= self.execute_query_expect_failure(self.client, self.TEST_QUERY)
       assert "RPC recv timed out" in str(ex)

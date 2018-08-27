@@ -86,7 +86,7 @@ void CreateAndAccessQueryStates(const TUniqueId& query_id, int num_accesses) {
   QueryState *query_state;
   query_state = ExecEnv::GetInstance()->query_exec_mgr()->CreateQueryState(query_ctx);
   DCHECK(query_state != nullptr);
-  query_state->AcquireExecResourceRefcount();
+  query_state->AcquireBackendResourceRefcount();
 
   for (int i=0; i < num_accesses ; ++i) {
     QueryState* qs;
@@ -95,7 +95,7 @@ void CreateAndAccessQueryStates(const TUniqueId& query_id, int num_accesses) {
     ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(qs);
   }
 
-  query_state->ReleaseExecResourceRefcount();
+  query_state->ReleaseBackendResourceRefcount();
   // This should drop the last reference count to the QueryState and destroy it.
   ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(query_state);
   // Make sure that the query doesn't exist in the map any longer.

@@ -93,7 +93,7 @@ RuntimeState::RuntimeState(
     profile_(RuntimeProfile::Create(obj_pool(), "<unnamed>")) {
   // We may use execution resources while evaluating exprs, etc. Decremented in
   // ReleaseResources() to release resources.
-  local_query_state_->AcquireExecResourceRefcount();
+  local_query_state_->AcquireBackendResourceRefcount();
   if (query_ctx().request_pool.empty()) {
     const_cast<TQueryCtx&>(query_ctx()).request_pool = "test-pool";
   }
@@ -279,7 +279,7 @@ void RuntimeState::ReleaseResources() {
   instance_mem_tracker_->Close();
 
   if (local_query_state_.get() != nullptr) {
-    local_query_state_->ReleaseExecResourceRefcount();
+    local_query_state_->ReleaseBackendResourceRefcount();
   }
   released_resources_ = true;
 }

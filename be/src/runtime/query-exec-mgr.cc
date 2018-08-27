@@ -50,7 +50,7 @@ Status QueryExecMgr::StartQuery(const TExecQueryFInstancesParams& params) {
   QueryState* qs = GetOrCreateQueryState(params.query_ctx, &dummy);
   Status status = qs->Init(params);
   if (!status.ok()) {
-    qs->ReleaseExecResourceRefcount(); // Release refcnt acquired in Init().
+    qs->ReleaseBackendResourceRefcount(); // Release refcnt acquired in Init().
     ReleaseQueryState(qs);
     return status;
   }
@@ -62,7 +62,7 @@ Status QueryExecMgr::StartQuery(const TExecQueryFInstancesParams& params) {
           &QueryExecMgr::StartQueryHelper, this, qs, &t, true);
   if (!status.ok()) {
     // decrement refcount taken in QueryState::Init()
-    qs->ReleaseExecResourceRefcount();
+    qs->ReleaseBackendResourceRefcount();
     // decrement refcount taken in GetOrCreateQueryState()
     ReleaseQueryState(qs);
     return status;
@@ -140,7 +140,7 @@ void QueryExecMgr::StartQueryHelper(QueryState* qs) {
 #endif
 
   // decrement refcount taken in QueryState::Init();
-  qs->ReleaseExecResourceRefcount();
+  qs->ReleaseBackendResourceRefcount();
   // decrement refcount taken in StartQuery()
   ReleaseQueryState(qs);
 }
