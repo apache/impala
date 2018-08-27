@@ -23,7 +23,12 @@ import pickle
 import stat
 import time
 from time import sleep
-from flask import Flask, render_template, request
+try:
+  from flask import Flask, render_template, request
+except ImportError as e:
+  raise Exception(
+      "Please run impala-pip install -r $IMPALA_HOME/infra/python/deps/extended-test-"
+      "requirements.txt:\n{0}".format(str(e)))
 from schedule_item import ScheduleItem
 from controller import PATH_TO_REPORTS, PATH_TO_SCHEDULE
 from threading import Thread
