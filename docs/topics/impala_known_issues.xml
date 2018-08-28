@@ -617,8 +617,10 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <conbody>
 
         <p>
-          Querying certain Avro tables could cause a crash or return no rows, even though Impala
-          could <codeph>DESCRIBE</codeph> the table.
+          The default value in Avro schema must match type of first union
+          type, e.g. if the default value is <codeph>null</codeph>, then the
+          first type in the <codeph>UNION</codeph> must be
+            <codeph>"null"</codeph>.
         </p>
 
         <p>
@@ -626,14 +628,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Workaround:</b> Swap the order of the fields in the schema specification. For
-          example, <codeph>["null", "string"]</codeph> instead of <codeph>["string",
-          "null"]</codeph>.
-        </p>
-
-        <p>
-          <b>Resolution:</b> Not allowing this syntax agrees with the Avro specification, so it
-          may still cause an error even when the crashing issue is resolved.
+          <b>Workaround:</b>Swap the order of the fields in the schema
+          specification. For example, use <codeph>["null", "string"]</codeph>
+          instead of <codeph>["string", "null"]</codeph>. Note that the files
+          written with the problematic schema must be rewritten with the new
+          schema because Avro files have embedded schemas.
         </p>
 
       </conbody>
