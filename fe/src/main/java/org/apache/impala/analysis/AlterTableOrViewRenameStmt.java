@@ -70,7 +70,7 @@ public class AlterTableOrViewRenameStmt extends AlterTableStmt {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     newTableName_.analyze();
-    table_ = analyzer.getTable(tableName_, Privilege.ALTER);
+    table_ = analyzer.getTable(tableName_, Privilege.ALL);
     if (table_ instanceof FeView && renameTable_) {
       throw new AnalysisException(String.format(
           "ALTER TABLE not allowed on a view: %s", table_.getFullName()));

@@ -2005,29 +2005,32 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     }
 
     // Alter table rename.
-    authorize("alter table functional.alltypes rename to functional.new_table")
+    authorize("alter table functional.alltypes rename to functional_parquet.new_table")
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onServer(TPrivilegeLevel.OWNER))
-        .ok(onServer(TPrivilegeLevel.ALTER, TPrivilegeLevel.CREATE))
-        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
-        .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
-        .ok(onDatabase("functional", TPrivilegeLevel.ALTER, TPrivilegeLevel.CREATE))
-        .ok(onDatabase("functional", TPrivilegeLevel.CREATE), onTable("functional",
-            "alltypes", TPrivilegeLevel.ALTER))
-        .error(alterError("functional.alltypes"))
-        .error(alterError("functional.alltypes"), onServer(allExcept(
-            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.ALTER,
-            TPrivilegeLevel.CREATE)))
-        .error(alterError("functional.alltypes"), onDatabase("functional", allExcept(
-            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.ALTER,
-            TPrivilegeLevel.CREATE)))
-        .error(alterError("functional.alltypes"), onDatabase("functional",
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL),
+            onDatabase("functional_parquet", TPrivilegeLevel.CREATE))
+        .ok(onDatabase("functional_parquet", TPrivilegeLevel.CREATE),
+            onTable("functional", "alltypes", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.OWNER),
+            onDatabase("functional_parquet", TPrivilegeLevel.CREATE))
+        .ok(onDatabase("functional_parquet", TPrivilegeLevel.CREATE),
+            onTable("functional", "alltypes", TPrivilegeLevel.OWNER))
+        .error(accessError("functional.alltypes"))
+        .error(accessError("functional.alltypes"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)))
+        .error(accessError("functional.alltypes"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)), onDatabase("functional_parquet",
+            TPrivilegeLevel.CREATE))
+        .error(createError("functional_parquet"), onDatabase("functional",
+            TPrivilegeLevel.ALL), onDatabase("functional_parquet", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)))
+        .error(accessError("functional.alltypes"), onDatabase("functional",
             TPrivilegeLevel.CREATE), onTable("functional", "alltypes", allExcept(
-            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.ALTER)))
-        .error(createError("functional"), onDatabase("functional",
-            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
-            TPrivilegeLevel.CREATE)),
-            onTable("functional", "alltypes", TPrivilegeLevel.ALTER));
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+        .error(createError("functional_parquet"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)),
+            onTable("functional", "alltypes", TPrivilegeLevel.ALL));
 
     // Only for Kudu tables.
     for (AuthzTest test: new AuthzTest[]{
@@ -2156,29 +2159,32 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     }
 
     // Alter view rename.
-    authorize("alter view functional.alltypes_view rename to functional.new_view")
+    authorize("alter view functional.alltypes_view rename to functional_parquet.new_view")
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onServer(TPrivilegeLevel.OWNER))
-        .ok(onServer(TPrivilegeLevel.ALTER, TPrivilegeLevel.CREATE))
-        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
-        .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
-        .ok(onDatabase("functional", TPrivilegeLevel.ALTER, TPrivilegeLevel.CREATE))
-        .ok(onDatabase("functional", TPrivilegeLevel.CREATE), onTable("functional",
-            "alltypes_view", TPrivilegeLevel.ALTER))
-        .error(alterError("functional.alltypes_view"))
-        .error(alterError("functional.alltypes_view"), onServer(allExcept(
-            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.ALTER,
-            TPrivilegeLevel.CREATE)))
-        .error(alterError("functional.alltypes_view"), onDatabase("functional", allExcept(
-            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.ALTER,
-            TPrivilegeLevel.CREATE)))
-        .error(alterError("functional.alltypes_view"), onDatabase("functional",
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL),
+            onDatabase("functional_parquet", TPrivilegeLevel.CREATE))
+        .ok(onDatabase("functional_parquet", TPrivilegeLevel.CREATE),
+            onTable("functional", "alltypes_view", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.OWNER),
+            onDatabase("functional_parquet", TPrivilegeLevel.CREATE))
+        .ok(onDatabase("functional_parquet", TPrivilegeLevel.CREATE),
+            onTable("functional", "alltypes_view", TPrivilegeLevel.OWNER))
+        .error(accessError("functional.alltypes_view"))
+        .error(accessError("functional.alltypes_view"), onServer(allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)))
+        .error(accessError("functional.alltypes_view"), onDatabase("functional",
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)),
+            onDatabase("functional_parquet", TPrivilegeLevel.CREATE))
+        .error(createError("functional_parquet"), onDatabase("functional",
+            TPrivilegeLevel.ALL), onDatabase("functional_parquet", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)))
+        .error(accessError("functional.alltypes_view"), onDatabase("functional",
             TPrivilegeLevel.CREATE), onTable("functional", "alltypes_view", allExcept(
-            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.ALTER)))
-        .error(createError("functional"), onDatabase("functional",
-            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
-            TPrivilegeLevel.CREATE)), onTable("functional", "alltypes_view",
-            TPrivilegeLevel.ALTER));
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+        .error(createError("functional_parquet"), onDatabase("functional", allExcept(
+            TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)),
+            onTable("functional", "alltypes_view", TPrivilegeLevel.ALL));
 
     // Alter view with constant select.
     authorize("alter view functional.alltypes_view as select 1")
