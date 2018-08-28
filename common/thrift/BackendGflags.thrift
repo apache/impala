@@ -99,4 +99,8 @@ struct TBackendGflags {
   36: required double invalidate_tables_fraction_on_memory_pressure
 
   37: required i32 local_catalog_max_fetch_retries
+
+  38: required i64 kudu_scanner_thread_estimated_bytes_per_column
+
+  39: required i64 kudu_scanner_thread_max_estimated_bytes
 }

@@ -25,7 +25,9 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.NotImplementedException;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableStats;
 
@@ -38,6 +40,13 @@ import com.google.common.collect.Lists;
  * Representation of the common elements of all scan nodes.
  */
 abstract public class ScanNode extends PlanNode {
+
+  // Factor capturing the worst-case deviation from a uniform distribution of scan ranges
+  // among nodes. The factor of 1.2 means that a particular node may have 20% more
+  // scan ranges than would have been estimated assuming a uniform distribution.
+  // Used for HDFS and Kudu Scan node estimations.
+  protected static final double SCAN_RANGE_SKEW_FACTOR = 1.2;
+
   protected final TupleDescriptor desc_;
 
   // Total number of rows this node is expected to process
@@ -216,6 +225,35 @@ abstract public class ScanNode extends PlanNode {
     }
   }
 
+  /**
+   * Helper function that returns the estimated number of scan ranges that would
+   * be assigned to each host based on the total number of scan ranges.
+   */
+  protected int estimatePerHostScanRanges(long totalNumOfScanRanges) {
+    return (int) Math.ceil(((double) totalNumOfScanRanges / (double) numNodes_) *
+        SCAN_RANGE_SKEW_FACTOR);
+  }
+
+  /**
+   * Helper function that returns the max number of scanner threads that can be
+   * spawned by a scan node.
+   */
+  protected int computeMaxNumberOfScannerThreads(TQueryOptions queryOptions,
+      int perHostScanRanges) {
+    // The non-MT scan node requires at least one scanner thread.
+    if (queryOptions.getMt_dop() >= 1) {
+      return 1;
+    }
+    int maxScannerThreads = Math.min(perHostScanRanges,
+        RuntimeEnv.INSTANCE.getNumCores());
+    // Account for the max scanner threads query option.
+    if (queryOptions.isSetNum_scanner_threads() &&
+        queryOptions.getNum_scanner_threads() > 0) {
+      maxScannerThreads = Math.min(maxScannerThreads,
+          queryOptions.getNum_scanner_threads());
+    }
+    return maxScannerThreads;
+  }
   /**
    * Returns true if this node has conjuncts to be evaluated by Impala against the scan
    * tuple.

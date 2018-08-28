@@ -3,7 +3,7 @@ select count(*) from functional_kudu.alltypes a, functional_kudu.alltypestiny b
 where a.int_col = b.tinyint_col + 1 and a.string_col = b.string_col
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=11.94MB mem-reservation=1.94MB thread-reservation=3
+|  Per-Host Resources: mem-estimate=13.44MB mem-reservation=1.94MB thread-reservation=3
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
@@ -22,13 +22,13 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN KUDU [functional_kudu.alltypestiny b]
-|     mem-estimate=0B mem-reservation=0B thread-reservation=1
+|     mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
 |     tuple-ids=1 row-size=18B cardinality=8
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
    runtime filters: RF002[min_max] -> a.string_col, RF003[min_max] -> a.int_col
-   mem-estimate=0B mem-reservation=0B thread-reservation=1
+   mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=21B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
@@ -40,7 +40,7 @@ where a.int_col + 1 = b.int_col
     and a.tinyint_col is not distinct from b.tinyint_col
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=11.94MB mem-reservation=1.94MB thread-reservation=3
+|  Per-Host Resources: mem-estimate=14.19MB mem-reservation=1.94MB thread-reservation=3
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
@@ -59,12 +59,12 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN KUDU [functional_kudu.alltypestiny b]
-|     mem-estimate=0B mem-reservation=0B thread-reservation=1
+|     mem-estimate=2.25MB mem-reservation=0B thread-reservation=1
 |     tuple-ids=1 row-size=22B cardinality=8
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
-   mem-estimate=0B mem-reservation=0B thread-reservation=1
+   mem-estimate=2.25MB mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=22B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
@@ -76,7 +76,7 @@ where a.tinyint_col = b.bigint_col
     and cast(a.float_col as double) = b.double_col
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=11.94MB mem-reservation=1.94MB thread-reservation=3
+|  Per-Host Resources: mem-estimate=14.94MB mem-reservation=1.94MB thread-reservation=3
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
@@ -95,13 +95,13 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN KUDU [functional_kudu.alltypestiny b]
-|     mem-estimate=0B mem-reservation=0B thread-reservation=1
+|     mem-estimate=3.00MB mem-reservation=0B thread-reservation=1
 |     tuple-ids=1 row-size=34B cardinality=8
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
    runtime filters: RF007[min_max] -> a.tinyint_col
-   mem-estimate=0B mem-reservation=0B thread-reservation=1
+   mem-estimate=3.00MB mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=26B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
@@ -130,7 +130,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--02:SCAN KUDU [functional_kudu.alltypes c]
-|     mem-estimate=0B mem-reservation=0B thread-reservation=1
+|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
 |     tuple-ids=2 row-size=4B cardinality=7300
 |     in pipelines: 02(GETNEXT)
 |
@@ -143,7 +143,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.alltypes b]
-|     partitions=24/24 files=24 size=188.92KB
+|     partitions=24/24 files=24 size=199.69KB
 |     runtime filters: RF000[bloom] -> b.int_col
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
@@ -156,7 +156,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
    runtime filters: RF001[min_max] -> a.int_col, RF003[min_max] -> a.int_col
-   mem-estimate=0B mem-reservation=0B thread-reservation=1
+   mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=4B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====

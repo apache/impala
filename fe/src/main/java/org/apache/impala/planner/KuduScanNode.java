@@ -39,6 +39,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TKuduScanNode;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -225,7 +226,7 @@ public class KuduScanNode extends ScanNode {
 
       TScanRangeLocationList locs = new TScanRangeLocationList();
       locs.setScan_range(scanRange);
-      locs.locations = locations;
+      locs.setLocations(locations);
       scanRangeSpecs_.addToConcrete_ranges(locs);
     }
   }
@@ -272,9 +273,27 @@ public class KuduScanNode extends ScanNode {
 
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
-    // TODO: add a memory estimate when we revisit memory estimates overall.
+    // The bulk of memory used by Kudu scan node is generally utilized by the
+    // RowbatchQueue plus the row batches filled in by the scanner threads and
+    // waiting to be queued into the RowbatchQueue. Due to a number of factors
+    // like variable length string columns, mem pool usage pattern,
+    // variability of the number of scanner threads being spawned and the
+    // variability of the average RowbatchQueue size, it is increasingly
+    // difficult to precisely estimate the memory usage. Therefore, we fall back
+    // to a more simpler approach of using empirically derived estimates.
+    int numOfScanRanges = scanRangeSpecs_.getConcrete_rangesSize();
+    int perHostScanRanges = estimatePerHostScanRanges(numOfScanRanges);
+    int maxScannerThreads = computeMaxNumberOfScannerThreads(queryOptions,
+        perHostScanRanges);
+    int num_cols = desc_.getSlots().size();
+    long estimated_bytes_per_column_per_thread = BackendConfig.INSTANCE.getBackendCfg().
+        kudu_scanner_thread_estimated_bytes_per_column;
+    long max_estimated_bytes_per_thread = BackendConfig.INSTANCE.getBackendCfg().
+        kudu_scanner_thread_max_estimated_bytes;
+    long mem_estimate_per_thread = Math.min(num_cols *
+        estimated_bytes_per_column_per_thread, max_estimated_bytes_per_thread);
     nodeResourceProfile_ = new ResourceProfileBuilder()
-        .setMemEstimateBytes(0)
+        .setMemEstimateBytes(mem_estimate_per_thread * maxScannerThreads)
         .setThreadReservation(useMtScanNode_ ? 0 : 1).build();
   }
 

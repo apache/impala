@@ -1,13 +1,13 @@
 select * from functional_kudu.zipcode_incomes where id = '8600000US00601'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=1.88MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
      kudu predicates: id = '8600000US00601'
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=1.88MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=124B cardinality=1
      in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
@@ -22,12 +22,12 @@ Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
      in pipelines: 00(GETNEXT)
 
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=1.88MB mem-reservation=0B thread-reservation=2
   DATASTREAM SINK [FRAGMENT=F01, EXCHANGE=01, UNPARTITIONED]
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
      kudu predicates: id = '8600000US00601'
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=1.88MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=124B cardinality=1
      in pipelines: 00(GETNEXT)
 ====
@@ -35,14 +35,14 @@ Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
 select * from functional_kudu.zipcode_incomes where id != '1' and zip = '2'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
      predicates: id != '1'
      kudu predicates: zip = '2'
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=3.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=124B cardinality=1
      in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
@@ -57,26 +57,26 @@ Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
      in pipelines: 00(GETNEXT)
 
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   DATASTREAM SINK [FRAGMENT=F01, EXCHANGE=01, UNPARTITIONED]
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
      predicates: id != '1'
      kudu predicates: zip = '2'
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=3.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=124B cardinality=1
      in pipelines: 00(GETNEXT)
 ====
 select * from functional_kudu.zipcode_incomes where id > '1' and zip > '2'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
      kudu predicates: zip > '2', id > '1'
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=3.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=124B cardinality=3317
      in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
@@ -91,25 +91,25 @@ Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
      in pipelines: 00(GETNEXT)
 
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   DATASTREAM SINK [FRAGMENT=F01, EXCHANGE=01, UNPARTITIONED]
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
      kudu predicates: zip > '2', id > '1'
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=3.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=124B cardinality=3317
      in pipelines: 00(GETNEXT)
 ====
 select * from functional_kudu.zipcode_incomes where id = '1' or id = '2' or zip = '3'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
      predicates: id IN ('1', '2') OR zip = '3'
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=3.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=124B cardinality=3
      in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
@@ -124,12 +124,12 @@ Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
      in pipelines: 00(GETNEXT)
 
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   DATASTREAM SINK [FRAGMENT=F01, EXCHANGE=01, UNPARTITIONED]
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
      predicates: id IN ('1', '2') OR zip = '3'
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=3.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=124B cardinality=3
      in pipelines: 00(GETNEXT)
 ====
@@ -159,14 +159,14 @@ string_col not in ("bar") and
 id in (int_col)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=9.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.alltypes]
      predicates: id IN (int_col), bigint_col IN (9999999999999999999), double_col IN (CAST('inf' AS DOUBLE)), float_col IN (CAST('NaN' AS FLOAT)), int_col IN (9999999999), smallint_col IN (99999, 2), tinyint_col IN (1, 999), bool_col IN (1), string_col NOT IN ('bar')
      kudu predicates: double_col IN (0.0), float_col IN (0.0), bigint_col IN (1, 2), int_col IN (1, 2), smallint_col IN (0, 2), string_col IN ('foo', 'foo       '), tinyint_col IN (1, 2), bool_col IN (TRUE)
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=9.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=97B cardinality=5
      in pipelines: 00(GETNEXT)
 ====
@@ -174,13 +174,13 @@ Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
 select * from functional_kudu.decimal_tbl where d1 in (1234, 12345);
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=4.50MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.decimal_tbl]
      kudu predicates: d1 IN (1234, 12345)
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=4.50MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=56B cardinality=2
      in pipelines: 00(GETNEXT)
 ====
@@ -192,14 +192,14 @@ timestamp_col > (nanoseconds_add(cast('1987-05-19 00:00:00' as timestamp), 10)) 
 timestamp_col < (seconds_add(cast('9999-12-31 24:59:59' as timestamp), 10))
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=9.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.alltypes]
      predicates: CAST(date_string_col AS TINYINT) IS NULL, timestamp_col < NULL
      kudu predicates: smallint_col IS NULL, tinyint_col IS NOT NULL, timestamp_col > TIMESTAMP '1987-05-19 00:00:00.000000010'
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=9.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=97B cardinality=730
      in pipelines: 00(GETNEXT)
 ====
@@ -208,13 +208,13 @@ timestamp_col in (cast('2010-03-01 00:00:00' as timestamp),
                   cast('2010-03-01 00:01:00' as timestamp))
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=9.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.alltypes]
      kudu predicates: timestamp_col IN (TIMESTAMP '2010-03-01 00:00:00', TIMESTAMP '2010-03-01 00:01:00')
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=9.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=97B cardinality=1
      in pipelines: 00(GETNEXT)
 ====
@@ -224,13 +224,13 @@ timestamp_col in (cast('2010-03-01 00:00:00' as timestamp),
                   cast('2010-03-01 00:01:00' as timestamp))
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=2
+Per-Host Resources: mem-estimate=9.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.alltypes]
      predicates: timestamp_col IN (TIMESTAMP '2010-03-01 00:00:00', NULL, TIMESTAMP '2010-03-01 00:01:00')
-     mem-estimate=0B mem-reservation=0B thread-reservation=1
+     mem-estimate=9.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=97B cardinality=3
      in pipelines: 00(GETNEXT)
 ====

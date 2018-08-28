@@ -140,11 +140,6 @@ public class HdfsScanNode extends ScanNode {
   // threads. Corresponds to the default value of --num_threads_per_core in the backend.
   private static final int MAX_THREAD_TOKENS_PER_CORE = 3;
 
-  // Factor capturing the worst-case deviation from a uniform distribution of scan ranges
-  // among nodes. The factor of 1.2 means that a particular node may have 20% more
-  // scan ranges than would have been estimated assuming a uniform distribution.
-  private static final double SCAN_RANGE_SKEW_FACTOR = 1.2;
-
   // The minimum amount of memory we estimate a scan will use. The number is
   // derived experimentally: running metadata-only Parquet count(*) scans on TPC-H
   // lineitem and TPC-DS store_sales of different sizes resulted in memory consumption
@@ -1376,8 +1371,7 @@ public class HdfsScanNode extends ScanNode {
         // excluding partition columns and columns that are populated from file metadata.
         partitionScanRange = columnReservations.size();
       } else {
-        partitionScanRange = (int) Math.ceil(
-            ((double) scanRangeSize / (double) numNodes_) * SCAN_RANGE_SKEW_FACTOR);
+        partitionScanRange = estimatePerHostScanRanges(scanRangeSize);
       }
       // From the resource management purview, we want to conservatively estimate memory
       // consumption based on the partition with the highest memory requirements.
@@ -1388,18 +1382,8 @@ public class HdfsScanNode extends ScanNode {
 
     // The non-MT scan node requires at least one scanner thread.
     int requiredThreads = useMtScanNode_ ? 0 : 1;
-    int maxScannerThreads;
-    if (queryOptions.getMt_dop() >= 1) {
-      maxScannerThreads = 1;
-    } else {
-      maxScannerThreads = Math.min(perHostScanRanges, RuntimeEnv.INSTANCE.getNumCores());
-      // Account for the max scanner threads query option.
-      if (queryOptions.isSetNum_scanner_threads() &&
-          queryOptions.getNum_scanner_threads() > 0) {
-        maxScannerThreads =
-            Math.min(maxScannerThreads, queryOptions.getNum_scanner_threads());
-      }
-    }
+    int maxScannerThreads = computeMaxNumberOfScannerThreads(queryOptions,
+        perHostScanRanges);
 
     long avgScanRangeBytes = (long) Math.ceil(totalBytes_ / (double) scanRangeSize);
     // The +1 accounts for an extra I/O buffer to read past the scan range due to a
