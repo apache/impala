@@ -831,7 +831,8 @@ Status HdfsScanner::IssueFooterRanges(HdfsScanNodeBase* scan_node,
   // The threads that process the footer will also do the scan, so we mark all the files
   // as complete here.
   if (footer_ranges.size() > 0) {
-    RETURN_IF_ERROR(scan_node->AddDiskIoRanges(footer_ranges, files.size()));
+    RETURN_IF_ERROR(
+        scan_node->AddDiskIoRanges(footer_ranges, files.size(), EnqueueLocation::TAIL));
   }
   return Status::OK();
 }

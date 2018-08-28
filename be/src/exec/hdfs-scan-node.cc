@@ -206,8 +206,8 @@ void HdfsScanNode::AddMaterializedRowBatch(unique_ptr<RowBatch> row_batch) {
 }
 
 Status HdfsScanNode::AddDiskIoRanges(const vector<ScanRange*>& ranges,
-    int num_files_queued) {
-  RETURN_IF_ERROR(reader_context_->AddScanRanges(ranges));
+    int num_files_queued, EnqueueLocation enqueue_location) {
+  RETURN_IF_ERROR(reader_context_->AddScanRanges(ranges, enqueue_location));
   num_unqueued_files_.Add(-num_files_queued);
   DCHECK_GE(num_unqueued_files_.Load(), 0);
   if (!ranges.empty()) ThreadTokenAvailableCb(runtime_state_->resource_pool());

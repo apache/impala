@@ -572,7 +572,7 @@ void DiskIoMgrTest::SingleReaderTestBody(const char* data, const char* expected_
           ranges.push_back(InitRange(&tmp_pool, tmp_file, 0, data_len, disk_id,
               stat_val.st_mtime, nullptr, false, sub_ranges));
         }
-        ASSERT_OK(reader->AddScanRanges(ranges));
+        ASSERT_OK(reader->AddScanRanges(ranges, EnqueueLocation::TAIL));
 
         AtomicInt32 num_ranges_processed;
         thread_group threads;
@@ -654,14 +654,14 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
       AtomicInt32 num_ranges_processed;
 
       // Issue first half the scan ranges.
-      ASSERT_OK(reader->AddScanRanges(ranges_first_half));
+      ASSERT_OK(reader->AddScanRanges(ranges_first_half, EnqueueLocation::TAIL));
 
       // Read a couple of them
       ScanRangeThread(&io_mgr, reader.get(), &read_client, data, strlen(data),
           Status::OK(), 2, &num_ranges_processed);
 
       // Issue second half
-      ASSERT_OK(reader->AddScanRanges(ranges_second_half));
+      ASSERT_OK(reader->AddScanRanges(ranges_second_half, EnqueueLocation::TAIL));
 
       // Start up some threads and then cancel
       thread_group threads;
@@ -725,7 +725,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         ranges.push_back(
             InitRange(&tmp_pool, tmp_file, 0, len, disk_id, stat_val.st_mtime));
       }
-      ASSERT_OK(reader->AddScanRanges(ranges));
+      ASSERT_OK(reader->AddScanRanges(ranges, EnqueueLocation::TAIL));
 
       AtomicInt32 num_ranges_processed;
       thread_group threads;
@@ -789,7 +789,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         ranges.push_back(
             InitRange(&tmp_pool, tmp_file, 0, len, disk_id, stat_val.st_mtime));
       }
-      ASSERT_OK(reader->AddScanRanges(ranges));
+      ASSERT_OK(reader->AddScanRanges(ranges, EnqueueLocation::TAIL));
 
       AtomicInt32 num_ranges_processed;
       int num_succesful_ranges = ranges.size() / 2;
@@ -857,7 +857,7 @@ TEST_F(DiskIoMgrTest, MemScarcity) {
     for (int i = 0; i < num_ranges; ++i) {
       ranges.push_back(InitRange(&pool_, tmp_file, 0, DATA_BYTES, 0, stat_val.st_mtime));
     }
-    ASSERT_OK(reader->AddScanRanges(ranges));
+    ASSERT_OK(reader->AddScanRanges(ranges, EnqueueLocation::TAIL));
     // Keep starting new ranges without returning buffers until we run out of
     // reservation.
     while (read_client.GetUnusedReservation() >= MIN_BUFFER_SIZE) {
@@ -947,7 +947,7 @@ void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
         SetReaderStub(range, make_unique<CacheReaderTestStub>(range, cached_data, len));
       }
     }
-    ASSERT_OK(reader->AddScanRanges(ranges));
+    ASSERT_OK(reader->AddScanRanges(ranges, EnqueueLocation::TAIL));
 
     AtomicInt32 num_ranges_processed;
     thread_group threads;
@@ -1156,7 +1156,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
             int disk_id = j % num_disks;
             ranges.push_back(InitRange(&tmp_pool, file_names[i].c_str(), j, 1, disk_id, mtimes[i]));
           }
-          ASSERT_OK(readers[i]->AddScanRanges(ranges));
+          ASSERT_OK(readers[i]->AddScanRanges(ranges, EnqueueLocation::TAIL));
         }
 
         AtomicInt32 num_ranges_processed;
@@ -1278,7 +1278,7 @@ TEST_F(DiskIoMgrTest, ZeroLengthScanRange) {
   Status status = reader->StartScanRange(range, &needs_buffers);
   ASSERT_EQ(TErrorCode::DISK_IO_ERROR, status.code());
 
-  status = reader->AddScanRanges(vector<ScanRange*>({range}));
+  status = reader->AddScanRanges(vector<ScanRange*>({range}), EnqueueLocation::TAIL);
   ASSERT_EQ(TErrorCode::DISK_IO_ERROR, status.code());
 
   io_mgr.UnregisterContext(reader.get());
@@ -1317,7 +1317,8 @@ TEST_F(DiskIoMgrTest, SkipAllocateBuffers) {
   EXPECT_TRUE(needs_buffers);
 
   // Test AddScanRanges()/GetNextUnstartedRange().
-  ASSERT_OK(reader->AddScanRanges(vector<ScanRange*>({ranges[2], ranges[3]})));
+  ASSERT_OK(reader->AddScanRanges(
+      vector<ScanRange*>({ranges[2], ranges[3]}), EnqueueLocation::TAIL));
 
   // Cancel two directly, cancel the other two indirectly via the context.
   ranges[0]->Cancel(Status::CancelledInternal("foo"));

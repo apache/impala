@@ -69,7 +69,7 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
   }
   // Issue the header ranges only. GetNextInternal() will issue the files' scan ranges
   // and those ranges will need scanner threads, so no files are marked completed yet.
-  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges, 0));
+  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges, 0, EnqueueLocation::TAIL));
   return Status::OK();
 }
 
@@ -167,7 +167,8 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
         context_->partition_descriptor()->id(), stream_->filename(), header_);
     HdfsFileDesc* desc = scan_node_->GetFileDesc(
         context_->partition_descriptor()->id(), stream_->filename());
-    RETURN_IF_ERROR(scan_node_->AddDiskIoRanges(desc));
+    // Issue the scan range with priority since it would result in producing a RowBatch.
+    RETURN_IF_ERROR(scan_node_->AddDiskIoRanges(desc, EnqueueLocation::HEAD));
     return Status::OK();
   }
   if (eos_) return Status::OK();

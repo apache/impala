@@ -24,11 +24,15 @@
 #include "util/condition-variable.h"
 
 namespace impala {
+
+/// Location at which a new ScanRange would be enqueued.
+enum class EnqueueLocation { HEAD, TAIL };
+
 namespace io {
 
-// Mode argument for AddRangeToDisk().
+/// Mode argument for AddRangeToDisk().
 enum class ScheduleMode {
-  IMMEDIATELY, UPON_GETNEXT, BY_CALLER
+  IMMEDIATELY, UPON_GETNEXT_HEAD, UPON_GETNEXT_TAIL, BY_CALLER
 };
 /// A request context is used to group together I/O requests belonging to a client of the
 /// I/O manager for management and scheduling.
@@ -99,8 +103,11 @@ class RequestContext {
   /// Adds the scan ranges to this context's queues, but does not start scheduling it.
   /// The range can be scheduled by a thread calling GetNextUnstartedRange(). This call
   /// is non-blocking. The caller must not deallocate the scan range pointers before
-  /// UnregisterContext(). 'ranges' must not be empty.
-  Status AddScanRanges(const std::vector<ScanRange*>& ranges) WARN_UNUSED_RESULT;
+  /// UnregisterContext(). 'ranges' must not be empty. Depnending on the enqueue_loction,
+  /// the scan ranges would be added with ScheduleMode::UPON_GETNEXT_HEAD or
+  /// ScheduleMode::UPON_GETNEXT_TAIL.
+  Status AddScanRanges(const std::vector<ScanRange*>& ranges,
+      EnqueueLocation enqueue_location) WARN_UNUSED_RESULT;
 
   /// Tries to get an unstarted scan range that was added to this context with
   /// AddScanRanges(). On success, returns OK and returns the range in '*range'.
@@ -272,9 +279,9 @@ class RequestContext {
   ///
   /// Scan ranges can have different 'schedule_mode' values. If IMMEDIATELY, the range is
   /// immediately added to the 'in_flight_ranges_' queue where it will be processed
-  /// asynchronously by disk threads. If UPON_GETNEXT, the range is added to the
-  /// 'unstarted_ranges_' queue, from which it can be returned to a client by
-  /// GetNextUnstartedRange(). If BY_CALLER, the scan range is not added to
+  /// asynchronously by disk threads. If UPON_GETNEXT_HEAD or UPON_GETNEXT_TAIL, the
+  /// range is added to the 'unstarted_ranges_' queue, from which it can be returned to a
+  /// client by GetNextUnstartedRange(). If BY_CALLER, the scan range is not added to
   /// any queues. The range will be scheduled later as a separate step, e.g. when it is
   /// unblocked by adding buffers to it. Caller must hold 'lock_' via 'lock'.
   void AddRangeToDisk(const boost::unique_lock<boost::mutex>& lock, RequestRange* range,

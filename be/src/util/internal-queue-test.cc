@@ -45,14 +45,14 @@ TEST(InternalQueue, TestBasic) {
   InternalQueue<IntNode> list;
   ASSERT_TRUE(list.empty());
   ASSERT_EQ(list.size(), 0);
-  ASSERT_TRUE(list.Dequeue() == NULL);
+  ASSERT_TRUE(list.Dequeue() == nullptr);
   ASSERT_TRUE(list.Validate());
 
   list.Enqueue(&one);
   ASSERT_TRUE(!list.empty());
   ASSERT_EQ(list.size(), 1);
   IntNode* i = list.Dequeue();
-  ASSERT_TRUE(i != NULL);
+  ASSERT_TRUE(i != nullptr);
   ASSERT_TRUE(list.empty());
   ASSERT_EQ(list.size(), 0);
   ASSERT_EQ(i->value, 1);
@@ -66,33 +66,33 @@ TEST(InternalQueue, TestBasic) {
   ASSERT_TRUE(list.Validate());
 
   i = list.Dequeue();
-  ASSERT_TRUE(i != NULL);
+  ASSERT_TRUE(i != nullptr);
   ASSERT_EQ(i->value, 1);
   ASSERT_TRUE(list.Validate());
 
   i = list.Dequeue();
-  ASSERT_TRUE(i != NULL);
+  ASSERT_TRUE(i != nullptr);
   ASSERT_EQ(i->value, 2);
   ASSERT_TRUE(list.Validate());
 
   i = list.Dequeue();
-  ASSERT_TRUE(i != NULL);
+  ASSERT_TRUE(i != nullptr);
   ASSERT_EQ(i->value, 3);
   ASSERT_TRUE(list.Validate());
 
   i = list.Dequeue();
-  ASSERT_TRUE(i != NULL);
+  ASSERT_TRUE(i != nullptr);
   ASSERT_EQ(i->value, 4);
   ASSERT_TRUE(list.Validate());
 
-  list.Enqueue(&one);
-  list.Enqueue(&two);
-  list.Enqueue(&three);
-  list.Enqueue(&four);
+  list.PushFront(&four);
+  list.PushFront(&three);
+  list.PushFront(&two);
+  list.PushFront(&one);
 
   IntNode* node = list.head();
   int val = 1;
-  while (node != NULL) {
+  while (node != nullptr) {
     ASSERT_EQ(node->value, val);
     node = node->Next();
     ++val;
@@ -100,7 +100,7 @@ TEST(InternalQueue, TestBasic) {
 
   node = list.tail();
   val = 4;
-  while (node != NULL) {
+  while (node != nullptr) {
     ASSERT_EQ(node->value, val);
     node = node->Prev();
     --val;
@@ -108,11 +108,11 @@ TEST(InternalQueue, TestBasic) {
 
   for (int i = 0; i < 4; ++i) {
     node = list.PopBack();
-    ASSERT_TRUE(node != NULL);
+    ASSERT_TRUE(node != nullptr);
     ASSERT_EQ(node->value, 4 - i);
     ASSERT_TRUE(list.Validate());
   }
-  ASSERT_TRUE(list.PopBack() == NULL);
+  ASSERT_TRUE(list.PopBack() == nullptr);
   ASSERT_EQ(list.size(), 0);
   ASSERT_TRUE(list.empty());
 }
@@ -145,7 +145,7 @@ TEST(InternalQueue, TestRemove) {
   ASSERT_EQ(queue.size(), nodes.size() / 2);
   for (int i = 0; i < nodes.size() / 2; ++i) {
     IntNode* node = queue.Dequeue();
-    ASSERT_TRUE(node != NULL);
+    ASSERT_TRUE(node != nullptr);
     ASSERT_EQ(node->value, i * 2 + 1);
   }
 }
@@ -172,7 +172,7 @@ void ConsumerThread(InternalQueue<IntNode>* queue, int num_consumes, int delta,
   int previous_value = -1;
   for (int i = 0; i < num_consumes && !*failed;) {
     IntNode* node = queue->Dequeue();
-    if (node == NULL) continue;
+    if (node == nullptr) continue;
     ++i;
     if (delta > 0) {
       if (node->value != previous_value + delta) *failed = true;
@@ -199,9 +199,9 @@ TEST(InternalQueue, TestClear) {
   ASSERT_TRUE(queue.Validate());
   ASSERT_TRUE(queue.empty());
 
-  queue.Enqueue(&nodes[0]);
-  queue.Enqueue(&nodes[1]);
-  queue.Enqueue(&nodes[2]);
+  queue.PushFront(&nodes[0]);
+  queue.PushFront(&nodes[1]);
+  queue.PushFront(&nodes[2]);
   ASSERT_TRUE(queue.Validate());
   ASSERT_EQ(queue.size(), 3);
 }

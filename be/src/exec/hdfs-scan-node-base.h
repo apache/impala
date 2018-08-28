@@ -31,6 +31,7 @@
 #include "exec/filter-context.h"
 #include "exec/scan-node.h"
 #include "runtime/descriptors.h"
+#include "runtime/io/request-context.h"
 #include "runtime/io/request-ranges.h"
 #include "util/avro-util.h"
 #include "util/container-util.h"
@@ -267,13 +268,18 @@ class HdfsScanNodeBase : public ScanNode {
   /// new scanner threads will be needed to process that file besides the additional
   /// threads needed to process those in 'ranges'.
   /// Can be overridden to add scan-node specific actions like starting scanner threads.
+  /// The enqueue_location specifies whether the scan ranges are added to the head or
+  /// tail of the queue.
   virtual Status AddDiskIoRanges(const std::vector<io::ScanRange*>& ranges,
-      int num_files_queued) WARN_UNUSED_RESULT;
+      int num_files_queued,
+      EnqueueLocation enqueue_location = EnqueueLocation::TAIL) WARN_UNUSED_RESULT;
 
   /// Adds all splits for file_desc to the io mgr queue and indicates one file has
-  /// been added completely.
-  inline Status AddDiskIoRanges(const HdfsFileDesc* file_desc) WARN_UNUSED_RESULT {
-    return AddDiskIoRanges(file_desc->splits, 1);
+  /// been added completely. If the enqueue_location is set to HEAD, the scan ranges that
+  /// belong to this file are processed ahead of other scan ranges currently queued.
+  inline Status AddDiskIoRanges(const HdfsFileDesc* file_desc,
+      EnqueueLocation enqueue_location = EnqueueLocation::TAIL) WARN_UNUSED_RESULT {
+    return AddDiskIoRanges(file_desc->splits, 1, enqueue_location);
   }
 
   /// Allocates and initializes a new template tuple allocated from pool with values

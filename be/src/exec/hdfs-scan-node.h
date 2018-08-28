@@ -83,9 +83,12 @@ class HdfsScanNode : public HdfsScanNodeBase {
 
   bool done() const { return done_; }
 
-  /// Adds ranges to the io mgr queue and starts up new scanner threads if possible.
+  /// Adds ranges to the io mgr queue and starts up new scanner threads if possible. The
+  /// enqueue_location parameter determines the location at which the scan ranges are
+  /// added to the queue.
   virtual Status AddDiskIoRanges(const std::vector<io::ScanRange*>& ranges,
-      int num_files_queued) override WARN_UNUSED_RESULT;
+      int num_files_queued, EnqueueLocation enqueue_location =
+                                EnqueueLocation::TAIL) override WARN_UNUSED_RESULT;
 
   /// Adds a materialized row batch for the scan node.  This is called from scanner
   /// threads. This function will block if the row batch queue is full.

@@ -84,7 +84,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
       case THdfsCompression::NONE:
         // For uncompressed text we just issue all ranges at once.
         // TODO: Lz4 is splittable, should be treated similarly.
-        RETURN_IF_ERROR(scan_node->AddDiskIoRanges(files[i]));
+        RETURN_IF_ERROR(scan_node->AddDiskIoRanges(files[i], EnqueueLocation::TAIL));
         break;
 
       case THdfsCompression::GZIP:
@@ -145,8 +145,8 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     }
   }
   if (compressed_text_scan_ranges.size() > 0) {
-    RETURN_IF_ERROR(scan_node->AddDiskIoRanges(compressed_text_scan_ranges,
-        compressed_text_files));
+    RETURN_IF_ERROR(scan_node->AddDiskIoRanges(
+        compressed_text_scan_ranges, compressed_text_files, EnqueueLocation::TAIL));
   }
   for (const auto& entry : plugin_text_files) {
     DCHECK_GT(entry.second.size(), 0) << "List should be non-empty";

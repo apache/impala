@@ -32,7 +32,7 @@ namespace impala {
 /// it's an internal queue, the list pointers are maintained in the Nodes which is memory
 /// owned by the user. The nodes cannot be deallocated while the queue has elements.
 /// The internal structure is a doubly-linked list.
-///  NULL <-- N1 <--> N2 <--> N3 --> NULL
+///  nullptr <-- N1 <--> N2 <--> N3 --> nullptr
 ///          (head)          (tail)
 ///
 /// InternalQueue<T> instantiates a thread-safe queue where the queue is protected by an
@@ -49,13 +49,13 @@ class InternalQueueBase {
  public:
   struct Node {
    public:
-    Node() : parent_queue(NULL), next(NULL), prev(NULL) {}
+    Node() : parent_queue(nullptr), next(nullptr), prev(nullptr) {}
     virtual ~Node() {}
 
     /// Returns true if the node is in a queue.
-    bool in_queue() const { return parent_queue != NULL; }
+    bool in_queue() const { return parent_queue != nullptr; }
 
-    /// Returns the Next/Prev node or NULL if this is the end/front.
+    /// Returns the Next/Prev node or nullptr if this is the end/front.
     T* Next() const {
       boost::lock_guard<LockType> lock(parent_queue->lock_);
       return reinterpret_cast<T*>(next);
@@ -68,88 +68,105 @@ class InternalQueueBase {
    private:
     friend class InternalQueueBase<LockType, T>;
 
-    /// Pointer to the queue this Node is on. NULL if not on any queue.
+    /// Pointer to the queue this Node is on. nullptr if not on any queue.
     InternalQueueBase<LockType, T>* parent_queue;
     Node* next;
     Node* prev;
   };
 
-  InternalQueueBase() : head_(NULL), tail_(NULL), size_(0) {}
+  InternalQueueBase() : head_(nullptr), tail_(nullptr), size_(0) {}
 
-  /// Returns the element at the head of the list without dequeuing or NULL
+  /// Returns the element at the head of the list without dequeuing or nullptr
   /// if the queue is empty. This is O(1).
   T* head() const {
     boost::lock_guard<LockType> lock(lock_);
-    if (empty()) return NULL;
+    if (empty()) return nullptr;
     return reinterpret_cast<T*>(head_);
   }
 
-  /// Returns the element at the end of the list without dequeuing or NULL
+  /// Returns the element at the end of the list without dequeuing or nullptr
   /// if the queue is empty. This is O(1).
   T* tail() {
     boost::lock_guard<LockType> lock(lock_);
-    if (empty()) return NULL;
+    if (empty()) return nullptr;
     return reinterpret_cast<T*>(tail_);
   }
 
   /// Enqueue node onto the queue's tail. This is O(1).
   void Enqueue(T* n) {
     Node* node = (Node*)n;
-    DCHECK(node->next == NULL);
-    DCHECK(node->prev == NULL);
-    DCHECK(node->parent_queue == NULL);
+    DCHECK(node->next == nullptr);
+    DCHECK(node->prev == nullptr);
+    DCHECK(node->parent_queue == nullptr);
     node->parent_queue = this;
     {
       boost::lock_guard<LockType> lock(lock_);
-      if (tail_ != NULL) tail_->next = node;
+      if (tail_ != nullptr) tail_->next = node;
       node->prev = tail_;
       tail_ = node;
-      if (head_ == NULL) head_ = node;
+      if (head_ == nullptr) head_ = node;
       ++size_;
     }
   }
 
-  /// Dequeues an element from the queue's head. Returns NULL if the queue
-  /// is empty. This is O(1).
-  T* Dequeue() {
-    Node* result = NULL;
+  /// Pushes the node onto the queue's head. This is O(1).
+  void PushFront(T* n) {
+    Node* node = (Node*)n;
+    DCHECK(node->next == nullptr);
+    DCHECK(node->prev == nullptr);
+    DCHECK(node->parent_queue == nullptr);
+    node->parent_queue = this;
     {
       boost::lock_guard<LockType> lock(lock_);
-      if (empty()) return NULL;
+      if (head_ != nullptr) head_->prev = node;
+      node->next = head_;
+      head_ = node;
+      if (tail_ == nullptr) tail_ = node;
+      ++size_;
+    }
+  }
+
+  /// Dequeues an element from the queue's head. Returns nullptr if the queue
+  /// is empty. This is O(1).
+  T* Dequeue() {
+    Node* result = nullptr;
+    {
+      boost::lock_guard<LockType> lock(lock_);
+      if (empty()) return nullptr;
       --size_;
       result = head_;
       head_ = head_->next;
-      if (head_ == NULL) {
-        tail_ = NULL;
+      if (head_ == nullptr) {
+        tail_ = nullptr;
       } else {
-        head_->prev = NULL;
+        head_->prev = nullptr;
       }
     }
-    DCHECK(result != NULL);
-    result->next = result->prev = NULL;
-    result->parent_queue = NULL;
+    DCHECK(result != nullptr);
+    result->next = result->prev = nullptr;
+    result->parent_queue = nullptr;
     return reinterpret_cast<T*>(result);
   }
 
-  /// Dequeues an element from the queue's tail. Returns NULL if the queue
+  /// Dequeues an element from the queue's tail. Returns nullptr if the queue
   /// is empty. This is O(1).
   T* PopBack() {
-    Node* result = NULL;
+    Node* result = nullptr;
     {
       boost::lock_guard<LockType> lock(lock_);
-      if (empty()) return NULL;
+      if (empty()) return nullptr;
       --size_;
       result = tail_;
       tail_ = tail_->prev;
-      if (tail_ == NULL) {
-        head_ = NULL;
+      if (tail_ == nullptr) {
+        head_ = nullptr;
       } else {
-        tail_->next = NULL;
+        tail_->next = nullptr;
       }
     }
-    DCHECK(result != NULL);
-    result->next = result->prev = NULL;
-    result->parent_queue = NULL;
+    DCHECK(result != nullptr);
+    result->next = result->prev = nullptr;
+    result->parent_queue = nullptr;
     return reinterpret_cast<T*>(result);
   }
 
@@ -160,34 +177,34 @@ class InternalQueueBase {
     if (node->parent_queue != this) return false;
     {
       boost::lock_guard<LockType> lock(lock_);
-      if (node->next == NULL && node->prev == NULL) {
+      if (node->next == nullptr && node->prev == nullptr) {
         // Removing only node
         DCHECK(node == head_);
         DCHECK(tail_ == node);
-        head_ = tail_ = NULL;
+        head_ = tail_ = nullptr;
         --size_;
-        node->parent_queue = NULL;
+        node->parent_queue = nullptr;
         return true;
       }
 
       if (head_ == node) {
-        DCHECK(node->prev == NULL);
+        DCHECK(node->prev == nullptr);
         head_ = node->next;
       } else {
-        DCHECK(node->prev != NULL);
+        DCHECK(node->prev != nullptr);
         node->prev->next = node->next;
       }
 
       if (node == tail_) {
-        DCHECK(node->next == NULL);
+        DCHECK(node->next == nullptr);
         tail_ = node->prev;
-      } else if (node->next != NULL) {
+      } else if (node->next != nullptr) {
         node->next->prev = node->prev;
       }
       --size_;
     }
-    node->next = node->prev = NULL;
-    node->parent_queue = NULL;
+    node->next = node->prev = nullptr;
+    node->parent_queue = nullptr;
     return true;
   }
 
@@ -195,18 +212,18 @@ class InternalQueueBase {
   void Clear() {
     boost::lock_guard<LockType> lock(lock_);
     Node* cur = head_;
-    while (cur != NULL) {
+    while (cur != nullptr) {
       Node* tmp = cur;
       cur = cur->next;
-      tmp->prev = tmp->next = NULL;
-      tmp->parent_queue = NULL;
+      tmp->prev = tmp->next = nullptr;
+      tmp->parent_queue = nullptr;
     }
     size_ = 0;
-    head_ = tail_ = NULL;
+    head_ = tail_ = nullptr;
   }
 
   int size() const { return size_; }
-  bool empty() const { return head_ == NULL; }
+  bool empty() const { return head_ == nullptr; }
 
   /// Returns if the target is on the queue. This is O(1) and does not acquire any locks.
   bool Contains(const T* target) const {
@@ -217,19 +234,19 @@ class InternalQueueBase {
   bool Validate() {
     int num_elements_found = 0;
     boost::lock_guard<LockType> lock(lock_);
-    if (head_ == NULL) {
-      if (tail_ != NULL) return false;
+    if (head_ == nullptr) {
+      if (tail_ != nullptr) return false;
       if (size() != 0) return false;
       return true;
     }
 
-    if (head_->prev != NULL) return false;
+    if (head_->prev != nullptr) return false;
     Node* current = head_;
-    while (current != NULL) {
+    while (current != nullptr) {
       if (current->parent_queue != this) return false;
       ++num_elements_found;
       Node* next = current->next;
-      if (next == NULL) {
+      if (next == nullptr) {
         if (current != tail_) return false;
       } else {
         if (next->prev != current) return false;
@@ -245,7 +262,7 @@ class InternalQueueBase {
   // from 'fn'.
   void Iterate(boost::function<bool(T*)> fn) {
     boost::lock_guard<LockType> lock(lock_);
-    for (Node* current = head_; current != NULL; current = current->next) {
+    for (Node* current = head_; current != nullptr; current = current->next) {
       if (!fn(reinterpret_cast<T*>(current))) return;
     }
   }
@@ -257,7 +274,7 @@ class InternalQueueBase {
     {
       boost::lock_guard<LockType> lock(lock_);
       Node* curr = head_;
-      while (curr != NULL) {
+      while (curr != nullptr) {
         ss << (void*)curr;
         curr = curr->next;
       }

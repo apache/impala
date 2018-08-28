@@ -283,6 +283,6 @@ void DiskIoMgrStress::NewClient(int i) {
       << exec_env->buffer_reservation()->DebugString();
 
   client.reader = io_mgr_->RegisterContext();
-  status = client.reader->AddScanRanges(client.scan_ranges);
+  status = client.reader->AddScanRanges(client.scan_ranges, EnqueueLocation::TAIL);
   CHECK(status.ok());
 }
