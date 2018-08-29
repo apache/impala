@@ -71,7 +71,7 @@ from threading import Timer
 #
 # Collect 5 breakpad minidumps from a statestored process 5s apart.
 #  python collect_diagnostics.py --pid $(pidof statestored) --minidumps 5 5
-#      --minidumps_dir /var/log/statestored/minidumps
+#      --minidumps_dir /var/log/impala-minidumps
 #
 #
 class Command(object):
@@ -125,6 +125,9 @@ class ImpalaDiagnosticsHandler(object):
     self.script_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
     # Name of the Impala process for which diagnostics should be collected.
     self.target_process_name = self.get_target_process_name()
+
+    self.minidump_search_path = os.path.join(self.args.minidumps_dir,
+        self.target_process_name)
 
     self.java_home = self.get_java_home_from_env()
     if not self.java_home and args.java_home:
@@ -276,7 +279,7 @@ class ImpalaDiagnosticsHandler(object):
     fallback_to_minidump = False
     if not self.pstack_cmd:
       # Fall back to collecting a minidump if pstack is not installed.
-      if not os.path.exists(self.args.minidumps_dir):
+      if not os.path.exists(self.minidump_search_path):
         logging.info("Skipping pstacks since pstack binary couldn't be located. Provide "
             + "--minidumps_dir for collecting minidumps instead.")
         # At this point, we can't proceed since we have nothing to collect.
@@ -348,8 +351,8 @@ class ImpalaDiagnosticsHandler(object):
   def copy_minidumps(self, target, start_ts):
     """Copies mindumps with create time >= start_ts to 'target' directory."""
     logging.info("Copying minidumps from %s to %s with ctime >= %s"
-        % (self.args.minidumps_dir, target, start_ts))
-    for filename in glob.glob(os.path.join(self.args.minidumps_dir, "*.dmp")):
+        % (self.minidump_search_path, target, start_ts))
+    for filename in glob.glob(os.path.join(self.minidump_search_path, "*.dmp")):
       try:
         minidump_ctime = self.get_minidump_create_timestamp(filename)
         if minidump_ctime >= math.floor(start_ts):
@@ -526,7 +529,9 @@ def get_args_parser():
       help="Collect breakpad minidumps for the Impala process. Requires --minidumps_dir\
       be set.")
   parser.add_argument("--minidumps_dir", action="store", dest="minidumps_dir", default="",
-      help="Path of the directory to which Impala process' minidumps are written")
+      help="Path of the directory to which Impala process' minidumps are written. Looks\
+      for minidumps in this path's subdirectory that is named after the target process\
+      name.")
   parser.add_argument("--profiles_dir", action="store", dest="profiles_dir", default="",
       help="Path of the profiles directory to be included in the diagnostics output.")
   parser.add_argument("--profiles_max_size_limit", action="store",
