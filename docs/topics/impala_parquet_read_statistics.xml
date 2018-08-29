@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="parquet_read_statistics">
+
+  <title>PARQUET_READ_STATISTICS Query Option (<keyword keyref="impala29"/> or higher only)</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>PARQUET_READ_STATISTICS</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Parquet"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>PARQUET_READ_STATISTICS</codeph> query option controls whether to read
+      statistics from Parquet files and use them during query processing.
+    </p>
+
+    <p>
+      Parquet stores min/max stats which can be used to skip reading row groups if they don't
+      qualify a certain predicate. When this query option is set to <codeph>true</codeph>,
+      Impala reads the Parquet statistics and skips reading row groups that do not match the
+      conditions in the <codeph>WHERE</codeph> clause.
+    </p>
+
+    <p>
+      Impala supports filtering based on Parquet statistics:
+    </p>
+
+    <ul>
+      <li>
+        Of the numerical types for the old version of the statistics: Boolean, Integer, Float
+      </li>
+
+      <li>
+        Of the types for the new version of the statistics (starting in IMPALA 2.8): Boolean,
+        Integer, Float, Decimal, String, Timestamp
+      </li>
+
+      <li>
+        For simple predicates of the forms: <codeph>&lt;slot> &lt;op> &lt;constant></codeph> or
+        <codeph>&lt;constant> &lt;op> &lt;slot></codeph>, where <codeph>&lt;op></codeph> is LT,
+        LE, GE, GT, and EQ
+      </li>
+    </ul>
+
+    <p>
+      The <codeph>PARQUET_READ_STATISTICS</codeph> option provides a workaround when dealing
+      with files that have corrupt Parquet statistics and unknown errors.
+    </p>
+
+    <p>
+      In the query runtime profile output for each Impalad instance, the
+      <codeph>NumStatsFilteredRowGroups</codeph> field in the SCAN node section shows the number
+      of row groups that were skipped based on Parquet statistics.
+    </p>
+
+    <p>
+      The supported values for the query option are:
+      <ul>
+        <li>
+          <codeph>true</codeph> (<codeph>1</codeph>): Read statistics from Parquet files and use
+          them in query processing.
+        </li>
+
+        <li>
+          <codeph>false</codeph> (<codeph>0</codeph>): Do not use Parquet read statistics.
+        </li>
+
+        <li>
+          Any other values are treated as <codeph>false</codeph>.
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      <b>Type:</b> Boolean
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>true</codeph>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_290"/>
+
+  </conbody>
+
+</concept>

@@ -35,56 +35,23 @@ under the License.
   </prolog>
 
   <conbody>
-
     <p>
-      <indexterm audience="hidden">Parquet support in Impala</indexterm>
-      Impala helps you to create, manage, and query Parquet tables. Parquet is a column-oriented binary file format
-      intended to be highly efficient for the types of large-scale queries that Impala is best at. Parquet is
-      especially good for queries scanning particular columns within a table, for example to query <q>wide</q>
-      tables with many columns, or to perform aggregation operations such as <codeph>SUM()</codeph> and
-      <codeph>AVG()</codeph> that need to process most or all of the values from a column. Each data file contains
-      the values for a set of rows (the <q>row group</q>). Within a data file, the values from each column are
-      organized so that they are all adjacent, enabling good compression for the values from that column. Queries
-      against a Parquet table can retrieve and analyze these values from any column quickly and with minimal I/O.
+      Impala allows you to create, manage, and query Parquet tables. Parquet
+      is a column-oriented binary file format intended to be highly efficient
+      for the types of large-scale queries that Impala is best at. Parquet is
+      especially good for queries scanning particular columns within a table,
+      for example to query <q>wide</q> tables with many columns, or to perform
+      aggregation operations such as <codeph>SUM()</codeph> and
+        <codeph>AVG()</codeph> that need to process most or all of the values
+      from a column. Each data file contains the values for a set of rows (the
+        <q>row group</q>). Within a data file, the values from each column are
+      organized so that they are all adjacent, enabling good compression for the
+      values from that column. Queries against a Parquet table can retrieve and
+      analyze these values from any column quickly and with minimal I/O.
     </p>
-
-    <table>
-      <title>Parquet Format Support in Impala</title>
-      <tgroup cols="5">
-        <colspec colname="1" colwidth="10*"/>
-        <colspec colname="2" colwidth="10*"/>
-        <colspec colname="3" colwidth="20*"/>
-        <colspec colname="4" colwidth="30*"/>
-        <colspec colname="5" colwidth="30*"/>
-        <thead>
-          <row>
-            <entry>
-              File Type
-            </entry>
-            <entry>
-              Format
-            </entry>
-            <entry>
-              Compression Codecs
-            </entry>
-            <entry>
-              Impala Can CREATE?
-            </entry>
-            <entry>
-              Impala Can INSERT?
-            </entry>
-          </row>
-        </thead>
-        <tbody>
-          <row conref="impala_file_formats.xml#file_formats/parquet_support">
-            <entry/>
-          </row>
-        </tbody>
-      </tgroup>
-    </table>
-
+    <p>See <xref href="impala_file_formats.xml#file_formats"/> for the summary
+      of Parquet format support.</p>
     <p outputclass="toc inpage"/>
-
   </conbody>
 
 

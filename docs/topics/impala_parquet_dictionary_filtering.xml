@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="parquet_dictionary_filtering" rev="2.9.0 IMPALA-4725">
+
+  <title>PARQUET_DICTIONARY_FILTERING Query Option (<keyword keyref="impala29"/> or higher only)</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>PARQUET_DICTIONARY_FILTERING</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Parquet"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p rev="parquet_dictionary_filtering">
+      The <codeph>PARQUET_DICTIONARY_FILTERING</codeph> query option controls whether Impala
+      uses dictionary filtering for Parquet filers.
+    </p>
+
+    <p>
+      To efficiently process a highly selective scan query, when this option is enabled, Impala
+      checks the values in the Parquet dictionary page and determine if the whole row group can
+      be thrown out.
+    </p>
+
+    <p>
+      A column chunk is purely dictionary encoded and can be used by dictionary filtering if any
+      of the following conditions meets:
+      <ol>
+        <li>
+          If the <codeph>encoding_stats</codeph> is in the Parquet file, dictionary filtering
+          uses it to determine if there are only dictionary encoded pages (i.e. there are no
+          data pages with an encoding other than PLAIN_DICTIONARY).
+        </li>
+
+        <li>
+          If the encoding stats are not present, dictionary filtering looks at the encodings.
+          The column is purely dictionary encoded if both of the conditions satisfy:
+          <ul>
+            <li>
+              PLAIN_DICTIONARY is present.
+            </li>
+
+            <li>
+              Only PLAIN_DICTIONARY, RLE, or BIT_PACKED encodings are listed.
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          Dictionary filtering works for the Parquet dictionaries with less than 40000 values if
+          the file was written by <keyword
+            keyref="impala29"> or lower</keyword>.
+        </li>
+      </ol>
+    </p>
+
+    <p>
+      In the query runtime profile output for each Impalad instance, the
+      <codeph>NumDictFilteredRowGroups</codeph> field in the SCAN node section shows the number
+      of row groups that were skipped based on dictionary filtering.
+    </p>
+
+    <p>
+      Note that row groups can be filtered out by Parquet statistics, and in such cases,
+      dictionary filtering will not be considered.
+    </p>
+
+    <p>
+      The supported values for the query option are:
+      <ul>
+        <li>
+          <codeph>true</codeph> (<codeph>1</codeph>): Use dictionary filtering.
+        </li>
+
+        <li>
+          <codeph>false</codeph> (<codeph>0</codeph>): Do not use dictionary filtering
+        </li>
+
+        <li>
+          Any other values are treated as <codeph>false</codeph>.
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      <b>Type:</b> Boolean
+    </p>
+
+    <p>
+      <b>Default:</b> <codeph>true</codeph> (<codeph>1</codeph>)
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/added_in_290"/>
+
+    <p conref="../shared/impala_common.xml#common/example_blurb"/>
+
+  </conbody>
+
+</concept>
