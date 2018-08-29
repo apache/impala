@@ -244,8 +244,12 @@ public class Frontend {
   public TUpdateCatalogCacheResponse updateCatalogCache(
       TUpdateCatalogCacheRequest req) throws CatalogException, TException {
     TUpdateCatalogCacheResponse resp = catalogManager_.updateCatalogCache(req);
-    authzChecker_.set(new AuthorizationChecker(
-        authzConfig_, getCatalog().getAuthPolicy()));
+    if (!req.is_delta) {
+      // In the case that it was a non-delta update, the catalog might have reloaded
+      // itself, and we need to reset the AuthorizationChecker accordingly.
+      authzChecker_.set(new AuthorizationChecker(
+          authzConfig_, getCatalog().getAuthPolicy()));
+    }
     return resp;
   }
 
