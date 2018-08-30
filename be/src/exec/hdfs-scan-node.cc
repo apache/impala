@@ -417,11 +417,6 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
       break;
     }
 
-    // Stop extra threads if we're over a soft limit in order to free up memory.
-    if (!first_thread && mem_tracker_->AnyLimitExceeded(MemLimit::SOFT)) {
-      break;
-    }
-
     // Done with range and it completed successfully
     if (progress_.done()) {
       // All ranges are finished.  Indicate we are done.
@@ -435,6 +430,15 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
       // node to process. This means that every range is either done or being processed by
       // another thread.
       all_ranges_started_ = true;
+      break;
+    }
+
+    // Stop extra threads if we're over a soft limit in order to free up memory.
+    if (!first_thread &&
+        (mem_tracker_->AnyLimitExceeded(MemLimit::SOFT) ||
+          !DebugAction(runtime_state_->query_options(),
+              "HDFS_SCANNER_THREAD_CHECK_SOFT_MEM_LIMIT").ok())) {
+      VLOG_QUERY << "Soft memory limit exceeded. Extra scanner thread exiting.";
       break;
     }
   }

@@ -64,6 +64,9 @@ DEBUG_ACTION_DIMS = [None,
   '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@0.5',
   '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
 
+# Trigger injected soft limit failures when scanner threads check memory limit.
+DEBUG_ACTION_DIMS.append('HDFS_SCANNER_THREAD_CHECK_SOFT_MEM_LIMIT:FAIL@0.5')
+
 class TestScannersAllTableFormats(ImpalaTestSuite):
   BATCH_SIZES = [0, 1, 16]
 
