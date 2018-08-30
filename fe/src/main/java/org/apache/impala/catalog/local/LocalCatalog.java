@@ -209,6 +209,9 @@ public class LocalCatalog implements FeCatalog {
   @Override
   public void waitForCatalogUpdate(long timeoutMs) {
     // No-op for local catalog.
+    // TODO(todd): Frontend.waitForCatalog() gets called at startup and ends
+    // up being a tight loop that spews logs unless we do something to wait better
+    // here.
   }
 
   @Override
@@ -218,7 +221,7 @@ public class LocalCatalog implements FeCatalog {
 
   @Override
   public AuthorizationPolicy getAuthPolicy() {
-    return null; // TODO(todd): implement auth policy
+    return metaProvider_.getAuthPolicy();
   }
 
   @Override
@@ -241,13 +244,13 @@ public class LocalCatalog implements FeCatalog {
 
   @Override
   public boolean isReady() {
-    // We are always ready.
-    return true;
+    return metaProvider_.isReady();
   }
 
   @Override
   public void setIsReady(boolean isReady) {
     // No-op for local catalog.
+    // This appears to only be used in some tests.
   }
 
   MetaProvider getMetaProvider() {

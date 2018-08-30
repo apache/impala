@@ -18,8 +18,10 @@
 # Superclass for all tests that need a custom cluster.
 # TODO: Configure cluster size and other parameters.
 
+import logging
 import os
 import os.path
+import pipes
 import pytest
 import re
 from subprocess import check_call
@@ -156,6 +158,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if os.environ.get("ERASURE_CODING") == "true":
       cmd.append("--impalad_args=--default_query_options=allow_erasure_coded_files=true")
 
+    logging.info("Starting cluster with command: %s" %
+                 " ".join(pipes.quote(arg) for arg in cmd + options))
     try:
       check_call(cmd + options, close_fds=True)
     finally:

@@ -23,9 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.TableName;
-import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.FeSupport;
@@ -35,8 +33,6 @@ import org.apache.impala.thrift.TDataSource;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TGetPartitionStatsResponse;
-import org.apache.impala.thrift.TPrincipal;
-import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
@@ -107,14 +103,47 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
   }
 
   /**
-   * Returns true if the given object does not depend on any other object already
-   * existing in the catalog in order to be added.
+   * Utility class for sequencing the order in which a set of updated catalog objects
+   * need to be applied to the catalog in order to satisfy referential constraints.
+   *
+   * If one type of object refers to another type of object, it needs to be added
+   * after it and deleted before it.
    */
-  private boolean isTopLevelCatalogObject(TCatalogObject catalogObject) {
-    return catalogObject.getType() == TCatalogObjectType.DATABASE ||
-        catalogObject.getType() == TCatalogObjectType.DATA_SOURCE ||
-        catalogObject.getType() == TCatalogObjectType.HDFS_CACHE_POOL ||
-        catalogObject.getType() == TCatalogObjectType.PRINCIPAL;
+  public static class ObjectUpdateSequencer {
+    private final ArrayDeque<TCatalogObject> updatedObjects = new ArrayDeque<>();
+    private final ArrayDeque<TCatalogObject> deletedObjects = new ArrayDeque<>();
+
+    public void add(TCatalogObject obj, boolean isDeleted) {
+      if (!isDeleted) {
+        // Update top-level objects first.
+        if (isTopLevelCatalogObject(obj)) {
+          updatedObjects.addFirst(obj);
+        } else {
+          updatedObjects.addLast(obj);
+        }
+      } else {
+        // Remove low-level objects first.
+        if (isTopLevelCatalogObject(obj)) {
+          deletedObjects.addLast(obj);
+        } else {
+          deletedObjects.addFirst(obj);
+        }
+      }
+    }
+
+    public Iterable<TCatalogObject> getUpdatedObjects() { return updatedObjects; }
+    public Iterable<TCatalogObject> getDeletedObjects() { return deletedObjects; }
+
+    /**
+     * Returns true if the given object does not depend on any other object already
+     * existing in the catalog in order to be added.
+     */
+    private static boolean isTopLevelCatalogObject(TCatalogObject catalogObject) {
+      return catalogObject.getType() == TCatalogObjectType.DATABASE ||
+          catalogObject.getType() == TCatalogObjectType.DATA_SOURCE ||
+          catalogObject.getType() == TCatalogObjectType.HDFS_CACHE_POOL ||
+          catalogObject.getType() == TCatalogObjectType.PRINCIPAL;
+    }
   }
 
   /**
@@ -156,8 +185,7 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
     TUpdateCatalogCacheRequest req) throws CatalogException, TException {
     // For updates from catalog op results, the service ID is set in the request.
     if (req.isSetCatalog_service_id()) setCatalogServiceId(req.catalog_service_id);
-    ArrayDeque<TCatalogObject> updatedObjects = new ArrayDeque<>();
-    ArrayDeque<TCatalogObject> deletedObjects = new ArrayDeque<>();
+    ObjectUpdateSequencer sequencer = new ObjectUpdateSequencer();
     long newCatalogVersion = lastSyncedCatalogVersion_.get();
     Pair<Boolean, ByteBuffer> update;
     while ((update = FeSupport.NativeGetNextCatalogObjectUpdate(req.native_iterator_ptr))
@@ -177,24 +205,12 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
       if (obj.type == TCatalogObjectType.CATALOG) {
         setCatalogServiceId(obj.catalog.catalog_service_id);
         newCatalogVersion = obj.catalog_version;
-      } else if (!update.first) {
-        // Update top-level objects first.
-        if (isTopLevelCatalogObject(obj)) {
-          updatedObjects.addFirst(obj);
-        } else {
-          updatedObjects.addLast(obj);
-        }
       } else {
-        // Remove low-level objects first.
-        if (isTopLevelCatalogObject(obj)) {
-          deletedObjects.addLast(obj);
-        } else {
-          deletedObjects.addFirst(obj);
-        }
+        sequencer.add(obj, update.first);
       }
     }
 
-    for (TCatalogObject catalogObject: updatedObjects) {
+    for (TCatalogObject catalogObject: sequencer.getUpdatedObjects()) {
       try {
         addCatalogObject(catalogObject);
       } catch (Exception e) {
@@ -202,7 +218,9 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
       }
     }
 
-    for (TCatalogObject catalogObject: deletedObjects) removeCatalogObject(catalogObject);
+    for (TCatalogObject catalogObject: sequencer.getDeletedObjects()) {
+      removeCatalogObject(catalogObject);
+    }
 
     lastSyncedCatalogVersion_.set(newCatalogVersion);
     // Cleanup old entries in the log.
@@ -322,10 +340,12 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
         removeDataSource(catalogObject.getData_source(), dropCatalogVersion);
         break;
       case PRINCIPAL:
-        removePrincipal(catalogObject.getPrincipal(), dropCatalogVersion);
+        authPolicy_.removePrincipalIfLowerVersion(catalogObject.getPrincipal(),
+            dropCatalogVersion);
         break;
       case PRIVILEGE:
-        removePrivilege(catalogObject.getPrivilege(), dropCatalogVersion);
+        authPolicy_.removePrivilegeIfLowerVersion(catalogObject.getPrivilege(),
+            dropCatalogVersion);
         break;
       case HDFS_CACHE_POOL:
         HdfsCachePool existingItem =
@@ -454,31 +474,6 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
       db.removeFunction(thriftFn.getSignature());
       CatalogObjectVersionSet.INSTANCE.removeVersion(
           fn.getCatalogVersion());
-    }
-  }
-
-  private void removePrincipal(TPrincipal thriftPrincipal, long dropCatalogVersion) {
-    Principal existingPrincipal = authPolicy_.getPrincipal(
-        thriftPrincipal.getPrincipal_name(), thriftPrincipal.getPrincipal_type());
-    // version of the drop, remove the function.
-    if (existingPrincipal != null &&
-        existingPrincipal.getCatalogVersion() < dropCatalogVersion) {
-      authPolicy_.removePrincipal(thriftPrincipal.getPrincipal_name(),
-          thriftPrincipal.getPrincipal_type());
-      CatalogObjectVersionSet.INSTANCE.removeAll(existingPrincipal.getPrivileges());
-    }
-  }
-
-  private void removePrivilege(TPrivilege thriftPrivilege, long dropCatalogVersion) {
-    Principal principal = authPolicy_.getPrincipal(thriftPrivilege.getPrincipal_id(),
-        thriftPrivilege.getPrincipal_type());
-    if (principal == null) return;
-    PrincipalPrivilege existingPrivilege =
-        principal.getPrivilege(thriftPrivilege.getPrivilege_name());
-    // version of the drop, remove the function.
-    if (existingPrivilege != null &&
-        existingPrivilege.getCatalogVersion() < dropCatalogVersion) {
-      principal.removePrivilege(thriftPrivilege.getPrivilege_name());
     }
   }
 

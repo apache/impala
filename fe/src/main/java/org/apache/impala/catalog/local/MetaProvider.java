@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.impala.catalog.AuthorizationPolicy;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -42,11 +43,20 @@ import com.google.errorprone.annotations.Immutable;
  *
  * Implementations may directly access the metadata from the source systems
  * or may include caching, etc.
- *
- * TODO(IMPALA-7127): expand this to include file metadata, sentry metadata,
- * etc.
  */
 interface MetaProvider {
+
+  /**
+   * Get the authorization policy. This acts as a repository of authorization
+   * metadata.
+   */
+  AuthorizationPolicy getAuthPolicy();
+
+  /**
+   * Return true if the metaprovider is ready to service requests.
+   */
+  boolean isReady();
+
   ImmutableList<String> loadDbList() throws TException;
 
   Database loadDb(String dbName) throws TException;

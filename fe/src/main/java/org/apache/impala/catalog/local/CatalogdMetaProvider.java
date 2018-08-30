@@ -36,8 +36,14 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.impala.catalog.AuthorizationPolicy;
 import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.CatalogDeltaLog;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.Principal;
+import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.ImpaladCatalog.ObjectUpdateSequencer;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
@@ -130,6 +136,18 @@ import com.google.errorprone.annotations.concurrent.GuardedBy;
  * it is no longer "linked". Over time, the old entries will naturally age out of the
  * cache.
  *
+ *
+ * Metadata that is _not_ fetched on demand
+ * ================================================
+ * This implementation does not fetch _all_ metadata on demand. In fact, some pieces of
+ * metadata are currently provided in the same manner as "legacy" coordinators: the
+ * full metadata objects are published by the catalog daemon into the statestore, and
+ * we keep a full "replica" of that information. In particular, we currently use this
+ * strategy for Sentry metadata (roles and privileges) since the caching of this data
+ * is relatively more complex. Given that this data is typically quite small relative
+ * to the table metadata, it's not too expensive to maintain the full replica.
+ *
+ *
  * TODO(todd): expose statistics on a per-query and per-daemon level about cache
  * hit rates, number of outbound RPCs, etc.
  * TODO(todd): handle retry/backoff to ride over short catalog interruptions
@@ -199,6 +217,12 @@ public class CatalogdMetaProvider implements MetaProvider {
       Catalog.INITIAL_CATALOG_VERSION);
 
   /**
+   * Tracks objects that have been deleted in response to a DDL issued from this
+   * coordinator.
+   */
+  CatalogDeltaLog deletedObjectsLog_ = new CatalogDeltaLog();
+
+  /**
    * The last known Catalog Service ID. If the ID changes, it indicates the CatalogServer
    * has restarted.
    */
@@ -206,6 +230,12 @@ public class CatalogdMetaProvider implements MetaProvider {
   private TUniqueId catalogServiceId_ = Catalog.INITIAL_CATALOG_SERVICE_ID;
   private final Object catalogServiceIdLock_ = new Object();
 
+
+  /**
+   * Cache of authorization policy metadata. Populated from data pushed from the
+   * StateStore. Currently this is _not_ "fetch-on-demand".
+   */
+  private final AuthorizationPolicy authPolicy_ = new AuthorizationPolicy();
 
   public CatalogdMetaProvider(TBackendGflags flags) {
     Preconditions.checkArgument(flags.isSetLocal_catalog_cache_expiration_s());
@@ -235,6 +265,16 @@ public class CatalogdMetaProvider implements MetaProvider {
 
   public CacheStats getCacheStats() {
     return cache_.stats();
+  }
+
+  @Override
+  public AuthorizationPolicy getAuthPolicy() {
+    return authPolicy_;
+  }
+
+  @Override
+  public boolean isReady() {
+    return lastSeenCatalogVersion_.get() > Catalog.INITIAL_CATALOG_VERSION;
   }
 
   /**
@@ -698,14 +738,23 @@ public class CatalogdMetaProvider implements MetaProvider {
    * indicate that the catalogd representation of the object has changed and therefore
    * needs to be invalidated in the impalad.
    */
-  public TUpdateCatalogCacheResponse updateCatalogCache(TUpdateCatalogCacheRequest req) {
+  public synchronized TUpdateCatalogCacheResponse updateCatalogCache(
+      TUpdateCatalogCacheRequest req) {
     if (req.isSetCatalog_service_id()) {
       witnessCatalogServiceId(req.catalog_service_id);
     }
 
+    // We might see a top-level catalog version number while visiting the objects. If so,
+    // we'll capture it here and process it down at the end after applying all other
+    // objects.
+    Long nextCatalogVersion = null;
+
+    ObjectUpdateSequencer authObjectSequencer = new ObjectUpdateSequencer();
+
     Pair<Boolean, ByteBuffer> update;
     while ((update = FeSupport.NativeGetNextCatalogObjectUpdate(req.native_iterator_ptr))
         != null) {
+      boolean isDelete = update.first;
       TCatalogObject obj = new TCatalogObject();
       try {
         obj.read(new TBinaryProtocol(new TByteBuffer(update.second)));
@@ -717,18 +766,53 @@ public class CatalogdMetaProvider implements MetaProvider {
             "coordinator.", e);
         continue;
       }
+      if (isDelete) {
+        deletedObjectsLog_.addRemovedObject(obj);
+      } else if (deletedObjectsLog_.wasObjectRemovedAfter(obj)) {
+        LOG.trace("Skipping update because a matching object was removed " +
+            "in a later catalog version: {}", obj);
+        continue;
+      }
+
       invalidateCacheForObject(obj);
+
+      // The sequencing of updates to authorization objects is important since they
+      // may be cross-referential. So, just add them to the sequencer which ensures
+      // we handle them in the right order later.
+      if (obj.type == TCatalogObjectType.PRINCIPAL ||
+          obj.type == TCatalogObjectType.PRIVILEGE) {
+        authObjectSequencer.add(obj, isDelete);
+      }
 
       // Handle CATALOG objects. These are sent only via the updates published via
       // the statestore topic, and not via the synchronous updates returned from DDLs.
       if (obj.type == TCatalogObjectType.CATALOG) {
         // The top-level CATALOG object version is used to implement SYNC_DDL. We need
         // to keep track of this and pass it back to the C++ code in the return value
-        // of this call.
-        lastSeenCatalogVersion_.set(obj.catalog_version);
+        // of this call. This is also used to know when the catalog is ready at
+        // startup.
+        nextCatalogVersion = obj.catalog_version;
         witnessCatalogServiceId(obj.catalog.catalog_service_id);
       }
     }
+
+    for (TCatalogObject obj : authObjectSequencer.getUpdatedObjects()) {
+      updateAuthPolicy(obj, /*isDelete=*/false);
+    }
+    for (TCatalogObject obj : authObjectSequencer.getDeletedObjects()) {
+      updateAuthPolicy(obj, /*isDelete=*/true);
+    }
+
+    deletedObjectsLog_.garbageCollect(lastSeenCatalogVersion_.get());
+
+    // NOTE: it's important to defer setting the new catalog version until the
+    // end of the loop, since the CATALOG object might be one of the first objects
+    // processed, and we don't want to prematurely indicate that we are done processing
+    // the update.
+    if (nextCatalogVersion != null) {
+      lastSeenCatalogVersion_.set(nextCatalogVersion);
+    }
+
     // TODO(IMPALA-7506) 'minVersion' here should be the minimum version of any object
     // that we have in our cache. This is used to make global INVALIDATE METADATA'
     // operations synchronous. The flow is as follows for v1 impalads:
@@ -757,6 +841,42 @@ public class CatalogdMetaProvider implements MetaProvider {
     }
   }
 
+  private void updateAuthPolicy(TCatalogObject obj, boolean isDelete) {
+    LOG.trace("Updating authorization policy: {} isDelete={}", obj, isDelete);
+    switch (obj.type) {
+    case PRINCIPAL:
+      if (!isDelete) {
+        Principal principal = Principal.fromThrift(obj.getPrincipal());
+        principal.setCatalogVersion(obj.getCatalog_version());
+        authPolicy_.addPrincipal(principal);
+      } else {
+        authPolicy_.removePrincipalIfLowerVersion(obj.getPrincipal(),
+            obj.getCatalog_version());
+      }
+      break;
+    case PRIVILEGE:
+      if (!isDelete) {
+        // TODO(todd): duplicate code from ImpaladCatalog.
+        PrincipalPrivilege privilege =
+            PrincipalPrivilege.fromThrift(obj.getPrivilege());
+        privilege.setCatalogVersion(obj.getCatalog_version());
+        try {
+          authPolicy_.addPrivilege(privilege);
+        } catch (CatalogException e) {
+          // TODO(todd) it's odd that we swallow this error, both here and in
+          // the original code in ImpaladCatalog.
+          LOG.error("Error adding privilege: ", e);
+        }
+      } else {
+        authPolicy_.removePrivilegeIfLowerVersion(obj.getPrivilege(),
+            obj.getCatalog_version());
+      }
+      break;
+    default:
+        throw new IllegalArgumentException("invalid type: " + obj.type);
+    }
+  }
+
   /**
    * Witness a service ID received from the catalog. We can see the service IDs
    * either from a DDL response (in which case the service ID is part of the RPC
@@ -775,6 +895,11 @@ public class CatalogdMetaProvider implements MetaProvider {
         }
         catalogServiceId_ = serviceId;
         cache_.invalidateAll();
+        // TODO(todd): we probably need to invalidate the auth policy too.
+        // we are probably better off detecting this at a higher level and
+        // reinstantiating the metaprovider entirely, similar to how ImpaladCatalog
+        // handles this.
+
         // TODO(todd): slight race here: a concurrent request from the old catalog
         // could theoretically be just about to write something back into the cache
         // after we do the above invalidate. Maybe we would be better off replacing

@@ -534,11 +534,15 @@ public class CatalogServiceCatalog extends Catalog {
         // whole catalog.
         // TODO(todd) ensure that the impalad does this invalidation as required.
         return obj;
+      case PRIVILEGE:
+      case PRINCIPAL:
+        // The caching of this data on the impalad side is somewhat complex
+        // and this code is also under some churn at the moment. So, we'll just publish
+        // the full information rather than doing fetch-on-demand.
+        return obj;
       case DATA_SOURCE:
       case FUNCTION:
       case HDFS_CACHE_POOL:
-      case PRIVILEGE:
-      case PRINCIPAL:
         // These are currently not cached by v2 impalad.
         // TODO(todd): handle these items.
         return null;
@@ -1667,6 +1671,8 @@ public class CatalogServiceCatalog extends Catalog {
     versionLock_.writeLock().lock();
     try {
       Principal principal = authPolicy_.removePrincipal(principalName, type);
+      // TODO(todd): does this end up leaking the privileges associated
+      // with this principal into the CatalogObjectVersionSet on the catalogd?
       if (principal == null) return null;
       for (PrincipalPrivilege priv: principal.getPrivileges()) {
         priv.setCatalogVersion(incrementAndGetCatalogVersion());

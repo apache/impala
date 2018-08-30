@@ -45,7 +45,7 @@ public class PrincipalPrivilege extends CatalogObjectImpl {
   private final TPrivilege privilege_;
 
   private PrincipalPrivilege(TPrivilege privilege) {
-    privilege_ = privilege;
+    privilege_ = Preconditions.checkNotNull(privilege);
   }
 
   public TPrivilege toThrift() { return privilege_; }

@@ -24,6 +24,7 @@ import java.util.Set;
 import com.google.common.base.Preconditions;
 import org.apache.commons.net.ntp.TimeStamp;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TPrincipal;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TResultRow;
@@ -285,6 +286,53 @@ public class AuthorizationPolicy implements PrivilegeCache {
     return type == TPrincipalType.ROLE ?
         removeRole(principalName) : removeUser(principalName);
   }
+
+
+  /**
+   * Removes a principal, but only if the existing principal has a lower version
+   * than the specified 'dropVersion'.
+   */
+  public synchronized void removePrincipalIfLowerVersion(TPrincipal thriftPrincipal,
+      long dropCatalogVersion) {
+    Principal existingPrincipal = getPrincipal(thriftPrincipal.getPrincipal_name(),
+        thriftPrincipal.getPrincipal_type());
+    if (existingPrincipal == null ||
+        existingPrincipal.getCatalogVersion() >= dropCatalogVersion) {
+      return;
+    }
+
+    removePrincipal(thriftPrincipal.getPrincipal_name(),
+        thriftPrincipal.getPrincipal_type());
+    // NOTE: the privileges are added to the CatalogObjectVersionSet automatically
+    // by being added to the CatalogObjectCache<Privilege> inside the principal.
+    // However, since we're just removing the principal wholesale here without removing
+    // anything from that map, we need to manually remove them from the version set.
+    //
+    // TODO(todd): it seems like it would make sense to do this in removePrincipal rather
+    // than here, but this is preserving the behavior of the existing code. Perhaps
+    // we have a memory leak in the catalogd due to not removing them there.
+    CatalogObjectVersionSet.INSTANCE.removeAll(existingPrincipal.getPrivileges());
+  }
+
+
+
+  /**
+   * Removes a privilege, but only if the existing privilege has a lower version
+   * than the specified 'dropVersion'.
+   */
+  public synchronized void removePrivilegeIfLowerVersion(TPrivilege thriftPrivilege,
+      long dropCatalogVersion) {
+    Principal principal = getPrincipal(thriftPrivilege.getPrincipal_id(),
+        thriftPrivilege.getPrincipal_type());
+    if (principal == null) return;
+    PrincipalPrivilege existingPrivilege =
+        principal.getPrivilege(thriftPrivilege.getPrivilege_name());
+    if (existingPrivilege != null &&
+        existingPrivilege.getCatalogVersion() < dropCatalogVersion) {
+      principal.removePrivilege(thriftPrivilege.getPrivilege_name());
+    }
+  }
+
 
   /**
    * Removes a role. Returns the removed role or null if no role with

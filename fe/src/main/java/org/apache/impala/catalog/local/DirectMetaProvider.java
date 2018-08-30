@@ -39,6 +39,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.impala.catalog.AuthorizationPolicy;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
@@ -79,6 +80,19 @@ class DirectMetaProvider implements MetaProvider {
       msClientPool_ = new MetaStoreClientPool(cfg.num_metadata_loading_threads,
           cfg.initial_hms_cnxn_timeout_s);
     }
+  }
+
+
+  @Override
+  public AuthorizationPolicy getAuthPolicy() {
+    throw new UnsupportedOperationException("not supported");
+  }
+
+  @Override
+  public boolean isReady() {
+    // Direct provider is always ready since we don't need to wait for
+    // an update from any external process.
+    return true;
   }
 
   @Override
