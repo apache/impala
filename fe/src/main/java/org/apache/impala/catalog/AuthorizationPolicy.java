@@ -24,7 +24,6 @@ import java.util.Set;
 import org.apache.commons.net.ntp.TimeStamp;
 import org.apache.log4j.Logger;
 import org.apache.sentry.core.common.ActiveRoleSet;
-import org.apache.sentry.provider.cache.PrivilegeCache;
 
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TPrivilege;
@@ -36,6 +35,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.apache.sentry.provider.cache.SentryPrivilegeCache;
 
 /**
  * A thread safe authorization policy cache, consisting of roles, groups that are
@@ -51,11 +51,11 @@ import com.google.common.collect.Sets;
  * rather than embedding the role name. When a privilege is added to a role, we do
  * a lookup to get the role ID to using the roleIds_ map.
  * Acts as the backing cache for the Sentry cached based provider (which is why
- * PrivilegeCache is implemented).
+ * SentryPrivilegeCache is implemented).
  * TODO: Instead of calling into Sentry to perform final authorization checks, we
  * should parse/validate the privileges in Impala.
  */
-public class AuthorizationPolicy implements PrivilegeCache {
+public class AuthorizationPolicy implements SentryPrivilegeCache {
   private static final Logger LOG = Logger.getLogger(AuthorizationPolicy.class);
 
   // Cache of role names (case-insensitive) to role objects.
@@ -295,8 +295,14 @@ public class AuthorizationPolicy implements PrivilegeCache {
   }
 
   @Override
+  public Set<String> listPrivileges(Set<String> groups, Set<String> users,
+      ActiveRoleSet roleSet) {
+    return listPrivileges(groups, roleSet);
+  }
+
+  @Override
   public void close() {
-    // Nothing to do, but required by PrivilegeCache.
+    // Nothing to do, but required by SentryPrivilegeCache.
   }
 
   /**
