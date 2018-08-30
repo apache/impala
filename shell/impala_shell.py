@@ -845,8 +845,11 @@ class ImpalaShell(object, cmd.Cmd):
     except TApplicationException:
       # We get a TApplicationException if the transport is valid,
       # but the RPC does not exist.
-      print_to_stderr("Error: Unable to communicate with impalad service. This "
-               "service may not be an impalad instance. Check host:port and try again.")
+      print_to_stderr("\n".join(textwrap.wrap(
+        "Error: Unable to communicate with impalad service. This "
+        "service may not be an impalad instance. A common problem is "
+        "that the port specified does not match the -beeswax_port flag on "
+        "the underlying impalad. Check host:port and try again.")))
       self.imp_client.close_connection()
       raise
     except ImportError:
