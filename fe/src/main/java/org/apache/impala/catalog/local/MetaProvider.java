@@ -22,13 +22,13 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.catalog.AuthorizationPolicy;
+import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -84,9 +84,11 @@ interface MetaProvider {
   List<String> loadFunctionNames(String dbName) throws TException;
 
   /**
-   * Retrieve the specified function from the metadata store.
+   * Retrieve the specified function from the metadata store. A function may have
+   * many overloads with the same name.
    */
-  Function getFunction(String dbName, String functionName) throws TException;
+  ImmutableList<Function> loadFunction(String dbName, String functionName)
+      throws TException;
 
   /**
    * Load the given partitions from the specified table.

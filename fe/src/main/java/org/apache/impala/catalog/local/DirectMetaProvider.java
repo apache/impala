@@ -33,13 +33,13 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.catalog.AuthorizationPolicy;
+import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.MetaStoreClientPool;
@@ -258,22 +258,22 @@ class DirectMetaProvider implements MetaProvider {
 
   @Override
   public List<String> loadFunctionNames(String dbName) throws TException {
-    Preconditions.checkNotNull(dbName);
-    try (MetaStoreClient c = msClientPool_.getClient()) {
-      return ImmutableList.copyOf(c.getHiveClient().getFunctions(
-          dbName, /*pattern=*/null));
-    }
+    // NOTE: this is a bit tricky to implement since functions may be stored as
+    // HMS functions or serialized functions in the DB parameters themselves. We
+    // need to do some refactoring to support this in DirectMetaProvider. Some code
+    // used to exist to do this in LocalDb -- look back in git history if you want to
+    // revive the usefulness of DirectMetaProvider.
+    throw new UnsupportedOperationException(
+        "Functions not supported by DirectMetaProvider");
   }
 
 
   @Override
-  public Function getFunction(String dbName, String functionName) throws TException {
-    Preconditions.checkNotNull(dbName);
-    Preconditions.checkNotNull(functionName);
-
-    try (MetaStoreClient c = msClientPool_.getClient()) {
-      return c.getHiveClient().getFunction(dbName, functionName);
-    }
+  public ImmutableList<Function> loadFunction(String dbName, String functionName)
+      throws TException {
+    // See above.
+    throw new UnsupportedOperationException(
+        "Functions not supported by DirectMetaProvider");
   }
 
   @Override

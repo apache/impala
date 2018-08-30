@@ -345,15 +345,19 @@ struct TPartialTableInfo {
 struct TDbInfoSelector {
   // The response should include the HMS Database object.
   1: bool want_hms_database
+
   // The response should include the list of table names in the DB.
   2: bool want_table_names
-  // TODO(todd): function names
+
+  // The response should include the list of function names in the DB.
+  3: bool want_function_names
 }
 
 // Returned information about a Database, as selected by TDbInfoSelector.
 struct TPartialDbInfo {
   1: optional hive_metastore.Database hms_database
   2: optional list<string> table_names
+  3: optional list<string> function_names
 }
 
 // RPC request for GetPartialCatalogObject.
@@ -361,7 +365,8 @@ struct TGetPartialCatalogObjectRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
 
   // A catalog object descriptor: a TCatalogObject with the object name and type fields
-  // set.
+  // set. This may be a TABLE, DB, CATALOG, or FUNCTION. The selectors below can
+  // further restrict what information should be returned.
   2: required CatalogObjects.TCatalogObject object_desc
 
   3: optional TTableInfoSelector table_info_selector
@@ -379,6 +384,9 @@ struct TGetPartialCatalogObjectResponse {
   3: optional TPartialTableInfo table_info
   4: optional TPartialDbInfo db_info
   5: optional TPartialCatalogInfo catalog_info
+
+  // Functions are small enough that we return them wholesale.
+  6: optional list<Types.TFunction> functions
 }
 
 

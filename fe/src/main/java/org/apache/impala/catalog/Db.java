@@ -45,6 +45,7 @@ import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -460,6 +461,9 @@ public class Db extends CatalogObjectImpl implements FeDb {
     }
     if (selector.want_table_names) {
       resp.db_info.table_names = getAllTableNames();
+    }
+    if (selector.want_function_names) {
+      resp.db_info.function_names = ImmutableList.copyOf(functions_.keySet());
     }
     return resp;
   }

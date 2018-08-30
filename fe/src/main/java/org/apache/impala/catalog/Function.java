@@ -334,6 +334,10 @@ public class Function extends CatalogObjectImpl {
   }
 
   public static Function fromThrift(TFunction fn) {
+    Preconditions.checkArgument(fn.isSetBinary_type());
+    Preconditions.checkArgument(fn.isSetArg_types());
+    Preconditions.checkArgument(fn.isSetRet_type());
+    Preconditions.checkArgument(fn.isSetHas_var_args());
     List<Type> argTypes = Lists.newArrayList();
     for (TColumnType t: fn.getArg_types()) {
       argTypes.add(Type.fromThrift(t));

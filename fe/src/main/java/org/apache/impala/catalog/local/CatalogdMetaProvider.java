@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
@@ -40,6 +39,7 @@ import org.apache.impala.catalog.AuthorizationPolicy;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogDeltaLog;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -55,6 +55,8 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDbInfoSelector;
 import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TFunctionName;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsFileDesc;
@@ -375,6 +377,19 @@ public class CatalogdMetaProvider implements MetaProvider {
     req.db_info_selector = new TDbInfoSelector();
     return req;
   }
+
+  private TGetPartialCatalogObjectRequest newReqForFunction(String dbName,
+      String funcName) {
+    TGetPartialCatalogObjectRequest req = new TGetPartialCatalogObjectRequest();
+    req.object_desc = new TCatalogObject();
+    req.object_desc.setType(TCatalogObjectType.FUNCTION);
+    req.object_desc.fn = new TFunction();
+    req.object_desc.fn.name = new TFunctionName();
+    req.object_desc.fn.name.db_name = dbName;
+    req.object_desc.fn.name.function_name = funcName;
+    return req;
+  }
+
 
   @Override
   public Database loadDb(final String dbName) throws TException {
@@ -713,16 +728,47 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   @Override
-  public List<String> loadFunctionNames(String dbName) throws MetaException, TException {
-    LOG.trace("loadFunctionNames({}): not cached yet", dbName);
-    return directProvider_.loadFunctionNames(dbName);
+  public List<String> loadFunctionNames(final String dbName) throws TException {
+    return loadWithCaching("function names for database " + dbName,
+        new DbCacheKey(dbName, DbCacheKey.DbInfoType.FUNCTION_NAMES),
+        new Callable<ImmutableList<String>>() {
+          @Override
+          public ImmutableList<String> call() throws Exception {
+            TGetPartialCatalogObjectRequest req = newReqForDb(dbName);
+            req.db_info_selector.want_function_names = true;
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.db_info != null && resp.db_info.function_names != null,
+                req, "missing expected function names");
+            return ImmutableList.copyOf(resp.db_info.function_names);
+          }
+      });
   }
 
   @Override
-  public Function getFunction(String dbName, String functionName)
-      throws MetaException, TException {
-    LOG.trace("getFunction({}, {}): not cached yet", dbName, functionName);
-    return directProvider_.getFunction(dbName, functionName);
+  public ImmutableList<Function> loadFunction(final String dbName,
+      final String functionName) throws TException {
+    ImmutableList<TFunction> thriftFuncs = loadWithCaching(
+        "function " + dbName + "." + functionName,
+        new FunctionsCacheKey(dbName, functionName),
+        new Callable<ImmutableList<TFunction>>() {
+          @Override
+          public ImmutableList<TFunction> call() throws Exception {
+            TGetPartialCatalogObjectRequest req = newReqForFunction(dbName, functionName);
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.functions != null, req, "missing expected function");
+            return ImmutableList.copyOf(resp.functions);
+          }
+      });
+    // It may seem wasteful to cache the thrift function objects and then always
+    // convert them back to non-Thrift 'Functions' on every load. However, loading
+    // functions is rare enough and this ensures we don't accidentally leak something
+    // mutable back to the catalog layer. If this turns out to be a problem we can
+    // consider wrapping Function with an immutable 'FeFunction' interface.
+    ImmutableList.Builder<Function> funcs = ImmutableList.builder();
+    for (TFunction thriftFunc : thriftFuncs) {
+      funcs.add(Function.fromThrift(thriftFunc));
+    }
+    return funcs.build();
   }
 
   /**
@@ -928,17 +974,27 @@ public class CatalogdMetaProvider implements MetaProvider {
       // Currently adding or dropping a table doesn't send an invalidation for the
       // DB, so we'll be coarse-grained here and invalidate the DB table list when
       // any table change happens. It's relatively cheap to re-fetch this.
-      invalidateCacheForDb(obj.table.db_name, DbCacheKey.DbInfoType.TABLE_NAMES,
+      invalidateCacheForDb(obj.table.db_name,
+          ImmutableList.of(DbCacheKey.DbInfoType.TABLE_NAMES),
+          invalidated);
+      break;
+    case FUNCTION:
+      // Same as above: if we see a function, it might be new or deleted and we should
+      // refresh the list of functions in the DB to be safe.
+      invalidateCacheForDb(obj.fn.name.db_name,
+          ImmutableList.of(DbCacheKey.DbInfoType.FUNCTION_NAMES),
+          invalidated);
+      invalidateCacheForFunction(obj.fn.name.db_name, obj.fn.name.function_name,
           invalidated);
       break;
     case DATABASE:
       if (cache_.asMap().remove(DB_LIST_CACHE_KEY) != null) {
         invalidated.add("list of database names");
       }
-      invalidateCacheForDb(obj.db.db_name, DbCacheKey.DbInfoType.TABLE_NAMES,
-          invalidated);
-      invalidateCacheForDb(obj.db.db_name, DbCacheKey.DbInfoType.HMS_METADATA,
-          invalidated);
+      invalidateCacheForDb(obj.db.db_name, ImmutableList.of(
+          DbCacheKey.DbInfoType.TABLE_NAMES,
+          DbCacheKey.DbInfoType.HMS_METADATA,
+          DbCacheKey.DbInfoType.FUNCTION_NAMES), invalidated);
       break;
 
     default:
@@ -950,15 +1006,18 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   /**
-   * Invalidate cached metadata of the given type for the given database. If anything
+   * Invalidate cached metadata of the given types for the given database. If anything
    * was invalidated, adds a human-readable string to 'invalidated' indicating the
    * invalidated metadata.
    */
-  private void invalidateCacheForDb(String dbName, DbCacheKey.DbInfoType type,
+  private void invalidateCacheForDb(String dbName, Iterable<DbCacheKey.DbInfoType> types,
       List<String> invalidated) {
-    DbCacheKey key = new DbCacheKey(dbName, type);
-    if (cache_.asMap().remove(key) != null) {
-      invalidated.add(type + " for DB " + dbName);
+    // TODO(todd) check whether we need to lower-case/canonicalize dbName?
+    for (DbCacheKey.DbInfoType type: types) {
+      DbCacheKey key = new DbCacheKey(dbName, type);
+      if (cache_.asMap().remove(key) != null) {
+        invalidated.add(type + " for DB " + dbName);
+      }
     }
   }
 
@@ -968,9 +1027,23 @@ public class CatalogdMetaProvider implements MetaProvider {
    */
   private void invalidateCacheForTable(String dbName, String tblName,
       List<String> invalidated) {
+    // TODO(todd) check whether we need to lower-case/canonicalize dbName and tblName?
     TableCacheKey key = new TableCacheKey(dbName, tblName);
     if (cache_.asMap().remove(key) != null) {
       invalidated.add("table " + dbName + "." + tblName);
+    }
+  }
+
+  /**
+   * Invalidate cached metadata for the given function. If anything was invalidated, adds
+   * a human-readable string to 'invalidated' indicating the invalidated metadata.
+   */
+  private void invalidateCacheForFunction(String dbName, String functionName,
+      List<String> invalidated) {
+    // TODO(todd) check whether we need to lower-case/canonicalize names?
+    FunctionsCacheKey key = new FunctionsCacheKey(dbName, functionName);
+    if (cache_.asMap().remove(key) != null) {
+      invalidated.add("function " + dbName + "." + functionName);
     }
   }
 
@@ -1083,30 +1156,50 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   /**
-   * Base class for cache keys related to a specific table. Such keys are explicitly
-   * invalidated by 'invalidateCacheForTable' above.
+   * Base class for cache key for a named item within a database (eg table or function).
    */
-  private static class TableCacheKey {
+  private static class DbChildCacheKey {
     final String dbName_;
-    final String tableName_;
+    final String childName_;
 
-    TableCacheKey(String dbName, String tableName) {
+    protected DbChildCacheKey(String dbName, String childName) {
       this.dbName_ = dbName;
-      this.tableName_ = tableName;
+      this.childName_ = childName;
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(dbName_, tableName_, getClass());
+      return Objects.hashCode(dbName_, childName_, getClass());
     }
     @Override
     public boolean equals(Object obj) {
       if (obj == null || !obj.getClass().equals(getClass())) {
         return false;
       }
-      TableCacheKey other = (TableCacheKey)obj;
-      return tableName_.equals(other.tableName_) &&
+      DbChildCacheKey other = (DbChildCacheKey)obj;
+      return childName_.equals(other.childName_) &&
           dbName_.equals(other.dbName_);
+    }
+  }
+
+  /**
+   * Base class for cache keys related to a specific table. Such keys are explicitly
+   * invalidated by 'invalidateCacheForTable' above.
+   */
+  private static class TableCacheKey extends DbChildCacheKey {
+    TableCacheKey(String dbName, String tableName) {
+      super(dbName, tableName);
+    }
+  }
+
+  /**
+   * Cache key for a the set of overloads of a function given a name.
+   * Invalidated by 'invalidateCacheForFunction' above.
+   * Values are ImmutableList<TFunction>.
+   */
+  private static class FunctionsCacheKey extends DbChildCacheKey {
+    FunctionsCacheKey(String dbName, String funcName) {
+      super(dbName, funcName);
     }
   }
 
@@ -1226,7 +1319,9 @@ public class CatalogdMetaProvider implements MetaProvider {
       /** Cache the HMS Database object */
       HMS_METADATA,
       /** Cache an ImmutableList<String> for table names within the DB */
-      TABLE_NAMES
+      TABLE_NAMES,
+      /** Cache an ImmutableList<String> for function names within the DB */
+      FUNCTION_NAMES
     }
     private final String dbName_;
     private final DbInfoType type_;

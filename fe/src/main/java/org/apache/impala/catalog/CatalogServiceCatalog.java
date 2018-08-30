@@ -54,6 +54,7 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCatalogUpdateResult;
 import org.apache.impala.thrift.TDatabase;
+import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TGetCatalogUsageResponse;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
@@ -540,8 +541,10 @@ public class CatalogServiceCatalog extends Catalog {
         // and this code is also under some churn at the moment. So, we'll just publish
         // the full information rather than doing fetch-on-demand.
         return obj;
-      case DATA_SOURCE:
       case FUNCTION:
+        min.setFn(new TFunction(obj.fn.getName()));
+        break;
+      case DATA_SOURCE:
       case HDFS_CACHE_POOL:
         // These are currently not cached by v2 impalad.
         // TODO(todd): handle these items.
@@ -2098,6 +2101,25 @@ public class CatalogServiceCatalog extends Catalog {
         return table.getPartialInfo(req);
       } finally {
         table.getLock().unlock();
+      }
+    }
+    case FUNCTION: {
+      versionLock_.readLock().lock();
+      try {
+        Db db = getDb(objectDesc.fn.name.db_name);
+        if (db == null) {
+          throw new CatalogException(
+              "Database not found: " + objectDesc.fn.name.db_name);
+        }
+
+        List<Function> funcs = db.getFunctions(objectDesc.fn.name.function_name);
+        TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
+        List<TFunction> thriftFuncs = Lists.newArrayListWithCapacity(funcs.size());
+        for (Function f : funcs) thriftFuncs.add(f.toThrift());
+        resp.setFunctions(thriftFuncs);
+        return resp;
+      } finally {
+        versionLock_.readLock().unlock();
       }
     }
     default:

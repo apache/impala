@@ -195,22 +195,40 @@ struct TAggregateFunction {
   10: optional bool ignores_distinct
 }
 
-// Represents a function in the Catalog.
+// Represents a function in the Catalog or a query plan, or may be used
+// in a minimal form in order to simply specify a function (e.g. when
+// included in a minimal catalog update or a TGetPartialCatalogInfo request).
+//
+// In the case of this latter 'specifier' use case, only the name must be
+// set.
 struct TFunction {
   // Fully qualified function name.
   1: required TFunctionName name
 
+  // -------------------------------------------------------------------------
+  // The following fields are always set, unless this TFunction is being used
+  // as a name-only "specifier".
+  // -------------------------------------------------------------------------
+
   // Type of the udf. e.g. hive, native, ir
-  2: required TFunctionBinaryType binary_type
+  2: optional TFunctionBinaryType binary_type
 
   // The types of the arguments to the function
-  3: required list<TColumnType> arg_types
+  3: optional list<TColumnType> arg_types
 
   // Return type for the function.
-  4: required TColumnType ret_type
+  4: optional TColumnType ret_type
 
   // If true, this function takes var args.
-  5: required bool has_var_args
+  5: optional bool has_var_args
+
+  // -------------------------------------------------------------------------
+  // The following fields are truly optional, even in "full" function objects.
+  //
+  // Note that TFunction objects are persisted in the user's metastore, so
+  // in many cases these fields are optional because they have been added
+  // incrementally across releases of Impala.
+  // -------------------------------------------------------------------------
 
   // Optional comment to attach to the function
   6: optional string comment
@@ -234,4 +252,8 @@ struct TFunction {
   // a no-op.
   // Not set when stored in the catalog.
   12: optional i64 last_modified_time
+
+
+  // NOTE: when adding fields to this struct, do not renumber the field IDs or
+  // add new required fields. This struct is serialized into user metastores.
 }
