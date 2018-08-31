@@ -131,6 +131,7 @@ under the License.
       <topicref href="topics/impala_dml.xml"/>
       <topicref href="topics/impala_alter_table.xml"/>
       <topicref href="topics/impala_alter_view.xml"/>
+      <topicref href="topics/impala_comment.xml"/>
       <topicref href="topics/impala_compute_stats.xml"/>
       <topicref audience="hidden" href="topics/impala_create_data_source.xml"/>
       <topicref href="topics/impala_create_database.xml"/>
