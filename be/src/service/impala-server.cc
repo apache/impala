@@ -1158,7 +1158,9 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
     request_state->summary_profile()->AddInfoStringRedacted("ExecSummary", exec_summary);
     request_state->summary_profile()->AddInfoStringRedacted("Errors",
         request_state->GetCoordinator()->GetErrorLog());
+  }
 
+  if (request_state->schedule() != nullptr) {
     const PerBackendExecParams& per_backend_params =
         request_state->schedule()->per_backend_exec_params();
     if (!per_backend_params.empty()) {

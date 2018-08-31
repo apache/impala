@@ -179,6 +179,13 @@ class ImpaladService(BaseImpalaService):
     num = len(result['backends'])
     return None if num is None else int(num)
 
+  def get_query_locations(self):
+    # Returns a dictionary of the format <host_address, num_of_queries_running_there>
+    result = json.loads(self.read_debug_webpage('queries?json', timeout=30, interval=1))
+    if result['query_locations'] is not None:
+      return {loc["location"]: loc["count"] for loc in result['query_locations']}
+    return None
+
   def get_in_flight_queries(self, timeout=30, interval=1):
     result = json.loads(self.read_debug_webpage('queries?json', timeout, interval))
     return result['in_flight_queries']
