@@ -20,6 +20,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include <openssl/err.h>
 #include <thrift/concurrency/Thread.h>
 #include <thrift/concurrency/ThreadManager.h>
 #include <thrift/protocol/TBinaryProtocol.h>
@@ -31,6 +32,7 @@
 
 #include <sstream>
 #include "gen-cpp/Types_types.h"
+#include "kudu/security/openssl_util.h"
 #include "rpc/TAcceptQueueServer.h"
 #include "rpc/auth-provider.h"
 #include "rpc/authentication.h"
@@ -70,6 +72,10 @@ map<string, SSLProtocol> SSLProtoVersions::PROTO_MAP = {
     {"tlsv1.2", TLSv1_2},
     {"tlsv1.1", TLSv1_1},
     {"tlsv1", TLSv1_0}};
+
+// A generic wrapper for OpenSSL structures.
+template <typename T>
+using c_unique_ptr = std::unique_ptr<T, std::function<void(T*)>>;
 
 Status SSLProtoVersions::StringToProtocol(const string& in, SSLProtocol* protocol) {
   for (const auto& proto : SSLProtoVersions::PROTO_MAP) {
@@ -352,8 +358,45 @@ class ImpalaSslSocketFactory : public TSSLSocketFactory {
   ImpalaSslSocketFactory(SSLProtocol version, const string& password)
     : TSSLSocketFactory(version), password_(password) {}
 
+  void ciphers(const string& enable) override {
+    SCOPED_OPENSSL_NO_PENDING_ERRORS;
+    TSSLSocketFactory::ciphers(enable);
+
+    // The following was taken from be/src/kudu/security/tls_context.cc, bugs fixed here
+    // may also need to be fixed there.
+    // Enable ECDH curves. For OpenSSL 1.1.0 and up, this is done automatically.
+#ifndef OPENSSL_NO_ECDH
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
+    // OpenSSL 1.0.1 and below only support setting a single ECDH curve at once.
+    // We choose prime256v1 because it's the first curve listed in the "modern
+    // compatibility" section of the Mozilla Server Side TLS recommendations,
+    // accessed Feb. 2017.
+    c_unique_ptr<EC_KEY> ecdh{
+        EC_KEY_new_by_curve_name(NID_X9_62_prime256v1), &EC_KEY_free};
+    if (ecdh == nullptr) {
+      throw TSSLException(
+          "failed to create prime256v1 curve: " + kudu::security::GetOpenSSLErrors());
+    }
+
+    int rc = SSL_CTX_set_tmp_ecdh(ctx_->get(), ecdh.get());
+    if (rc <= 0) {
+      throw new TSSLException(
+          "failed to set ECDH curve: " + kudu::security::GetOpenSSLErrors());
+    }
+#elif OPENSSL_VERSION_NUMBER < 0x10100000L
+    // OpenSSL 1.0.2 provides the set_ecdh_auto API which internally figures out
+    // the best curve to use.
+    int rc = SSL_CTX_set_ecdh_auto(ctx_->get(), 1);
+    if (rc <= 0) {
+      throw TSSLException(
+          "failed to configure ECDH support: " + kudu::security::GetOpenSSLErrors());
+    }
+#endif
+#endif
+  }
+
  protected:
-  virtual void getPassword(string& output, int size) {
+  virtual void getPassword(string& output, int size) override {
     output = password_;
     if (output.size() > size) output.resize(size);
   }

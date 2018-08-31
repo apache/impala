@@ -107,6 +107,23 @@ class TestClientSsl(CustomClusterTestSuite):
     assert "Query Status: Cancelled" in result.stdout
     assert impalad.wait_for_num_in_flight_queries(0)
 
+  # Test that the shell can connect to a ECDH only cluster.
+  TLS_ECDH_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
+                  "--ssl_server_certificate=%s/server-cert.pem "
+                  "--ssl_private_key=%s/server-key.pem "
+                  "--hostname=localhost "  # Required to match hostname in certificate"
+                  "--ssl_cipher_list=ECDHE-RSA-AES128-GCM-SHA256 "
+                  % (CERT_DIR, CERT_DIR, CERT_DIR))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args=TLS_ECDH_ARGS,
+                                    statestored_args=TLS_ECDH_ARGS,
+                                    catalogd_args=TLS_ECDH_ARGS)
+  @pytest.mark.skipif(HAS_LEGACY_OPENSSL, reason=SKIP_SSL_MSG)
+  def test_tls_ecdh(self, vector):
+    self._verify_negative_cases()
+    self._validate_positive_cases("%s/server-cert.pem" % self.CERT_DIR)
+
   # Test that the shell can connect to a TLS1.2 only cluster, and for good measure
   # restrict the cipher suite to just one choice.
   TLS_V12_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
