@@ -32,6 +32,9 @@ add_library(Runtime
   client-cache.cc
   coordinator.cc
   coordinator-backend-state.cc
+  datetime-parse-util.cc
+  date-parse-util.cc
+  date-value.cc
   debug-options.cc
   descriptors.cc
   dml-exec-state.cc
@@ -81,6 +84,7 @@ ADD_BE_LSAN_TEST(mem-pool-test)
 ADD_BE_LSAN_TEST(free-pool-test)
 ADD_BE_LSAN_TEST(string-buffer-test)
 ADD_BE_TEST(data-stream-test) # TODO: this test leaks
+ADD_BE_LSAN_TEST(date-test)
 ADD_BE_LSAN_TEST(timestamp-test)
 ADD_BE_LSAN_TEST(raw-value-test)
 ADD_BE_LSAN_TEST(string-compare-test)

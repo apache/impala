@@ -24,9 +24,9 @@
 #include <gutil/strings/substitute.h>
 
 #include "exprs/anyval-util.h"
+#include "runtime/datetime-parse-util.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.inline.h"
-#include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf.h"
 #include "udf/udf-internal.h"
@@ -56,13 +56,16 @@ typedef boost::posix_time::seconds Seconds;
 
 namespace impala {
 
+using datetime_parse_util::DateTimeFormatContext;
+using datetime_parse_util::ParseFormatTokens;
+
 StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
     const TimestampValue& tv, const StringVal& fmt) {
   void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
   DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
   if (!context->IsArgConstant(1)) {
     dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
-    if (!TimestampParser::ParseFormatTokens(dt_ctx)){
+    if (!ParseFormatTokens(dt_ctx)){
       TimestampFunctions::ReportBadFormat(context, fmt, false);
       return StringVal::null();
     }
@@ -165,7 +168,7 @@ TimestampVal TimestampFunctions::ToTimestamp(FunctionContext* context,
   DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
   if (!context->IsArgConstant(1)) {
      dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
-     if (!TimestampParser::ParseFormatTokens(dt_ctx)) {
+     if (!ParseFormatTokens(dt_ctx)) {
        ReportBadFormat(context, fmt, false);
        return TimestampVal::null();
      }

@@ -23,8 +23,8 @@
 
 #include "common/status.h"
 #include "exprs/timezone_db.h"
+#include "runtime/datetime-parse-util.h"
 #include "runtime/raw-value.inline.h"
-#include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "testutil/gtest-util.h"
@@ -40,6 +40,9 @@ using boost::posix_time::ptime;
 using boost::posix_time::time_duration;
 
 namespace impala {
+
+using datetime_parse_util::ParseFormatTokens;
+using datetime_parse_util::DateTimeFormatContext;
 
 // Used for defining a custom date/time format test. The structure can be used to
 // indicate whether the format or value is expected to fail. In a happy path test,
@@ -181,8 +184,8 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
         }
       }
       string fmt_val = "Format: " + fmt + ", Val: " + val;
-      DateTimeFormatContext dt_ctx(fmt.c_str(), fmt.length());
-      ASSERT_TRUE(TimestampParser::ParseFormatTokens(&dt_ctx)) << fmt_val;
+      DateTimeFormatContext dt_ctx(fmt.c_str());
+      ASSERT_TRUE(ParseFormatTokens(&dt_ctx)) << fmt_val;
       TimestampValue tv = TimestampValue::Parse(val.c_str(), val.length(), dt_ctx);
       ValidateTimestamp(tv, fmt, val, fmt_val, year, month, day, hours, mins, secs,
           frac);
@@ -211,8 +214,8 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
           if (i + 1 < toks_len) val.push_back(*separator);
         }
         string fmt_val = "Format: " + fmt + ", Val: " + val;
-        DateTimeFormatContext dt_ctx(fmt.c_str(), fmt.length());
-        ASSERT_TRUE(TimestampParser::ParseFormatTokens(&dt_ctx)) << fmt_val;
+        DateTimeFormatContext dt_ctx(fmt.c_str());
+        ASSERT_TRUE(ParseFormatTokens(&dt_ctx)) << fmt_val;
         TimestampValue tv = TimestampValue::Parse(val.c_str(), val.length(), dt_ctx);
         ValidateTimestamp(tv, fmt, val, fmt_val, year, month, day, hours, mins, secs,
             frac);
@@ -541,9 +544,9 @@ TEST(TimestampTest, Basic) {
   // or literal value.
   for (int i = 0; i < test_cases.size(); ++i) {
     TimestampTC test_case = test_cases[i];
-    DateTimeFormatContext dt_ctx(test_case.fmt, strlen(test_case.fmt));
+    DateTimeFormatContext dt_ctx(test_case.fmt);
     dt_ctx.SetCenturyBreak(now);
-    bool parse_result = TimestampParser::ParseFormatTokens(&dt_ctx);
+    bool parse_result = ParseFormatTokens(&dt_ctx);
     if (test_case.fmt_should_fail) {
       EXPECT_FALSE(parse_result) << "TC: " << i;
       continue;
@@ -616,8 +619,8 @@ TEST(TimestampTest, Basic) {
   // Loop through format test cases
   for (int i = 0; i < fmt_test_cases.size(); ++i) {
     TimestampFormatTC test_case = fmt_test_cases[i];
-    DateTimeFormatContext dt_ctx(test_case.fmt, strlen(test_case.fmt));
-    ASSERT_TRUE(TimestampParser::ParseFormatTokens(&dt_ctx))  << "TC: " << i;
+    DateTimeFormatContext dt_ctx(test_case.fmt);
+    ASSERT_TRUE(ParseFormatTokens(&dt_ctx))  << "TC: " << i;
     TimestampValue cust_tv = TimestampValue::FromUnixTime(test_case.ts, utc_tz);
     EXPECT_NE(cust_tv.date(), not_a_date) << "TC: " << i;
     EXPECT_NE(cust_tv.time(), not_a_date_time) << "TC: " << i;

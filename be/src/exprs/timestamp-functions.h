@@ -65,6 +65,10 @@ class TimestampFunctions {
   static const int64_t MAX_MILLI_INTERVAL = MAX_SEC_INTERVAL * 1000;
   static const int64_t MAX_MICRO_INTERVAL = MAX_MILLI_INTERVAL * 1000;
 
+  /// Static result values for ShortMonthName() function.
+  /// Short month names are also used in DateParser.
+  static const std::string MONTH_ARRAY[12];
+
   /// Parse and initialize format string if it is a constant. Raise error if invalid.
   static void UnixAndFromUnixPrepare(FunctionContext* context,
       FunctionContext::FunctionStateScope scope);
@@ -230,11 +234,9 @@ class TimestampFunctions {
 
  private:
 
-  /// Static result values for DayName(), ShortDayName(), ShortMonthName() and
-  /// LongMonthName functions.
+  /// Static result values for DayName(), ShortDayName() and LongMonthName() functions.
   static const std::string DAY_ARRAY[7];
   static const std::string DAYNAME_ARRAY[7];
-  static const std::string MONTH_ARRAY[12];
   static const std::string MONTHNAME_ARRAY[12];
 };
 

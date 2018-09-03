@@ -39,6 +39,10 @@ using boost::posix_time::to_iso_extended_string;
 using boost::posix_time::to_simple_string;
 using namespace impala;
 
+using datetime_parse_util::DateTimeFormatContext;
+using datetime_parse_util::InitParseCtx;
+using datetime_parse_util::ParseFormatTokens;
+
 // Benchmark for parsing timestamps.
 // Machine Info: Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz
 // ParseDate:            Function     Rate (iters/ms)          Comparison
@@ -202,7 +206,7 @@ int main(int argc, char **argv) {
   CpuInfo::Init();
   cout << Benchmark::GetMachineInfo() << endl;
 
-  TimestampParser::Init();
+  InitParseCtx();
 
   TestData dates, times, datetimes, tzdatetimes;
 
@@ -226,9 +230,9 @@ int main(int argc, char **argv) {
   timestamp_suite.AddBenchmark("Impala", TestImpalaDate, &times);
 
   dt_ctx.Reset("yyyy-MM-dd HH:mm:ss", 19);
-  TimestampParser::ParseFormatTokens(&dt_ctx);
+  ParseFormatTokens(&dt_ctx);
   dt_ctx_tz.Reset("yyyy-MM-dd HH:mm:ss+hh:mm", 25);
-  TimestampParser::ParseFormatTokens(&dt_ctx_tz);
+  ParseFormatTokens(&dt_ctx_tz);
 
   Benchmark timestamp_with_format_suite("ParseTimestampWithFormat");
   timestamp_with_format_suite.AddBenchmark("BoostDateTime",

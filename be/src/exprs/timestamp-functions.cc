@@ -21,8 +21,8 @@
 #include "exprs/anyval-util.h"
 #include "exprs/timezone_db.h"
 #include "gutil/strings/substitute.h"
+#include "runtime/datetime-parse-util.h"
 #include "runtime/string-value.inline.h"
-#include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "udf/udf-internal.h"
@@ -31,6 +31,9 @@
 #include "common/names.h"
 
 namespace impala {
+
+using datetime_parse_util::DateTimeFormatContext;
+using datetime_parse_util::ParseFormatTokens;
 
 const string TimestampFunctions::DAY_ARRAY[7] = {"Sun", "Mon", "Tue", "Wed", "Thu",
     "Fri", "Sat"};
@@ -120,7 +123,7 @@ void TimestampFunctions::UnixAndFromUnixPrepare(
       return;
     }
     dt_ctx = new DateTimeFormatContext(fmt_ref.ptr, fmt_ref.len);
-    bool parse_result = TimestampParser::ParseFormatTokens(dt_ctx);
+    bool parse_result = ParseFormatTokens(dt_ctx);
     if (!parse_result) {
       delete dt_ctx;
       TimestampFunctions::ReportBadFormat(context, fmt_val, true);

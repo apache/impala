@@ -37,7 +37,9 @@ DECLARE_bool(use_local_tz_for_unix_timestamp_conversions);
 
 namespace impala {
 
+namespace datetime_parse_util {
 struct DateTimeFormatContext;
+}
 
 /// Represents either a (1) date and time, (2) a date with an undefined time, or (3)
 /// a time with an undefined date. In all cases, times have up to nanosecond resolution
@@ -89,7 +91,7 @@ class TimestampValue {
   static TimestampValue Parse(const std::string& str);
   static TimestampValue Parse(const char* str, int len);
   static TimestampValue Parse(const char* str, int len,
-      const DateTimeFormatContext& dt_ctx);
+      const datetime_parse_util::DateTimeFormatContext& dt_ctx);
 
   /// Unix time (seconds since 1970-01-01 UTC by definition) constructors.
   /// Return the corresponding timestamp in the 'local_tz' time zone if
@@ -199,7 +201,8 @@ class TimestampValue {
   /// len -- the length of the buffer
   /// buff -- the buffer that will hold the result
   /// Returns the number of characters copied in to the buffer (minus the terminator)
-  int Format(const DateTimeFormatContext& dt_ctx, int len, char* buff) const;
+  int Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx, int len,
+      char* buff) const;
 
   /// Interpret 'this' as a timestamp in UTC and convert to unix time.
   /// Returns false if the conversion failed ('unix_time' will be undefined), otherwise

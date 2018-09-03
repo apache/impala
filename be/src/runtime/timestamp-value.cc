@@ -48,6 +48,8 @@ const int64_t EPOCH_DAY_NUMBER =
 
 namespace impala {
 
+using datetime_parse_util::DateTimeFormatContext;
+
 const char* TimestampValue::LLVM_CLASS_NAME = "class.impala::TimestampValue";
 const double TimestampValue::ONE_BILLIONTH = 0.000000001;
 
