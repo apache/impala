@@ -97,10 +97,10 @@ class JunitReport(object):
   def add_testsuite_element(self):
     """Create the testsuite element."""
     self.testsuite_element = ET.SubElement(self.root_element, "testsuite")
+    self.testsuite_element.set("name", "{name}.{phase}.{step}".format(
+      name=SCRIPT_NAME, phase=self.phase, step=self.step))
     self.testsuite_element.set(
-      "name", "{}.{}.{}".format(SCRIPT_NAME, self.phase, self.step))
-    self.testsuite_element.set(
-      "timestamp", "{}+00:00".format(self.utc_time.strftime('%Y-%m-%d %H:%M:%S')))
+      "timestamp", "{ts}+00:00".format(ts=self.utc_time.strftime('%Y-%m-%d %H:%M:%S')))
     self.testsuite_element.set("disabled", "0")
     self.testsuite_element.set("errors", "0")
     self.testsuite_element.set("failures", "0")
@@ -114,7 +114,8 @@ class JunitReport(object):
   def add_testcase_element(self):
     """Create the testcase element."""
     self.testcase_element = ET.SubElement(self.testsuite_element, "testcase")
-    self.testcase_element.set("classname", "{}.{}".format(SCRIPT_NAME, self.phase))
+    self.testcase_element.set("classname", "{name}.{phase}".format(
+      name=SCRIPT_NAME, phase=self.phase))
     self.testcase_element.set("name", self.step)
 
   def set_error(self):
@@ -133,7 +134,8 @@ class JunitReport(object):
       output_type: [string] either out or err
       file_or_string: a path to a file containing the content, or a plain string
     """
-    output = ET.SubElement(self.testcase_element, "system-{}".format(output_type))
+    output = ET.SubElement(self.testcase_element,
+        "system-{output_type}".format(output_type=output_type))
     output.text = JunitReport.get_xml_content(file_or_string)
 
   def to_file(self, junitxml_logdir=JUNITXML_LOGDIR):
@@ -155,9 +157,9 @@ class JunitReport(object):
       else:
         raise
 
-    filename = '{}.{}.xml'.format(
-        self.testsuite_element.attrib['name'],
-        self.utc_time.strftime('%Y%m%d_%H_%M_%S')
+    filename = '{name}.{ts}.xml'.format(
+        name=self.testsuite_element.attrib['name'],
+        ts=self.utc_time.strftime('%Y%m%d_%H_%M_%S')
     )
     junit_log_file = os.path.join(junitxml_logdir, filename)
 
