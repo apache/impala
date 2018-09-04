@@ -218,6 +218,42 @@ class TestObservability(ImpalaTestSuite):
     assert event_regex_index == len(event_regexes), \
         "Didn't find all events in profile: \n" + runtime_profile
 
+  def test_query_profile_contains_all_events(self, unique_database):
+    """Test that the expected events show up in a query profile for various queries"""
+    # make a data file to load data from
+    path = "tmp/{0}/data_file".format(unique_database)
+    self.hdfs_client.delete_file_dir(path)
+    self.hdfs_client.create_file(path, "1")
+    use_query = "use {0}".format(unique_database)
+    self.execute_query(use_query)
+    # all the events we will see for every query
+    event_regexes = [
+      r'Query Compilation:',
+      r'Query Timeline:',
+      r'Planning finished'
+    ]
+    # queries that explore different code paths in Frontend compilation
+    queries = [
+      'create table if not exists impala_6568 (i int)',
+      'select * from impala_6568',
+      'explain select * from impala_6568',
+      'describe impala_6568',
+      'alter table impala_6568 set tblproperties(\'numRows\'=\'10\')',
+      "load data inpath '/{0}' into table impala_6568".format(path)
+    ]
+    # run each query...
+    for query in queries:
+      runtime_profile = self.execute_query(query).runtime_profile
+      # and check that all the expected events appear in the resulting profile
+      self.__verify_profile_contains_every_event(event_regexes, runtime_profile, query)
+
+  def __verify_profile_contains_every_event(self, event_regexes, runtime_profile, query):
+    """Test that all the expected events show up in a given query profile."""
+    for regex in event_regexes:
+      assert any(re.search(regex, line) for line in runtime_profile.splitlines()), \
+          "Didn't find event '" + regex + "' for query '" + query + \
+          "' in profile: \n" + runtime_profile
+
 class TestThriftProfile(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

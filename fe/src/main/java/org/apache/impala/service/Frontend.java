@@ -87,7 +87,6 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -1032,6 +1031,14 @@ public class Frontend {
     // Timeline of important events in the planning process, used for debugging
     // and profiling.
     EventSequence timeline = new EventSequence("Query Compilation");
+    TExecRequest result = getTExecRequest(queryCtx, timeline, explainString);
+    timeline.markEvent("Planning finished");
+    result.setTimeline(timeline.toThrift());
+    return result;
+  }
+
+  private TExecRequest getTExecRequest(TQueryCtx queryCtx, EventSequence timeline,
+      StringBuilder explainString) throws ImpalaException {
     LOG.info("Analyzing query: " + queryCtx.client_request.stmt);
 
     // Parse stmt and collect/load metadata to populate a stmt-local table cache
@@ -1048,11 +1055,7 @@ public class Frontend {
     timeline.markEvent("Analysis finished");
     Preconditions.checkNotNull(analysisResult.getStmt());
 
-    TExecRequest result = new TExecRequest();
-    result.setQuery_options(queryCtx.client_request.getQuery_options());
-    result.setAccess_events(analysisResult.getAccessEvents());
-    result.analysis_warnings = analysisResult.getAnalyzer().getWarnings();
-    result.setUser_has_profile_access(analysisResult.userHasProfileAccess());
+    TExecRequest result = createBaseExecRequest(queryCtx, analysisResult);
 
     TQueryOptions queryOptions = queryCtx.client_request.query_options;
     if (analysisResult.isCatalogOp()) {
@@ -1062,21 +1065,15 @@ public class Frontend {
       if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
         result.catalog_op_request.setLineage_graph(thriftLineageGraph);
       }
-      // Set MT_DOP=4 for COMPUTE STATS on Parquet/ORC tables, unless the user has already
-      // provided another value for MT_DOP.
-      if (!queryOptions.isSetMt_dop() &&
-          analysisResult.isComputeStatsStmt() &&
-          analysisResult.getComputeStatsStmt().isColumnar()) {
-        queryOptions.setMt_dop(4);
-      }
-      // If unset, set MT_DOP to 0 to simplify the rest of the code.
-      if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
+      setMtDopForCatalogOp(analysisResult, queryOptions);
       // All DDL operations except for CTAS are done with analysis at this point.
-      if (!analysisResult.isCreateTableAsSelectStmt()) return result;
+      if (!analysisResult.isCreateTableAsSelectStmt()) {
+        return result;
+      }
     } else if (analysisResult.isLoadDataStmt()) {
       result.stmt_type = TStmtType.LOAD;
-      result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(
-          new TColumn("summary", Type.STRING.toThrift()))));
+      result.setResult_set_metadata(new TResultSetMetadata(
+          Collections.singletonList(new TColumn("summary", Type.STRING.toThrift()))));
       result.setLoad_data_request(analysisResult.getLoadDataStmt().toThrift());
       return result;
     } else if (analysisResult.isSetStmt()) {
@@ -1098,16 +1095,8 @@ public class Frontend {
     if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
 
     // create TQueryExecRequest
-    Preconditions.checkState(analysisResult.isQueryStmt() || analysisResult.isDmlStmt()
-        || analysisResult.isCreateTableAsSelectStmt() || analysisResult.isUpdateStmt()
-        || analysisResult.isDeleteStmt());
-
-    Planner planner = new Planner(analysisResult, queryCtx, timeline);
-    TQueryExecRequest queryExecRequest = createExecRequest(planner, explainString);
-    queryCtx.setDesc_tbl(
-        planner.getAnalysisResult().getAnalyzer().getDescTbl().toThrift());
-    queryExecRequest.setQuery_ctx(queryCtx);
-    queryExecRequest.setHost_list(analysisResult.getAnalyzer().getHostIndex().getList());
+    TQueryExecRequest queryExecRequest =
+        getPlannedExecRequest(queryCtx, analysisResult, timeline, explainString);
 
     TLineageGraph thriftLineageGraph = analysisResult.getThriftLineageGraph();
     if (thriftLineageGraph != null && thriftLineageGraph.isSetQuery_text()) {
@@ -1127,20 +1116,10 @@ public class Frontend {
 
     result.setQuery_exec_request(queryExecRequest);
     if (analysisResult.isQueryStmt()) {
-      // fill in the metadata
-      LOG.trace("create result set metadata");
       result.stmt_type = TStmtType.QUERY;
       result.query_exec_request.stmt_type = result.stmt_type;
-      TResultSetMetadata metadata = new TResultSetMetadata();
-      QueryStmt queryStmt = analysisResult.getQueryStmt();
-      int colCnt = queryStmt.getColLabels().size();
-      for (int i = 0; i < colCnt; ++i) {
-        TColumn colDesc = new TColumn();
-        colDesc.columnName = queryStmt.getColLabels().get(i);
-        colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
-        metadata.addToColumns(colDesc);
-      }
-      result.setResult_set_metadata(metadata);
+      // fill in the metadata
+      result.setResult_set_metadata(createQueryResultSetMetadata(analysisResult));
     } else if (analysisResult.isInsertStmt() ||
         analysisResult.isCreateTableAsSelectStmt()) {
       // For CTAS the overall TExecRequest statement type is DDL, but the
@@ -1148,31 +1127,101 @@ public class Frontend {
       result.stmt_type =
           analysisResult.isCreateTableAsSelectStmt() ? TStmtType.DDL : TStmtType.DML;
       result.query_exec_request.stmt_type = TStmtType.DML;
-
       // create finalization params of insert stmt
-      InsertStmt insertStmt = analysisResult.getInsertStmt();
-      if (insertStmt.getTargetTable() instanceof FeFsTable) {
-        TFinalizeParams finalizeParams = new TFinalizeParams();
-        finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
-        finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
-        finalizeParams.setTable_id(DescriptorTable.TABLE_SINK_ID);
-        String db = insertStmt.getTargetTableName().getDb();
-        finalizeParams.setTable_db(db == null ? queryCtx.session.database : db);
-        FeFsTable hdfsTable = (FeFsTable) insertStmt.getTargetTable();
-        finalizeParams.setHdfs_base_dir(hdfsTable.getHdfsBaseDir());
-        finalizeParams.setStaging_dir(
-            hdfsTable.getHdfsBaseDir() + "/_impala_insert_staging");
-        queryExecRequest.setFinalize_params(finalizeParams);
-      }
+      addFinalizationParamsForInsert(
+          queryCtx, queryExecRequest, analysisResult.getInsertStmt());
     } else {
-      Preconditions.checkState(analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt());
+      Preconditions.checkState(
+          analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt());
       result.stmt_type = TStmtType.DML;
       result.query_exec_request.stmt_type = TStmtType.DML;
     }
 
-    timeline.markEvent("Planning finished");
-    result.setTimeline(timeline.toThrift());
     return result;
+  }
+
+  /**
+   * Set MT_DOP based on the analysis result
+   */
+  private static void setMtDopForCatalogOp(
+      AnalysisResult analysisResult, TQueryOptions queryOptions) {
+    // Set MT_DOP=4 for COMPUTE STATS on Parquet/ORC tables, unless the user has already
+    // provided another value for MT_DOP.
+    if (!queryOptions.isSetMt_dop() && analysisResult.isComputeStatsStmt()
+        && analysisResult.getComputeStatsStmt().isColumnar()) {
+      queryOptions.setMt_dop(4);
+    }
+    // If unset, set MT_DOP to 0 to simplify the rest of the code.
+    if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
+  }
+
+  /**
+   * Create the TExecRequest and initialize it
+   */
+  private static TExecRequest createBaseExecRequest(
+      TQueryCtx queryCtx, AnalysisResult analysisResult) {
+    TExecRequest result = new TExecRequest();
+    result.setQuery_options(queryCtx.client_request.getQuery_options());
+    result.setAccess_events(analysisResult.getAccessEvents());
+    result.analysis_warnings = analysisResult.getAnalyzer().getWarnings();
+    result.setUser_has_profile_access(analysisResult.userHasProfileAccess());
+    return result;
+  }
+
+  /**
+   * Add the finalize params for an insert statement to the queryExecRequest
+   */
+  private static void addFinalizationParamsForInsert(
+      TQueryCtx queryCtx, TQueryExecRequest queryExecRequest, InsertStmt insertStmt) {
+    if (insertStmt.getTargetTable() instanceof FeFsTable) {
+      TFinalizeParams finalizeParams = new TFinalizeParams();
+      finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
+      finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
+      finalizeParams.setTable_id(DescriptorTable.TABLE_SINK_ID);
+      String db = insertStmt.getTargetTableName().getDb();
+      finalizeParams.setTable_db(db == null ? queryCtx.session.database : db);
+      FeFsTable hdfsTable = (FeFsTable) insertStmt.getTargetTable();
+      finalizeParams.setHdfs_base_dir(hdfsTable.getHdfsBaseDir());
+      finalizeParams.setStaging_dir(
+          hdfsTable.getHdfsBaseDir() + "/_impala_insert_staging");
+      queryExecRequest.setFinalize_params(finalizeParams);
+    }
+  }
+
+  /**
+   * Add the metadata for the result set
+   */
+  private static TResultSetMetadata createQueryResultSetMetadata(
+      AnalysisResult analysisResult) {
+    LOG.trace("create result set metadata");
+    TResultSetMetadata metadata = new TResultSetMetadata();
+    QueryStmt queryStmt = analysisResult.getQueryStmt();
+    int colCnt = queryStmt.getColLabels().size();
+    for (int i = 0; i < colCnt; ++i) {
+      TColumn colDesc = new TColumn();
+      colDesc.columnName = queryStmt.getColLabels().get(i);
+      colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
+      metadata.addToColumns(colDesc);
+    }
+    return metadata;
+  }
+
+  /**
+   * Get the TQueryExecRequest and use it to populate the query context
+   */
+  private TQueryExecRequest getPlannedExecRequest(TQueryCtx queryCtx,
+      AnalysisResult analysisResult, EventSequence timeline, StringBuilder explainString)
+      throws ImpalaException {
+    Preconditions.checkState(analysisResult.isQueryStmt() || analysisResult.isDmlStmt()
+        || analysisResult.isCreateTableAsSelectStmt() || analysisResult.isUpdateStmt()
+        || analysisResult.isDeleteStmt());
+    Planner planner = new Planner(analysisResult, queryCtx, timeline);
+    TQueryExecRequest queryExecRequest = createExecRequest(planner, explainString);
+    queryCtx.setDesc_tbl(
+        planner.getAnalysisResult().getAnalyzer().getDescTbl().toThrift());
+    queryExecRequest.setQuery_ctx(queryCtx);
+    queryExecRequest.setHost_list(analysisResult.getAnalyzer().getHostIndex().getList());
+    return queryExecRequest;
   }
 
   /**
@@ -1200,7 +1249,7 @@ public class Frontend {
     result.setResult_set_metadata(metadata);
 
     // create the explain result set - split the explain string into one line per row
-    String[] explainStringArray = explainString.toString().split("\n");
+    String[] explainStringArray = explainString.split("\n");
     TExplainResult explainResult = new TExplainResult();
     explainResult.results = Lists.newArrayList();
     for (int i = 0; i < explainStringArray.length; ++i) {
