@@ -127,9 +127,10 @@ under the License.
               <codeph>INSERT</codeph>, <codeph>CREATE</codeph>,
               <codeph>ALTER</codeph>, <codeph>DROP</codeph>, <b><i>and</i></b>
             <codeph>REFRESH</codeph> privileges.</li>
-          <li>The parent levels of the specified scope are implicitly supported.
-            For example, if a privilege is listed with the
-              <codeph>TABLE</codeph> scope, the same privilege granted on
+          <li>The parent levels of the specified scope are implicitly supported
+            where a scope refers to the specific level in the object hierarchy
+            that the privilege is granted. For example, if a privilege is listed
+            with the <codeph>TABLE</codeph> scope, the same privilege granted on
               <codeph>DATABASE</codeph> and <codeph>SERVER</codeph> will allow
             the user to execute the specified SQL statement.</li>
         </ul><table id="sentry_privileges_objects_tab" frame="all" colsep="1"
@@ -403,6 +404,12 @@ under the License.
                 <entry>DESCRIBE &lt;table/view></entry>
                 <entry>SELECT, INSERT, <b><i>or</i></b> REFRESH</entry>
                 <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>If the user has the SELECT privilege at the COLUMN level,
+                  only the columns the user has access will show.</entry>
+                <entry>SELECT</entry>
+                <entry>COLUMN</entry>
               </row>
               <row>
                 <entry>USE</entry>

@@ -21,7 +21,13 @@ under the License.
 <concept rev="2.0.0" id="grant">
 
   <title>GRANT Statement (<keyword keyref="impala20"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>GRANT</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>GRANT</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -33,16 +39,15 @@ under the License.
       <data name="Category" value="Administrators"/>
       <data name="Category" value="Developers"/>
       <data name="Category" value="Data Analysts"/>
-      <!-- Consider whether to go deeper into categories like Security for the Sentry-related statements. -->
+<!-- Consider whether to go deeper into categories like Security for the Sentry-related statements. -->
     </metadata>
   </prolog>
 
   <conbody>
 
     <p rev="2.0.0">
-      <indexterm audience="hidden">GRANT statement</indexterm> The
-        <codeph>GRANT</codeph> statement grants a privilege on a specified object
-      to a role or grants a role to a group.
+      The <codeph>GRANT</codeph> statement grants a privilege on a specified object to a role or
+      grants a role to a group.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
@@ -54,7 +59,7 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
    [WITH GRANT OPTION]
 
 <ph id="privileges" rev="3.0">privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)</ph>
-<ph id="priv_objs" rev="3.0">object_type ::= TABLE | DATABASE | SERVER | URI</ph>
+<ph id="priv_objs" rev="3.0">object_type ::= SERVER | URI | DATABASE | TABLE</ph>
 </codeblock>
 
     <p>
@@ -66,40 +71,39 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
 
     <p>
-      Only administrative users (initially, a predefined set of users
-      specified in the Sentry service configuration file) can use this
-      statement.
+      Only administrative users (initially, a predefined set of users specified in the Sentry
+      service configuration file) can use this statement.
     </p>
-    <p>Only Sentry administrative users can grant roles to a group. </p>
 
-    <p> The <codeph>WITH GRANT OPTION</codeph> clause allows members of the
-      specified role to issue <codeph>GRANT</codeph> and <codeph>REVOKE</codeph>
-      statements for those same privileges. Hence, if a role has the
-        <codeph>ALL</codeph> privilege on a database and the <codeph>WITH GRANT
-        OPTION</codeph> set, users granted that role can execute
-        <codeph>GRANT</codeph>/<codeph>REVOKE</codeph> statements only for that
-      database or child tables of the database. This means a user could revoke
-      the privileges of the user that provided them the <codeph>GRANT
-        OPTION</codeph>. </p>
+    <p>
+      Only Sentry administrative users can grant roles to a group.
+    </p>
 
-    <p> Impala does not currently support revoking only the <codeph>WITH GRANT
-        OPTION</codeph> from a privilege previously granted to a role. To remove
-      the <codeph>WITH GRANT OPTION</codeph>, revoke the privilege and grant it
-      again without the <codeph>WITH GRANT OPTION</codeph> flag. </p>
+    <p>
+      The <codeph>WITH GRANT OPTION</codeph> clause allows members of the specified role to
+      issue <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements for those same
+      privileges. Hence, if a role has the <codeph>ALL</codeph> privilege on a database and the
+      <codeph>WITH GRANT OPTION</codeph> set, users granted that role can execute
+      <codeph>GRANT</codeph>/<codeph>REVOKE</codeph> statements only for that database or child
+      tables of the database. This means a user could revoke the privileges of the user that
+      provided them the <codeph>GRANT OPTION</codeph>.
+    </p>
 
     <p rev="2.3.0 collevelauth">
-      The ability to grant or revoke <codeph>SELECT</codeph> privilege on specific columns is available
-      in <keyword keyref="impala23_full"/> and higher. See <xref keyref="sg_hive_sql"/> for details.
+      The ability to grant or revoke <codeph>SELECT</codeph> privilege on specific columns is
+      available in <keyword keyref="impala23_full"/> and higher. See
+      <xref keyref="sg_hive_sql"/> for details.
     </p>
+
     <p>
       <b>Usage notes:</b>
     </p>
 
     <p>
-      You can only grant the <codeph>ALL</codeph> privilege to the
-        <codeph>URI</codeph> object. Finer-grained privileges mentioned below on
-      a <codeph>URI</codeph> are not supported.
+      You can only grant the <codeph>ALL</codeph> privilege to the <codeph>URI</codeph> object.
+      Finer-grained privileges mentioned below on a <codeph>URI</codeph> are not supported.
     </p>
+
     <p conref="../shared/impala_common.xml#common/sentry_privileges_objects"/>
 
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
@@ -107,20 +111,21 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
     <p>
       <ul>
         <li>
-          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements are available in
-          <keyword keyref="impala20_full"/> and later.
+          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements are available
+          in <keyword keyref="impala20_full"/> and later.
         </li>
 
         <li>
-          In <keyword keyref="impala14_full"/> and later, Impala can make use of any roles and privileges specified by the
-          <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Hive, when your system is configured to
-          use the Sentry service instead of the file-based policy mechanism.
+          In <keyword keyref="impala14_full"/> and later, Impala can make use of any roles and
+          privileges specified by the <codeph>GRANT</codeph> and <codeph>REVOKE</codeph>
+          statements in Hive, when your system is configured to use the Sentry service instead
+          of the file-based policy mechanism.
         </li>
 
         <li>
-          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements for privileges do not require
-          the <codeph>ROLE</codeph> keyword to be repeated before each role name, unlike the equivalent Hive
-          statements.
+          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements for
+          privileges do not require the <codeph>ROLE</codeph> keyword to be repeated before each
+          role name, unlike the equivalent Hive statements.
         </li>
 
         <li conref="../shared/impala_common.xml#common/grant_revoke_single"/>
@@ -132,14 +137,18 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
     <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
     <p conref="../shared/impala_common.xml#common/kudu_sentry_limitations"/>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
-      <xref href="impala_authorization.xml#authorization"/>, <xref href="impala_revoke.xml#revoke"/>,
-      <xref href="impala_create_role.xml#create_role"/>, <xref href="impala_drop_role.xml#drop_role"/>,
-      <xref href="impala_show.xml#show"/>
+      <xref href="impala_authorization.xml#authorization"/>,
+      <xref href="impala_revoke.xml#revoke"/>,
+      <xref href="impala_create_role.xml#create_role"/>,
+      <xref href="impala_drop_role.xml#drop_role"/>, <xref href="impala_show.xml#show"/>
     </p>
+
   </conbody>
+
 </concept>

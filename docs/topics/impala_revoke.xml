@@ -21,7 +21,13 @@ under the License.
 <concept rev="2.0.0" id="revoke">
 
   <title>REVOKE Statement (<keyword keyref="impala20"/> or higher only)</title>
-  <titlealts audience="PDF"><navtitle>REVOKE</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>REVOKE</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -33,44 +39,58 @@ under the License.
       <data name="Category" value="Administrators"/>
       <data name="Category" value="Developers"/>
       <data name="Category" value="Data Analysts"/>
-      <!-- Consider whether to go deeper into categories like Security for the Sentry-related statements. -->
+<!-- Consider whether to go deeper into categories like Security for the Sentry-related statements. -->
     </metadata>
   </prolog>
 
   <conbody>
 
     <p rev="2.0.0">
-      The <codeph>REVOKE</codeph> statement revokes roles or
-      privileges on a specified object from groups.
+      The <codeph>REVOKE</codeph> statement revokes roles or privileges on a specified object
+      from groups.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
 <codeblock rev="2.3.0 collevelauth">REVOKE ROLE <varname>role_name</varname> FROM GROUP <varname>group_name</varname>
 
-REVOKE <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
+REVOKE [GRANT OPTION FOR] <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
   FROM [ROLE] <varname>role_name</varname>
 
 <ph rev="3.0">
   privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)
 </ph>
-<ph rev="3.0">
-  object_type ::= TABLE | DATABASE | SERVER | URI
-</ph>
-</codeblock>
+<ph id="priv_objs" rev="3.0">object_type ::= SERVER | URI | DATABASE | TABLE</ph></codeblock>
 
     <p>
-      See <keyword keyref="grant"/> for the required privileges and the scope
-      for SQL operations.
+      <b>Usage notes:</b>
     </p>
 
     <p>
-      The <codeph>ALL</codeph> privilege is a distinct privilege and not a
-      union of all other privileges. Revoking <codeph>SELECT</codeph>,
-        <codeph>INSERT</codeph>, etc. from a role that only has the
-        <codeph>ALL</codeph> privilege has no effect. To reduce the privileges
-      of that role you must <codeph>REVOKE ALL</codeph> and
-        <codeph>GRANT</codeph> the desired privileges.
+      See <keyword keyref="grant"/> for the required privileges and the scope for SQL
+      operations.
+    </p>
+
+    <p>
+      The <codeph>ALL</codeph> privilege is a distinct privilege and not a union of all other
+      privileges. Revoking <codeph>SELECT</codeph>, <codeph>INSERT</codeph>, etc. from a role
+      that only has the <codeph>ALL</codeph> privilege has no effect. To reduce the privileges
+      of that role you must <codeph>REVOKE ALL</codeph> and <codeph>GRANT</codeph> the desired
+      privileges.
+    </p>
+
+    <p>
+      You cannot revoke a privilege granted with the <codeph>WITH GRANT OPTION</codeph>. If a
+      privilege is granted with the <codeph>WITH GRANT OPTION</codeph>, first revoke the grant
+      option, and then revoke the privilege.
+    </p>
+
+    <p>
+      For example:
+<codeblock>GRANT ALL ON SERVER TO ROLE foo_role;
+...
+REVOKE GRANT OPTION FOR ALL ON SERVER FROM ROLE foo_role;
+REVOKE ALL ON SERVER FROM ROLE foo_role;</codeblock>
     </p>
 
     <p>
@@ -78,38 +98,42 @@ REVOKE <varname>privilege</varname> ON <varname>object_type</varname> <varname>o
     </p>
 
     <p rev="2.3.0 collevelauth">
-      The ability to grant or revoke <codeph>SELECT</codeph> privilege on specific columns is available
-      in <keyword keyref="impala23_full"/> and higher. See
+      The ability to grant or revoke <codeph>SELECT</codeph> privilege on specific columns is
+      available in <keyword keyref="impala23_full"/> and higher. See
       <xref keyref="sg_hive_sql"/> for details.
     </p>
 
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
 
     <p>
-      Only administrative users (those with <codeph>ALL</codeph> privileges on the server, defined in the Sentry
-      policy file) can use this statement.
+      Only administrative users (those with <codeph>ALL</codeph> privileges on the server,
+      defined in the Sentry policy file) can use this statement.
     </p>
-    <p>Only Sentry administrative users can revoke the role from a group.</p>
+
+    <p>
+      Only Sentry administrative users can revoke the role from a group.
+    </p>
 
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
 
     <p>
       <ul>
         <li>
-          The <codeph>REVOKE</codeph> statements are available in <keyword
+          The <codeph>REVOKE</codeph> statements are available in
+          <keyword
             keyref="impala20_full"/> and higher.
         </li>
 
         <li>
-          In <keyword keyref="impala14_full"/> and higher, Impala makes use of any roles and privileges specified by the
-          <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Hive, when your system is configured to
-          use the Sentry service instead of the file-based policy mechanism.
+          In <keyword keyref="impala14_full"/> and higher, Impala makes use of any roles and
+          privileges specified by the <codeph>GRANT</codeph> and <codeph>REVOKE</codeph>
+          statements in Hive, when your system is configured to use the Sentry service instead
+          of the file-based policy mechanism.
         </li>
 
         <li>
-          The Impala <codeph>REVOKE</codeph> statements do not require the
-            <codeph>ROLE</codeph> keyword to be repeated before each role name,
-          unlike the equivalent Hive statements.
+          The Impala <codeph>REVOKE</codeph> statements do not require the <codeph>ROLE</codeph>
+          keyword to be repeated before each role name, unlike the equivalent Hive statements.
         </li>
 
         <li conref="../shared/impala_common.xml#common/grant_revoke_single"/>
@@ -121,14 +145,17 @@ REVOKE <varname>privilege</varname> ON <varname>object_type</varname> <varname>o
     <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
 
     <p rev="2.8.0" conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
     <p conref="../shared/impala_common.xml#common/kudu_sentry_limitations"/>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
-      <xref href="impala_authorization.xml#authorization"/>, <xref href="impala_grant.xml#grant"/>
-      <xref href="impala_create_role.xml#create_role"/>, <xref href="impala_drop_role.xml#drop_role"/>,
-      <xref href="impala_show.xml#show"/>
+      <xref href="impala_authorization.xml#authorization"/>,
+      <xref href="impala_grant.xml#grant"/> <xref href="impala_create_role.xml#create_role"/>,
+      <xref href="impala_drop_role.xml#drop_role"/>, <xref href="impala_show.xml#show"/>
     </p>
+
   </conbody>
+
 </concept>
