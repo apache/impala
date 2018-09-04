@@ -209,6 +209,26 @@ select uuid() from four_row_table;
         </dd>
 
       </dlentry>
+
+
+
+      <dlentry id="coordinator">
+        <dt>
+          <codeph>coordinator()</codeph>
+        </dt>
+
+        <dd>
+          <indexterm audience="hidden">coordinator() function</indexterm>
+          <b>Purpose:</b> Returns the name of the host which is running the
+          <codeph>impalad</codeph> daemon that is acting as the <codeph>coordinator</codeph>
+          for the curent query.
+          <p>
+            <b>Return type:</b> <codeph>string</codeph>
+          </p>
+        </dd>
+
+      </dlentry>
+
     </dl>
   </conbody>
 </concept>

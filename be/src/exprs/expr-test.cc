@@ -31,6 +31,7 @@
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "common/object-pool.h"
+#include "exprs/anyval-util.h"
 #include "exprs/is-null-predicate.h"
 #include "exprs/like-predicate.h"
 #include "exprs/literal.h"
@@ -65,6 +66,7 @@
 #include "util/string-parser.h"
 #include "util/string-util.h"
 #include "util/test-info.h"
+#include "utility-functions.h"
 
 #include "common/names.h"
 
@@ -4874,6 +4876,9 @@ TEST_F(ExprTest, UtilityFunctions) {
   TestStringValue("version()", GetVersionString());
   TestValue("sleep(100)", TYPE_BOOLEAN, true);
   TestIsNull("sleep(NULL)", TYPE_BOOLEAN);
+  string hostname;
+  ASSERT_OK(GetHostname(&hostname));
+  TestStringValue("coordinator()", hostname);
 
   // Test typeOf
   TestStringValue("typeOf(!true)", "BOOLEAN");
@@ -4890,6 +4895,8 @@ TEST_F(ExprTest, UtilityFunctions) {
   TestStringValue("typeOf(cast(10 as FLOAT))", "FLOAT");
   TestStringValue("typeOf(cast(10 as DOUBLE))", "DOUBLE");
   TestStringValue("typeOf(current_database())", "STRING");
+  TestStringValue("typeOf(version())", "STRING");
+  TestStringValue("typeOf(coordinator())", "STRING");
   TestStringValue("typeOf(now())", "TIMESTAMP");
   TestStringValue("typeOf(utc_timestamp())", "TIMESTAMP");
   TestStringValue("typeOf(cast(10 as DECIMAL))", "DECIMAL(9,0)");
@@ -4944,6 +4951,26 @@ TEST_F(ExprTest, UtilityFunctions) {
 
   // Test NULL input returns NULL
   TestIsNull("fnv_hash(NULL)", TYPE_BIGINT);
+}
+
+// Test that UtilityFunctions::Coordinator() will return null if coord_address is unset
+TEST_F(ExprTest, CoordinatorFunction) {
+  // Make a RuntimeState where the query context does not have coord_address set.
+  // Note that this should never happen in a real impalad.
+  RuntimeState state(TQueryCtx(), ExecEnv::GetInstance());
+  MemTracker tracker;
+  MemPool mem_pool(&tracker);
+  FunctionContext::TypeDesc return_type;
+  return_type.type = FunctionContext::Type::TYPE_STRING;
+  std::vector<FunctionContext::TypeDesc> no_arguments;
+  FunctionContext* context =
+      CreateUdfTestContext(return_type, no_arguments, &state, &mem_pool);
+
+  StringVal coordinator = UtilityFunctions::Coordinator(context);
+  ASSERT_TRUE(coordinator.is_null) << "Coordinator() did not return expected null value";
+
+  UdfTestHarness::CloseContext(context);
+  state.ReleaseResources();
 }
 
 TEST_F(ExprTest, MurmurHashFunction) {

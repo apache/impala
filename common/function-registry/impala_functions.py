@@ -582,6 +582,7 @@ visible_functions = [
   [['sleep'], 'BOOLEAN', ['INT'], 'impala::UtilityFunctions::Sleep'],
   [['pid'], 'INT', [], 'impala::UtilityFunctions::Pid'],
   [['version'], 'STRING', [], 'impala::UtilityFunctions::Version'],
+  [['coordinator'], 'STRING', [], 'impala::UtilityFunctions::Coordinator'],
   [['typeOf'], 'STRING', ['BOOLEAN'], '_ZN6impala16UtilityFunctions6TypeOfIN10impala_udf10BooleanValEEENS2_9StringValEPNS2_15FunctionContextERKT_'],
   [['typeOf'], 'STRING', ['TINYINT'], '_ZN6impala16UtilityFunctions6TypeOfIN10impala_udf10TinyIntValEEENS2_9StringValEPNS2_15FunctionContextERKT_'],
   [['typeOf'], 'STRING', ['SMALLINT'], '_ZN6impala16UtilityFunctions6TypeOfIN10impala_udf11SmallIntValEEENS2_9StringValEPNS2_15FunctionContextERKT_'],

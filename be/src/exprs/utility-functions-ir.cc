@@ -171,6 +171,14 @@ StringVal UtilityFunctions::CurrentSession(FunctionContext* ctx) {
   return AnyValUtil::FromString(ctx, PrintId(ctx->impl()->state()->session_id()));
 }
 
+StringVal UtilityFunctions::Coordinator(FunctionContext* ctx) {
+  const TQueryCtx& query_ctx = ctx->impl()->state()->query_ctx();
+  // An empty string indicates the coordinator was not set in the query request.
+  return query_ctx.__isset.coord_address ?
+      AnyValUtil::FromString(ctx, query_ctx.coord_address.hostname) :
+      StringVal::null();
+}
+
 template<typename T>
 StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const T& /*input_val*/) {
   FunctionContext::TypeDesc type_desc = *(ctx->GetArgType(0));

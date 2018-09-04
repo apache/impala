@@ -91,6 +91,10 @@ class UtilityFunctions {
   static void UuidClose(FunctionContext* ctx,
       FunctionContext::FunctionStateScope scope);
 
+  /// Implementation of the coordinator() function.
+  /// Returns the name of the host where the coordinator is running.
+  static StringVal Coordinator(FunctionContext* ctx);
+
   /// Implementation of the typeOf() function. Returns the type of the input
   /// expression. input_val is not used and it is kept here in order to let
   /// the compiler generate the corresponding fully-qualified function name.
