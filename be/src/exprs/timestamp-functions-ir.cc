@@ -708,6 +708,16 @@ inline void AddInterval<Seconds>(FunctionContext* context, int64_t interval,
   *datetime += Seconds(seconds);
 }
 
+/// Workaround a boost bug in adding large millisecond intervals.
+template <>
+inline void AddInterval<Milliseconds>(FunctionContext* context, int64_t interval,
+    ptime* datetime) {
+  int64_t seconds = interval / 1000;
+  int64_t milliseconds = interval % 1000;
+  AddInterval<Seconds>(context, seconds, datetime);
+  *datetime += Milliseconds(milliseconds);
+}
+
 /// Workaround a boost bug in adding large microsecond intervals.
 template <>
 inline void AddInterval<Microseconds>(FunctionContext* context, int64_t interval,

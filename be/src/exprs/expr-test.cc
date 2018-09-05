@@ -6050,6 +6050,8 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("cast(date_sub(cast('2012-01-02 01:00:00.033000001' "
       "as timestamp), interval cast(90000033 as bigint) milliseconds) as string)",
       "2012-01-01 00:00:00.000000001");
+  TestStringValue("cast(cast(0 as timestamp) + interval -10000000000000 milliseconds "
+      "as string)", "1653-02-10 06:13:20");
   // Add/sub microseconds.
   TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.000000001' "
       "as timestamp), interval 1033 microseconds) as string)",
