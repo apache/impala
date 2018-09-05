@@ -15,14 +15,19 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from tests.common.skip import SkipIf
+from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
+from tests.common.environ import ImpalaTestClusterFlagsDetector
+from tests.common.skip import SkipIfBuildType
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 import json
 import requests
+import pytest
+
 
 class TestWebPage(ImpalaTestSuite):
 
+  ROOT_URL = "http://localhost:{0}/"
   GET_JAVA_LOGLEVEL_URL = "http://localhost:{0}/get_java_loglevel"
   SET_JAVA_LOGLEVEL_URL = "http://localhost:{0}/set_java_loglevel"
   RESET_JAVA_LOGLEVEL_URL = "http://localhost:{0}/reset_java_loglevel"
@@ -46,8 +51,55 @@ class TestWebPage(ImpalaTestSuite):
   TEST_PORTS_WITH_SS = ["25000", "25010", "25020"]
   CATALOG_TEST_PORT = ["25020"]
 
+  def test_get_root_url(self):
+    """Tests that the root URL is accessible and loads properly"""
+    self.get_and_check_status(self.ROOT_URL)
+
+  def test_get_build_flags(self):
+    """Tests that the build flags on the root page contain valid values"""
+    for port in self.TEST_PORTS_WITH_SS:
+      build_flags = ImpalaTestClusterFlagsDetector.\
+          get_build_flags_from_web_ui(self.ROOT_URL.format(port))
+
+      assert len(build_flags) == 3
+      assert "is_ndebug" in build_flags
+      assert build_flags["is_ndebug"] in ["true", "false"]
+      assert "cmake_build_type" in build_flags
+      assert build_flags["cmake_build_type"] in ["debug", "release", "address_sanitizer",
+          "tidy", "ubsan", "ubsan_full", "tsan", "code_coverage_release",
+          "code_coverage_debug"]
+      assert "library_link_type" in build_flags
+      assert build_flags["library_link_type"] in ["dynamic", "static"]
+
+  @SkipIfBuildType.remote
+  def test_root_correct_build_flags(self):
+    """Tests that the build flags on the root page contain correct values"""
+    assert not IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster()
+    for port in self.TEST_PORTS_WITH_SS:
+      build_flags = ImpalaTestClusterFlagsDetector.\
+          get_build_flags_from_web_ui(self.ROOT_URL.format(port))
+
+      assert build_flags["cmake_build_type"] ==\
+              IMPALA_TEST_CLUSTER_PROPERTIES.build_flavor
+      assert build_flags["library_link_type"] ==\
+              IMPALA_TEST_CLUSTER_PROPERTIES.library_link_type
+
+  def test_root_consistent_build_flags(self):
+    """Tests that the build flags on the root page contain consistent values"""
+    for port in self.TEST_PORTS_WITH_SS:
+      build_flags = ImpalaTestClusterFlagsDetector.\
+          get_build_flags_from_web_ui(self.ROOT_URL.format(port))
+
+      is_ndebug = build_flags["is_ndebug"] == "true"
+
+      if not is_ndebug:
+        assert not build_flags["cmake_build_type"] in ["release"]
+
+      if build_flags["cmake_build_type"] in ["debug"]:
+        assert not is_ndebug
+
   def test_memz(self):
-    """test /memz at impalad / statestored / catalogd"""
+    """Tests /memz at impalad / statestored / catalogd"""
 
     page = requests.get("http://localhost:25000/memz")
     assert page.status_code == requests.codes.ok
@@ -79,26 +131,31 @@ class TestWebPage(ImpalaTestSuite):
       except ValueError:
         assert False, "Invalid JSON returned from /jmx endpoint: %s" % jmx_json
 
-  def get_and_check_status(self, url, string_to_search = "", ports_to_test = None):
+  def get_and_check_status(self, url, string_to_search="", ports_to_test=None):
     """Helper method that polls a given url and asserts the return code is ok and
     the response contains the input string."""
     if ports_to_test is None:
       ports_to_test = self.TEST_PORTS_WITH_SS
+
+    responses = []
     for port in ports_to_test:
       input_url = url.format(port)
       response = requests.get(input_url)
       assert response.status_code == requests.codes.ok\
           and string_to_search in response.text, "Offending url: " + input_url
+      responses.append(response)
+    return responses
 
-  def get_debug_page(self, page_url):
+  def get_debug_page(self, page_url, port=25000):
     """Returns the content of the debug page 'page_url' as json."""
-    response = self.get_and_check_status(page_url + "?json", ports_to_test=[25000])
-    assert "application/json" in response.headers['Content-Type']
-    return json.loads(response)
+    responses = self.get_and_check_status(page_url + "?json", ports_to_test=[port])
+    assert len(responses) == 1
+    assert "application/json" in responses[0].headers['Content-Type']
+    return json.loads(responses[0].text)
 
-  def get_and_check_status_jvm(self, url, string_to_search = ""):
+  def get_and_check_status_jvm(self, url, string_to_search=""):
     """Calls get_and_check_status() for impalad and catalogd only"""
-    self.get_and_check_status(url, string_to_search,
+    return self.get_and_check_status(url, string_to_search,
                               ports_to_test=self.TEST_PORTS_WITHOUT_SS)
 
   def test_content_type(self):
@@ -151,7 +208,7 @@ class TestWebPage(ImpalaTestSuite):
     self.get_and_check_status(set_glog_url, "v set to 3")
 
     # Try resetting the glog logging defaults again.
-    self.get_and_check_status( self.RESET_GLOG_LOGLEVEL_URL, "v set to ")
+    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, "v set to ")
 
     # Try to get the log level of an empty class input
     get_loglevel_url = (self.GET_JAVA_LOGLEVEL_URL + "?class=")
@@ -214,17 +271,19 @@ class TestWebPage(ImpalaTestSuite):
     cancels the query."""
     if query_options:
       self.client.set_configuration(query_options)
-    query_handle =  self.client.execute_async(query)
+    query_handle = self.client.execute_async(query)
     response_json = ""
     try:
-      response = self.get_and_check_status(
+      responses = self.get_and_check_status(
         page_url + "?query_id=%s&json" % query_handle.get_handle().id,
         ports_to_test=[25000])
-      response_json = json.loads(response)
+      assert len(responses) == 1
+      response_json = json.loads(responses[0].text)
     finally:
       self.client.cancel(query_handle)
     return response_json
 
+  @pytest.mark.skip(reason='IMPALA-7625')
   def test_backend_states(self, unique_database):
     """Test that /query_backends returns the list of backend states for DML or queries;
     nothing for DDL statements"""
@@ -240,6 +299,7 @@ class TestWebPage(ImpalaTestSuite):
       else:
         assert 'backend_states' not in response_json
 
+  @pytest.mark.skip(reason='IMPALA-7625')
   def test_backend_instances(self, unique_database):
     """Test that /query_finstances returns the list of fragment instances for DML or
     queries; nothing for DDL statements"""
@@ -255,6 +315,7 @@ class TestWebPage(ImpalaTestSuite):
       else:
         assert 'backend_instances' not in response_json
 
+  @pytest.mark.skip(reason='IMPALA-7625')
   def test_backend_instances_mt_dop(self, unique_database):
     """Test that accessing /query_finstances does not crash the backend when running with
     mt_dop."""
@@ -268,14 +329,15 @@ class TestWebPage(ImpalaTestSuite):
   def test_io_mgr_threads(self):
     """Test that IoMgr threads have readable names. This test assumed that all systems we
     support have a disk called 'sda'."""
-    response = self.get_and_check_status(
+    responses = self.get_and_check_status(
         self.THREAD_GROUP_URL + "?group=disk-io-mgr&json", ports_to_test=[25000])
-    response_json = json.loads(response)
+    assert len(responses) == 1
+    response_json = json.loads(responses[0].text)
     thread_names = [t["name"] for t in response_json['threads']]
-    expected_name_patterns = ["ADLS remote", "S3 remote", "HDFS remote", "sda"]
+    expected_name_patterns = ["ADLS remote", "S3 remote", "HDFS remote"]
     for pattern in expected_name_patterns:
       assert any(pattern in t for t in thread_names), \
-           "Could not find thread matching '%s'" % pattern
+          "Could not find thread matching '%s'" % pattern
 
   def test_krpc_rpcz(self):
     """Test that KRPC metrics are exposed in /rpcz and that they are updated when

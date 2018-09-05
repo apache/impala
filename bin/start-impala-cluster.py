@@ -29,7 +29,7 @@ from getpass import getuser
 from time import sleep, time
 from optparse import OptionParser, SUPPRESS_HELP
 from testdata.common import cgroups
-from tests.common.environ import specific_build_type_timeout
+from tests.common.environ import build_flavor_timeout
 
 logging.basicConfig(level=logging.ERROR, format="%(asctime)s %(threadName)s: %(message)s",
     datefmt="%H:%M:%S")
@@ -120,7 +120,7 @@ CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 # It is set to a high value to avoid failing if processes are slow to shut down.
 KILL_TIMEOUT_IN_SECONDS = 240
 # For build types like ASAN, modify the default Kudu rpc timeout.
-KUDU_RPC_TIMEOUT = specific_build_type_timeout(0, slow_build_timeout=60000)
+KUDU_RPC_TIMEOUT = build_flavor_timeout(0, slow_build_timeout=60000)
 
 def find_user_processes(binaries):
   """Returns an iterator over all processes owned by the current user with a matching

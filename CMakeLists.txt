@@ -30,6 +30,9 @@ if (NOT DEFINED BUILD_SHARED_LIBS)
   set(BUILD_SHARED_LIBS OFF)
 endif()
 
+# Store BUILD_SHARED_LIBS in a variable so it can be read in config.h.in
+set(IMPALA_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+
 # Build compile commands database
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -47,8 +50,14 @@ endif(NOT CMAKE_BUILD_TYPE)
 STRING (TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE)
 
 message(STATUS "Build type is ${CMAKE_BUILD_TYPE}")
-# Write the build type to a file so that tests can determine the current build type.
-file(WRITE "${CMAKE_SOURCE_DIR}/.cmake_build_type" ${CMAKE_BUILD_TYPE})
+
+# Write build flags to a file so that they can be read by tests
+file(WRITE "${CMAKE_SOURCE_DIR}/.cmake_build_type" ${CMAKE_BUILD_TYPE}\n)
+file(APPEND "${CMAKE_SOURCE_DIR}/.cmake_build_type" ${BUILD_SHARED_LIBS}\n)
+
+# Store CMAKE_BUILD_TYPE in a variable so it can be read in config.h.in
+string(REPLACE "_" "-" ESCAPED_CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE})
+set(IMPALA_CMAKE_BUILD_TYPE ${ESCAPED_CMAKE_BUILD_TYPE})
 
 set(ENABLE_CODE_COVERAGE false)
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_DEBUG")
@@ -60,6 +69,13 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_RELEASE")
 endif()
 
 message(STATUS "ENABLE_CODE_COVERAGE: ${ENABLE_CODE_COVERAGE}")
+
+if (ENABLE_CODE_COVERAGE
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN"
+    OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
+  set (SLOW_BUILD true)
+endif()
 
 # Helper function that given a package name constructs the package_ROOT variable based on
 # the version number extracted from the environment

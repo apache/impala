@@ -20,11 +20,11 @@ import pytest
 import re
 import time
 
-from tests.common.environ import specific_build_type_timeout
+from tests.common.environ import build_flavor_timeout
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal, SkipIfIsilon
 
-WAIT_TIME_MS = specific_build_type_timeout(60000, slow_build_timeout=100000)
+WAIT_TIME_MS = build_flavor_timeout(60000, slow_build_timeout=100000)
 
 # Some of the queries in runtime_filters consume a lot of memory, leading to
 # significant memory reservations in parallel tests.

@@ -224,11 +224,38 @@ void JmxHandler(const Webserver::ArgumentMap& args, Document* document) {
   }
 }
 
+// Helper function that creates a Value for a given build flag name, value and adds it to
+// an array of build_flags
+void AddBuildFlag(const std::string& flag_name, const std::string& flag_value,
+    Document* document, Value* build_flags) {
+  Value build_type(kObjectType);
+  Value build_type_name(flag_name.c_str(), document->GetAllocator());
+  build_type.AddMember("flag_name", build_type_name, document->GetAllocator());
+  Value build_type_value(flag_value.c_str(), document->GetAllocator());
+  build_type.AddMember("flag_value", build_type_value, document->GetAllocator());
+  build_flags->PushBack(build_type, document->GetAllocator());
+}
+
 namespace impala {
 
 void RootHandler(const Webserver::ArgumentMap& args, Document* document) {
   Value version(GetVersionString().c_str(), document->GetAllocator());
   document->AddMember("version", version, document->GetAllocator());
+
+#ifdef NDEBUG
+  const char* is_ndebug = "true";
+#else
+  const char* is_ndebug = "false";
+#endif
+
+  Value build_flags(kArrayType);
+  AddBuildFlag("is_ndebug", is_ndebug, document, &build_flags);
+  string cmake_build_type(GetCMakeBuildType());
+  replace(cmake_build_type.begin(), cmake_build_type.end(), '-', '_');
+  AddBuildFlag("cmake_build_type", cmake_build_type, document, &build_flags);
+  AddBuildFlag("library_link_type", GetLibraryLinkType(), document, &build_flags);
+  document->AddMember("build_flags", build_flags, document->GetAllocator());
+
   Value cpu_info(CpuInfo::DebugString().c_str(), document->GetAllocator());
   document->AddMember("cpu_info", cpu_info, document->GetAllocator());
   Value mem_info(MemInfo::DebugString().c_str(), document->GetAllocator());

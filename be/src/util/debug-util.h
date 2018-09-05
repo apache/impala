@@ -24,6 +24,7 @@
 
 #include <thrift/protocol/TDebugProtocol.h>
 
+#include "common/config.h"
 #include "gen-cpp/JniCatalog_types.h"
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/Exprs_types.h"
@@ -96,6 +97,24 @@ bool ParseId(const std::string& s, TUniqueId* id);
 /// If compact == false, this string is appended: "\nBuilt on <build time>"
 /// This is used to set gflags build version
 std::string GetBuildVersion(bool compact = false);
+
+#ifndef IMPALA_CMAKE_BUILD_TYPE
+static_assert(false, "IMPALA_CMAKE_BUILD_TYPE is not defined");
+#endif
+
+/// Returns the value of CMAKE_BUILD_TYPE used to build the code
+constexpr const char* GetCMakeBuildType() {
+  return AS_STRING(IMPALA_CMAKE_BUILD_TYPE);
+}
+
+/// Returns whether the code was dynamically or statically linked, return
+/// value is either STATIC or DYNAMIC.
+constexpr const char* GetLibraryLinkType() {
+  return AS_STRING(IMPALA_BUILD_SHARED_LIBS)[0] == 'O'
+          && AS_STRING(IMPALA_BUILD_SHARED_LIBS)[1] == 'N' ?
+      "DYNAMIC" :
+      "STATIC";
+}
 
 /// Returns "<program short name> version <GetBuildVersion(compact)>"
 std::string GetVersionString(bool compact = false);

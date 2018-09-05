@@ -22,7 +22,7 @@ import re
 import socket
 import time
 
-from tests.common.environ import specific_build_type_timeout
+from tests.common.environ import build_flavor_timeout
 from time import sleep
 
 from impala.error import HiveServer2Error
@@ -50,7 +50,7 @@ class TestRestart(CustomClusterTestSuite):
     # We need to wait for the impalad to register to the new statestored and for a
     # non-empty catalog update from the new statestored. It cannot be expressed with the
     # existing metrics yet so we wait for some time here.
-    wait_time_s = specific_build_type_timeout(60, slow_build_timeout=100)
+    wait_time_s = build_flavor_timeout(60, slow_build_timeout=100)
     sleep(wait_time_s)
     for retry in xrange(wait_time_s):
       try:

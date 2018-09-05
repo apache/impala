@@ -39,7 +39,7 @@ from StatestoreService.StatestoreSubscriber import TTopicRegistration
 from ErrorCodes.ttypes import TErrorCode
 from Status.ttypes import TStatus
 
-from tests.common.environ import specific_build_type_timeout
+from tests.common.environ import build_flavor_timeout
 
 LOG = logging.getLogger('test_statestore')
 
@@ -69,10 +69,10 @@ DEFAULT_UPDATE_STATE_RESPONSE = TUpdateStateResponse(status=STATUS_OK, topic_upd
                                                      skipped=False)
 
 # IMPALA-3501: the timeout needs to be higher in code coverage builds
-WAIT_FOR_FAILURE_TIMEOUT = specific_build_type_timeout(40, code_coverage_build_timeout=60)
-WAIT_FOR_HEARTBEAT_TIMEOUT = specific_build_type_timeout(
+WAIT_FOR_FAILURE_TIMEOUT = build_flavor_timeout(40, code_coverage_build_timeout=60)
+WAIT_FOR_HEARTBEAT_TIMEOUT = build_flavor_timeout(
     40, code_coverage_build_timeout=60)
-WAIT_FOR_UPDATE_TIMEOUT = specific_build_type_timeout(40, code_coverage_build_timeout=60)
+WAIT_FOR_UPDATE_TIMEOUT = build_flavor_timeout(40, code_coverage_build_timeout=60)
 
 class WildcardServerSocket(TSocket.TSocketBase, TTransport.TServerTransportBase):
   """Specialised server socket that binds to a random port at construction"""

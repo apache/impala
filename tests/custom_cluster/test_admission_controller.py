@@ -31,7 +31,7 @@ from time import sleep, time
 from beeswaxd.BeeswaxService import QueryState
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.environ import specific_build_type_timeout, IMPALAD_BUILD
+from tests.common.environ import build_flavor_timeout, IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.resource_pool_config import ResourcePoolConfig
 from tests.common.skip import (
@@ -119,7 +119,7 @@ POOL_NAME = "default-pool"
 
 # Stress test timeout (seconds). The timeout needs to be significantly higher for
 # slow builds like code coverage and ASAN (IMPALA-3790, IMPALA-6241).
-STRESS_TIMEOUT = specific_build_type_timeout(60, slow_build_timeout=600)
+STRESS_TIMEOUT = build_flavor_timeout(60, slow_build_timeout=600)
 
 # The number of queries that can execute concurrently in the pool POOL_NAME.
 MAX_NUM_CONCURRENT_QUERIES = 5
@@ -902,7 +902,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
     # Additional constraints for code coverage jobs and core.
     num_queries = None
-    if IMPALAD_BUILD.has_code_coverage():
+    if IMPALA_TEST_CLUSTER_PROPERTIES.has_code_coverage():
       # Code coverage builds can't handle the increased concurrency.
       num_queries = 15
     elif cls.exploration_strategy() == 'core':
