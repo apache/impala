@@ -24,7 +24,7 @@ import os
 import pytest
 from functools import partial
 
-from tests.common.environ import IMPALAD_BUILD
+from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
 from tests.util.filesystem_utils import (
     IS_ABFS,
     IS_ADLS,
@@ -161,8 +161,10 @@ class SkipIfNotHdfsMinicluster:
       reason="Test is tuned for 3-node HDFS minicluster with no EC")
 
 class SkipIfBuildType:
-  not_dev_build = pytest.mark.skipif(not IMPALAD_BUILD.is_dev(),
-      reason="Tests depends on debug build startup option.")
+  not_dev_build = pytest.mark.skipif(not IMPALA_TEST_CLUSTER_PROPERTIES.is_dev(),
+      reason="Test depends on debug build startup option.")
+  remote = pytest.mark.skipif(IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
+      reason="Test depends on running against a local Impala cluster")
 
 class SkipIfEC:
   remote_read = pytest.mark.skipif(IS_EC, reason="EC files are read remotely and "

@@ -32,7 +32,10 @@ under the License.
   {{/impala_server_mode}}
 
   <h2>Vers<span id="v">i</span>on</h2>
-  <pre id="version_pre">{{version}}</pre>
+  <pre id="version_pre">{{version}}
+Build Flags: {{#build_flags}}{{flag_name}}={{flag_value}}  {{/build_flags}}</pre>
+<!-- The space after {{flag_value}} is necessary to add a space between each flag when
+this page is rendered -->
 
   <h2>Process Start Time</h2>
   <pre>{{process_start_time}}</pre>

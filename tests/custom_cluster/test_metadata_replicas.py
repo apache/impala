@@ -18,7 +18,6 @@
 import pytest
 import re
 from time import sleep
-from tests.common.environ import specific_build_type_timeout
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import (
     SkipIfS3,

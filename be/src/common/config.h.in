@@ -28,5 +28,8 @@
 #cmakedefine HAVE_PIPE2
 #cmakedefine HAVE_MAGIC_H
 #cmakedefine HAVE_SYNC_FILE_RANGE
+#cmakedefine SLOW_BUILD
+#cmakedefine IMPALA_BUILD_SHARED_LIBS @IMPALA_BUILD_SHARED_LIBS@
+#cmakedefine IMPALA_CMAKE_BUILD_TYPE @IMPALA_CMAKE_BUILD_TYPE@
 
 #endif
