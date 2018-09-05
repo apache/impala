@@ -75,6 +75,7 @@ ClientRequestState::ClientRequestState(
     coord_exec_called_(false),
     // Profile is assigned name w/ id after planning
     profile_(RuntimeProfile::Create(&profile_pool_, "Query")),
+    frontend_profile_(RuntimeProfile::Create(&profile_pool_, "Frontend")),
     server_profile_(RuntimeProfile::Create(&profile_pool_, "ImpalaServer")),
     summary_profile_(RuntimeProfile::Create(&profile_pool_, "Summary")),
     frontend_(frontend),
@@ -116,6 +117,8 @@ ClientRequestState::ClientRequestState(
       "Sql Statement", query_ctx_.client_request.stmt);
   summary_profile_->AddInfoString("Coordinator",
       TNetworkAddressToString(exec_env->GetThriftBackendAddress()));
+
+  profile_->AddChild(frontend_profile_);
 }
 
 ClientRequestState::~ClientRequestState() {
@@ -134,6 +137,13 @@ Status ClientRequestState::SetResultCache(QueryResultSet* cache,
   }
   result_cache_max_size_ = max_size;
   return Status::OK();
+}
+
+void ClientRequestState::SetFrontendProfile(TRuntimeProfileNode profile) {
+  // Should we defer creating and adding the child until here? probably.
+  TRuntimeProfileTree prof_tree;
+  prof_tree.nodes.emplace_back(std::move(profile));
+  frontend_profile_->Update(prof_tree);
 }
 
 Status ClientRequestState::Exec(TExecRequest* exec_request) {

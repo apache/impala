@@ -210,3 +210,20 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
     finally:
       client1.close()
       client2.close()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true",
+      catalogd_args="--catalog_topic_mode=minimal")
+  def test_cache_profile_metrics(self):
+    """
+    Test that profile output includes impalad local cache metrics.
+    """
+    try:
+      client = self.cluster.impalads[0].service.create_beeswax_client()
+      query = "select count(*) from functional.alltypes"
+      ret = self.execute_query_expect_success(client, query)
+      assert ret.runtime_profile.count("Frontend:") == 1
+      assert ret.runtime_profile.count("CatalogFetch") > 1
+    finally:
+      client.close()

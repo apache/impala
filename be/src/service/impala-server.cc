@@ -951,6 +951,7 @@ Status ImpalaServer::ExecuteInternal(
     (*request_state)->set_user_profile_access(result.user_has_profile_access);
     (*request_state)->summary_profile()->AddEventSequence(
         result.timeline.name, result.timeline);
+    (*request_state)->SetFrontendProfile(result.profile);
     if (result.__isset.result_set_metadata) {
       (*request_state)->set_result_metadata(result.result_set_metadata);
     }
