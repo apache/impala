@@ -634,6 +634,7 @@ struct TExecRequest {
   10: optional TSetQueryOptionRequest set_query_option_request
 
   // Timeline of planner's operation, for profiling
+  // TODO(todd): should integrate this with the 'profile' member instead.
   11: optional RuntimeProfile.TEventSequence timeline
 
   // If false, the user that runs this statement doesn't have access to the runtime
@@ -643,6 +644,9 @@ struct TExecRequest {
 
   // Set iff stmt_type is ADMIN_FN.
   13: optional TAdminRequest admin_request
+
+  // Profile information from the planning process.
+  14: optional RuntimeProfile.TRuntimeProfileNode profile
 }
 
 // Parameters to FeSupport.cacheJar().

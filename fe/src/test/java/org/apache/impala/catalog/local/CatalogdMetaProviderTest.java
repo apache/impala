@@ -19,6 +19,7 @@ package org.apache.impala.catalog.local;
 
 import static org.junit.Assert.*;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -31,11 +32,13 @@ import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
 import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.util.ListMap;
 import org.junit.Test;
@@ -220,5 +223,22 @@ public class CatalogdMetaProviderTest {
     stats = diffStats();
     assertEquals(0, stats.hitCount());
     assertEquals(1, stats.missCount());
+  }
+
+  @Test
+  public void testProfile() throws Exception {
+    FrontendProfile profile;
+    try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
+      provider_.loadTable("functional", "alltypes");
+      profile = FrontendProfile.getCurrent();
+    }
+    TRuntimeProfileNode prof = profile.emitAsThrift();
+    assertEquals(3, prof.counters.size());
+    Collections.sort(prof.counters);
+    assertEquals("TCounter(name:CatalogFetch.Tables.Hits, unit:NONE, value:1)",
+        prof.counters.get(0).toString());
+    assertEquals("TCounter(name:CatalogFetch.Tables.Requests, unit:NONE, value:1)",
+        prof.counters.get(1).toString());
+    assertEquals("CatalogFetch.Tables.Time", prof.counters.get(2).name);
   }
 }
