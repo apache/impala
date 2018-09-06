@@ -1,0 +1,9 @@
+====
+---- QUERY
+select * from corrupt_footer_len_incr
+---- TYPES
+bigint
+---- RESULTS
+---- CATCH
+row_regex: .*File '.*' is invalid. Invalid metadata size in file footer: 446 bytes. File size: 320 bytes.*
+====

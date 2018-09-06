@@ -201,3 +201,17 @@ Parquet file that contains two rows with the following schema:
 - int32 int_col2
 - float float_col
 It is used to test primitive type widening (IMPALA-6373).
+
+corrupt_footer_len_decr.parquet:
+Parquet file that contains one row of the following schema:
+- bigint c
+The footer size is manually modified (using hexedit) to be the original file size minus
+1, to cause metadata deserialization in footer parsing to fail, thus trigger the printing
+of an error message with incorrect file offset, to verify that it's fixed by IMPALA-6442.
+
+corrupt_footer_len_incr.parquet:
+Parquet file that contains one row of the following schema:
+- bigint c
+The footer size is manually modified (using hexedit) to be larger than the original file
+size and cause footer parsing to fail. It's used to test an error message related to
+IMPALA-6442.

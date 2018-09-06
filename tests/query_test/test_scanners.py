@@ -398,6 +398,41 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet-corrupt-rle-counts-abort',
                        vector, unique_database)
 
+  def corrupt_footer_len_common(self, vector, unique_database, testname_postfix):
+    """Common code shared by some tests (such as the ones included in IMPALA-6442 patch).
+       It creates a simple table then loads manually corrupted Parquet file, and runs
+       simple query to trigger the printing of related messages. Individual test checks if
+       the printed messageses are expected.
+    """
+    test_file = "testdata/data/corrupt_footer_len_" + testname_postfix + ".parquet"
+    test_table = "corrupt_footer_len_" + testname_postfix
+    test_spec = "QueryTest/parquet-corrupt-footer-len-" + testname_postfix
+    # Create test table and copy the corrupt files into it.
+    test_files = [test_file]
+    create_table_and_copy_files(self.client,
+                                "create table {db}.{tbl} (c bigint) stored as parquet",
+                                unique_database, test_table, test_files)
+    # Querying the corrupted files should not DCHECK or crash.
+    vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case(test_spec, vector, unique_database)
+    vector.get_value('exec_option')['abort_on_error'] = 1
+    self.run_test_case(test_spec, vector, unique_database)
+
+  def test_corrupt_footer_len_decr(self, vector, unique_database):
+    """IMPALA-6442: Misleading file offset reporting in error messages.
+       Case tested: decrease the original Parquet footer size by 1, thus metadata
+       deserialization fails and prints expected error message with correct file offset of
+       the Parquet file metadata (footer).
+    """
+    self.corrupt_footer_len_common(vector, unique_database, "decr")
+
+  def test_corrupt_footer_len_incr(self, vector, unique_database):
+    """IMPALA-6442: Misleading file offset reporting in error messages.
+       Case tested: make the Parquet footer size bigger than the file, thus the footer
+       can not be loaded and corresponding error message is printed.
+    """
+    self.corrupt_footer_len_common(vector, unique_database, "incr")
+
   def test_bad_compressed_page_size(self, vector, unique_database):
     """IMPALA-6353: Tests that a parquet dict page with 0 compressed_page_size is
     gracefully handled. """

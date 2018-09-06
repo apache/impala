@@ -1,0 +1,9 @@
+====
+---- QUERY
+select * from corrupt_footer_len_decr
+---- TYPES
+bigint
+---- RESULTS
+---- CATCH
+row_regex: .*File '.*' of length 320 bytes has invalid file metadata at file offset 123, Error = couldn't deserialize thrift msg:.*
+====

@@ -1161,22 +1161,23 @@ inline bool HdfsParquetScanner::ReadCollectionItem(
 }
 
 Status HdfsParquetScanner::ProcessFooter() {
-  int64_t len = stream_->scan_range()->len();
+  const int64_t file_len = stream_->file_desc()->file_length;
+  const int64_t scan_range_len = stream_->scan_range()->len();
 
   // We're processing the scan range issued in IssueInitialRanges(). The scan range should
   // be the last FOOTER_BYTES of the file. !success means the file is shorter than we
   // expect. Note we can't detect if the file is larger than we expect without attempting
   // to read past the end of the scan range, but in this case we'll fail below trying to
   // parse the footer.
-  DCHECK_LE(len, FOOTER_SIZE);
+  DCHECK_LE(scan_range_len, FOOTER_SIZE);
   uint8_t* buffer;
-  bool success = stream_->ReadBytes(len, &buffer, &parse_status_);
+  bool success = stream_->ReadBytes(scan_range_len, &buffer, &parse_status_);
   if (!success) {
     DCHECK(!parse_status_.ok());
     if (parse_status_.code() == TErrorCode::SCANNER_INCOMPLETE_READ) {
       VLOG_QUERY << "Metadata for file '" << filename() << "' appears stale: "
                  << "metadata states file size to be "
-                 << PrettyPrinter::Print(stream_->file_desc()->file_length, TUnit::BYTES)
+                 << PrettyPrinter::Print(file_len, TUnit::BYTES)
                  << ", but could only read "
                  << PrettyPrinter::Print(stream_->total_bytes_returned(), TUnit::BYTES);
       return Status(TErrorCode::STALE_METADATA_FILE_TOO_SHORT, filename(),
@@ -1187,7 +1188,8 @@ Status HdfsParquetScanner::ProcessFooter() {
   DCHECK(stream_->eosr());
 
   // Number of bytes in buffer after the fixed size footer is accounted for.
-  int remaining_bytes_buffered = len - sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER);
+  int remaining_bytes_buffered = scan_range_len - sizeof(int32_t) -
+      sizeof(PARQUET_VERSION_NUMBER);
 
   // Make sure footer has enough bytes to contain the required information.
   if (remaining_bytes_buffered < 0) {
@@ -1195,7 +1197,7 @@ Status HdfsParquetScanner::ProcessFooter() {
   }
 
   // Validate magic file bytes are correct.
-  uint8_t* magic_number_ptr = buffer + len - sizeof(PARQUET_VERSION_NUMBER);
+  uint8_t* magic_number_ptr = buffer + scan_range_len - sizeof(PARQUET_VERSION_NUMBER);
   if (memcmp(magic_number_ptr, PARQUET_VERSION_NUMBER,
              sizeof(PARQUET_VERSION_NUMBER)) != 0) {
     return Status(TErrorCode::PARQUET_BAD_VERSION_NUMBER, filename(),
@@ -1208,6 +1210,11 @@ Status HdfsParquetScanner::ProcessFooter() {
   uint8_t* metadata_size_ptr = magic_number_ptr - sizeof(int32_t);
   uint32_t metadata_size = *reinterpret_cast<uint32_t*>(metadata_size_ptr);
   uint8_t* metadata_ptr = metadata_size_ptr - metadata_size;
+  // The start of the metadata is:
+  // file_len - 4-byte footer length field - 4-byte version number field - metadata size
+  int64_t metadata_start = file_len - sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER) -
+      metadata_size;
+
   // If the metadata was too big, we need to read it into a contiguous buffer before
   // deserializing it.
   ScopedBuffer metadata_buffer(scan_node_->mem_tracker());
@@ -1219,15 +1226,10 @@ Status HdfsParquetScanner::ProcessFooter() {
     // We'll just issue more ranges to the IoMgr that is the actual footer.
     int64_t partition_id = context_->partition_descriptor()->id();
     const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(partition_id, filename());
-    DCHECK(file_desc != nullptr);
-    // The start of the metadata is:
-    // file_length - 4-byte metadata size - footer-size - metadata size
-    int64_t metadata_start = file_desc->file_length - sizeof(int32_t)
-        - sizeof(PARQUET_VERSION_NUMBER) - metadata_size;
+    DCHECK_EQ(file_desc, stream_->file_desc());
     if (metadata_start < 0) {
       return Status(Substitute("File '$0' is invalid. Invalid metadata size in file "
-          "footer: $1 bytes. File size: $2 bytes.", filename(), metadata_size,
-          file_desc->file_length));
+          "footer: $1 bytes. File size: $2 bytes.", filename(), metadata_size, file_len));
     }
 
     if (!metadata_buffer.TryAllocate(metadata_size)) {
@@ -1237,7 +1239,7 @@ Status HdfsParquetScanner::ProcessFooter() {
     }
     metadata_ptr = metadata_buffer.buffer();
 
-    // Read the header into the metadata buffer.
+    // Read the footer into the metadata buffer.
     ScanRange* metadata_range = scan_node_->AllocateScanRange(
         metadata_range_->fs(), filename(), metadata_size, metadata_start, partition_id,
         metadata_range_->disk_id(), metadata_range_->expected_local(),
@@ -1255,14 +1257,13 @@ Status HdfsParquetScanner::ProcessFooter() {
     metadata_range->ReturnBuffer(move(io_buffer));
   }
 
-  // Deserialize file header
+  // Deserialize file footer
   // TODO: this takes ~7ms for a 1000-column table, figure out how to reduce this.
   Status status =
       DeserializeThriftMsg(metadata_ptr, &metadata_size, true, &file_metadata_);
   if (!status.ok()) {
-    return Status(Substitute("File $0 has invalid file metadata at file offset $1. "
-        "Error = $2.", filename(),
-        metadata_size + sizeof(PARQUET_VERSION_NUMBER) + sizeof(uint32_t),
+    return Status(Substitute("File '$0' of length $1 bytes has invalid file metadata "
+        "at file offset $2, Error = $3.", filename(), file_len, metadata_start,
         status.GetDetail()));
   }
 
