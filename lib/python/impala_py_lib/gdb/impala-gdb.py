@@ -43,13 +43,12 @@ def get_fragment_instances():
             if 'impala::Thread::SuperviseThread' in gdb.Frame.name(f):
                 gdb.Frame.select(f)
                 block = gdb.Frame.block(f)
-                gdb.lookup_symbol('parent_thread_info', block)
-                p = f.read_var('parent_thread_info')
-                # No valid parent_thread_info pointer
-                if not p:
+                gdb.lookup_symbol('thread_debug_info', block)
+                tdi = f.read_var('thread_debug_info')
+                # No valid thread_debug_info
+                if not tdi:
                     break
-                v = p.dereference()
-                fi = str(v['instance_id_'])
+                fi = str(tdi['instance_id_'])
                 if ':' in fi:
                     fragment_instances[fi.strip('"')].append(thread.num)
                 break
