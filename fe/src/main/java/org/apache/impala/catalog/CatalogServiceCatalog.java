@@ -49,6 +49,7 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.CatalogServiceConstants;
 import org.apache.impala.thrift.TCatalog;
 import org.apache.impala.thrift.TCatalogInfoSelector;
@@ -2094,7 +2095,9 @@ public class CatalogServiceCatalog extends Catalog {
   /**
    * Return a partial view of information about a given catalog object. This services
    * the CatalogdMetaProvider running on impalads when they are configured in
-   * "local-catalog" mode.
+   * "local-catalog" mode. If required objects are not present, for example, the database
+   * from which a table is requested, the types of the missing objects will be set in the
+   * response's lookup_status.
    */
   public TGetPartialCatalogObjectResponse getPartialCatalogObject(
       TGetPartialCatalogObjectRequest req) throws CatalogException {
@@ -2109,8 +2112,7 @@ public class CatalogServiceCatalog extends Catalog {
       try {
         Db db = getDb(dbDesc.getDb_name());
         if (db == null) {
-          throw new CatalogException(
-              "Database not found: " + req.object_desc.getDb().getDb_name());
+          return createGetPartialCatalogObjectError(CatalogLookupStatus.DB_NOT_FOUND);
         }
 
         return db.getPartialInfo(req);
@@ -2119,11 +2121,15 @@ public class CatalogServiceCatalog extends Catalog {
       }
     case TABLE:
     case VIEW: {
-      Table table = getOrLoadTable(objectDesc.getTable().getDb_name(),
-          objectDesc.getTable().getTbl_name());
+      Table table;
+      try {
+        table = getOrLoadTable(
+            objectDesc.getTable().getDb_name(), objectDesc.getTable().getTbl_name());
+      } catch (DatabaseNotFoundException e) {
+        return createGetPartialCatalogObjectError(CatalogLookupStatus.DB_NOT_FOUND);
+      }
       if (table == null) {
-        throw new CatalogException("Table not found: " +
-            objectDesc.getTable().getTbl_name());
+        return createGetPartialCatalogObjectError(CatalogLookupStatus.TABLE_NOT_FOUND);
       }
       // TODO(todd): consider a read-write lock here.
       table.getLock().lock();
@@ -2138,11 +2144,14 @@ public class CatalogServiceCatalog extends Catalog {
       try {
         Db db = getDb(objectDesc.fn.name.db_name);
         if (db == null) {
-          throw new CatalogException(
-              "Database not found: " + objectDesc.fn.name.db_name);
+          return createGetPartialCatalogObjectError(CatalogLookupStatus.DB_NOT_FOUND);
         }
 
         List<Function> funcs = db.getFunctions(objectDesc.fn.name.function_name);
+        if (funcs.isEmpty()) {
+          return createGetPartialCatalogObjectError(
+              CatalogLookupStatus.FUNCTION_NOT_FOUND);
+        }
         TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
         List<TFunction> thriftFuncs = Lists.newArrayListWithCapacity(funcs.size());
         for (Function f : funcs) thriftFuncs.add(f.toThrift());
@@ -2156,6 +2165,13 @@ public class CatalogServiceCatalog extends Catalog {
       throw new CatalogException("Unable to fetch partial info for type: " +
           req.object_desc.type);
     }
+  }
+
+  private static TGetPartialCatalogObjectResponse createGetPartialCatalogObjectError(
+      CatalogLookupStatus status) {
+    TGetPartialCatalogObjectResponse resp = new TGetPartialCatalogObjectResponse();
+    resp.setLookup_status(status);
+    return resp;
   }
 
   /**

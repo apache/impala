@@ -374,19 +374,29 @@ struct TGetPartialCatalogObjectRequest {
   5: optional TCatalogInfoSelector catalog_info_selector
 }
 
+enum CatalogLookupStatus {
+  OK,
+  DB_NOT_FOUND,
+  TABLE_NOT_FOUND,
+  FUNCTION_NOT_FOUND
+}
+
 // RPC response for GetPartialCatalogObject.
 struct TGetPartialCatalogObjectResponse {
   // The status of the operation, OK if the operation was successful.
   // Unset indicates "OK".
   1: optional Status.TStatus status
 
-  2: optional i64 object_version_number
-  3: optional TPartialTableInfo table_info
-  4: optional TPartialDbInfo db_info
-  5: optional TPartialCatalogInfo catalog_info
+  // Catalog-specific error codes (eg if the object no longer exists).
+  2: optional CatalogLookupStatus lookup_status = CatalogLookupStatus.OK
+
+  3: optional i64 object_version_number
+  4: optional TPartialTableInfo table_info
+  5: optional TPartialDbInfo db_info
+  6: optional TPartialCatalogInfo catalog_info
 
   // Functions are small enough that we return them wholesale.
-  6: optional list<Types.TFunction> functions
+  7: optional list<Types.TFunction> functions
 }
 
 

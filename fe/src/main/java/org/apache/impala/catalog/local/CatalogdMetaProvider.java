@@ -48,6 +48,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
@@ -88,6 +89,7 @@ import com.google.common.cache.Weigher;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.errorprone.annotations.Immutable;
 import com.google.errorprone.annotations.concurrent.GuardedBy;
 
@@ -301,6 +303,24 @@ public class CatalogdMetaProvider implements MetaProvider {
       throw new TException(resp.toString());
     }
 
+    // If we get a "not found" response, then we assume that this was a case of an
+    // inconsistent cache. For example, we might have cached the list of tables within
+    // a database, but the table we're trying to load was dropped just prior to us
+    // trying to load it. In these cases, we need to invalidate whatever cache items
+    // might have led us to the dropped object and throw an exception so that we
+    // can retry with a reloaded cache.
+    switch (resp.lookup_status) {
+      case DB_NOT_FOUND:
+      case FUNCTION_NOT_FOUND:
+      case TABLE_NOT_FOUND:
+        invalidateCacheForObject(req.object_desc);
+        throw new InconsistentMetadataFetchException(
+            String.format("Fetching {} failed. Could not find {}",
+                req.object_desc.type.name(), resp.lookup_status.name()));
+      default: break;
+    }
+    Preconditions.checkState(resp.lookup_status == CatalogLookupStatus.OK);
+
     // If we requested information about a particular version of an object, but
     // got back a response for a different version, then we have a case of "read skew".
     // For example, we may have fetched the partition list of a table, performed pruning,
@@ -311,11 +331,12 @@ public class CatalogdMetaProvider implements MetaProvider {
         resp.isSetObject_version_number() &&
         req.object_desc.catalog_version != resp.object_version_number) {
       invalidateCacheForObject(req.object_desc);
-      throw new InconsistentMetadataFetchException(String.format(
-          "Catalog object %s changed version from %s to %s while fetching metadata",
-          req.object_desc.toString(),
-          req.object_desc.catalog_version,
-          resp.object_version_number));
+      LOG.warn("Catalog object {} changed version from {} to {} while fetching metadata",
+          req.object_desc.toString(), req.object_desc.catalog_version,
+          resp.object_version_number);
+      throw new InconsistentMetadataFetchException(
+          String.format("Catalog object %s changed version between accesses.",
+              req.object_desc.toString()));
     }
     return resp;
   }
@@ -337,7 +358,7 @@ public class CatalogdMetaProvider implements MetaProvider {
           return loadCallable.call();
         }
       });
-    } catch (ExecutionException e) {
+    } catch (ExecutionException | UncheckedExecutionException e) {
       Throwables.propagateIfPossible(e.getCause(), TException.class);
       throw new RuntimeException(e);
     } finally {
@@ -522,37 +543,27 @@ public class CatalogdMetaProvider implements MetaProvider {
   @Override
   public List<PartitionRef> loadPartitionList(final TableMetaRef table)
       throws TException {
-    final Reference<Boolean> hitCache = new Reference<>(true);
-    try {
-      PartitionListCacheKey key = new PartitionListCacheKey((TableMetaRefImpl)table);
-      return (List<PartitionRef>) cache_.get(key,
-          new Callable<List<PartitionRef>>() {
-            /** Called to load cache for cache misses */
-            @Override
-            public List<PartitionRef> call() throws Exception {
-              hitCache.setRef(false);
-              TGetPartialCatalogObjectRequest req = newReqForTable(table);
-              req.table_info_selector.want_partition_names = true;
-              TGetPartialCatalogObjectResponse resp = sendRequest(req);
-              checkResponse(resp.table_info != null && resp.table_info.partitions != null,
-                  req, "missing partition list result");
-              List<PartitionRef> partitionRefs = Lists.newArrayListWithCapacity(
-                  resp.table_info.partitions.size());
-              for (TPartialPartitionInfo p: resp.table_info.partitions) {
-                checkResponse(p.isSetId(), req,
-                    "response missing partition IDs for partition %s", p);
-                partitionRefs.add(new PartitionRefImpl(p));
-              }
-              return partitionRefs;
+    PartitionListCacheKey key = new PartitionListCacheKey((TableMetaRefImpl) table);
+    return (List<PartitionRef>) loadWithCaching(
+        "partition list for " + table, key, new Callable<List<PartitionRef>>() {
+          /** Called to load cache for cache misses */
+          @Override
+          public List<PartitionRef> call() throws Exception {
+            TGetPartialCatalogObjectRequest req = newReqForTable(table);
+            req.table_info_selector.want_partition_names = true;
+            TGetPartialCatalogObjectResponse resp = sendRequest(req);
+            checkResponse(resp.table_info != null && resp.table_info.partitions != null,
+                req, "missing partition list result");
+            List<PartitionRef> partitionRefs =
+                Lists.newArrayListWithCapacity(resp.table_info.partitions.size());
+            for (TPartialPartitionInfo p : resp.table_info.partitions) {
+              checkResponse(
+                  p.isSetId(), req, "response missing partition IDs for partition %s", p);
+              partitionRefs.add(new PartitionRefImpl(p));
             }
-          });
-    } catch (ExecutionException e) {
-      Throwables.propagateIfPossible(e.getCause(), TException.class);
-      throw new RuntimeException(e);
-    } finally {
-      LOG.trace("Request for partition list of {}: {}", table,
-          hitCache.getRef() ? "hit":"miss");
-    }
+            return partitionRefs;
+          }
+        });
   }
 
   @Override
@@ -712,19 +723,14 @@ public class CatalogdMetaProvider implements MetaProvider {
 
   @Override
   public String loadNullPartitionKeyValue() throws MetaException, TException {
-    try {
-      return (String) cache_.get(NULL_PARTITION_KEY_VALUE_CACHE_KEY,
-          new Callable<String>() {
-            /** Called to load cache for cache misses */
-            @Override
-            public String call() throws Exception {
-              return directProvider_.loadNullPartitionKeyValue();
-            }
-          });
-    } catch (ExecutionException e) {
-      Throwables.propagateIfPossible(e.getCause(), TException.class);
-      throw new RuntimeException(e);
-    }
+    return (String) loadWithCaching("null partition key value",
+        NULL_PARTITION_KEY_VALUE_CACHE_KEY, new Callable<String>() {
+          /** Called to load cache for cache misses */
+          @Override
+          public String call() throws Exception {
+            return directProvider_.loadNullPartitionKeyValue();
+          }
+        });
   }
 
   @Override
@@ -961,7 +967,8 @@ public class CatalogdMetaProvider implements MetaProvider {
 
   /**
    * Invalidate items from the cache in response to seeing an updated catalog object
-   * from the catalogd.
+   * from the catalogd or getting an error response from another request that indicates
+   * that the object has been removed.
    */
   @VisibleForTesting
   void invalidateCacheForObject(TCatalogObject obj) {
