@@ -532,7 +532,7 @@ class TestDdlStatements(TestDdlBase):
     for impalad in ImpalaCluster().impalads:
       client = impalad.service.create_beeswax_client()
       try:
-        for attempt in itertools.count(start=1):
+        for attempt in itertools.count(1):
           assert attempt <= num_attempts, "ran out of attempts"
           try:
             result = self.execute_query_expect_success(
