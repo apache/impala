@@ -61,7 +61,7 @@ LINE_LIMIT = 90
 # Source file extensions that we should apply our line limit and whitespace rules to.
 SOURCE_EXTENSIONS = set([".cc", ".h", ".java", ".py", ".sh", ".thrift"])
 
-# Source file patterns that we exclude from our line limit and whitespace rules.
+# Source file patterns that we exclude from our checks.
 EXCLUDE_FILE_PATTERNS = [
     re.compile(r".*be/src/kudu.*"),  # Kudu source code may have different rules.
     re.compile(r".*-benchmark.cc"),  # Benchmark files tend to have long lines.
@@ -112,6 +112,13 @@ def get_flake8_comments(revision):
     file, line, col, details = match.groups()
     line = int(line)
     col = int(col)
+    skip_file = False
+    for pattern in EXCLUDE_FILE_PATTERNS:
+      if pattern.match(file):
+        skip_file = True
+        break
+    if skip_file:
+      continue
     comments_for_file = comments[file]
     comment = {"message": "flake8: {0}".format(details)}
     # Heuristic: if the error is on the first column, assume it applies to the whole line.
