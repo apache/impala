@@ -479,8 +479,9 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Implementation of AddInfoString() and AppendInfoString(). If 'append' is false,
   /// implements AddInfoString(), otherwise implements AppendInfoString().
   /// Redaction rules are applied on the info string if 'redact' is true.
+  /// Trailing whitspace is removed.
   void AddInfoStringInternal(
-      const std::string& key, const std::string& value, bool append, bool redact = false);
+      const std::string& key, std::string value, bool append, bool redact = false);
 
   /// Name of the counter maintaining the total time.
   static const std::string TOTAL_TIME_COUNTER_NAME;

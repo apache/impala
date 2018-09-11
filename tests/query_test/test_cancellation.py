@@ -152,11 +152,15 @@ class TestCancellation(ImpalaTestSuite):
 
       def fetch_results():
         threading.current_thread().fetch_results_error = None
+        threading.current_thread().query_profile = None
         try:
           new_client = self.create_impala_client()
           new_client.fetch(query, handle)
         except ImpalaBeeswaxException as e:
           threading.current_thread().fetch_results_error = e
+
+        threading.current_thread().query_profile = \
+          self.impalad_test_service.get_thrift_profile(handle.get_handle().id)
 
       thread = threading.Thread(target=fetch_results)
       thread.start()
@@ -178,6 +182,17 @@ class TestCancellation(ImpalaTestSuite):
 
       # Before accessing fetch_results_error we need to join the fetch thread
       thread.join()
+
+      # IMPALA-2063 Cancellation tests may generate profile text that is otherwise hard
+      # to reproduce for testing mis-formatting.
+      profile = thread.query_profile
+      if profile:
+        for (k, v) in profile.nodes[1].info_strings.iteritems():
+          assert v == v.rstrip(), \
+            "Mis-formatted profile text: %s %s" % (k, v)
+          # "Plan" text may be strangely formatted.
+          assert k == 'Plan' or '\n\n' not in v, \
+            "Mis-formatted profile text: %s %s" % (k, v)
 
       if thread.fetch_results_error is None:
         # If the fetch rpc didn't result in CANCELLED (and auto-close the query) then

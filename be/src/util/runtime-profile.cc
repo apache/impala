@@ -27,6 +27,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "common/object-pool.h"
+#include "gutil/strings/strip.h"
 #include "rpc/thrift-util.h"
 #include "util/coding-util.h"
 #include "util/compress.h"
@@ -292,7 +293,7 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
       DCHECK(it != info_strings.end());
       InfoStrings::iterator existing = info_strings_.find(key);
       if (existing == info_strings_.end()) {
-        info_strings_.insert(make_pair(key, it->second));
+        info_strings_.emplace(key, it->second);
         info_strings_display_order_.push_back(key);
       } else {
         info_strings_[key] = it->second;
@@ -534,19 +535,23 @@ void RuntimeProfile::AppendInfoString(const string& key, const string& value) {
   return AddInfoStringInternal(key, value, true);
 }
 
-void RuntimeProfile::AddInfoStringInternal(
-    const string& key, const string& value, bool append, bool redact) {
-  const string& info = redact ? RedactCopy(value): value;
+void RuntimeProfile::AddInfoStringInternal(const string& key, string value,
+    bool append, bool redact) {
+
+  if (redact) Redact(&value);
+
+  StripTrailingWhitespace(&value);
+
   lock_guard<SpinLock> l(info_strings_lock_);
   InfoStrings::iterator it = info_strings_.find(key);
   if (it == info_strings_.end()) {
-    info_strings_.insert(make_pair(key, info));
+    info_strings_.emplace(key, std::move(value));
     info_strings_display_order_.push_back(key);
   } else {
     if (append) {
-      it->second += ", " + value;
+      it->second += ", " + std::move(value);
     } else {
-      it->second = info;
+      it->second = std::move(value);
     }
   }
 }
