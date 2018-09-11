@@ -183,7 +183,7 @@ class ImpaladService(BaseImpalaService):
     # Returns a dictionary of the format <host_address, num_of_queries_running_there>
     result = json.loads(self.read_debug_webpage('queries?json', timeout=30, interval=1))
     if result['query_locations'] is not None:
-      return {loc["location"]: loc["count"] for loc in result['query_locations']}
+      return dict([(loc["location"], loc["count"]) for loc in result['query_locations']])
     return None
 
   def get_in_flight_queries(self, timeout=30, interval=1):
