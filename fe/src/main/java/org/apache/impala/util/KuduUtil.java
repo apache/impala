@@ -21,6 +21,7 @@ import static java.lang.String.format;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -59,7 +60,6 @@ import org.apache.kudu.client.RangePartitionBound;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 public class KuduUtil {
 
@@ -72,7 +72,8 @@ public class KuduUtil {
   private static int KUDU_CLIENT_WORKER_THREAD_COUNT = 5;
 
   // Maps lists of master addresses to KuduClients, for sharing clients across the FE.
-  private static Map<String, KuduClient> kuduClients_ = Maps.newHashMap();
+  private static Map<String, KuduClient> kuduClients_ =
+      new ConcurrentHashMap<String, KuduClient>();
 
   /**
    * Gets a KuduClient for the specified Kudu master addresses (as a comma-separated
@@ -84,14 +85,16 @@ public class KuduUtil {
    * fetching tablet metadata.
    */
   public static KuduClient getKuduClient(String kuduMasters) {
-    if (!kuduClients_.containsKey(kuduMasters)) {
+    KuduClient client = kuduClients_.get(kuduMasters);
+    if (client == null) {
       KuduClientBuilder b = new KuduClient.KuduClientBuilder(kuduMasters);
       b.defaultAdminOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
       b.defaultOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
       b.workerCount(KUDU_CLIENT_WORKER_THREAD_COUNT);
-      kuduClients_.put(kuduMasters, b.build());
+      client = b.build();
+      kuduClients_.put(kuduMasters, client);
     }
-    return kuduClients_.get(kuduMasters);
+    return client;
   }
 
   /**
