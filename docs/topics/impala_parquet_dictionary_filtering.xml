@@ -42,12 +42,12 @@ under the License.
 
     <p rev="parquet_dictionary_filtering">
       The <codeph>PARQUET_DICTIONARY_FILTERING</codeph> query option controls whether Impala
-      uses dictionary filtering for Parquet filers.
+      uses dictionary filtering for Parquet files.
     </p>
 
     <p>
       To efficiently process a highly selective scan query, when this option is enabled, Impala
-      checks the values in the Parquet dictionary page and determine if the whole row group can
+      checks the values in the Parquet dictionary page and determines if the whole row group can
       be thrown out.
     </p>
 
