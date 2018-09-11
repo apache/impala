@@ -36,6 +36,7 @@ namespace io {
 class DiskIoMgr;
 class DiskQueue;
 class ExclusiveHdfsFileHandle;
+class FileReader;
 class RequestContext;
 class ScanRange;
 
@@ -66,6 +67,7 @@ class BufferDescriptor {
   DISALLOW_COPY_AND_ASSIGN(BufferDescriptor);
   /// This class is tightly coupled with ScanRange. Making them friends is easiest.
   friend class ScanRange;
+  friend class HdfsFileReader;
 
   /// Create a buffer descriptor for a range and data buffer.
   BufferDescriptor(ScanRange* scan_range, uint8_t* buffer, int64_t buffer_len);
@@ -191,6 +193,7 @@ struct BufferOpts {
 
  private:
   friend class ScanRange;
+  friend class HdfsFileReader;
 
   BufferOpts(
       bool try_cache, int64_t mtime, uint8_t* client_buffer, int64_t client_buffer_len)
@@ -237,6 +240,7 @@ class ScanRange : public RequestRange {
 
   void* meta_data() const { return meta_data_; }
   bool try_cache() const { return try_cache_; }
+  bool read_in_flight() const { return read_in_flight_; }
   bool expected_local() const { return expected_local_; }
 
   /// Returns the next buffer for this scan range. buffer is an output parameter.
@@ -265,6 +269,8 @@ class ScanRange : public RequestRange {
 
   int64_t mtime() const { return mtime_; }
 
+  int BytesRead() const;
+
  private:
   DISALLOW_COPY_AND_ASSIGN(ScanRange);
 
@@ -274,6 +280,8 @@ class ScanRange : public RequestRange {
   friend class DiskQueue;
   friend class DiskIoMgr;
   friend class RequestContext;
+  friend class HdfsFileReader;
+  friend class LocalFileReader;
 
   // Tag for the buffer associated with range. See external_buffer_tag_ for details.
   enum class ExternalBufferTag { CLIENT_BUFFER, CACHED_BUFFER, NO_BUFFER };
@@ -281,11 +289,11 @@ class ScanRange : public RequestRange {
   /// Initialize internal fields
   void InitInternal(DiskIoMgr* io_mgr, RequestContext* reader);
 
-  /// Reads from the DN cache. On success, sets cached_buffer_ to the DN buffer
-  /// and *read_succeeded to true.
+  /// If data is cached, returns ok() and * read_succeeded is set to true. Also enqueues
+  /// a ready buffer from the cached data.
   /// If the data is not cached, returns ok() and *read_succeeded is set to false.
   /// Returns a non-ok status if it ran into a non-continuable error.
-  ///  The reader lock must be held by the caller.
+  /// The reader lock must be held by the caller.
   Status ReadFromCache(const boost::unique_lock<boost::mutex>& reader_lock,
       bool* read_succeeded) WARN_UNUSED_RESULT;
 
@@ -303,7 +311,7 @@ class ScanRange : public RequestRange {
   /// Cleans up a buffer that was not returned to the client.
   /// Either ReturnBuffer() or CleanUpBuffer() is called for every BufferDescriptor.
   /// The caller must hold 'lock_' via 'scan_range_lock'.
-  /// This function may acquire 'hdfs_lock_'
+  /// This function may acquire 'file_reader_->lock()'
   void CleanUpBuffer(const boost::unique_lock<boost::mutex>& scan_range_lock,
       std::unique_ptr<BufferDescriptor> buffer);
 
@@ -325,6 +333,17 @@ class ScanRange : public RequestRange {
 
   ExternalBufferTag external_buffer_tag() const { return external_buffer_tag_; }
 
+  /// If non-OK, this scan range has been cancelled. This status is the reason for
+  /// cancellation - CANCELLED_INTERNALLY if cancelled without error, or another status
+  /// if an error caused cancellation. Note that a range can be cancelled without
+  /// cancelling the owning context. This means that ranges can be cancelled or hit errors
+  /// without aborting all scan ranges.
+  //
+  /// Writers must hold both 'lock_' and 'file_reader_->lock()'. Readers must hold either
+  /// 'lock_' or 'file_reader_->lock()'. This prevents the range from being cancelled
+  /// while any thread is inside a critical section.
+  Status cancel_status_;
+
   /// END: private members that are accessed by other io:: classes
   /////////////////////////////////////////
 
@@ -336,33 +355,6 @@ class ScanRange : public RequestRange {
 
   /// Maximum length in bytes for hdfsRead() calls.
   int64_t MaxReadChunkSize() const;
-
-  /// Opens the file for this range. This function only modifies state in this range.
-  /// If 'use_file_handle_cache' is true and this is a local hdfs file, then this scan
-  /// range will not maintain an exclusive file handle. It will borrow an hdfs file
-  /// handle from the file handle cache for each Read(), so Open() does nothing.
-  /// If 'use_file_handle_cache' is false or this is a remote hdfs file or this is
-  /// a local OS file, Open() will open a file handle on the scan range for
-  /// exclusive use by this scan range. The scan range is the exclusive owner of the
-  /// file handle, and the file handle is destroyed in Close().
-  /// All local OS files are opened using normal OS file APIs.
-  ///
-  /// If an error is encountered during opening, returns a status describing the error.
-  /// If the scan range was cancelled, returns the reason for cancellation. Otherwise, on
-  /// success, returns OK.
-  Status Open(bool use_file_handle_cache) WARN_UNUSED_RESULT;
-
-  /// Closes the file for this range. This function only modifies state in this range.
-  void Close();
-
-  /// Reads from this range into 'buffer', which has length 'buffer_len' bytes. Returns
-  /// the number of bytes read. The read position in this scan range is updated.
-  ///
-  /// If an error is encountered during reading, returns a status describing the error.
-  /// If the scan range was cancelled, returns the reason for cancellation. Otherwise, on
-  /// success, returns OK.
-  Status Read(uint8_t* buffer, int64_t buffer_len, int64_t* bytes_read,
-      bool* eosr) WARN_UNUSED_RESULT;
 
   /// Get the read statistics from the Hdfs file handle and aggregate them to
   /// the RequestContext. This clears the statistics on this file handle.
@@ -414,50 +406,23 @@ class ScanRange : public RequestRange {
   /// Last modified time of the file associated with the scan range. Set in Reset().
   int64_t mtime_;
 
-  /// Total number of bytes read remotely. This is necessary to maintain a count of
-  /// the number of remote scan ranges. Since IO statistics can be collected multiple
-  /// times for a scan range, it is necessary to keep some state about whether this
-  /// scan range has already been counted as remote. There is also a requirement to
-  /// log the number of unexpected remote bytes for a scan range. To solve both
-  /// requirements, maintain num_remote_bytes_ on the ScanRange and push it to the
-  /// reader_ once at the close of the scan range.
-  int64_t num_remote_bytes_;
-
   DiskIoMgr* io_mgr_ = nullptr;
 
   /// Reader/owner of the scan range
   RequestContext* reader_ = nullptr;
 
-  /// File handle either to hdfs or local fs (FILE*)
-  /// The hdfs file handle is stored here in three cases:
-  /// 1. The file handle cache is off (max_cached_file_handles == 0).
-  /// 2. The scan range is using hdfs caching.
-  /// -OR-
-  /// 3. The hdfs file is expected to be remote (expected_local_ == false)
-  /// In each case, the scan range gets a new ExclusiveHdfsFileHandle at Open(),
-  /// owns it exclusively, and destroys it in Close().
-  union {
-    FILE* local_file_ = nullptr;
-    ExclusiveHdfsFileHandle* exclusive_hdfs_fh_;
-  };
-
   /// Tagged union that holds a buffer for the cases when there is a buffer allocated
   /// externally from DiskIoMgr that is associated with the scan range.
   ExternalBufferTag external_buffer_tag_;
-  union {
-    /// Valid if the 'external_buffer_tag_' is CLIENT_BUFFER.
-    struct {
-      /// Client-provided buffer to read the whole scan range into.
-      uint8_t* data;
 
-      /// Length of the client-provided buffer.
-      int64_t len;
-    } client_buffer_;
+  /// Valid if the 'external_buffer_tag_' is CLIENT_BUFFER.
+  struct {
+    /// Client-provided buffer to read the whole scan range into.
+    uint8_t* data;
 
-    /// Valid and non-NULL if the external_buffer_tag_ is CACHED_BUFFER, which means
-    /// that a cached read succeeded and all the bytes for the range are in this buffer.
-    struct hadoopRzBuffer* cached_buffer_ = nullptr;
-  };
+    /// Length of the client-provided buffer.
+    int64_t len;
+  } client_buffer_;
 
   /// The number of buffers that have been returned to a client via GetNext() that have
   /// not yet been returned with ReturnBuffer().
@@ -468,9 +433,6 @@ class ScanRange : public RequestRange {
   /// If RequestContext::lock_ and this lock need to be held simultaneously,
   /// RequestContext::lock_ must be taken first.
   boost::mutex lock_;
-
-  /// Number of bytes read so far for this scan range
-  int bytes_read_;
 
   /// Buffers to read into, used if the 'external_buffer_tag_' is NO_BUFFER. These are
   /// initially populated when the client calls AllocateBuffersForRange() and
@@ -513,24 +475,8 @@ class ScanRange : public RequestRange {
   /// cancelled.
   ConditionVariable buffer_ready_cv_;
 
-  /// Lock that should be taken during hdfs calls. Only one thread (the disk reading
-  /// thread) calls into hdfs at a time so this lock does not have performance impact.
-  /// This lock only serves to coordinate cleanup. Specifically it serves to ensure
-  /// that the disk threads are finished with HDFS calls before is_cancelled_ is set
-  /// to true and cleanup starts.
-  /// If this lock and lock_ need to be taken, lock_ must be taken first.
-  boost::mutex hdfs_lock_;
-
-  /// If non-OK, this scan range has been cancelled. This status is the reason for
-  /// cancellation - CANCELLED_INTERNALLY if cancelled without error, or another status
-  /// if an error caused cancellation. Note that a range can be cancelled without
-  /// cancelling the owning context. This means that ranges can be cancelled or hit errors
-  /// without aborting all scan ranges.
-  //
-  /// Writers must hold both 'lock_' and 'hdfs_lock_'. Readers must hold either 'lock_'
-  /// or 'hdfs_lock_'. This prevents the range from being cancelled while any thread
-  /// is inside a critical section.
-  Status cancel_status_;
+  /// Polymorphic object that is responsible for doing file operations.
+  std::unique_ptr<FileReader> file_reader_;
 };
 
 /// Used to specify data to be written to a file and offset.

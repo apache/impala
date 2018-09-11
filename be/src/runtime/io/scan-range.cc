@@ -18,6 +18,8 @@
 #include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/io/disk-io-mgr-internal.h"
+#include "runtime/io/hdfs-file-reader.h"
+#include "runtime/io/local-file-reader.h"
 #include "util/error-util.h"
 #include "util/hdfs-util.h"
 
@@ -26,20 +28,12 @@
 using namespace impala;
 using namespace impala::io;
 
-DEFINE_bool(use_hdfs_pread, false, "Enables using hdfsPread() instead of hdfsRead() "
-    "when performing HDFS read operations. This is necessary to use HDFS hedged reads "
-    "(assuming the HDFS client is configured to do so).");
-
 // TODO: Run perf tests and empirically settle on the most optimal default value for the
 // read buffer size. Currently setting it as 128k for the same reason as for S3, i.e.
 // due to JNI array allocation and memcpy overhead, 128k was emperically found to have the
 // least overhead.
 DEFINE_int64(adls_read_chunk_size, 128 * 1024, "The maximum read chunk size to use when "
     "reading from ADLS.");
-
-#ifndef NDEBUG
-DECLARE_int32(stress_disk_read_delay_ms);
-#endif
 
 // Implementation of the ScanRange functionality. Each ScanRange contains a queue
 // of ready buffers. For each ScanRange, there is only a single producer and
@@ -169,8 +163,13 @@ unique_ptr<BufferDescriptor> ScanRange::GetUnusedBuffer(
   return result;
 }
 
+int ScanRange::BytesRead() const {
+  DCHECK(file_reader_ != nullptr);
+  return file_reader_->bytes_read();
+}
+
 ReadOutcome ScanRange::DoRead(int disk_id) {
-  int64_t bytes_remaining = len_ - bytes_read_;
+  int64_t bytes_remaining = len_ - BytesRead();
   DCHECK_GT(bytes_remaining, 0);
 
   unique_ptr<BufferDescriptor> buffer_desc;
@@ -199,14 +198,15 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
 
   // No locks in this section.  Only working on local vars.  We don't want to hold a
   // lock across the read call.
-  Status read_status = Open(is_file_handle_caching_enabled());
+  Status read_status = file_reader_->Open(is_file_handle_caching_enabled());
   if (read_status.ok()) {
     COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, 1L);
     COUNTER_BITOR_IF_NOT_NULL(reader_->disks_accessed_bitmap_, 1LL << disk_id);
 
-    read_status = Read(buffer_desc->buffer_, buffer_desc->buffer_len_,
-        &buffer_desc->len_, &buffer_desc->eosr_);
-    buffer_desc->scan_range_offset_ = bytes_read_ - buffer_desc->len_;
+    read_status = file_reader_->ReadFromPos(offset_ + BytesRead(), buffer_desc->buffer_,
+        min(len() - BytesRead(), buffer_desc->buffer_len_), &buffer_desc->len_,
+        &buffer_desc->eosr_);
+    buffer_desc->scan_range_offset_ = BytesRead() - buffer_desc->len_;
 
     COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, buffer_desc->len_);
     COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, -1L);
@@ -224,7 +224,7 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
     // threads.
     CancelInternal(read_status, true);
     // No more reads for this scan range - we can close it.
-    Close();
+    file_reader_->Close();
     return ReadOutcome::CANCELLED;
   }
 
@@ -235,7 +235,7 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
   if (!EnqueueReadyBuffer(move(buffer_desc))) return ReadOutcome::CANCELLED;
   if (eosr) {
     // No more reads for this scan range - we can close it.
-    Close();
+    file_reader_->Close();
     return ReadOutcome::SUCCESS_EOSR;
   }
   return ReadOutcome::SUCCESS_NO_EOSR;
@@ -258,7 +258,7 @@ void ScanRange::CleanUpBuffer(
     // Close the scan range if there are no more buffers in the reader and no more buffers
     // will be returned to readers in future. Close() is idempotent so it is ok to call
     // multiple times during cleanup so long as the range is actually finished.
-    Close();
+    file_reader_->Close();
   }
 }
 
@@ -291,7 +291,7 @@ void ScanRange::CancelInternal(const Status& status, bool read_error) {
     // threads are in critical sections.
     unique_lock<mutex> scan_range_lock(lock_);
     {
-      unique_lock<mutex> hdfs_lock(hdfs_lock_);
+      unique_lock<SpinLock> fs_lock(file_reader_->lock());
       DCHECK(Validate()) << DebugString();
       // If already cancelled, preserve the original reason for cancellation. Most of the
       // cleanup is not required if already cancelled, but we need to set
@@ -317,7 +317,7 @@ void ScanRange::CancelInternal(const Status& status, bool read_error) {
 
   // For cached buffers, we can't close the range until the cached buffer is returned.
   // Close() is called from ScanRange::CleanUpBufferLocked().
-  if (external_buffer_tag_ != ExternalBufferTag::CACHED_BUFFER) Close();
+  if (external_buffer_tag_ != ExternalBufferTag::CACHED_BUFFER) file_reader_->Close();
 }
 
 void ScanRange::WaitForInFlightRead() {
@@ -327,22 +327,21 @@ void ScanRange::WaitForInFlightRead() {
 
 string ScanRange::DebugString() const {
   stringstream ss;
-  ss << "file=" << file_ << " disk_id=" << disk_id_ << " offset=" << offset_
-     << " len=" << len_ << " bytes_read=" << bytes_read_
-     << " cancel_status=" << cancel_status_.GetDetail()
+  ss << "file=" << file_ << " disk_id=" << disk_id_ << " offset=" << offset_;
+  if (file_reader_) ss << " " << file_reader_->DebugString();
+  ss << " cancel_status=" << cancel_status_.GetDetail()
      << " buffer_queue=" << ready_buffers_.size()
      << " num_buffers_in_readers=" << num_buffers_in_reader_.Load()
      << " unused_iomgr_buffers=" << unused_iomgr_buffers_.size()
      << " unused_iomgr_buffer_bytes=" << unused_iomgr_buffer_bytes_
-     << " blocked_on_buffer=" << blocked_on_buffer_
-     << " hdfs_file=" << exclusive_hdfs_fh_;
+     << " blocked_on_buffer=" << blocked_on_buffer_;
   return ss.str();
 }
 
 bool ScanRange::Validate() {
-  if (bytes_read_ > len_) {
+  if (BytesRead() > len_) {
     LOG(ERROR) << "Bytes read tracking is wrong. Shouldn't read past the scan range."
-                 << " bytes_read_=" << bytes_read_ << " len_=" << len_;
+                 << " bytes_read_=" << BytesRead() << " len_=" << len_;
     return false;
   }
   if (!cancel_status_.ok() && !ready_buffers_.empty()) {
@@ -375,11 +374,9 @@ bool ScanRange::Validate() {
 
 ScanRange::ScanRange()
   : RequestRange(RequestType::READ),
-    num_remote_bytes_(0),
     external_buffer_tag_(ExternalBufferTag::NO_BUFFER) {}
 
 ScanRange::~ScanRange() {
-  DCHECK(exclusive_hdfs_fh_ == nullptr) << "File was not closed.";
   DCHECK(external_buffer_tag_ != ExternalBufferTag::CACHED_BUFFER)
       << "Cached buffer was not released.";
   DCHECK(!read_in_flight_);
@@ -397,14 +394,17 @@ void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
   DCHECK(buffer_opts.client_buffer_ == nullptr ||
          buffer_opts.client_buffer_len_ >= len_);
   fs_ = fs;
+  if (fs_) {
+    file_reader_ = make_unique<HdfsFileReader>(this, fs_, expected_local);
+  } else {
+    file_reader_ = make_unique<LocalFileReader>(this);
+  }
   file_ = file;
   len_ = len;
   offset_ = offset;
   disk_id_ = disk_id;
   try_cache_ = buffer_opts.try_cache_;
   mtime_ = buffer_opts.mtime_;
-  expected_local_ = expected_local;
-  num_remote_bytes_ = 0;
   meta_data_ = meta_data;
   if (buffer_opts.client_buffer_ != nullptr) {
     external_buffer_tag_ = ExternalBufferTag::CLIENT_BUFFER;
@@ -413,125 +413,22 @@ void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
   } else {
     external_buffer_tag_ = ExternalBufferTag::NO_BUFFER;
   }
+  expected_local_ = expected_local;
   io_mgr_ = nullptr;
   reader_ = nullptr;
-  exclusive_hdfs_fh_ = nullptr;
 }
 
 void ScanRange::InitInternal(DiskIoMgr* io_mgr, RequestContext* reader) {
-  DCHECK(exclusive_hdfs_fh_ == nullptr);
-  DCHECK(local_file_ == nullptr);
   DCHECK(!read_in_flight_);
   io_mgr_ = io_mgr;
   reader_ = reader;
-  local_file_ = nullptr;
-  exclusive_hdfs_fh_ = nullptr;
-  bytes_read_ = 0;
   unused_iomgr_buffer_bytes_ = 0;
   iomgr_buffer_cumulative_bytes_used_ = 0;
   cancel_status_ = Status::OK();
   eosr_queued_ = false;
   blocked_on_buffer_ = false;
+  file_reader_->ResetState();
   DCHECK(Validate()) << DebugString();
-}
-
-Status ScanRange::Open(bool use_file_handle_cache) {
-  unique_lock<mutex> hdfs_lock(hdfs_lock_);
-  RETURN_IF_ERROR(cancel_status_);
-
-  if (fs_ != nullptr) {
-    if (exclusive_hdfs_fh_ != nullptr) return Status::OK();
-    // With file handle caching, the scan range does not maintain its own
-    // hdfs file handle. File handle caching is only used for local files,
-    // so s3 and remote filesystems should obtain an exclusive file handle
-    // for each scan range.
-    if (use_file_handle_cache && expected_local_) return Status::OK();
-    // Get a new exclusive file handle.
-    exclusive_hdfs_fh_ = io_mgr_->GetExclusiveHdfsFileHandle(fs_, file_string(),
-        mtime(), reader_);
-    if (exclusive_hdfs_fh_ == nullptr) {
-      return Status(TErrorCode::DISK_IO_ERROR,
-          GetHdfsErrorMsg("Failed to open HDFS file ", file_));
-    }
-
-    if (hdfsSeek(fs_, exclusive_hdfs_fh_->file(), offset_) != 0) {
-      // Destroy the file handle
-      io_mgr_->ReleaseExclusiveHdfsFileHandle(exclusive_hdfs_fh_);
-      exclusive_hdfs_fh_ = nullptr;
-      return Status(TErrorCode::DISK_IO_ERROR,
-          Substitute("Error seeking to $0 in file: $1 $2", offset_, file_,
-          GetHdfsErrorMsg("")));
-    }
-  } else {
-    if (local_file_ != nullptr) return Status::OK();
-
-    local_file_ = fopen(file(), "r");
-    if (local_file_ == nullptr) {
-      return Status(TErrorCode::DISK_IO_ERROR, Substitute("Could not open file: $0: $1",
-            file_, GetStrErrMsg()));
-    }
-    if (fseek(local_file_, offset_, SEEK_SET) == -1) {
-      fclose(local_file_);
-      local_file_ = nullptr;
-      return Status(TErrorCode::DISK_IO_ERROR, Substitute("Could not seek to $0 "
-          "for file: $1: $2", offset_, file_, GetStrErrMsg()));
-    }
-  }
-  ImpaladMetrics::IO_MGR_NUM_OPEN_FILES->Increment(1L);
-  return Status::OK();
-}
-
-void ScanRange::Close() {
-  unique_lock<mutex> hdfs_lock(hdfs_lock_);
-  bool closed_file = false;
-  if (fs_ != nullptr) {
-    if (exclusive_hdfs_fh_ != nullptr) {
-      GetHdfsStatistics(exclusive_hdfs_fh_->file());
-
-      if (external_buffer_tag_ == ExternalBufferTag::CACHED_BUFFER) {
-        hadoopRzBufferFree(exclusive_hdfs_fh_->file(), cached_buffer_);
-        cached_buffer_ = nullptr;
-        external_buffer_tag_ = ExternalBufferTag::NO_BUFFER;
-      }
-
-      // Destroy the file handle.
-      io_mgr_->ReleaseExclusiveHdfsFileHandle(exclusive_hdfs_fh_);
-      exclusive_hdfs_fh_ = nullptr;
-      closed_file = true;
-    }
-
-    if (FLAGS_use_hdfs_pread && IsHdfsPath(file())) {
-      // Update Hedged Read Metrics.
-      // We call it only if the --use_hdfs_pread flag is set, to avoid having the
-      // libhdfs client malloc and free a hdfsHedgedReadMetrics object unnecessarily
-      // otherwise. 'hedged_metrics' is only set upon success.
-      // We also avoid calling hdfsGetHedgedReadMetrics() when the file is not on HDFS
-      // (see HDFS-13417).
-      struct hdfsHedgedReadMetrics* hedged_metrics;
-      int success = hdfsGetHedgedReadMetrics(fs_, &hedged_metrics);
-      if (success == 0) {
-        ImpaladMetrics::HEDGED_READ_OPS->SetValue(hedged_metrics->hedgedReadOps);
-        ImpaladMetrics::HEDGED_READ_OPS_WIN->SetValue(hedged_metrics->hedgedReadOpsWin);
-        hdfsFreeHedgedReadMetrics(hedged_metrics);
-      }
-    }
-
-    if (num_remote_bytes_ > 0) {
-      reader_->num_remote_ranges_.Add(1L);
-      if (expected_local_) {
-        reader_->unexpected_remote_bytes_.Add(num_remote_bytes_);
-        VLOG_FILE << "Unexpected remote HDFS read of "
-                  << PrettyPrinter::Print(num_remote_bytes_, TUnit::BYTES)
-                  << " for file '" << file_ << "'";
-      }
-    }
-  } else {
-    if (local_file_ == nullptr) return;
-    fclose(local_file_);
-    local_file_ = nullptr;
-    closed_file = true;
-  }
-  if (closed_file) ImpaladMetrics::IO_MGR_NUM_OPEN_FILES->Increment(-1L);
 }
 
 int64_t ScanRange::MaxReadChunkSize() const {
@@ -553,185 +450,36 @@ int64_t ScanRange::MaxReadChunkSize() const {
   return numeric_limits<int>::max();
 }
 
-// TODO: how do we best use the disk here.  e.g. is it good to break up a
-// 1MB read into 8 128K reads?
-// TODO: look at linux disk scheduling
-Status ScanRange::Read(
-    uint8_t* buffer, int64_t buffer_len, int64_t* bytes_read, bool* eosr) {
-  DCHECK(read_in_flight_);
-  // Delay before acquiring the lock, to allow triggering IMPALA-6587 race.
-#ifndef NDEBUG
-  if (FLAGS_stress_disk_read_delay_ms > 0) {
-    SleepForMs(FLAGS_stress_disk_read_delay_ms);
-  }
-#endif
-  unique_lock<mutex> hdfs_lock(hdfs_lock_);
-  RETURN_IF_ERROR(cancel_status_);
-
-  *eosr = false;
-  *bytes_read = 0;
-  // Read until the end of the scan range or the end of the buffer.
-  int bytes_to_read = min(len_ - bytes_read_, buffer_len);
-  DCHECK_GE(bytes_to_read, 0);
-
-  if (fs_ != nullptr) {
-    CachedHdfsFileHandle* borrowed_hdfs_fh = nullptr;
-    hdfsFile hdfs_file;
-
-    // If the scan range has an exclusive file handle, use it. Otherwise, borrow
-    // a file handle from the cache.
-    if (exclusive_hdfs_fh_ != nullptr) {
-      hdfs_file = exclusive_hdfs_fh_->file();
-    } else {
-      borrowed_hdfs_fh = io_mgr_->GetCachedHdfsFileHandle(fs_, file_string(),
-          mtime(), reader_);
-      if (borrowed_hdfs_fh == nullptr) {
-        return Status(TErrorCode::DISK_IO_ERROR,
-            GetHdfsErrorMsg("Failed to open HDFS file ", file_));
-      }
-      hdfs_file = borrowed_hdfs_fh->file();
-    }
-
-    int64_t max_chunk_size = MaxReadChunkSize();
-    Status status = Status::OK();
-    {
-      ScopedTimer<MonotonicStopWatch> req_context_read_timer(reader_->read_timer_);
-      while (*bytes_read < bytes_to_read) {
-        int chunk_size = min(bytes_to_read - *bytes_read, max_chunk_size);
-        DCHECK_GE(chunk_size, 0);
-        // The hdfsRead() length argument is an int.
-        DCHECK_LE(chunk_size, numeric_limits<int>::max());
-        int current_bytes_read = -1;
-        // bytes_read_ is only updated after the while loop
-        int64_t position_in_file = offset_ + bytes_read_ + *bytes_read;
-        int num_retries = 0;
-        while (true) {
-          status = Status::OK();
-          // For file handles from the cache, any of the below file operations may fail
-          // due to a bad file handle. In each case, record the error, but allow for a
-          // retry to fix it.
-          if (FLAGS_use_hdfs_pread) {
-            current_bytes_read = hdfsPread(fs_, hdfs_file, position_in_file,
-                buffer + *bytes_read, chunk_size);
-            if (current_bytes_read == -1) {
-              status = Status(TErrorCode::DISK_IO_ERROR,
-                  GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
-            }
-          } else {
-            // If the file handle is borrowed, it may not be at the appropriate
-            // location. Seek to the appropriate location.
-            bool seek_failed = false;
-            if (borrowed_hdfs_fh != nullptr) {
-              if (hdfsSeek(fs_, hdfs_file, position_in_file) != 0) {
-                status = Status(TErrorCode::DISK_IO_ERROR,
-                  Substitute("Error seeking to $0 in file: $1: $2", position_in_file,
-                      file_, GetHdfsErrorMsg("")));
-                seek_failed = true;
-              }
-            }
-            if (!seek_failed) {
-              current_bytes_read = hdfsRead(fs_, hdfs_file, buffer + *bytes_read,
-                  chunk_size);
-              if (current_bytes_read == -1) {
-                status = Status(TErrorCode::DISK_IO_ERROR,
-                    GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
-              }
-            }
-          }
-
-          // Do not retry:
-          // - if read was successful (current_bytes_read != -1)
-          // - or if already retried once
-          // - or if this not using a borrowed file handle
-          DCHECK_LE(num_retries, 1);
-          if (current_bytes_read != -1 || borrowed_hdfs_fh == nullptr ||
-              num_retries == 1) {
-            break;
-          }
-          // The error may be due to a bad file handle. Reopen the file handle and retry.
-          // Exclude this time from the read timers.
-          req_context_read_timer.Stop();
-          ++num_retries;
-          RETURN_IF_ERROR(io_mgr_->ReopenCachedHdfsFileHandle(fs_, file_string(),
-              mtime(), reader_, &borrowed_hdfs_fh));
-          hdfs_file = borrowed_hdfs_fh->file();
-          req_context_read_timer.Start();
-        }
-        if (!status.ok()) break;
-        if (current_bytes_read == 0) {
-          // No more bytes in the file. The scan range went past the end.
-          *eosr = true;
-          break;
-        }
-        *bytes_read += current_bytes_read;
-
-        // Collect and accumulate statistics
-        GetHdfsStatistics(hdfs_file);
-      }
-    }
-
-    if (borrowed_hdfs_fh != nullptr) {
-      io_mgr_->ReleaseCachedHdfsFileHandle(file_string(), borrowed_hdfs_fh);
-    }
-    if (!status.ok()) return status;
-  } else {
-    DCHECK(local_file_ != nullptr);
-    *bytes_read = fread(buffer, 1, bytes_to_read, local_file_);
-    DCHECK_GE(*bytes_read, 0);
-    DCHECK_LE(*bytes_read, bytes_to_read);
-    if (*bytes_read < bytes_to_read) {
-      if (ferror(local_file_) != 0) {
-        return Status(TErrorCode::DISK_IO_ERROR, Substitute("Error reading from $0"
-            "at byte offset: $1: $2", file_, offset_ + bytes_read_, GetStrErrMsg()));
-      } else {
-        // On Linux, we should only get partial reads from block devices on error or eof.
-        DCHECK(feof(local_file_) != 0);
-        *eosr = true;
-      }
-    }
-  }
-  bytes_read_ += *bytes_read;
-  DCHECK_LE(bytes_read_, len_);
-  if (bytes_read_ == len_) *eosr = true;
-  return Status::OK();
-}
-
 Status ScanRange::ReadFromCache(
     const unique_lock<mutex>& reader_lock, bool* read_succeeded) {
   DCHECK(reader_lock.mutex() == &reader_->lock_ && reader_lock.owns_lock());
   DCHECK(try_cache_);
-  DCHECK_EQ(bytes_read_, 0);
+  DCHECK_EQ(BytesRead(), 0);
   *read_succeeded = false;
-  Status status = Open(false);
+  Status status = file_reader_->Open(false);
   if (!status.ok()) return status;
 
   // Cached reads not supported on local filesystem.
   if (fs_ == nullptr) return Status::OK();
 
+  // Check cancel status.
   {
-    unique_lock<mutex> hdfs_lock(hdfs_lock_);
+    unique_lock<mutex> lock(lock_);
     RETURN_IF_ERROR(cancel_status_);
-
-    DCHECK(exclusive_hdfs_fh_ != nullptr);
-    DCHECK(external_buffer_tag_ == ExternalBufferTag::NO_BUFFER);
-    cached_buffer_ =
-      hadoopReadZero(exclusive_hdfs_fh_->file(), io_mgr_->cached_read_options(), len());
-    if (cached_buffer_ != nullptr) {
-      external_buffer_tag_ = ExternalBufferTag::CACHED_BUFFER;
-    }
   }
+
+  DCHECK(external_buffer_tag_ == ExternalBufferTag::NO_BUFFER);
+  void* buffer = file_reader_->CachedFile();
+  if (buffer != nullptr) external_buffer_tag_ = ExternalBufferTag::CACHED_BUFFER;
   // Data was not cached, caller will fall back to normal read path.
   if (external_buffer_tag_ != ExternalBufferTag::CACHED_BUFFER) {
     VLOG_QUERY << "Cache read failed for scan range: " << DebugString()
                << ". Switching to disk read path.";
     // Clean up the scan range state before re-issuing it.
-    Close();
+    file_reader_->Close();
     return Status::OK();
   }
-
-  // Cached read returned a buffer, verify we read the correct amount of data.
-  void* buffer = const_cast<void*>(hadoopRzBufferGet(cached_buffer_));
-  int32_t bytes_read = hadoopRzBufferLength(cached_buffer_);
+  int bytes_read = BytesRead();
   // A partial read can happen when files are truncated.
   // TODO: If HDFS ever supports partially cached blocks, we'll have to distinguish
   // between errors and partially cached blocks here.
@@ -740,7 +488,7 @@ Status ScanRange::ReadFromCache(
       << len() << " bytes, but read " << bytes_read << ". Switching to disk read path.";
     // Close the scan range. 'read_succeeded' is still false, so the caller will fall back
     // to non-cached read of this scan range.
-    Close();
+    file_reader_->Close();
     return Status::OK();
   }
 
@@ -751,28 +499,10 @@ Status ScanRange::ReadFromCache(
   desc->len_ = bytes_read;
   desc->scan_range_offset_ = 0;
   desc->eosr_ = true;
-  bytes_read_ = bytes_read;
   EnqueueReadyBuffer(move(desc));
   COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, bytes_read);
   *read_succeeded = true;
   return Status::OK();
-}
-
-void ScanRange::GetHdfsStatistics(hdfsFile hdfs_file) {
-  struct hdfsReadStatistics* stats;
-  if (IsHdfsPath(file())) {
-    int success = hdfsFileGetReadStatistics(hdfs_file, &stats);
-    if (success == 0) {
-      reader_->bytes_read_local_.Add(stats->totalLocalBytesRead);
-      reader_->bytes_read_short_circuit_.Add(stats->totalShortCircuitBytesRead);
-      reader_->bytes_read_dn_cache_.Add(stats->totalZeroCopyBytesRead);
-      if (stats->totalLocalBytesRead != stats->totalBytesRead) {
-        num_remote_bytes_ += stats->totalBytesRead - stats->totalLocalBytesRead;
-      }
-      hdfsFileFreeReadStatistics(stats);
-    }
-    hdfsFileClearReadStatistics(hdfs_file);
-  }
 }
 
 BufferDescriptor::BufferDescriptor(ScanRange* scan_range,

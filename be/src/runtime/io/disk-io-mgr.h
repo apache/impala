@@ -360,6 +360,7 @@ class DiskIoMgr : public CacheLineAligned {
   /// BEGIN: private members that are accessed by other io:: classes
   friend class DiskQueue;
   friend class ScanRange;
+  friend class HdfsFileReader;
 
   /// Write the specified range to disk and calls writer_context->WriteDone() when done.
   /// Responsible for opening and closing the file that is written.

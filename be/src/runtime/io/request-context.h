@@ -185,6 +185,7 @@ class RequestContext {
   friend class DiskQueue;
   friend class DiskIoMgr;
   friend class ScanRange;
+  friend class HdfsFileReader;
 
   enum State {
     /// Reader is initialized and maps to a client

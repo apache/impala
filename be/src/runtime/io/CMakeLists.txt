@@ -29,6 +29,9 @@ add_library(Io
   error-converter.cc
   request-context.cc
   scan-range.cc
+  file-reader.cc
+  hdfs-file-reader.cc
+  local-file-reader.cc
 )
 add_dependencies(Io gen-deps)
 
