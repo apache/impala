@@ -20,8 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept id="thread_reservation_limit">
 
-  <title>THREAD_RESERVATION_LIMIT Query Option (<keyword keyref="impala31"/> or
-    higher only)</title>
+  <title>THREAD_RESERVATION_LIMIT Query Option (<keyword keyref="impala31"/> or higher only)</title>
 
   <titlealts audience="PDF">
 
@@ -51,10 +50,8 @@ under the License.
       admission controller before they start executing. You can see the number of reserved
       threads for a query in its
       <xref
-        href="https://www.cloudera.com/documentation/enterprise/latest/topics/impala_explain_plan.html"
-        format="html" scope="external">
-      <u>explain plan</u>
-      </xref> in the “Per-Host Resource Reservation" line.
+        href="impala_explain_plan.xml#explain_plan">explain plan</xref> in the
+      “Per-Host Resource Reservation" line.
     </p>
 
     <p>

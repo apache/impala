@@ -721,11 +721,9 @@ Inserted 2 rows in 0.16s
           assigned a constant value.
           </p>
           <p>
-            See <xref
-              href="https://www.cloudera.com/documentation/enterprise/latest/topics/impala_partitioning.html#partition_static_dynamic"
-              format="html" scope="external"><u>Static and Dynamic Partitioning
-                Clauses</u></xref> for examples and performance characteristics
-            of static and dynamic partitioned inserts.
+            See <xref href="impala_partitioning.xml#partition_static_dynamic"
+          /> for examples and performance characteristics of static and dynamic
+          partitioned inserts.
           </p>
           <p>
             The following rules apply to dynamic partition
