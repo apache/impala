@@ -241,7 +241,14 @@ class QueryReport(object):
     self.result_hash = None
     self.runtime_secs = None
     self.mem_was_spilled = False
-    self.mem_limit_exceeded = False
+    # not_enough_memory includes conditions like "Memory limit exceeded", admission
+    # control rejecting because not enough memory, etc.
+    self.not_enough_memory = False
+    # ac_rejected is true if the query was rejected by admission control.
+    # It is mutually exclusive with not_enough_memory - if the query is rejected by
+    # admission control because the memory limit is too low, it is counted as
+    # not_enough_memory.
+    # TODO: reconsider whether they should be mutually exclusive
     self.ac_rejected = False
     self.ac_timedout = False
     self.other_error = None
@@ -250,10 +257,26 @@ class QueryReport(object):
     self.profile = None
     self.query_id = None
 
+  def __str__(self):
+    return dedent("""
+        <QueryReport
+        result_hash: %(result_hash)s
+        runtime_secs: %(runtime_secs)s
+        mem_was_spilled: %(mem_was_spilled)s
+        not_enough_memory: %(not_enough_memory)s
+        ac_rejected: %(ac_rejected)s
+        ac_timedout: %(ac_timedout)s
+        other_error: %(other_error)s
+        timed_out: %(timed_out)s
+        was_cancelled: %(was_cancelled)s
+        query_id: %(query_id)s
+        >
+        """.strip() % self.__dict__)
+
   def has_query_error(self):
     """Return true if any kind of error status was returned from the query (i.e.
     the query didn't run to completion, time out or get cancelled)."""
-    return (self.mem_limit_exceeded or self.ac_rejected or self.ac_timedout
+    return (self.not_enough_memory or self.ac_rejected or self.ac_timedout
             or self.other_error)
 
   def write_query_profile(self, directory, prefix=None):
@@ -747,7 +770,7 @@ class StressRunner(object):
               id=report.query_id,
               mesg=error_msg))
         if (
-            report.mem_limit_exceeded and (self.test_admission_control or
+            report.not_enough_memory and (self.test_admission_control or
             not self._mem_broker.was_overcommitted(reservation_id))
         ):
           increment(self._num_successive_errors)
@@ -816,7 +839,7 @@ class StressRunner(object):
   def _update_from_query_report(self, report):
     LOG.debug("Updating runtime stats")
     increment(self._num_queries_finished)
-    if report.mem_limit_exceeded:
+    if report.not_enough_memory:
       increment(self._num_queries_exceeded_mem_limit)
     if report.ac_rejected:
       increment(self._num_queries_ac_rejected)
@@ -1089,7 +1112,7 @@ class QueryRunner(object):
           report.mem_was_spilled = any([
               pattern.search(report.profile) is not None
               for pattern in QueryRunner.SPILLED_PATTERNS])
-          report.mem_limit_exceeded = "Memory limit exceeded" in report.profile
+          report.not_enough_memory = "Memory limit exceeded" in report.profile
     except Exception as error:
       # A mem limit error would have been caught above, no need to check for that here.
       report.other_error = error
@@ -1121,18 +1144,21 @@ class QueryRunner(object):
     """
     fetch_and_set_profile(cursor, report)
     caught_msg = str(caught_exception).lower().strip()
-    if "rejected query from pool" in caught_msg:
-      report.ac_rejected = True
-      return
-    if "admission for query exceeded timeout" in caught_msg:
-      report.ac_timedout = True
-      return
+    # Distinguish error conditions based on string fragments. The AC rejection and
+    # out-of-memory conditions actually overlap (since some memory checks happen in
+    # admission control) so check the out-of-memory conditions first.
     if "memory limit exceeded" in caught_msg or \
        "repartitioning did not reduce the size of a spilled partition" in caught_msg or \
        "failed to get minimum memory reservation" in caught_msg or \
        "minimum memory reservation is greater than" in caught_msg or \
        "minimum memory reservation needed is greater than" in caught_msg:
-      report.mem_limit_exceeded = True
+      report.not_enough_memory = True
+      return
+    if "rejected query from pool" in caught_msg:
+      report.ac_rejected = True
+      return
+    if "admission for query exceeded timeout" in caught_msg:
+      report.ac_timedout = True
       return
 
     LOG.debug("Non-mem limit error for query with id %s: %s", report.query_id,
@@ -1347,6 +1373,7 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
     ):
       query.required_mem_mb_without_spilling = required_mem
       query.solo_runtime_secs_without_spilling = report.runtime_secs
+      assert report.runtime_secs is not None, report
       query.solo_runtime_profile_without_spilling = report.profile
 
   def get_report(desired_outcome=None):
@@ -1377,7 +1404,7 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
               "Result hash mismatch for query %s; expected %s, got %s" %
               (query.logical_query_id, query.result_hash, report.result_hash))
 
-      if report.mem_limit_exceeded:
+      if report.not_enough_memory:
         outcome = "EXCEEDED"
       elif report.mem_was_spilled:
         outcome = "SPILLED"
@@ -1411,8 +1438,8 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
     while True:
       LOG.info("Next mem_limit: {0}".format(mem_limit))
       report = get_report()
-      if not report or report.mem_limit_exceeded:
-        if report and report.mem_limit_exceeded:
+      if not report or report.not_enough_memory:
+        if report and report.not_enough_memory:
           limit_exceeded_mem = mem_limit
         if mem_limit == impala.min_impalad_mem_mb:
           LOG.warn(
@@ -1442,7 +1469,7 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
     report = get_report(desired_outcome=("NOT_SPILLED" if spill_mem else None))
     if not report:
       lower_bound = mem_limit
-    elif report.mem_limit_exceeded:
+    elif report.not_enough_memory:
       lower_bound = mem_limit
       limit_exceeded_mem = mem_limit
     else:
@@ -1477,7 +1504,7 @@ def populate_runtime_info(query, impala, converted_args, timeout_secs=maxint):
     should_break = mem_limit / float(upper_bound) > 1 - mem_limit_eq_threshold_percent \
         or upper_bound - mem_limit < mem_limit_eq_threshold_mb
     report = get_report(desired_outcome="SPILLED")
-    if not report or report.mem_limit_exceeded:
+    if not report or report.not_enough_memory:
       lower_bound = mem_limit
     else:
       update_runtime_info()
