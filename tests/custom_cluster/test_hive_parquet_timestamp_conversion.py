@@ -19,6 +19,7 @@
 
 import os
 import pytest
+from subprocess import check_call
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.util.filesystem_utils import get_fs_path
@@ -127,3 +128,29 @@ class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
         """)\
         .get_data()
     assert len(data) == 0
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("-convert_legacy_hive_parquet_utc_timestamps=true")
+  def test_stat_filtering(self, vector, unique_database):
+    """ IMPALA-7559: Check that Parquet stat filtering doesn't skip row groups
+        incorrectly when timezone conversion is needed.
+    """
+    self.client.execute(
+       "create table %s.t (i int, d timestamp) stored as parquet" % unique_database)
+
+    tbl_loc = get_fs_path("/test-warehouse/%s.db/t" % unique_database)
+    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
+        "/testdata/data/hive_single_value_timestamp.parq", tbl_loc])
+
+    # TODO: other tests in this file could also use query option 'timezone' to enable
+    #       real data validation
+    data = self.execute_query_expect_success(self.client,
+        'select * from %s.t' % unique_database,
+        query_options={"timezone": "CET"}).get_data()
+    assert data == '1\t2018-10-01 02:30:00'
+
+    # This query returned 0 rows before the fix for IMPALA-7559.
+    data = self.execute_query_expect_success(self.client,
+        'select * from %s.t where d = "2018-10-01 02:30:00"' % unique_database,
+        query_options={"timezone": "CET"}).get_data()
+    assert data == '1\t2018-10-01 02:30:00'

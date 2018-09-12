@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <queue>
 
+#include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
 
 #include "codegen/codegen-anyval.h"
@@ -36,6 +37,8 @@
 #include "rpc/thrift-util.h"
 
 #include "common/names.h"
+
+DECLARE_bool(convert_legacy_hive_parquet_utc_timestamps);
 
 using std::move;
 using std::sort;
@@ -450,6 +453,21 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
 
   if (!state_->query_options().parquet_read_statistics) return Status::OK();
 
+  // IMPALA-7559: if the values are converted from UTC to local time, then either the
+  // stats need to be converted from UTC to local, or the predicate's min/max values
+  // need to be converted from local to UTC. Doing this correctly is quite complex if
+  // the timestamps fall into timezone rules changes (DST change or historical rule
+  // change), so currently stat filtering is simply disabled for these columns.
+  //
+  // Note that parquet-mr only writes stats if min and max are equal, because it cannot
+  // order timestamps correctly, so the only case affected here is when every value is
+  // the same in the column chunk.
+  // TODO: This topic needs more investigation related to IMPALA-5050, which will add
+  // support for INT64 millisec/microsec timestamp columns, and also a metadata field
+  // whether utc->local conversion is necessary. I am not sure how parquet-mr handles
+  // stats for these types at the moment.
+  bool disable_min_max_filter_for_timestamps = IsTimezoneConversionNeededForTimestamps();
+
   const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
   if (!min_max_tuple_desc) return Status::OK();
 
@@ -497,6 +515,16 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
 
     const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
     const ColumnType& col_type = slot_desc->type();
+
+    int64_t null_count = 0;
+    bool null_count_result = ColumnStatsBase::ReadNullCountStat(col_chunk, &null_count);
+    if (null_count_result && null_count == col_chunk.meta_data.num_values) {
+      *skip_row_group = true;
+      break;
+    }
+
+    if (col_type.IsTimestampType() && disable_min_max_filter_for_timestamps) continue;
+
     bool stats_read = false;
     void* slot = min_max_tuple_->GetSlot(slot_desc->tuple_offset());
     const string& fn_name = eval->root().function_name();
@@ -510,13 +538,6 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
           col_chunk, col_type, col_order, ColumnStatsBase::StatsField::MAX, slot);
     } else {
       DCHECK(false) << "Unsupported function name for statistics evaluation: " << fn_name;
-    }
-
-    int64_t null_count = 0;
-    bool null_count_result = ColumnStatsBase::ReadNullCountStat(col_chunk, &null_count);
-    if (null_count_result && null_count == col_chunk.meta_data.num_values) {
-      *skip_row_group = true;
-      break;
     }
 
     if (stats_read) {
@@ -1654,6 +1675,11 @@ Status HdfsParquetScanner::ValidateEndOfRowGroup(
         !state_->abort_on_error());
   }
   return Status::OK();
+}
+
+bool HdfsParquetScanner::IsTimezoneConversionNeededForTimestamps() {
+  return FLAGS_convert_legacy_hive_parquet_utc_timestamps &&
+      file_version_.application == "parquet-mr";
 }
 
 }

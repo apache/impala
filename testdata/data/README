@@ -215,3 +215,11 @@ Parquet file that contains one row of the following schema:
 The footer size is manually modified (using hexedit) to be larger than the original file
 size and cause footer parsing to fail. It's used to test an error message related to
 IMPALA-6442.
+
+hive_single_value_timestamp.parq:
+Parquet file written by Hive with the followin schema:
+i int, timestamp d
+Contains a single row. It is used to test IMPALA-7559 which only occurs when all values
+in a column chunk are the same timestamp and the file is written with parquet-mr (which
+is used by Hive).
+
