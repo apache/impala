@@ -27,6 +27,7 @@ import logging
 import os
 import pytest
 
+from tests.common.environ import specific_build_type_timeout
 from common.test_result_verifier import QueryTestResult
 from tests.common.patterns import is_valid_impala_identifier
 from tests.comparison.db_connection import ImpalaConnection
@@ -49,10 +50,14 @@ if FILESYSTEM == 'isilon':
   DEFAULT_NAMENODE_ADDR = "{node}:{port}".format(node=os.getenv("ISILON_NAMENODE"),
                                                  port=ISILON_WEBHDFS_PORT)
 
+# Timeout each individual test case after 2 hours, or 4 hours for slow builds
+PYTEST_TIMEOUT_S = \
+    specific_build_type_timeout(2 * 60 * 60, slow_build_timeout=4 * 60 * 60)
 
 def pytest_configure(config):
-  """ Hook startup of pytest to set up log format. """
+  """ Hook startup of pytest. Sets up log format and per-test timeout. """
   configure_logging()
+  config.option.timeout = PYTEST_TIMEOUT_S
 
 
 def configure_logging():
