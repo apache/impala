@@ -256,8 +256,8 @@ Status GroupingAggregator::GetRowsFromPartition(
     }
     // Process next partition.
     RETURN_IF_ERROR(NextPartition());
-    DCHECK(output_partition_ != nullptr);
   }
+  DCHECK(output_partition_ != nullptr);
 
   SCOPED_TIMER(get_results_timer_);
 
@@ -389,13 +389,6 @@ Status GroupingAggregator::Reset(RuntimeState* state) {
 }
 
 void GroupingAggregator::Close(RuntimeState* state) {
-  // Iterate through the remaining rows in the hash table and call Serialize/Finalize on
-  // them in order to free any memory allocated by UDAs
-  if (output_partition_ != nullptr) {
-    CleanupHashTbl(output_partition_->agg_fn_evals, output_iterator_);
-    output_partition_->Close(false);
-  }
-
   ClosePartitions();
 
   if (tuple_pool_.get() != nullptr) tuple_pool_->FreeAll();
@@ -939,6 +932,14 @@ void GroupingAggregator::PushSpilledPartition(Partition* partition) {
 }
 
 void GroupingAggregator::ClosePartitions() {
+  // Iterate through the remaining rows in the hash table and call Serialize/Finalize on
+  // them in order to free any memory allocated by UDAs
+  if (output_partition_ != nullptr) {
+    CleanupHashTbl(output_partition_->agg_fn_evals, output_iterator_);
+    output_partition_->Close(false);
+    output_partition_ = nullptr;
+    output_iterator_.SetAtEnd();
+  }
   for (Partition* partition : hash_partitions_) {
     if (partition != nullptr) partition->Close(true);
   }

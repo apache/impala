@@ -209,7 +209,8 @@ class GroupingAggregator : public Aggregator {
   std::unique_ptr<MemPool> tuple_pool_;
 
   /// The current partition and iterator to the next row in its hash table that we need
-  /// to return in GetNext()
+  /// to return in GetNext(). If 'output_iterator_' is not AtEnd() then
+  /// 'output_partition_' is not nullptr.
   Partition* output_partition_;
   HashTable::Iterator output_iterator_;
 
@@ -579,9 +580,9 @@ class GroupingAggregator : public Aggregator {
   /// earlier and also improves time locality of access to spilled data on disk.
   void PushSpilledPartition(Partition* partition);
 
-  /// Calls Close() on every Partition in 'aggregated_partitions_',
-  /// 'spilled_partitions_', and 'hash_partitions_' and then resets the lists,
-  /// the vector and the partition pool.
+  /// Calls Close() on 'output_partition_' and every Partition in
+  /// 'aggregated_partitions_', 'spilled_partitions_', and 'hash_partitions_' and then
+  /// resets the lists, the vector, the partition pool, and 'output_iterator_'.
   void ClosePartitions();
 
   /// Calls finalizes on all tuples starting at 'it'.

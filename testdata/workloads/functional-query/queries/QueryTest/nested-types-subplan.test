@@ -708,3 +708,15 @@ where c_custkey < (select o_orderkey
 ---- CATCH
 Subquery must not return more than one row: SELECT o_orderkey FROM c.c_orders WHERE o_orderkey = 6000000 OR o_orderkey = 4285920
 ====
+---- QUERY
+# IMPALA-7573: SELECT DISTINCT in a subplan.
+select c_custkey, c_mktsegment, o_orderkey, o_orderdate
+from customer c,
+  (select distinct o1.o_orderkey, o2.o_orderdate
+   from c.c_orders o1, c.c_orders o2
+   where o1.o_orderkey = o2.o_orderkey limit 1) v where c_custkey = 1;
+---- RESULTS
+1,'BUILDING',4808192,'1996-06-29'
+---- TYPES
+BIGINT,STRING,BIGINT,STRING
+====
