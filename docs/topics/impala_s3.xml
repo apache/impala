@@ -726,17 +726,14 @@ under the License.
           </p>
         </li>
         <li>
-          <p>
-            Set the safety valve <codeph>fs.s3a.connection.maximum</codeph> to 1500 for <cmdname>impalad</cmdname>.
-          </p>
+          <p> Set <codeph>fs.s3a.connection.maximum</codeph> to 1500 for
+              <cmdname>impalad</cmdname>. </p>
         </li>
         <li>
-          <p>
-            Set safety valve <codeph>fs.s3a.block.size</codeph> to 134217728
-            (128 MB in bytes) if most Parquet files queried by Impala were written by Hive
-            or ParquetMR jobs. Set the block size to 268435456 (256 MB in bytes) if most Parquet
-            files queried by Impala were written by Impala.
-          </p>
+          <p> Set <codeph>fs.s3a.block.size</codeph> to 134217728 (128 MB in
+            bytes) if most Parquet files queried by Impala were written by Hive
+            or ParquetMR jobs. Set the block size to 268435456 (256 MB in bytes)
+            if most Parquet files queried by Impala were written by Impala. </p>
         </li>
         <li>
           <p>

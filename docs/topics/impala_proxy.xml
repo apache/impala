@@ -369,18 +369,6 @@ klist -k <varname>keytabfile</varname>
 
       </ol>
 
-<!--
-We basically want to merge the keytab from the proxy host to all the impalad host's keytab file. To merge two keytab files, we first need to ship the proxy keytab to all the impalad node, then merge keytab files using MIT Kerberos "ktutil" command line tool.
-
-<codeblock>$ ktutil
-ktutil: read_kt krb5.keytab
-ktutil: read_kt proxy-host.keytab
-ktutil: write_kt krb5.keytab
-ktutil: quit</codeblock>
-
-The setup of the -principal and -be_principal has to be set through safety valve.
--->
-
     </conbody>
 
   </concept>
