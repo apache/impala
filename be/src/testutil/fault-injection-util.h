@@ -34,7 +34,6 @@ class FaultInjectionUtil {
     RPC_UPDATEFILTER,
     RPC_TRANSMITDATA,
     RPC_REPORTEXECSTATUS,
-    RPC_REMOTESHUTDOWN,
     RPC_RANDOM    // This must be last.
   };
 

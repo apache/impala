@@ -107,11 +107,3 @@ void ImpalaInternalService::PublishFilter(TPublishFilterResult& return_val,
   if (qs.get() == nullptr) return;
   qs->PublishFilter(params);
 }
-
-void ImpalaInternalService::RemoteShutdown(TRemoteShutdownResult& return_val,
-    const TRemoteShutdownParams& params) {
-  FAULT_INJECTION_RPC_DELAY(RPC_REMOTESHUTDOWN);
-  Status status = impala_server_->StartShutdown(
-      params.__isset.deadline_s ? params.deadline_s : -1, &return_val.shutdown_status);
-  status.ToThrift(&return_val.status);
-}

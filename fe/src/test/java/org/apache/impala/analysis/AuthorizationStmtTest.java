@@ -2583,19 +2583,6 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     }
   }
 
-  @Test
-  public void testShutdown() throws ImpalaException {
-    // Requires ALL privilege on server.
-    authorize(": shutdown()")
-        .ok(onServer(TPrivilegeLevel.ALL))
-        .error(accessError("server"))
-        .error(accessError("server"), onServer(TPrivilegeLevel.REFRESH))
-        .error(accessError("server"), onServer(TPrivilegeLevel.SELECT))
-        .error(accessError("server"), onDatabase("functional", TPrivilegeLevel.ALL))
-        .error(accessError("server"),
-            onTable("functional", "alltypes", TPrivilegeLevel.ALL));
-  }
-
   // Convert TDescribeResult to list of strings.
   private static List<String> resultToStringList(TDescribeResult result) {
     List<String> list = new ArrayList<>();

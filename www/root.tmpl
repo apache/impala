@@ -18,16 +18,8 @@ under the License.
 -->
 {{! Template for / }}
 {{>www/common-header.tmpl}}
-  {{?is_quiescing}}
-  <div class="alert alert-info" role="alert">
-  <h4>Shutdown in Progress</h4>
-  <p>
-  {{shutdown_status}}
-  </div>
-  {{/is_quiescing}}
-
   {{?impala_server_mode}}
-  <h2>Impala Server Mode: {{?is_coordinator}}Coordinator{{/is_coordinator}}
+  <h2>Impala Server Mode: {{?is_coordinator}}Coordinator{{/is_coordinator}} 
     {{?is_executor}}Executor{{/is_executor}}</h2>
   {{/impala_server_mode}}
 

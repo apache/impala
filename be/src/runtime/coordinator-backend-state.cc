@@ -377,29 +377,38 @@ bool Coordinator::BackendState::Cancel() {
   VLOG_QUERY << "sending CancelQueryFInstances rpc for query_id=" << PrintId(query_id()) <<
       " backend=" << TNetworkAddressToString(impalad_address());
 
+  Status rpc_status;
+  Status client_status;
+  // Try to send the RPC 3 times before failing.
+  for (int i = 0; i < 3; ++i) {
+    ImpalaBackendConnection backend_client(ExecEnv::GetInstance()->impalad_client_cache(),
+        impalad_address(), &client_status);
+    if (!client_status.ok()) continue;
 
-  // The return value 'dummy' is ignored as it's only set if the fragment
-  // instance cannot be found in the backend. The fragment instances of a query
-  // can all be cancelled locally in a backend due to RPC failure to
-  // coordinator. In which case, the query state can be gone already.
-  ImpalaBackendConnection::RpcStatus rpc_status = ImpalaBackendConnection::DoRpcWithRetry(
-      ExecEnv::GetInstance()->impalad_client_cache(), impalad_address(),
-      &ImpalaBackendClient::CancelQueryFInstances, params,
-      [this] () {
-        return DebugAction(query_ctx().client_request.query_options,
-            "COORD_CANCEL_QUERY_FINSTANCES_RPC");
-      }, &dummy);
-  if (!rpc_status.status.ok()) {
-    status_.MergeStatus(rpc_status.status);
-    if (rpc_status.client_error) {
-      VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id())
-                 << " failed to connect to " << TNetworkAddressToString(impalad_address())
-                 << " :" << rpc_status.status.msg().msg();
-    } else {
-      VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id())
-                 << " rpc to " << TNetworkAddressToString(impalad_address())
-                 << " failed: " << rpc_status.status.msg().msg();
-    }
+    rpc_status = DebugAction(query_ctx().client_request.query_options,
+        "COORD_CANCEL_QUERY_FINSTANCES_RPC");
+    if (!rpc_status.ok()) continue;
+
+    // The return value 'dummy' is ignored as it's only set if the fragment
+    // instance cannot be found in the backend. The fragment instances of a query
+    // can all be cancelled locally in a backend due to RPC failure to
+    // coordinator. In which case, the query state can be gone already.
+    rpc_status = backend_client.DoRpc(
+        &ImpalaBackendClient::CancelQueryFInstances, params, &dummy);
+    if (rpc_status.ok()) break;
+  }
+  if (!client_status.ok()) {
+    status_.MergeStatus(client_status);
+    VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id())
+               << " failed to connect to " << TNetworkAddressToString(impalad_address())
+               << " :" << client_status.msg().msg();
+    return true;
+  }
+  if (!rpc_status.ok()) {
+    status_.MergeStatus(rpc_status);
+    VLOG_QUERY << "CancelQueryFInstances query_id= " << PrintId(query_id())
+               << " rpc to " << TNetworkAddressToString(impalad_address())
+               << " failed: " << rpc_status.msg().msg();
     return true;
   }
   return true;

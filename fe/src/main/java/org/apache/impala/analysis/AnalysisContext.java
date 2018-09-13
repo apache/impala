@@ -132,7 +132,6 @@ public class AnalysisContext {
       return stmt_ instanceof ShowCreateFunctionStmt;
     }
     public boolean isShowFilesStmt() { return stmt_ instanceof ShowFilesStmt; }
-    public boolean isAdminFnStmt() { return stmt_ instanceof AdminFnStmt; }
     public boolean isDescribeDbStmt() { return stmt_ instanceof DescribeDbStmt; }
     public boolean isDescribeTableStmt() { return stmt_ instanceof DescribeTableStmt; }
     public boolean isResetMetadataStmt() { return stmt_ instanceof ResetMetadataStmt; }
@@ -365,11 +364,6 @@ public class AnalysisContext {
     public AlterDbStmt getAlterDbStmt() {
       Preconditions.checkState(isAlterDbStmt());
       return (AlterDbStmt) stmt_;
-    }
-
-    public AdminFnStmt getAdminFnStmt() {
-      Preconditions.checkState(isAdminFnStmt());
-      return (AdminFnStmt) stmt_;
     }
 
     public StatementBase getStmt() { return stmt_; }

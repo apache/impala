@@ -844,7 +844,6 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::ArgumentMap& args,
     backend_obj.AddMember("is_coordinator", backend.is_coordinator,
         document->GetAllocator());
     backend_obj.AddMember("is_executor", backend.is_executor, document->GetAllocator());
-    backend_obj.AddMember("is_quiescing", backend.is_quiescing, document->GetAllocator());
     backends_list.PushBack(backend_obj, document->GetAllocator());
   }
   document->AddMember("backends", backends_list, document->GetAllocator());

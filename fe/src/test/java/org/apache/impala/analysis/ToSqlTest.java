@@ -22,6 +22,7 @@ import static org.junit.Assert.fail;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.testutil.TestUtils;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
@@ -63,14 +64,6 @@ public class ToSqlTest extends FrontendTestBase {
       if (op.isSemiJoin()) continue;
       nonSemiJoinTypes_[j++] = op.toString();
     }
-  }
-
-  /**
-   * Helper for the common case when the string should be identical after a roundtrip
-   * through the parser.
-   */
-  private void testToSql(String query) {
-    testToSql(query, query);
   }
 
   private void testToSql(String query, String expected) {
@@ -1435,8 +1428,9 @@ public class ToSqlTest extends FrontendTestBase {
    */
   @Test
   public void testInvalidate() {
-    testToSql("INVALIDATE METADATA");
-    testToSql("INVALIDATE METADATA functional.alltypes");
+    testToSql("INVALIDATE METADATA", "INVALIDATE METADATA");
+    testToSql("INVALIDATE METADATA functional.alltypes",
+        "INVALIDATE METADATA functional.alltypes");
   }
 
   /**
@@ -1444,19 +1438,9 @@ public class ToSqlTest extends FrontendTestBase {
    */
   @Test
   public void testRefresh() {
-    testToSql("REFRESH functional.alltypes");
-    testToSql("REFRESH functional.alltypes PARTITION (year=2009, month=1)");
-    testToSql("REFRESH FUNCTIONS functional");
-  }
-
-  /**
-   * Test admin functions are output correctly.
-   */
-  @Test
-  public void testAdminFn() {
-    testToSql(":shutdown()");
-    testToSql(":shutdown('hostname')");
-    testToSql(":shutdown('hostname', 1000)");
-    testToSql(":shutdown(1000)");
+    testToSql("REFRESH functional.alltypes", "REFRESH functional.alltypes");
+    testToSql("REFRESH functional.alltypes PARTITION (year=2009, month=1)",
+        "REFRESH functional.alltypes PARTITION (year=2009, month=1)");
+    testToSql("REFRESH FUNCTIONS functional", "REFRESH FUNCTIONS functional");
   }
 }

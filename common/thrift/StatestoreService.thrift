@@ -74,10 +74,6 @@ struct TBackendDescriptor {
 
   // The process memory limit of this backend (in bytes).
   8: required i64 proc_mem_limit;
-
-  // True if fragment instances should not be scheduled on this daemon because the
-  // daemon has been quiescing, e.g. if it shutting down.
-  9: required bool is_quiescing;
 }
 
 // Description of a single entry in a topic

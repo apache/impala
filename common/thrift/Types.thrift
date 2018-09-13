@@ -100,8 +100,7 @@ enum TStmtType {
   DML, // Data modification e.g. INSERT
   EXPLAIN,
   LOAD, // Statement type for LOAD commands
-  SET,
-  ADMIN_FN // Admin function, e.g. ": shutdown()".
+  SET
 }
 
 // Level of verboseness for "explain" output.

@@ -251,20 +251,11 @@ void RootHandler(const Webserver::ArgumentMap& args, Document* document) {
 
   ExecEnv* env = ExecEnv::GetInstance();
   if (env == nullptr || env->impala_server() == nullptr) return;
-  ImpalaServer* impala_server = env->impala_server();
   document->AddMember("impala_server_mode", true, document->GetAllocator());
-  document->AddMember("is_coordinator", impala_server->IsCoordinator(),
+  document->AddMember("is_coordinator", env->impala_server()->IsCoordinator(),
       document->GetAllocator());
-  document->AddMember("is_executor", impala_server->IsExecutor(),
+  document->AddMember("is_executor", env->impala_server()->IsExecutor(),
       document->GetAllocator());
-  bool is_quiescing = impala_server->IsShuttingDown();
-  document->AddMember("is_quiescing", is_quiescing, document->GetAllocator());
-  if (is_quiescing) {
-    Value shutdown_status(
-        impala_server->ShutdownStatusToString(impala_server->GetShutdownStatus()).c_str(),
-        document->GetAllocator());
-    document->AddMember("shutdown_status", shutdown_status, document->GetAllocator());
-  }
 }
 
 void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracker,
