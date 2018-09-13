@@ -42,6 +42,9 @@ CATALOGD_ARGS = 'catalogd_args'
 # Additional args passed to the start-impala-cluster script.
 START_ARGS = 'start_args'
 SENTRY_CONFIG = 'sentry_config'
+# Default query options passed to the impala daemon command line. Handled separately from
+# other impala daemon arguments to allow merging multiple defaults into a single list.
+DEFAULT_QUERY_OPTIONS = 'default_query_options'
 
 # Run with fast topic updates by default to reduce time to first query running.
 DEFAULT_STATESTORE_ARGS = '--statestore_update_frequency_ms=50 \
@@ -92,7 +95,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   @staticmethod
   def with_args(impalad_args=None, statestored_args=None, catalogd_args=None,
-      start_args=None, sentry_config=None):
+                start_args=None, sentry_config=None, default_query_options=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -109,6 +112,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[START_ARGS] = start_args
       if sentry_config is not None:
         func.func_dict[SENTRY_CONFIG] = sentry_config
+      if default_query_options is not None:
+        func.func_dict[DEFAULT_QUERY_OPTIONS] = default_query_options
       return func
     return decorate
 
@@ -123,7 +128,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if SENTRY_CONFIG in method.func_dict:
       self._start_sentry_service(method.func_dict[SENTRY_CONFIG])
     # Start a clean new cluster before each test
-    self._start_impala_cluster(cluster_args)
+    self._start_impala_cluster(
+        cluster_args, default_query_options=method.func_dict.get(DEFAULT_QUERY_OPTIONS))
     super(CustomClusterTestSuite, self).setup_class()
 
   def teardown_method(self, method):
@@ -155,7 +161,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   @classmethod
   def _start_impala_cluster(cls, options, log_dir=os.getenv('LOG_DIR', "/tmp/"),
       cluster_size=CLUSTER_SIZE, num_coordinators=NUM_COORDINATORS,
-      use_exclusive_coordinators=False, log_level=1, expected_num_executors=CLUSTER_SIZE):
+      use_exclusive_coordinators=False, log_level=1, expected_num_executors=CLUSTER_SIZE,
+      default_query_options=None):
     cls.impala_log_dir = log_dir
     # We ignore TEST_START_CLUSTER_ARGS here. Custom cluster tests specifically test that
     # certain custom startup arguments work and we want to keep them independent of dev
@@ -177,8 +184,16 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       cmd.append("--impalad_args=%s --catalogd_args=%s" %
                  ("--pull_incremental_statistcs", "--pull_incremental_statistics"))
 
+    default_query_option_kvs = []
+    # Put any defaults first, then any arguments after that so they can override defaults.
     if os.environ.get("ERASURE_CODING") == "true":
-      cmd.append("--impalad_args=--default_query_options=allow_erasure_coded_files=true")
+      default_query_option_kvs.append(("allow_erasure_coded_files", "true"))
+    if default_query_options is not None:
+      default_query_option_kvs.extend(default_query_options)
+
+    if default_query_option_kvs:
+      options.append("--impalad_args=--default_query_options={0}".format(
+          ','.join(["{0}={1}".format(k, v) for k, v in default_query_option_kvs])))
 
     logging.info("Starting cluster with command: %s" %
                  " ".join(pipes.quote(arg) for arg in cmd + options))
