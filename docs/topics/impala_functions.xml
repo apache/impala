@@ -21,7 +21,13 @@ under the License.
 <concept id="builtins">
 
   <title id="title_functions">Impala Built-In Functions</title>
-  <titlealts audience="PDF"><navtitle>Built-In Functions</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>Built-In Functions</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -35,17 +41,10 @@ under the License.
 
   <conbody>
 
-    <!-- To do:
-      Opportunity to conref some material between here and the "Functions" topic under "Schema Objects".
-    -->
-
     <p>
-      Impala supports several categories of built-in functions. These functions let you perform mathematical
-      calculations, string manipulation, date calculations, and other kinds of data transformations directly in
-      <codeph>SELECT</codeph> statements. The built-in functions let a SQL query return results with all
-      formatting, calculating, and type conversions applied, rather than performing time-consuming postprocessing
-      in another application. By applying function calls where practical, you can make a SQL query that is as
-      convenient as an expression in a procedural programming language or a formula in a spreadsheet.
+      Impala supports several categories of built-in functions. These functions let you perform
+      mathematical calculations, string manipulation, date calculations, and other kinds of data
+      transformations directly in SQL statements.
     </p>
 
     <p>
@@ -74,106 +73,1370 @@ under the License.
       </li>
 
       <li>
-        Aggregation functions, explained in <xref href="impala_aggregate_functions.xml#aggregate_functions"/>.
+        <xref href="impala_aggregate_functions.xml#aggregate_functions"/>.
+      </li>
+
+      <li>
+        <xref href="impala_analytic_functions.xml#analytic_functions"/>
+      </li>
+
+      <li>
+        <xref href="impala_bit_functions.xml#bit_functions"/>
+      </li>
+
+      <li>
+        <xref href="impala_misc_functions.xml#misc_functions"/>
       </li>
     </ul>
 
     <p>
-      You call any of these functions through the <codeph>SELECT</codeph> statement. For most functions, you can
-      omit the <codeph>FROM</codeph> clause and supply literal values for any required arguments:
+      The following is a list of built-in functions supported in Impala:
     </p>
 
-<codeblock>select abs(-1);
-+---------+
-| abs(-1) |
-+---------+
-| 1       |
-+---------+
-
-select concat('The rain ', 'in Spain');
-+---------------------------------+
-| concat('the rain ', 'in spain') |
-+---------------------------------+
-| The rain in Spain               |
-+---------------------------------+
-
-select power(2,5);
-+-------------+
-| power(2, 5) |
-+-------------+
-| 32          |
-+-------------+
-</codeblock>
-
-    <p>
-      When you use a <codeph>FROM</codeph> clause and specify a column name as a function argument, the function is
-      applied for each item in the result set:
-    </p>
-
-<!-- TK: make real output for these; change the queries if necessary to use tables I already have. -->
-
-<codeblock>select concat('Country = ',country_code) from all_countries where population &gt; 100000000;
-select round(price) as dollar_value from product_catalog where price between 0.0 and 100.0;
-</codeblock>
-
-    <p>
-      Typically, if any argument to a built-in function is <codeph>NULL</codeph>, the result value is also
-      <codeph>NULL</codeph>:
-    </p>
-
-<codeblock>select cos(null);
-+-----------+
-| cos(null) |
-+-----------+
-| NULL      |
-+-----------+
-
-select power(2,null);
-+----------------+
-| power(2, null) |
-+----------------+
-| NULL           |
-+----------------+
-
-select concat('a',null,'b');
-+------------------------+
-| concat('a', null, 'b') |
-+------------------------+
-| NULL                   |
-+------------------------+
-</codeblock>
-
-    <p conref="../shared/impala_common.xml#common/aggr1"/>
-
-<codeblock conref="../shared/impala_common.xml#common/aggr2"/>
-
-    <p conref="../shared/impala_common.xml#common/aggr3"/>
-
-    <p>
-      Aggregate functions are a special category with different rules. These functions calculate a return value
-      across all the items in a result set, so they do require a <codeph>FROM</codeph> clause in the query:
-    </p>
-
-<!-- TK: make real output for these; change the queries if necessary to use tables I already have. -->
-
-<codeblock>select count(product_id) from product_catalog;
-select max(height), avg(height) from census_data where age &gt; 20;
-</codeblock>
-
-    <p>
-      Aggregate functions also ignore <codeph>NULL</codeph> values rather than returning a <codeph>NULL</codeph>
-      result. For example, if some rows have <codeph>NULL</codeph> for a particular column, those rows are ignored
-      when computing the AVG() for that column. Likewise, specifying <codeph>COUNT(col_name)</codeph> in a query
-      counts only those rows where <codeph>col_name</codeph> contains a non-<codeph>NULL</codeph> value.
-    </p>
-
-    <p rev="2.0.0">
-      Analytic functions are a variation on aggregate functions. Instead of returning a single value, or an
-      identical value for each group of rows, they can compute values that vary based on a <q>window</q> consisting
-      of other rows around them in the result set.
-    </p>
-
-    <p outputclass="toc"/>
+    <table id="impala_functions" frame="none" colsep="0" rowsep="0">
+      <tgroup cols="1">
+        <colspec colnum="1" colname="col1"/>
+        <tbody>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/abs"
+                >ABS</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/acos"
+                >ACOS</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/add_months"
+                >ADD_MONTHS</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/adddate"
+                >ADDDATE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_appx_median.xml#appx_median">APPX_MEDIAN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/ascii"
+                >ASCII</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/asin"
+                >ASIN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/atan"
+                >ATAN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/atan2"
+                >ATAN2</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_avg.xml#avg">AVG</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#avg_analytic">AVG - Analytic
+              Function</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/base64decode"
+                >BASE64DECODE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/base64encode"
+                >BASE64ENCODE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/bitand"
+                >BITAND</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/bin"
+                >BIN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/bitnot"
+                >BITNOT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/bitor"
+                >BITOR</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/bitxor"
+                >BITXOR</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/btrim"
+                >BTRIM</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/case"
+                >CASE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/case2"
+                >CASE
+              WHEN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conversion_functions.xml#conversion_functions/cast"
+                >CAST</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/ceil">CEIL, CEILING,
+              DCEIL</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/char_length"
+                >CHAR_LENGTH</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/chr"
+                >CHR</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/coalesce"
+                >COALESCE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/concat"
+                >CONCAT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/concat_ws"
+                >CONCAT_WS</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/conv"
+                >CONV</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/cos"
+                >COS</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/cosh"
+                >COSH</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/cot"
+                >COT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_count.xml#count">COUNT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#count_analytic">COUNT - Analytic
+              Function</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/countset"
+                >COUNTSET</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#cume_dist"
+                >CUME_DIST</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_misc_functions.xml#misc_functions/current_database"
+                >CURRENT_DATABASE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/current_timestamp"
+                >CURRENT_TIMESTAMP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/date_add"
+                >DATE_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/date_part"
+                >DATE_PART</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/date_sub"
+                >DATE_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/date_trunc"
+                >DATE_TRUNC</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/datediff"
+                >DATEDIFF</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_datetime_functions.xml#datetime_functions/day"
+                >DAY</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/dayname"
+                >DAYNAME</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/dayofweek"
+                >DAYOFWEEK</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/dayofyear"
+                >DAYOFYEAR</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/days_add"
+                >DAYS_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/days_sub"
+                >DAYS_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/decode"
+                >DECODE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/degrees"
+                >DEGREES</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#dense_rank"
+                >DENSE_RANK</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/e">E</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_misc_functions.xml#misc_functions/effective_user"
+                >EFFECTIVE_USER</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/exp"
+                >EXP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/extract"
+                >EXTRACT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/factorial"
+                >FACTORIAL</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/find_in_set"
+                >FIND_IN_SET</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#first_value"
+                >FIRST_VALUE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/floor">FLOOR, DFLOOR</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/fmod"
+                >FMOD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/fnv_hash"
+                >FNV_HASH</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/from_unixtime"
+                >FROM_UNIXTIME</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/from_timestamp"
+                >FROM_TIMESTAMP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/from_utc_timestamp"
+                >FROM_UTC_TIMESTAMP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/getbit"
+                >GETBIT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/greatest"
+                >GREATEST</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/group_concat"
+                >GROUP_CONCAT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_group_concat.xml#group_concat">GROUP_CONCAT - Analytic
+              Function</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/hex"
+                >HEX</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_datetime_functions.xml#datetime_functions/hour"
+                >HOUR</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/hours_add"
+                >HOURS_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/hours_sub"
+                >HOURS_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/if"
+                >IF</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/ifnull"
+                >IFNULL</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/initcap"
+                >INITCAP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/instr"
+                >INSTR</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/int_months_between"
+                >INT_MONTHS_BETWEEN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/is_inf"
+                >IS_INF</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/is_nan"
+                >IS_NAN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/isfalse"
+                >ISFALSE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/isnotfalse"
+                >ISNOTFALSE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/isnottrue"
+                >ISNOTTRUE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/isnull"
+                >ISNULL</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/istrue"
+                >ISTRUE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#lag">LAG</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#last_value"
+                >LAST_VALUE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#lead">LEAD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/least"
+                >LEAST</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/left"
+                >LEFT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/length"
+                >LENGTH</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/ln">LN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/locate"
+                >LOCATE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/log"
+                >LOG</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/log10"
+                >LOG10</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/log2"
+                >LOG2</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/lower"
+                >LOWER,
+              LCASE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/lpad"
+                >LPAD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/ltrim"
+                >LTRIM</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_max.xml#max">MAX</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#max_analytic">MAX - Analytic
+              Function</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/max_int"
+                >MAX_INT,
+              MAX_TINYINT, MAX_SMALLINT, MAX_BIGINT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/microseconds_add"
+                >MICROSECONDS_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/microseconds_sub"
+                >MICROSECONDS_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/millisecond"
+                >MILLISECOND</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/milliseconds_add"
+                >MILLISECONDS_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/milliseconds_sub"
+                >MILLISECONDS_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_min.xml#min">MIN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#min_analytic">MIN - Analytic
+              Function</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/min_int"
+                >MIN_INT,
+              MIN_TINYINT, MIN_SMALLINT, MIN_BIGINT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/minute"
+                >MINUTE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/minutes_add"
+                >MINUTES_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/minutes_sub"
+                >MINUTES_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/mod"
+                >MOD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/month"
+                >MONTH</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/monthname"
+                >MONTHNAME</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/months_add"
+                >MONTHS_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/months_between"
+                >MONTHS_BETWEEN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/months_sub"
+                >MONTHS_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/murmur_hash"
+                >MURMUR_HASH</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/nanoseconds_add"
+                >NANOSECONDS_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/nanoseconds_sub"
+                >NANOSECONDS_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_ndv.xml#ndv">NDV</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/negative"
+                >NEGATIVE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/next_day"
+                >NEXT_DAY</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/nonnullvalue"
+                >NONNULLVALUE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_datetime_functions.xml#datetime_functions/now"
+                >NOW</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#ntile">NTILE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/nullif"
+                >NULLIF</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/nullifzero"
+                >NULLIFZERO</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/nullvalue"
+                >NULLVALUE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/nvl"
+                >NVL</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/nvl2"
+                >NVL2</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#over">OVER Clause</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/parse_url"
+                >PARSE_URL</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#percent_rank"
+                >PERCENT_RANK</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/pi">PI</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_misc_functions.xml#misc_functions/pid"
+                >PID</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/pmod"
+                >PMOD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/positive"
+                >POSITIVE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/pow">POW, POWER, DPOW,
+              FPOW</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/precision"
+                >PRECISION</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/quarter"
+                >QUARTER</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/quotient"
+                >QUOTIENT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/radians"
+                >RADIANS</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/rand">RAND, RANDOM</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#rank">RANK</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/regexp_escape"
+                >REGEXP_ESCAPE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/regexp_extract"
+                >REGEXP_EXTRACT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/regexp_like"
+                >REGEXP_LIKE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/regexp_replace"
+                >REGEXP_REPLACE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/repeat"
+                >REPEAT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/replace"
+                >REPLACE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/reverse"
+                >REVERSE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/right"
+                >RIGHT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/rotateleft"
+                >ROTATELEFT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/rotateright"
+                >ROTATERIGHT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/round">ROUND, DROUND</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#row_number"
+                >ROW_NUMBER</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/rpad"
+                >RPAD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/rtrim"
+                >RTRIM</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/scale"
+                >SCALE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/second"
+                >SECOND</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/seconds_add"
+                >SECONDS_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/seconds_sub"
+                >SECONDS_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/setbit"
+                >SETBIT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/shiftleft"
+                >SHIFTLEFT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_bit_functions.xml#bit_functions/shiftright"
+                >SHIFTRIGHT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/sign"
+                >SIGN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/sin"
+                >SIN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/sinh"
+                >SINH</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_misc_functions.xml#misc_functions/sleep"
+                >SLEEP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/space"
+                >SPACE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/split_part"
+                >SPLIT_PART</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/sqrt"
+                >SQRT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_stddev.xml#stddev">STDDEV, STDDEV_SAMP, STDDEV_POP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/strleft"
+                >STRLEFT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/strright"
+                >STRRIGHT</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/subdate"
+                >SUBDATE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/substr"
+                >SUBSTR,
+              SUBSTRING</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_sum.xml#sum">SUM</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_analytic_functions.xml#sum_analytic">SUM - Analytic
+              Function</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/tan"
+                >TAN</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/tanh"
+                >TANH</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/timeofday"
+                >TIMEOFDAY</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/timestamp_cmp"
+                >TIMESTAMP_CMP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/to_date"
+                >TO_DATE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/to_timestamp"
+                >TO_TIMESTAMP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/to_utc_timestamp"
+                >TO_UTC_TIMESTAMP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_string_functions.xml#string_functions/translate"
+                >TRANSLATE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/trim"
+                >TRIM</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/trunc"
+                >TRUNC</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/truncate"
+                >TRUNCATE,
+              DTRUNC, TRUNC</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conversion_functions.xml#conversion_functions/typeof"
+                >TYPEOF</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/unhex"
+                >UNHEX</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/unix_timestamp"
+                >UNIX_TIMESTAMP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/upper"
+                >UPPER,
+              UCASE</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_misc_functions.xml#misc_functions/user"
+                >USER</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/utc_timestamp"
+                >UTC_TIMESTAMP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_misc_functions.xml#misc_functions/uuid"
+                >UUID</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_variance.xml#variance">VARIANCE, VARIANCE_SAMP, VARIANCE_POP,
+              VAR_SAMP, VAR_POP</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_misc_functions.xml#misc_functions/version"
+                >VERSION</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/weekofyear"
+                >WEEKOFYEAR</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/weeks_add"
+                >WEEKS_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/weeks_sub"
+                >WEEKS_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_math_functions.xml#math_functions/width_bucket"
+                >WIDTH_BUCKET</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_datetime_functions.xml#datetime_functions/year"
+                >YEAR</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/years_add"
+                >YEARS_ADD</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_datetime_functions.xml#datetime_functions/years_sub"
+                >YEARS_SUB</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref
+                href="impala_conditional_functions.xml#conditional_functions/zeroifnull"
+                >ZEROIFNULL</xref>
+            </entry>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
 
   </conbody>
 
