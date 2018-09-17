@@ -58,18 +58,13 @@ SHOW FILES IN [<varname>database_name</varname>.]<varname>table_name</varname> <
 SHOW CURRENT ROLES
 SHOW ROLE GRANT GROUP <varname>group_name</varname>
 SHOW GRANT ROLE <varname>role_name</varname></ph>
+
+<ph rev="3.1.0">SHOW GRANT USER <varname>user_name</varname>
+SHOW GRANT USER <varname>user_name</varname> ON SERVER
+SHOW GRANT USER <varname>user_name</varname> ON DATABASE <varname>database_name</varname>
+SHOW GRANT USER <varname>user_name</varname> ON TABLE <varname>table_name</varname>
+SHOW GRANT USER <varname>user_name</varname> ON URI <varname>uri</varname></ph>
 </codeblock>
-
-<!-- SHOW ROLE GRANT { USER <varname>user_name</varname> | GROUP <varname>group_name</varname> | ROLE <varname>role_name</varname> } -->
-
-<!-- Extracted from the previous codeblock because even hidden content produces blank lines.
-<ph audience="hidden" rev="1.4.0">SHOW DATA SOURCES [LIKE '<varname>source_name</varname>]</ph>
--->
-
-<!-- Some suggestion there would be this syntax for 1.4, but it's not in the builds:
-<ph rev="1.4.0">SHOW [CACHED] TABLES [IN <varname>database_name</varname>] [[LIKE] '<varname>pattern</varname>']</ph>
-<ph rev="1.4.0">SHOW [CACHED] PARTITIONS [<varname>database_name</varname>.]<varname>table_name</varname></ph>
--->
 
     <p>
       Issue a <codeph>SHOW <varname>object_type</varname></codeph> statement to see the appropriate objects in the
@@ -502,6 +497,34 @@ where id between 1 and 1000000;
 
       <p conref="../shared/impala_common.xml#common/related_info"/>
 
+      <p>
+        <xref href="impala_authorization.xml#authorization"/>
+      </p>
+    </conbody>
+  </concept>
+  <concept rev="3.1.0" id="show_grant_user">
+    <title>SHOW GRANT USER Statement</title>
+    <prolog>
+      <metadata>
+        <data name="Category" value="Sentry"/>
+        <data name="Category" value="Users"/>
+      </metadata>
+    </prolog>
+    <conbody>
+      <p> The <codeph>SHOW GRANT USER</codeph> statement shows the list of
+        privileges for a given user. This statement is only allowed for Sentry
+        administrative users. However, the current user can run <codeph>SHOW
+          GRANT USER</codeph> for themselves. </p>
+      <p>This syntax is available in <keyword keyref="impala31_full"/> and later
+        only, when you are using the Sentry authorization framework along with
+        the Sentry service, as described in <xref
+          href="impala_authorization.xml#sentry_service"/>. It does not apply
+        when you use the Sentry framework with privileges defined in a policy
+        file. </p>
+      <p conref="../shared/impala_common.xml#common/security_blurb"/>
+      <p conref="../shared/impala_common.xml#common/show_security"/>
+      <p conref="../shared/impala_common.xml#common/permissions_blurb_no"/>
+      <p conref="../shared/impala_common.xml#common/related_info"/>
       <p>
         <xref href="impala_authorization.xml#authorization"/>
       </p>

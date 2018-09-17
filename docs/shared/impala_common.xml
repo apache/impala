@@ -1656,12 +1656,13 @@ select c_first_name, c_last_name from customer where lower(trim(c_last_name)) rl
       </p>
 
       <p id="show_security">
-        When authorization is enabled, the output of the <codeph>SHOW</codeph> statement is limited to those
-        objects for which you have some privilege. There might be other database, tables, and so on, but their
-        names are concealed. If you believe an object exists but you cannot see it in the <codeph>SHOW</codeph>
-        output, check with the system administrator if you need to be granted a new privilege for that object. See
-        <xref href="../topics/impala_authorization.xml#authorization"/> for how to set up authorization and add
-        privileges for specific kinds of objects.
+        When authorization is enabled, the output of the
+          <codeph>SHOW</codeph> statement only shows those objects for which you
+        have the privilege to view. If you believe an object exists but you
+        cannot see it in the <codeph>SHOW</codeph> output, check with the system
+        administrator if you need to be granted a new privilege for that object.
+        See <xref href="../topics/impala_authorization.xml#authorization"/> for
+        how to set up authorization and add privileges for specific objects.
       </p>
 
       <p id="infinity_and_nan" rev="IMPALA-3267">
