@@ -16,6 +16,9 @@
 # under the License.
 import pytest
 import time
+from tests.common.environ import IMPALAD_BUILD
+from tests.util.filesystem_utils import IS_HDFS, IS_LOCAL
+
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
@@ -28,6 +31,9 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
   metadata_cache_string = "columns (list) = list&lt;struct&gt;"
   url = "http://localhost:25020/catalog_object?object_type=TABLE&" \
         "object_name=functional.alltypes"
+
+  timeout_flag = "--invalidate_tables_timeout_s=" + \
+      ("20" if IMPALAD_BUILD.runs_slowly() or (not IS_HDFS and not IS_LOCAL) else "10")
 
   @classmethod
   def get_workload(cls):
@@ -52,14 +58,13 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
       assert time.time() < timeout
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(catalogd_args="--invalidate_tables_timeout_s=5",
-      impalad_args="--invalidate_tables_timeout_s=5")
+  @CustomClusterTestSuite.with_args(catalogd_args=timeout_flag, impalad_args=timeout_flag)
   def test_v1_catalog(self, cursor):
     self._run_test(cursor)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      catalogd_args="--invalidate_tables_timeout_s=5 --catalog_topic_mode=minimal",
-      impalad_args="--invalidate_tables_timeout_s=5 --use_local_catalog")
+      catalogd_args=timeout_flag + " --catalog_topic_mode=minimal",
+      impalad_args=timeout_flag + " --use_local_catalog")
   def test_local_catalog(self, cursor):
     self._run_test(cursor)
