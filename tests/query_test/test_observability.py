@@ -221,9 +221,8 @@ class TestObservability(ImpalaTestSuite):
   def test_query_profile_contains_all_events(self, unique_database):
     """Test that the expected events show up in a query profile for various queries"""
     # make a data file to load data from
-    path = "tmp/{0}/data_file".format(unique_database)
-    self.hdfs_client.delete_file_dir(path)
-    self.hdfs_client.create_file(path, "1")
+    path = "test-warehouse/{0}.db/data_file".format(unique_database)
+    self.filesystem_client.create_file(path, "1")
     use_query = "use {0}".format(unique_database)
     self.execute_query(use_query)
     # all the events we will see for every query
