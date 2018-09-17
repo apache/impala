@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.apache.impala.catalog.AuthorizationException;
 import org.apache.impala.catalog.CatalogException;
@@ -365,14 +366,77 @@ public class SentryProxy {
    * be modified. Returns the granted privileges.
    * Throws exception if there was any error updating the Sentry Service or if the Impala
    * catalog does not contain the given role name.
+   * This code is odd because we need to avoid duplicate privileges in Sentry because
+   * the same privilege with and without grant option are two different privileges.
+   * https://issues.apache.org/jira/browse/SENTRY-2408
+   * If the current privilege and the requested privilege have the same grant option
+   * state, then just execute the grant. This is necessary so that if the user does not
+   * have the ability to grant, Sentry will throw an exception. We don't want to
+   * expose data by skipping the grant if it already exists.
+   * For the case when the existing privilege does not have the grant option, but the
+   * request does, we need to first add the new privilege, then revoke the old one.
+   * If this is done in the wrong order, and an exception is thrown, the user will get
+   * a "REVOKE_PRIVILEGE" error on a grant.
+   * For the case when the existing privilege does have the grant option, but the
+   * request does not, we add the grant option to the request because the privilege
+   * should not be "downgraded", we don't want to have duplicates, and we still need
+   * Sentry to perform the "has grant ability" check. Downgraded indicates changing a
+   * privilege from one that has a grant option to one that does not.
    */
   public synchronized List<PrincipalPrivilege> grantRolePrivileges(User user,
-      String roleName, List<TPrivilege> privileges) throws ImpalaException {
+      String roleName, List<TPrivilege> privileges, boolean hasGrantOption,
+      List<PrincipalPrivilege> removedPrivileges) throws ImpalaException {
+    // First find out what's in the catalog. All privileges will have the same grant
+    // option set. The only case there will be more than one privilege is in the case
+    // of multiple column privileges.
+    Preconditions.checkArgument(!privileges.isEmpty());
+    TPrivilege tWithGrant = privileges.get(0).deepCopy().setHas_grant_opt(true);
+    tWithGrant = tWithGrant.setPrivilege_name(PrincipalPrivilege
+        .buildPrivilegeName(tWithGrant));
+    PrincipalPrivilege catWithGrant = catalog_.getPrincipalPrivilege(roleName,
+        tWithGrant);
+    TPrivilege tNoGrant = privileges.get(0).deepCopy().setHas_grant_opt(false);
+    tNoGrant = tNoGrant.setPrivilege_name(PrincipalPrivilege
+        .buildPrivilegeName(tNoGrant));
+    PrincipalPrivilege catNoGrant = catalog_.getPrincipalPrivilege(roleName, tNoGrant);
+
+    // List of privileges that should be removed. If removed, they will be added to
+    // the removedPrivileges list.
+    List<TPrivilege> toRemove = null;
+
+    if (catNoGrant != null && hasGrantOption) {
+      toRemove = privileges.stream().map(p -> {
+        TPrivilege tp = p.deepCopy();
+        return tp.setPrivilege_name((PrincipalPrivilege
+            .buildPrivilegeName(tp.setHas_grant_opt(false))));
+        }).collect(Collectors.toList());
+    } else if (catWithGrant != null && !hasGrantOption) {
+      // Elevate the requested privileges.
+      privileges = privileges.stream().map(p -> p.setPrivilege_name(PrincipalPrivilege
+          .buildPrivilegeName(p.setHas_grant_opt(true)))).collect(Collectors.toList());
+    }
+
+    // This is a list of privileges that were added, to be returned.
+    List<PrincipalPrivilege> rolePrivileges = Lists.newArrayList();
+    // Do the grants first
     sentryPolicyService_.grantRolePrivileges(user, roleName, privileges);
     // Update the catalog
-    List<PrincipalPrivilege> rolePrivileges = Lists.newArrayList();
     for (TPrivilege privilege: privileges) {
       rolePrivileges.add(catalog_.addRolePrivilege(roleName, privilege));
+    }
+
+    // Then the revokes
+    if (toRemove != null && !toRemove.isEmpty()) {
+      sentryPolicyService_.revokeRolePrivileges(user, roleName, toRemove);
+      for (TPrivilege privilege : toRemove) {
+        PrincipalPrivilege rolePriv = catalog_.removeRolePrivilege(roleName, privilege);
+        if (rolePriv == null) continue;
+        removedPrivileges.add(rolePriv);
+      }
+      // If we removed anything, it might have removed the grants, so redo the grants.
+      // TODO: https://issues.apache.org/jira/browse/SENTRY-2408
+      // When Sentry adds API to modify privileges, this code can be refactored.
+      sentryPolicyService_.grantRolePrivileges(user, roleName, privileges);
     }
     return rolePrivileges;
   }
@@ -386,6 +450,13 @@ public class SentryProxy {
    * are granted, in the case where the revoke involves a grant option.  In this case
    * privileges that contain the grant option are removed and the new privileges without
    * the grant option are added.
+   *
+   * The revoke code is confusing because of the various usages of "grant option". The
+   * parameter "hasGrantOption" indicates that the revoke should just remove the grant
+   * option from an existing privilege. The grant option on the privilege indicates
+   * whether the existing privilege has the grant option set which for the case of
+   * revokes, there's currently no SQL statement that will result in the grant option
+   * being set on the request.
    */
   public synchronized List<PrincipalPrivilege> revokeRolePrivileges(User user,
       String roleName, List<TPrivilege> privileges, boolean hasGrantOption,
@@ -393,11 +464,25 @@ public class SentryProxy {
     List<PrincipalPrivilege> rolePrivileges = Lists.newArrayList();
     if (!hasGrantOption) {
       sentryPolicyService_.revokeRolePrivileges(user, roleName, privileges);
-      // Update the catalog
+      // Update the catalog. The catalog should only have one privilege whether it has
+      // the grant option or not. We need to remove it which ever one is set. Since the
+      // catalog object name for privileges contains the grantoption value, we need to
+      // check both.
       for (TPrivilege privilege: privileges) {
-        PrincipalPrivilege rolePriv = catalog_.removeRolePrivilege(roleName, privilege);
-        if (rolePriv == null) continue;
-        rolePrivileges.add(rolePriv);
+        TPrivilege privNotGrant = privilege.deepCopy();
+        privNotGrant.setHas_grant_opt(!privilege.has_grant_opt);
+        privNotGrant.setPrivilege_name(PrincipalPrivilege
+            .buildPrivilegeName(privNotGrant));
+        PrincipalPrivilege rolePrivNotGrant = catalog_.removeRolePrivilege(roleName,
+            privNotGrant);
+        PrincipalPrivilege rolePriv = catalog_.removeRolePrivilege(roleName,
+            privilege);
+        if (rolePrivNotGrant != null) {
+          rolePrivileges.add(rolePrivNotGrant);
+        }
+        if (rolePriv != null) {
+          rolePrivileges.add(rolePriv);
+        }
       }
     } else {
       // If the REVOKE GRANT OPTION has been specified, the privileges with grant must be

@@ -338,7 +338,8 @@ public class SentryPolicyService {
       switch (scope) {
         case SERVER:
           client.get().revokeServerPrivilege(requestingUser.getShortName(), roleName,
-              privilege.getServer_name(), privilege.getPrivilege_level().toString());
+              privilege.getServer_name(), privilege.getPrivilege_level().toString(),
+              /* grant option */ null);
           break;
         case DATABASE:
           client.get().revokeDatabasePrivilege(requestingUser.getShortName(), roleName,

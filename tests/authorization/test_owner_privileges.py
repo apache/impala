@@ -30,16 +30,16 @@ from getpass import getuser
 from os import getenv
 from time import sleep, time
 
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.sentry_cache_test_suite import SentryCacheTestSuite, TestObject
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 
 # The polling frequency used by catalogd to refresh Sentry privileges.
 # The long polling is so we can check updates just for the cache.
 # The other polling is so we can get the updates without having to wait.
 SENTRY_LONG_POLLING_FREQUENCY_S = 60
-SENTRY_POLLING_FREQUENCY_S = 3
+SENTRY_POLLING_FREQUENCY_S = 1
 # The timeout, in seconds, when waiting for a refresh of Sentry privileges.
-SENTRY_REFRESH_TIMEOUT_S = 9
+SENTRY_REFRESH_TIMEOUT_S = SENTRY_POLLING_FREQUENCY_S * 2
 
 SENTRY_CONFIG_DIR = getenv('IMPALA_HOME') + '/fe/src/test/resources/'
 SENTRY_BASE_LOG_DIR = getenv('IMPALA_CLUSTER_LOGS_DIR') + "/sentry"
@@ -48,33 +48,7 @@ SENTRY_CONFIG_FILE_OO_NOGRANT = SENTRY_CONFIG_DIR + 'sentry-site_oo_nogrant.xml'
 SENTRY_CONFIG_FILE_NO_OO = SENTRY_CONFIG_DIR + 'sentry-site_no_oo.xml'
 
 
-class TestObject():
-  DATABASE = "database"
-  TABLE = "table"
-  VIEW = "view"
-
-  def __init__(self, obj_type, obj_name, grant=False):
-    self.obj_name = obj_name
-    self.obj_type = obj_type
-    parts = obj_name.split(".")
-    self.db_name = parts[0]
-    self.table_name = None
-    self.table_def = ""
-    self.view_select = ""
-    if len(parts) > 1:
-      self.table_name = parts[1]
-    if obj_type == TestObject.VIEW:
-      self.grant_name = TestObject.TABLE
-      self.view_select = "as select * from functional.alltypes"
-    elif obj_type == TestObject.TABLE:
-      self.grant_name = TestObject.TABLE
-      self.table_def = "(col1 int)"
-    else:
-      self.grant_name = obj_type
-    self.grant = grant
-
-
-class TestOwnerPrivileges(CustomClusterTestSuite):
+class TestOwnerPrivileges(SentryCacheTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestOwnerPrivileges, cls).add_test_dimensions()
@@ -130,7 +104,7 @@ class TestOwnerPrivileges(CustomClusterTestSuite):
         self.execute_query("drop role %s" % role_name)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
+  @SentryCacheTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=" + SENTRY_CONFIG_FILE_OO,
     catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE_OO +
     " --sentry_catalog_polling_frequency_s=" + str(SENTRY_LONG_POLLING_FREQUENCY_S),
@@ -144,22 +118,22 @@ class TestOwnerPrivileges(CustomClusterTestSuite):
         unique_database + ".owner_priv_view", grant=True))
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
+  @SentryCacheTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=" + SENTRY_CONFIG_FILE_OO,
     catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE_OO +
     " --sentry_catalog_polling_frequency_s=" + str(SENTRY_POLLING_FREQUENCY_S),
     sentry_config=SENTRY_CONFIG_FILE_OO)
   def test_owner_privileges_with_grant(self, vector, unique_database):
     self.__execute_owner_privilege_tests(TestObject(TestObject.DATABASE, "owner_priv_db",
-        grant=True), sentry_refresh_timeout_sec=SENTRY_REFRESH_TIMEOUT_S)
+        grant=True), sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
     self.__execute_owner_privilege_tests(TestObject(TestObject.TABLE,
         unique_database + ".owner_priv_tbl", grant=True),
-        sentry_refresh_timeout_sec=SENTRY_REFRESH_TIMEOUT_S)
+        sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
     self.__execute_owner_privilege_tests(TestObject(TestObject.VIEW,
         unique_database + ".owner_priv_view", grant=True),
-        sentry_refresh_timeout_sec=SENTRY_REFRESH_TIMEOUT_S)
+        sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
 
-  def __execute_owner_privilege_tests(self, test_obj, sentry_refresh_timeout_sec=0):
+  def __execute_owner_privilege_tests(self, test_obj, sentry_refresh_timeout_s=0):
     """
     Executes all the statements required to validate owner privileges work correctly
     for a specific database, table, or view.
@@ -167,111 +141,76 @@ class TestOwnerPrivileges(CustomClusterTestSuite):
     # Create object and ensure root gets owner privileges.
     self.root_impalad_client = self.create_impala_client()
     self.test_user_impalad_client = self.create_impala_client()
-    self.__root_query("create %s if not exists %s %s %s" % (test_obj.obj_type,
-        test_obj.obj_name, test_obj.table_def, test_obj.view_select))
-    self.__validate_privileges(self.root_impalad_client, "root", "show grant user root",
-        test_obj, sentry_refresh_timeout_sec)
+    self.user_query(self.root_impalad_client, "create %s if not exists %s %s %s"
+        % (test_obj.obj_type, test_obj.obj_name, test_obj.table_def,
+        test_obj.view_select), user="root")
+    self.validate_privileges(self.root_impalad_client, "show grant user root", test_obj,
+        sentry_refresh_timeout_s, "root")
 
     # Ensure grant works.
-    self.__root_query("grant all on %s %s to role owner_priv_test_all_role"
-        % (test_obj.grant_name, test_obj.obj_name))
-    self.__root_query("revoke all on %s %s from role owner_priv_test_all_role"
-        % (test_obj.grant_name, test_obj.obj_name))
+    self.user_query(self.root_impalad_client,
+        "grant all on %s %s to role owner_priv_test_all_role"
+        % (test_obj.grant_name, test_obj.obj_name), user="root")
+    self.user_query(self.root_impalad_client,
+        "revoke all on %s %s from role owner_priv_test_all_role"
+        % (test_obj.grant_name, test_obj.obj_name), user="root")
 
     # Change the database owner and ensure root does not have owner privileges.
-    self.__root_query("alter %s %s set owner user test_user" % (test_obj.obj_type,
-        test_obj.obj_name))
-    result = self.__root_query("show grant user root")
+    self.user_query(self.root_impalad_client, "alter %s %s set owner user test_user"
+        % (test_obj.obj_type, test_obj.obj_name), user="root")
+    result = self.user_query(self.root_impalad_client, "show grant user root",
+        user="root", delay_s=sentry_refresh_timeout_s)
     assert len(result.data) == 0
 
     # Ensure root cannot drop database after owner change.
-    self.__root_query_fail("drop %s %s" % (test_obj.obj_type, test_obj.obj_name),
-        "does not have privileges to execute 'DROP'")
+    self.user_query(self.root_impalad_client, "drop %s %s" % (test_obj.obj_type,
+        test_obj.obj_name), user="root",
+        error_msg="does not have privileges to execute 'DROP'")
 
     # test_user should have privileges for object now.
-    self.__validate_privileges(self.test_user_impalad_client, "test_user",
-        "show grant user test_user", test_obj, sentry_refresh_timeout_sec)
+    self.validate_privileges(self.test_user_impalad_client, "show grant user test_user",
+        test_obj, sentry_refresh_timeout_s, "test_user")
 
     # Change the owner to a role and ensure test_user doesn't have privileges.
     # Set the owner back to root since for views, test_user doesn't have select
     # privileges on the underlying table.
     self.execute_query("alter %s %s set owner user root" % (test_obj.obj_type,
         test_obj.obj_name))
-    result = self.__test_user_query("show grant user test_user")
+    result = self.user_query(self.test_user_impalad_client,
+        "show grant user test_user", user="test_user", delay_s=sentry_refresh_timeout_s)
     assert len(result.data) == 0
-    self.__root_query("alter %s %s set owner role owner_priv_test_owner_role"
-        % (test_obj.obj_type, test_obj.obj_name))
+    self.user_query(self.root_impalad_client,
+        "alter %s %s set owner role owner_priv_test_owner_role"
+        % (test_obj.obj_type, test_obj.obj_name), user="root")
     # Ensure root does not have user privileges.
-    result = self.__root_query("show grant user root")
+    result = self.user_query(self.root_impalad_client, "show grant user root",
+        user="root", delay_s=sentry_refresh_timeout_s)
     assert len(result.data) == 0
 
     # Ensure role has owner privileges.
-    self.__validate_privileges(self.root_impalad_client, "root",
-        "show grant role owner_priv_test_owner_role", test_obj,
-        sentry_refresh_timeout_sec)
+    self.validate_privileges(self.root_impalad_client,
+        "show grant role owner_priv_test_owner_role", test_obj, sentry_refresh_timeout_s,
+        "root")
 
     # Drop the object and ensure no role privileges.
-    self.__root_query("drop %s %s " % (test_obj.obj_type, test_obj.obj_name))
-    result = self.__root_query("show grant role owner_priv_test_owner_role")
+    self.user_query(self.root_impalad_client, "drop %s %s " % (test_obj.obj_type,
+        test_obj.obj_name), user="root")
+    result = self.user_query(self.root_impalad_client, "show grant role " +
+        "owner_priv_test_owner_role", user="root", delay_s=sentry_refresh_timeout_s)
     assert len(result.data) == 0
 
     # Ensure user privileges are gone after drop.
-    self.__root_query("create %s if not exists %s %s %s" % (test_obj.obj_type,
-        test_obj.obj_name, test_obj.table_def, test_obj.view_select))
-    self.__root_query("drop %s %s " % (test_obj.obj_type, test_obj.obj_name))
-    result = self.__root_query("show grant user root")
+    self.user_query(self.root_impalad_client, "create %s if not exists %s %s %s"
+        % (test_obj.obj_type, test_obj.obj_name, test_obj.table_def,
+        test_obj.view_select), user="root")
+    self.user_query(self.root_impalad_client, "drop %s %s " % (test_obj.obj_type,
+        test_obj.obj_name), user="root")
+    result = self.user_query(self.root_impalad_client, "show grant user root",
+        user="root")
     assert len(result.data) == 0
 
-  def __str_to_bool(self, val):
-    if val.lower() == 'true':
-      return True
-    return False
-
-  def __check_privileges(self, result, test_obj, null_create_date=True):
-    # results should have the following columns
-    # scope, database, table, column, uri, privilege, grant_option, create_time
-    for row in result.data:
-      col = row.split('\t')
-      assert col[0] == test_obj.grant_name
-      assert col[1] == test_obj.db_name
-      if test_obj.table_name is not None and len(test_obj.table_name) > 0:
-        assert col[2] == test_obj.table_name
-      assert self.__str_to_bool(col[6]) == test_obj.grant
-      if not null_create_date:
-        assert str(col[7]) != 'NULL'
-
-  def __root_query(self, query):
-    return self.execute_query_expect_success(self.root_impalad_client, query, user="root")
-
-  def __root_query_fail(self, query, error_msg):
-    e = self.execute_query_expect_failure(self.root_impalad_client, query, user="root")
-    self.__verify_exceptions(error_msg, str(e))
-
-  def __validate_privileges(self, client, user, query, test_obj, timeout_sec):
-    """Validate privileges. If timeout_sec is > 0 then retry until create_date is not null
-    or the timeout_sec is reached.
-    """
-    if timeout_sec is None or timeout_sec <= 0:
-      self.__check_privileges(self.execute_query_expect_success(client, query,
-            user=user), test_obj)
-    else:
-      start_time = time()
-      while time() - start_time < timeout_sec:
-        result = self.execute_query_expect_success(client, query, user=user)
-        try:
-          self.__check_privileges(result, test_obj, null_create_date=False)
-          return True
-        except Exception:
-          pass
-        sleep(1)
-      return False
-
-  def __test_user_query(self, query):
-    return self.execute_query_expect_success(self.test_user_impalad_client, query,
-        user="test_user")
-
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
+  @SentryCacheTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=" + SENTRY_CONFIG_FILE_NO_OO,
     catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE_NO_OO +
     " --sentry_catalog_polling_frequency_s=" + str(SENTRY_LONG_POLLING_FREQUENCY_S),
@@ -285,55 +224,60 @@ class TestOwnerPrivileges(CustomClusterTestSuite):
         unique_database + ".owner_priv_view"))
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
+  @SentryCacheTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=" + SENTRY_CONFIG_FILE_NO_OO,
     catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE_NO_OO +
     " --sentry_catalog_polling_frequency_s=" + str(SENTRY_POLLING_FREQUENCY_S),
     sentry_config=SENTRY_CONFIG_FILE_NO_OO)
   def test_owner_privileges_disabled(self, vector, unique_database):
     self.__execute_owner_privilege_tests_no_oo(TestObject(TestObject.DATABASE,
-        "owner_priv_db"), sentry_refresh_timeout_sec=SENTRY_REFRESH_TIMEOUT_S)
+        "owner_priv_db"), sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
     self.__execute_owner_privilege_tests_no_oo(TestObject(TestObject.TABLE,
         unique_database + ".owner_priv_tbl"),
-        sentry_refresh_timeout_sec=SENTRY_REFRESH_TIMEOUT_S)
+        sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
     self.__execute_owner_privilege_tests_no_oo(TestObject(TestObject.VIEW,
         unique_database + ".owner_priv_view"),
-        sentry_refresh_timeout_sec=SENTRY_REFRESH_TIMEOUT_S)
+        sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
 
-  def __execute_owner_privilege_tests_no_oo(self, test_obj, sentry_refresh_timeout_sec=0):
+  def __execute_owner_privilege_tests_no_oo(self, test_obj, sentry_refresh_timeout_s=0):
     """
     Executes all the statements required to validate owner privileges work correctly
     for a specific database, table, or view.
     """
     # Create object and ensure root gets owner privileges.
     self.root_impalad_client = self.create_impala_client()
-    self.test_user_impalad_client = self.create_impala_client()
-    self.__root_query("create %s if not exists %s %s %s" % (test_obj.obj_type,
-        test_obj.obj_name, test_obj.table_def, test_obj.view_select))
+    self.user_query(self.root_impalad_client, "create %s if not exists %s %s %s"
+        % (test_obj.obj_type, test_obj.obj_name, test_obj.table_def,
+        test_obj.view_select), user="root")
     # For user privileges, if the user has no privileges, the user will not exist
     # in the privileges list.
-    self.__root_query_fail("show grant user root", "User 'root' does not exist")
+    self.user_query(self.root_impalad_client, "show grant user root",
+        user="root", error_msg="User 'root' does not exist")
 
     # Ensure grant doesn't work.
-    self.__root_query_fail("grant all on %s %s to role owner_priv_test_all_role"
-        % (test_obj.grant_name, test_obj.obj_name),
-        "does not have privileges to execute: GRANT_PRIVILEGE")
+    self.user_query(self.root_impalad_client,
+        "grant all on %s %s to role owner_priv_test_all_role"
+        % (test_obj.grant_name, test_obj.obj_name), user="root",
+        error_msg="does not have privileges to execute: GRANT_PRIVILEGE")
 
-    self.__root_query_fail("revoke all on %s %s from role owner_priv_test_all_role"
-        % (test_obj.grant_name, test_obj.obj_name),
-        "does not have privileges to execute: REVOKE_PRIVILEGE")
+    self.user_query(self.root_impalad_client,
+        "revoke all on %s %s from role owner_priv_test_all_role"
+        % (test_obj.grant_name, test_obj.obj_name), user="root",
+        error_msg="does not have privileges to execute: REVOKE_PRIVILEGE")
 
     # Ensure changing the database owner doesn't work.
-    self.__root_query_fail("alter %s %s set owner user test_user"
-        % (test_obj.obj_type, test_obj.obj_name),
-        "does not have privileges with 'GRANT OPTION'")
+    self.user_query(self.root_impalad_client, "alter %s %s set owner user test_user"
+        % (test_obj.obj_type, test_obj.obj_name), user="root",
+        error_msg="does not have privileges with 'GRANT OPTION'")
 
     # Ensure root cannot drop database.
-    self.__root_query_fail("drop %s %s" % (test_obj.obj_type, test_obj.obj_name),
-        "does not have privileges to execute 'DROP'")
+    self.user_query(self.root_impalad_client, "drop %s %s" % (test_obj.obj_type,
+        test_obj.obj_name), user="root",
+        error_msg="does not have privileges to execute 'DROP'",
+        delay_s=sentry_refresh_timeout_s)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
+  @SentryCacheTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=" + SENTRY_CONFIG_FILE_OO_NOGRANT,
     catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE_OO_NOGRANT +
     " --sentry_catalog_polling_frequency_s=" + str(SENTRY_LONG_POLLING_FREQUENCY_S),
@@ -347,60 +291,52 @@ class TestOwnerPrivileges(CustomClusterTestSuite):
         unique_database + ".owner_priv_view"))
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
+  @SentryCacheTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=" + SENTRY_CONFIG_FILE_OO_NOGRANT,
     catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE_OO_NOGRANT +
     " --sentry_catalog_polling_frequency_s=" + str(SENTRY_POLLING_FREQUENCY_S),
     sentry_config=SENTRY_CONFIG_FILE_OO_NOGRANT)
   def test_owner_privileges_without_grant(self, vector, unique_database):
     self.__execute_owner_privilege_tests_oo_nogrant(TestObject(TestObject.DATABASE,
-        "owner_priv_db"), sentry_refresh_timeout_sec=SENTRY_REFRESH_TIMEOUT_S)
+        "owner_priv_db"), sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
     self.__execute_owner_privilege_tests_oo_nogrant(TestObject(TestObject.TABLE,
         unique_database + ".owner_priv_tbl"),
-        sentry_refresh_timeout_sec=SENTRY_REFRESH_TIMEOUT_S)
+        sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
     self.__execute_owner_privilege_tests_oo_nogrant(TestObject(TestObject.VIEW,
         unique_database + ".owner_priv_view"),
-        sentry_refresh_timeout_sec=SENTRY_REFRESH_TIMEOUT_S)
+        sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
 
   def __execute_owner_privilege_tests_oo_nogrant(self, test_obj,
-      sentry_refresh_timeout_sec=0):
+      sentry_refresh_timeout_s=0):
     """
     Executes all the statements required to validate owner privileges work correctly
     for a specific database, table, or view.
     """
     # Create object and ensure root gets owner privileges.
     self.root_impalad_client = self.create_impala_client()
-    self.test_user_impalad_client = self.create_impala_client()
-    self.__root_query("create %s if not exists %s %s %s" % (test_obj.obj_type,
-        test_obj.obj_name, test_obj.table_def, test_obj.view_select))
-    self.__validate_privileges(self.root_impalad_client, "root", "show grant user root",
-        test_obj, sentry_refresh_timeout_sec)
+    self.user_query(self.root_impalad_client, "create %s if not exists %s %s %s"
+        % (test_obj.obj_type, test_obj.obj_name, test_obj.table_def,
+        test_obj.view_select), user="root")
+    self.validate_privileges(self.root_impalad_client, "show grant user root", test_obj,
+        sentry_refresh_timeout_s, "root")
 
     # Ensure grant doesn't work.
-    self.__root_query_fail("grant all on %s %s to role owner_priv_test_all_role"
-        % (test_obj.grant_name, test_obj.obj_name),
-        "does not have privileges to execute: GRANT_PRIVILEGE")
+    self.user_query(self.root_impalad_client,
+        "grant all on %s %s to role owner_priv_test_all_role"
+        % (test_obj.grant_name, test_obj.obj_name), user="root",
+        error_msg="does not have privileges to execute: GRANT_PRIVILEGE")
 
-    self.__root_query_fail("revoke all on %s %s from role owner_priv_test_all_role"
-        % (test_obj.grant_name, test_obj.obj_name),
-        "does not have privileges to execute: REVOKE_PRIVILEGE")
+    self.user_query(self.root_impalad_client,
+        "revoke all on %s %s from role owner_priv_test_all_role"
+        % (test_obj.grant_name, test_obj.obj_name), user="root",
+        error_msg="does not have privileges to execute: REVOKE_PRIVILEGE")
 
-    self.__root_query_fail("alter %s %s set owner user test_user"
-        % (test_obj.obj_type, test_obj.obj_name),
-        "does not have privileges with 'GRANT OPTION'")
+    self.user_query(self.root_impalad_client, "alter %s %s set owner user test_user"
+        % (test_obj.obj_type, test_obj.obj_name), user="root",
+        error_msg="does not have privileges with 'GRANT OPTION'")
 
-    self.__root_query("drop %s %s " % (test_obj.obj_type, test_obj.obj_name))
-    result = self.__root_query("show grant user root")
+    self.user_query(self.root_impalad_client, "drop %s %s " % (test_obj.obj_type,
+        test_obj.obj_name), user="root")
+    result = self.user_query(self.root_impalad_client, "show grant user root",
+        user="root")
     assert len(result.data) == 0
-
-  def __verify_exceptions(self, expected_str, actual_str):
-    """
-    Verifies that 'expected_str' is a substring of the actual exception string
-    'actual_str'.
-    """
-    actual_str = actual_str.replace('\n', '')
-    # Strip newlines so we can split error message into multiple lines
-    expected_str = expected_str.replace('\n', '')
-    if expected_str in actual_str: return
-    assert False, 'Unexpected exception string. Expected: %s\nNot found in actual: %s' % \
-      (expected_str, actual_str)

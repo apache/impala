@@ -2298,15 +2298,15 @@ public class AuthorizationStmtTest extends FrontendTestBase {
                 TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
       }
     } finally {
-      authzCatalog_.removeRole("foo_owner");
+      authzCatalog_.removeRole("foo");
     }
     boolean exceptionThrown = false;
     try {
-      parseAndAnalyze("alter database functional set owner role foo_owner",
+      parseAndAnalyze("alter database functional set owner role foo",
           analysisContext_ , frontend_);
     } catch (AnalysisException e) {
       exceptionThrown = true;
-      assertEquals("Role 'foo_owner' does not exist.", e.getLocalizedMessage());
+      assertEquals("Role 'foo' does not exist.", e.getLocalizedMessage());
     }
     assertTrue(exceptionThrown);
 

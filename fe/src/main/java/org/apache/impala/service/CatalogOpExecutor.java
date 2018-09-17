@@ -2863,8 +2863,7 @@ public class CatalogOpExecutor {
 
   /**
    * This is a helper method to take care of catalog related updates when removing
-   * a privilege. The lock is held to prevent race conditions between getting the owner
-   * and updating the privileges for that owner.
+   * a privilege.
    */
   private void removePrivilegeFromCatalog(String ownerString, PrincipalType ownerType,
     TPrivilege filter, TDdlExecResponse response) {
@@ -3160,7 +3159,8 @@ public class CatalogOpExecutor {
         Lists.newArrayListWithExpectedSize(privileges.size());
     if (grantRevokePrivParams.isIs_grant()) {
       addedRolePrivileges = catalog_.getSentryProxy().grantRolePrivileges(requestingUser,
-          roleName, privileges);
+          roleName, privileges, grantRevokePrivParams.isHas_grant_opt(),
+          removedGrantOptPrivileges);
       addSummary(resp, "Privilege(s) have been granted.");
     } else {
       // If this is a revoke of a privilege that contains the grant option, the privileges
@@ -3201,14 +3201,19 @@ public class CatalogOpExecutor {
         resp.result.setUpdated_catalog_objects(updatedPrivs);
         resp.result.setVersion(
             updatedPrivs.get(updatedPrivs.size() - 1).getCatalog_version());
+        if (!removedPrivs.isEmpty()) {
+          resp.result.setRemoved_catalog_objects(removedPrivs);
+          resp.result.setVersion(
+              Math.max(getLastItemVersion(updatedPrivs),
+                  getLastItemVersion(removedPrivs)));
+        }
       }
     } else if (privileges.get(0).isHas_grant_opt()) {
       if (!updatedPrivs.isEmpty() && !removedPrivs.isEmpty()) {
         resp.result.setUpdated_catalog_objects(updatedPrivs);
         resp.result.setRemoved_catalog_objects(removedPrivs);
         resp.result.setVersion(
-            getLastItemVersion(updatedPrivs) > getLastItemVersion(removedPrivs) ?
-            getLastItemVersion(updatedPrivs) : getLastItemVersion(removedPrivs));
+            Math.max(getLastItemVersion(updatedPrivs), getLastItemVersion(removedPrivs)));
       }
     } else {
       if (!removedPrivs.isEmpty()) {
