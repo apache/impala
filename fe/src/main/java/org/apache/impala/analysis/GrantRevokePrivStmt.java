@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 
-import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
@@ -64,9 +63,6 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
       privilege.setPrincipal_id(role_.getId());
       privilege.setPrincipal_type(role_.getPrincipalType());
       privilege.setHas_grant_opt(hasGrantOpt_);
-      // Need to rebuild the privilege name since it doesn't include grant option
-      // before now.
-      privilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(privilege));
     }
     params.setHas_grant_opt(hasGrantOpt_);
     params.setPrivileges(privileges);

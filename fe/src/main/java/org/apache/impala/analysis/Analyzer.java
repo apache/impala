@@ -2655,13 +2655,4 @@ public class Analyzer {
     }
     registerPrivReq(builder.toRequest());
   }
-
-  /**
-   * Returns the server name if authorization is enabled. Returns null when authorization
-   * is not enabled.
-   */
-  public String getServerName() {
-    return getAuthzConfig().isEnabled() ? getAuthzConfig().getServerName().intern() :
-        null;
-  }
 }

@@ -50,10 +50,6 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
 
     dbName_ = analyzer.getTargetDbName(tableName_);
     owner_ = analyzer.getUser().getName();
-    // Set the servername here if authorization is enabled because analyzer_ is not
-    // available in the toThrift() method.
-    serverName_ = analyzer.getServerName();
-
     if (analyzer.dbContainsTable(dbName_, tableName_.getTbl(), Privilege.CREATE) &&
         !ifNotExists_) {
       throw new AnalysisException(Analyzer.TBL_ALREADY_EXISTS_ERROR_MSG +

@@ -29,7 +29,6 @@ import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
@@ -1979,47 +1978,31 @@ public class AuthorizationStmtTest extends FrontendTestBase {
               TPrivilegeLevel.ALTER)));
     }
 
-    try {
-      // We cannot set an owner to a role that doesn't exist
-      authzCatalog_.addRole("foo_owner");
-      // Alter table set owner.
-      for (AuthzTest test: new AuthzTest[]{
-          authorize("alter table functional.alltypes set owner user foo_owner"),
-          authorize("alter table functional.alltypes set owner role foo_owner")}) {
-        test.ok(onServer(true, TPrivilegeLevel.ALL))
-            .ok(onServer(true, TPrivilegeLevel.OWNER))
-            .ok(onDatabase(true, "functional", TPrivilegeLevel.ALL))
-            .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
-            .ok(onTable(true, "functional", "alltypes", TPrivilegeLevel.ALL))
-            .ok(onTable(true, "functional", "alltypes", TPrivilegeLevel.OWNER))
-            .error(accessError(true, "functional.alltypes"), onServer(
-                TPrivilegeLevel.values()))
-            .error(accessError(true, "functional.alltypes"), onDatabase("functional",
-                TPrivilegeLevel.values()))
-            .error(accessError(true, "functional.alltypes"), onTable("functional",
-                "alltypes", TPrivilegeLevel.values()))
-            .error(accessError(true, "functional.alltypes"))
-            .error(accessError(true, "functional.alltypes"), onServer(true, allExcept(
-                TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
-            .error(accessError(true, "functional.alltypes"), onDatabase(true,
-                "functional", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
-            .error(accessError(true, "functional.alltypes"),
-                onTable(true, "functional", "alltypes", allExcept(
-                TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
-      }
-    } finally {
-      authzCatalog_.removeRole("foo_owner");
+    // Alter table set owner.
+    for (AuthzTest test: new AuthzTest[]{
+        authorize("alter table functional.alltypes set owner user foo_owner"),
+        authorize("alter table functional.alltypes set owner role foo_owner")}) {
+      test.ok(onServer(true, TPrivilegeLevel.ALL))
+          .ok(onServer(true, TPrivilegeLevel.OWNER))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.ALL))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
+          .ok(onTable(true, "functional", "alltypes", TPrivilegeLevel.ALL))
+          .ok(onTable(true, "functional", "alltypes", TPrivilegeLevel.OWNER))
+          .error(accessError(true, "functional.alltypes"), onServer(
+              TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes"), onDatabase("functional",
+              TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes"), onTable("functional",
+              "alltypes", TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes"))
+          .error(accessError(true, "functional.alltypes"), onServer(true, allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError(true, "functional.alltypes"), onDatabase(true, "functional",
+              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError(true, "functional.alltypes"),
+              onTable(true, "functional", "alltypes", allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
     }
-
-    boolean exceptionThrown = false;
-    try {
-      parseAndAnalyze("alter table functional.alltypes set owner role foo_owner",
-          analysisContext_ , frontend_);
-    } catch (AnalysisException e) {
-      exceptionThrown = true;
-      assertEquals("Role 'foo_owner' does not exist.", e.getLocalizedMessage());
-    }
-    assertTrue(exceptionThrown);
 
     // Alter table rename.
     authorize("alter table functional.alltypes rename to functional_parquet.new_table")
@@ -2223,36 +2206,29 @@ public class AuthorizationStmtTest extends FrontendTestBase {
             "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
             TPrivilegeLevel.ALTER)));
 
-
-    try {
-      // We cannot set an owner to a role that doesn't exist
-      authzCatalog_.addRole("foo_owner");
-      // Alter view set owner.
-      for (AuthzTest test: new AuthzTest[]{
-          authorize("alter view functional.alltypes_view set owner user foo_owner"),
-          authorize("alter view functional.alltypes_view set owner role foo_owner")}) {
-        test.ok(onServer(true, TPrivilegeLevel.ALL))
-            .ok(onServer(true, TPrivilegeLevel.OWNER))
-            .ok(onDatabase(true, "functional", TPrivilegeLevel.ALL))
-            .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
-            .ok(onTable(true, "functional", "alltypes_view", TPrivilegeLevel.ALL))
-            .ok(onTable(true, "functional", "alltypes_view", TPrivilegeLevel.OWNER))
-            .error(accessError(true, "functional.alltypes_view"), onServer(
-                TPrivilegeLevel.values()))
-            .error(accessError(true, "functional.alltypes_view"), onDatabase("functional",
-                TPrivilegeLevel.values()))
-            .error(accessError(true, "functional.alltypes_view"), onTable("functional",
-                "alltypes_view", TPrivilegeLevel.values()))
-            .error(accessError(true, "functional.alltypes_view"))
-            .error(accessError(true, "functional.alltypes_view"), onServer(allExcept(
-                TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
-            .error(accessError(true, "functional.alltypes_view"), onDatabase("functional",
-                allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
-            .error(accessError(true, "functional.alltypes_view"), onTable("functional",
-                "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
-      }
-    } finally {
-      authzCatalog_.removeRole("foo_owner");
+    // Alter view set owner.
+    for (AuthzTest test: new AuthzTest[]{
+        authorize("alter view functional.alltypes_view set owner user foo_owner"),
+        authorize("alter view functional.alltypes_view set owner role foo_owner")}) {
+      test.ok(onServer(true, TPrivilegeLevel.ALL))
+          .ok(onServer(true, TPrivilegeLevel.OWNER))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.ALL))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
+          .ok(onTable(true, "functional", "alltypes_view", TPrivilegeLevel.ALL))
+          .ok(onTable(true, "functional", "alltypes_view", TPrivilegeLevel.OWNER))
+          .error(accessError(true, "functional.alltypes_view"), onServer(
+              TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes_view"), onDatabase("functional",
+              TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes_view"), onTable("functional",
+              "alltypes_view", TPrivilegeLevel.values()))
+          .error(accessError(true, "functional.alltypes_view"))
+          .error(accessError(true, "functional.alltypes_view"), onServer(allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError(true, "functional.alltypes_view"), onDatabase("functional",
+              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError(true, "functional.alltypes_view"), onTable("functional",
+              "alltypes_view", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
     }
 
     // Database does not exist.
@@ -2272,44 +2248,28 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
   @Test
   public void testAlterDatabase() throws ImpalaException {
-    try {
-      // We cannot set an owner to a role that doesn't exist
-      authzCatalog_.addRole("foo");
-      // Alter database set owner.
-      for (String ownerType: new String[]{"user", "role"}) {
-        authorize(String.format("alter database functional set owner %s foo", ownerType))
-            .ok(onServer(true, TPrivilegeLevel.ALL))
-            .ok(onServer(true, TPrivilegeLevel.OWNER))
-            .ok(onDatabase(true, "functional", TPrivilegeLevel.ALL))
-            .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
-            .error(accessError(true, "functional"), onServer(TPrivilegeLevel.values()))
-            .error(accessError(true, "functional"), onDatabase("functional",
-                TPrivilegeLevel.values()))
-            .error(accessError(true, "functional"))
-            .error(accessError(true, "functional"), onServer(true, allExcept(
-                TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
-            .error(accessError(true, "functional"), onDatabase(true, "functional",
-                allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
+    // Alter database set owner.
+    for (String ownerType: new String[]{"user", "role"}) {
+      authorize(String.format("alter database functional set owner %s foo", ownerType))
+          .ok(onServer(true, TPrivilegeLevel.ALL))
+          .ok(onServer(true, TPrivilegeLevel.OWNER))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.ALL))
+          .ok(onDatabase(true, "functional", TPrivilegeLevel.OWNER))
+          .error(accessError(true, "functional"), onServer(TPrivilegeLevel.values()))
+          .error(accessError(true, "functional"), onDatabase("functional",
+              TPrivilegeLevel.values()))
+          .error(accessError(true, "functional"))
+          .error(accessError(true, "functional"), onServer(true, allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
+          .error(accessError(true, "functional"), onDatabase(true, "functional",
+              allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
 
-        // Database does not exist.
-        authorize(String.format("alter database nodb set owner %s foo", ownerType))
-            .error(accessError(true, "nodb"))
-            .error(accessError(true, "nodb"), onServer(true, allExcept(
-                TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
-      }
-    } finally {
-      authzCatalog_.removeRole("foo_owner");
+      // Database does not exist.
+      authorize(String.format("alter database nodb set owner %s foo", ownerType))
+          .error(accessError(true, "nodb"))
+          .error(accessError(true, "nodb"), onServer(true, allExcept(
+              TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
     }
-    boolean exceptionThrown = false;
-    try {
-      parseAndAnalyze("alter database functional set owner role foo_owner",
-          analysisContext_ , frontend_);
-    } catch (AnalysisException e) {
-      exceptionThrown = true;
-      assertEquals("Role 'foo_owner' does not exist.", e.getLocalizedMessage());
-    }
-    assertTrue(exceptionThrown);
-
   }
 
   @Test

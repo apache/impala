@@ -64,9 +64,6 @@ public class CreateTableStmt extends StatementBase {
   // Table owner. Set during analysis
   private String owner_;
 
-  // Server name needed for privileges. Set during analysis.
-  private String serverName_;
-
   public CreateTableStmt(TableDef tableDef) {
     Preconditions.checkNotNull(tableDef);
     tableDef_ = tableDef;
@@ -177,7 +174,7 @@ public class CreateTableStmt extends StatementBase {
     for (ColumnDef pkColDef: getPrimaryKeyColumnDefs()) {
       params.addToPrimary_key_column_names(pkColDef.getColName());
     }
-    params.setServer_name(serverName_);
+
     return params;
   }
 
@@ -190,9 +187,6 @@ public class CreateTableStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     owner_ = analyzer.getUser().getName();
-    // Set the servername here if authorization is enabled because analyzer_ is not
-    // available in the toThrift() method.
-    serverName_ = analyzer.getServerName();
     tableDef_.analyze(analyzer);
     analyzeKuduFormat(analyzer);
     // Avro tables can have empty column defs because they can infer them from the Avro

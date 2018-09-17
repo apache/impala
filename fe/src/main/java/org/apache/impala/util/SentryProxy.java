@@ -30,7 +30,6 @@ import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
-import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.log4j.Logger;
 import org.apache.sentry.api.service.thrift.TSentryGroup;
@@ -47,8 +46,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.apache.sentry.service.common.SentryOwnerPrivilegeType;
-import org.apache.sentry.service.common.ServiceConstants;
 
 /**
  * Thread safe class that acts as a link between the Sentry Service and the Catalog
@@ -81,11 +78,8 @@ public class SentryProxy {
   // Sentry Service admin => have full rights to read/update the Sentry Service.
   private final User processUser_;
 
-  // The value for the object ownership config.
-  private final String objectOwnershipConfigValue_;
-
   public SentryProxy(SentryConfig sentryConfig, CatalogServiceCatalog catalog,
-      String kerberosPrincipal) throws ImpalaException {
+      String kerberosPrincipal) {
     Preconditions.checkNotNull(catalog);
     Preconditions.checkNotNull(sentryConfig);
     catalog_ = catalog;
@@ -96,14 +90,6 @@ public class SentryProxy {
     }
     sentryPolicyService_ = new SentryPolicyService(sentryConfig);
 
-    // For some tests, we create a config but may not have a config file.
-    if (sentryConfig.getConfigFile() != null && !sentryConfig.getConfigFile().isEmpty()) {
-      objectOwnershipConfigValue_ = sentryPolicyService_
-          .getConfigValue(ServiceConstants.ServerConfig
-          .SENTRY_DB_POLICY_STORE_OWNER_AS_PRIVILEGE);
-    } else {
-      objectOwnershipConfigValue_ = SentryOwnerPrivilegeType.NONE.toString();
-    }
     policyReader_.scheduleAtFixedRate(new PolicyReader(false), 0,
         BackendConfig.INSTANCE.getSentryCatalogPollingFrequency(),
         TimeUnit.SECONDS);
@@ -219,11 +205,16 @@ public class SentryProxy {
         // usersToRemove set.
         usersToRemove.remove(userName);
 
-        Reference<Boolean> existingUser = new Reference<>();
-        org.apache.impala.catalog.User user = catalog_.addUserIfNotExists(userName,
-            existingUser);
-        if (existingUser.getRef() && resetVersions_) {
-          user.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
+        org.apache.impala.catalog.User existingUser =
+            catalog_.getAuthPolicy().getUser(userName);
+        org.apache.impala.catalog.User user;
+        if (existingUser != null) {
+          user = existingUser;
+          if (resetVersions_) {
+            user.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
+          }
+        } else {
+          user = catalog_.addUser(userName);
         }
         refreshPrivilegesInCatalog(user, allUsersPrivileges);
       }
@@ -382,14 +373,11 @@ public class SentryProxy {
    * catalog. If the RPC to the Sentry Service fails the Impala catalog will not be
    * modified. Returns the removed privileges. Throws an exception if there was any error
    * updating the Sentry Service or if the Impala catalog does not contain the given role
-   * name.  The addedPrivileges parameter will be populated with any new privileges that
-   * are granted, in the case where the revoke involves a grant option.  In this case
-   * privileges that contain the grant option are removed and the new privileges without
-   * the grant option are added.
+   * name.
    */
   public synchronized List<PrincipalPrivilege> revokeRolePrivileges(User user,
-      String roleName, List<TPrivilege> privileges, boolean hasGrantOption,
-      List<PrincipalPrivilege> addedPrivileges) throws ImpalaException {
+      String roleName, List<TPrivilege> privileges, boolean hasGrantOption)
+      throws ImpalaException {
     List<PrincipalPrivilege> rolePrivileges = Lists.newArrayList();
     if (!hasGrantOption) {
       sentryPolicyService_.revokeRolePrivileges(user, roleName, privileges);
@@ -400,31 +388,25 @@ public class SentryProxy {
         rolePrivileges.add(rolePriv);
       }
     } else {
-      // If the REVOKE GRANT OPTION has been specified, the privileges with grant must be
-      // revoked and these same privileges are added back to the catalog with the grant
-      // option set to false. They can not simply be updated because "grantoption" is part
-      // of the name of the catalog object. Sentry does not yet provide an
-      // "alter privilege" API so we need to revoke the privileges and re-grant them.
+      // If the REVOKE GRANT OPTION has been specified, the privileges should not be
+      // removed, they should just be updated to clear the GRANT OPTION flag. Sentry
+      // does not yet provide an "alter privilege" API so we need to revoke the
+      // privileges and re-grant them.
       sentryPolicyService_.revokeRolePrivileges(user, roleName, privileges);
-      List<TPrivilege> newPrivs = Lists.newArrayList();
+      List<TPrivilege> updatedPrivileges = Lists.newArrayList();
       for (TPrivilege privilege: privileges) {
         PrincipalPrivilege existingPriv = catalog_.getPrincipalPrivilege(roleName,
             privilege);
         if (existingPriv == null) continue;
-        rolePrivileges.add(catalog_.removeRolePrivilege(roleName, privilege));
-
-        TPrivilege addedPriv = new TPrivilege(existingPriv.toThrift());
-        addedPriv.setHas_grant_opt(false);
-        addedPriv.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(addedPriv));
-        newPrivs.add(addedPriv);
+        TPrivilege updatedPriv = existingPriv.toThrift();
+        updatedPriv.setHas_grant_opt(false);
+        updatedPrivileges.add(updatedPriv);
       }
       // Re-grant the updated privileges.
-      if (!newPrivs.isEmpty()) {
-        sentryPolicyService_.grantRolePrivileges(user, roleName, newPrivs);
-      }
+      sentryPolicyService_.grantRolePrivileges(user, roleName, updatedPrivileges);
       // Update the catalog
-      for (TPrivilege newPriv: newPrivs) {
-        addedPrivileges.add(catalog_.addRolePrivilege(roleName, newPriv));
+      for (TPrivilege updatedPriv: updatedPrivileges) {
+        rolePrivileges.add(catalog_.addRolePrivilege(roleName, updatedPriv));
       }
     }
     return rolePrivileges;
@@ -446,28 +428,4 @@ public class SentryProxy {
           "may resolve this problem: ", e);
     }
   }
-
-  /**
-   * Checks if object ownership is enabled in Sentry.
-   */
-  public boolean isObjectOwnershipEnabled() {
-    if (objectOwnershipConfigValue_.length() == 0 ||
-        objectOwnershipConfigValue_.equalsIgnoreCase(
-            SentryOwnerPrivilegeType.NONE.toString())) {
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Checks if 'with grant' is enabled for object ownership in Sentry.
-   */
-  public boolean isObjectOwnershipGrantEnabled() {
-    if (objectOwnershipConfigValue_.equalsIgnoreCase(
-        SentryOwnerPrivilegeType.ALL_WITH_GRANT.toString())) {
-      return true;
-    }
-    return false;
-  }
-
 }

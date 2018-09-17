@@ -109,8 +109,8 @@
 </property-->
 
 <property>
-  <name>hive.sentry.conf.url</name>
-  <value>file:///${IMPALA_HOME}/fe/src/test/resources/sentry-site.xml</value>
+  <name>hive.access.conf.url</name>
+  <value>file:///${IMPALA_HOME}/fe/src/test/resources/auth-site.xml</value>
 </property>
 
 <property>
@@ -204,19 +204,5 @@
   <name>hive.default.rcfile.serde</name>
   <value>org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe</value>
   <description>The default SerDe hive will use for the rcfile format</description>
-</property>
-
-<!-- These properties are for enabling the notifications between Hive and Sentry -->
-<property>
-  <name>hive.metastore.transactional.event.listeners</name>
-  <value>org.apache.hive.hcatalog.listener.DbNotificationListener</value>
-</property>
-<property>
-  <name>hive.metastore.event.listeners</name>
-  <value>org.apache.sentry.binding.metastore.SentrySyncHMSNotificationsPostEventListener</value>
-</property>
-<property>
-  <name>hcatalog.message.factory.impl.json</name>
-  <value>org.apache.sentry.binding.metastore.messaging.json.SentryJSONMessageFactory</value>
 </property>
 </configuration>
