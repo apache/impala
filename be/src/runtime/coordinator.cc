@@ -373,7 +373,7 @@ Status Coordinator::FinishBackendStartup() {
   }
   query_profile_->AddInfoString(
       "Backend startup latencies", latencies.ToHumanReadable());
-  query_profile_->AddInfoString("Slowest Backend to startup", max_latency_host);
+  query_profile_->AddInfoString("Slowest backend to start up", max_latency_host);
   return UpdateExecState(status, nullptr, error_hostname);
 }
 
