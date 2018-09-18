@@ -27,9 +27,6 @@
 
 namespace impala {
 
-class RowBatch;
-class ScalarExprEvaluator;
-
 /// Wraps a client-API specific result representation, and implements the logic required
 /// to translate into that format from Impala's row format.
 ///
@@ -39,11 +36,12 @@ class QueryResultSet {
   QueryResultSet() {}
   virtual ~QueryResultSet() {}
 
-  /// Add 'num_rows' rows to the result set, obtained by evaluating 'expr_evals' over
-  /// the rows in 'batch' starting at start_idx. Batch must contain at least
-  /// ('start_idx' + 'num_rows') rows.
-  virtual Status AddRows(const std::vector<ScalarExprEvaluator*>& expr_evals,
-      RowBatch* batch, int start_idx, int num_rows) = 0;
+  /// Add a single row to this result set. The row is a vector of pointers to values,
+  /// whose memory belongs to the caller. 'scales' contains the scales for decimal values
+  /// (# of digits after decimal), with -1 indicating no scale specified or the
+  /// corresponding value is not a decimal.
+  virtual Status AddOneRow(
+      const std::vector<void*>& row, const std::vector<int>& scales) = 0;
 
   /// Add the TResultRow to this result set. When a row comes from a DDL/metadata
   /// operation, the row in the form of TResultRow.
