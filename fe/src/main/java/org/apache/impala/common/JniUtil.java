@@ -43,7 +43,6 @@ import org.apache.thrift.protocol.TProtocolFactory;
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 
-import org.apache.impala.thrift.TGetJvmMemoryMetricsRequest;
 import org.apache.impala.thrift.TGetJvmMemoryMetricsResponse;
 import org.apache.impala.thrift.TGetJvmThreadsInfoRequest;
 import org.apache.impala.thrift.TGetJvmThreadsInfoResponse;
@@ -125,89 +124,92 @@ public class JniUtil {
   /**
    * Collect the JVM's memory statistics into a thrift structure for translation into
    * Impala metrics by the backend. A synthetic 'total' memory pool is included with
-   * aggregate statistics for all real pools.
+   * aggregate statistics for all real pools. Metrics for the JvmPauseMonitor
+   * and Garbage Collection are also included.
    */
-  public static byte[] getJvmMemoryMetrics(byte[] argument) throws ImpalaException {
-    TGetJvmMemoryMetricsRequest request = new TGetJvmMemoryMetricsRequest();
-    JniUtil.deserializeThrift(protocolFactory_, request, argument);
-
+  public static byte[] getJvmMemoryMetrics() throws ImpalaException {
     TGetJvmMemoryMetricsResponse jvmMetrics = new TGetJvmMemoryMetricsResponse();
     jvmMetrics.setMemory_pools(new ArrayList<TJvmMemoryPool>());
     TJvmMemoryPool totalUsage = new TJvmMemoryPool();
-    boolean is_total =
-        request.getMemory_pool() != null && request.getMemory_pool().equals("total");
 
-    if (request.get_all || is_total) {
-      totalUsage.setName("total");
-      jvmMetrics.getMemory_pools().add(totalUsage);
-    }
+    totalUsage.setName("total");
+    jvmMetrics.getMemory_pools().add(totalUsage);
+
     for (MemoryPoolMXBean memBean: ManagementFactory.getMemoryPoolMXBeans()) {
-      if (request.get_all || is_total ||
-          memBean.getName().equals(request.getMemory_pool())) {
-        TJvmMemoryPool usage = new TJvmMemoryPool();
-        MemoryUsage beanUsage = memBean.getUsage();
-        usage.setCommitted(beanUsage.getCommitted());
-        usage.setInit(beanUsage.getInit());
-        usage.setMax(beanUsage.getMax());
-        usage.setUsed(beanUsage.getUsed());
-        usage.setName(memBean.getName());
+      TJvmMemoryPool usage = new TJvmMemoryPool();
+      MemoryUsage beanUsage = memBean.getUsage();
+      usage.setCommitted(beanUsage.getCommitted());
+      usage.setInit(beanUsage.getInit());
+      usage.setMax(beanUsage.getMax());
+      usage.setUsed(beanUsage.getUsed());
+      usage.setName(memBean.getName());
 
-        totalUsage.committed += beanUsage.getCommitted();
-        totalUsage.init += beanUsage.getInit();
-        totalUsage.max += beanUsage.getMax();
-        totalUsage.used += beanUsage.getUsed();
+      totalUsage.committed += beanUsage.getCommitted();
+      totalUsage.init += beanUsage.getInit();
+      totalUsage.max += beanUsage.getMax();
+      totalUsage.used += beanUsage.getUsed();
 
-        MemoryUsage peakUsage = memBean.getPeakUsage();
-        usage.setPeak_committed(peakUsage.getCommitted());
-        usage.setPeak_init(peakUsage.getInit());
-        usage.setPeak_max(peakUsage.getMax());
-        usage.setPeak_used(peakUsage.getUsed());
+      MemoryUsage peakUsage = memBean.getPeakUsage();
+      usage.setPeak_committed(peakUsage.getCommitted());
+      usage.setPeak_init(peakUsage.getInit());
+      usage.setPeak_max(peakUsage.getMax());
+      usage.setPeak_used(peakUsage.getUsed());
 
-        totalUsage.peak_committed += peakUsage.getCommitted();
-        totalUsage.peak_init += peakUsage.getInit();
-        totalUsage.peak_max += peakUsage.getMax();
-        totalUsage.peak_used += peakUsage.getUsed();
+      totalUsage.peak_committed += peakUsage.getCommitted();
+      totalUsage.peak_init += peakUsage.getInit();
+      totalUsage.peak_max += peakUsage.getMax();
+      totalUsage.peak_used += peakUsage.getUsed();
 
-        if (!is_total) {
-          jvmMetrics.getMemory_pools().add(usage);
-          if (!request.get_all) break;
-        }
-      }
+      jvmMetrics.getMemory_pools().add(usage);
     }
 
-    if (request.get_all || request.getMemory_pool().equals("heap")) {
-      // Populate heap usage
-      MemoryMXBean mBean = ManagementFactory.getMemoryMXBean();
-      TJvmMemoryPool heap = new TJvmMemoryPool();
-      MemoryUsage heapUsage = mBean.getHeapMemoryUsage();
-      heap.setCommitted(heapUsage.getCommitted());
-      heap.setInit(heapUsage.getInit());
-      heap.setMax(heapUsage.getMax());
-      heap.setUsed(heapUsage.getUsed());
-      heap.setName("heap");
-      heap.setPeak_committed(0);
-      heap.setPeak_init(0);
-      heap.setPeak_max(0);
-      heap.setPeak_used(0);
-      jvmMetrics.getMemory_pools().add(heap);
-    }
+    // Populate heap usage
+    MemoryMXBean mBean = ManagementFactory.getMemoryMXBean();
+    TJvmMemoryPool heap = new TJvmMemoryPool();
+    MemoryUsage heapUsage = mBean.getHeapMemoryUsage();
+    heap.setCommitted(heapUsage.getCommitted());
+    heap.setInit(heapUsage.getInit());
+    heap.setMax(heapUsage.getMax());
+    heap.setUsed(heapUsage.getUsed());
+    heap.setName("heap");
+    heap.setPeak_committed(0);
+    heap.setPeak_init(0);
+    heap.setPeak_max(0);
+    heap.setPeak_used(0);
+    jvmMetrics.getMemory_pools().add(heap);
 
-    if (request.get_all || request.getMemory_pool().equals("non-heap")) {
-      // Populate non-heap usage
-      MemoryMXBean mBean = ManagementFactory.getMemoryMXBean();
-      TJvmMemoryPool nonHeap = new TJvmMemoryPool();
-      MemoryUsage nonHeapUsage = mBean.getNonHeapMemoryUsage();
-      nonHeap.setCommitted(nonHeapUsage.getCommitted());
-      nonHeap.setInit(nonHeapUsage.getInit());
-      nonHeap.setMax(nonHeapUsage.getMax());
-      nonHeap.setUsed(nonHeapUsage.getUsed());
-      nonHeap.setName("non-heap");
-      nonHeap.setPeak_committed(0);
-      nonHeap.setPeak_init(0);
-      nonHeap.setPeak_max(0);
-      nonHeap.setPeak_used(0);
-      jvmMetrics.getMemory_pools().add(nonHeap);
+    // Populate non-heap usage
+    TJvmMemoryPool nonHeap = new TJvmMemoryPool();
+    MemoryUsage nonHeapUsage = mBean.getNonHeapMemoryUsage();
+    nonHeap.setCommitted(nonHeapUsage.getCommitted());
+    nonHeap.setInit(nonHeapUsage.getInit());
+    nonHeap.setMax(nonHeapUsage.getMax());
+    nonHeap.setUsed(nonHeapUsage.getUsed());
+    nonHeap.setName("non-heap");
+    nonHeap.setPeak_committed(0);
+    nonHeap.setPeak_init(0);
+    nonHeap.setPeak_max(0);
+    nonHeap.setPeak_used(0);
+    jvmMetrics.getMemory_pools().add(nonHeap);
+
+    // Populate JvmPauseMonitor metrics
+    jvmMetrics.setGc_num_warn_threshold_exceeded(
+        JvmPauseMonitor.INSTANCE.getNumGcWarnThresholdExceeded());
+    jvmMetrics.setGc_num_info_threshold_exceeded(
+        JvmPauseMonitor.INSTANCE.getNumGcInfoThresholdExceeded());
+    jvmMetrics.setGc_total_extra_sleep_time_millis(
+        JvmPauseMonitor.INSTANCE.getTotalGcExtraSleepTime());
+
+    // And Garbage Collector metrics
+    long gcCount = 0;
+    long gcTimeMillis = 0;
+    for (GarbageCollectorMXBean bean : ManagementFactory.getGarbageCollectorMXBeans()) {
+      gcCount += bean.getCollectionCount();
+      gcTimeMillis += bean.getCollectionTime();
     }
+    jvmMetrics.setGc_count(gcCount);
+    jvmMetrics.setGc_time_millis(gcTimeMillis);
+
     return serializeToThrift(jvmMetrics, protocolFactory_);
   }
 

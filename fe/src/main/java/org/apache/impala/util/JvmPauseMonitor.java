@@ -59,6 +59,14 @@ public class JvmPauseMonitor {
   private long infoThresholdMs_;
   private static final long INFO_THRESHOLD_MS = 1000;
 
+  // Overall metrics
+  // Volatile to allow populating metrics concurrently with the values
+  // being updated without staleness (but with no other synchronization
+  // guarantees).
+  private volatile long numGcWarnThresholdExceeded = 0;
+  private volatile long numGcInfoThresholdExceeded = 0;
+  private volatile long totalGcExtraSleepTime = 0;
+
   // Daemon thread running the pause monitor loop.
   private Thread monitorThread_;
   private volatile boolean shouldRun = true;
@@ -90,6 +98,18 @@ public class JvmPauseMonitor {
 
   public boolean isStarted() {
     return monitorThread_ != null;
+  }
+
+  public long getNumGcWarnThresholdExceeded() {
+    return numGcWarnThresholdExceeded;
+  }
+
+  public long getNumGcInfoThresholdExceeded() {
+    return numGcInfoThresholdExceeded;
+  }
+
+  public long getTotalGcExtraSleepTime() {
+    return totalGcExtraSleepTime;
   }
 
   /**
@@ -181,12 +201,15 @@ public class JvmPauseMonitor {
         Map<String, GcTimes> gcTimesAfterSleep = getGcTimes();
 
         if (extraSleepTime > warnThresholdMs_) {
+          ++numGcWarnThresholdExceeded;
           LOG.warn(formatMessage(
               extraSleepTime, gcTimesAfterSleep, gcTimesBeforeSleep));
         } else if (extraSleepTime > infoThresholdMs_) {
+          ++numGcInfoThresholdExceeded;
           LOG.info(formatMessage(
               extraSleepTime, gcTimesAfterSleep, gcTimesBeforeSleep));
         }
+        totalGcExtraSleepTime += extraSleepTime;
         gcTimesBeforeSleep = gcTimesAfterSleep;
 
         if (deadlockCheckIntervalS_ > 0 &&

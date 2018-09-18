@@ -1505,6 +1505,61 @@
     "key": "jvm.$0.peak-max-usage-bytes"
   },
   {
+    "description": "Jvm Garbage Collection Time",
+    "contexts": [
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Jvm Garbage Collection Time",
+    "units": "TIME_MS",
+    "kind": "COUNTER",
+    "key": "jvm.gc_time_millis"
+  },
+  {
+    "description": "Jvm Garbage Collection Count",
+    "contexts": [
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Jvm Garbage Collection Count",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "jvm.gc_count"
+  },
+  {
+    "description": "Jvm Pause Detection Warning Threshold Exceeded",
+    "contexts": [
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Jvm Pause Detector Warn Threshold Exceeded",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "jvm.gc_num_warn_threshold_exceeded"
+  },
+  {
+    "description": "Jvm Pause Detection Info Threshold Exceeded",
+    "contexts": [
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Jvm Pause Detector Info Threshold Exceeded",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "jvm.gc_num_info_threshold_exceeded"
+  },
+  {
+    "description": "Jvm Pause Detection Extra Sleep Time",
+    "contexts": [
+      "CATALOGSERVER",
+      "IMPALAD"
+    ],
+    "label": "Jvm Pause Detector Extra Sleep Time",
+    "units": "TIME_MS",
+    "kind": "COUNTER",
+    "key": "jvm.gc_total_extra_sleep_time_millis"
+  },
+  {
     "description": "Distribution of query latencies",
     "contexts": [
         "IMPALAD"

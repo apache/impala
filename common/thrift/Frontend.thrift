@@ -792,20 +792,23 @@ struct TJvmMemoryPool {
   9: required string name
 }
 
-// Request to get one or all sets of memory pool metrics.
-struct TGetJvmMemoryMetricsRequest {
-  // If set, return all pools
-  1: required bool get_all
-
-  // If get_all is false, this must be set to the name of the memory pool to return.
-  2: optional string memory_pool
-}
-
 // Response from JniUtil::GetJvmMemoryMetrics()
 struct TGetJvmMemoryMetricsResponse {
   // One entry for every pool tracked by the Jvm, plus a synthetic aggregate pool called
   // 'total'
   1: required list<TJvmMemoryPool> memory_pools
+
+  // Metrics from JvmPauseMonitor, measuring how much time is spend
+  // pausing, presumably because of Garbage Collection. These
+  // names are consistent with Hadoop's metric names.
+  2: required i64 gc_num_warn_threshold_exceeded
+  3: required i64 gc_num_info_threshold_exceeded
+  4: required i64 gc_total_extra_sleep_time_millis
+
+  // Metrics for JVM Garbage Collection, from the management beans;
+  // these are cumulative across all types of GCs.
+  5: required i64 gc_count
+  6: required i64 gc_time_millis
 }
 
 // Contains information about a JVM thread

@@ -372,7 +372,7 @@ class JniUtil {
 
   /// Populates 'result' with a list of memory metrics from the Jvm. Returns Status::OK
   /// unless there is an exception.
-  static Status GetJvmMemoryMetrics(const TGetJvmMemoryMetricsRequest& request,
+  static Status GetJvmMemoryMetrics(
       TGetJvmMemoryMetricsResponse* result) WARN_UNUSED_RESULT;
 
   /// Populates 'result' with information about live JVM threads. Returns

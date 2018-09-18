@@ -24,6 +24,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 class TestPauseMonitor(CustomClusterTestSuite):
   """Class for pause monitor tests."""
 
+  @CustomClusterTestSuite.with_args("--logbuflevel=-1")
   def test_jvm_pause_monitor_logs_entries(self):
     """This test injects a non-GC pause and confirms that that the JVM pause
     monitor detects and logs it."""
@@ -32,7 +33,10 @@ class TestPauseMonitor(CustomClusterTestSuite):
     impalad.kill(signal.SIGSTOP)
     time.sleep(5)
     impalad.kill(signal.SIGCONT)
-    # Wait for a few seconds for the logs to get flushed.
-    time.sleep(5)
+    # Wait for over a second for the cache metrics to expire.
+    time.sleep(1.2)
     # Check that the pause is detected.
     self.assert_impalad_log_contains('INFO', "Detected pause in JVM or host machine")
+    # Check that the metrics we have for this updated as well
+    assert impalad.service.get_metric_value("jvm.gc_num_info_threshold_exceeded") > 0
+    assert impalad.service.get_metric_value("jvm.gc_total_extra_sleep_time_millis") > 0

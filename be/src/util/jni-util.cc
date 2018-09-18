@@ -182,7 +182,7 @@ Status JniUtil::Init() {
   }
 
   get_jvm_metrics_id_ =
-      env->GetStaticMethodID(jni_util_cl_, "getJvmMemoryMetrics", "([B)[B");
+      env->GetStaticMethodID(jni_util_cl_, "getJvmMemoryMetrics", "()[B");
   if (get_jvm_metrics_id_ == NULL) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
     return Status("Failed to find JniUtil.getJvmMemoryMetrics method.");
@@ -260,10 +260,8 @@ Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& pr
   return Status(Substitute("$0$1", prefix, msg_str_guard.get()));
 }
 
-Status JniUtil::GetJvmMemoryMetrics(const TGetJvmMemoryMetricsRequest& request,
-    TGetJvmMemoryMetricsResponse* result) {
-  return JniCall::static_method(jni_util_class(), get_jvm_metrics_id_)
-      .with_thrift_arg(request).Call(result);
+Status JniUtil::GetJvmMemoryMetrics(TGetJvmMemoryMetricsResponse* result) {
+  return JniCall::static_method(jni_util_class(), get_jvm_metrics_id_).Call(result);
 }
 
 Status JniUtil::GetJvmThreadsInfo(const TGetJvmThreadsInfoRequest& request,
