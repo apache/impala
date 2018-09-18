@@ -533,7 +533,7 @@ class ImpalaShell(object, cmd.Cmd):
         new_imp_client = self._new_impala_client()
         new_imp_client.connect()
         new_imp_client.cancel_query(self.last_query_handle, False)
-        self.imp_client.close_query(self.last_query_handle)
+        new_imp_client.close_query(self.last_query_handle)
         break
       except Exception, e:
         # Suppress harmless errors.
