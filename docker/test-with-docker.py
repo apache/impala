@@ -435,6 +435,8 @@ class TestWithDocker(object):
     self.name = name
     self.containers = []
     self.git_root = _check_output(["git", "rev-parse", "--show-toplevel"]).strip()
+    # Protects multiple concurrent calls to "docker create"
+    self.docker_lock = threading.Lock()
 
     # If using worktrees, we need to find $GIT_COMMON_DIR; rev-parse
     # supports finding it as of vesion 2.5.0; for older versions, we
@@ -505,46 +507,51 @@ class TestWithDocker(object):
     localtime_link_target = os.path.realpath("/etc/localtime")
     assert localtime_link_target.startswith("/usr/share/zoneinfo")
 
-    container_id = _check_output([
-        "docker", "create",
-        # Required for some of the ntp handling in bootstrap and Kudu;
-        # requirement may be lifted in newer Docker versions.
-        "--privileged",
-        "--name", name,
-        # Whereas the container names vary across containers, we use the same
-        # hostname repeatedly, so that the build container and the test
-        # containers have the same hostnames. Kudu errors out with "Remote
-        # error: Service unavailable: Timed out: could not wait for desired
-        # snapshot timestamp to be consistent: Tablet is lagging too much to be
-        # able to serve snapshot scan." if reading with READ_AT_SNAPSHOT
-        # if the hostnames change underneath it.
-        "--hostname", self.name,
-        # Label with the git root directory for easier cleanup
-        "--label=pwd=" + self.git_root,
-        # Consistent locales
-        "-e", "LC_ALL=C",
-        "-e", "IMPALAD_MEM_LIMIT_BYTES=" +
-        str(self.impalad_mem_limit_bytes),
-        # Mount the git directory so that clones can be local.
-        # We use /repo to have access to certain scripts,
-        # and we use /git_common_dir to have local clones,
-        # even when "git worktree" is being used.
-        "-v", self.git_root + ":/repo:ro",
-        "-v", self.git_common_dir + ":/git_common_dir:ro",
-        "-e", "GIT_HEAD_REV=" + self.git_head_rev,
-        # Share timezone between host and container
-        "-e", "LOCALTIME_LINK_TARGET=" + localtime_link_target,
-        "-v", self.ccache_dir + ":/ccache",
-        "-v", _make_dir_if_not_exist(self.log_dir,
-                                     logdir) + ":/logs",
-        "-v", base + ":/mnt/base:ro"]
-        + extras
-        + [image]
-        + entrypoint).strip()
-    ctr = Container(name=name, id_=container_id,
-                     logfile=os.path.join(self.log_dir, logdir, logname))
-    logging.info("Created container %s", ctr)
-    return ctr
+    # Workaround for what appears to be https://github.com/moby/moby/issues/13885
+    # Namely, if we run too many "docker create" at the same time, one
+    # of them hangs forever. To avoid the issue, we serialize the invocations
+    # of "docker create".
+    with self.docker_lock:
+      container_id = _check_output([
+          "docker", "create",
+          # Required for some of the ntp handling in bootstrap and Kudu;
+          # requirement may be lifted in newer Docker versions.
+          "--privileged",
+          "--name", name,
+          # Whereas the container names vary across containers, we use the same
+          # hostname repeatedly, so that the build container and the test
+          # containers have the same hostnames. Kudu errors out with "Remote
+          # error: Service unavailable: Timed out: could not wait for desired
+          # snapshot timestamp to be consistent: Tablet is lagging too much to be
+          # able to serve snapshot scan." if reading with READ_AT_SNAPSHOT
+          # if the hostnames change underneath it.
+          "--hostname", self.name,
+          # Label with the git root directory for easier cleanup
+          "--label=pwd=" + self.git_root,
+          # Consistent locales
+          "-e", "LC_ALL=C",
+          "-e", "IMPALAD_MEM_LIMIT_BYTES=" +
+          str(self.impalad_mem_limit_bytes),
+          # Mount the git directory so that clones can be local.
+          # We use /repo to have access to certain scripts,
+          # and we use /git_common_dir to have local clones,
+          # even when "git worktree" is being used.
+          "-v", self.git_root + ":/repo:ro",
+          "-v", self.git_common_dir + ":/git_common_dir:ro",
+          "-e", "GIT_HEAD_REV=" + self.git_head_rev,
+          # Share timezone between host and container
+          "-e", "LOCALTIME_LINK_TARGET=" + localtime_link_target,
+          "-v", self.ccache_dir + ":/ccache",
+          "-v", _make_dir_if_not_exist(self.log_dir,
+                                       logdir) + ":/logs",
+          "-v", base + ":/mnt/base:ro"]
+          + extras
+          + [image]
+          + entrypoint).strip()
+      ctr = Container(name=name, id_=container_id,
+                       logfile=os.path.join(self.log_dir, logdir, logname))
+      logging.info("Created container %s", ctr)
+      return ctr
 
   def _run_container(self, container):
     """Runs container, and returns True if the container had a successful exit value.
