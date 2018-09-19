@@ -208,10 +208,13 @@ public class LocalCatalog implements FeCatalog {
 
   @Override
   public void waitForCatalogUpdate(long timeoutMs) {
-    // No-op for local catalog.
-    // TODO(todd): Frontend.waitForCatalog() gets called at startup and ends
-    // up being a tight loop that spews logs unless we do something to wait better
-    // here.
+    if (isReady()) return;
+    // Sleep here to avoid log spew from the retry loop in Frontend.
+    try {
+      Thread.sleep(timeoutMs);
+    } catch (InterruptedException e) {
+      // Ignore
+    }
   }
 
   @Override
