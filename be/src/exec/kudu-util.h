@@ -21,6 +21,7 @@
 // TODO: Remove when toolchain callbacks.h properly defines ::tm.
 struct tm;
 
+#include <gutil/strings/substitute.h>
 #include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
 #include <kudu/client/value.h>

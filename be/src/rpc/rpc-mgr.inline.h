@@ -24,6 +24,7 @@
 #include "kudu/rpc/messenger.h"
 #include "kudu/rpc/rpc_header.pb.h"
 #include "kudu/rpc/service_pool.h"
+#include "kudu/rpc/user_credentials.h"
 #include "util/network-util.h"
 
 namespace impala {
@@ -38,6 +39,13 @@ Status RpcMgr::GetProxy(const TNetworkAddress& address, const std::string& hostn
   kudu::Sockaddr sockaddr;
   RETURN_IF_ERROR(TNetworkAddressToSockaddr(address, &sockaddr));
   proxy->reset(new P(messenger_, sockaddr, hostname));
+
+  // Always set the user credentials as Proxy ctor may fail in GetLoggedInUser().
+  // An empty user name will result in SASL failure. See IMPALA-7585.
+  kudu::rpc::UserCredentials creds;
+  creds.set_real_user("impala");
+  (*proxy)->set_user_credentials(creds);
+
   return Status::OK();
 }
 

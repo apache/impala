@@ -31,6 +31,7 @@
 #include "runtime/mem-tracker.h"
 #include "testutil/gtest-util.h"
 #include "testutil/scoped-flag-setter.h"
+#include "util/auth-util.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/test-info.h"
@@ -175,7 +176,11 @@ class PingServiceImpl : public PingServiceIf {
 
   virtual bool Authorize(const google::protobuf::Message* req,
       google::protobuf::Message* resp, RpcContext* context) override {
-    return rpc_mgr_->Authorize("PingService", context, mem_tracker());
+    if (!IsKerberosEnabled()) {
+      return context->remote_user().username() == "impala";
+    } else {
+      return rpc_mgr_->Authorize("PingService", context, mem_tracker());
+    }
   }
 
   virtual void Ping(const PingRequestPB* request, PingResponsePB* response, RpcContext*
