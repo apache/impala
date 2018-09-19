@@ -5,6 +5,7 @@
 # in either its literal elements or its structure is not protected by copyright law;
 # therefore, such a file does not require a license header."
 .clang-format
+.gitattributes
 .gitignore
 */.gitignore
 */rat_exclude_files.txt

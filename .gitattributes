@@ -1,0 +1,20 @@
+# Marking minified JS files prevents long lines from showing up in "git grep".
+tests/comparison/leopard/static/css/bootstrap.css binary
+tests/comparison/leopard/static/css/bootstrap.css.map binary
+tests/comparison/leopard/static/css/bootstrap.min.css binary
+tests/comparison/leopard/static/js/bootstrap.js binary
+tests/comparison/leopard/static/js/bootstrap.min.js binary
+www/bootstrap/css/bootstrap.css binary
+www/bootstrap/css/bootstrap.css.map binary
+www/bootstrap/css/bootstrap.min.css binary
+www/bootstrap/js/bootstrap.js binary
+www/bootstrap/js/bootstrap.min.js
+www/bootstrap/js/bootstrap.min.js binary
+www/d3.v3.min.js binary
+www/dagre-d3.min.js binary
+www/DataTables-1.10.12/js/dataTables.bootstrap.min.js binary
+www/DataTables-1.10.12/js/dataTables.foundation.min.js binary
+www/DataTables-1.10.12/js/dataTables.jqueryui.min.js binary
+www/DataTables-1.10.12/js/jquery.dataTables.min.js binary
+www/datatables.min.js binary
+www/jquery/jquery-1.12.4.min.js binary
