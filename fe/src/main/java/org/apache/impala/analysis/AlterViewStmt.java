@@ -49,7 +49,7 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
 
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
     dbName_ = analyzer.getTargetDbName(tableName_);
-    owner_ = analyzer.getUser().getName();
+    owner_ = analyzer.getUserShortName();
     // Set the servername here if authorization is enabled because analyzer_ is not
     // available in the toThrift() method.
     serverName_ = analyzer.getServerName();

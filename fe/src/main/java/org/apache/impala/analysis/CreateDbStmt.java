@@ -104,7 +104,7 @@ public class CreateDbStmt extends StatementBase {
     if (location_ != null) {
       location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
     }
-    owner_ = analyzer.getUser().getName();
+    owner_ = analyzer.getUserShortName();
     // Set the servername here if authorization is enabled because analyzer_ is not
     // available in the toThrift() method.
     serverName_ = analyzer.getServerName();

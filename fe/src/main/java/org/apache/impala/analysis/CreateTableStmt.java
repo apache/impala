@@ -189,7 +189,7 @@ public class CreateTableStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    owner_ = analyzer.getUser().getName();
+    owner_ = analyzer.getUserShortName();
     // Set the servername here if authorization is enabled because analyzer_ is not
     // available in the toThrift() method.
     serverName_ = analyzer.getServerName();

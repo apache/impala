@@ -2340,6 +2340,15 @@ public class Analyzer {
 
   public String getDefaultDb() { return globalState_.queryCtx.session.database; }
   public User getUser() { return user_; }
+  public String getUserShortName() throws AnalysisException {
+    try {
+      return getUser().getShortName();
+    } catch (InternalException e) {
+      throw new AnalysisException("Could not get the shortened name for user: " +
+          getUser().getName(), e);
+    }
+  }
+
   public TQueryCtx getQueryCtx() { return globalState_.queryCtx; }
   public TQueryOptions getQueryOptions() {
     return globalState_.queryCtx.client_request.getQuery_options();
