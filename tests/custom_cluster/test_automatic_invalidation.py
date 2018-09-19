@@ -32,8 +32,10 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
   url = "http://localhost:25020/catalog_object?object_type=TABLE&" \
         "object_name=functional.alltypes"
 
-  timeout_flag = "--invalidate_tables_timeout_s=" + \
-      ("20" if IMPALAD_BUILD.runs_slowly() or (not IS_HDFS and not IS_LOCAL) else "10")
+  # The test will run a query and assumes the table is loaded when the query finishes.
+  # The timeout should be larger than the time of the query.
+  timeout = 20 if IMPALAD_BUILD.runs_slowly() or (not IS_HDFS and not IS_LOCAL) else 10
+  timeout_flag = "--invalidate_tables_timeout_s=" + str(timeout)
 
   @classmethod
   def get_workload(cls):
@@ -49,13 +51,14 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
     cursor.fetchall()
     # The table is cached after usage.
     assert self.metadata_cache_string in self._get_catalog_object()
-    timeout = time.time() + 20
+    # Wait 2 * table TTL for the invalidation to take effect.
+    max_wait_time = time.time() + self.timeout * 2
     while True:
       time.sleep(1)
       # The table is eventually evicted.
       if self.metadata_cache_string not in self._get_catalog_object():
         return
-      assert time.time() < timeout
+      assert time.time() < max_wait_time
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(catalogd_args=timeout_flag, impalad_args=timeout_flag)
