@@ -171,7 +171,7 @@ public class AuthorizationChecker {
     if (request.getPrivilege().getAnyOf()) {
       for (ImpalaAction action: actions) {
         if (provider_.hasAccess(new Subject(user.getShortName()), authorizeables,
-            EnumSet.of(action), ActiveRoleSet.ALL)) {
+            EnumSet.of(action), request.hasGrantOption(), ActiveRoleSet.ALL)) {
           return true;
         }
       }

@@ -29,7 +29,8 @@ from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.calculation_util import get_random_id
 from tests.verifiers.metric_verifier import MetricVerifier
 
-SENTRY_CONFIG_FILE = getenv('IMPALA_HOME') + '/fe/src/test/resources/sentry-site.xml'
+SENTRY_CONFIG_FILE = getenv('IMPALA_HOME') + \
+    '/fe/src/test/resources/sentry-site.xml'
 
 class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
   @classmethod
@@ -83,14 +84,16 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1",
-      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE)
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
+      sentry_config=SENTRY_CONFIG_FILE)
   def test_grant_revoke(self, vector):
     self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1",
-      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE)
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
+      sentry_config=SENTRY_CONFIG_FILE)
   def test_grant_revoke_kudu(self, vector):
     if getenv("KUDU_IS_SUPPORTED") == "false":
       pytest.skip("Kudu is not supported")
@@ -100,7 +103,8 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1",
       catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE +
-                    " --sentry_catalog_polling_frequency_s=1")
+                    " --sentry_catalog_polling_frequency_s=1",
+      sentry_config=SENTRY_CONFIG_FILE)
   def test_role_privilege_case(self, vector):
     """IMPALA-5582: Store sentry privileges in lower case. This
     test grants select privileges to roles assgined to tables/db
@@ -164,7 +168,8 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1",
-      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE)
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
+      sentry_config=SENTRY_CONFIG_FILE)
   def test_role_update(self, vector):
     """IMPALA-5355: The initial update from the statestore has the privileges and roles in
     reverse order if a role was modified, but not the associated privilege. Verify that

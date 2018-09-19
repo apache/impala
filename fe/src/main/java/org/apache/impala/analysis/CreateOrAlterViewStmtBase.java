@@ -49,6 +49,9 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
   protected String dbName_;
   protected String owner_;
 
+  // Server name needed for privileges. Set during analysis.
+  protected String serverName_;
+
   // The original SQL-string given as view definition. Set during analysis.
   // Corresponds to Hive's viewOriginalText.
   protected String originalViewDef_;
@@ -186,7 +189,8 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     params.setIf_not_exists(getIfNotExists());
     params.setOriginal_view_def(originalViewDef_);
     params.setExpanded_view_def(inlineViewDef_);
-    if (comment_ != null) params.setComment(comment_);
+    params.setServer_name(serverName_);
+    params.setComment(comment_);
     return params;
   }
 

@@ -43,6 +43,7 @@ import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.common.RuntimeEnv;
@@ -243,7 +244,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
       int initialHmsCnxnTimeoutSec, SentryConfig sentryConfig, TUniqueId catalogServiceId,
-      String kerberosPrincipal, String localLibraryPath) {
+      String kerberosPrincipal, String localLibraryPath) throws ImpalaException {
     super(INITIAL_META_STORE_CLIENT_POOL_SIZE, initialHmsCnxnTimeoutSec);
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
@@ -1642,6 +1643,25 @@ public class CatalogServiceCatalog extends Catalog {
     return (User) user;
   }
 
+  /**
+   * Add a user to the catalog if it doesn't exist. This is necessary so privileges
+   * can be added for a user. example: owner privileges.
+   */
+  public User addUserIfNotExists(String owner, Reference<Boolean> existingUser) {
+    versionLock_.writeLock().lock();
+    try {
+      User user = getAuthPolicy().getUser(owner);
+      existingUser.setRef(Boolean.TRUE);
+      if (user == null) {
+        user = addUser(owner);
+        existingUser.setRef(Boolean.FALSE);
+      }
+      return user;
+    } finally {
+      versionLock_.writeLock().unlock();
+    }
+  }
+
   private Principal addPrincipal(String principalName, Set<String> grantGroups,
       TPrincipalType type) {
     versionLock_.writeLock().lock();
@@ -1739,6 +1759,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public PrincipalPrivilege addRolePrivilege(String roleName, TPrivilege thriftPriv)
       throws CatalogException {
+    Preconditions.checkArgument(thriftPriv.getPrincipal_type() == TPrincipalType.ROLE);
     return addPrincipalPrivilege(roleName, thriftPriv, TPrincipalType.ROLE);
   }
 
@@ -1749,6 +1770,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public PrincipalPrivilege addUserPrivilege(String userName, TPrivilege thriftPriv)
       throws CatalogException {
+    Preconditions.checkArgument(thriftPriv.getPrincipal_type() == TPrincipalType.USER);
     return addPrincipalPrivilege(userName, thriftPriv, TPrincipalType.USER);
   }
 

@@ -28,6 +28,7 @@ import org.apache.sentry.api.service.thrift.SentryPolicyServiceClient;
 import org.apache.sentry.api.service.thrift.TSentryGrantOption;
 import org.apache.sentry.api.service.thrift.TSentryPrivilege;
 import org.apache.sentry.api.service.thrift.TSentryRole;
+import org.apache.sentry.core.common.exception.SentryUserException;
 import org.apache.sentry.service.thrift.SentryServiceClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +59,7 @@ public class SentryPolicyService {
    * TODO: When SENTRY-296 is resolved we can more easily cache connections instead of
    * opening a new connection for each request.
    */
-  class SentryServiceClient {
+  class SentryServiceClient implements AutoCloseable {
     private final SentryPolicyServiceClient client_;
 
     /**
@@ -469,6 +470,19 @@ public class SentryPolicyService {
               "listAllUsersPrivileges"), e);
     } finally {
       client.close();
+    }
+  }
+
+  /**
+   * Returns the configuration value for the specified key.  Will return an empty string
+   * if no value is set.
+   */
+  public String getConfigValue(String key) throws ImpalaException {
+    try (SentryServiceClient client = new SentryServiceClient()) {
+      return client.get().getConfigValue(key, "");
+    } catch (SentryUserException e) {
+      throw new InternalException("Error making 'getConfigValue' RPC to Sentry Service: ",
+          e);
     }
   }
 

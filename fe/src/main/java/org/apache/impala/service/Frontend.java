@@ -124,6 +124,7 @@ import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TPlanExecInfo;
 import org.apache.impala.thrift.TPlanFragment;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
@@ -498,9 +499,17 @@ public class Frontend {
       Set<String> groupNames =
           getAuthzChecker().getUserGroups(analysis.getAnalyzer().getUser());
       // User must be an admin to execute this operation if they have not been granted
-      // this principal.
-      ddl.getShow_grant_principal_params().setIs_admin_op(Sets.intersection(groupNames,
-          showGrantPrincipalStmt.getPrincipal().getGrantGroups()).isEmpty());
+      // this principal, or the same user as the request.
+      boolean requiresAdmin;
+      if (showGrantPrincipalStmt.getPrincipal().getPrincipalType()
+          == TPrincipalType.USER) {
+        requiresAdmin = !showGrantPrincipalStmt.getPrincipal().getName().equals(
+            analysis.getAnalyzer().getUser().getName());
+      } else {
+        requiresAdmin = Sets.intersection(groupNames, showGrantPrincipalStmt
+            .getPrincipal().getGrantGroups()).isEmpty();
+      }
+      ddl.getShow_grant_principal_params().setIs_admin_op(requiresAdmin);
       metadata.setColumns(Arrays.asList(
           new TColumn("name", Type.STRING.toThrift())));
     } else if (analysis.isCreateDropRoleStmt()) {

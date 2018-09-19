@@ -23,6 +23,10 @@
  <value>none</value>
 </property>
 <property>
+  <name>hive.sentry.server</name>
+  <value>server1</value>
+</property>
+<property>
  <name>sentry.service.admin.group</name>
  <value>${USER}</value>
 </property>
