@@ -29,6 +29,7 @@ import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SqlParser;
 import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
@@ -138,6 +139,7 @@ public class View extends Table implements FeView {
     // populate a view definition.
     SqlScanner input = new SqlScanner(new StringReader(inlineViewDef));
     SqlParser parser = new SqlParser(input);
+    parser.setQueryOptions(new TQueryOptions());
     ParseNode node = null;
     try {
       node = (ParseNode) parser.parse().value;

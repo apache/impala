@@ -40,6 +40,7 @@ import org.apache.impala.analysis.CreateTableStmt;
 import org.apache.impala.analysis.SqlParser;
 import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.testutil.ImpalaJdbcClient;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.Metrics;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -100,6 +101,7 @@ public class JdbcTest {
     // that we do not execute arbitrary SQL here and pollute the test setup.
     SqlScanner input = new SqlScanner(new StringReader(createTableSql));
     SqlParser parser = new SqlParser(input);
+    parser.setQueryOptions(new TQueryOptions());
     Object result = parser.parse().value;
     if (!(result instanceof CreateTableStmt)) {
       throw new Exception("Given stmt is not a CREATE TABLE stmt: " + createTableSql);

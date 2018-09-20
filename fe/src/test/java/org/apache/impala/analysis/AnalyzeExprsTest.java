@@ -2319,36 +2319,61 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testFuncExprDepthLimit("cast(", "1", " as int)");
   }
 
-  // Verifies the resulting expr decimal type is expectedType under decimal v1 and
+  // Verifies the resulting expr decimal type is expectedType under decimal v1 or
   // decimal v2.
-  private void testDecimalExpr(String expr,
-      Type decimalV1ExpectedType, Type decimalV2ExpectedType) {
+  private void testDecimalExpr(String expr, Type decimalExpectedType, boolean isV2) {
     TQueryOptions queryOpts = new TQueryOptions();
 
-    queryOpts.setDecimal_v2(false);
+    queryOpts.setDecimal_v2(isV2);
     SelectStmt selectStmt =
         (SelectStmt) AnalyzesOk("select " + expr, createAnalysisCtx(queryOpts));
     Expr root = selectStmt.resultExprs_.get(0);
     Type actualType = root.getType();
     Assert.assertTrue(
-        "Expr: " + expr + " Decimal Version: 1" +
-        " Expected: " + decimalV1ExpectedType + " Actual: " + actualType,
-        decimalV1ExpectedType.equals(actualType));
+        "Expr: " + expr + " Decimal Version: " + (isV2? "2" : "1") +
+        " Expected: " + decimalExpectedType + " Actual: " + actualType,
+        decimalExpectedType.equals(actualType));
+  }
 
-    queryOpts.setDecimal_v2(true);
-    selectStmt = (SelectStmt) AnalyzesOk("select " + expr, createAnalysisCtx(queryOpts));
-    root = selectStmt.resultExprs_.get(0);
-    actualType = root.getType();
-    Assert.assertTrue(
-        "Expr: " + expr + " Decimal Version: 2" +
-            " Expected: " + decimalV2ExpectedType + " Actual: " + actualType,
-        decimalV2ExpectedType.equals(actualType));
+  // Verifies the resulting expr decimal type is expectedType under decimal v1.
+  private void testDecimalExprV1(String expr, Type decimalExpectedType) {
+    testDecimalExpr(expr, decimalExpectedType, false);
+  }
+
+  // Verifies the resulting expr decimal type is expectedType under decimal v2.
+  private void testDecimalExprV2(String expr, Type decimalExpectedType) {
+    testDecimalExpr(expr, decimalExpectedType, true);
+  }
+
+  // Verifies the resulting expr decimal type is expectedType under decimal v1 and
+  // decimal v2.
+  private void testDecimalExpr(String expr,
+      Type decimalV1ExpectedType, Type decimalV2ExpectedType) {
+    testDecimalExprV1(expr, decimalV1ExpectedType);
+    testDecimalExprV2(expr, decimalV2ExpectedType);
   }
 
   // Verifies the resulting expr decimal type is exptectedType
   private void testDecimalExpr(String expr, Type expectedType) {
     testDecimalExpr(expr, expectedType, expectedType);
   }
+
+  // Verify that mod and % returns the same type when it's DECIMAL V2 mdoe.
+  // See IMPALA-6202.
+  @Test
+  public void TestModReturnType() {
+    testDecimalExprV2("mod(9.8, 3)", ScalarType.createDecimalType(2,1));
+    testDecimalExprV2("9.7 % 3", ScalarType.createDecimalType(2,1));
+
+    testDecimalExprV2("mod(109.8, 3)", ScalarType.createDecimalType(4,1));
+    testDecimalExprV2("109.7 % 3", ScalarType.createDecimalType(4,1));
+
+    testDecimalExprV2("mod(109.8, 3.45)", ScalarType.createDecimalType(3,2));
+    testDecimalExprV2("109.7 % 3.45", ScalarType.createDecimalType(3,2));
+
+    testDecimalExprV1("mod(9.6, 3)", ScalarType.createDecimalType(4,1));
+    testDecimalExprV1("9.5 % 3", Type.DOUBLE);
+ }
 
   @Test
   public void TestDecimalArithmetic() {

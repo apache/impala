@@ -28,6 +28,7 @@ import org.apache.impala.analysis.TypeDef;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TPrimitiveType;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScalarType;
 import org.apache.impala.thrift.TStructField;
 import org.apache.impala.thrift.TTypeNode;
@@ -264,6 +265,7 @@ public abstract class Type {
     String stmt = String.format("CREATE TABLE $DUMMY ($DUMMY %s)", typeStr);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
+    parser.setQueryOptions(new TQueryOptions());
     CreateTableStmt createTableStmt;
     try {
       Object o = parser.parse().value;

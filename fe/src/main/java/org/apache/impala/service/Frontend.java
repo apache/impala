@@ -1033,9 +1033,17 @@ public class Frontend {
     return result;
   }
 
+  @VisibleForTesting
   public StatementBase parse(String stmt) throws AnalysisException {
+    return parse(stmt, new TQueryOptions());
+  }
+
+  public StatementBase parse(String stmt, TQueryOptions options)
+      throws AnalysisException {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
+    Preconditions.checkArgument(options != null);
+    parser.setQueryOptions(options);
     try {
       return (StatementBase) parser.parse().value;
     } catch (Exception e) {
@@ -1090,7 +1098,8 @@ public class Frontend {
   private TExecRequest doCreateExecRequest(TQueryCtx queryCtx, EventSequence timeline,
       StringBuilder explainString) throws ImpalaException {
     // Parse stmt and collect/load metadata to populate a stmt-local table cache
-    StatementBase stmt = parse(queryCtx.client_request.stmt);
+    StatementBase stmt =
+        parse(queryCtx.client_request.stmt, queryCtx.client_request.query_options);
     StmtMetadataLoader metadataLoader =
         new StmtMetadataLoader(this, queryCtx.session.database, timeline);
     StmtTableCache stmtTableCache = metadataLoader.loadTables(stmt);

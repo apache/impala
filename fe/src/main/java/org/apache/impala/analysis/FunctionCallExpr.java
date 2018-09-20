@@ -34,6 +34,7 @@ import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TFunctionBinaryType;
+import org.apache.impala.thrift.TQueryOptions;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -80,9 +81,10 @@ public class FunctionCallExpr extends Expr {
 
   /**
    * Returns an Expr that evaluates the function call <fnName>(<params>). The returned
-   * Expr is not necessarily a FunctionCallExpr (example: DECODE())
+   * Expr is not necessarily a FunctionCallExpr (example: DECODE()).
    */
-  public static Expr createExpr(FunctionName fnName, FunctionParams params) {
+  public static Expr createExpr(FunctionName fnName, FunctionParams params,
+      TQueryOptions options) {
     FunctionCallExpr functionCallExpr = new FunctionCallExpr(fnName, params);
     if (functionNameEqualsBuiltin(fnName, "decode")) {
       return new CaseExpr(functionCallExpr);
@@ -102,6 +104,14 @@ public class FunctionCallExpr extends Expr {
           params.exprs().get(0), // x
           new NullLiteral() // NULL
       ));
+    }
+    // "mod" and "%" are equivalent in DECIMAL V2 mode.
+    Preconditions.checkArgument(options != null);
+    if (options.isDecimal_v2() && functionNameEqualsBuiltin(fnName, "mod")) {
+      List<Expr> plist = Lists.newArrayList(params.exprs());
+      Preconditions.checkArgument(plist.size() == 2);
+      return new ArithmeticExpr(ArithmeticExpr.Operator.MOD,
+          plist.get(0), plist.get(1));
     }
     return functionCallExpr;
   }

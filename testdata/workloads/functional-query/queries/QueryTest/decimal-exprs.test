@@ -512,3 +512,31 @@ select cast("1234.5" as decimal(5, 2));
 ---- CATCH
 UDF ERROR: String to Decimal cast overflowed
 ====
+---- QUERY
+# mod and % should be equivalent in Decimal V2 mode.
+set decimal_v2=true;
+select typeof(9.8 % 3);
+---- RESULTS
+'DECIMAL(2,1)'
+====
+---- QUERY
+# mod and % should be equivalent in Decimal V2 mode.
+set decimal_v2=true;
+select typeof(mod(9.7,3));
+---- RESULTS
+'DECIMAL(2,1)'
+====
+---- QUERY
+# mod and % are different in Decimal V1 mode for this case.
+set decimal_v2=false;
+select typeof(9.6 % 3);
+---- RESULTS
+'DOUBLE'
+====
+---- QUERY
+# mod and % are different in Decimal V1 mode for this case.
+set decimal_v2=false;
+select typeof(mod(9.6, 3));
+---- RESULTS
+'DECIMAL(4,1)'
+====

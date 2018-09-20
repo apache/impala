@@ -30,6 +30,7 @@ import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
@@ -67,6 +68,7 @@ public class ParserTest extends FrontendTestBase {
   public void ParserError(String stmt, String expectedErrorString) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
+    parser.setQueryOptions(new TQueryOptions());
     Object result = null; // Save this object to make debugging easier
     try {
       result = parser.parse().value;

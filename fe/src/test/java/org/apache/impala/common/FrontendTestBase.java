@@ -275,6 +275,7 @@ public class FrontendTestBase {
   public ParseNode ParsesOk(String stmt) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
+    parser.setQueryOptions(new TQueryOptions());
     ParseNode node = null;
     try {
       node = (ParseNode) parser.parse().value;
@@ -439,7 +440,7 @@ public class FrontendTestBase {
 
   protected AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx, Frontend fe)
       throws ImpalaException {
-    StatementBase parsedStmt = fe.parse(stmt);
+    StatementBase parsedStmt = fe.parse(stmt, ctx.getQueryOptions());
     StmtMetadataLoader mdLoader =
         new StmtMetadataLoader(fe, ctx.getQueryCtx().session.database, null);
     StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);

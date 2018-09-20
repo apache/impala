@@ -52,6 +52,7 @@ import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TOwnerType;
 import org.apache.impala.thrift.TPrivilegeLevel;
+import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.thrift.TPrincipalType;
@@ -67,6 +68,10 @@ parser code {:
   // list of expected tokens ids from current parsing state
   // for generating syntax error message
   private final List<Integer> expectedTokenIds_ = new ArrayList<Integer>();
+
+  // Currently used to tell if it's decimal V1 or V2 mode.
+  // TODO: remove when V1 code is dropped.
+  private TQueryOptions queryOptions;
 
   // to avoid reporting trivial tokens as expected tokens in error messages
   private boolean reportExpectedToken(Integer tokenId, int numExpectedTokens) {
@@ -94,6 +99,14 @@ parser code {:
         break;
     }
     return msg;
+  }
+
+  public void setQueryOptions(TQueryOptions options) {
+    queryOptions = options;
+  }
+
+  public TQueryOptions getQueryOptions() {
+    return queryOptions;
   }
 
   // override to save error token
@@ -2972,10 +2985,10 @@ function_call_expr ::=
   function_name:fn_name LPAREN RPAREN
   {:
     RESULT = FunctionCallExpr.createExpr(
-        fn_name, new FunctionParams(new ArrayList<Expr>()));
+        fn_name, new FunctionParams(new ArrayList<Expr>()), parser.getQueryOptions());
   :}
   | function_name:fn_name LPAREN function_params:params RPAREN
-  {: RESULT = FunctionCallExpr.createExpr(fn_name, params); :}
+  {: RESULT = FunctionCallExpr.createExpr(fn_name, params, parser.getQueryOptions()); :}
   // Below is a special case for EXTRACT. Idents are used to avoid adding new keywords.
   | function_name:fn_name LPAREN ident_or_default:u KW_FROM expr:t RPAREN
   {:  RESULT = new ExtractFromExpr(fn_name, u, t); :}
