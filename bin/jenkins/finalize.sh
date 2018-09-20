@@ -30,3 +30,18 @@ if [[ $(grep "Out of memory" "${IMPALA_HOME}"/logs_system/dmesg) ]]; then
   "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize --step dmesg \
       --stdout "${IMPALA_HOME}"/logs_system/dmesg --error "Process was OOM killed."
 fi
+
+# Check for any minidumps and symbolize and dump them.
+LOGS_DIR="${IMPALA_HOME}"/logs
+if [[ $(find $LOGS_DIR -path "*minidumps*" -name "*dmp") ]]; then
+  SYM_DIR=$(mktemp -d)
+  dump_breakpad_symbols.py -b $IMPALA_HOME/be/build/latest -d $SYM_DIR
+  for minidump in $(find $LOGS_DIR -path "*minidumps*" -name "*dmp"); do
+    $IMPALA_TOOLCHAIN/breakpad-$IMPALA_BREAKPAD_VERSION/bin/minidump_stackwalk \
+        ${minidump} $SYM_DIR > ${minidump}_dumped 2> ${minidump}_dumped.log
+    "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize --step minidumps \
+        --error "Minidump generated: $minidump" \
+        --stderr "$(head -n 100 ${minidump}_dumped)"
+  done
+  rm -rf $SYM_DIR
+fi
