@@ -81,12 +81,19 @@ public class HdfsTableSink extends TableSink {
   public void computeResourceProfile(TQueryOptions queryOptions) {
     PlanNode inputNode = fragment_.getPlanRoot();
     int numInstances = fragment_.getNumInstances(queryOptions.getMt_dop());
-    // Compute the per-instance number of partitions, taking the number of nodes
-    // and the data partition of the fragment executing this sink into account.
-    long numPartitionsPerInstance =
-        fragment_.getPerInstanceNdv(queryOptions.getMt_dop(), partitionKeyExprs_);
-    if (numPartitionsPerInstance == -1) {
-      numPartitionsPerInstance = DEFAULT_NUM_PARTITIONS;
+    // Compute the number of partitions buffered in memory at the same time, taking into
+    // account the number of nodes and the data partition of the fragment executing this
+    // sink.
+    long numBufferedPartitionsPerInstance;
+    if (inputIsClustered_) {
+      // If the insert is clustered, it produces a single partition at a time.
+      numBufferedPartitionsPerInstance = 1;
+    } else {
+      numBufferedPartitionsPerInstance =
+          fragment_.getPerInstanceNdv(queryOptions.getMt_dop(), partitionKeyExprs_);
+      if (numBufferedPartitionsPerInstance == -1) {
+        numBufferedPartitionsPerInstance = DEFAULT_NUM_PARTITIONS;
+      }
     }
 
     FeFsTable table = (FeFsTable) targetTable_;
@@ -98,7 +105,7 @@ public class HdfsTableSink extends TableSink {
     // The estimate is based purely on the per-partition mem req if the input cardinality_
     // or the avg row size is unknown.
     if (inputNode.getCardinality() == -1 || inputNode.getAvgRowSize() == -1) {
-      perInstanceMemEstimate = numPartitionsPerInstance * perPartitionMemReq;
+      perInstanceMemEstimate = numBufferedPartitionsPerInstance * perPartitionMemReq;
     } else {
       // The per-partition estimate may be higher than the memory required to buffer
       // the entire input data.
@@ -107,7 +114,7 @@ public class HdfsTableSink extends TableSink {
       long perInstanceInputBytes =
           (long) Math.ceil(perInstanceInputCardinality * inputNode.getAvgRowSize());
       long perInstanceMemReq =
-          PlanNode.checkedMultiply(numPartitionsPerInstance, perPartitionMemReq);
+          PlanNode.checkedMultiply(numBufferedPartitionsPerInstance, perPartitionMemReq);
       perInstanceMemEstimate = Math.min(perInstanceInputBytes, perInstanceMemReq);
     }
     resourceProfile_ = ResourceProfile.noReservation(perInstanceMemEstimate);

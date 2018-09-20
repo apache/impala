@@ -3944,13 +3944,13 @@ partitioned by (l_partkey) as
 select l_comment, l_partkey from tpch.lineitem
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=20.00MB Threads=2
-Per-Host Resource Estimates: Memory=307MB
+Per-Host Resource Estimates: Memory=106MB
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=306.99MB mem-reservation=20.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=106.00MB mem-reservation=20.00MB thread-reservation=2
 WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
 |  partitions=200516
-|  mem-estimate=288.99MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0
 |
 01:SORT
 |  order by: l_partkey ASC NULLS LAST
@@ -3969,13 +3969,13 @@ WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=20.00MB Threads=3
-Per-Host Resource Estimates: Memory=202MB
+Per-Host Resource Estimates: Memory=106MB
 
 F01:PLAN FRAGMENT [HASH(l_partkey)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=114.33MB mem-reservation=12.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=18.10MB mem-reservation=12.00MB thread-reservation=1
 WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
 |  partitions=200516
-|  mem-estimate=96.33MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0
 |
 02:SORT
 |  order by: l_partkey ASC NULLS LAST
@@ -4001,19 +4001,95 @@ Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservati
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=40.00MB Threads=4
-Per-Host Resource Estimates: Memory=308MB
+Per-Host Resource Estimates: Memory=212MB
 
 F01:PLAN FRAGMENT [HASH(l_partkey)] hosts=3 instances=6
-|  Per-Host Resources: mem-estimate=132.33MB mem-reservation=24.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=36.20MB mem-reservation=24.00MB thread-reservation=2
 WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
 |  partitions=200516
-|  mem-estimate=48.16MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0
 |
 02:SORT
 |  order by: l_partkey ASC NULLS LAST
 |  mem-estimate=18.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1 row-size=50B cardinality=6001215
 |  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(l_partkey)]
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=50B cardinality=6001215
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Host Resources: mem-estimate=176.00MB mem-reservation=16.00MB thread-reservation=2
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6001215 size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1068457
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=50B cardinality=6001215
+   in pipelines: 00(GETNEXT)
+====
+# Noclustered dynamically partitioned HDFS insert.
+create /* +noclustered */ table dummy_insert
+partitioned by (l_partkey) as
+select l_comment, l_partkey from tpch.lineitem
+---- PLAN
+Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
+Per-Host Resource Estimates: Memory=377MB
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=376.99MB mem-reservation=8.00MB thread-reservation=2
+WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
+|  partitions=200516
+|  mem-estimate=288.99MB mem-reservation=0B thread-reservation=0
+|
+00:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6001215 size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1068457
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=50B cardinality=6001215
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=8.00MB Threads=3
+Per-Host Resource Estimates: Memory=184MB
+
+F01:PLAN FRAGMENT [HASH(l_partkey)] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=96.33MB mem-reservation=0B thread-reservation=1
+WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
+|  partitions=200516
+|  mem-estimate=96.33MB mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [HASH(l_partkey)]
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=50B cardinality=6001215
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=2
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6001215 size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1068457
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=50B cardinality=6001215
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=4
+Per-Host Resource Estimates: Memory=272MB
+
+F01:PLAN FRAGMENT [HASH(l_partkey)] hosts=3 instances=6
+|  Per-Host Resources: mem-estimate=96.33MB mem-reservation=0B thread-reservation=2
+WRITE TO HDFS [default.dummy_insert, OVERWRITE=false, PARTITION-KEYS=(l_partkey)]
+|  partitions=200516
+|  mem-estimate=48.16MB mem-reservation=0B thread-reservation=0
 |
 01:EXCHANGE [HASH(l_partkey)]
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
