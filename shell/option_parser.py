@@ -221,7 +221,10 @@ def get_option_parser(defaults):
                          " It must follow the pattern \"KEY=VALUE\","
                          " KEY must be a valid query option. Valid query options "
                          " can be listed by command 'set'.")
-
+  parser.add_option("-t", "--client_connect_timeout_ms",
+                    help="Timeout in milliseconds after which impala-shell will time out"
+                    " if it fails to connect to Impala server. Set to 0 to disable any"
+                    " timeout.")
   # add default values to the help text
   for option in parser.option_list:
     # since the quiet flag is the same as the verbose flag

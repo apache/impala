@@ -51,4 +51,5 @@ impala_shell_defaults = {
             'verbose': True,
             'version': False,
             'write_delimited': False,
+            'client_connect_timeout_ms': 5000,
             }

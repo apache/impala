@@ -32,6 +32,7 @@ from tests.common.skip import SkipIf
 from time import sleep, time
 from util import IMPALAD, SHELL_CMD
 from util import assert_var_substitution, run_impala_shell_cmd, ImpalaShell
+from contextlib import closing
 
 DEFAULT_QUERY = 'select 1'
 QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
@@ -757,3 +758,17 @@ class TestImpalaShell(ImpalaTestSuite):
       find_query_option("duplicate", test_input)
     with pytest.raises(AssertionError):
       find_query_option("not_an_option", test_input)
+
+  def test_impala_shell_timeout(self):
+    """Tests that impala shell times out during connect.
+       This creates a random listening socket and we try to connect to this
+       socket through the impala-shell. The impala-shell should timeout and not hang
+       indefinitely while connecting
+    """
+    with closing(socket.socket()) as s:
+      s.bind(("", 0))
+      # maximum number of queued connections on this socket is 1.
+      s.listen(1)
+      test_port = s.getsockname()[1]
+      args = '-q "select foo; select bar;" --ssl -t 2000 -i localhost:%d' % (test_port)
+      run_impala_shell_cmd(args, expect_success=False)

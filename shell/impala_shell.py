@@ -168,7 +168,7 @@ class ImpalaShell(object, cmd.Cmd):
     self.ldap_password = options.ldap_password
     self.ldap_password_cmd = options.ldap_password_cmd
     self.use_ldap = options.use_ldap
-
+    self.client_connect_timeout_ms = options.client_connect_timeout_ms
     self.verbose = options.verbose
     self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     self.server_version = ImpalaShell.UNKNOWN_SERVER_VERSION
@@ -518,7 +518,7 @@ class ImpalaShell(object, cmd.Cmd):
     return ImpalaClient(self.impalad, self.kerberos_host_fqdn, self.use_kerberos,
                         self.kerberos_service_name, self.use_ssl,
                         self.ca_cert, self.user, self.ldap_password,
-                        self.use_ldap)
+                        self.use_ldap, self.client_connect_timeout_ms, self.verbose)
 
   def _signal_handler(self, signal, frame):
     """Handles query cancellation on a Ctrl+C event"""
@@ -818,12 +818,13 @@ class ImpalaShell(object, cmd.Cmd):
       print_to_stderr("Unable to import the python 'ssl' module. It is"
       " required for an SSL-secured connection.")
       sys.exit(1)
-    except socket.error, (code, e):
+    except socket.error, e:
       # if the socket was interrupted, reconnect the connection with the client
-      if code == errno.EINTR:
+      if e.errno == errno.EINTR:
         self._reconnect_cancellation()
       else:
-        print_to_stderr("Socket error %s: %s" % (code, e))
+        print_to_stderr("Socket error %s: %s" % (e.errno, e))
+        self.imp_client.close_connection()
         self.prompt = self.DISCONNECTED_PROMPT
     except Exception, e:
       if self.ldap_password_cmd and \
@@ -1507,7 +1508,7 @@ def parse_variables(keyvals):
 
 def replace_variables(set_variables, string):
   """Replaces variable within the string with their corresponding values using the
-  given set_variables."""
+     given set_variables."""
   errors = False
   matches = set(map(lambda v: v.upper(), re.findall(r'(?<!\\)\${([^}]+)}', string)))
   for name in matches:
@@ -1537,8 +1538,8 @@ def replace_variables(set_variables, string):
 
 
 def get_var_name(name):
-  """Look for a namespace:var_name pattern in an option name.
-     Return the variable name if it's a match or None otherwise.
+  """Looks for a namespace:var_name pattern in an option name.
+     Returns the variable name if it's a match or None otherwise.
   """
   ns_match = re.match(r'^([^:]*):(.*)', name)
   if ns_match is not None:
