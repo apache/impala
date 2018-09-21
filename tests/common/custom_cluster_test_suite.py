@@ -45,6 +45,7 @@ SENTRY_CONFIG = 'sentry_config'
 # Default query options passed to the impala daemon command line. Handled separately from
 # other impala daemon arguments to allow merging multiple defaults into a single list.
 DEFAULT_QUERY_OPTIONS = 'default_query_options'
+LOG_DIR = 'log_dir'
 
 # Run with fast topic updates by default to reduce time to first query running.
 DEFAULT_STATESTORE_ARGS = '--statestore_update_frequency_ms=50 \
@@ -95,7 +96,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   @staticmethod
   def with_args(impalad_args=None, statestored_args=None, catalogd_args=None,
-                start_args=None, sentry_config=None, default_query_options=None):
+      start_args=None, sentry_config=None, default_query_options=None, log_dir=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
     method's func_dict"""
     def decorate(func):
@@ -114,6 +115,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[SENTRY_CONFIG] = sentry_config
       if default_query_options is not None:
         func.func_dict[DEFAULT_QUERY_OPTIONS] = default_query_options
+      if log_dir is not None:
+        func.func_dict[LOG_DIR] = log_dir
       return func
     return decorate
 
@@ -128,8 +131,13 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     if SENTRY_CONFIG in method.func_dict:
       self._start_sentry_service(method.func_dict[SENTRY_CONFIG])
     # Start a clean new cluster before each test
-    self._start_impala_cluster(
-        cluster_args, default_query_options=method.func_dict.get(DEFAULT_QUERY_OPTIONS))
+    if LOG_DIR in method.func_dict:
+      self._start_impala_cluster(cluster_args,
+          default_query_options=method.func_dict.get(DEFAULT_QUERY_OPTIONS),
+          log_dir=method.func_dict[LOG_DIR])
+    else:
+      self._start_impala_cluster(cluster_args,
+          default_query_options=method.func_dict.get(DEFAULT_QUERY_OPTIONS))
     super(CustomClusterTestSuite, self).setup_class()
 
   def teardown_method(self, method):

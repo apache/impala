@@ -31,10 +31,15 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.file_utils import assert_file_in_dir_contains,\
+    assert_no_files_in_dir_contain
 from tests.hs2.hs2_test_suite import operation_id_to_query_id
 from tests.util.filesystem_utils import WAREHOUSE
 
 AUTH_POLICY_FILE = "%s/authz-policy.ini" % WAREHOUSE
+SENTRY_CONFIG_DIR = os.getenv('IMPALA_HOME') + '/fe/src/test/resources/'
+SENTRY_CONFIG_FILE = SENTRY_CONFIG_DIR + 'sentry-site.xml'
+
 
 class TestAuthorization(CustomClusterTestSuite):
   AUDIT_LOG_DIR = tempfile.mkdtemp(dir=os.getenv('LOG_DIR'))
@@ -357,3 +362,22 @@ class TestAuthorization(CustomClusterTestSuite):
     else:
       assert "User %s is not authorized to access the runtime profile or "\
           "execution summary." % (getuser()) in str(exec_summary_resp)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--server_name=server1 --sentry_config=" + SENTRY_CONFIG_FILE,
+      catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
+      log_dir=tempfile.mkdtemp(prefix="test_deprecated_none_", dir=os.getenv("LOG_DIR")))
+  def test_deprecated_flag_doesnt_show(self):
+    assert_no_files_in_dir_contain(self.impala_log_dir, "authorization_policy_file " +
+        "flag is deprecated. Object Ownership feature is not supported")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--server_name=server1\
+      --authorization_policy_file=%s\
+      --authorization_policy_provider_class=%s" % (AUTH_POLICY_FILE,
+       "org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider"),
+      log_dir=tempfile.mkdtemp(prefix="test_deprecated_", dir=os.getenv("LOG_DIR")))
+  def test_deprecated_flags(self):
+    assert_file_in_dir_contains(self.impala_log_dir, "authorization_policy_file flag" +
+        " is deprecated. Object Ownership feature is not supported")

@@ -27,6 +27,8 @@ from tempfile import mkdtemp
 from time import sleep
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.file_utils import grep_file, assert_file_in_dir_contains,\
+    assert_no_files_in_dir_contain
 
 LOG = logging.getLogger(__name__)
 
@@ -121,20 +123,20 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
       if self.cluster.impalads:
         raise Exception("No impalads should have started")
     with open(os.path.join(self.log_dir, 'impalad-error.log')) as file:
-      result = self.grep_file(file, expected_error_message)
+      result = grep_file(file, expected_error_message)
     assert result, 'The expected error message was not found'
 
   def assert_log_redaction(self, unredacted_value, redacted_value, expect_audit=True):
     '''Asserts that the 'unredacted_value' is not present but the 'redacted_value' is.'''
     # Logs should not contain the unredacted value.
-    self.assert_no_files_in_dir_contain(self.log_dir, unredacted_value)
-    self.assert_no_files_in_dir_contain(self.audit_dir, unredacted_value)
-    self.assert_no_files_in_dir_contain(self.profile_dir, unredacted_value)
+    assert_no_files_in_dir_contain(self.log_dir, unredacted_value)
+    assert_no_files_in_dir_contain(self.audit_dir, unredacted_value)
+    assert_no_files_in_dir_contain(self.profile_dir, unredacted_value)
     # But the redacted value should be there except for the profile since that is
     # encoded.
-    self.assert_file_in_dir_contains(self.log_dir, redacted_value)
+    assert_file_in_dir_contains(self.log_dir, redacted_value)
     if expect_audit:
-      self.assert_file_in_dir_contains(self.audit_dir, redacted_value)
+      assert_file_in_dir_contains(self.audit_dir, redacted_value)
 
   def assert_web_ui_redaction(self, query_id, unredacted_value, redacted_value):
     '''Asserts that the 'unredacted_value' is not present but the 'redacted_value' is.'''
@@ -145,7 +147,7 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
       for response_format in ('html', 'json'):
         # The 'html' param is actually ignored by the server.
         url = page + '?query_id=' + query_id + "&" + response_format
-        results = self.grep_file(impala_service.open_debug_webpage(url), unredacted_value)
+        results = grep_file(impala_service.open_debug_webpage(url), unredacted_value)
         assert not results, "Web page %s should not contain '%s' but does" \
             % (url, unredacted_value)
     # But the redacted value should be shown.
@@ -157,7 +159,7 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     impala_service = self.create_impala_service()
     for page in ('queries', 'query_stmt', 'query_plan_text', 'query_profile'):
       url = '%s?query_id=%s' % (page, query_id)
-      results = self.grep_file(impala_service.open_debug_webpage(url), search)
+      results = grep_file(impala_service.open_debug_webpage(url), search)
       assert results, "Web page %s should contain '%s' but does not" \
           % (url, search)
 
@@ -165,48 +167,9 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     ''' Asserts that the query profile for 'query_id' contains 'search' string'''
     impala_service = self.create_impala_service()
     url = 'query_profile?query_id=%s' % query_id
-    results = self.grep_file(impala_service.open_debug_webpage(url), search)
+    results = grep_file(impala_service.open_debug_webpage(url), search)
     assert results, "Query profile %s should contain '%s' but does not" \
         % (url, search)
-
-  def assert_file_in_dir_contains(self, dir, search):
-    '''Asserts that at least one file in the 'dir' contains the 'search' term.'''
-    results = self.grep_dir(dir,search)
-    assert results, "%s should have a file containing '%s' but no file was found" \
-        % (dir, search)
-
-  def assert_no_files_in_dir_contain(self, dir, search):
-    '''Asserts that no files in the 'dir' contains the 'search' term.'''
-    results = self.grep_dir(dir,search)
-    assert not results, \
-        "%s should not have any file containing '%s' but a file was found" \
-        % (dir, search)
-
-  def grep_dir(self, dir, search):
-    '''Recursively search for files that contain 'search' and return a list of matched
-       lines grouped by file.
-    '''
-    matching_files = dict()
-    for dir_name, _, file_names in os.walk(dir):
-      for file_name in file_names:
-        file_path = os.path.join(dir_name, file_name)
-        if os.path.islink(file_path):
-          continue
-        with open(file_path) as file:
-          matching_lines = self.grep_file(file, search)
-          if matching_lines:
-            matching_files[file_name] = matching_lines
-    return matching_files
-
-  def grep_file(self, file, search):
-    '''Return lines in 'file' that contain the 'search' term. 'file' must already be
-       opened.
-    '''
-    matching_lines = list()
-    for line in file:
-      if search in line:
-        matching_lines.append(line)
-    return matching_lines
 
   @pytest.mark.execute_serially
   def test_bad_rules(self):
@@ -266,10 +229,10 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     # only a second is needed.
     sleep(5)
     # The query should show up in both the audit and non-audit logs
-    self.assert_file_in_dir_contains(self.log_dir, email)
-    self.assert_file_in_dir_contains(self.audit_dir, email)
+    assert_file_in_dir_contains(self.log_dir, email)
+    assert_file_in_dir_contains(self.audit_dir, email)
     # The profile is encoded so the email won't be found.
-    self.assert_no_files_in_dir_contain(self.profile_dir, email)
+    assert_no_files_in_dir_contain(self.profile_dir, email)
 
     # Since all the tests passed, the log dir shouldn't be of interest and can be
     # deleted.
