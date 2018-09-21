@@ -51,6 +51,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -84,6 +85,7 @@ import org.apache.impala.thrift.TLoadDataReq;
 import org.apache.impala.thrift.TLoadDataResp;
 import org.apache.impala.thrift.TLogLevel;
 import org.apache.impala.thrift.TMetadataOpRequest;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TShowFilesParams;
@@ -559,8 +561,19 @@ public class JniFrontend {
     TShowGrantPrincipalParams params = new TShowGrantPrincipalParams();
     JniUtil.deserializeThrift(protocolFactory_, params, showGrantPrincipalParams);
     TResultSet result;
-    result = frontend_.getCatalog().getAuthPolicy().getPrincipalPrivileges(
-        params.getName(), params.getPrivilege(), params.getPrincipal_type());
+    switch (params.getPrincipal_type()) {
+      case USER:
+        result = frontend_.getCatalog().getAuthPolicy().getUserPrivileges(
+            params.getName(), params.getPrivilege(), frontend_);
+        break;
+      case ROLE:
+        result = frontend_.getCatalog().getAuthPolicy().getRolePrivileges(
+            params.getName(), params.getPrivilege());
+        break;
+      default:
+        throw new AnalysisException("Unexpected TPrincipalType: " +
+            params.getPrincipal_type());
+    }
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);

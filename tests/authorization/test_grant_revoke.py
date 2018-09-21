@@ -288,9 +288,8 @@ class TestGrantRevoke(SentryCacheTestSuite):
     try:
       self.client.execute("create role {0}".format(role_name))
       self.client.execute("grant all on server to {0}".format(role_name))
-      self.client.execute(
-          "grant role {0} to group `{1}`".format(
-           role_name, grp.getgrnam(getuser()).gr_name))
+      self.client.execute("grant role {0} to group `{1}`".format(role_name,
+          grp.getgrnam(getuser()).gr_name))
 
       self.client.execute("create database " + db_name)
       self.client.execute("create database " + db_name_upper_case)

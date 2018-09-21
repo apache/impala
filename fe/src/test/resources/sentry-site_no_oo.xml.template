@@ -96,4 +96,9 @@
     <name>sentry.db.explicit.grants.permitted</name>
     <value></value>
   </property>
+  <!-- Custom group mapping for custom cluster tests -->
+  <property>
+    <name>sentry.store.group.mapping</name>
+    <value>org.apache.impala.service.CustomClusterGroupMapper</value>
+  </property>
 </configuration>

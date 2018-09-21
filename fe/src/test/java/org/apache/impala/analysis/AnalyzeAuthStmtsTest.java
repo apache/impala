@@ -93,10 +93,9 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
     AnalysisError("SHOW GRANT ROLE does_not_exist ON SERVER",
         "Role 'does_not_exist' does not exist.");
 
-    AnalysisError("SHOW GRANT USER does_not_exist",
-        "User 'does_not_exist' does not exist.");
-    AnalysisError("SHOW GRANT USER does_not_exist ON SERVER",
-        "User 'does_not_exist' does not exist.");
+    // Determining if a user exists on the system is done in the AuthorizationPolicy and
+    // these tests run with authorization disabled. The SHOW GRANT USER will be tested
+    // in the custom cluster tests test_grant_revoke.
   }
 
   @Test

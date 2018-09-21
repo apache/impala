@@ -40,16 +40,26 @@ class SentryCacheTestSuite(CustomClusterTestSuite):
     return val.lower() == 'true'
 
   @staticmethod
-  def __check_privileges(result, test_obj, null_create_date=True):
+  def __check_privileges(result, test_obj, null_create_date=True, show_user=False):
     """
     This method validates privileges. Most validations are assertions, but for
     null_create_date, we just return False to indicate the privilege cannot
-    be validated because it has not been refreshed from Sentry yet.
+    be validated because it has not been refreshed from Sentry yet. If the query is
+    for "show grant user" then we need to account for the two extra columns.
     """
-    # results should have the following columns
+    # results should have the following columns for offset 0
     # scope, database, table, column, uri, privilege, grant_option, create_time
+    # results should have the following columns for offset 2
+    # principal name, principal type, scope, database, table, column, uri, privilege,
+    # grant_option, create_time
     for row in result.data:
       col = row.split('\t')
+      # If we're running show grant user, we ignore any columns that have "ROLE".
+      # This is because this method currently only validates single user privileges.
+      if show_user and col[0] == 'ROLE':
+        continue
+      if show_user:
+        col = col[2:]
       assert col[0] == test_obj.grant_name
       assert col[1] == test_obj.db_name
       if test_obj.table_name is not None and len(test_obj.table_name) > 0:
@@ -64,16 +74,18 @@ class SentryCacheTestSuite(CustomClusterTestSuite):
     """Validate privileges. If timeout_sec is > 0 then retry until create_date is not null
     or the timeout_sec is reached. If delay_s is > 0 then wait that long before running.
     """
+    show_user = True if 'show grant user' in query else False
     if delay_s > 0:
       sleep(delay_s)
     if timeout_sec is None or timeout_sec <= 0:
       self.__check_privileges(self.execute_query_expect_success(client, query,
-          user=user), test_obj)
+          user=user), test_obj, show_user=show_user)
     else:
       start_time = time()
       while time() - start_time < timeout_sec:
         result = self.execute_query_expect_success(client, query, user=user)
-        success = self.__check_privileges(result, test_obj, null_create_date=False)
+        success = self.__check_privileges(result, test_obj, null_create_date=False,
+            show_user=show_user)
         if success:
           return True
         sleep(1)

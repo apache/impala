@@ -23,6 +23,9 @@ import java.util.Set;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.net.ntp.TimeStamp;
+import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
+import org.apache.impala.service.Frontend;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TPrincipal;
 import org.apache.impala.thrift.TPrincipalType;
@@ -461,55 +464,134 @@ public class AuthorizationPolicy implements PrivilegeCache {
   }
 
   /**
-   * Returns the privileges that have been granted to a principal as a tabular result set.
+   * Returns the privileges that have been granted to a role as a tabular result set.
    * Allows for filtering based on a specific privilege spec or showing all privileges
-   * granted to the principal. Used by the SHOW GRANT ROLE/USER statement.
+   * granted to the role. Used by the SHOW GRANT ROLE statement.
    */
-  public synchronized TResultSet getPrincipalPrivileges(String principalName,
-      TPrivilege filter, TPrincipalType type) {
+  public synchronized TResultSet getRolePrivileges(String principalName,
+      TPrivilege filter) {
     TResultSet result = new TResultSet();
     result.setSchema(new TResultSetMetadata());
-    result.getSchema().addToColumns(new TColumn("scope", Type.STRING.toThrift()));
-    result.getSchema().addToColumns(new TColumn("database", Type.STRING.toThrift()));
-    result.getSchema().addToColumns(new TColumn("table", Type.STRING.toThrift()));
-    result.getSchema().addToColumns(new TColumn("column", Type.STRING.toThrift()));
-    result.getSchema().addToColumns(new TColumn("uri", Type.STRING.toThrift()));
-    result.getSchema().addToColumns(new TColumn("privilege", Type.STRING.toThrift()));
-    result.getSchema().addToColumns(
-        new TColumn("grant_option", Type.BOOLEAN.toThrift()));
-    result.getSchema().addToColumns(new TColumn("create_time", Type.STRING.toThrift()));
+    addColumnOutputColumns(result.getSchema());
     result.setRows(Lists.<TResultRow>newArrayList());
 
-    Principal principal = getPrincipal(principalName, type);
-    if (principal == null) return result;
-    for (PrincipalPrivilege p: principal.getPrivileges()) {
-      TPrivilege privilege = p.toThrift();
-      if (filter != null) {
-        // Check if the privileges are targeting the same object.
-        filter.setPrivilege_level(privilege.getPrivilege_level());
-        String privName = PrincipalPrivilege.buildPrivilegeName(filter);
-        if (!privName.equalsIgnoreCase(
-            PrincipalPrivilege.buildPrivilegeName(privilege))) {
-          continue;
-        }
+    Role role = getRole(principalName);
+    if (role != null) {
+      for (PrincipalPrivilege p : role.getPrivileges()) {
+        TPrivilege privilege = p.toThrift();
+        if (filter != null && isPrivilegeFiltered(filter, privilege)) continue;
+        TResultRowBuilder rowBuilder = new TResultRowBuilder();
+        result.addToRows(addShowPrincipalOutputResults(privilege, rowBuilder).get());
       }
-      TResultRowBuilder rowBuilder = new TResultRowBuilder();
-      rowBuilder.add(privilege.getScope().toString().toLowerCase());
-      rowBuilder.add(Strings.nullToEmpty(privilege.getDb_name()).toLowerCase());
-      rowBuilder.add(Strings.nullToEmpty(privilege.getTable_name()).toLowerCase());
-      rowBuilder.add(Strings.nullToEmpty(privilege.getColumn_name()).toLowerCase());
-      // URIs are case sensitive
-      rowBuilder.add(Strings.nullToEmpty(privilege.getUri()));
-      rowBuilder.add(privilege.getPrivilege_level().toString().toLowerCase());
-      rowBuilder.add(Boolean.toString(privilege.isHas_grant_opt()));
-      if (privilege.getCreate_time_ms() == -1) {
-        rowBuilder.add(null);
-      } else {
-        rowBuilder.add(
-            TimeStamp.getNtpTime(privilege.getCreate_time_ms()).toDateString());
-      }
-      result.addToRows(rowBuilder.get());
     }
     return result;
+  }
+
+  /**
+   * Check if the filter matches the privilege.
+   */
+  private boolean isPrivilegeFiltered(TPrivilege filter, TPrivilege privilege) {
+    filter.setPrivilege_level(privilege.getPrivilege_level());
+    String privName = PrincipalPrivilege.buildPrivilegeName(filter);
+    return !privName.equalsIgnoreCase(PrincipalPrivilege.buildPrivilegeName(privilege));
+  }
+
+  /**
+   * This method adds the common column headers used for both SHOW GRANT USER
+   * and SHOW GRANT ROLE.
+   */
+  private void addColumnOutputColumns(TResultSetMetadata schema) {
+    schema.addToColumns(new TColumn("scope", Type.STRING.toThrift()));
+    schema.addToColumns(new TColumn("database", Type.STRING.toThrift()));
+    schema.addToColumns(new TColumn("table", Type.STRING.toThrift()));
+    schema.addToColumns(new TColumn("column", Type.STRING.toThrift()));
+    schema.addToColumns(new TColumn("uri", Type.STRING.toThrift()));
+    schema.addToColumns(new TColumn("privilege", Type.STRING.toThrift()));
+    schema.addToColumns(new TColumn("grant_option", Type.BOOLEAN.toThrift()));
+    schema.addToColumns(new TColumn("create_time", Type.STRING.toThrift()));
+  }
+
+  /**
+   * This method adds the common output for both SHOW GRANT USER and SHOW GRANT ROLE.
+   */
+  private TResultRowBuilder addShowPrincipalOutputResults(TPrivilege privilege,
+      TResultRowBuilder rowBuilder) {
+    rowBuilder.add(privilege.getScope().toString().toLowerCase());
+    rowBuilder.add(Strings.nullToEmpty(privilege.getDb_name()).toLowerCase());
+    rowBuilder.add(Strings.nullToEmpty(privilege.getTable_name()).toLowerCase());
+    rowBuilder.add(Strings.nullToEmpty(privilege.getColumn_name()).toLowerCase());
+    // URIs are case sensitive
+    rowBuilder.add(Strings.nullToEmpty(privilege.getUri()));
+    rowBuilder.add(privilege.getPrivilege_level().toString().toLowerCase());
+    rowBuilder.add(Boolean.toString(privilege.isHas_grant_opt()));
+    if (privilege.getCreate_time_ms() == -1) {
+      rowBuilder.add(null);
+    } else {
+      rowBuilder.add(TimeStamp.getNtpTime(privilege.getCreate_time_ms()).toDateString());
+    }
+    return rowBuilder;
+  }
+
+  /**
+   * Returns the privileges that have been granted to a user as a tabular result set.
+   * Allows for filtering based on a specific privilege spec or showing all privileges
+   * granted to the user. Used by the SHOW GRANT USER statement.
+   */
+  public synchronized TResultSet getUserPrivileges(String principalName,
+      TPrivilege filter, Frontend fe) throws InternalException, AnalysisException {
+    TResultSet result = new TResultSet();
+    result.setSchema(new TResultSetMetadata());
+
+    result.getSchema().addToColumns(new TColumn("principal_type",
+        Type.STRING.toThrift()));
+    result.getSchema().addToColumns(new TColumn("principal_name",
+        Type.STRING.toThrift()));
+    addColumnOutputColumns(result.getSchema());
+    result.setRows(Lists.<TResultRow>newArrayList());
+
+    // A user should be considered to not exist if they do not have any groups.
+    Set<String> groupNames = fe.getAuthzChecker().getUserGroups(
+        new org.apache.impala.authorization.User(principalName));
+    if (groupNames.isEmpty()) {
+      throw new AnalysisException(String.format("User '%s' does not exist.",
+          principalName));
+    }
+    User user = getUser(principalName);
+    if (user != null) {
+      createShowUserPrivilegesResultRows(result, user.getPrivileges(), filter,
+          principalName, TPrincipalType.USER);
+    }
+
+    // Get the groups that user belongs to, get the roles those groups belong to and
+    // return those privileges as well.
+    List<Role> roles = Lists.newArrayList();
+    for (String groupName: groupNames) {
+      roles.addAll(fe.getCatalog().getAuthPolicy().getGrantedRoles(groupName));
+    }
+    for (Role role: roles) {
+      Principal rolePrincipal = getRole(role.getName());
+      if (rolePrincipal != null) {
+        createShowUserPrivilegesResultRows(result, rolePrincipal.getPrivileges(), filter,
+            rolePrincipal.getName(), TPrincipalType.ROLE);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * This method adds the rows to the output for the SHOW GRANT USER statement for user
+   * and associated roles.
+   */
+  private void createShowUserPrivilegesResultRows(TResultSet result,
+      List<PrincipalPrivilege> privileges, TPrivilege filter, String name,
+      TPrincipalType type) {
+    for (PrincipalPrivilege p : privileges) {
+      TPrivilege privilege = p.toThrift();
+      if (filter != null && isPrivilegeFiltered(filter, privilege)) continue;
+      TResultRowBuilder rowBuilder = new TResultRowBuilder();
+      rowBuilder.add(Strings.nullToEmpty(type.name().toUpperCase()));
+      rowBuilder.add(Strings.nullToEmpty(name));
+      result.addToRows(addShowPrincipalOutputResults(privilege, rowBuilder).get());
+    }
   }
 }
