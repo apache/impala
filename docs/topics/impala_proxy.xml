@@ -82,10 +82,12 @@ under the License.
         </li>
 
         <li>
-          The coordinator node for each Impala query potentially requires more memory and CPU cycles than the other
-          nodes that process the query. The proxy server can issue queries using round-robin scheduling, so that
-          each connection uses a different coordinator node. This load-balancing technique lets the Impala nodes
-          share this additional work, rather than concentrating it on a single machine.
+          The coordinator node for each Impala query potentially requires
+          more memory and CPU cycles than the other nodes that process the
+          query. The proxy server can issue queries so that each connection uses
+          a different coordinator node. This load-balancing technique lets the
+          Impala nodes share this additional work, rather than concentrating it
+          on a single machine.
         </li>
       </ul>
 
