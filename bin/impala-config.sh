@@ -169,9 +169,13 @@ export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
 export KUDU_JAVA_VERSION=1.8.0-cdh6.x-SNAPSHOT
 
+# When IMPALA_(CDH_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
+# which will be substituted for the CDH platform label in bootstrap_toolchain.py
 unset IMPALA_HADOOP_URL
 unset IMPALA_HBASE_URL
 unset IMPALA_HIVE_URL
+unset IMPALA_KUDU_URL
+unset IMPALA_KUDU_VERSION
 unset IMPALA_SENTRY_URL
 unset IMPALA_LLAMA_MINIKDC_URL
 
@@ -568,13 +572,12 @@ fi
 export KUDU_IS_SUPPORTED
 
 if $USE_CDH_KUDU; then
-  export IMPALA_KUDU_VERSION=1.8.0-cdh6.x-SNAPSHOT
+  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1.8.0-cdh6.x-SNAPSHOT"}
   export IMPALA_KUDU_HOME=${CDH_COMPONENTS_HOME}/kudu-$IMPALA_KUDU_VERSION
 else
-  export IMPALA_KUDU_VERSION=5211897
+  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"5211897"}
   export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN}/kudu-$IMPALA_KUDU_VERSION
 fi
-unset IMPALA_KUDU_URL
 
 # Set $THRIFT_HOME to the Thrift directory in toolchain.
 export THRIFT_HOME="${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}"

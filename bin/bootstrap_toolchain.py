@@ -407,6 +407,9 @@ def download_cdh_components(toolchain_root, cdh_components, url_prefix):
       download_path = url_prefix + file_name
     else:
       download_path = component.url
+      if "%(platform_label)" in component.url:
+        download_path = \
+            download_path.replace("%(platform_label)", get_platform_release_label().cdh)
     wget_and_unpack_package(download_path, file_name, cdh_components_home, False)
 
   execute_many(download, cdh_components)
