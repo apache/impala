@@ -1740,5 +1740,125 @@
     "units": "NONE",
     "kind": "PROPERTY",
     "key": "tzdata-path"
+  },
+  {
+    "description": "Average time spent loading new values into the Impalad Catalog Cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Average Impalad catalog cache load time",
+    "units": "TIME_NS",
+    "kind": "GAUGE",
+    "key": "catalog.cache.average-load-time"
+  },
+  {
+    "description": "Total number of evictions from the Impalad Catalog Cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache eviction count",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "catalog.cache.eviction-count"
+  },
+  {
+    "description": "Total number of Impalad Catalog cache hits.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache hit count",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "catalog.cache.hit-count"
+  },
+  {
+    "description": "Ratio of Impalad Catalog cache requests that were hits.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache hit rate",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.cache.hit-rate"
+  },
+  {
+    "description": "Total requests to Impalad Catalog cache requests that loaded new values.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache load count",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "catalog.cache.load-count"
+  },
+  {
+    "description": "Total requests to Impalad Catalog cache requests that threw exceptions loading new values.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache load exception count",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "catalog.cache.load-exception-count"
+  },
+  {
+    "description": "Ratio of Impalad Catalog cache requests that threw exceptions loading new values.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache load exception rate",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.cache.load-exception-rate"
+  },
+  {
+    "description": "Number of Impalad Catalog cache requests that successfully loaded new values.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache load success count",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "catalog.cache.load-success-count"
+  },
+  {
+    "description": "Number of Impalad Catalog cache requests that returned uncached values.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache load miss count",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "catalog.cache.miss-count"
+  },
+  {
+    "description": "Ratio of Impalad Catalog cache requests that were misses.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache load miss rate",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.cache.miss-rate"
+  },
+  {
+    "description": "Total number of Impalad Catalog cache requests.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache request count",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "catalog.cache.request-count"
+  },
+  {
+    "description": "Total time spent in Impalad Catalog cache loading new values.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impalad catalog cache time spent in loads",
+    "units": "TIME_NS",
+    "kind": "COUNTER",
+    "key": "catalog.cache.total-load-time"
   }
 ]

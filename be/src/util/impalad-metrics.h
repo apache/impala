@@ -121,6 +121,47 @@ class ImpaladMetricKeys {
   /// a catalog server with an unexpected ID.
   static const char* CATALOG_READY;
 
+  /// Average time spent loading new values into the Impalad Catalog Cache.
+  static const char* CATALOG_CACHE_AVG_LOAD_TIME;
+
+  /// Total number of evictions from the Impalad Catalog Cache. Does not include manual
+  /// cache invalidate calls.
+  static const char* CATALOG_CACHE_EVICTION_COUNT;
+
+  /// Total number of Impalad Catalog cache hits.
+  static const char* CATALOG_CACHE_HIT_COUNT;
+
+  /// Ratio of Impalad Catalog cache requests that were hits. Accounts for all the
+  /// requests since the process boot time.
+  static const char* CATALOG_CACHE_HIT_RATE;
+
+  /// Total requests to Impalad Catalog cache requests that loaded new values.
+  static const char* CATALOG_CACHE_LOAD_COUNT;
+
+  /// Total requests to Impalad Catalog cache requests that threw exceptions loading
+  /// new values.
+  static const char* CATALOG_CACHE_LOAD_EXCEPTION_COUNT;
+
+  /// Ratio of Impalad Catalog cache requests that threw exceptions loading new values.
+  /// Accounts for all the requests since the process boot time.
+  static const char* CATALOG_CACHE_LOAD_EXCEPTION_RATE;
+
+  /// Number of Impalad Catalog cache requests that successfully loaded new values.
+  static const char* CATALOG_CACHE_LOAD_SUCCESS_COUNT;
+
+  /// Number of Impalad Catalog cache requests that returned uncached values.
+  static const char* CATALOG_CACHE_MISS_COUNT;
+
+  /// Ratio of Impalad Catalog cache requests that were misses. Accounts for all the
+  /// requests since the process boot time.
+  static const char* CATALOG_CACHE_MISS_RATE;
+
+  /// Total number of Impalad Catalog cache requests.
+  static const char* CATALOG_CACHE_REQUEST_COUNT;
+
+  /// Total time spent in Impalad Catalog cache loading new values.
+  static const char* CATALOG_CACHE_TOTAL_LOAD_TIME;
+
   /// Number of files open for insert
   static const char* NUM_FILES_OPEN_FOR_INSERT;
 
@@ -180,12 +221,24 @@ class ImpaladMetrics {
   static IntCounter* IO_MGR_CACHED_FILE_HANDLES_REOPENED;
   static IntCounter* HEDGED_READ_OPS;
   static IntCounter* HEDGED_READ_OPS_WIN;
+  static IntCounter* CATALOG_CACHE_EVICTION_COUNT;
+  static IntCounter* CATALOG_CACHE_HIT_COUNT;
+  static IntCounter* CATALOG_CACHE_LOAD_COUNT;
+  static IntCounter* CATALOG_CACHE_LOAD_EXCEPTION_COUNT;
+  static IntCounter* CATALOG_CACHE_LOAD_SUCCESS_COUNT;
+  static IntCounter* CATALOG_CACHE_MISS_COUNT;
+  static IntCounter* CATALOG_CACHE_REQUEST_COUNT;
+  static IntCounter* CATALOG_CACHE_TOTAL_LOAD_TIME;
 
   // Gauges
   static IntGauge* CATALOG_NUM_DBS;
   static IntGauge* CATALOG_NUM_TABLES;
   static IntGauge* CATALOG_VERSION;
   static IntGauge* CATALOG_TOPIC_VERSION;
+  static DoubleGauge* CATALOG_CACHE_AVG_LOAD_TIME;
+  static DoubleGauge* CATALOG_CACHE_HIT_RATE;
+  static DoubleGauge* CATALOG_CACHE_LOAD_EXCEPTION_RATE;
+  static DoubleGauge* CATALOG_CACHE_MISS_RATE;
   static IntGauge* IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS;
   static IntGauge* IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS;
   static IntGauge* IO_MGR_NUM_BUFFERS;
@@ -201,6 +254,7 @@ class ImpaladMetrics {
   static IntGauge* NUM_QUERIES_REGISTERED;
   static IntGauge* RESULTSET_CACHE_TOTAL_NUM_ROWS;
   static IntGauge* RESULTSET_CACHE_TOTAL_BYTES;
+
   // Properties
   static BooleanProperty* CATALOG_READY;
   static BooleanProperty* IMPALA_SERVER_READY;
@@ -215,6 +269,10 @@ class ImpaladMetrics {
 
   // Creates and initializes all metrics above in 'm'.
   static void CreateMetrics(MetricGroup* m);
+
+ private:
+  // Initializes the metrics for this coordinator's metadata catalog.
+  static void InitCatalogMetrics(MetricGroup* m);
 };
 
 

@@ -549,7 +549,10 @@ class ImpalaServer : public ImpalaServiceIf,
   std::shared_ptr<ClientRequestState> GetClientRequestState(
       const TUniqueId& query_id);
 
-  /// Updates the number of databases / tables metrics from the FE catalog
+  /// Updates a set of Impalad catalog metrics including number tables/databases and
+  /// some cache metrics applicable to local catalog mode (if configured). Called at
+  /// the end of statestore update callback (to account for metadata object changes)
+  /// and at the end of query planning to update local catalog cache access metrics.
   Status UpdateCatalogMetrics() WARN_UNUSED_RESULT;
 
   /// Depending on the query type, this either submits the query to the admission

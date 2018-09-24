@@ -38,7 +38,6 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.common.InternalException;
-import org.apache.impala.service.FeSupport;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PrunablePartition;
@@ -256,7 +255,7 @@ public class LocalCatalog implements FeCatalog {
     // This appears to only be used in some tests.
   }
 
-  MetaProvider getMetaProvider() {
+  public MetaProvider getMetaProvider() {
     return metaProvider_;
   }
 }

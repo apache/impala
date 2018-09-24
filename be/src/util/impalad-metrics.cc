@@ -22,6 +22,8 @@
 
 #include "common/names.h"
 
+DECLARE_bool(use_local_catalog);
+
 namespace impala {
 
 // Naming convention: Components should be separated by '.' and words should
@@ -75,8 +77,28 @@ const char* ImpaladMetricKeys::CATALOG_NUM_TABLES =
 const char* ImpaladMetricKeys::CATALOG_VERSION = "catalog.curr-version";
 const char* ImpaladMetricKeys::CATALOG_TOPIC_VERSION = "catalog.curr-topic";
 const char* ImpaladMetricKeys::CATALOG_SERVICE_ID = "catalog.curr-serviceid";
-const char* ImpaladMetricKeys::CATALOG_READY =
-    "catalog.ready";
+const char* ImpaladMetricKeys::CATALOG_READY = "catalog.ready";
+const char* ImpaladMetricKeys::CATALOG_CACHE_AVG_LOAD_TIME =
+    "catalog.cache.average-load-time";
+const char* ImpaladMetricKeys::CATALOG_CACHE_EVICTION_COUNT =
+    "catalog.cache.eviction-count";
+const char* ImpaladMetricKeys::CATALOG_CACHE_HIT_COUNT = "catalog.cache.hit-count";
+const char* ImpaladMetricKeys::CATALOG_CACHE_HIT_RATE ="catalog.cache.hit-rate";
+const char* ImpaladMetricKeys::CATALOG_CACHE_LOAD_COUNT = "catalog.cache.load-count";
+const char* ImpaladMetricKeys::CATALOG_CACHE_LOAD_EXCEPTION_COUNT =
+    "catalog.cache.load-exception-count";
+const char* ImpaladMetricKeys::CATALOG_CACHE_LOAD_EXCEPTION_RATE =
+    "catalog.cache.load-exception-rate";
+const char* ImpaladMetricKeys::CATALOG_CACHE_LOAD_SUCCESS_COUNT =
+    "catalog.cache.load-success-count";
+const char* ImpaladMetricKeys::CATALOG_CACHE_MISS_COUNT =
+    "catalog.cache.miss-count";
+const char* ImpaladMetricKeys::CATALOG_CACHE_MISS_RATE =
+    "catalog.cache.miss-rate";
+const char* ImpaladMetricKeys::CATALOG_CACHE_REQUEST_COUNT =
+    "catalog.cache.request-count";
+const char* ImpaladMetricKeys::CATALOG_CACHE_TOTAL_LOAD_TIME =
+    "catalog.cache.total-load-time";
 const char* ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT =
     "impala-server.num-files-open-for-insert";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS =
@@ -122,6 +144,14 @@ IntCounter* ImpaladMetrics::IO_MGR_BYTES_WRITTEN = NULL;
 IntCounter* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_REOPENED = NULL;
 IntCounter* ImpaladMetrics::HEDGED_READ_OPS = NULL;
 IntCounter* ImpaladMetrics::HEDGED_READ_OPS_WIN = NULL;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_EVICTION_COUNT = NULL;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_HIT_COUNT = NULL;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_LOAD_COUNT = NULL;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_COUNT = NULL;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_LOAD_SUCCESS_COUNT = NULL;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_MISS_COUNT = NULL;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_REQUEST_COUNT = NULL;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_TOTAL_LOAD_TIME = NULL;
 
 // Gauges
 IntGauge* ImpaladMetrics::CATALOG_NUM_DBS = NULL;
@@ -143,6 +173,10 @@ IntGauge* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = NULL;
 IntGauge* ImpaladMetrics::NUM_QUERIES_REGISTERED = NULL;
 IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS = NULL;
 IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES = NULL;
+DoubleGauge* ImpaladMetrics::CATALOG_CACHE_AVG_LOAD_TIME = NULL;
+DoubleGauge* ImpaladMetrics::CATALOG_CACHE_HIT_RATE = NULL;
+DoubleGauge* ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_RATE = NULL;
+DoubleGauge* ImpaladMetrics::CATALOG_CACHE_MISS_RATE = NULL;
 
 // Properties
 BooleanProperty* ImpaladMetrics::CATALOG_READY = NULL;
@@ -157,6 +191,48 @@ HistogramMetric* ImpaladMetrics::DDL_DURATIONS = NULL;
 // Other
 StatsMetric<uint64_t, StatsType::MEAN>*
 ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO = NULL;
+
+void ImpaladMetrics::InitCatalogMetrics(MetricGroup* m) {
+  // Initialize catalog metrics
+  MetricGroup* catalog_metrics = m->GetOrCreateChildGroup("catalog");
+  CATALOG_NUM_DBS = catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_NUM_DBS, 0);
+  CATALOG_NUM_TABLES =
+      catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_NUM_TABLES, 0);
+  CATALOG_VERSION = catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_VERSION, 0);
+  CATALOG_TOPIC_VERSION =
+      catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_TOPIC_VERSION, 0);
+  CATALOG_SERVICE_ID =
+      catalog_metrics->AddProperty<string>(ImpaladMetricKeys::CATALOG_SERVICE_ID, "");
+  CATALOG_READY =
+      catalog_metrics->AddProperty<bool>(ImpaladMetricKeys::CATALOG_READY, false);
+  // CatalogdMetaProvider cache metrics. Valid only when --use_local_catalog is set.
+  if (FLAGS_use_local_catalog) {
+    CATALOG_CACHE_AVG_LOAD_TIME = catalog_metrics->AddDoubleGauge(
+        ImpaladMetricKeys::CATALOG_CACHE_AVG_LOAD_TIME, 0);
+    CATALOG_CACHE_EVICTION_COUNT =
+        catalog_metrics->AddCounter(ImpaladMetricKeys::CATALOG_CACHE_EVICTION_COUNT, 0);
+    CATALOG_CACHE_HIT_COUNT =
+        catalog_metrics->AddCounter(ImpaladMetricKeys::CATALOG_CACHE_HIT_COUNT, 0);
+    CATALOG_CACHE_HIT_RATE =
+        catalog_metrics->AddDoubleGauge(ImpaladMetricKeys::CATALOG_CACHE_HIT_RATE, 0);
+    CATALOG_CACHE_LOAD_COUNT =
+        catalog_metrics->AddCounter(ImpaladMetricKeys::CATALOG_CACHE_LOAD_COUNT, 0);
+    CATALOG_CACHE_LOAD_EXCEPTION_COUNT = catalog_metrics->AddCounter(
+        ImpaladMetricKeys::CATALOG_CACHE_LOAD_EXCEPTION_COUNT, 0);
+    CATALOG_CACHE_LOAD_EXCEPTION_RATE = catalog_metrics->AddDoubleGauge(
+        ImpaladMetricKeys::CATALOG_CACHE_LOAD_EXCEPTION_RATE, 0);
+    CATALOG_CACHE_LOAD_SUCCESS_COUNT = catalog_metrics->AddCounter(
+        ImpaladMetricKeys::CATALOG_CACHE_LOAD_SUCCESS_COUNT, 0);
+    CATALOG_CACHE_MISS_COUNT =
+        catalog_metrics->AddCounter(ImpaladMetricKeys::CATALOG_CACHE_MISS_COUNT, 0);
+    CATALOG_CACHE_MISS_RATE =
+        catalog_metrics->AddDoubleGauge(ImpaladMetricKeys::CATALOG_CACHE_MISS_RATE, 0);
+    CATALOG_CACHE_REQUEST_COUNT =
+        catalog_metrics->AddCounter(ImpaladMetricKeys::CATALOG_CACHE_REQUEST_COUNT, 0);
+    CATALOG_CACHE_TOTAL_LOAD_TIME =
+        catalog_metrics->AddCounter(ImpaladMetricKeys::CATALOG_CACHE_TOTAL_LOAD_TIME, 0);
+  }
+}
 
 void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   // Initialize impalad metrics
@@ -235,18 +311,7 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       StatsMetric<uint64_t, StatsType::MEAN>::CreateAndRegister(m,
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO);
 
-  // Initialize catalog metrics
-  MetricGroup* catalog_metrics = m->GetOrCreateChildGroup("catalog");
-  CATALOG_NUM_DBS = catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_NUM_DBS, 0);
-  CATALOG_NUM_TABLES =
-      catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_NUM_TABLES, 0);
-  CATALOG_VERSION = catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_VERSION, 0);
-  CATALOG_TOPIC_VERSION =
-      catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_TOPIC_VERSION, 0);
-  CATALOG_SERVICE_ID =
-      catalog_metrics->AddProperty<string>(ImpaladMetricKeys::CATALOG_SERVICE_ID, "");
-  CATALOG_READY =
-      catalog_metrics->AddProperty<bool>(ImpaladMetricKeys::CATALOG_READY, false);
+  InitCatalogMetrics(m);
 
   // Maximum duration to be tracked by the query durations metric. No particular reasoning
   // behind five hours, except to say that there's some threshold beyond which queries

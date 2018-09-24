@@ -102,6 +102,20 @@ struct TGetTableMetricsResponse {
 struct TGetCatalogMetricsResult {
   1: required i32 num_dbs
   2: required i32 num_tables
+  // Following cache metrics are set only in local catalog mode. These map to Guava's
+  // CacheStats. Accounts for all the cache requests since the process boot time.
+  3: optional i64 cache_eviction_count
+  4: optional i64 cache_hit_count
+  5: optional i64 cache_load_count
+  6: optional i64 cache_load_exception_count
+  7: optional i64 cache_load_success_count
+  8: optional i64 cache_miss_count
+  9: optional i64 cache_request_count
+  10: optional i64 cache_total_load_time
+  11: optional double cache_avg_load_time
+  12: optional double cache_hit_rate
+  13: optional double cache_load_exception_rate
+  14: optional double cache_miss_rate
 }
 
 // Arguments to getDbs, which returns a list of dbs that match an optional pattern

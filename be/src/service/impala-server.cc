@@ -974,11 +974,9 @@ Status ImpalaServer::ExecuteInternal(
 
   // start execution of query; also starts fragment status reports
   RETURN_IF_ERROR((*request_state)->Exec(&result));
-  if (result.stmt_type == TStmtType::DDL) {
-    Status status = UpdateCatalogMetrics();
-    if (!status.ok()) {
-      VLOG_QUERY << "Couldn't update catalog metrics: " << status.GetDetail();
-    }
+  Status status = UpdateCatalogMetrics();
+  if (!status.ok()) {
+    VLOG_QUERY << "Couldn't update catalog metrics: " << status.GetDetail();
   }
 
   if ((*request_state)->schedule() != nullptr) {
@@ -1203,7 +1201,36 @@ Status ImpalaServer::UpdateCatalogMetrics() {
   RETURN_IF_ERROR(exec_env_->frontend()->GetCatalogMetrics(&metrics));
   ImpaladMetrics::CATALOG_NUM_DBS->SetValue(metrics.num_dbs);
   ImpaladMetrics::CATALOG_NUM_TABLES->SetValue(metrics.num_tables);
+  if (!FLAGS_use_local_catalog) return Status::OK();
+  DCHECK(metrics.__isset.cache_eviction_count);
+  DCHECK(metrics.__isset.cache_hit_count);
+  DCHECK(metrics.__isset.cache_load_count);
+  DCHECK(metrics.__isset.cache_load_exception_count);
+  DCHECK(metrics.__isset.cache_load_success_count);
+  DCHECK(metrics.__isset.cache_miss_count);
+  DCHECK(metrics.__isset.cache_request_count);
+  DCHECK(metrics.__isset.cache_total_load_time);
+  DCHECK(metrics.__isset.cache_avg_load_time);
+  DCHECK(metrics.__isset.cache_hit_rate);
+  DCHECK(metrics.__isset.cache_load_exception_rate);
+  DCHECK(metrics.__isset.cache_miss_rate);
+  ImpaladMetrics::CATALOG_CACHE_EVICTION_COUNT->SetValue(metrics.cache_eviction_count);
+  ImpaladMetrics::CATALOG_CACHE_HIT_COUNT->SetValue(metrics.cache_hit_count);
+  ImpaladMetrics::CATALOG_CACHE_LOAD_COUNT->SetValue(metrics.cache_load_count);
+  ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_COUNT->SetValue(
+      metrics.cache_load_exception_count);
+  ImpaladMetrics::CATALOG_CACHE_LOAD_SUCCESS_COUNT->SetValue(
+      metrics.cache_load_success_count);
+  ImpaladMetrics::CATALOG_CACHE_MISS_COUNT->SetValue(metrics.cache_miss_count);
+  ImpaladMetrics::CATALOG_CACHE_REQUEST_COUNT->SetValue(metrics.cache_request_count);
+  ImpaladMetrics::CATALOG_CACHE_TOTAL_LOAD_TIME->SetValue(metrics.cache_total_load_time);
+  ImpaladMetrics::CATALOG_CACHE_AVG_LOAD_TIME->SetValue(metrics.cache_avg_load_time);
+  ImpaladMetrics::CATALOG_CACHE_HIT_RATE->SetValue(metrics.cache_hit_rate);
+  ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_RATE->SetValue(
+      metrics.cache_load_exception_rate);
+  ImpaladMetrics::CATALOG_CACHE_MISS_RATE->SetValue(metrics.cache_miss_rate);
   return Status::OK();
+
 }
 
 Status ImpalaServer::CancelInternal(const TUniqueId& query_id, bool check_inflight,

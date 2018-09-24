@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.cache.CacheStats;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
@@ -32,9 +33,14 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.analysis.ToSqlUtils;
+import org.apache.impala.catalog.local.CatalogdMetaProvider;
 import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.local.LocalCatalog;
+import org.apache.impala.catalog.local.MetaProvider;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TColumnDescriptor;
+import org.apache.impala.thrift.TGetCatalogMetricsResult;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TTableStats;
 import org.slf4j.Logger;
@@ -348,4 +354,35 @@ public abstract class FeCatalogUtils {
     }
     return thriftHdfsPart;
   }
+
+  /**
+   * Populates cache metrics in the input TGetCatalogMetricsResult object.
+   * No-op if CatalogdMetaProvider is not the configured metadata provider.
+   */
+  public static void populateCacheMetrics(
+      FeCatalog catalog, TGetCatalogMetricsResult metrics) {
+    Preconditions.checkNotNull(catalog);
+    Preconditions.checkNotNull(metrics);
+    // Populate cache stats only if configured in local mode.
+    if (!BackendConfig.INSTANCE.getBackendCfg().use_local_catalog) return;
+    Preconditions.checkState(catalog instanceof LocalCatalog);
+    MetaProvider provider = ((LocalCatalog) catalog).getMetaProvider();
+    if (!(provider instanceof CatalogdMetaProvider)) return;
+
+    CacheStats stats = ((CatalogdMetaProvider) provider).getCacheStats();
+    metrics.setCache_eviction_count(stats.evictionCount());
+    metrics.setCache_hit_count(stats.hitCount());
+    metrics.setCache_load_count(stats.loadCount());
+    metrics.setCache_load_exception_count(stats.loadExceptionCount());
+    metrics.setCache_load_success_count(stats.loadSuccessCount());
+    metrics.setCache_miss_count(stats.missCount());
+    metrics.setCache_request_count(stats.requestCount());
+    metrics.setCache_total_load_time(stats.totalLoadTime());
+    metrics.setCache_avg_load_time(stats.averageLoadPenalty());
+    metrics.setCache_hit_rate(stats.hitRate());
+    metrics.setCache_load_exception_rate(stats.loadExceptionRate());
+    metrics.setCache_miss_rate(stats.missRate());
+  }
+
+
 }

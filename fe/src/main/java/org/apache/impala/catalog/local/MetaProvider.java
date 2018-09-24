@@ -44,7 +44,7 @@ import com.google.errorprone.annotations.Immutable;
  * Implementations may directly access the metadata from the source systems
  * or may include caching, etc.
  */
-interface MetaProvider {
+public interface MetaProvider {
 
   /**
    * Get the authorization policy. This acts as a repository of authorization
