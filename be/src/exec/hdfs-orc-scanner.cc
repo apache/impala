@@ -24,7 +24,6 @@
 #include "runtime/exec-env.h"
 #include "runtime/io/request-context.h"
 #include "runtime/runtime-filter.inline.h"
-#include "runtime/timestamp-value.inline.h"
 #include "runtime/tuple-row.h"
 #include "util/decompress.h"
 

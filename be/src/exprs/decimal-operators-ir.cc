@@ -26,7 +26,6 @@
 #include "exprs/scalar-expr.h"
 #include "exprs/timezone_db.h"
 #include "runtime/decimal-value.inline.h"
-#include "runtime/timestamp-value.inline.h"
 #include "util/decimal-util.h"
 #include "util/string-parser.h"
 
