@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="3.1.0" id="timezone">
+
+  <title>TIMEZONE Query Option (<keyword keyref="impala31_full"/> or higher only)</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>TIMEZONE</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>TIMEZONE</codeph> query option defines the timezone used for conversions
+      between UTC and the local time. If not set, Impala uses the system time zone where the
+      Coordinator Impalad runs. As query options are not sent to the Coordinator immediately,
+      the timezones are validated only when the query runs.
+    </p>
+
+    <p>
+      Impala takes the timezone into a consideration in the following cases:
+      <ul>
+        <li>
+          When calling the <codeph>NOW()</codeph> function
+        </li>
+
+        <li>
+          When converting between Unix time and timestamp if the
+          <codeph>use_local_tz_for_unix_timestamp_conversions</codeph> flag is
+          <codeph>TRUE</codeph>
+        </li>
+
+        <li>
+          When reading Parquet timestamps written by Hive if the
+          <codeph>convert_legacy_hive_parquet_utc_timestamps</codeph> flag is
+          <codeph>TRUE</codeph>
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      <b>Syntax:</b>
+    </p>
+
+<codeblock>SET TIMEZONE=<varname>time zone</varname></codeblock>
+
+    <p>
+      <varname>time zone</varname> can be a canonical code or a time zone name defined in
+      <xref
+        href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
+        format="html" scope="external">IANA
+      Time Zone Database</xref>. The value is case-sensitive.
+    </p>
+
+    <p>
+      Leading/trailing quotes (') and double quotes (") are stripped.
+    </p>
+
+    <p>
+      If <varname>time zone</varname> is an empty string, the time zone for the query is set to
+      the default time zone of the Impalad Coordinator.
+    </p>
+
+    <p>
+      If <varname>time zone</varname> is <codeph>NULL</codeph> or a space character, Impala
+      returns an error when the query is executed.
+    </p>
+
+    <p>
+      <b>Type:</b> String
+    </p>
+
+    <p>
+      <b>Default:</b> The system time zone where the Coordinator Impalad runs
+    </p>
+
+    <p>
+      <b>Examples:</b>
+<codeblock>SET TIMEZONE=UTC;
+SET TIMEZONE="Europe/Budapest";</codeblock>
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala31"/>
+    </p>
+
+  </conbody>
+
+</concept>
