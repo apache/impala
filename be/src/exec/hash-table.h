@@ -165,10 +165,10 @@ class HashTableCtx {
   Status CodegenEvalRow(LlvmCodeGen* codegen, bool build_row, llvm::Function** fn);
 
   /// Codegen for evaluating a TupleRow and comparing equality. Function signature
-  /// matches HashTable::Equals(). 'force_null_equality' is true if the generated
-  /// equality function should treat all NULLs as equal. See the template parameter
-  /// to HashTable::Equals().
-  Status CodegenEquals(LlvmCodeGen* codegen, bool force_null_equality,
+  /// matches HashTable::Equals(). 'inclusive_equality' is true if the generated
+  /// equality function should treat all NULLs as equal and all NaNs as equal.
+  /// See the template parameter to HashTable::Equals().
+  Status CodegenEquals(LlvmCodeGen* codegen, bool inclusive_equality,
       llvm::Function** fn);
 
   /// Codegen for hashing expr values. Function prototype matches HashRow identically.
@@ -431,11 +431,11 @@ class HashTableCtx {
   /// Wrapper function for calling correct HashUtil function in non-codegen'd case.
   uint32_t Hash(const void* input, int len, uint32_t hash) const;
 
-  /// Evaluate 'row' over build exprs, storing values into 'expr_values' and nullness into
-  /// 'expr_values_null'. This will be replaced by codegen. We do not want this function
-  /// inlined when cross compiled because we need to be able to differentiate between
-  /// EvalBuildRow and EvalProbeRow by name and the build/probe exprs are baked into the
-  /// codegen'd function.
+  /// Evaluate 'row' over build exprs, storing values into 'expr_values' and nullness
+  /// into 'expr_values_null'. This will be replaced by codegen. We do not want this
+  /// function inlined when cross compiled because we need to be able to differentiate
+  /// between EvalBuildRow and EvalProbeRow by name and the build/probe exprs are baked
+  /// into the codegen'd function.
   bool IR_NO_INLINE EvalBuildRow(
       const TupleRow* row, uint8_t* expr_values, uint8_t* expr_values_null) noexcept {
     return EvalRow(row, build_expr_evals_, expr_values, expr_values_null);
@@ -460,18 +460,17 @@ class HashTableCtx {
       uint8_t* expr_values, uint8_t* expr_values_null) noexcept;
 
   /// Returns true if the values of build_exprs evaluated over 'build_row' equal the
-  /// values in 'expr_values' with nullness 'expr_values_null'. FORCE_NULL_EQUALITY is
-  /// true if all nulls should be treated as equal, regardless of the values of
-  /// 'finds_nulls_'. This will be replaced by codegen.
-  template <bool FORCE_NULL_EQUALITY>
+  /// values in 'expr_values' with nullness 'expr_values_null'. INCLUSIVE_EQUALITY
+  /// means "NULL==NULL" and "NaN==NaN". This will be replaced by codegen.
+  template <bool INCLUSIVE_EQUALITY>
   bool IR_NO_INLINE Equals(const TupleRow* build_row, const uint8_t* expr_values,
       const uint8_t* expr_values_null) const noexcept;
 
   /// Helper function that calls Equals() with the current row. Always inlined so that
   /// it does not appear in cross-compiled IR.
-  template <bool FORCE_NULL_EQUALITY>
+  template <bool INCLUSIVE_EQUALITY>
   bool ALWAYS_INLINE Equals(const TupleRow* build_row) const {
-    return Equals<FORCE_NULL_EQUALITY>(build_row, expr_values_cache_.cur_expr_values(),
+    return Equals<INCLUSIVE_EQUALITY>(build_row, expr_values_cache_.cur_expr_values(),
         expr_values_cache_.cur_expr_values_null());
   }
 
@@ -848,14 +847,14 @@ class HashTable {
   /// this function. The values of the expression values cache in 'ht_ctx' will be
   /// used to probe the hash table.
   ///
-  /// 'FORCE_NULL_EQUALITY' is true if NULLs should always be considered equal when
-  /// comparing two rows.
+  /// 'INCLUSIVE_EQUALITY' is true if NULLs and NaNs should always be
+  /// considered equal when comparing two rows.
   ///
   /// 'hash' is the hash computed by EvalAndHashBuild() or EvalAndHashProbe().
   /// 'found' indicates that a bucket that contains an equal row is found.
   ///
   /// There are wrappers of this function that perform the Find and Insert logic.
-  template <bool FORCE_NULL_EQUALITY>
+  template <bool INCLUSIVE_EQUALITY>
   int64_t IR_ALWAYS_INLINE Probe(Bucket* buckets, int64_t num_buckets,
       HashTableCtx* ht_ctx, uint32_t hash, bool* found);
 

@@ -18,7 +18,7 @@
 #include "codegen/codegen-anyval.h"
 
 #include "codegen/codegen-util.h"
-
+#include "runtime/raw-value.h"
 #include "common/names.h"
 
 using namespace impala;
@@ -466,6 +466,29 @@ void CodegenAnyVal::SetDate(llvm::Value* date) {
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
 }
 
+void CodegenAnyVal::ConvertToCanonicalForm() {
+  // Convert the value to a bit pattern that is unambiguous.
+  // Specifically, for floating point type values, NaN values are converted to
+  // the same bit pattern.
+  switch(type_.type) {
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE: {
+      llvm::Value* raw = GetVal();
+      llvm::Value* canonical_val;
+      if (type_.type == TYPE_FLOAT) {
+        canonical_val = llvm::ConstantFP::getNaN(codegen_->float_type());
+      } else {
+        canonical_val = llvm::ConstantFP::getNaN(codegen_->double_type());
+      }
+      llvm::Value* is_nan = builder_->CreateFCmpUNO(raw, raw, "cmp_nan");
+      SetVal(builder_->CreateSelect(is_nan, canonical_val, raw));
+      break;
+    }
+    default:
+      ;
+  }
+}
+
 llvm::Value* CodegenAnyVal::GetLoweredPtr(const string& name) const {
   llvm::Value* lowered_ptr =
       codegen_->CreateEntryBlockAlloca(*builder_, value_->getType(), name.c_str());
@@ -702,7 +725,8 @@ llvm::Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
   }
 }
 
-llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr) {
+llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr,
+    bool inclusive_equality) {
   llvm::Value* val = NULL;
   if (!type_.IsStringType()) {
      val = builder_->CreateLoad(native_ptr);
@@ -718,9 +742,19 @@ llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr) {
     case TYPE_DECIMAL:
       return builder_->CreateICmpEQ(GetVal(), val, "cmp_raw");
     case TYPE_FLOAT:
-    case TYPE_DOUBLE:
+    case TYPE_DOUBLE:{
       // Use the ordering version "OEQ" to ensure that 'nan' != 'nan'.
-      return builder_->CreateFCmpOEQ(GetVal(), val, "cmp_raw");
+      llvm::Value* local_val = GetVal();
+      llvm::Value* cmp_raw = builder_->CreateFCmpOEQ(local_val, val, "cmp_raw");
+      if (!inclusive_equality) return cmp_raw;
+
+      // Mirror logic in HashTableCtx::Equals - IMPALA-6661
+      llvm::Value* local_is_nan = builder_->CreateFCmpUNO(local_val,
+          local_val, "local_val_is_nan");
+      llvm::Value* val_is_nan = builder_->CreateFCmpUNO(val, val, "val_is_nan");
+      llvm::Value* both_nan = builder_->CreateAnd(local_is_nan, val_is_nan);
+      return builder_->CreateOr(cmp_raw, both_nan, "cmp_raw_with_nan");
+    }
     case TYPE_STRING:
     case TYPE_VARCHAR:
     case TYPE_FIXED_UDA_INTERMEDIATE: {

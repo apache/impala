@@ -37,6 +37,12 @@ class RawValue {
   /// Ascii output precision for double/float
   static const int ASCII_PRECISION;
 
+  /// Single NaN values to ensure all NaN values can be assigned one bit pattern
+  /// that will always compare and hash the same way.  Allows for all NaN values
+  /// to be put into the same "group by" bucket.
+  static const double CANONICAL_DOUBLE_NAN;
+  static const float CANONICAL_FLOAT_NAN;
+
   /// Convert 'value' into ascii and write to 'stream'. NULL turns into "NULL". 'scale'
   /// determines how many digits after the decimal are printed for floating point numbers,
   /// -1 indicates to use the stream's current formatting.
@@ -97,6 +103,13 @@ class RawValue {
   /// This is more performant than Compare() == 0 for string equality, mostly because of
   /// the length comparison check.
   static inline bool Eq(const void* v1, const void* v2, const ColumnType& type);
+
+  /// Returns true if val/type correspond to a NaN floating point value.
+  static inline bool IsNaN(const void* val, const ColumnType& type);
+
+  /// Returns a canonical NaN value for a floating point type
+  /// (which will always have the same bit-pattern to maintain consistency in hashing).
+  static inline const void* CanonicalNaNValue(const ColumnType& type);
 };
 
 }

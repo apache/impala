@@ -185,7 +185,7 @@ bool HashTableCtx::EvalRow(const TupleRow* row,
   bool has_null = false;
   for (int i = 0; i < evals.size(); ++i) {
     void* loc = expr_values_cache_.ExprValuePtr(expr_values, i);
-    void* val = evals[i]->GetValue(row);
+    const void* val = evals[i]->GetValue(row);
     if (val == NULL) {
       // If the table doesn't store nulls, no reason to keep evaluating
       if (!stores_nulls_) return true;
@@ -195,8 +195,12 @@ bool HashTableCtx::EvalRow(const TupleRow* row,
     } else {
       expr_values_null[i] = false;
     }
-    DCHECK_LE(build_exprs_[i]->type().GetSlotSize(), sizeof(NULL_VALUE));
-    RawValue::Write(val, loc, build_exprs_[i]->type(), NULL);
+    const ColumnType& expr_type = build_exprs_[i]->type();
+    DCHECK_LE(expr_type.GetSlotSize(), sizeof(NULL_VALUE));
+    if (RawValue::IsNaN(val, expr_type)) {
+      val = RawValue::CanonicalNaNValue(expr_type);
+    }
+    RawValue::Write(val, loc, expr_type, NULL);
   }
   return has_null;
 }
@@ -230,13 +234,13 @@ uint32_t HashTableCtx::HashVariableLenRow(const uint8_t* expr_values,
   return hash;
 }
 
-template <bool FORCE_NULL_EQUALITY>
+template <bool INCLUSIVE_EQUALITY>
 bool HashTableCtx::Equals(const TupleRow* build_row, const uint8_t* expr_values,
     const uint8_t* expr_values_null) const noexcept {
   for (int i = 0; i < build_expr_evals_.size(); ++i) {
     void* val = build_expr_evals_[i]->GetValue(build_row);
     if (val == NULL) {
-      if (!(FORCE_NULL_EQUALITY || finds_nulls_[i])) return false;
+      if (!(INCLUSIVE_EQUALITY || finds_nulls_[i])) return false;
       if (!expr_values_null[i]) return false;
       continue;
     } else {
@@ -245,7 +249,16 @@ bool HashTableCtx::Equals(const TupleRow* build_row, const uint8_t* expr_values,
 
     const void* loc = expr_values_cache_.ExprValuePtr(expr_values, i);
     DCHECK(build_exprs_[i] == &build_expr_evals_[i]->root());
-    if (!RawValue::Eq(loc, val, build_exprs_[i]->type())) return false;
+
+    const ColumnType& expr_type = build_exprs_[i]->type();
+    if (!RawValue::Eq(loc, val, expr_type)) {
+      if (INCLUSIVE_EQUALITY) {
+        bool val_is_nan = RawValue::IsNaN(val, expr_type);
+        bool local_is_nan = RawValue::IsNaN(loc, expr_type);
+        if (val_is_nan && local_is_nan) continue;
+      }
+      return false;
+    }
   }
   return true;
 }
@@ -786,6 +799,9 @@ Status HashTableCtx::CodegenEvalRow(
 
     // Not null block
     builder.SetInsertPoint(not_null_block);
+
+    result.ConvertToCanonicalForm();
+
     result.StoreToNativePtr(llvm_loc);
     builder.CreateBr(continue_block);
 
@@ -1059,7 +1075,7 @@ Status HashTableCtx::CodegenHashRow(
 //   br i1 %cmp_raw10, label %continue3, label %false_block
 // }
 Status HashTableCtx::CodegenEquals(
-    LlvmCodeGen* codegen, bool force_null_equality, llvm::Function** fn) {
+    LlvmCodeGen* codegen, bool inclusive_equality, llvm::Function** fn) {
   for (int i = 0; i < build_exprs_.size(); ++i) {
     // Disable codegen for CHAR
     if (build_exprs_[i]->type().type == TYPE_CHAR) {
@@ -1123,13 +1139,14 @@ Status HashTableCtx::CodegenEquals(
 
     // We consider null values equal if we are comparing build rows or if the join
     // predicate is <=>
-    if (force_null_equality || finds_nulls_[i]) {
+    if (inclusive_equality || finds_nulls_[i]) {
       llvm::Value* llvm_null_byte_loc = builder.CreateInBoundsGEP(
           NULL, expr_values_null, codegen->GetI32Constant(i), "null_byte_loc");
       llvm::Value* null_byte = builder.CreateLoad(llvm_null_byte_loc);
       row_is_null =
           builder.CreateICmpNE(null_byte, codegen->GetI8Constant(0));
     }
+    if (inclusive_equality) result.ConvertToCanonicalForm();
 
     // Get llvm value for row_val from 'expr_values'
     int offset = expr_values_cache_.expr_values_offsets(i);
@@ -1154,7 +1171,7 @@ Status HashTableCtx::CodegenEquals(
       builder.SetInsertPoint(cmp_block);
     }
     // Check result == row_val
-    llvm::Value* is_equal = result.EqToNativePtr(row_val);
+    llvm::Value* is_equal = result.EqToNativePtr(row_val, inclusive_equality);
     builder.CreateCondBr(is_equal, continue_block, false_block);
 
     builder.SetInsertPoint(continue_block);

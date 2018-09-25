@@ -48,7 +48,7 @@ inline void HashTableCtx::ExprValuesCache::NextRow() {
   DCHECK_LE(cur_expr_values_hash_ - expr_values_hash_array_.get(), capacity_);
 }
 
-template <bool FORCE_NULL_EQUALITY>
+template <bool INCLUSIVE_EQUALITY>
 inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
     HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
   DCHECK(buckets != NULL);
@@ -66,7 +66,7 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
     if (LIKELY(!bucket->filled)) return bucket_idx;
     if (hash == bucket->hash) {
       if (ht_ctx != NULL &&
-          ht_ctx->Equals<FORCE_NULL_EQUALITY>(GetRow(bucket, ht_ctx->scratch_row_))) {
+          ht_ctx->Equals<INCLUSIVE_EQUALITY>(GetRow(bucket, ht_ctx->scratch_row_))) {
         *found = true;
         return bucket_idx;
       }

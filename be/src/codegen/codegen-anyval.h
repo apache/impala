@@ -226,14 +226,31 @@ class CodegenAnyVal {
   void WriteToSlot(const SlotDescriptor& slot_desc, llvm::Value* tuple,
       llvm::Value* pool_val, llvm::BasicBlock* insert_before = nullptr);
 
+  /// Rewrites the bit values of a value in a canonical form.
+  /// Floating point values may be "NaN".  Nominally, NaN != NaN, but
+  /// for grouping purposes we want that to not be the case.
+  /// Therefore all NaN values need to be converted into a consistent
+  /// form where all bits are the same.  This method will do that -
+  /// ensure that all NaN values have the same bit pattern.
+  ///
+  /// Generically speaking, a canonical form of a value ensures that
+  /// all ambiguity is removed from a value's bit settings -- if there
+  /// are bits that can be freely changed without changing the logical
+  /// value of the value. (Currently this only has an impact for NaN
+  /// float and double values.)
+  void ConvertToCanonicalForm();
+
   /// Returns the i1 result of this == other. this and other must be non-null.
   llvm::Value* Eq(CodegenAnyVal* other);
 
   /// Compares this *Val to the value of 'native_ptr'. 'native_ptr' should be a pointer to
   /// a native type, e.g. StringValue, or TimestampValue. This *Val should match
   /// 'native_ptr's type (e.g. if this is an IntVal, 'native_ptr' should have type i32*).
-  /// Returns the i1 result of the equality comparison.
-  llvm::Value* EqToNativePtr(llvm::Value* native_ptr);
+  /// Returns the i1 result of the equality comparison. "inclusive_equality" means that
+  /// the scope of equality will be expanded to include considering as equal scenarios
+  /// that would otherwise resolve to not-equal, such as a comparison of floating-point
+  /// "NaN" values.
+  llvm::Value* EqToNativePtr(llvm::Value* native_ptr, bool inclusive_equality = false);
 
   /// Returns the i32 result of comparing this value to 'other' (similar to
   /// RawValue::Compare()). This and 'other' must be non-null. Return value is < 0 if
