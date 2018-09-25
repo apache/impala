@@ -39,6 +39,29 @@ namespace impala {
 static const uint32_t HASH_VAL_NULL = 0x58081667;
 static const uint32_t HASH_VAL_EMPTY = 0x7dca7eee;
 
+inline bool RawValue::IsNaN(const void* val, const ColumnType& type) {
+  switch(type.type) {
+  case TYPE_FLOAT:
+    return std::isnan(*reinterpret_cast<const float*>(val));
+  case TYPE_DOUBLE:
+    return std::isnan(*reinterpret_cast<const double*>(val));
+  default:
+    return false;
+  }
+}
+
+inline const void* RawValue::CanonicalNaNValue(const ColumnType& type) {
+  switch(type.type) {
+  case TYPE_FLOAT:
+    return &CANONICAL_FLOAT_NAN;
+  case TYPE_DOUBLE:
+    return &CANONICAL_DOUBLE_NAN;
+  default:
+    DCHECK(false);
+    return nullptr;
+  }
+}
+
 inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type) {
   const StringValue* string_value1;
   const StringValue* string_value2;
@@ -144,6 +167,7 @@ inline uint32_t RawValue::GetHashValueNonNull<float>(const float* v,
     const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_FLOAT);
   DCHECK(v != NULL);
+  if (std::isnan(*v)) v = &RawValue::CANONICAL_FLOAT_NAN;
   return HashUtil::MurmurHash2_64(v, 4, seed);
 }
 
@@ -152,6 +176,7 @@ inline uint32_t RawValue::GetHashValueNonNull<double>(const double* v,
     const ColumnType& type, uint32_t seed) {
   DCHECK_EQ(type.type, TYPE_DOUBLE);
   DCHECK(v != NULL);
+  if (std::isnan(*v)) v = &RawValue::CANONICAL_DOUBLE_NAN;
   return HashUtil::MurmurHash2_64(v, 8, seed);
 }
 

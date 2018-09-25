@@ -795,3 +795,30 @@ where sqrt(-a.id) = b.float_col / b.double_col
 ---- TYPES
 INT
 ====
+---- QUERY
+# Test than 'nan' != 'nan' when joining.
+with t1 as (select cast(sqrt(0.5-x) as FLOAT) c1, y c2 from
+     (VALUES((1.6 x, 0 y), (3.2, 1), (5.4,2), (0.5, 3), (0.5, 4), (-0.5, 5))) XX),
+     t2 as (select * from t1)
+select t1.c1,t2.c1 from t1 right outer join t2 on t1.c1 = t2.c1;
+---- RESULTS
+0,0
+0,0
+0,0
+0,0
+1,1
+NULL,NaN
+NULL,NaN
+NULL,NaN
+---- TYPES
+FLOAT,FLOAT
+====
+---- QUERY
+# Test that NaN <=> NaN in joins
+select t1.float_col as v
+    from functional.alltypessmall t1, functional.alltypessmall t2
+    where sqrt(0.5-t1.float_col) <=> sqrt(0.5-t2.float_col) and t1.float_col > 0.5
+---- RESULTS
+---- TYPES
+FLOAT
+====

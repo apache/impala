@@ -3071,3 +3071,13 @@ where cast(get_json_object(t.json, '$.a.b.c') as int) > 1
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-6661 - NaN should not evaluate as the same as any other NaN via <=>
+WITH W AS (SELECT T.*, CAST(SQRT(X) AS FLOAT)  P, CAST(SQRT(Y) AS FLOAT) Q
+FROM (VALUES((CAST(-1.0 AS FLOAT) X, CAST(-1.0 AS FLOAT) Y), (-1.0, 0), (0, -1.0), (0, 0))) T )
+SELECT * FROM W WHERE W.Q<=>W.P
+---- RESULTS
+0,0,0,0
+---- TYPES
+FLOAT, FLOAT, FLOAT, FLOAT
+====
