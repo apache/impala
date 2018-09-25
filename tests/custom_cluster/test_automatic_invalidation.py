@@ -14,8 +14,11 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
+import os
 import pytest
 import time
+from subprocess import call
 from tests.common.environ import IMPALAD_BUILD
 from tests.util.filesystem_utils import IS_HDFS, IS_LOCAL
 
@@ -71,3 +74,32 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
       impalad_args=timeout_flag + " --use_local_catalog")
   def test_local_catalog(self, cursor):
     self._run_test(cursor)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(catalogd_args="--invalidate_tables_timeout_s=1",
+                                    impalad_args="--invalidate_tables_timeout_s=1")
+  def test_invalid_table(self):
+    """ Regression test for IMPALA-7606. Tables failed to be loaded don't have a
+        last used time and shouldn't be considered for invalidation."""
+    self.execute_query_expect_failure(self.client, "select * from functional.bad_serde")
+    # The table expires after 1 second. Sleeping for another logbufsecs=5 seconds to wait
+    # for the log to be flushed. Wait 4 more seconds to reduce flakiness.
+    time.sleep(10)
+    assert "Unexpected exception thrown while attempting to automatically invalidate "\
+        "tables" not in open(os.path.join(self.impala_log_dir, "catalogd.INFO")).read()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--invalidate_tables_on_memory_pressure "
+                  "--invalidate_tables_gc_old_gen_full_threshold=0 "
+                  "--invalidate_tables_fraction_on_memory_pressure=1",
+    impalad_args="--invalidate_tables_on_memory_pressure")
+  def test_memory_pressure(self):
+    """ Test that memory-based invalidation kicks out all the tables after an GC."""
+    self.execute_query(self.query)
+    # This triggers a full GC as of openjdk 1.8.
+    call(["jmap", "-histo:live", str(self.cluster.catalogd.get_pid())])
+    # Sleep for logbufsecs=5 seconds to wait for the log to be flushed. Wait 5 more
+    # seconds to reduce flakiness.
+    time.sleep(10)
+    assert self.metadata_cache_string not in self._get_catalog_object()

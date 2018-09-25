@@ -154,9 +154,9 @@ public class CatalogdTableInvalidator {
     for (GarbageCollectorMXBean gcbean : gcbeans) {
       for (String poolName : gcbean.getMemoryPoolNames()) {
         if (!poolName.contains("Old")) continue;
-        if (!(gcbean instanceof NotificationListener)) {
+        if (!(gcbean instanceof NotificationEmitter)) {
           LOG.warn("GCBean " + gcbean.getClass().getName() + " is not supported " +
-              "because it does not implement NotificationListener. " + commonErrMsg);
+              "because it does not implement NotificationEmitter. " + commonErrMsg);
           return false;
         }
         oldGenGcBean_ = gcbean;
@@ -201,7 +201,7 @@ public class CatalogdTableInvalidator {
     List<Table> tables = new ArrayList<>();
     for (Db db : catalog_.getAllDbs()) {
       for (Table table : db.getTables()) {
-        if (table.isLoaded()) tables.add(table);
+        if (!(table instanceof IncompleteTable)) tables.add(table);
       }
     }
     // TODO: use quick select
@@ -225,7 +225,7 @@ public class CatalogdTableInvalidator {
     long now = TIME_SOURCE.read();
     for (Db db : catalog_.getAllDbs()) {
       for (Table table : catalog_.getAllTables(db)) {
-        if (!table.isLoaded()) continue;
+        if (table instanceof IncompleteTable) continue;
         long inactivityTime = now - table.getLastUsedTime();
         if (inactivityTime <= retireAgeNano) continue;
         Reference<Boolean> tblWasRemoved = new Reference<>();
