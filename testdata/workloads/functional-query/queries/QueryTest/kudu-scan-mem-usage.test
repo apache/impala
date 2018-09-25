@@ -4,7 +4,7 @@
 # Only one scanner thread per impalad should be started.
 # Set num_scanner_threads to reduce the row batch queue length and avoid IMPALA-7465.
 set num_scanner_threads=2;
-set mem_limit=4mb;
+set mem_limit="6.5mb";
 select * from tpch_kudu.orders
 order by o_orderkey limit 3;
 ---- TYPES
