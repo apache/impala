@@ -533,10 +533,11 @@ enum TPrivilegeLevel {
 // corresponding to a table must also specify all the parent objects (database name
 // and server name).
 struct TPrivilege {
+  // NOTE: This field is no longer needed. Keeping it here to keep the field numbers.
   // A human readable name for this privilege. The combination of principal_id +
   // privilege_name is guaranteed to be unique. Stored in a form that can be passed
   // to Sentry: [ServerName]->[DbName]->[TableName]->[ColumnName]->[Action Granted].
-  1: required string privilege_name
+  // 1: required string privilege_name
 
   // The level of access this privilege provides.
   2: required TPrivilegeLevel privilege_level

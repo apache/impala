@@ -1793,27 +1793,29 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Removes a PrincipalPrivilege from the given role name. Returns the removed
-   * PrincipalPrivilege with an incremented catalog version or null if no matching
-   * privilege was found. Throws a CatalogException if no role exists with this name.
+   * Removes a PrincipalPrivilege from the given role name and privilege name. Returns
+   * the removed PrincipalPrivilege with an incremented catalog version or null if no
+   * matching privilege was found. Throws a CatalogException if no role exists with this
+   * name.
    */
-  public PrincipalPrivilege removeRolePrivilege(String roleName, TPrivilege thriftPriv)
+  public PrincipalPrivilege removeRolePrivilege(String roleName, String privilegeName)
       throws CatalogException {
-    return removePrincipalPrivilege(roleName, thriftPriv, TPrincipalType.ROLE);
+    return removePrincipalPrivilege(roleName, privilegeName, TPrincipalType.ROLE);
   }
 
   /**
-   * Removes a PrincipalPrivilege from the given user name. Returns the removed
-   * PrincipalPrivilege with an incremented catalog version or null if no matching
-   * privilege was found. Throws a CatalogException if no user exists with this name.
+   * Removes a PrincipalPrivilege from the given user name and privilege name. Returns
+   * the removed PrincipalPrivilege with an incremented catalog version or null if no
+   * matching privilege was found. Throws a CatalogException if no user exists with this
+   * name.
    */
-  public PrincipalPrivilege removeUserPrivilege(String userName, TPrivilege thriftPriv)
+  public PrincipalPrivilege removeUserPrivilege(String userName, String privilegeName)
       throws CatalogException {
-    return removePrincipalPrivilege(userName, thriftPriv, TPrincipalType.USER);
+    return removePrincipalPrivilege(userName, privilegeName, TPrincipalType.USER);
   }
 
   private PrincipalPrivilege removePrincipalPrivilege(String principalName,
-      TPrivilege privilege, TPrincipalType type) throws CatalogException {
+      String privilegeName, TPrincipalType type) throws CatalogException {
     versionLock_.writeLock().lock();
     try {
       Principal principal = authPolicy_.getPrincipal(principalName, type);
@@ -1821,8 +1823,7 @@ public class CatalogServiceCatalog extends Catalog {
         throw new CatalogException(String.format("%s does not exist: %s",
             Principal.toString(type), principalName));
       }
-      PrincipalPrivilege principalPrivilege =
-          principal.removePrivilege(privilege.getPrivilege_name());
+      PrincipalPrivilege principalPrivilege = principal.removePrivilege(privilegeName);
       if (principalPrivilege == null) return null;
       principalPrivilege.setCatalogVersion(incrementAndGetCatalogVersion());
       deleteLog_.addRemovedObject(principalPrivilege.toTCatalogObject());
@@ -1839,6 +1840,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public PrincipalPrivilege getPrincipalPrivilege(String principalName,
       TPrivilege privSpec) throws CatalogException {
+    String privilegeName = PrincipalPrivilege.buildPrivilegeName(privSpec);
     versionLock_.readLock().lock();
     try {
       Principal principal = authPolicy_.getPrincipal(principalName,
@@ -1847,7 +1849,7 @@ public class CatalogServiceCatalog extends Catalog {
         throw new CatalogException(Principal.toString(privSpec.getPrincipal_type()) +
             " does not exist: " + principalName);
       }
-      return principal.getPrivilege(privSpec.getPrivilege_name());
+      return principal.getPrivilege(privilegeName);
     } finally {
       versionLock_.readLock().unlock();
     }

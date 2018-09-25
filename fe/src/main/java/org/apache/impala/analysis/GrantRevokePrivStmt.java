@@ -64,9 +64,6 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
       privilege.setPrincipal_id(role_.getId());
       privilege.setPrincipal_type(role_.getPrincipalType());
       privilege.setHas_grant_opt(hasGrantOpt_);
-      // Need to rebuild the privilege name since it doesn't include grant option
-      // before now.
-      privilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(privilege));
     }
     params.setHas_grant_opt(hasGrantOpt_);
     params.setPrivileges(privileges);

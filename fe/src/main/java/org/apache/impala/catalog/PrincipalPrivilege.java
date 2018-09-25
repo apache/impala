@@ -56,7 +56,8 @@ public class PrincipalPrivilege extends CatalogObjectImpl {
   /**
    * Builds a privilege name for the given TPrivilege object. For simplicity, this name is
    * generated in a format that can be sent to the Sentry client to perform authorization
-   * checks.
+   * checks. The format is:
+   * [ServerName=value]->[DbName=value]->[TableName=value]->[ColumnName=value]->[Action Granted=value]->[Grant Option=value]
    */
   public static String buildPrivilegeName(TPrivilege privilege) {
     List<String> authorizable = Lists.newArrayListWithExpectedSize(4);
@@ -125,12 +126,21 @@ public class PrincipalPrivilege extends CatalogObjectImpl {
     }
   }
 
+  /**
+   * Copies the given privilege and sets the has grant option.
+   */
+  public static TPrivilege copyPrivilegeWithGrant(TPrivilege privilege,
+      boolean hasGrantOption) {
+    TPrivilege copy = privilege.deepCopy();
+    return copy.setHas_grant_opt(hasGrantOption);
+  }
+
   @Override
   public TCatalogObjectType getCatalogObjectType() {
     return TCatalogObjectType.PRIVILEGE;
   }
   @Override
-  public String getName() { return privilege_.getPrivilege_name(); }
+  public String getName() { return buildPrivilegeName(privilege_); }
   public int getPrincipalId() { return privilege_.getPrincipal_id(); }
   public TPrincipalType getPrincipalType() { return privilege_.getPrincipal_type(); }
   @Override

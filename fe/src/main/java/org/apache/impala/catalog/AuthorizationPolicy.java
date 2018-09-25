@@ -325,11 +325,11 @@ public class AuthorizationPolicy implements PrivilegeCache {
     Principal principal = getPrincipal(thriftPrivilege.getPrincipal_id(),
         thriftPrivilege.getPrincipal_type());
     if (principal == null) return;
-    PrincipalPrivilege existingPrivilege =
-        principal.getPrivilege(thriftPrivilege.getPrivilege_name());
+    String privilegeName = PrincipalPrivilege.buildPrivilegeName(thriftPrivilege);
+    PrincipalPrivilege existingPrivilege = principal.getPrivilege(privilegeName);
     if (existingPrivilege != null &&
         existingPrivilege.getCatalogVersion() < dropCatalogVersion) {
-      principal.removePrivilege(thriftPrivilege.getPrivilege_name());
+      principal.removePrivilege(privilegeName);
     }
   }
 
@@ -488,7 +488,10 @@ public class AuthorizationPolicy implements PrivilegeCache {
         // Check if the privileges are targeting the same object.
         filter.setPrivilege_level(privilege.getPrivilege_level());
         String privName = PrincipalPrivilege.buildPrivilegeName(filter);
-        if (!privName.equalsIgnoreCase(privilege.getPrivilege_name())) continue;
+        if (!privName.equalsIgnoreCase(
+            PrincipalPrivilege.buildPrivilegeName(privilege))) {
+          continue;
+        }
       }
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
       rowBuilder.add(privilege.getScope().toString().toLowerCase());

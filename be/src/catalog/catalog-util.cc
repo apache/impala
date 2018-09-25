@@ -212,7 +212,6 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       catalog_object->__set_privilege(TPrivilege());
       catalog_object->privilege.__set_principal_id(
           atoi(object_name.substr(0, pos).c_str()));
-      catalog_object->privilege.__set_privilege_name(object_name.substr(pos + 1));
       break;
     }
     case TCatalogObjectType::CATALOG:

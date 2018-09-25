@@ -21,6 +21,9 @@
 
 import grp
 import pytest
+import os
+import sys
+import subprocess
 from getpass import getuser
 from os import getenv
 from time import sleep
@@ -157,6 +160,45 @@ class TestGrantRevoke(SentryCacheTestSuite):
         "grant_rev_db.tbl1"), "select")
     self.__execute_with_grant_option_tests(TestObject(TestObject.VIEW,
         "grant_rev_db.tbl1"), "select")
+
+  @pytest.mark.execute_serially
+  @SentryCacheTestSuite.with_args(
+    impalad_args="--server_name=server1",
+    catalogd_args="--sentry_config=%s " % SENTRY_CONFIG_FILE +
+                  "--sentry_catalog_polling_frequency_s=%d" % SENTRY_POLLING_FREQUENCY_S,
+    sentry_config=SENTRY_CONFIG_FILE)
+  def test_grant_revoke_with_sentry_refresh(self):
+    group_name = grp.getgrnam(getuser()).gr_name
+    role_name = "grant_revoke_test_sentry_refresh"
+    try:
+      self.client.execute("create role %s" % role_name)
+      self.client.execute("grant role %s to group `%s`" % (role_name, group_name))
+      # Add select and insert into the catalog.
+      self.client.execute("grant select on table functional.alltypes to %s" % role_name)
+      self.client.execute("grant insert on table functional.alltypes to %s" % role_name)
+      # Grant alter privilege and revoke insert privilege using Sentry CLI.
+      subprocess.check_call(
+        ["/bin/bash", "-c", "%s/bin/sentryShell "
+         "--conf %s/sentry-site.xml -gpr "
+         "-p 'server=server1->db=functional->table=alltypes->action=alter' "
+         "-r %s" % (os.getenv("SENTRY_HOME"), os.getenv("SENTRY_CONF_DIR"), role_name)],
+        stdout=sys.stdout, stderr=sys.stderr)
+      subprocess.check_call(
+          ["/bin/bash", "-c", "%s/bin/sentryShell "
+           "--conf %s/sentry-site.xml -rpr "
+           "-p 'server=server1->db=functional->table=alltypes->action=insert' "
+           "-r %s" % (os.getenv("SENTRY_HOME"), os.getenv("SENTRY_CONF_DIR"), role_name)],
+          stdout=sys.stdout, stderr=sys.stderr)
+      # Wait for the catalog update with Sentry refresh.
+      sleep(SENTRY_POLLING_FREQUENCY_S + 3)
+      # Ensure alter privilege was granted and insert privilege was revoked.
+      result = self.execute_query_expect_success(self.client, "show grant role %s" %
+                                                 role_name)
+      assert len(result.data) == 2
+      assert any('select' in x for x in result.data)
+      assert any('alter' in x for x in result.data)
+    finally:
+      self.client.execute("drop role %s" % role_name)
 
   def __execute_with_grant_option_tests(self, test_obj, privilege,
       sentry_refresh_timeout_s=0):

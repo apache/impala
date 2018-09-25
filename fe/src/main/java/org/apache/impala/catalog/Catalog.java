@@ -519,18 +519,18 @@ public abstract class Catalog {
               Principal.toString(objectDesc.getPrincipal().getPrincipal_type())
                   .toLowerCase(), objectDesc.getPrivilege().getPrincipal_id()));
         }
-        for (PrincipalPrivilege p: tmpPrincipal.getPrivileges()) {
-          if (p.getName().equalsIgnoreCase(
-              objectDesc.getPrivilege().getPrivilege_name())) {
-            result.setType(p.getCatalogObjectType());
-            result.setCatalog_version(p.getCatalogVersion());
-            result.setPrivilege(p.toThrift());
-            return result;
-          }
+        String privilegeName = PrincipalPrivilege.buildPrivilegeName(
+            objectDesc.getPrivilege());
+        PrincipalPrivilege privilege = tmpPrincipal.getPrivilege(privilegeName);
+        if (privilege != null) {
+          result.setType(privilege.getCatalogObjectType());
+          result.setCatalog_version(privilege.getCatalogVersion());
+          result.setPrivilege(privilege.toThrift());
+          return result;
         }
         throw new CatalogException(String.format("%s '%s' does not contain " +
             "privilege: '%s'", Principal.toString(tmpPrincipal.getPrincipalType()),
-            tmpPrincipal.getName(), objectDesc.getPrivilege().getPrivilege_name()));
+            tmpPrincipal.getName(), privilegeName));
       default: throw new IllegalStateException(
           "Unexpected TCatalogObject type: " + objectDesc.getType());
     }
@@ -561,8 +561,10 @@ public abstract class Catalog {
         return "PRINCIPAL:" + catalogObject.getPrincipal().getPrincipal_name()
             .toLowerCase();
       case PRIVILEGE:
+        // The combination of privilege name + principal ID is guaranteed to be unique.
         return "PRIVILEGE:" +
-            catalogObject.getPrivilege().getPrivilege_name().toLowerCase() + "." +
+            PrincipalPrivilege.buildPrivilegeName(catalogObject.getPrivilege())
+                .toLowerCase() + "." +
             Integer.toString(catalogObject.getPrivilege().getPrincipal_id());
       case HDFS_CACHE_POOL:
         return "HDFS_CACHE_POOL:" +

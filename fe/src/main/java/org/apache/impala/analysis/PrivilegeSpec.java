@@ -134,7 +134,6 @@ public class PrivilegeSpec implements ParseNode {
     if (uri_ != null) privilege.setUri(uri_.toString());
     if (columnName != null) privilege.setColumn_name(columnName);
     privilege.setCreate_time_ms(-1);
-    privilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(privilege));
     return privilege;
   }
 

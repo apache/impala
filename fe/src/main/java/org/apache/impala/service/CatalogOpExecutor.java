@@ -1852,7 +1852,6 @@ public class CatalogOpExecutor {
     TPrivilege privilege = createDatabaseOwnerPrivilegeFilter(databaseName, serverName);
     privilege.setScope(TPrivilegeScope.TABLE);
     privilege.setTable_name(tableName);
-    privilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(privilege));
     return privilege;
   }
 
@@ -1865,8 +1864,7 @@ public class CatalogOpExecutor {
     privilege.setScope(TPrivilegeScope.DATABASE).setServer_name(serverName)
         .setPrivilege_level(TPrivilegeLevel.OWNER)
         .setDb_name(databaseName).setCreate_time_ms(-1)
-        .setHas_grant_opt(isObjectOwnershipGrantEnabled())
-        .setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(privilege));
+        .setHas_grant_opt(isObjectOwnershipGrantEnabled());
     return privilege;
   }
 
@@ -2871,10 +2869,12 @@ public class CatalogOpExecutor {
       PrincipalPrivilege removedPrivilege;
       switch (ownerType) {
         case ROLE:
-          removedPrivilege = catalog_.removeRolePrivilege(ownerString, filter);
+          removedPrivilege = catalog_.removeRolePrivilege(ownerString,
+              PrincipalPrivilege.buildPrivilegeName(filter));
           break;
         case USER:
-          removedPrivilege = catalog_.removeUserPrivilege(ownerString, filter);
+          removedPrivilege = catalog_.removeUserPrivilege(ownerString,
+              PrincipalPrivilege.buildPrivilegeName(filter));
           break;
         default:
           throw new CatalogException("Unexpected ownerType: " + ownerType.name());

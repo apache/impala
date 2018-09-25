@@ -2979,11 +2979,9 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private TPrivilege[] onServer(boolean grantOption, TPrivilegeLevel... levels) {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
-      privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.SERVER, false);
+      privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.SERVER, false);
       privileges[i].setServer_name(SENTRY_SERVER);
       privileges[i].setHas_grant_opt(grantOption);
-      privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
-          privileges[i]));
     }
     return privileges;
   }
@@ -2996,12 +2994,10 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       TPrivilegeLevel... levels) {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
-      privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.DATABASE, false);
+      privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.DATABASE, false);
       privileges[i].setServer_name(SENTRY_SERVER);
       privileges[i].setDb_name(db);
       privileges[i].setHas_grant_opt(grantOption);
-      privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
-          privileges[i]));
     }
     return privileges;
   }
@@ -3014,13 +3010,11 @@ public class AuthorizationStmtTest extends FrontendTestBase {
       TPrivilegeLevel... levels) {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
-      privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.TABLE, false);
+      privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.TABLE, false);
       privileges[i].setServer_name(SENTRY_SERVER);
       privileges[i].setDb_name(db);
       privileges[i].setTable_name(table);
       privileges[i].setHas_grant_opt(grantOption);
-      privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
-          privileges[i]));
     }
     return privileges;
   }
@@ -3047,14 +3041,12 @@ public class AuthorizationStmtTest extends FrontendTestBase {
     int idx = 0;
     for (int i = 0; i < levels.length; i++) {
       for (String column: columns) {
-        privileges[idx] = new TPrivilege("", levels[i], TPrivilegeScope.COLUMN, false);
+        privileges[idx] = new TPrivilege(levels[i], TPrivilegeScope.COLUMN, false);
         privileges[idx].setServer_name(SENTRY_SERVER);
         privileges[idx].setDb_name(db);
         privileges[idx].setTable_name(table);
         privileges[idx].setColumn_name(column);
         privileges[idx].setHas_grant_opt(grantOption);
-        privileges[idx].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
-            privileges[idx]));
         idx++;
       }
     }
@@ -3068,12 +3060,10 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private TPrivilege[] onUri(boolean grantOption, String uri, TPrivilegeLevel... levels) {
     TPrivilege[] privileges = new TPrivilege[levels.length];
     for (int i = 0; i < levels.length; i++) {
-      privileges[i] = new TPrivilege("", levels[i], TPrivilegeScope.URI, false);
+      privileges[i] = new TPrivilege(levels[i], TPrivilegeScope.URI, false);
       privileges[i].setServer_name(SENTRY_SERVER);
       privileges[i].setUri(uri);
       privileges[i].setHas_grant_opt(grantOption);
-      privileges[i].setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(
-          privileges[i]));
     }
     return privileges;
   }

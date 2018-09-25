@@ -829,7 +829,6 @@ public class CatalogTest {
     userPrivilege.setServer_name("server1");
     userPrivilege.setScope(TPrivilegeScope.SERVER);
     userPrivilege.setPrivilege_level(TPrivilegeLevel.ALL);
-    userPrivilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(userPrivilege));
     catalog_.addUserPrivilege("user1", userPrivilege);
     assertSame(user, authPolicy.getPrincipal("user1", TPrincipalType.USER));
     assertNull(authPolicy.getPrincipal("user2", TPrincipalType.USER));
@@ -849,7 +848,6 @@ public class CatalogTest {
     rolePrivilege.setServer_name("server1");
     rolePrivilege.setScope(TPrivilegeScope.SERVER);
     rolePrivilege.setPrivilege_level(TPrivilegeLevel.ALL);
-    rolePrivilege.setPrivilege_name(PrincipalPrivilege.buildPrivilegeName(rolePrivilege));
     catalog_.addRolePrivilege("role1", rolePrivilege);
     assertSame(role, catalog_.getAuthPolicy().getPrincipal("role1", TPrincipalType.ROLE));
     assertNull(catalog_.getAuthPolicy().getPrincipal("role1", TPrincipalType.USER));
