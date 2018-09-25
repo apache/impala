@@ -817,10 +817,9 @@ show CREATE TABLE numeric_grades_default_letter;
 |   student STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,                  |
 |   PRIMARY KEY (score)                                                                          |
 | )                                                                                              |
-| PARTITION BY <b>RANGE (score) (...)</b>                                                               |
+| PARTITION BY <b>RANGE (score) (...)</b>                                                          |
 | STORED AS KUDU                                                                                 |
-| TBLPROPERTIES ('kudu.master_addresses'='vd0342.example.com:7051',                              |
-|   'kudu.table_name'='impala::USER.numeric_grades_default_letter')                              |
+| TBLPROPERTIES ('kudu.master_addresses'='vd0342.example.com:7051')                              |
 +------------------------------------------------------------------------------------------------+
 
 show range partitions numeric_grades_default_letter;

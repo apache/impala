@@ -1007,15 +1007,14 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
             You cannot use the <codeph>REPLACE COLUMNS</codeph> clause with a Kudu table.
           </p>
         </li>
-        <li>
-          <p>
-            The <codeph>RENAME TO</codeph> clause for a Kudu table only affects the name stored in the
-            metastore database that Impala uses to refer to the table. To change which underlying Kudu
-            table is associated with an Impala table name, you must change the <codeph>TBLPROPERTIES</codeph>
-            property of the table: <codeph>SET TBLPROPERTIES('kudu.table_name'='<varname>kudu_tbl_name</varname>)</codeph>.
-            Doing so causes Kudu to change the name of the underlying Kudu table.
-          </p>
-        </li>
+        <li> The <codeph>RENAME TO</codeph> clause for a Kudu table only affects
+          the name stored in the metastore database that Impala uses to refer to
+          the table. To change which underlying Kudu table is associated with an
+          Impala table name, you must change the <codeph>TBLPROPERTIES</codeph>
+          property of the table: <codeph>SET
+              TBLPROPERTIES('kudu.table_name'='<varname>kudu_tbl_name</varname>)</codeph>.
+          You can only change underlying Kudu tables for the external
+          tables.</li>
       </ul>
     </p>
 
