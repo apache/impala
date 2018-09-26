@@ -194,6 +194,13 @@ class TimestampValue {
         && date.day_number() <= MAX_DAY_NUMBER;
   }
 
+  /// Verifies that the time is not negative and is less than a whole day.
+  static inline bool IsValidTime(const boost::posix_time::time_duration& time) {
+    static const int64_t NANOS_PER_DAY = 1'000'000'000LL*60*60*24;
+    return !time.is_negative()
+        && time.total_nanoseconds() < NANOS_PER_DAY;
+  }
+
   /// Formats the timestamp using the given date/time context and places the result in the
   /// string buffer. The size of the buffer should be at least dt_ctx.fmt_out_len + 1. A
   /// string terminator will be appended to the string.

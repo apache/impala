@@ -6,3 +6,10 @@ SELECT * FROM out_of_range_timestamp;
 ---- CATCH
 Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp/out_of_range_timestamp.parquet' column 'ts' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.
 ====
+---- QUERY
+# IMPALA-7595: Test Parquet timestamp columns where the time part is
+# out of the valid range [0..24H).
+SELECT * FROM out_of_range_time_of_day;
+---- CATCH
+Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_time_of_day/out_of_range_time_of_day.parquet' column 'd' contains a timestamp with invalid time of day. The time of day should be 0 <= and < 24 hour (in nanoseconds)
+====

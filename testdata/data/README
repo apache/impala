@@ -223,3 +223,10 @@ Contains a single row. It is used to test IMPALA-7559 which only occurs when all
 in a column chunk are the same timestamp and the file is written with parquet-mr (which
 is used by Hive).
 
+out_of_range_time_of_day.parquet:
+IMPALA-7595: Parquet file that contains timestamps where the time part is out of the
+valid range [0..24H). Before the fix, select * returned these values:
+1970-01-01 -00:00:00.000000001  (invalid - negative time of day)
+1970-01-01 00:00:00
+1970-01-01 23:59:59.999999999
+1970-01-01 24:00:00 (invalid - time of day should be less than a whole day)

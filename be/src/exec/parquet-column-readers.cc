@@ -694,9 +694,16 @@ inline bool ScalarColumnReader<TimestampValue, parquet::Type::INT96, true>
 template <>
 bool ScalarColumnReader<TimestampValue, parquet::Type::INT96, true>::ValidateValue(
     TimestampValue* val) const {
-  if (UNLIKELY(!TimestampValue::IsValidDate(val->date()))) {
-    ErrorMsg msg(TErrorCode::PARQUET_TIMESTAMP_OUT_OF_RANGE,
-        filename(), node_.element->name);
+  if (UNLIKELY(!TimestampValue::IsValidDate(val->date())
+      || !TimestampValue::IsValidTime(val->time()))) {
+    // If both are corrupt, invalid time takes precedence over invalid date, because
+    // invalid date may come from a more or less functional encoder that does not respect
+    // the 1400..9999 limit, while an invalid time is a good indicator of buggy encoder
+    // or memory garbage.
+    TErrorCode::type errorCode = TimestampValue::IsValidTime(val->time())
+        ? TErrorCode::PARQUET_TIMESTAMP_OUT_OF_RANGE
+        : TErrorCode::PARQUET_TIMESTAMP_INVALID_TIME_OF_DAY;
+    ErrorMsg msg(errorCode, filename(), node_.element->name);
     Status status = parent_->state_->LogOrReturnError(msg);
     if (!status.ok()) parent_->parse_status_ = status;
     return false;
