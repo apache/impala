@@ -120,6 +120,8 @@ class TestClientSsl(CustomClusterTestSuite):
                                     statestored_args=TLS_ECDH_ARGS,
                                     catalogd_args=TLS_ECDH_ARGS)
   @pytest.mark.skipif(HAS_LEGACY_OPENSSL, reason=SKIP_SSL_MSG)
+  @pytest.mark.skipif(sys.version_info < REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12,
+      reason="Working around IMPALA-7628. TODO: is the right workaround?")
   def test_tls_ecdh(self, vector):
     self._verify_negative_cases()
     self._validate_positive_cases("%s/server-cert.pem" % self.CERT_DIR)
