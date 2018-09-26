@@ -91,4 +91,9 @@
     <name>sentry.hive.testing.mode</name>
     <value>true</value>
   </property>
+  <!-- Empty means allow all privileges -->
+  <property>
+    <name>sentry.db.explicit.grants.permitted</name>
+    <value></value>
+  </property>
 </configuration>
