@@ -29,7 +29,7 @@ class TestSetAndUnset(CustomClusterTestSuite, HS2TestSuite):
   """
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args="--default_query_options=debug_action=custom")
+      default_query_options=[('debug_action', 'custom')])
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6)
   def test_set_and_unset(self):
     """

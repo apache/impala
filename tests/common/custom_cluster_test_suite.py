@@ -195,10 +195,11 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       default_query_option_kvs.append(("allow_erasure_coded_files", "true"))
     if default_query_options is not None:
       default_query_option_kvs.extend(default_query_options)
-
-    if default_query_option_kvs:
-      options.append("--impalad_args=--default_query_options={0}".format(
-          ','.join(["{0}={1}".format(k, v) for k, v in default_query_option_kvs])))
+    # Add the default query options after any arguments. This will override any default
+    # options set in --impalad_args by design to force tests to pass default_query_options
+    # into this function directly.
+    options.append("--impalad_args=--default_query_options={0}".format(
+        ','.join(["{0}={1}".format(k, v) for k, v in default_query_option_kvs])))
 
     logging.info("Starting cluster with command: %s" %
                  " ".join(pipes.quote(arg) for arg in cmd + options))

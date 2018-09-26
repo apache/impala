@@ -30,6 +30,7 @@ from TCLIService import TCLIService
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfEC
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 LOG = logging.getLogger(__name__)
@@ -161,6 +162,7 @@ class TestShutdownCommand(CustomClusterTestSuite, HS2TestSuite):
   EXEC_SHUTDOWN_DEADLINE_S = 10
 
   @pytest.mark.execute_serially
+  @SkipIfEC.scheduling
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \
           --shutdown_deadline_s={deadline} \

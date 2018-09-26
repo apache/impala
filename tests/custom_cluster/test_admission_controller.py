@@ -215,13 +215,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         rhs = re.split(": ", line)[1]
         confs = re.split(",", rhs)
         break
-    assert len(confs) == len(expected_query_options)
-    confs = map(str.lower, confs)
-    for expected in expected_query_options:
-      if expected.lower() not in confs:
-        expected = ",".join(sorted(expected_query_options))
-        actual = ",".join(sorted(confs))
-        assert False, "Expected query options %s, got %s." % (expected, actual)
+    expected_set = set([x.lower() for x in expected_query_options])
+    confs_set = set([x.lower() for x in confs])
+    assert expected_set.issubset(confs_set)
 
   def __check_hs2_query_opts(self, pool_name, mem_limit=None, expected_options=None):
     """ Submits a query via HS2 (optionally with a mem_limit in the confOverlay)
@@ -283,8 +279,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-      impalad_args=impalad_admission_ctrl_config_args(\
-          "-default_query_options=mem_limit=200000000"),
+      impalad_args=impalad_admission_ctrl_config_args(),
+      default_query_options=[('mem_limit', 200000000)],
       statestored_args=_STATESTORED_ARGS)
   @needs_session(conf_overlay={'batch_size': '100'})
   def test_set_request_pool(self):

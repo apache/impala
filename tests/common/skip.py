@@ -147,3 +147,4 @@ class SkipIfEC:
       "features relying on local read do not work.")
   oom = pytest.mark.skipif(IS_EC, reason="Probably broken by HDFS-13540.")
   fix_later = pytest.mark.skipif(IS_EC, reason="It should work but doesn't.")
+  scheduling = pytest.mark.skipif(IS_EC, reason="Scheduling is different on EC")
