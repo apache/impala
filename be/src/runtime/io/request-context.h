@@ -281,6 +281,14 @@ class RequestContext {
   void RemoveActiveScanRangeLocked(
       const boost::unique_lock<boost::mutex>& lock, ScanRange* range);
 
+  /// Try to read the scan range from the cache. '*read_succeeded' is set to true if the
+  /// scan range can be found in the cache, otherwise false.
+  /// If '*needs_buffers' is returned as true, the caller must call
+  /// AllocateBuffersForRange() to add buffers for the data to be read into before the
+  /// range can be scheduled.
+  Status TryReadFromCache(const boost::unique_lock<boost::mutex>& lock, ScanRange* range,
+      bool* read_succeeded, bool* needs_buffers);
+
   // Counters are updated by other classes - expose to other io:: classes for convenience.
 
   /// Total bytes read for this reader

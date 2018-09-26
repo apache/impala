@@ -163,13 +163,8 @@ unique_ptr<BufferDescriptor> ScanRange::GetUnusedBuffer(
   return result;
 }
 
-int ScanRange::BytesRead() const {
-  DCHECK(file_reader_ != nullptr);
-  return file_reader_->bytes_read();
-}
-
 ReadOutcome ScanRange::DoRead(int disk_id) {
-  int64_t bytes_remaining = len_ - BytesRead();
+  int64_t bytes_remaining = bytes_to_read_ - bytes_read_;
   DCHECK_GT(bytes_remaining, 0);
 
   unique_ptr<BufferDescriptor> buffer_desc;
@@ -183,8 +178,8 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
           this, client_buffer_.data, client_buffer_.len));
     } else {
       DCHECK(external_buffer_tag_ == ScanRange::ExternalBufferTag::NO_BUFFER)
-          << "This code path does not handle other buffer types, i.e. HDFS cache"
-          << static_cast<int>(external_buffer_tag_);
+          << "This code path does not handle other buffer types, i.e. HDFS cache. "
+          << "external_buffer_tag_=" << static_cast<int>(external_buffer_tag_);
       buffer_desc = GetUnusedBuffer(lock);
       if (buffer_desc == nullptr) {
         // No buffer available - the range will be rescheduled when a buffer is added.
@@ -199,21 +194,27 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
   // No locks in this section.  Only working on local vars.  We don't want to hold a
   // lock across the read call.
   Status read_status = file_reader_->Open(is_file_handle_caching_enabled());
+  bool eof = false;
   if (read_status.ok()) {
     COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, 1L);
     COUNTER_BITOR_IF_NOT_NULL(reader_->disks_accessed_bitmap_, 1LL << disk_id);
 
-    read_status = file_reader_->ReadFromPos(offset_ + BytesRead(), buffer_desc->buffer_,
-        min(len() - BytesRead(), buffer_desc->buffer_len_), &buffer_desc->len_,
-        &buffer_desc->eosr_);
-    buffer_desc->scan_range_offset_ = BytesRead() - buffer_desc->len_;
+    if (sub_ranges_.empty()) {
+      DCHECK(cache_.data == nullptr);
+      read_status = file_reader_->ReadFromPos(offset_ + bytes_read_, buffer_desc->buffer_,
+          min(len() - bytes_read_, buffer_desc->buffer_len_),
+          &buffer_desc->len_, &eof);
+    } else {
+      read_status = ReadSubRanges(buffer_desc.get(), &eof);
+    }
 
     COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, buffer_desc->len_);
     COUNTER_ADD_IF_NOT_NULL(reader_->active_read_thread_counter_, -1L);
   }
 
   DCHECK(buffer_desc->buffer_ != nullptr);
-  DCHECK(!buffer_desc->is_cached()) << "HDFS cache reads don't go through this code path.";
+  DCHECK(!buffer_desc->is_cached()) <<
+      "Pure HDFS cache reads don't go through this code path.";
   if (!read_status.ok()) {
     // Free buffer to release resources before we cancel the range so that all buffers
     // are freed at cancellation.
@@ -228,9 +229,15 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
     return ReadOutcome::CANCELLED;
   }
 
+  bytes_read_ += buffer_desc->len();
+  DCHECK_LE(bytes_read_, bytes_to_read_);
+
+  // It is end of stream if it is end of file, or read all the bytes.
+  buffer_desc->eosr_ = eof || bytes_read_ == bytes_to_read_;
+
   // After calling EnqueueReadyBuffer(), it is no longer valid to touch 'buffer_desc'.
   // Store the state we need before calling EnqueueReadyBuffer().
-  bool eosr = buffer_desc->eosr_;
+  bool eosr = buffer_desc->eosr();
   // Read successful - enqueue the buffer and return the appropriate outcome.
   if (!EnqueueReadyBuffer(move(buffer_desc))) return ReadOutcome::CANCELLED;
   if (eosr) {
@@ -239,6 +246,42 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
     return ReadOutcome::SUCCESS_EOSR;
   }
   return ReadOutcome::SUCCESS_NO_EOSR;
+}
+
+Status ScanRange::ReadSubRanges(BufferDescriptor* buffer_desc, bool* eof) {
+  buffer_desc->len_ = 0;
+  while (buffer_desc->len() < buffer_desc->buffer_len() &&
+      sub_range_pos_.index < sub_ranges_.size()) {
+    SubRange& sub_range = sub_ranges_[sub_range_pos_.index];
+    int64_t offset = sub_range.offset + sub_range_pos_.bytes_read;
+    int64_t bytes_to_read = min(sub_range.length - sub_range_pos_.bytes_read,
+        buffer_desc->buffer_len() - buffer_desc->len());
+
+    if (cache_.data != nullptr) {
+      memcpy(buffer_desc->buffer_ + buffer_desc->len(),
+          cache_.data + offset, bytes_to_read);
+    } else {
+      int64_t current_bytes_read;
+      Status read_status = file_reader_->ReadFromPos(offset,
+          buffer_desc->buffer_ + buffer_desc->len(), bytes_to_read, &current_bytes_read,
+          eof);
+      if (!read_status.ok()) return read_status;
+      if (current_bytes_read != bytes_to_read) {
+        DCHECK(*eof);
+        DCHECK_LT(current_bytes_read, bytes_to_read);
+        return Status(TErrorCode::SCANNER_INCOMPLETE_READ, bytes_to_read,
+            current_bytes_read, file(), offset);
+      }
+    }
+
+    buffer_desc->len_ += bytes_to_read;
+    sub_range_pos_.bytes_read += bytes_to_read;
+    if (sub_range_pos_.bytes_read == sub_range.length) {
+      sub_range_pos_.index += 1;
+      sub_range_pos_.bytes_read = 0;
+    }
+  }
+  return Status::OK();
 }
 
 void ScanRange::SetBlockedOnBuffer() {
@@ -339,9 +382,10 @@ string ScanRange::DebugString() const {
 }
 
 bool ScanRange::Validate() {
-  if (BytesRead() > len_) {
-    LOG(ERROR) << "Bytes read tracking is wrong. Shouldn't read past the scan range."
-                 << " bytes_read_=" << BytesRead() << " len_=" << len_;
+  if (bytes_read_ > bytes_to_read_) {
+    LOG(ERROR) << "Bytes read tracking is wrong. Too many bytes have been read."
+                 << " bytes_read_=" << bytes_read_
+                 << " bytes_to_read_=" << bytes_to_read_;
     return false;
   }
   if (!cancel_status_.ok() && !ready_buffers_.empty()) {
@@ -377,8 +421,6 @@ ScanRange::ScanRange()
     external_buffer_tag_(ExternalBufferTag::NO_BUFFER) {}
 
 ScanRange::~ScanRange() {
-  DCHECK(external_buffer_tag_ != ExternalBufferTag::CACHED_BUFFER)
-      << "Cached buffer was not released.";
   DCHECK(!read_in_flight_);
   DCHECK_EQ(0, ready_buffers_.size());
   DCHECK_EQ(0, num_buffers_in_reader_.Load());
@@ -386,6 +428,12 @@ ScanRange::~ScanRange() {
 
 void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
     int disk_id, bool expected_local, const BufferOpts& buffer_opts, void* meta_data) {
+  Reset(fs, file, len, offset, disk_id, expected_local, buffer_opts, {}, meta_data);
+}
+
+void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
+    int disk_id, bool expected_local, const BufferOpts& buffer_opts,
+    vector<SubRange>&& sub_ranges, void* meta_data) {
   DCHECK(ready_buffers_.empty());
   DCHECK(!read_in_flight_);
   DCHECK(file != nullptr);
@@ -401,6 +449,7 @@ void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
   }
   file_ = file;
   len_ = len;
+  bytes_to_read_ = len;
   offset_ = offset;
   disk_id_ = disk_id;
   try_cache_ = buffer_opts.try_cache_;
@@ -416,6 +465,59 @@ void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
   expected_local_ = expected_local;
   io_mgr_ = nullptr;
   reader_ = nullptr;
+  sub_ranges_.clear();
+  sub_range_pos_ = {};
+  InitSubRanges(move(sub_ranges));
+}
+
+void ScanRange::InitSubRanges(vector<SubRange>&& sub_ranges) {
+  sub_ranges_ = std::move(sub_ranges);
+  DCHECK(ValidateSubRanges());
+  MergeSubRanges();
+  DCHECK(ValidateSubRanges());
+  sub_range_pos_ = {};
+
+  if (sub_ranges_.empty()) return;
+
+  int length_sum = 0;
+  for (auto& sub_range : sub_ranges_) {
+    length_sum += sub_range.length;
+  }
+  bytes_to_read_ = length_sum;
+}
+
+bool ScanRange::ValidateSubRanges() {
+  for (int i = 0; i < sub_ranges_.size(); ++i) {
+    SubRange& sub_range = sub_ranges_[i];
+    if (sub_range.length <= 0) return false;
+    if (sub_range.offset < offset_) return false;
+    if (sub_range.offset + sub_range.length > offset_ + len_) return false;
+
+    if (i == sub_ranges_.size() - 1) break;
+
+    SubRange& next_sub_range = sub_ranges_[i+1];
+    if (sub_range.offset + sub_range.length > next_sub_range.offset) return false;
+  }
+  return true;
+}
+
+void ScanRange::MergeSubRanges() {
+  if (sub_ranges_.empty()) return;
+  for (int i = 0; i < sub_ranges_.size() - 1; ++i) {
+    SubRange& current = sub_ranges_[i];
+    int j = i + 1;
+    for (; j < sub_ranges_.size(); ++j) {
+      SubRange& sr_j = sub_ranges_[j];
+      if (sr_j.offset == current.offset + current.length) {
+        current.length += sr_j.length;
+      } else {
+        break;
+      }
+    }
+    if (j > i + 1) {
+      sub_ranges_.erase(sub_ranges_.begin() + i + 1, sub_ranges_.begin() + j);
+    }
+  }
 }
 
 void ScanRange::InitInternal(DiskIoMgr* io_mgr, RequestContext* reader) {
@@ -427,8 +529,14 @@ void ScanRange::InitInternal(DiskIoMgr* io_mgr, RequestContext* reader) {
   cancel_status_ = Status::OK();
   eosr_queued_ = false;
   blocked_on_buffer_ = false;
+  bytes_read_ = 0;
+  sub_range_pos_ = {};
   file_reader_->ResetState();
   DCHECK(Validate()) << DebugString();
+}
+
+void ScanRange::SetFileReader(unique_ptr<FileReader> file_reader) {
+  file_reader_ = move(file_reader);
 }
 
 int64_t ScanRange::MaxReadChunkSize() const {
@@ -454,13 +562,10 @@ Status ScanRange::ReadFromCache(
     const unique_lock<mutex>& reader_lock, bool* read_succeeded) {
   DCHECK(reader_lock.mutex() == &reader_->lock_ && reader_lock.owns_lock());
   DCHECK(try_cache_);
-  DCHECK_EQ(BytesRead(), 0);
+  DCHECK_EQ(bytes_read_, 0);
   *read_succeeded = false;
   Status status = file_reader_->Open(false);
   if (!status.ok()) return status;
-
-  // Cached reads not supported on local filesystem.
-  if (fs_ == nullptr) return Status::OK();
 
   // Check cancel status.
   {
@@ -468,40 +573,43 @@ Status ScanRange::ReadFromCache(
     RETURN_IF_ERROR(cancel_status_);
   }
 
-  DCHECK(external_buffer_tag_ == ExternalBufferTag::NO_BUFFER);
-  void* buffer = file_reader_->CachedFile();
-  if (buffer != nullptr) external_buffer_tag_ = ExternalBufferTag::CACHED_BUFFER;
+  file_reader_->CachedFile(&cache_.data, &cache_.len);
   // Data was not cached, caller will fall back to normal read path.
-  if (external_buffer_tag_ != ExternalBufferTag::CACHED_BUFFER) {
+  if (cache_.data == nullptr) {
     VLOG_QUERY << "Cache read failed for scan range: " << DebugString()
                << ". Switching to disk read path.";
     // Clean up the scan range state before re-issuing it.
     file_reader_->Close();
     return Status::OK();
   }
-  int bytes_read = BytesRead();
   // A partial read can happen when files are truncated.
   // TODO: If HDFS ever supports partially cached blocks, we'll have to distinguish
   // between errors and partially cached blocks here.
-  if (bytes_read < len()) {
+  if (cache_.len < len()) {
     VLOG_QUERY << "Error reading file from HDFS cache: " << file_ << ". Expected "
-      << len() << " bytes, but read " << bytes_read << ". Switching to disk read path.";
+      << len() << " bytes, but read " << cache_.len << ". Switching to disk read path.";
     // Close the scan range. 'read_succeeded' is still false, so the caller will fall back
     // to non-cached read of this scan range.
     file_reader_->Close();
     return Status::OK();
   }
 
+  *read_succeeded = true;
+  // If there are sub-ranges, then we need to memcpy() them from the cached buffer.
+  if (HasSubRanges()) return Status::OK();
+
+  DCHECK(external_buffer_tag_ != ExternalBufferTag::CLIENT_BUFFER);
+  external_buffer_tag_ = ExternalBufferTag::CACHED_BUFFER;
+  bytes_read_ = cache_.len;
+
   // Create a single buffer desc for the entire scan range and enqueue that.
   // The memory is owned by the HDFS java client, not the Impala backend.
   unique_ptr<BufferDescriptor> desc = unique_ptr<BufferDescriptor>(new BufferDescriptor(
-      this, reinterpret_cast<uint8_t*>(buffer), 0));
-  desc->len_ = bytes_read;
-  desc->scan_range_offset_ = 0;
+      this, cache_.data, 0));
+  desc->len_ = cache_.len;
   desc->eosr_ = true;
   EnqueueReadyBuffer(move(desc));
-  COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, bytes_read);
-  *read_succeeded = true;
+  COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, cache_.len);
   return Status::OK();
 }
 

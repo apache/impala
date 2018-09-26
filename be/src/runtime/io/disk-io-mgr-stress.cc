@@ -119,6 +119,7 @@ void DiskIoMgrStress::ClientThread(int client_id) {
 
     while (!eos) {
       ScanRange* range;
+      int64_t scan_range_offset = 0;
       bool needs_buffers;
       Status status = client->reader->GetNextUnstartedRange(&range, &needs_buffers);
       CHECK(status.ok() || status.IsCancelled());
@@ -135,7 +136,6 @@ void DiskIoMgrStress::ClientThread(int client_id) {
         CHECK(status.ok() || status.IsCancelled());
         if (buffer == NULL) break;
 
-        int64_t scan_range_offset = buffer->scan_range_offset();
         int len = buffer->len();
         CHECK_GE(scan_range_offset, 0);
         CHECK_LT(scan_range_offset, expected.size());
@@ -154,6 +154,7 @@ void DiskIoMgrStress::ClientThread(int client_id) {
         memcpy(read_buffer + file_offset, buffer->buffer(), buffer->len());
         range->ReturnBuffer(move(buffer));
         bytes_read += len;
+        scan_range_offset += len;
 
         CHECK_GE(bytes_read, 0);
         CHECK_LE(bytes_read, expected.size());

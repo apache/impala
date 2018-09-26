@@ -302,7 +302,7 @@ Status DiskIoMgr::AllocateBuffersForRange(
   BufferPool* bp = ExecEnv::GetInstance()->buffer_pool();
   Status status;
   vector<unique_ptr<BufferDescriptor>> buffers;
-  for (int64_t buffer_size : ChooseBufferSizes(range->len(), max_bytes)) {
+  for (int64_t buffer_size : ChooseBufferSizes(range->bytes_to_read(), max_bytes)) {
     BufferPool::BufferHandle handle;
     status = bp->AllocateBuffer(bp_client, buffer_size, &handle);
     if (!status.ok()) goto error;

@@ -40,6 +40,7 @@ namespace io {
 
 HdfsFileReader::~HdfsFileReader() {
   DCHECK(exclusive_hdfs_fh_ == nullptr) << "File was not closed.";
+  DCHECK(cached_buffer_ == nullptr) << "Cached buffer was not released.";
 }
 
 Status HdfsFileReader::Open(bool use_file_handle_cache) {
@@ -73,7 +74,7 @@ Status HdfsFileReader::Open(bool use_file_handle_cache) {
 }
 
 Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
-    int64_t bytes_to_read, int64_t* bytes_read, bool* eosr) {
+    int64_t bytes_to_read, int64_t* bytes_read, bool* eof) {
   DCHECK(scan_range_->read_in_flight());
   DCHECK_GE(bytes_to_read, 0);
   // Delay before acquiring the lock, to allow triggering IMPALA-6587 race.
@@ -87,7 +88,7 @@ Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
 
   auto io_mgr = scan_range_->io_mgr_;
   auto request_context = scan_range_->reader_;
-  *eosr = false;
+  *eof = false;
   *bytes_read = 0;
 
   CachedHdfsFileHandle* borrowed_hdfs_fh = nullptr;
@@ -151,7 +152,7 @@ Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
       DCHECK_GT(current_bytes_read, -1);
       if (current_bytes_read == 0) {
         // No more bytes in the file. The scan range went past the end.
-        *eosr = true;
+        *eof = true;
         break;
       }
       *bytes_read += current_bytes_read;
@@ -164,12 +165,7 @@ Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
   if (borrowed_hdfs_fh != nullptr) {
     io_mgr->ReleaseCachedHdfsFileHandle(scan_range_->file_string(), borrowed_hdfs_fh);
   }
-  if (!status.ok())
-    return status;
-  bytes_read_ += *bytes_read;
-  DCHECK_LE(bytes_read_, scan_range_->len());
-  if (bytes_read_ == scan_range_->len()) *eosr = true;
-  return Status::OK();
+  return status;
 }
 
 Status HdfsFileReader::ReadFromPosInternal(hdfsFile hdfs_file, int64_t position_in_file,
@@ -203,16 +199,22 @@ Status HdfsFileReader::ReadFromPosInternal(hdfsFile hdfs_file, int64_t position_
   return Status::OK();
 }
 
-void* HdfsFileReader::CachedFile() {
+void HdfsFileReader::CachedFile(uint8_t** data, int64_t* length) {
   {
     unique_lock<SpinLock> hdfs_lock(lock_);
+    DCHECK(cached_buffer_ == nullptr);
     DCHECK(exclusive_hdfs_fh_ != nullptr);
     cached_buffer_ = hadoopReadZero(exclusive_hdfs_fh_->file(),
         scan_range_->io_mgr_->cached_read_options(), scan_range_->len());
   }
-  if (cached_buffer_ == nullptr) return nullptr;
-  bytes_read_ = hadoopRzBufferLength(cached_buffer_);
-  return const_cast<void*>(hadoopRzBufferGet(cached_buffer_));
+  if (cached_buffer_ == nullptr) {
+    *data = nullptr;
+    *length = 0;
+    return;
+  }
+  *data = reinterpret_cast<uint8_t*>(
+      const_cast<void*>(hadoopRzBufferGet(cached_buffer_)));
+  *length = hadoopRzBufferLength(cached_buffer_);
 }
 
 void HdfsFileReader::Close() {
@@ -220,11 +222,9 @@ void HdfsFileReader::Close() {
   if (exclusive_hdfs_fh_ != nullptr) {
     GetHdfsStatistics(exclusive_hdfs_fh_->file());
 
-    if (scan_range_->external_buffer_tag_ ==
-        ScanRange::ExternalBufferTag::CACHED_BUFFER) {
+    if (cached_buffer_ != nullptr) {
       hadoopRzBufferFree(exclusive_hdfs_fh_->file(), cached_buffer_);
       cached_buffer_ = nullptr;
-      scan_range_->external_buffer_tag_ = ScanRange::ExternalBufferTag::NO_BUFFER;
     }
 
     // Destroy the file handle.

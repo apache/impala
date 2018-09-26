@@ -34,11 +34,11 @@ public:
 
   virtual Status Open(bool use_file_handle_cache) override;
   virtual Status ReadFromPos(int64_t file_offset, uint8_t* buffer,
-      int64_t bytes_to_read, int64_t* bytes_read, bool* eosr) override;
+      int64_t bytes_to_read, int64_t* bytes_read, bool* eof) override;
   /// Reads from the DN cache. On success, sets cached_buffer_ to the DN
   /// buffer and returns a pointer to the underlying raw buffer.
   /// Returns nullptr if the data is not cached.
-  virtual void* CachedFile() override;
+  virtual void CachedFile(uint8_t** data, int64_t* length) override;
   virtual void Close() override;
   virtual void ResetState() override;
   virtual std::string DebugString() const override;

@@ -18,26 +18,44 @@
 #pragma once
 
 #include "runtime/io/file-reader.h"
+#include "runtime/io/request-ranges.h"
 
 namespace impala {
 namespace io {
 
-/// File reader class for the local file system.
-/// It uses the standard C APIs from stdio.h
-class LocalFileReader : public FileReader {
+/// Only for testing the code path when reading from the cache is successful.
+/// Takes a pointer to a buffer in its constructor, also the length of this buffer.
+/// CachedFile() simply returns the pointer and length.
+/// Invoking ReadFromPos() on it results in an error.
+class CacheReaderTestStub : public FileReader {
 public:
-  LocalFileReader(ScanRange* scan_range) : FileReader(scan_range) {}
-  ~LocalFileReader() {}
+  CacheReaderTestStub(ScanRange* scan_range, uint8_t* cache, int64_t length) :
+    FileReader(scan_range),
+    cache_(cache),
+    length_(length) {
+  }
 
-  virtual Status Open(bool use_file_handle_cache) override;
+  ~CacheReaderTestStub() {}
+
+  virtual Status Open(bool use_file_handle_cache) override {
+    return Status::OK();
+  }
+
   virtual Status ReadFromPos(int64_t file_offset, uint8_t* buffer,
-      int64_t bytes_to_read, int64_t* bytes_read, bool* eof) override;
-  /// We don't cache files of the local file system.
-  virtual void CachedFile(uint8_t** data, int64_t* length) override;
-  virtual void Close() override;
+      int64_t bytes_to_read, int64_t* bytes_read, bool* eof) override {
+    DCHECK(false);
+    return Status("Not implemented");
+  }
+
+  virtual void CachedFile(uint8_t** data, int64_t* length) override {
+    *length = length_;
+    *data = cache_;
+  }
+
+  virtual void Close() override {}
 private:
-  /// Points to a C FILE object between calls to Open() and Close(), otherwise nullptr.
-  FILE* file_ = nullptr;
+  uint8_t* cache_ = nullptr;
+  int64_t length_ = 0;
 };
 
 }

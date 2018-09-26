@@ -24,6 +24,7 @@
 #include "common/init.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
+#include "runtime/io/cache-reader-test-stub.h"
 #include "runtime/io/local-file-system-with-fault-injection.h"
 #include "runtime/io/disk-io-mgr-stress.h"
 #include "runtime/io/disk-io-mgr.h"
@@ -179,7 +180,7 @@ class DiskIoMgrTest : public testing::Test {
     }
     ASSERT_OK(range->GetNext(&buffer));
     ASSERT_TRUE(buffer != nullptr);
-    EXPECT_EQ(buffer->len(), range->len());
+    EXPECT_EQ(buffer->len(), range->bytes_to_read());
     if (expected_len < 0) expected_len = strlen(expected);
     int cmp = memcmp(buffer->buffer(), expected, expected_len);
     EXPECT_TRUE(cmp == 0);
@@ -190,6 +191,7 @@ class DiskIoMgrTest : public testing::Test {
       const char* expected, int expected_len, const Status& expected_status) {
     char result[expected_len + 1];
     memset(result, 0, expected_len + 1);
+    int64_t scan_range_offset = 0;
 
     while (true) {
       unique_ptr<BufferDescriptor> buffer;
@@ -200,8 +202,9 @@ class DiskIoMgrTest : public testing::Test {
         break;
       }
       ASSERT_LE(buffer->len(), expected_len);
-      memcpy(result + range->offset() + buffer->scan_range_offset(),
+      memcpy(result + range->offset() + scan_range_offset,
           buffer->buffer(), buffer->len());
+      scan_range_offset += buffer->len();
       range->ReturnBuffer(move(buffer));
     }
     ValidateEmptyOrCorrect(expected, result, expected_len);
@@ -229,11 +232,16 @@ class DiskIoMgrTest : public testing::Test {
     }
   }
 
+  static void SetReaderStub(ScanRange* scan_range, unique_ptr<FileReader> reader_stub) {
+    scan_range->SetFileReader(move(reader_stub));
+  }
+
   ScanRange* InitRange(ObjectPool* pool, const char* file_path, int offset, int len,
-      int disk_id, int64_t mtime, void* meta_data = nullptr, bool is_cached = false) {
+      int disk_id, int64_t mtime, void* meta_data = nullptr, bool is_cached = false,
+      std::vector<ScanRange::SubRange> sub_ranges = {}) {
     ScanRange* range = pool->Add(new ScanRange);
     range->Reset(nullptr, file_path, len, offset, disk_id, true,
-        BufferOpts(is_cached, mtime), meta_data);
+        BufferOpts(is_cached, mtime), move(sub_ranges), meta_data);
     EXPECT_EQ(mtime, range->mtime());
     return range;
   }
@@ -251,6 +259,12 @@ class DiskIoMgrTest : public testing::Test {
   void AddWriteRange(int num_of_writes, int32_t* data,
       const string& tmp_file, int offset, RequestContext* writer,
       const string& expected_output);
+
+  void SingleReaderTestBody(const char* data, const char* expected_result,
+      vector<ScanRange::SubRange> sub_ranges = {});
+
+  void CachedReadsTestBody(const char* data, const char* expected,
+      bool fake_cache, vector<ScanRange::SubRange> sub_ranges = {});
 
   /// Convenience function to get a reference to the buffer pool.
   BufferPool* buffer_pool() const { return ExecEnv::GetInstance()->buffer_pool(); }
@@ -522,13 +536,11 @@ TEST_F(DiskIoMgrTest, SingleWriterCancel) {
   buffer_pool()->DeregisterClient(&read_client);
 }
 
-// Basic test with a single reader, testing multiple threads, disks and a different
-// number of buffers.
-TEST_F(DiskIoMgrTest, SingleReader) {
-  InitRootReservation(LARGE_RESERVATION_LIMIT);
+void DiskIoMgrTest::SingleReaderTestBody(const char* data, const char* expected_result,
+    vector<ScanRange::SubRange> sub_ranges) {
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
-  const char* data = "abcdefghijklm";
-  int len = strlen(data);
+  int data_len = strlen(data);
+  int expected_result_len = strlen(expected_result);
   CreateTempFile(tmp_file, data);
 
   // Get mtime for file
@@ -554,9 +566,10 @@ TEST_F(DiskIoMgrTest, SingleReader) {
         unique_ptr<RequestContext> reader = io_mgr.RegisterContext();
 
         vector<ScanRange*> ranges;
-        for (int i = 0; i < len; ++i) {
+        for (int i = 0; i < data_len; ++i) {
           int disk_id = i % num_disks;
-          ranges.push_back(InitRange(&tmp_pool, tmp_file, 0, len, disk_id, stat_val.st_mtime));
+          ranges.push_back(InitRange(&tmp_pool, tmp_file, 0, data_len, disk_id,
+              stat_val.st_mtime, nullptr, false, sub_ranges));
         }
         ASSERT_OK(reader->AddScanRanges(ranges));
 
@@ -564,7 +577,8 @@ TEST_F(DiskIoMgrTest, SingleReader) {
         thread_group threads;
         for (int i = 0; i < num_read_threads; ++i) {
           threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader.get(),
-              &read_client, data, len, Status::OK(), 0, &num_ranges_processed));
+              &read_client, expected_result, expected_result_len, Status::OK(), 0,
+              &num_ranges_processed));
         }
         threads.join_all();
 
@@ -576,6 +590,23 @@ TEST_F(DiskIoMgrTest, SingleReader) {
     }
   }
   EXPECT_EQ(root_reservation_.GetChildReservations(), 0);
+}
+
+// Basic test with a single reader, testing multiple threads, disks and a different
+// number of buffers.
+TEST_F(DiskIoMgrTest, SingleReader) {
+  InitRootReservation(LARGE_RESERVATION_LIMIT);
+  const char* data = "abcdefghijklm";
+  SingleReaderTestBody(data, data);
+}
+
+TEST_F(DiskIoMgrTest, SingleReaderSubRanges) {
+  InitRootReservation(LARGE_RESERVATION_LIMIT);
+  const char* data = "abcdefghijklm";
+  int64_t data_len = strlen(data);
+  SingleReaderTestBody(data, data, {{0, data_len}});
+  SingleReaderTestBody(data, "abdef", {{0, 2}, {3, 3}});
+  SingleReaderTestBody(data, "bceflm", {{1, 2}, {4, 2}, {11, 2}});
 }
 
 // This test issues adding additional scan ranges while there are some still in flight.
@@ -872,14 +903,10 @@ TEST_F(DiskIoMgrTest, MemScarcity) {
   }
 }
 
-// Test when some scan ranges are marked as being cached.
-// Since these files are not in HDFS, the cached path always fails so this
-// only tests the fallback mechanism.
-// TODO: we can fake the cached read path without HDFS
-TEST_F(DiskIoMgrTest, CachedReads) {
-  InitRootReservation(LARGE_RESERVATION_LIMIT);
+void DiskIoMgrTest::CachedReadsTestBody(const char* data, const char* expected,
+    bool fake_cache, vector<ScanRange::SubRange> sub_ranges) {
   const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
-  const char* data = "abcdefghijklm";
+  uint8_t* cached_data = reinterpret_cast<uint8_t*>(const_cast<char*>(data));
   int len = strlen(data);
   CreateTempFile(tmp_file, data);
 
@@ -898,17 +925,26 @@ TEST_F(DiskIoMgrTest, CachedReads) {
     unique_ptr<RequestContext> reader = io_mgr.RegisterContext();
 
     ScanRange* complete_range =
-        InitRange(&pool_, tmp_file, 0, strlen(data), 0, stat_val.st_mtime, nullptr, true);
+        InitRange(&pool_, tmp_file, 0, strlen(data), 0, stat_val.st_mtime, nullptr, true,
+            sub_ranges);
+    if (fake_cache) {
+      SetReaderStub(complete_range, make_unique<CacheReaderTestStub>(
+          complete_range, cached_data, len));
+    }
 
     // Issue some reads before the async ones are issued
-    ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, data);
-    ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, data);
+    ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, expected);
+    ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, expected);
 
     vector<ScanRange*> ranges;
     for (int i = 0; i < len; ++i) {
       int disk_id = i % num_disks;
-      ranges.push_back(
-          InitRange(&pool_, tmp_file, 0, len, disk_id, stat_val.st_mtime, nullptr, true));
+      ScanRange* range = InitRange(&pool_, tmp_file, 0, len, disk_id, stat_val.st_mtime,
+          nullptr, true, sub_ranges);
+      ranges.push_back(range);
+      if (fake_cache) {
+        SetReaderStub(range, make_unique<CacheReaderTestStub>(range, cached_data, len));
+      }
     }
     ASSERT_OK(reader->AddScanRanges(ranges));
 
@@ -916,19 +952,19 @@ TEST_F(DiskIoMgrTest, CachedReads) {
     thread_group threads;
     for (int i = 0; i < 5; ++i) {
       threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader.get(), &read_client,
-          data, strlen(data), Status::OK(), 0, &num_ranges_processed));
+          expected, strlen(expected), Status::OK(), 0, &num_ranges_processed));
     }
 
     // Issue some more sync ranges
     for (int i = 0; i < 5; ++i) {
       sched_yield();
-      ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, data);
+      ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, expected);
     }
 
     threads.join_all();
 
-    ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, data);
-    ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, data);
+    ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, expected);
+    ValidateSyncRead(&io_mgr, reader.get(), &read_client, complete_range, expected);
 
     EXPECT_EQ(num_ranges_processed.Load(), ranges.size());
     io_mgr.UnregisterContext(reader.get());
@@ -936,6 +972,32 @@ TEST_F(DiskIoMgrTest, CachedReads) {
     buffer_pool()->DeregisterClient(&read_client);
   }
   EXPECT_EQ(root_reservation_.GetChildReservations(), 0);
+}
+
+// Test when some scan ranges are marked as being cached.
+TEST_F(DiskIoMgrTest, CachedReads) {
+  InitRootReservation(LARGE_RESERVATION_LIMIT);
+  const char* data = "abcdefghijklm";
+  // Don't fake the cache, i.e. test the fallback mechanism
+  CachedReadsTestBody(data, data, false);
+  // Fake the test with a file reader stub.
+  CachedReadsTestBody(data, data, true);
+}
+
+// Test when some scan ranges are marked as being cached and there
+// are sub-ranges as well.
+TEST_F(DiskIoMgrTest, CachedReadsSubRanges) {
+  InitRootReservation(LARGE_RESERVATION_LIMIT);
+  const char* data = "abcdefghijklm";
+  int64_t data_len = strlen(data);
+
+  // first iteration tests the fallback mechanism with sub-ranges
+  // second iteration fakes a cache
+  for (bool fake_cache : {false, true}) {
+    CachedReadsTestBody(data, data, fake_cache, {{0, data_len}});
+    CachedReadsTestBody(data, "bc", fake_cache, {{1, 2}});
+    CachedReadsTestBody(data, "abchilm", fake_cache, {{0, 3}, {7, 2}, {11, 2}});
+  }
 }
 
 TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
@@ -1395,6 +1457,63 @@ TEST_F(DiskIoMgrTest, ReadIntoClientBuffer) {
     // DiskIoMgr should not have allocated memory.
     EXPECT_EQ(root_reservation_.GetChildReservations(), 0);
     range->ReturnBuffer(move(io_buffer));
+  }
+
+  io_mgr->UnregisterContext(reader.get());
+  EXPECT_EQ(root_reservation_.GetChildReservations(), 0);
+}
+
+// Test reading into a client-allocated buffer using sub-ranges.
+TEST_F(DiskIoMgrTest, ReadIntoClientBufferSubRanges) {
+  InitRootReservation(LARGE_RESERVATION_LIMIT);
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "the quick brown fox jumped over the lazy dog";
+  uint8_t* cache = reinterpret_cast<uint8_t*>(const_cast<char*>(data));
+  int data_len = strlen(data);
+  int read_len = 4; // Make buffer size smaller than client-provided buffer.
+  CreateTempFile(tmp_file, data);
+
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
+  scoped_ptr<DiskIoMgr> io_mgr(new DiskIoMgr(1, 1, 1, read_len, read_len));
+  ASSERT_OK(io_mgr->Init());
+  // Reader doesn't need to provide client if it's providing buffers.
+  unique_ptr<RequestContext> reader = io_mgr->RegisterContext();
+
+  auto test_case = [&](bool fake_cache, const char* expected_result,
+      vector<ScanRange::SubRange> sub_ranges) {
+    int result_len = strlen(expected_result);
+    vector<uint8_t> client_buffer(result_len);
+    ScanRange* range = pool_.Add(new ScanRange);
+    range->Reset(nullptr, tmp_file, data_len, 0, 0, true,
+        BufferOpts::ReadInto(fake_cache, stat_val.st_mtime, client_buffer.data(),
+            result_len), move(sub_ranges));
+    if (fake_cache) {
+      SetReaderStub(range, make_unique<CacheReaderTestStub>(range, cache, data_len));
+    }
+    bool needs_buffers;
+    ASSERT_OK(reader->StartScanRange(range, &needs_buffers));
+    ASSERT_FALSE(needs_buffers);
+
+    unique_ptr<BufferDescriptor> io_buffer;
+    ASSERT_OK(range->GetNext(&io_buffer));
+    ASSERT_TRUE(io_buffer->eosr());
+    ASSERT_EQ(result_len, io_buffer->len());
+    ASSERT_EQ(client_buffer.data(), io_buffer->buffer());
+    ASSERT_EQ(memcmp(io_buffer->buffer(), expected_result, result_len), 0);
+
+    // DiskIoMgr should not have allocated memory.
+    EXPECT_EQ(root_reservation_.GetChildReservations(), 0);
+    range->ReturnBuffer(move(io_buffer));
+  };
+
+  for (bool fake_cache : {false, true}) {
+    test_case(fake_cache, data, {{0, data_len}});
+    test_case(fake_cache, data, {{0, 15}, {15, data_len - 15}});
+    test_case(fake_cache, "quick fox", {{4, 5}, {15, 4}});
+    test_case(fake_cache, "the brown dog", {{0, 3}, {9, 6}, {data_len - 4, 4}});
   }
 
   io_mgr->UnregisterContext(reader.get());

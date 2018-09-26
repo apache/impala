@@ -60,9 +60,6 @@ class BufferDescriptor {
   int64_t len() { return len_; }
   bool eosr() { return eosr_; }
 
-  /// Returns the offset within the scan range that this buffer starts at
-  int64_t scan_range_offset() const { return scan_range_offset_; }
-
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferDescriptor);
   /// This class is tightly coupled with ScanRange. Making them friends is easiest.
@@ -100,8 +97,6 @@ class BufferDescriptor {
 
   /// true if the current scan range is complete
   bool eosr_ = false;
-
-  int64_t scan_range_offset_ = 0;
 
   // Handle to an allocated buffer and the client used to allocate it buffer. Only used
   // for non-external buffers.
@@ -191,6 +186,15 @@ struct BufferOpts {
     return BufferOpts(false, NEVER_CACHE, client_buffer, client_buffer_len);
   }
 
+  /// Use only when you don't want to to read the entire scan range, but only sub-ranges
+  /// in it. In this case you can copy the relevant parts from the HDFS cache into the
+  /// client buffer. The length of the buffer, 'client_buffer_len' must fit the
+  /// concatenation of all the sub-ranges.
+  static BufferOpts ReadInto(bool try_cache, int64_t mtime, uint8_t* client_buffer,
+      int64_t client_buffer_len) {
+    return BufferOpts(try_cache, mtime, client_buffer, client_buffer_len);
+  }
+
  private:
   friend class ScanRange;
   friend class HdfsFileReader;
@@ -227,6 +231,12 @@ class ScanRange : public RequestRange {
 
   virtual ~ScanRange();
 
+  /// Defines an internal range within this ScanRange.
+  struct SubRange {
+    int64_t offset;
+    int64_t length;
+  };
+
   /// Resets this scan range object with the scan range description. The scan range
   /// is for bytes [offset, offset + len) in 'file' on 'fs' (which is nullptr for the
   /// local filesystem). The scan range must be non-empty and fall within the file bounds
@@ -238,10 +248,17 @@ class ScanRange : public RequestRange {
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
       bool expected_local, const BufferOpts& buffer_opts, void* meta_data = nullptr);
 
+  /// Same as above, but it also adds sub-ranges. No need to merge contiguous sub-ranges
+  /// in advance, as this method will do the merge.
+  void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
+      bool expected_local, const BufferOpts& buffer_opts,
+      std::vector<SubRange>&& sub_ranges, void* meta_data = nullptr);
+
   void* meta_data() const { return meta_data_; }
   bool try_cache() const { return try_cache_; }
   bool read_in_flight() const { return read_in_flight_; }
   bool expected_local() const { return expected_local_; }
+  int64_t bytes_to_read() const { return bytes_to_read_; }
 
   /// Returns the next buffer for this scan range. buffer is an output parameter.
   /// This function blocks until a buffer is ready or an error occurred. If this is
@@ -269,7 +286,7 @@ class ScanRange : public RequestRange {
 
   int64_t mtime() const { return mtime_; }
 
-  int BytesRead() const;
+  bool HasSubRanges() const { return !sub_ranges_.empty(); }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(ScanRange);
@@ -279,6 +296,7 @@ class ScanRange : public RequestRange {
   friend class BufferDescriptor;
   friend class DiskQueue;
   friend class DiskIoMgr;
+  friend class DiskIoMgrTest;
   friend class RequestContext;
   friend class HdfsFileReader;
   friend class LocalFileReader;
@@ -344,6 +362,9 @@ class ScanRange : public RequestRange {
   /// while any thread is inside a critical section.
   Status cancel_status_;
 
+  /// Only for testing
+  void SetFileReader(std::unique_ptr<FileReader> file_reader);
+
   /// END: private members that are accessed by other io:: classes
   /////////////////////////////////////////
 
@@ -383,9 +404,27 @@ class ScanRange : public RequestRange {
     return !cancel_status_.ok() || (eosr_queued_ && ready_buffers_.empty());
   }
 
+  /// Adds sub-ranges to this ScanRange. If sub_ranges is not empty, then ScanRange won't
+  /// read everything from its range, but will only read these sub-ranges.
+  /// Sub-ranges need to be ordered by 'offset' and cannot overlap with each other.
+  /// Doesn't need to merge continuous sub-ranges in advance, this method will do.
+  void InitSubRanges(std::vector<SubRange>&& sub_ranges);
+
+  /// Read the sub-ranges into buffer and track the current position in 'sub_range_pos_'.
+  /// If cached data is available, then memcpy() from it instead of actually reading the
+  /// files.
+  Status ReadSubRanges(BufferDescriptor* buffer, bool* eof);
+
   /// Validates the internal state of this range. lock_ must be taken
   /// before calling this.
   bool Validate();
+
+  /// Validates the sub-ranges. All sub-range must be inside of this ScanRange.
+  /// They need to be ordered by offset and cannot overlap.
+  bool ValidateSubRanges();
+
+  /// Merges adjacent and continuous sub-ranges.
+  void MergeSubRanges();
 
   /// Pointer to caller specified metadata. This is untouched by the io manager
   /// and the caller can put whatever auxiliary data in here.
@@ -418,18 +457,26 @@ class ScanRange : public RequestRange {
   /// Valid if the 'external_buffer_tag_' is CLIENT_BUFFER.
   struct {
     /// Client-provided buffer to read the whole scan range into.
-    uint8_t* data;
+    uint8_t* data = nullptr;
 
     /// Length of the client-provided buffer.
-    int64_t len;
+    int64_t len = 0;
   } client_buffer_;
+
+  /// Valid if reading file contents from cache was successful.
+  struct {
+    /// Pointer to the contents of the file.
+    uint8_t* data = nullptr;
+    /// Length of the contents.
+    int64_t len = 0;
+  } cache_;
 
   /// The number of buffers that have been returned to a client via GetNext() that have
   /// not yet been returned with ReturnBuffer().
   AtomicInt32 num_buffers_in_reader_{0};
 
   /// Lock protecting fields below.
-  /// This lock should not be taken during Open()/Read()/Close().
+  /// This lock should not be taken during FileReader::Open()/Read()/Close().
   /// If RequestContext::lock_ and this lock need to be held simultaneously,
   /// RequestContext::lock_ must be taken first.
   boost::mutex lock_;
@@ -475,8 +522,30 @@ class ScanRange : public RequestRange {
   /// cancelled.
   ConditionVariable buffer_ready_cv_;
 
+  /// Number of bytes read by this scan range.
+  int64_t bytes_read_ = 0;
+
   /// Polymorphic object that is responsible for doing file operations.
   std::unique_ptr<FileReader> file_reader_;
+
+  /// If not empty, the ScanRange will only read these parts from the file.
+  std::vector<SubRange> sub_ranges_;
+
+  // Read position in the sub-ranges.
+  struct SubRangePosition {
+    /// Index of SubRange in 'ScanRange::sub_ranges_' to read next
+    int64_t index = 0;
+    /// Bytes already read from 'ScanRange::sub_ranges_[sub_range_index]'
+    int64_t bytes_read = 0;
+  };
+
+  /// Current read position in the sub-ranges.
+  SubRangePosition sub_range_pos_;
+
+  /// Number of bytes need to be read by this ScanRange. If there are no sub-ranges it
+  /// equals to 'len_'. If there are sub-ranges then it equals to the sum of the lengths
+  /// of the sub-ranges (which is less than or equal to 'len_').
+  int64_t bytes_to_read_ = 0;
 };
 
 /// Used to specify data to be written to a file and offset.
