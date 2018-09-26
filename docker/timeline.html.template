@@ -104,32 +104,61 @@ function drawChart() {
   // timeofday isn't supported here
   dataTable.addColumn({ type: 'datetime', id: 'Start' });
   dataTable.addColumn({ type: 'datetime', id: 'End' });
+
+  // Extract the build name, which is a common prefix of the container names.
+  // Add one to the length we know that the driver script adds a hyphen when building
+  //the container names.
+  var buildnamePrefix = data.buildname;
+  var commonPrefix = buildnamePrefix.length + 1;
   // Timeline
+  const rowLabels = new Set();
   for (i = 0; i < data.timeline.length; ++i) {
     var row = data.timeline[i];
-    dataTable.addRow([ row[0], row[1], ts_to_date(row[2]), ts_to_date(row[3]) ]);
+    // Hack up the label in row[0]: cut off the common prefix, which is the build
+    // name. This is the same for all shards, so it is not useful for the charts.
+    var rowLabel = row[0].slice(commonPrefix);
+    if (rowLabel == "") rowLabel = ' -- ';
+    dataTable.addRow([ rowLabel, row[1], ts_to_date(row[2]), ts_to_date(row[3]) ]);
+    rowLabels.add(rowLabel);
   }
-  chart.draw(dataTable, { height: "400px" } );
+  // Precompute timeline height to get rid of the timeline's own scrollbar.
+  const laneHeight = 41;
+  const axisHeight = 50;
+
+  timelineHeight = rowLabels.size * laneHeight + axisHeight;
+  var options = {
+    // Width is specified in the <div> tag below; for some reason it doesn't have the
+    // same effect when specified here.
+    // Height is precomputed from the incoming data, so we set it here.
+    height: timelineHeight,
+    timeline: { showRowLabels : 'true' }
+  };
+  chart.draw(dataTable, options);
 
   for (const k of Object.keys(data.metrics)) {
     var lineChart = document.createElement("div");
     lineChartContainer.appendChild(lineChart);
 
     var dataTable = new google.visualization.DataTable();
-    dataTable.addColumn({ type: 'timeofday', id: 'Time' });
-    dataTable.addColumn({ type: 'number', id: 'User' });
-    dataTable.addColumn({ type: 'number', id: 'System' });
+    dataTable.addColumn({ type: 'timeofday', label: 'Time', id: 'Time' });
+    dataTable.addColumn({ type: 'number', label: 'User', id: 'User' });
+    dataTable.addColumn({ type: 'number', label: 'System', id: 'System' });
 
     for (const row of data.metrics[k]) {
       dataTable.addRow([ ts_to_hms(row[0]), row[1], row[2] ]);
     }
+    // De-clutter the timeline labels: Slice off the common prefix of the build name
+    var title = k.slice(commonPrefix);
+    if (title == "") title = ' -- ';
     var options = {
-      title: 'CPU',
+      title: 'CPU: ' + title,
       legend: { position: 'bottom' },
       hAxis: {
         minValue: [0, 0, 0],
         maxValue: ts_to_hms(data.max_ts)
-      }
+      },
+      // Stretch the CPU graph a bit wider than the default
+      chartArea: {width: '95%'},
     };
 
     var chart = new google.visualization.LineChart(lineChart);
@@ -137,5 +166,7 @@ function drawChart() {
   }
 }
 </script>
-<div id="timelineContainer" style="height: 400px;"></div>
+<!-- Set width here, but leave height unset,
+     it is computed above in the JavaScript code. -->
+<div id="timelineContainer" style="width: 99%;"></div>
 <div id="lineChartContainer" style="height: 200px;"></div>

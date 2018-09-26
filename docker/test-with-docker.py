@@ -616,7 +616,7 @@ class TestWithDocker(object):
   def _create_build_image(self):
     """Creates the "build image", with Impala compiled and data loaded."""
     container = self._create_container(
-        image="ubuntu:16.04", name=self.name,
+        image="ubuntu:16.04", name=self.name + "-build",
         logdir="build",
         logname="log-build.txt",
         # entrypoint.sh will create a user with our uid; this
@@ -709,7 +709,8 @@ class TestWithDocker(object):
     timeline = monitor.Timeline(
         monitor_file=self.monitoring_output_file,
         containers=self.containers,
-        interesting_re=self._INTERESTING_RE)
+        interesting_re=self._INTERESTING_RE,
+        buildname=self.name)
     timeline.create(os.path.join(self.log_dir, "timeline.html"))
 
   def log_summary(self):

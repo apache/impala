@@ -217,10 +217,11 @@ class Timeline(object):
   the charts, which happens in the browser.
   """
 
-  def __init__(self, monitor_file, containers, interesting_re):
+  def __init__(self, monitor_file, containers, interesting_re, buildname):
     self.monitor_file = monitor_file
     self.containers = containers
     self.interesting_re = interesting_re
+    self.buildname = buildname
 
   def logfile_timeline(self, container):
     """Returns a list of (name, timestamp, line) tuples for interesting lines in
@@ -340,7 +341,7 @@ class Timeline(object):
       template_path = os.path.join(os.path.dirname(__file__), "timeline.html.template")
       shutil.copyfileobj(file(template_path), o)
       o.write("\n<script>\nvar data = \n")
-      json.dump(dict(timeline=timeline_json, metrics=metrics_by_container,
-                     max_ts=(max_metric_ts - min_ts)), o, indent=2)
+      json.dump(dict(buildname=self.buildname, timeline=timeline_json,
+          metrics=metrics_by_container, max_ts=(max_metric_ts - min_ts)), o, indent=2)
       o.write("</script>")
       o.close()
