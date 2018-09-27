@@ -115,6 +115,10 @@ public class BackendConfig {
     return backendCfg_.invalidate_tables_fraction_on_memory_pressure;
   }
 
+  public int getLocalCatalogMaxFetchRetries() {
+    return backendCfg_.local_catalog_max_fetch_retries;
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

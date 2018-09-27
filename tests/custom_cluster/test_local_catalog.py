@@ -24,7 +24,7 @@ import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
-RETRY_PROFILE_MSG = 'Retrying query planning due to inconsistent metadata'
+RETRY_PROFILE_MSG = 'Retried query planning due to inconsistent metadata'
 
 class TestCompactCatalogUpdates(CustomClusterTestSuite):
 
@@ -224,6 +224,57 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
         t.join(30)
       assert replans_seen[0] > 0, "Did not trigger any re-plans"
 
+    finally:
+      client1.close()
+      client2.close()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true --local_catalog_max_fetch_retries=0",
+      catalogd_args="--catalog_topic_mode=minimal")
+  def test_replan_limit(self, unique_database):
+    """
+    Tests that the flag to limit the number of retries works and that
+    an inconsistent metadata exception when running concurrent reads/writes
+    is seen. With the max retries set to 0, no retries are expected and with
+    the concurrent read/write workload, an inconsistent metadata exception is
+    expected.
+    """
+    try:
+      client1 = self.cluster.impalads[0].service.create_beeswax_client()
+      client2 = self.cluster.impalads[1].service.create_beeswax_client()
+
+      # Keeps track of the inconsistent exceptions seen. A mutable container
+      # is used by multiple threads to update this state.
+      inconsistency_seen = [0]
+      inconsistency_seen_lock = threading.Lock()
+
+      def stress_thread(client):
+        # Each thread picks one of these queries. The queries, accessing
+        # a subset of partitions, will detect version skew when the refresh
+        # is concurrently run. An inconsistent metadata exception will be
+        # thrown because of the version skew.
+        while inconsistency_seen[0] == 0:
+          q = random.choice([
+            'refresh functional.alltypes',
+            'select count(*) from functional.alltypes where month=4',
+            'select count(*) from functional.alltypes where month=5'])
+          try:
+            ret = self.execute_query_unchecked(client, q)
+            # Since the max retries is 0, we should never retry.
+            assert RETRY_PROFILE_MSG not in ret.runtime_profile
+          except Exception as e:
+            if 'InconsistentMetadataFetchException' in str(e):
+              with inconsistency_seen_lock:
+                inconsistency_seen[0] += 1
+
+      threads = [threading.Thread(target=stress_thread, args=(c,))
+                 for c in [client1, client2]]
+      for t in threads:
+        t.start()
+      for t in threads:
+        t.join(10)
+      assert inconsistency_seen[0] > 0, "Did not observe inconsistent metadata"
     finally:
       client1.close()
       client2.close()

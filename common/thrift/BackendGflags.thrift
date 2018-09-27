@@ -97,4 +97,6 @@ struct TBackendGflags {
   35: required double invalidate_tables_gc_old_gen_full_threshold
 
   36: required double invalidate_tables_fraction_on_memory_pressure
+
+  37: required i32 local_catalog_max_fetch_retries
 }

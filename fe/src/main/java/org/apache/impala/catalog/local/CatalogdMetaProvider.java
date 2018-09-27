@@ -346,8 +346,8 @@ public class CatalogdMetaProvider implements MetaProvider {
       case TABLE_NOT_FOUND:
         invalidateCacheForObject(req.object_desc);
         throw new InconsistentMetadataFetchException(
-            String.format("Fetching {} failed. Could not find {}",
-                req.object_desc.type.name(), resp.lookup_status.name()));
+            String.format("Fetching %s failed. Could not find %s",
+                req.object_desc.type.name(), req.object_desc.toString()));
       default: break;
     }
     Preconditions.checkState(resp.lookup_status == CatalogLookupStatus.OK);

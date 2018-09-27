@@ -174,7 +174,8 @@ public class Frontend {
   private static final int AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS = 5 * 60;
 
   // Maximum number of times to retry a query if it fails due to inconsistent metadata.
-  private static final int INCONSISTENT_METADATA_NUM_RETRIES = 10;
+  private static final int INCONSISTENT_METADATA_NUM_RETRIES =
+      BackendConfig.INSTANCE.getLocalCatalogMaxFetchRetries();
 
   private final FeCatalogManager catalogManager_;
   private final AuthorizationConfig authzConfig_;
@@ -1070,29 +1071,42 @@ public class Frontend {
     }
   }
 
+  /**
+   * Marks 'timeline' with the number of query planning retries that were needed.
+   * Includes a 'msg' that explains the cause of retries. If there were no retries, then
+   * 'timeline' is not written.
+   */
+  private void markTimelineRetries(int numRetries, String msg, EventSequence timeline) {
+    if (numRetries == 0) return;
+    timeline.markEvent(
+        String.format("Retried query planning due to inconsistent metadata "
+            + "%s of %s times: ",numRetries, INCONSISTENT_METADATA_NUM_RETRIES) + msg);
+  }
+
   private TExecRequest getTExecRequest(TQueryCtx queryCtx, EventSequence timeline,
       StringBuilder explainString) throws ImpalaException {
     LOG.info("Analyzing query: " + queryCtx.client_request.stmt);
 
     int attempt = 0;
+    String retryMsg = "";
     while (true) {
       try {
-        return doCreateExecRequest(queryCtx, timeline, explainString);
+        TExecRequest req = doCreateExecRequest(queryCtx, timeline, explainString);
+        markTimelineRetries(attempt, retryMsg, timeline);
+        return req;
       } catch (InconsistentMetadataFetchException e) {
         if (attempt++ == INCONSISTENT_METADATA_NUM_RETRIES) {
+          markTimelineRetries(attempt, e.getMessage(), timeline);
           throw e;
         }
         if (attempt > 1) {
           // Back-off a bit on later retries.
           Uninterruptibles.sleepUninterruptibly(200 * attempt, TimeUnit.MILLISECONDS);
         }
-        timeline.markEvent(
-            String.format("Retrying query planning due to inconsistent metadata "
-                    + "fetch, attempt %s of %s: ",
-                attempt, INCONSISTENT_METADATA_NUM_RETRIES)
-            + e.getMessage());
-        LOG.warn("Retrying plan of query {}: {} (retry #{})",
-            queryCtx.client_request.stmt, e.getMessage(), attempt);
+        retryMsg = e.getMessage();
+        LOG.warn("Retrying plan of query {}: {} (retry #{} of {})",
+            queryCtx.client_request.stmt, retryMsg, attempt,
+            INCONSISTENT_METADATA_NUM_RETRIES);
       }
     }
   }

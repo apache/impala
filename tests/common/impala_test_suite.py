@@ -554,6 +554,10 @@ class ImpalaTestSuite(BaseTestSuite):
     return result
 
   @execute_wrapper
+  def execute_query_unchecked(self, impalad_client, query, query_options=None, user=None):
+    return self.__execute_query(impalad_client, query, query_options, user)
+
+  @execute_wrapper
   def execute_query(self, query, query_options=None):
     return self.__execute_query(self.client, query, query_options)
 

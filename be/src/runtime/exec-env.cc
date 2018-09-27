@@ -94,6 +94,10 @@ DEFINE_int32_hidden(local_catalog_cache_expiration_s, 60 * 60,
     "of the catalog cache within each impalad. Even if the configured "
     "cache capacity has not been reached, items are removed from the cache "
     "if they have not been accessed in this amount of time.");
+DEFINE_int32_hidden(local_catalog_max_fetch_retries, 40,
+    "If --use_local_catalog is enabled, configures the maximum number of times "
+    "the frontend retries when fetching a metadata object from the impalad "
+    "coordinator's local catalog cache.");
 
 DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);
