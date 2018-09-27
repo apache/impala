@@ -923,12 +923,12 @@ class HashTable {
   RuntimeState* state_;
 
   /// Suballocator to allocate data pages and hash table buckets with.
-  Suballocator* allocator_;
+  Suballocator* const allocator_;
 
   /// Stream contains the rows referenced by the hash table. Can be NULL if the
   /// row only contains a single tuple, in which case the TupleRow indirection
   /// is removed by the hash table.
-  BufferedTupleStream* tuple_stream_;
+  BufferedTupleStream* const tuple_stream_;
 
   /// Constants on how the hash table should behave.
 
@@ -946,62 +946,57 @@ class HashTable {
   std::vector<std::unique_ptr<Suballocation>> data_pages_;
 
   /// Byte size of all buffers in data_pages_.
-  int64_t total_data_page_size_;
+  int64_t total_data_page_size_ = 0;
 
   /// Next duplicate node to insert. Vaild when node_remaining_current_page_ > 0.
-  DuplicateNode* next_node_;
+  DuplicateNode* next_node_ = nullptr;
 
   /// Number of nodes left in the current page.
-  int node_remaining_current_page_;
+  int node_remaining_current_page_ = 0;
 
   /// Number of duplicate nodes.
-  int64_t num_duplicate_nodes_;
+  int64_t num_duplicate_nodes_ = 0;
 
-  const int64_t max_num_buckets_;
+  const int64_t max_num_buckets_ = 0;
 
   /// Allocation containing all buckets.
   std::unique_ptr<Suballocation> bucket_allocation_;
 
   /// Pointer to the 'buckets_' array from 'bucket_allocation_'.
-  Bucket* buckets_;
+  Bucket* buckets_ = nullptr;
 
   /// Total number of buckets (filled and empty).
   int64_t num_buckets_;
 
   /// Number of non-empty buckets.  Used to determine when to resize.
-  int64_t num_filled_buckets_;
+  int64_t num_filled_buckets_ = 0;
 
   /// Number of (non-empty) buckets with duplicates. These buckets do not point to slots
   /// in the tuple stream, rather than to a linked list of Nodes.
-  int64_t num_buckets_with_duplicates_;
+  int64_t num_buckets_with_duplicates_ = 0;
 
   /// Number of build tuples, used for constructing temp row* for probes.
   const int num_build_tuples_;
 
   /// Flag used to check that we don't lose stored matches when spilling hash tables
   /// (IMPALA-1488).
-  bool has_matches_;
+  bool has_matches_ = false;
 
   /// The stats below can be used for debugging perf.
-  /// TODO: Should we make these statistics atomic?
-  /// Number of FindProbeRow(), Insert(), or FindBuildRowBucket() calls that probe the
-  /// hash table.
-  int64_t num_probes_;
-
-  /// Number of probes that failed and had to fall back to linear probing without cap.
-  int64_t num_failed_probes_;
+  /// Number of Probe() calls that probe the hash table.
+  int64_t num_probes_ = 0;
 
   /// Total distance traveled for each probe. That is the sum of the diff between the end
   /// position of a probe (find/insert) and its start position
   /// (hash & (num_buckets_ - 1)).
-  int64_t travel_length_;
+  int64_t travel_length_ = 0;
 
   /// The number of cases where we had to compare buckets with the same hash value, but
   /// the row equality failed.
-  int64_t num_hash_collisions_;
+  int64_t num_hash_collisions_ = 0;
 
   /// How many times this table has resized so far.
-  int64_t num_resizes_;
+  int64_t num_resizes_ = 0;
 };
 
 }

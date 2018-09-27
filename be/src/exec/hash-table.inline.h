@@ -54,6 +54,7 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
   DCHECK(buckets != NULL);
   DCHECK_GT(num_buckets, 0);
   *found = false;
+  ++num_probes_;
   int64_t bucket_idx = hash & (num_buckets - 1);
 
   // In case of linear probing it counts the total number of steps for statistics and
@@ -92,7 +93,6 @@ inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
 
 inline HashTable::HtData* HashTable::InsertInternal(
     HashTableCtx* ht_ctx, Status* status) {
-  ++num_probes_;
   bool found = false;
   uint32_t hash = ht_ctx->expr_values_cache()->CurExprValuesHash();
   int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, &found);
@@ -135,7 +135,6 @@ inline void HashTable::PrefetchBucket(uint32_t hash) {
 }
 
 inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx) {
-  ++num_probes_;
   bool found = false;
   uint32_t hash = ht_ctx->expr_values_cache()->CurExprValuesHash();
   int64_t bucket_idx = Probe<false>(buckets_, num_buckets_, ht_ctx, hash, &found);
@@ -149,7 +148,6 @@ inline HashTable::Iterator HashTable::FindProbeRow(HashTableCtx* ht_ctx) {
 // TODO: support lazy evaluation like HashTable::Insert().
 inline HashTable::Iterator HashTable::FindBuildRowBucket(
     HashTableCtx* ht_ctx, bool* found) {
-  ++num_probes_;
   uint32_t hash = ht_ctx->expr_values_cache()->CurExprValuesHash();
   int64_t bucket_idx = Probe<true>(buckets_, num_buckets_, ht_ctx, hash, found);
   DuplicateNode* duplicates = NULL;

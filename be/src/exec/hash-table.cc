@@ -381,19 +381,9 @@ HashTable::HashTable(bool quadratic_probing, Suballocator* allocator,
     stores_tuples_(num_build_tuples == 1),
     stores_duplicates_(stores_duplicates),
     quadratic_probing_(quadratic_probing),
-    total_data_page_size_(0),
-    next_node_(NULL),
-    node_remaining_current_page_(0),
-    num_duplicate_nodes_(0),
     max_num_buckets_(max_num_buckets),
-    buckets_(NULL),
     num_buckets_(num_buckets),
-    num_filled_buckets_(0),
-    num_buckets_with_duplicates_(0),
-    num_build_tuples_(num_build_tuples),
-    has_matches_(false),
-    num_probes_(0), num_failed_probes_(0), travel_length_(0), num_hash_collisions_(0),
-    num_resizes_(0) {
+    num_build_tuples_(num_build_tuples) {
   DCHECK_EQ((num_buckets & (num_buckets - 1)), 0) << "num_buckets must be a power of 2";
   DCHECK_GT(num_buckets, 0) << "num_buckets must be larger than 0";
   DCHECK(stores_tuples_ || stream != NULL);
@@ -568,7 +558,6 @@ string HashTable::PrintStats() const {
   ss << "Duplicates: " << num_buckets_with_duplicates_ << " buckets "
      << num_duplicate_nodes_ << " nodes" << endl;
   ss << "Probes: " << num_probes_ << endl;
-  ss << "FailedProbes: " << num_failed_probes_ << endl;
   ss << "Travel: " << travel_length_ << " " << avg_travel << endl;
   ss << "HashCollisions: " << num_hash_collisions_ << " " << avg_collisions << endl;
   ss << "Resizes: " << num_resizes_ << endl;
