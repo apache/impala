@@ -115,6 +115,13 @@ static unique_ptr<impala::Thread> memory_maintenance_thread;
 // time slept. If that exceeds PAUSE_WARN_THRESHOLD_MS, a warning is logged.
 static unique_ptr<impala::Thread> pause_monitor;
 
+// Thread only used in backend tests to implement a test timeout.
+static unique_ptr<impala::Thread> be_timeout_thread;
+
+// Timeout after 2 hours - backend tests should generally run in minutes or tens of
+// minutes at worst.
+static const int64_t BE_TEST_TIMEOUT_S = 60L * 60L * 2L;
+
 [[noreturn]] static void LogMaintenanceThread() {
   while (true) {
     sleep(FLAGS_logbufsecs);
@@ -236,9 +243,20 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
       &LogMaintenanceThread, &log_maintenance_thread);
   if (!thread_spawn_status.ok()) CLEAN_EXIT_WITH_ERROR(thread_spawn_status.GetDetail());
 
-  thread_spawn_status = Thread::Create("common", "pause-monitor",
-      &PauseMonitorLoop, &pause_monitor);
+  thread_spawn_status =
+      Thread::Create("common", "pause-monitor", &PauseMonitorLoop, &pause_monitor);
   if (!thread_spawn_status.ok()) CLEAN_EXIT_WITH_ERROR(thread_spawn_status.GetDetail());
+
+  // Implement timeout for backend tests.
+  if (impala::TestInfo::is_be_test()) {
+    thread_spawn_status = Thread::Create("common", "be-test-timeout-thread",
+        []() {
+          SleepForMs(BE_TEST_TIMEOUT_S * 1000L);
+          LOG(FATAL) << "Backend test timed out after " << BE_TEST_TIMEOUT_S << "s";
+        },
+        &be_timeout_thread);
+    if (!thread_spawn_status.ok()) CLEAN_EXIT_WITH_ERROR(thread_spawn_status.GetDetail());
+  }
 
   PeriodicCounterUpdater::Init();
 

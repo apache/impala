@@ -33,6 +33,7 @@ class TestInfo {
   /// Called in InitCommonRuntime().
   static void Init(Mode mode) { mode_ = mode; }
 
+  static bool is_be_test() { return mode_ == BE_TEST; }
   static bool is_fe_test() { return mode_ == FE_TEST; }
   static bool is_test() { return mode_ == BE_TEST || mode_ == FE_TEST; }
 

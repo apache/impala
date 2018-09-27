@@ -24,7 +24,7 @@
 
 // Wrapper around gtest's ASSERT_DEBUG_DEATH that prevents coredumps and minidumps
 // being generated as the result of the death test.
-#ifndef NDEBUG
+#if !defined(NDEBUG) && !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
 #define IMPALA_ASSERT_DEBUG_DEATH(fn, msg)      \
   do {                                          \
     ScopedCoredumpDisabler disable_coredumps;   \
@@ -37,6 +37,9 @@
 // death tests that work in both debug and release builds. To avoid this problem, update
 // our wrapper macro to simply omit the death test expression in release builds, where we
 // can't actually test DCHECKs anyway.
+// Also disable the death tests in ASAN and TSAN builds where we suspect there is a
+// higher risk of hangs because of races with other threads holding locks during fork() -
+// see IMPALA-7581.
 #define IMPALA_ASSERT_DEBUG_DEATH(fn, msg)
 #endif
 
