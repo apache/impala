@@ -82,6 +82,18 @@ public class AnalyticPlanner {
   }
 
   /**
+   * Return true if and only if exprs is non-empty and contains non-constant
+   * expressions.
+   */
+  private boolean activeExprs(List<Expr> exprs) {
+    if (exprs.isEmpty())  return false;
+    for (Expr p: exprs) {
+      if (!p.isConstant()) { return true; }
+    }
+    return false;
+  }
+
+  /**
    * Return plan tree that augments 'root' with plan nodes that implement single-node
    * evaluation of the AnalyticExprs in analyticInfo.
    * This plan takes into account a possible hash partition of its input on
@@ -224,7 +236,7 @@ public class AnalyticPlanner {
     // remove the non-partitioning group from partitionGroups
     PartitionGroup nonPartitioning = null;
     for (PartitionGroup pg: partitionGroups) {
-      if (pg.partitionByExprs.isEmpty()) {
+      if (!activeExprs(pg.partitionByExprs)) {
         nonPartitioning = pg;
         break;
       }
@@ -308,9 +320,10 @@ public class AnalyticPlanner {
     TupleDescriptor bufferedTupleDesc = null;
     // map from input to buffered tuple
     ExprSubstitutionMap bufferedSmap = new ExprSubstitutionMap();
+    boolean activePartition = activeExprs(partitionByExprs);
 
     // sort on partition by (pb) + order by (ob) exprs and create pb/ob predicates
-    if (!partitionByExprs.isEmpty() || !orderByElements.isEmpty()) {
+    if (activePartition || !orderByElements.isEmpty()) {
       // first sort on partitionExprs (direction doesn't matter)
       List<Expr> sortExprs = Lists.newArrayList(partitionByExprs);
       List<Boolean> isAsc =
@@ -337,12 +350,12 @@ public class AnalyticPlanner {
 
       // if this sort group does not have partitioning exprs, we want the sort
       // to be executed like a regular distributed sort
-      if (!partitionByExprs.isEmpty()) sortNode.setIsAnalyticSort(true);
+      if (activePartition) sortNode.setIsAnalyticSort(true);
 
       if (partitionExprs != null) {
         // create required input partition
         DataPartition inputPartition = DataPartition.UNPARTITIONED;
-        if (!partitionExprs.isEmpty()) {
+        if (activePartition) {
           inputPartition = DataPartition.hashPartitioned(partitionExprs);
         }
         sortNode.setInputPartition(inputPartition);
@@ -380,7 +393,7 @@ public class AnalyticPlanner {
       // we need to remap the pb/ob exprs to a) the sort output, b) our buffer of the
       // sort input
       Expr partitionByEq = null;
-      if (!windowGroup.partitionByExprs.isEmpty()) {
+      if (activeExprs(windowGroup.partitionByExprs)) {
         partitionByEq = createNullMatchingEquals(
             Expr.substituteList(windowGroup.partitionByExprs, sortSmap, analyzer_, false),
             sortTupleId, bufferedSmap);
