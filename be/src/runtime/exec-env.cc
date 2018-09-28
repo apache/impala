@@ -129,6 +129,8 @@ DEFINE_int32(backend_client_rpc_timeout_ms, 300000, "(Advanced) The underlying "
 DEFINE_int32(catalog_client_connection_num_retries, 3, "Retry catalog connections.");
 DEFINE_int32(catalog_client_rpc_timeout_ms, 0, "(Advanced) The underlying TSocket "
     "send/recv timeout in milliseconds for a catalog client RPC.");
+DEFINE_int32(catalog_client_rpc_retry_interval_ms, 10000, "(Advanced) The time to wait "
+    "before retrying when the catalog RPC client fails to connect to catalogd.");
 
 const static string DEFAULT_FS = "fs.defaultFS";
 
@@ -155,7 +157,8 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
             FLAGS_backend_client_rpc_timeout_ms, FLAGS_backend_client_rpc_timeout_ms, "",
             !FLAGS_ssl_client_ca_certificate.empty())),
     catalogd_client_cache_(
-        new CatalogServiceClientCache(FLAGS_catalog_client_connection_num_retries, 0,
+        new CatalogServiceClientCache(FLAGS_catalog_client_connection_num_retries,
+            FLAGS_catalog_client_rpc_retry_interval_ms,
             FLAGS_catalog_client_rpc_timeout_ms, FLAGS_catalog_client_rpc_timeout_ms, "",
             !FLAGS_ssl_client_ca_certificate.empty())),
     htable_factory_(new HBaseTableFactory()),
