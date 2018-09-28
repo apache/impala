@@ -424,22 +424,14 @@ public class AnalyticExpr extends Expr {
     type_ = getFnCall().getType();
 
     for (Expr e: partitionExprs_) {
-      if (e.isConstant()) {
-        throw new AnalysisException(
-            "Expressions in the PARTITION BY clause must not be constant: "
-              + e.toSql() + " (in " + toSql() + ")");
-      } else if (e.getType().isComplexType()) {
+      if (e.getType().isComplexType()) {
         throw new AnalysisException(String.format("PARTITION BY expression '%s' with " +
             "complex type '%s' is not supported.", e.toSql(),
             e.getType().toSql()));
       }
     }
     for (OrderByElement e: orderByElements_) {
-      if (e.getExpr().isConstant()) {
-        throw new AnalysisException(
-            "Expressions in the ORDER BY clause must not be constant: "
-              + e.getExpr().toSql() + " (in " + toSql() + ")");
-      } else if (e.getExpr().getType().isComplexType()) {
+      if (e.getExpr().getType().isComplexType()) {
         throw new AnalysisException(String.format("ORDER BY expression '%s' with " +
             "complex type '%s' is not supported.", e.getExpr().toSql(),
             e.getExpr().getType().toSql()));

@@ -1005,16 +1005,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "(first_value(cast(int_col AS DECIMAL)) " +
         " over (order by int_col rows between 2 preceding and 1 preceding)) " +
         "from functional.alltypestiny");
-    // IMPALA-1354: Constant expressions in order by and partition by exprs
-    AnalysisError(
-        "select rank() over (order by 1) from functional.alltypestiny",
-        "Expressions in the ORDER BY clause must not be constant: 1");
-    AnalysisError(
-        "select rank() over (partition by 2 order by id) from functional.alltypestiny",
-        "Expressions in the PARTITION BY clause must not be constant: 2");
-    AnalysisError(
-        "select rank() over (partition by 2 order by 1) from functional.alltypestiny",
-        "Expressions in the PARTITION BY clause must not be constant: 2");
+    // IMPALA-6323: Allow constant expressions in analytic window exprs.
+    AnalyzesOk("select rank() over (order by 1) from functional.alltypestiny");
+    AnalyzesOk("select count() over (partition by 2) from functional.alltypestiny");
+    AnalyzesOk(
+        "select rank() over (partition by 2 order by 1) from functional.alltypestiny");
 
     // nested analytic exprs
     AnalysisError(

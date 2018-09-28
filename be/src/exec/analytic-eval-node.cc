@@ -394,7 +394,8 @@ inline Status AnalyticEvalNode::TryAddResultTupleForPrevRow(
            << " idx=" << stream_idx;
   if (fn_scope_ != ROWS && (next_partition
         || (fn_scope_ == RANGE && window_.__isset.window_end
-            && !PrevRowCompare(order_by_eq_expr_eval_, child_tuple_cmp_row)))) {
+            && !(order_by_eq_expr_eval_ == nullptr ||
+                 PrevRowCompare(order_by_eq_expr_eval_, child_tuple_cmp_row))))) {
     RETURN_IF_ERROR(AddResultTuple(stream_idx - 1));
   }
   return Status::OK();
