@@ -53,7 +53,7 @@ under the License.
 
     <p>
       A column chunk is purely dictionary encoded and can be used by dictionary filtering if any
-      of the following conditions meets:
+      of the following conditions are met:
       <ol>
         <li>
           If the <codeph>encoding_stats</codeph> is in the Parquet file, dictionary filtering
@@ -120,8 +120,6 @@ under the License.
     </p>
 
     <p conref="../shared/impala_common.xml#common/added_in_290"/>
-
-    <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
   </conbody>
 
