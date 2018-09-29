@@ -395,27 +395,25 @@ def wait_for_catalog(impalad, timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS
   """Waits for a catalog copy to be received by the impalad. When its received,
      additionally waits for client ports to be opened."""
   start_time = time()
-  client_beeswax = None
-  client_hs2 = None
+  beeswax_port_is_open = False
+  hs2_port_is_open = False
   num_dbs = 0
   num_tbls = 0
-  while (time() - start_time < timeout_in_seconds):
+  while ((time() - start_time < timeout_in_seconds) and
+      not (beeswax_port_is_open and hs2_port_is_open)):
     try:
       num_dbs, num_tbls = impalad.service.get_metric_values(
           ["catalog.num-databases", "catalog.num-tables"])
-      client_beeswax = impalad.service.create_beeswax_client()
-      client_hs2 = impalad.service.create_hs2_client()
-      break
+      beeswax_port_is_open = impalad.service.beeswax_port_is_open()
+      hs2_port_is_open = impalad.service.hs2_port_is_open()
     except Exception as e:
       LOG.exception(("Client services not ready. Waiting for catalog cache: "
           "({num_dbs} DBs / {num_tbls} tables). Trying again ...").format(
               num_dbs=num_dbs,
               num_tbls=num_tbls))
-    finally:
-      if client_beeswax is not None: client_beeswax.close()
     sleep(0.5)
 
-  if client_beeswax is None or client_hs2 is None:
+  if not hs2_port_is_open or not beeswax_port_is_open:
     raise RuntimeError("Unable to open client ports within {num_seconds} seconds.".format(
         num_seconds=timeout_in_seconds))
 

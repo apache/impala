@@ -385,3 +385,36 @@ NULL,0.0000
 ---- TYPES
 DECIMAL, DECIMAL
 ====
+---- QUERY
+# Query return mixed NULL and non-NULL decimal values.
+select case when rn % 2 = 0 then c1 end,
+       case when rn % 3 = 0 then c2 end,
+       case when rn % 4 = 0 then c3 end
+from (
+  select *, row_number() over (order by c1) rn
+  from decimal_tiny) v
+where rn <= 20
+---- RESULTS
+NULL,NULL,NULL
+0.1111,NULL,NULL
+NULL,102.44444,NULL
+0.3333,NULL,0.3
+NULL,NULL,NULL
+0.5555,106.11110,NULL
+NULL,NULL,NULL
+0.7777,NULL,0.7
+NULL,109.77776,NULL
+0.9999,NULL,NULL
+NULL,NULL,NULL
+1.2221,113.44442,0.1
+NULL,NULL,NULL
+1.4443,NULL,NULL
+NULL,117.11108,NULL
+1.6665,NULL,0.5
+NULL,NULL,NULL
+1.8887,120.77774,NULL
+NULL,NULL,NULL
+2.1109,NULL,0.9
+---- TYPES
+DECIMAL, DECIMAL, DECIMAL
+====

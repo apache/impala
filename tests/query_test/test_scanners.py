@@ -48,8 +48,6 @@ from tests.common.file_utils import (
     create_table_from_parquet,
     create_table_and_copy_files)
 from tests.common.test_result_verifier import (
-    parse_column_types,
-    parse_column_labels,
     QueryTestResult,
     parse_result_rows)
 from tests.common.test_vector import ImpalaTestDimension
@@ -275,8 +273,8 @@ class TestWideTable(ImpalaTestSuite):
       assert len(result.data) == NUM_ROWS
       return
 
-    types = parse_column_types(result.schema)
-    labels = parse_column_labels(result.schema)
+    types = result.column_types
+    labels = result.column_labels
     expected = QueryTestResult(expected_result, types, labels, order_matters=False)
     actual = QueryTestResult(parse_result_rows(result), types, labels,
         order_matters=False)

@@ -23,7 +23,9 @@ import re
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfEC
-from tests.common.test_dimensions import create_uncompressed_text_dimension, extend_exec_option_dimension
+from tests.common.test_dimensions import (
+    create_uncompressed_text_dimension, extend_exec_option_dimension,
+    create_beeswax_hs2_dimension, hs2_parquet_constraint)
 from tests.common.test_vector import ImpalaTestVector
 
 class TestQueries(ImpalaTestSuite):
@@ -33,6 +35,11 @@ class TestQueries(ImpalaTestSuite):
     if cls.exploration_strategy() == 'core':
       cls.ImpalaTestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format == 'parquet')
+    # Run these queries through both beeswax and HS2 to get coverage of both protocols.
+    # Don't run all combinations of table format and protocol - the dimensions should
+    # be orthogonal.
+    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_dimension())
+    cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
 
     # Adding a test dimension here to test the small query opt in exhaustive.
     if cls.exploration_strategy() == 'exhaustive':

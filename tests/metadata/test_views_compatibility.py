@@ -103,7 +103,7 @@ class TestViewCompatibility(ImpalaTestSuite):
       # The table may or may not have been created in Hive. And so, "invalidate metadata"
       # may throw an exception.
       try:
-        self.client.invalidate_table(test_case.hive_view_name)
+        self.client.execute("invalidate metadata {0}".format(test_case.hive_view_name))
       except ImpalaBeeswaxException as e:
         assert "TableNotFoundException" in str(e)
 
@@ -135,7 +135,7 @@ class TestViewCompatibility(ImpalaTestSuite):
       self._exec_in_hive(test_case.get_drop_view_sql('HIVE'),\
                           test_case.get_create_view_sql('HIVE'), None)
       try:
-        self.client.invalidate_table(test_case.hive_view_name)
+        self.client.execute("invalidate metadata {0}".format(test_case.hive_view_name))
       except ImpalaBeeswaxException as e:
         assert "TableNotFoundException" in str(e)
 

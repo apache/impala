@@ -122,11 +122,14 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         cls.create_table_info_dimension(cls.exploration_strategy()))
     cls.ImpalaTestMatrix.add_dimension(cls.__create_exec_option_dimension())
+    # Execute tests through Beeswax by default. Individual tests that have been converted
+    # to work with the HS2 client can add HS2 in addition to or instead of beeswax.
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol', 'beeswax'))
 
   @classmethod
   def setup_class(cls):
     """Setup section that runs before each test suite"""
-    cls.hive_client, cls.client = [None, None]
+    cls.hive_client, cls.client, cls.hs2_client = [None, None, None]
     # Create a Hive Metastore Client (used for executing some test SETUP steps
     metastore_host, metastore_port = pytest.config.option.metastore_server.split(':')
     trans_type = 'buffered'
@@ -141,8 +144,15 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.hive_client = ThriftHiveMetastore.Client(protocol)
     cls.hive_transport.open()
 
-    # Create a connection to Impala.
-    cls.client = cls.create_impala_client(IMPALAD)
+    # Create a connection to Impala, self.client is Beeswax so that existing tests that
+    # assume beeswax do not need modification (yet).
+    cls.client = cls.create_impala_client(protocol='beeswax')
+    try:
+      cls.hs2_client = cls.create_impala_client(protocol='hs2')
+    except Exception, e:
+      # HS2 connection can fail for benign reasons, e.g. running with unsupported auth.
+      LOG.info("HS2 connection setup failed, continuing...: {0}", e)
+
 
     # Default query options are populated on demand.
     cls.default_query_options = {}
@@ -165,16 +175,40 @@ class ImpalaTestSuite(BaseTestSuite):
     # Cleanup the Impala and Hive Metastore client connections
     if cls.hive_transport:
       cls.hive_transport.close()
-
     if cls.client:
       cls.client.close()
+    if cls.hs2_client:
+      cls.hs2_client.close()
 
   @classmethod
-  def create_impala_client(cls, host_port=IMPALAD):
+  def create_impala_client(cls, host_port=None, protocol='beeswax'):
+    if host_port is None:
+      host_port = cls.__get_default_host_port(protocol)
     client = create_connection(host_port=host_port,
-        use_kerberos=pytest.config.option.use_kerberos)
+        use_kerberos=pytest.config.option.use_kerberos, protocol=protocol)
     client.connect()
     return client
+
+  @classmethod
+  def __get_default_host_port(cls, protocol):
+    if protocol == 'beeswax':
+      return IMPALAD
+    else:
+      assert protocol == 'hs2'
+      return IMPALAD_HS2_HOST_PORT
+
+  @classmethod
+  def __get_cluster_host_ports(cls, protocol):
+    """Return a list of host/port combinations for all impalads in the cluster."""
+    if protocol == 'beeswax':
+      return IMPALAD_HOST_PORT_LIST
+    else:
+      assert protocol == 'hs2'
+      # TODO: support running tests against multiple coordinators for HS2. It should work,
+      # we just need to update all test runners to pass in all host/port combinations for
+      # the cluster and then handle it here.
+      raise NotImplementedError(
+          "Not yet implemented: only one HS2 host/port can be configured")
 
   @classmethod
   def create_impala_service(cls, host_port=IMPALAD, webserver_port=25000):
@@ -208,13 +242,9 @@ class ImpalaTestSuite(BaseTestSuite):
     """
     # Populate the default query option if it's empty.
     if not self.default_query_options:
-      try:
-        query_options = impalad_client.get_default_configuration()
-        for query_option in query_options:
-          self.default_query_options[query_option.key.upper()] = query_option.value
-      except Exception as e:
-        LOG.info('Unexpected exception when getting default query options: ' + str(e))
-        return
+      query_options = impalad_client.get_default_configuration()
+      for key, value in query_options.iteritems():
+        self.default_query_options[key.upper()] = value
     # Restore all the changed query options.
     for query_option in query_options_changed:
       query_option = query_option.upper()
@@ -295,7 +325,7 @@ class ImpalaTestSuite(BaseTestSuite):
       actual values are easily compared.
     """
     replace_filenames_with_placeholder = True
-    for section_name in ('RESULTS', 'ERRORS'):
+    for section_name in ('RESULTS', 'DBAPI_RESULTS', 'ERRORS'):
       if section_name in test_section:
         if "$NAMENODE" in test_section[section_name]:
           replace_filenames_with_placeholder = False
@@ -305,8 +335,22 @@ class ImpalaTestSuite(BaseTestSuite):
                                      .replace('$USER', getuser())
         if use_db:
           test_section[section_name] = test_section[section_name].replace('$DATABASE', use_db)
+    result_section, type_section = 'RESULTS', 'TYPES'
+    if vector.get_value('protocol') == 'hs2':
+      if 'DBAPI_RESULTS' in test_section:
+        assert 'RESULTS' in test_section,\
+            "Base RESULTS section must always be included alongside DBAPI_RESULTS"
+        # In some cases Impyla (the HS2 dbapi client) is expected to return different
+        # results, so use the dbapi-specific section if present.
+        result_section = 'DBAPI_RESULTS'
+      if 'HS2_TYPES' in test_section:
+        assert 'TYPES' in test_section,\
+            "Base TYPES section must always be included alongside HS2_TYPES"
+        # In some cases HS2 types are expected differ from Beeswax types (e.g. see
+        # IMPALA-914), so use the HS2-specific section if present.
+        type_section = 'HS2_TYPES'
     verify_raw_results(test_section, result, vector.get_value('table_format').file_format,
-                       pytest.config.option.update_results,
+                       result_section, type_section, pytest.config.option.update_results,
                        replace_filenames_with_placeholder)
 
 
@@ -318,7 +362,10 @@ class ImpalaTestSuite(BaseTestSuite):
     Runs the query using targeting the file format/compression specified in the test
     vector and the exec options specified in the test vector. If multiple_impalad=True
     a connection to a random impalad will be chosen to execute each test section.
-    Otherwise, the default impalad client will be used.
+    Otherwise, the default impalad client will be used. If 'protocol' (either 'hs2' or
+    'beeswax') is set in the vector, a client for that protocol is used. Otherwise we
+    use the default: beeswax.
+
     Additionally, the encoding for all test data can be specified using the 'encoding'
     parameter. This is useful when data is ingested in a different encoding (ex.
     latin). If not set, the default system encoding will be used.
@@ -328,6 +375,7 @@ class ImpalaTestSuite(BaseTestSuite):
     """
     table_format_info = vector.get_value('table_format')
     exec_options = vector.get_value('exec_option')
+    protocol = vector.get_value('protocol')
 
     # Resolve the current user's primary group name.
     group_id = pwd.getpwnam(getuser()).pw_gid
@@ -336,9 +384,14 @@ class ImpalaTestSuite(BaseTestSuite):
     target_impalad_clients = list()
     if multiple_impalad:
       target_impalad_clients =\
-          map(ImpalaTestSuite.create_impala_client, IMPALAD_HOST_PORT_LIST)
+          [ImpalaTestSuite.create_impala_client(host_port, protocol=protocol)
+           for host_port in self.__get_cluster_host_ports(protocol)]
     else:
-      target_impalad_clients = [self.client]
+      if protocol == 'beeswax':
+        target_impalad_clients = [self.client]
+      else:
+        assert protocol == 'hs2'
+        target_impalad_clients = [self.hs2_client]
 
     # Change the database to reflect the file_format, compression codec etc, or the
     # user specified database for all targeted impalad.
@@ -402,7 +455,7 @@ class ImpalaTestSuite(BaseTestSuite):
         if 'USER' in test_section:
           # Create a new client so the session will use the new username.
           user = test_section['USER'].strip()
-          target_impalad_client = self.create_impala_client()
+          target_impalad_client = self.create_impala_client(protocol=protocol)
         for query in query.split(';'):
           set_pattern_match = SET_PATTERN.match(query)
           if set_pattern_match != None:
@@ -463,8 +516,8 @@ class ImpalaTestSuite(BaseTestSuite):
             test_section['DML_RESULTS_TABLE']
         dml_result = self.__execute_query(target_impalad_client, dml_results_query)
         verify_raw_results(test_section, dml_result,
-            vector.get_value('table_format').file_format,
-            pytest.config.option.update_results, result_section='DML_RESULTS')
+            vector.get_value('table_format').file_format, result_section='DML_RESULTS',
+            update_section=pytest.config.option.update_results)
     if pytest.config.option.update_results:
       output_file = os.path.join(EE_TEST_LOGS_DIR,
                                  test_file_name.replace('/','_') + ".test")
@@ -629,13 +682,6 @@ class ImpalaTestSuite(BaseTestSuite):
     """Executes the given query against the specified Impalad"""
     if query_options is not None: impalad_client.set_configuration(query_options)
     return impalad_client.execute(query, user=user)
-
-  def __execute_query_new_client(self, query, query_options=None,
-      use_kerberos=False):
-    """Executes the given query against the specified Impalad"""
-    new_client = self.create_impala_client()
-    new_client.set_configuration(query_options)
-    return new_client.execute(query)
 
   def __reset_table(self, db_name, table_name):
     """Resets a table (drops and recreates the table)"""

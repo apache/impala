@@ -29,12 +29,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args("--idle_session_timeout=6")
   def test_session_expiration(self, vector):
     impalad = self.cluster.get_any_impalad()
-    # setup_class creates an Impala client to <hostname>:21000 after the cluster starts.
-    # The client expires at the same time as the client created below. Since we choose the
-    # impalad to connect to randomly, the test becomes flaky, as the metric we expect to
-    # be incremented by 1 gets incremented by 2 if both clients are connected to the same
-    # Impalad.
-    self.client.close()
+    self.__close_default_clients()
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
     client = impalad.service.create_beeswax_client()
     # Sleep for half the expiration time to confirm that the session is not expired early
@@ -50,7 +45,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args("--idle_session_timeout=3")
   def test_session_expiration_with_set(self, vector):
     impalad = self.cluster.get_any_impalad()
-    self.client.close()
+    self.__close_default_clients()
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
 
     # Test if we can set a shorter timeout than the process-wide option
@@ -72,7 +67,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args("--idle_session_timeout=5")
   def test_unsetting_session_expiration(self, vector):
     impalad = self.cluster.get_any_impalad()
-    self.client.close()
+    self.__close_default_clients()
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
 
     # Test unsetting IDLE_SESSION_TIMEOUT
@@ -109,3 +104,10 @@ class TestSessionExpiration(CustomClusterTestSuite):
     queued_query_profile = impalad.service.create_beeswax_client().get_runtime_profile(
       queued_handle)
     assert "Admission result: Cancelled (queued)" in queued_query_profile
+
+  def __close_default_clients(self):
+    """Close the clients that were automatically created by setup_class(). These clients
+    can expire during test, which results in metrics that tests depend on changing. Each
+    test should create its own clients as needed."""
+    self.client.close()
+    self.hs2_client.close()

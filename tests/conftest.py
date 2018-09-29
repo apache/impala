@@ -78,9 +78,9 @@ def pytest_addoption(parser):
                    "format: workload:exploration_strategy. Ex: tpch:core,tpcds:pairwise.")
 
   parser.addoption("--impalad", default=DEFAULT_IMPALADS,
-                   help="A comma-separated list of impalad host:ports to target. Note: "
-                   "Not all tests make use of all impalad, some tests target just the "
-                   "first item in the list (it is considered the 'default'")
+                   help="A comma-separated list of impalad Beeswax host:ports to target. "
+                   "Note: Not all tests make use of all impalad, some tests target just "
+                   "the first item in the list (it is considered the 'default'")
 
   parser.addoption("--impalad_hs2_port", default=DEFAULT_IMPALAD_HS2_PORT,
                    help="The impalad HiveServer2 port.")

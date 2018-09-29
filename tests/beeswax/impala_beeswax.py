@@ -74,6 +74,12 @@ class ImpalaBeeswaxResult(object):
     self.time_taken = kwargs.get('time_taken', 0)
     self.summary = kwargs.get('summary', str())
     self.schema = kwargs.get('schema', None)
+    self.column_types = None
+    self.column_labels = None
+    if self.schema is not None:
+      # Extract labels and types so there is a shared interface with HS2ResultSet.
+      self.column_types = [fs.type.upper() for fs in self.schema.fieldSchemas]
+      self.column_labels = [fs.name.upper() for fs in self.schema.fieldSchemas]
     self.runtime_profile = kwargs.get('runtime_profile', str())
     self.exec_summary = kwargs.get('exec_summary', None)
 
@@ -419,14 +425,6 @@ class ImpalaBeeswaxClient(object):
 
   def get_log(self, query_handle):
     return self.__do_rpc(lambda: self.imp_service.get_log(query_handle))
-
-  def refresh(self):
-    """Invalidate the Impalad catalog"""
-    return self.execute("invalidate metadata")
-
-  def refresh_table(self, db_name, table_name):
-    """Refresh a specific table from the catalog"""
-    return self.execute("refresh %s.%s" % (db_name, table_name))
 
   def fetch_results(self, query_string, query_handle, max_rows = -1):
     """Fetches query results given a handle and query type (insert, use, other)"""

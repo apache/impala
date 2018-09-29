@@ -283,9 +283,20 @@ class ImpaladService(BaseImpalaService):
 
   def create_beeswax_client(self, use_kerberos=False):
     """Creates a new beeswax client connection to the impalad"""
-    client = create_connection('%s:%d' % (self.hostname, self.beeswax_port), use_kerberos)
+    client = create_connection('%s:%d' % (self.hostname, self.beeswax_port),
+                               use_kerberos, 'beeswax')
     client.connect()
     return client
+
+  def beeswax_port_is_open(self):
+    """Test if the beeswax port is open. Does not need to authenticate."""
+    try:
+      # The beeswax client will connect successfully even if not authenticated.
+      client = self.create_beeswax_client()
+      client.close()
+      return True
+    except Exception:
+      return False
 
   def create_ldap_beeswax_client(self, user, password, use_ssl=False):
     client = create_ldap_connection('%s:%d' % (self.hostname, self.beeswax_port),
@@ -295,14 +306,23 @@ class ImpaladService(BaseImpalaService):
 
   def create_hs2_client(self):
     """Creates a new HS2 client connection to the impalad"""
-    host, port = (self.hostname, self.hs2_port)
-    socket = TSocket(host, port)
-    transport = TBufferedTransport(socket)
-    transport.open()
-    protocol = TBinaryProtocol.TBinaryProtocol(transport)
-    hs2_client = TCLIService.Client(protocol)
-    return hs2_client
+    client = create_connection('%s:%d' % (self.hostname, self.hs2_port), protocol='hs2')
+    client.connect()
+    return client
 
+  def hs2_port_is_open(self):
+    """Test if the HS2 port is open. Does not need to authenticate."""
+    # Impyla will try to authenticate as part of connecting, so preserve previous logic
+    # that uses the HS2 thrift code directly.
+    try:
+      socket = TSocket(self.hostname, self.hs2_port)
+      transport = TBufferedTransport(socket)
+      transport.open()
+      transport.close()
+      return True
+    except Exception, e:
+      LOG.info(e)
+      return False
 
 # Allows for interacting with the StateStore service to perform operations such as
 # accessing the debug webpage.

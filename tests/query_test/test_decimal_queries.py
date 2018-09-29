@@ -20,7 +20,8 @@
 from copy import copy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_exec_option_dimension_from_dict
+from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
+    create_beeswax_hs2_dimension, hs2_parquet_constraint)
 from tests.common.test_vector import ImpalaTestDimension
 
 class TestDecimalQueries(ImpalaTestSuite):
@@ -44,6 +45,11 @@ class TestDecimalQueries(ImpalaTestSuite):
         (v.get_value('table_format').file_format == 'text' and
          v.get_value('table_format').compression_codec == 'none') or
          v.get_value('table_format').file_format in ['parquet', 'orc', 'kudu'])
+
+    # Run these queries through both beeswax and HS2 to get coverage of decimals returned
+    # via both protocols.
+    cls.ImpalaTestMatrix.add_dimension(create_beeswax_hs2_dimension())
+    cls.ImpalaTestMatrix.add_constraint(hs2_parquet_constraint)
 
   def test_queries(self, vector):
     self.run_test_case('QueryTest/decimal', vector)

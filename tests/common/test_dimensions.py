@@ -113,6 +113,26 @@ def create_avro_snappy_dimension(workload):
   return ImpalaTestDimension('table_format',
       TableFormatInfo.create_from_string(dataset, 'avro/snap/block'))
 
+
+def create_beeswax_hs2_dimension():
+  return ImpalaTestDimension('protocol', 'beeswax', 'hs2')
+
+
+def hs2_parquet_constraint(v):
+  """Constraint function, used to only run HS2 against Parquet format, because file format
+  and the client protocol are orthogonal."""
+  return (v.get_value('protocol') == 'beeswax' or
+          v.get_value('table_format').file_format == 'parquet' and
+          v.get_value('table_format').compression_codec == 'none')
+
+
+def hs2_text_constraint(v):
+  """Constraint function, used to only run HS2 against uncompressed text, because file
+  format and the client protocol are orthogonal."""
+  return (v.get_value('protocol') == 'beeswax' or
+          v.get_value('table_format').file_format == 'text' and
+          v.get_value('table_format').compression_codec == 'none')
+
 # Common sets of values for the exec option vectors
 ALL_BATCH_SIZES = [0]
 

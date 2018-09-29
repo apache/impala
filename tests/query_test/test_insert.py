@@ -27,8 +27,6 @@ from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_uncompressed_text_dimension)
 from tests.common.test_result_verifier import (
-    parse_column_types,
-    parse_column_labels,
     QueryTestResult,
     parse_result_rows)
 from tests.common.test_vector import ImpalaTestDimension
@@ -201,8 +199,8 @@ class TestInsertWideTable(ImpalaTestSuite):
     assert result.data == ["1"]
 
     result = self.client.execute("select * from " + table_name)
-    types = parse_column_types(result.schema)
-    labels = parse_column_labels(result.schema)
+    types = result.column_types
+    labels = result.column_labels
     expected = QueryTestResult([col_vals], types, labels, order_matters=False)
     actual = QueryTestResult(parse_result_rows(result), types, labels, order_matters=False)
     assert expected == actual

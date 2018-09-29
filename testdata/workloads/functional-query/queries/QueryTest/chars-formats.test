@@ -3,6 +3,8 @@
 select * from chars_formats order by vc;
 ---- TYPES
 char, char, string
+---- HS2_TYPES
+char, char, varchar
 ---- RESULTS
 'abc  ','8d3fffddf79e9a232ffd19f9ccaa4d6b37a6a243dbe0f23137b108a043d9da13121a9b505c804956b22e93c7f93969f4a7ba8ddea45bf4aab0bebc8f814e09918d3fffddf79e','abc'
 'abcde','68f8c4575da360c32abb46689e58193a0eeaa905ae6f4a5e6c702a6ae1db35a6f86f8222b7a5489d96eb0466c755b677a64160d074617096a8c6279038bc720468f8c4575da3','b2fe9d4638503a57f93396098f24103a'
@@ -30,6 +32,8 @@ char
 select vc from chars_formats order by vc;
 ---- TYPES
 string
+---- HS2_TYPES
+varchar
 ---- RESULTS
 'abc'
 'b2fe9d4638503a57f93396098f24103a'

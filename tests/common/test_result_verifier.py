@@ -85,7 +85,7 @@ class ResultRow(object):
     self.regex = try_compile_regex(row_string)
 
   def __parse_row(self, row_string, column_types, column_labels):
-    """Parses a row string and build a list of ResultColumn objects"""
+    """Parses a row string (from Beeswax) and build a list of ResultColumn objects"""
     column_values = list()
     if not row_string:
       return column_values
@@ -314,8 +314,10 @@ def apply_error_match_filter(error_list, replace_filenames=True):
     return re.sub(r'Backend \d+:', '', row)
   return [replace_fn(row) for row in error_list]
 
-def verify_raw_results(test_section, exec_result, file_format, update_section=False,
-                       replace_filenames=True, result_section='RESULTS'):
+
+def verify_raw_results(test_section, exec_result, file_format, result_section,
+                       type_section='TYPES', update_section=False,
+                       replace_filenames=True):
   """
   Accepts a raw exec_result object and verifies it matches the expected results,
   including checking the ERRORS, TYPES, and LABELS test sections.
@@ -328,6 +330,9 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
 
   The result_section parameter can be used to make this function check the results in
   a DML_RESULTS section instead of the regular RESULTS section.
+
+  The 'type_section' parameter can be used to make this function check the types against
+  an alternative section from the default TYPES.
   TODO: separate out the handling of sections like ERRORS from checking of query results
   to allow regular RESULTS/ERRORS sections in tests with DML_RESULTS (IMPALA-4471).
   """
@@ -350,11 +355,11 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
       else:
         raise
 
-  if 'TYPES' in test_section:
+  if type_section in test_section:
     # Distinguish between an empty list and a list with an empty string.
-    expected_types = list()
-    if test_section.get('TYPES'):
-      expected_types = [c.strip().upper() for c in test_section['TYPES'].rstrip('\n').split(',')]
+    section = test_section[type_section]
+    expected_types = [c.strip().upper()
+                      for c in remove_comments(section).rstrip('\n').split(',')]
 
     # Avro and Kudu represent TIMESTAMP columns as strings, so tests using TIMESTAMP are
     # skipped because results will be wrong.
@@ -371,7 +376,7 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
       LOG.info("Skipping type verification of Avro-format table.")
       actual_types = expected_types
     else:
-      actual_types = parse_column_types(exec_result.schema)
+      actual_types = exec_result.column_types
 
     try:
       verify_results(expected_types, actual_types, order_matters=True)
@@ -386,8 +391,8 @@ def verify_raw_results(test_section, exec_result, file_format, update_section=Fa
     actual_types = ['BIGINT']
 
   actual_labels = ['DUMMY_LABEL']
-  if exec_result and exec_result.schema:
-    actual_labels = parse_column_labels(exec_result.schema)
+  if exec_result and exec_result.column_labels:
+    actual_labels = exec_result.column_labels
 
   if 'LABELS' in test_section:
     assert actual_labels is not None
@@ -441,22 +446,11 @@ def contains_order_by(query):
   """Returns true of the query contains an 'order by' clause"""
   return re.search( r'order\s+by\b', query, re.M|re.I) is not None
 
-def parse_column_types(schema):
-  """Enumerates all field schemas and returns a list of column type strings"""
-  return [fs.type.upper() for fs in schema.fieldSchemas]
-
-def parse_column_labels(schema):
-  """Enumerates all field schemas and returns a list of column label strings"""
-  # This is an statement doesn't return a field schema (insert statement).
-  if schema is None or schema.fieldSchemas is None: return list()
-  return [fs.name.upper() for fs in schema.fieldSchemas]
-
 def create_query_result(exec_result, order_matters=False):
   """Creates query result in the test format from the result returned from a query"""
-  col_labels = parse_column_labels(exec_result.schema)
-  col_types = parse_column_types(exec_result.schema)
   data = parse_result_rows(exec_result)
-  return QueryTestResult(data, col_types, col_labels, order_matters)
+  return QueryTestResult(data, exec_result.column_types, exec_result.column_labels,
+                         order_matters)
 
 def parse_result_rows(exec_result):
   """
@@ -467,17 +461,17 @@ def parse_result_rows(exec_result):
     return []
 
   # If the schema is 'None' assume this is an insert statement
-  if exec_result.schema is None:
+  if exec_result.column_labels is None:
     return raw_result
 
   result = list()
-  col_types = parse_column_types(exec_result.schema)
+  col_types = exec_result.column_types or []
   for row in exec_result.data:
     cols = row.split('\t')
     assert len(cols) == len(col_types)
     new_cols = list()
     for i in xrange(len(cols)):
-      if col_types[i] == 'STRING' or col_types[i] == 'CHAR':
+      if col_types[i] in ['STRING', 'CHAR', 'VARCHAR']:
         col = cols[i].encode('unicode_escape')
         new_cols.append("'%s'" % col)
       else:

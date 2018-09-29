@@ -17,12 +17,16 @@
 #
 # The base class that should be used for almost all Impala tests
 
+import logging
 import pytest
 import os
 import time
 from subprocess import check_call
 from tests.util.filesystem_utils import get_fs_path
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+
+LOG = logging.getLogger('test_coordinators')
+LOG.setLevel(level=logging.DEBUG)
 
 class TestCoordinators(CustomClusterTestSuite):
   @pytest.mark.execute_serially
@@ -43,14 +47,16 @@ class TestCoordinators(CustomClusterTestSuite):
     beeswax_client = None
     try:
       beeswax_client = worker.service.create_beeswax_client()
-    except: pass
+    except Exception, e:
+      LOG.info("Caught exception {0}".format(e))
     finally:
       assert beeswax_client is None
 
     hs2_client = None
     try:
       hs2_client = worker.service.create_hs2_client()
-    except: pass
+    except Exception, e:
+      LOG.info("Caught exception {0}".format(e))
     finally:
       assert hs2_client is None
 
