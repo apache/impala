@@ -31,6 +31,7 @@
 #include "runtime/tuple-row.h"
 #include "util/bit-util.h"
 #include "util/coding-util.h"
+#include "util/ubsan.h"
 #include "util/url-parser.h"
 
 #include "common/names.h"
@@ -308,7 +309,7 @@ StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& st
 
     // Copy in replacement - always safe since we always leave room for one more replace
     DCHECK_LE(ptr - result.ptr + replace.len, buffer_space);
-    memcpy(ptr, replace.ptr, replace.len);
+    Ubsan::MemCpy(ptr, replace.ptr, replace.len);
     ptr += replace.len;
 
     // Don't want to re-match within already replaced pattern
@@ -865,12 +866,12 @@ StringVal StringFunctions::ConcatWs(FunctionContext* context, const StringVal& s
 
   // Loop again to append the data.
   uint8_t* ptr = result.ptr;
-  memcpy(ptr, strs[0].ptr, strs[0].len);
+  Ubsan::MemCpy(ptr, strs[0].ptr, strs[0].len);
   ptr += strs[0].len;
   for (int32_t i = 1; i < num_children; ++i) {
-    memcpy(ptr, sep.ptr, sep.len);
+    Ubsan::MemCpy(ptr, sep.ptr, sep.len);
     ptr += sep.len;
-    memcpy(ptr, strs[i].ptr, strs[i].len);
+    Ubsan::MemCpy(ptr, strs[i].ptr, strs[i].len);
     ptr += strs[i].len;
   }
   return result;

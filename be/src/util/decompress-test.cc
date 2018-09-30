@@ -26,6 +26,7 @@
 #include "testutil/gtest-util.h"
 #include "util/decompress.h"
 #include "util/compress.h"
+#include "util/ubsan.h"
 
 #include "common/names.h"
 
@@ -123,7 +124,7 @@ class DecompressorTest : public ::testing::Test {
         compressed, &output_len, &output));
 
     EXPECT_EQ(output_len, input_len);
-    EXPECT_EQ(memcmp(input, output, input_len), 0);
+    EXPECT_EQ(Ubsan::MemCmp(input, output, input_len), 0);
 
     // Preallocated output buffers
     int64_t max_compressed_length = compressor->MaxOutputLen(input_len, input);
@@ -145,7 +146,7 @@ class DecompressorTest : public ::testing::Test {
                                            &output_len, &output));
 
     EXPECT_EQ(output_len, input_len);
-    EXPECT_EQ(memcmp(input, output, input_len), 0);
+    EXPECT_EQ(Ubsan::MemCmp(input, output, input_len), 0);
   }
 
   // Test the behavior when the decompressor is given too little / too much space.
@@ -218,7 +219,8 @@ class DecompressorTest : public ::testing::Test {
       int64_t compressed_bytes_read = 0;
       RETURN_IF_ERROR(decompressor->ProcessBlockStreaming(compressed_bytes_remaining,
           compressed_input, &compressed_bytes_read, &output_len, &output, &stream_end));
-      EXPECT_EQ(memcmp(uncompressed_input + decompressed_len, output, output_len), 0);
+      EXPECT_EQ(
+          Ubsan::MemCmp(uncompressed_input + decompressed_len, output, output_len), 0);
       decompressed_len += output_len;
       EXPECT_LE(decompressed_len, uncompressed_len);
       compressed_input = compressed_input + compressed_bytes_read;
@@ -266,7 +268,7 @@ class DecompressorTest : public ::testing::Test {
         &output_len, &output));
 
     EXPECT_EQ(output_len, input_len);
-    EXPECT_EQ(memcmp(input, output, input_len), 0);
+    EXPECT_EQ(Ubsan::MemCmp(input, output, input_len), 0);
   }
 
   void RunTestMultiStreamDecompressing(THdfsCompression::type format) {

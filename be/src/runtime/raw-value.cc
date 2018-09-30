@@ -22,6 +22,7 @@
 #include "runtime/raw-value.inline.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple.h"
+#include "util/ubsan.h"
 
 #include "common/names.h"
 
@@ -156,7 +157,7 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
         // to reflect this change as well (the codegen'd Allocate() call is actually
         // generated in CodegenAnyVal::StoreToNativePtr()).
         dest->ptr = reinterpret_cast<char*>(pool->Allocate(dest->len));
-        memcpy(dest->ptr, src->ptr, dest->len);
+        Ubsan::MemCpy(dest->ptr, src->ptr, dest->len);
       } else {
         dest->ptr = src->ptr;
       }

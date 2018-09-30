@@ -518,7 +518,7 @@ StringVal::StringVal(FunctionContext* context, int str_len) noexcept : len(str_l
 StringVal StringVal::CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len) noexcept {
   StringVal result(ctx, len);
   if (LIKELY(!result.is_null)) {
-    memcpy(result.ptr, buf, len);
+    std::copy(buf, buf + len, result.ptr);
   }
   return result;
 }

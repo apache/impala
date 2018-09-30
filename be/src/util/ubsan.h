@@ -23,6 +23,8 @@
 
 #include <cstring>
 
+#include "common/logging.h"
+
 class Ubsan {
  public:
   static void* MemSet(void* s, int c, size_t n) {
@@ -38,6 +40,13 @@ class Ubsan {
       return dest;
     }
     return std::memcpy(dest, src, n);
+  }
+  static int MemCmp(const void *s1, const void *s2, size_t n) {
+    if (s1 == nullptr || s2 == nullptr) {
+      DCHECK_EQ(n, 0);
+      return 0;
+    }
+    return std::memcmp(s1, s2, n);
   }
 };
 

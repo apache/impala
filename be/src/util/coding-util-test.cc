@@ -22,6 +22,7 @@
 #include "common/logging.h"
 #include "testutil/gtest-util.h"
 #include "util/coding-util.h"
+#include "util/ubsan.h"
 
 #include "common/names.h"
 
@@ -42,7 +43,7 @@ void TestUrl(const string& input, const string& expected_encoded, bool hive_comp
   // Convert string to vector and try that also
   vector<uint8_t> input_vector;
   input_vector.resize(input.size());
-  memcpy(input_vector.data(), input.c_str(), input.size());
+  Ubsan::MemCpy(input_vector.data(), input.c_str(), input.size());
   string intermediate2;
   UrlEncode(input_vector, &intermediate2, hive_compat);
   EXPECT_EQ(intermediate, intermediate2);

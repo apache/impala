@@ -23,6 +23,7 @@
 #include <boost/thread/lock_guard.hpp>
 
 #include "util/spinlock.h"
+#include "util/ubsan.h"
 
 namespace impala {
 
@@ -52,7 +53,7 @@ class StreamingSampler {
       current_sample_count_(0),
       current_sample_total_time_(0) {
     DCHECK_LE(samples_collected_, MAX_SAMPLES);
-    memcpy(samples_, initial_samples.data(), sizeof(T) * samples_collected_);
+    Ubsan::MemCpy(samples_, initial_samples.data(), sizeof(T) * samples_collected_);
   }
 
   /// Add a sample to the sampler. 'ms' is the time elapsed since the last time this
