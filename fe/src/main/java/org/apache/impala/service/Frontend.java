@@ -508,7 +508,7 @@ public class Frontend {
       if (showGrantPrincipalStmt.getPrincipal().getPrincipalType()
           == TPrincipalType.USER) {
         requiresAdmin = !showGrantPrincipalStmt.getPrincipal().getName().equals(
-            analysis.getAnalyzer().getUser().getName());
+            analysis.getAnalyzer().getUser().getShortName());
       } else {
         requiresAdmin = Sets.intersection(groupNames, showGrantPrincipalStmt
             .getPrincipal().getGrantGroups()).isEmpty();
