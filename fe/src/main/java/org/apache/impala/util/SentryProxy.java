@@ -209,7 +209,7 @@ public class SentryProxy {
      */
     private Set<String> refreshUserPrivileges() throws ImpalaException {
       // Assume all users should be removed. Then query the Policy Service and remove
-      // roles from this set that actually exist.
+      // users from this set that actually exist.
       Set<String> usersToRemove = catalog_.getAuthPolicy().getAllUserNames();
       Map<String, Set<TSentryPrivilege>> allUsersPrivileges =
           sentryPolicyService_.listAllUsersPrivileges(processUser_);
@@ -242,8 +242,11 @@ public class SentryProxy {
       // deleted from this set and we are left with the set of privileges that need
       // to be removed.
       Set<String> privilegesToRemove = principal.getPrivilegeNames();
+      Set<TSentryPrivilege> sentryPrivileges = allPrincipalPrivileges.get(
+          principal.getName());
+      if (sentryPrivileges == null) return;
       // Check all the privileges that are part of this principal.
-      for (TSentryPrivilege sentryPriv: allPrincipalPrivileges.get(principal.getName())) {
+      for (TSentryPrivilege sentryPriv: sentryPrivileges) {
         TPrivilege thriftPriv =
             SentryPolicyService.sentryPrivilegeToTPrivilege(sentryPriv, principal);
         String privilegeName = PrincipalPrivilege.buildPrivilegeName(thriftPriv);
