@@ -44,7 +44,6 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
         return dict(metrics_data)
     assert False, "Catalog cache metrics not found in %s" % child_groups
 
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
@@ -172,6 +171,142 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       impalad_args="--use_local_catalog=true",
       catalogd_args="--catalog_topic_mode=minimal")
+  def test_cache_metrics(self, unique_database):
+    """
+    Test that profile output includes impalad local cache metrics. Also verifies that
+    the daemon level metrics are updated between query runs.
+    """
+    try:
+      impalad = self.cluster.impalads[0]
+      client = impalad.service.create_beeswax_client()
+      cache_hit_rate_metric_key = "catalog.cache.hit-rate"
+      cache_miss_rate_metric_key = "catalog.cache.miss-rate"
+      cache_hit_count_metric_key = "catalog.cache.hit-count"
+      cache_request_count_metric_key = "catalog.cache.request-count"
+      cache_request_count_prev_run = 0
+      cache_hit_count_prev_run = 0
+      test_table_name = "%s.test_cache_metrics_test_tbl" % unique_database
+      # A mix of queries of various types.
+      queries_to_test = ["select count(*) from functional.alltypes",
+          "explain select count(*) from functional.alltypes",
+          "create table %s (a int)" % test_table_name,
+          "drop table %s" % test_table_name]
+      for _ in xrange(0, 10):
+        for query in queries_to_test:
+          ret = self.execute_query_expect_success(client, query)
+          assert ret.runtime_profile.count("Frontend:") == 1
+          assert ret.runtime_profile.count("CatalogFetch") > 1
+          cache_metrics = self.get_catalog_cache_metrics(impalad)
+          cache_hit_rate = cache_metrics[cache_hit_rate_metric_key]
+          cache_miss_rate = cache_metrics[cache_miss_rate_metric_key]
+          cache_hit_count = cache_metrics[cache_hit_count_metric_key]
+          cache_request_count = cache_metrics[cache_request_count_metric_key]
+          assert cache_hit_rate > 0.0 and cache_hit_rate < 1.0
+          assert cache_miss_rate > 0.0 and cache_miss_rate < 1.0
+          assert cache_hit_count > cache_hit_count_prev_run,\
+              "%s not updated between two query runs, query - %s"\
+              % (cache_hit_count_metric_key, query)
+          assert cache_request_count > cache_request_count_prev_run,\
+             "%s not updated betweeen two query runs, query - %s"\
+             % (cache_request_count_metric_key, query)
+          cache_hit_count_prev_run = cache_hit_count
+          cache_request_count_prev_run = cache_request_count
+    finally:
+      client.close()
+
+class TestLocalCatalogRetries(CustomClusterTestSuite):
+
+  def _check_metadata_retries(self, queries):
+    """
+    Runs 'queries' concurrently, recording any inconsistent metadata exceptions.
+    'queries' is a list of query strings. The queries are run by two threads,
+    each one selecting a random query to run in a loop.
+    """
+    # Tracks number of inconsistent metadata exceptions.
+    inconsistent_seen = [0]
+    inconsistent_seen_lock = threading.Lock()
+    # Tracks query failures for all other reasons.
+    failed_queries = Queue.Queue()
+    try:
+      client1 = self.cluster.impalads[0].service.create_beeswax_client()
+      client2 = self.cluster.impalads[1].service.create_beeswax_client()
+
+      def stress_thread(client):
+        # Loops, picks a random query in each iteration, runs it,
+        # and looks for retries and InconsistentMetadataFetchExceptions.
+        # Limit the number of queries run. Too many queries takes up too
+        # much memory which can get OOM killed in tests.
+        attempt = 0
+        while inconsistent_seen[0] == 0 and attempt < 100:
+          q = random.choice(queries)
+          attempt += 1
+          try:
+            ret = self.execute_query_unchecked(client, q)
+          except Exception, e:
+            if 'InconsistentMetadataFetchException' in str(e):
+              with inconsistent_seen_lock:
+                inconsistent_seen[0] += 1
+            else:
+              failed_queries.put((q, str(e)))
+
+      threads = [threading.Thread(target=stress_thread, args=(c,))
+                 for c in [client1, client2]]
+      for t in threads:
+        t.start()
+      for t in threads:
+        # When there are failures, they're observed quickly.
+        t.join(30)
+
+      assert failed_queries.empty(),\
+          "Failed query count non zero: %s" % list(failed_queries.queue)
+
+    finally:
+      client1.close()
+      client2.close()
+    return inconsistent_seen[0]
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true",
+      catalogd_args="--catalog_topic_mode=minimal")
+  def test_fetch_metadata_retry(self):
+    """
+    Tests that operations that fetch metadata (excluding those fetches needed for
+    query planning) retry when they hit an InconsistentMetadataFetchException.
+    """
+    queries = [
+      "show column stats functional.alltypes",
+      "show table stats functional.alltypes",
+      "describe extended functional.alltypes",
+      "show tables in functional like 'all*'",
+      "show files in functional.alltypes",
+      "refresh functional.alltypes"]
+    seen = self._check_metadata_retries(queries)
+    assert seen == 0, "Saw inconsistent metadata"
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true --local_catalog_max_fetch_retries=0",
+      catalogd_args="--catalog_topic_mode=minimal")
+  def test_replan_limit(self):
+    """
+    Tests that the flag to limit the number of retries works and that
+    an inconsistent metadata exception when running concurrent reads/writes
+    is seen. With the max retries set to 0, no retries are expected and with
+    the concurrent read/write workload, an inconsistent metadata exception is
+    expected.
+    """
+    queries = [
+      'refresh functional.alltypes',
+      'select count(*) from functional.alltypes where month=4',
+      'select count(*) from functional.alltypes where month=5']
+    seen = self._check_metadata_retries(queries)
+    assert seen > 0, "Did not observe inconsistent metadata"
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true",
+      catalogd_args="--catalog_topic_mode=minimal")
   def test_replan_on_stale_metadata(self, unique_database):
     """
     Tests that when metadata is inconsistent while planning a query,
@@ -201,6 +336,7 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
       # indicates that a replan has happened.
       # We expect stress_thread to cause a re-plan. The counter is stored in a
       # mutable container so that stress_thread can update it.
+      # TODO: consolidate with _check_metadata_retries.
       replans_seen = [0]
       replans_seen_lock = threading.Lock()
 
@@ -278,102 +414,3 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
     finally:
       client1.close()
       client2.close()
-
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      impalad_args="--use_local_catalog=true --local_catalog_max_fetch_retries=0",
-      catalogd_args="--catalog_topic_mode=minimal")
-  def test_replan_limit(self, unique_database):
-    """
-    Tests that the flag to limit the number of retries works and that
-    an inconsistent metadata exception when running concurrent reads/writes
-    is seen. With the max retries set to 0, no retries are expected and with
-    the concurrent read/write workload, an inconsistent metadata exception is
-    expected.
-    """
-    try:
-      client1 = self.cluster.impalads[0].service.create_beeswax_client()
-      client2 = self.cluster.impalads[1].service.create_beeswax_client()
-
-      # Keeps track of the inconsistent exceptions seen. A mutable container
-      # is used by multiple threads to update this state.
-      inconsistency_seen = [0]
-      inconsistency_seen_lock = threading.Lock()
-
-      def stress_thread(client):
-        # Each thread picks one of these queries. The queries, accessing
-        # a subset of partitions, will detect version skew when the refresh
-        # is concurrently run. An inconsistent metadata exception will be
-        # thrown because of the version skew.
-        while inconsistency_seen[0] == 0:
-          q = random.choice([
-            'refresh functional.alltypes',
-            'select count(*) from functional.alltypes where month=4',
-            'select count(*) from functional.alltypes where month=5'])
-          try:
-            ret = self.execute_query_unchecked(client, q)
-            # Since the max retries is 0, we should never retry.
-            assert RETRY_PROFILE_MSG not in ret.runtime_profile
-          except Exception as e:
-            if 'InconsistentMetadataFetchException' in str(e):
-              with inconsistency_seen_lock:
-                inconsistency_seen[0] += 1
-
-      threads = [threading.Thread(target=stress_thread, args=(c,))
-                 for c in [client1, client2]]
-      for t in threads:
-        t.start()
-      for t in threads:
-        t.join(10)
-      assert inconsistency_seen[0] > 0, "Did not observe inconsistent metadata"
-    finally:
-      client1.close()
-      client2.close()
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      impalad_args="--use_local_catalog=true",
-      catalogd_args="--catalog_topic_mode=minimal")
-  def test_cache_metrics(self, unique_database):
-    """
-    Test that profile output includes impalad local cache metrics. Also verifies that
-    the daemon level metrics are updated between query runs.
-    """
-    try:
-      impalad = self.cluster.impalads[0]
-      client = impalad.service.create_beeswax_client()
-      cache_hit_rate_metric_key = "catalog.cache.hit-rate"
-      cache_miss_rate_metric_key = "catalog.cache.miss-rate"
-      cache_hit_count_metric_key = "catalog.cache.hit-count"
-      cache_request_count_metric_key = "catalog.cache.request-count"
-      cache_request_count_prev_run = 0
-      cache_hit_count_prev_run = 0
-      test_table_name = "%s.test_cache_metrics_test_tbl" % unique_database
-      # A mix of queries of various types.
-      queries_to_test = ["select count(*) from functional.alltypes",
-          "explain select count(*) from functional.alltypes",
-          "create table %s (a int)" % test_table_name,
-          "drop table %s" % test_table_name]
-      for _ in xrange(0, 10):
-        for query in queries_to_test:
-          ret = self.execute_query_expect_success(client, query)
-          assert ret.runtime_profile.count("Frontend:") == 1
-          assert ret.runtime_profile.count("CatalogFetch") > 1
-          cache_metrics = self.get_catalog_cache_metrics(impalad)
-          cache_hit_rate = cache_metrics[cache_hit_rate_metric_key]
-          cache_miss_rate = cache_metrics[cache_miss_rate_metric_key]
-          cache_hit_count = cache_metrics[cache_hit_count_metric_key]
-          cache_request_count = cache_metrics[cache_request_count_metric_key]
-          assert cache_hit_rate > 0.0 and cache_hit_rate < 1.0
-          assert cache_miss_rate > 0.0 and cache_miss_rate < 1.0
-          assert cache_hit_count > cache_hit_count_prev_run,\
-              "%s not updated between two query runs, query - %s"\
-              % (cache_hit_count_metric_key, query)
-          assert cache_request_count > cache_request_count_prev_run,\
-             "%s not updated betweeen two query runs, query - %s"\
-             % (cache_request_count_metric_key, query)
-          cache_hit_count_prev_run = cache_hit_count
-          cache_request_count_prev_run = cache_request_count
-    finally:
-      client.close()

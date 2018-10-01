@@ -586,6 +586,20 @@ public class Frontend {
    */
   public TLoadDataResp loadTableData(TLoadDataReq request) throws ImpalaException,
       IOException {
+    TTableName tableName = request.getTable_name();
+    RetryTracker retries = new RetryTracker(
+        String.format("load table data %s.%s", tableName.db_name, tableName.table_name));
+    while (true) {
+      try {
+        return doLoadTableData(request);
+      } catch(InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
+  }
+
+  private TLoadDataResp doLoadTableData(TLoadDataReq request) throws ImpalaException,
+      IOException {
     TableName tableName = TableName.fromThrift(request.getTable_name());
 
     // Get the destination for the load. If the load is targeting a partition,
@@ -657,10 +671,59 @@ public class Frontend {
   }
 
   /**
+   * Keeps track of retries when handling InconsistentMetadataFetchExceptions.
+   * Whenever a Catalog object is acquired (e.g., getCatalog), operations that access
+   * finer-grained objects, such as tables and partitions, can throw such a runtime
+   * exception. Inconsistent metadata comes up due to interleaving catalog object updates
+   * with retrieving those objects. Instead of bubbling up the issue to the user, retrying
+   * can get the user's operation to run on a consistent snapshot and to succeed.
+   * Retries are *not* needed for accessing top-level objects such as databases, since
+   * they do not have a parent, so cannot be inconsistent.
+   * TODO: this class is typically used in a loop at the call-site. replace with lambdas
+   *       in Java 8 to simplify the looping boilerplate.
+   */
+  public static class RetryTracker {
+    // Number of exceptions seen
+    private int attempt_ = 0;
+    // Message to add when logging retries.
+    private final String msg_;
+
+    public RetryTracker(String msg) { msg_ = msg; }
+
+    /**
+     * Record a retry. If the number of retries exceeds to configured maximum, the
+     * exception is thrown. Otherwise, the number of retries is incremented and logged.
+     * TODO: record these retries in the profile as done for query retries.
+     */
+    public void handleRetryOrThrow(InconsistentMetadataFetchException exception) {
+      if (attempt_++ >= INCONSISTENT_METADATA_NUM_RETRIES) throw exception;
+      if (attempt_ > 1) {
+        // Back-off a bit on later retries.
+        Uninterruptibles.sleepUninterruptibly(200 * attempt_, TimeUnit.MILLISECONDS);
+      }
+      LOG.warn(String.format("Retried %s: (retry #%s of %s)", msg_,
+          attempt_, INCONSISTENT_METADATA_NUM_RETRIES), exception);
+    }
+  }
+
+  /**
    * Returns all tables in database 'dbName' that match the pattern of 'matcher' and are
    * accessible to 'user'.
    */
   public List<String> getTableNames(String dbName, PatternMatcher matcher,
+      User user) throws ImpalaException {
+    RetryTracker retries = new RetryTracker(
+        String.format("fetching %s table names", dbName));
+    while (true) {
+      try {
+        return doGetTableNames(dbName, matcher, user);
+      } catch(InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
+  }
+
+  private List<String> doGetTableNames(String dbName, PatternMatcher matcher,
       User user) throws ImpalaException {
     List<String> tblNames = getCatalog().getTableNames(dbName, matcher);
     if (authzConfig_.isEnabled()) {
@@ -738,6 +801,7 @@ public class Frontend {
    * matches all data sources.
    */
   public List<? extends FeDataSource> getDataSrcs(String pattern) {
+    // TODO: handle InconsistentMetadataException for data sources.
     return getCatalog().getDataSources(
         PatternMatcher.createHivePatternMatcher(pattern));
   }
@@ -746,6 +810,19 @@ public class Frontend {
    * Generate result set and schema for a SHOW COLUMN STATS command.
    */
   public TResultSet getColumnStats(String dbName, String tableName)
+      throws ImpalaException {
+    RetryTracker retries = new RetryTracker(
+        String.format("fetching column stats from %s.%s", dbName, tableName));
+    while (true) {
+      try {
+        return doGetColumnStats(dbName, tableName);
+      } catch(InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
+  }
+
+  private TResultSet doGetColumnStats(String dbName, String tableName)
       throws ImpalaException {
     FeTable table = getCatalog().getTable(dbName, tableName);
     TResultSet result = new TResultSet();
@@ -775,6 +852,19 @@ public class Frontend {
    */
   public TResultSet getTableStats(String dbName, String tableName, TShowStatsOp op)
       throws ImpalaException {
+    RetryTracker retries = new RetryTracker(
+        String.format("fetching table stats from %s.%s", dbName, tableName));
+    while (true) {
+      try {
+        return doGetTableStats(dbName, tableName, op);
+      } catch(InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
+  }
+
+  private TResultSet doGetTableStats(String dbName, String tableName, TShowStatsOp op)
+      throws ImpalaException {
     FeTable table = getCatalog().getTable(dbName, tableName);
     if (table instanceof FeFsTable) {
       return ((FeFsTable) table).getTableStats();
@@ -799,6 +889,20 @@ public class Frontend {
    * name instead of pattern and returns exact match only.
    */
   public List<Function> getFunctions(TFunctionCategory category,
+      String dbName, String fnPattern, boolean exactMatch)
+      throws DatabaseNotFoundException {
+    RetryTracker retries = new RetryTracker(
+        String.format("fetching functions from %s", dbName));
+    while (true) {
+      try {
+        return doGetFunctions(category, dbName, fnPattern, exactMatch);
+      } catch(InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
+  }
+
+  private List<Function> doGetFunctions(TFunctionCategory category,
       String dbName, String fnPattern, boolean exactMatch)
       throws DatabaseNotFoundException {
     FeDb db = getCatalog().getDb(dbName);
@@ -840,7 +944,21 @@ public class Frontend {
    */
   public TDescribeResult describeTable(TTableName tableName,
       TDescribeOutputStyle outputStyle, User user) throws ImpalaException {
-    FeTable table = getCatalog().getTable(tableName.db_name, tableName.table_name);
+    RetryTracker retries = new RetryTracker(
+        String.format("fetching table %s.%s", tableName.db_name, tableName.table_name));
+    while (true) {
+      try {
+        return doDescribeTable(tableName, outputStyle, user);
+      } catch(InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
+  }
+
+  private TDescribeResult doDescribeTable(TTableName tableName,
+      TDescribeOutputStyle outputStyle, User user) throws ImpalaException {
+    FeTable table = getCatalog().getTable(tableName.db_name,
+        tableName.table_name);
     List<Column> filteredColumns;
     if (authzConfig_.isEnabled()) {
       // First run a table check
@@ -1360,6 +1478,21 @@ public class Frontend {
    * Returns all files info of a table or partition.
    */
   public TResultSet getTableFiles(TShowFilesParams request)
+      throws ImpalaException {
+    TTableName tableName = request.getTable_name();
+    RetryTracker retries = new RetryTracker(
+        String.format("getting table files %s.%s", tableName.db_name,
+            tableName.table_name));
+    while (true) {
+      try {
+        return doGetTableFiles(request);
+      } catch(InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
+  }
+
+  private TResultSet doGetTableFiles(TShowFilesParams request)
       throws ImpalaException{
     FeTable table = getCatalog().getTable(request.getTable_name().getDb_name(),
         request.getTable_name().getTable_name());

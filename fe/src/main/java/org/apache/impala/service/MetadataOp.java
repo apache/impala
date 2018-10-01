@@ -35,6 +35,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnValue;
@@ -255,6 +256,23 @@ public class MetadataOp {
    * If columns is null, then 'result.columns' will not be populated.
    */
   private static DbsMetadata getDbsMetadata(Frontend fe, String catalogName,
+      PatternMatcher schemaPatternMatcher, PatternMatcher tablePatternMatcher,
+      PatternMatcher columnPatternMatcher, PatternMatcher fnPatternMatcher, User user)
+      throws ImpalaException {
+    Frontend.RetryTracker retries = new Frontend.RetryTracker(
+        String.format("fetching metadata"));
+    while (true) {
+      try {
+        return doGetDbsMetadata(fe, catalogName,
+            schemaPatternMatcher, tablePatternMatcher,
+            columnPatternMatcher, fnPatternMatcher, user);
+      } catch(InconsistentMetadataFetchException e) {
+        retries.handleRetryOrThrow(e);
+      }
+    }
+  }
+
+  private static DbsMetadata doGetDbsMetadata(Frontend fe, String catalogName,
       PatternMatcher schemaPatternMatcher, PatternMatcher tablePatternMatcher,
       PatternMatcher columnPatternMatcher, PatternMatcher fnPatternMatcher, User user)
       throws ImpalaException {
