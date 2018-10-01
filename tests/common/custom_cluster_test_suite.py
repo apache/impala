@@ -187,7 +187,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
     if pytest.config.option.pull_incremental_statistics:
       cmd.append("--impalad_args=%s --catalogd_args=%s" %
-                 ("--pull_incremental_statistics", "--pull_incremental_statistics"))
+                 ("--pull_incremental_statistcs", "--pull_incremental_statistics"))
 
     default_query_option_kvs = []
     # Put any defaults first, then any arguments after that so they can override defaults.

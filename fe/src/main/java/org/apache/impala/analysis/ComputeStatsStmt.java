@@ -46,18 +46,15 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
-import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.thrift.TComputeStatsParams;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TGetPartitionStatsResponse;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TTableName;
-import org.apache.impala.thrift.TUnit;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -116,21 +113,6 @@ public class ComputeStatsStmt extends StatementBase {
       "'%s' because its column definitions do not match those in the Avro schema.";
   private static String AVRO_SCHEMA_MSG_SUFFIX = "Please re-create the table with " +
           "column definitions, e.g., using the result of 'SHOW CREATE TABLE'";
-
-  // Metrics collected when fetching incremental statistics from Catalogd. All metrics
-  // are per query.
-  private static final String STATS_FETCH_PREFIX = "StatsFetch";
-  // Time (ms) needed to fetch all partitions stats from catalogd.
-  private static final String STATS_FETCH_TIME = STATS_FETCH_PREFIX + ".Time";
-  // Number of compressed bytes received for all partitions.
-  private static final String STATS_FETCH_COMPRESSED_BYTES =
-      STATS_FETCH_PREFIX + ".CompressedBytes";
-  // Number of partitions sent from Catalogd.
-  private static final String STATS_FETCH_TOTAL_PARTITIONS =
-      STATS_FETCH_PREFIX + ".TotalPartitions";
-  // Number of partitions sent from Catalogd that include statistics.
-  private static final String STATS_FETCH_NUM_PARTITIONS_WITH_STATS =
-      STATS_FETCH_PREFIX + ".NumPartitionsWithStats";
 
   protected final TableName tableName_;
   protected final TableSampleClause sampleParams_;
@@ -645,6 +627,8 @@ public class ComputeStatsStmt extends StatementBase {
    * - incremental statistics are present
    * - the partition is whitelisted in 'partitions'
    * - the partition is present in the local impalad catalog
+   * TODO(vercegovac): Add metrics to track time spent for these rpc's when fetching
+   *                   from catalog. Look into adding to timeline.
    * TODO(vercegovac): Look into parallelizing the fetch while child-queries are
    *                   running. Easiest would be to move this fetch to the backend.
    */
@@ -654,10 +638,6 @@ public class ComputeStatsStmt extends StatementBase {
     Preconditions.checkState(BackendConfig.INSTANCE.pullIncrementalStatistics()
         && !RuntimeEnv.INSTANCE.isTestEnv());
     if (partitions.isEmpty()) return Collections.emptyMap();
-    Stopwatch sw = new Stopwatch().start();
-    int numCompressedBytes = 0;
-    int totalPartitions = 0;
-    int numPartitionsWithStats = 0;
     try {
       TGetPartitionStatsResponse response =
           analyzer.getCatalog().getPartitionStats(table.getTableName());
@@ -677,19 +657,16 @@ public class ComputeStatsStmt extends StatementBase {
       // local catalogs are returned.
       Map<Long, TPartitionStats> partitionStats =
           Maps.newHashMapWithExpectedSize(partitions.size());
-      totalPartitions = partitions.size();
       for (FeFsPartition part: partitions) {
         ByteBuffer compressedStats = response.partition_stats.get(
             FeCatalogUtils.getPartitionName(part));
         if (compressedStats != null) {
           byte[] compressedStatsBytes = new byte[compressedStats.remaining()];
-          numCompressedBytes += compressedStatsBytes.length;
           compressedStats.get(compressedStatsBytes);
           TPartitionStats remoteStats =
               PartitionStatsUtil.partStatsFromCompressedBytes(
                   compressedStatsBytes, part);
           if (remoteStats != null && remoteStats.isSetIntermediate_col_stats()) {
-            ++numPartitionsWithStats;
             partitionStats.put(part.getId(), remoteStats);
           }
         }
@@ -698,23 +675,7 @@ public class ComputeStatsStmt extends StatementBase {
     } catch (Exception e) {
       Throwables.propagateIfInstanceOf(e, AnalysisException.class);
       throw new AnalysisException("Error fetching partition statistics", e);
-    } finally {
-      recordFetchMetrics(numCompressedBytes, totalPartitions, numPartitionsWithStats, sw);
     }
-  }
-
-  /**
-   * Adds metrics to the frontend profile when fetching incremental stats from catalogd.
-   */
-  private static void recordFetchMetrics(int numCompressedBytes,
-      int totalPartitions, int numPartitionsWithStats, Stopwatch stopwatch) {
-    FrontendProfile profile = FrontendProfile.getCurrentOrNull();
-    if (profile == null) return;
-    profile.addToCounter(STATS_FETCH_COMPRESSED_BYTES, TUnit.BYTES, numCompressedBytes);
-    profile.addToCounter(STATS_FETCH_TOTAL_PARTITIONS, TUnit.NONE, totalPartitions);
-    profile.addToCounter(STATS_FETCH_NUM_PARTITIONS_WITH_STATS, TUnit.NONE,
-        numPartitionsWithStats);
-    profile.addToCounter(STATS_FETCH_TIME, TUnit.TIME_MS, stopwatch.elapsedMillis());
   }
 
   /**
