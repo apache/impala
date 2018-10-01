@@ -1167,6 +1167,7 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
   if (request_state->GetCoordinator() != nullptr) {
     TExecSummary t_exec_summary;
     request_state->GetCoordinator()->GetTExecSummary(&t_exec_summary);
+    request_state->summary_profile()->SetTExecSummary(t_exec_summary);
     string exec_summary = PrintExecSummary(t_exec_summary);
     request_state->summary_profile()->AddInfoStringRedacted("ExecSummary", exec_summary);
     request_state->summary_profile()->AddInfoStringRedacted("Errors",

@@ -18,6 +18,7 @@
 namespace cpp impala
 namespace java org.apache.impala.thrift
 
+include "ExecStats.thrift"
 include "Metrics.thrift"
 
 // Counter data
@@ -99,4 +100,5 @@ struct TRuntimeProfileNode {
 // pre-order traversal
 struct TRuntimeProfileTree {
   1: required list<TRuntimeProfileNode> nodes
+  2: optional ExecStats.TExecSummary exec_summary
 }

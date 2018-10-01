@@ -365,6 +365,12 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// This function updates local_time_percent_ for each profile.
   void ComputeTimeInProfile();
 
+  /// Set ExecSummary
+  void SetTExecSummary(const TExecSummary& summary);
+
+  /// Get a copy of exec_summary tp t_exec_summary
+  void GetExecSummary(TExecSummary* t_exec_summary) const;
+
  private:
   /// Pool for allocated counters. Usually owned by the creator of this
   /// object, but occasionally allocated in the constructor.
@@ -464,6 +470,12 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// ComputeTimeInProfile()
   int64_t local_time_ns_;
 
+  /// The Exec Summary
+  TExecSummary t_exec_summary_;
+
+  /// Protects exec_summary.
+  mutable SpinLock t_exec_summary_lock_;
+
   /// Constructor used by Create().
   RuntimeProfile(ObjectPool* pool, const std::string& name, bool is_averaged_profile);
 
@@ -482,6 +494,9 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Trailing whitspace is removed.
   void AddInfoStringInternal(
       const std::string& key, std::string value, bool append, bool redact = false);
+
+  /// Send exec_summary to thrift
+  void ExecSummaryToThrift(TRuntimeProfileTree* tree) const;
 
   /// Name of the counter maintaining the total time.
   static const std::string TOTAL_TIME_COUNTER_NAME;

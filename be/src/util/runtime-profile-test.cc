@@ -43,7 +43,7 @@ TEST(CountersTest, Basic) {
   profile_a->AddChild(profile_a2);
 
   // Test Empty
-  profile_a->ToThrift(&thrift_profile.nodes);
+  profile_a->ToThrift(&thrift_profile);
   EXPECT_EQ(thrift_profile.nodes.size(), 3);
   thrift_profile.nodes.clear();
 
@@ -63,12 +63,22 @@ TEST(CountersTest, Basic) {
   counter_b = profile_a2->AddCounter("B", TUnit::BYTES);
   EXPECT_TRUE(counter_b != NULL);
 
+  // Update status to be included in ExecSummary
+  TExecSummary exec_summary;
+  TStatus status;
+  status.__set_status_code(TErrorCode::CANCELLED);
+  exec_summary.__set_status(status);
+  profile_a->SetTExecSummary(exec_summary);
+
   // Serialize/deserialize
-  profile_a->ToThrift(&thrift_profile.nodes);
+  profile_a->ToThrift(&thrift_profile);
   RuntimeProfile* from_thrift = RuntimeProfile::CreateFromThrift(&pool, thrift_profile);
   counter_merged = from_thrift->GetCounter("A");
   EXPECT_EQ(counter_merged->value(), 1);
   EXPECT_TRUE(from_thrift->GetCounter("Not there") ==  NULL);
+  TExecSummary exec_summary_result;
+  from_thrift->GetExecSummary(&exec_summary_result);
+  EXPECT_EQ(exec_summary_result.status, status);
 
   // Averaged
   RuntimeProfile* averaged_profile = RuntimeProfile::Create(&pool, "Merged", true);

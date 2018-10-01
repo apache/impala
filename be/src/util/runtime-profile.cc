@@ -111,7 +111,9 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
     const TRuntimeProfileTree& profiles) {
   if (profiles.nodes.size() == 0) return NULL;
   int idx = 0;
-  return RuntimeProfile::CreateFromThrift(pool, profiles.nodes, &idx);
+  RuntimeProfile* profile = RuntimeProfile::CreateFromThrift(pool, profiles.nodes, &idx);
+  profile->SetTExecSummary(profiles.exec_summary);
+  return profile;
 }
 
 RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
@@ -848,9 +850,15 @@ Status RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   return Status::OK();;
 }
 
+void RuntimeProfile::SetTExecSummary(const TExecSummary& summary) {
+  lock_guard<SpinLock> l(t_exec_summary_lock_);
+  t_exec_summary_ = summary;
+}
+
 void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) const {
   tree->nodes.clear();
   ToThrift(&tree->nodes);
+  ExecSummaryToThrift(tree);
 }
 
 void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
@@ -937,6 +945,15 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
     // fix up indentation flag
     (*nodes)[child_idx].indent = children[i].second;
   }
+}
+
+void RuntimeProfile::ExecSummaryToThrift(TRuntimeProfileTree* tree) const {
+  GetExecSummary(&tree->exec_summary);
+}
+
+void RuntimeProfile::GetExecSummary(TExecSummary* t_exec_summary) const {
+  lock_guard<SpinLock> l(t_exec_summary_lock_);
+  *t_exec_summary = t_exec_summary_;
 }
 
 int64_t RuntimeProfile::UnitsPerSecond(
