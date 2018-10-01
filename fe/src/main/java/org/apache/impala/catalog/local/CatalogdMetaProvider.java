@@ -48,7 +48,6 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.service.FeSupport;
-import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TCatalogInfoSelector;
@@ -67,7 +66,6 @@ import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableInfoSelector;
 import org.apache.impala.thrift.TUniqueId;
-import org.apache.impala.thrift.TUnit;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.util.ListMap;
@@ -83,7 +81,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -187,25 +184,6 @@ public class CatalogdMetaProvider implements MetaProvider {
    * an ImmutableList<String>.
    */
   private static final Object DB_LIST_CACHE_KEY = new Object();
-
-  private static final String CATALOG_FETCH_PREFIX = "CatalogFetch";
-  private static final String DB_LIST_STATS_CATEGORY = "DatabaseList";
-  private static final String DB_METADATA_STATS_CATEGORY = "Databases";
-  private static final String TABLE_NAMES_STATS_CATEGORY = "TableNames";
-  private static final String TABLE_METADATA_CACHE_CATEGORY = "Tables";
-  private static final String PARTITION_LIST_STATS_CATEGORY = "PartitionLists";
-  private static final String PARTITIONS_STATS_CATEGORY = "Partitions";
-  private static final String COLUMN_STATS_STATS_CATEGORY = "ColumnStats";
-  private static final String GLOBAL_CONFIGURATION_STATS_CATEGORY = "Config";
-  private static final String FUNCTION_LIST_STATS_CATEGORY = "FunctionLists";
-  private static final String FUNCTIONS_STATS_CATEGORY = "Functions";
-  private static final String RPC_STATS_CATEGORY = "RPCs";
-  private static final String RPC_REQUESTS =
-      CATALOG_FETCH_PREFIX + "." + RPC_STATS_CATEGORY + ".Requests";
-  private static final String RPC_BYTES =
-      CATALOG_FETCH_PREFIX + "." + RPC_STATS_CATEGORY + ".Bytes";
-  private static final String RPC_TIME =
-      CATALOG_FETCH_PREFIX + "." + RPC_STATS_CATEGORY + ".Time";
 
   /**
    * File descriptors store replicas using a compressed format that references hosts
@@ -312,20 +290,11 @@ public class CatalogdMetaProvider implements MetaProvider {
       TGetPartialCatalogObjectRequest req)
       throws TException {
     TGetPartialCatalogObjectResponse resp;
-    byte[] ret = null;
-    Stopwatch sw = new Stopwatch().start();
+    byte[] ret;
     try {
       ret = FeSupport.GetPartialCatalogObject(new TSerializer().serialize(req));
     } catch (InternalException e) {
       throw new TException(e);
-    } finally {
-      sw.stop();
-      FrontendProfile profile = FrontendProfile.getCurrentOrNull();
-      if (profile != null) {
-        profile.addToCounter(RPC_REQUESTS, TUnit.NONE, 1);
-        profile.addToCounter(RPC_BYTES, TUnit.BYTES, ret == null ? 0 : ret.length);
-        profile.addToCounter(RPC_TIME, TUnit.TIME_MS, sw.elapsed(TimeUnit.MILLISECONDS));
-      }
     }
     resp = new TGetPartialCatalogObjectResponse();
     new TDeserializer().deserialize(resp, ret);
@@ -374,15 +343,13 @@ public class CatalogdMetaProvider implements MetaProvider {
 
   @SuppressWarnings("unchecked")
   private <CacheKeyType, ValueType> ValueType loadWithCaching(String itemString,
-      String statsCategory, CacheKeyType key,
-      final Callable<ValueType> loadCallable) throws TException {
+      CacheKeyType key, final Callable<ValueType> loadCallable) throws TException {
     // TODO(todd): there a race here if an invalidation comes in while we are
     // fetching here. Perhaps we need some locking, or need to remember the
     // version numbers of the invalidation messages and ensure that we don't
     // 'put' an element with a too-old version? See:
     // https://softwaremill.com/race-condition-cache-guava-caffeine/
     final Reference<Boolean> hit = new Reference<>(true);
-    Stopwatch sw = new Stopwatch().start();
     try {
       return (ValueType)cache_.get(key, new Callable<ValueType>() {
         @Override
@@ -395,39 +362,13 @@ public class CatalogdMetaProvider implements MetaProvider {
       Throwables.propagateIfPossible(e.getCause(), TException.class);
       throw new RuntimeException(e);
     } finally {
-      sw.stop();
-      addStatsToProfile(statsCategory, /*numHits=*/hit.getRef() ? 1 : 0,
-          /*numMisses=*/hit.getRef() ? 0 : 1, sw);
       LOG.trace("Request for {}: {}", itemString, hit.getRef() ? "hit" : "miss");
-    }
-  }
-
-  /**
-   * Adds basic statistics to the query's profile when accessing cache entries.
-   * For each cache request, the number of hits, misses, and elapsed time is aggregated.
-   * Cache requests for different types of cache entries, such as function names vs.
-   * table names, are differentiated by a 'statsCategory'.
-   */
-  private void addStatsToProfile(String statsCategory, int numHits, int numMisses,
-      Stopwatch stopwatch) {
-    FrontendProfile profile = FrontendProfile.getCurrentOrNull();
-    if (profile == null) return;
-    final String prefix = CATALOG_FETCH_PREFIX + "." +
-        Preconditions.checkNotNull(statsCategory) + ".";
-    profile.addToCounter(prefix + "Requests", TUnit.NONE, numHits + numMisses);;
-    profile.addToCounter(prefix + "Time", TUnit.TIME_MS,
-        stopwatch.elapsed(TimeUnit.MILLISECONDS));
-    if (numHits > 0) {
-      profile.addToCounter(prefix + "Hits", TUnit.NONE, numHits);
-    }
-    if (numMisses > 0) {
-      profile.addToCounter(prefix + "Misses", TUnit.NONE, numMisses);
     }
   }
 
   @Override
   public ImmutableList<String> loadDbList() throws TException {
-    return loadWithCaching("database list", DB_LIST_STATS_CATEGORY, DB_LIST_CACHE_KEY,
+    return loadWithCaching("database list", DB_LIST_CACHE_KEY,
         new Callable<ImmutableList<String>>() {
           @Override
           public ImmutableList<String> call() throws Exception {
@@ -474,7 +415,6 @@ public class CatalogdMetaProvider implements MetaProvider {
   @Override
   public Database loadDb(final String dbName) throws TException {
     return loadWithCaching("database metadata for " + dbName,
-        DB_METADATA_STATS_CATEGORY,
         new DbCacheKey(dbName, DbCacheKey.DbInfoType.HMS_METADATA),
         new Callable<Database>() {
           @Override
@@ -493,7 +433,6 @@ public class CatalogdMetaProvider implements MetaProvider {
   public ImmutableList<String> loadTableNames(final String dbName)
       throws MetaException, UnknownDBException, TException {
     return loadWithCaching("table names for database " + dbName,
-        TABLE_NAMES_STATS_CATEGORY,
         new DbCacheKey(dbName, DbCacheKey.DbInfoType.TABLE_NAMES),
         new Callable<ImmutableList<String>>() {
           @Override
@@ -535,7 +474,6 @@ public class CatalogdMetaProvider implements MetaProvider {
     TableCacheKey cacheKey = new TableCacheKey(dbName, tableName);
     TableMetaRefImpl ref = loadWithCaching(
         "table metadata for " + dbName + "." + tableName,
-        TABLE_METADATA_CACHE_CATEGORY,
         cacheKey,
         new Callable<TableMetaRefImpl>() {
           @Override
@@ -555,7 +493,6 @@ public class CatalogdMetaProvider implements MetaProvider {
   @Override
   public List<ColumnStatisticsObj> loadTableColumnStatistics(final TableMetaRef table,
       List<String> colNames) throws TException {
-    Stopwatch sw = new Stopwatch().start();
     List<ColumnStatisticsObj> ret = Lists.newArrayListWithCapacity(colNames.size());
     // Look up in cache first, keeping track of which ones are missing.
     // We can't use 'loadWithCaching' since we need to fetch several entries batched
@@ -597,9 +534,6 @@ public class CatalogdMetaProvider implements MetaProvider {
             NEGATIVE_COLUMN_STATS_SENTINEL);
       }
     }
-    sw.stop();
-    addStatsToProfile(COLUMN_STATS_STATS_CATEGORY,
-        hitCount + negativeHitCount, missingCols.size(), sw);
     LOG.trace("Request for column stats of {}: hit {}/ neg hit {} / miss {}",
         table, hitCount, negativeHitCount, missingCols.size());
     return ret;
@@ -610,8 +544,8 @@ public class CatalogdMetaProvider implements MetaProvider {
   public List<PartitionRef> loadPartitionList(final TableMetaRef table)
       throws TException {
     PartitionListCacheKey key = new PartitionListCacheKey((TableMetaRefImpl) table);
-    return (List<PartitionRef>) loadWithCaching("partition list for " + table,
-        PARTITION_LIST_STATS_CATEGORY, key, new Callable<List<PartitionRef>>() {
+    return (List<PartitionRef>) loadWithCaching(
+        "partition list for " + table, key, new Callable<List<PartitionRef>>() {
           /** Called to load cache for cache misses */
           @Override
           public List<PartitionRef> call() throws Exception {
@@ -640,13 +574,13 @@ public class CatalogdMetaProvider implements MetaProvider {
       throws MetaException, TException {
     Preconditions.checkArgument(table instanceof TableMetaRefImpl);
     TableMetaRefImpl refImpl = (TableMetaRefImpl)table;
-    Stopwatch sw = new Stopwatch().start();
+
     // Load what we can from the cache.
     Map<PartitionRef, PartitionMetadata> refToMeta = loadPartitionsFromCache(refImpl,
         hostIndex, partitionRefs);
 
-    final int numHits = refToMeta.size();
-    final int numMisses = partitionRefs.size() - numHits;
+    LOG.trace("Request for partitions of {}: hit {}/{}", table, refToMeta.size(),
+        partitionRefs.size());
 
     // Load the remainder from the catalogd.
     List<PartitionRef> missingRefs = Lists.newArrayList();
@@ -660,10 +594,6 @@ public class CatalogdMetaProvider implements MetaProvider {
       // Write back to the cache.
       storePartitionsInCache(refImpl, hostIndex, fromCatalogd);
     }
-    sw.stop();
-    addStatsToProfile(PARTITIONS_STATS_CATEGORY, refToMeta.size(), numMisses, sw);
-    LOG.trace("Request for partitions of {}: hit {}/{}", table, refToMeta.size(),
-        partitionRefs.size());
 
     // Convert the returned map to be by-name instead of by-ref.
     Map<String, PartitionMetadata> nameToMeta = Maps.newHashMapWithExpectedSize(
@@ -794,9 +724,7 @@ public class CatalogdMetaProvider implements MetaProvider {
   @Override
   public String loadNullPartitionKeyValue() throws MetaException, TException {
     return (String) loadWithCaching("null partition key value",
-        GLOBAL_CONFIGURATION_STATS_CATEGORY,
-        NULL_PARTITION_KEY_VALUE_CACHE_KEY,
-        new Callable<String>() {
+        NULL_PARTITION_KEY_VALUE_CACHE_KEY, new Callable<String>() {
           /** Called to load cache for cache misses */
           @Override
           public String call() throws Exception {
@@ -808,7 +736,6 @@ public class CatalogdMetaProvider implements MetaProvider {
   @Override
   public List<String> loadFunctionNames(final String dbName) throws TException {
     return loadWithCaching("function names for database " + dbName,
-        FUNCTION_LIST_STATS_CATEGORY,
         new DbCacheKey(dbName, DbCacheKey.DbInfoType.FUNCTION_NAMES),
         new Callable<ImmutableList<String>>() {
           @Override
@@ -828,7 +755,6 @@ public class CatalogdMetaProvider implements MetaProvider {
       final String functionName) throws TException {
     ImmutableList<TFunction> thriftFuncs = loadWithCaching(
         "function " + dbName + "." + functionName,
-        FUNCTIONS_STATS_CATEGORY,
         new FunctionsCacheKey(dbName, functionName),
         new Callable<ImmutableList<TFunction>>() {
           @Override

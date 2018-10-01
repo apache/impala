@@ -306,8 +306,9 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
       for _ in xrange(0, 10):
         for query in queries_to_test:
           ret = self.execute_query_expect_success(client, query)
-          assert ret.runtime_profile.count("Frontend:") == 1
-          assert ret.runtime_profile.count("CatalogFetch") > 1
+          # TODO: re-enable checks when counters are put back into profile
+          # assert ret.runtime_profile.count("Frontend:") == 1
+          # assert ret.runtime_profile.count("CatalogFetch") > 1
           cache_metrics = self.get_catalog_cache_metrics(impalad)
           cache_hit_rate = cache_metrics[cache_hit_rate_metric_key]
           cache_miss_rate = cache_metrics[cache_miss_rate_metric_key]

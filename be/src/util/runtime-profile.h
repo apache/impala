@@ -263,7 +263,7 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   Counter* inactive_timer() { return counter_map_[INACTIVE_TIME_COUNTER_NAME]; }
   int64_t local_time() { return local_time_ns_; }
 
-  /// Prints the contents of the profile in a name: value format.
+  /// Prints the counters in a name: value format.
   /// Does not hold locks when it makes any function calls.
   void PrettyPrint(std::ostream* s, const std::string& prefix="") const;
 
