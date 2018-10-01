@@ -103,4 +103,8 @@ struct TBackendGflags {
   38: required i64 kudu_scanner_thread_estimated_bytes_per_column
 
   39: required i64 kudu_scanner_thread_max_estimated_bytes
+
+  40: required i32 catalog_max_parallel_partial_fetch_rpc
+
+  41: required i64 catalog_partial_fetch_rpc_queue_timeout_s
 }

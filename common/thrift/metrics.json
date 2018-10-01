@@ -1890,5 +1890,15 @@
     "units": "TIME_NS",
     "kind": "COUNTER",
     "key": "catalog.cache.total-load-time"
+  },
+  {
+    "description": "RPC queue length for partial object fetches.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "RPC queue length for partial object fetch requests.",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.partial-fetch-rpc.queue-len"
   }
 ]

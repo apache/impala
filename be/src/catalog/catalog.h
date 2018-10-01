@@ -100,6 +100,10 @@ class Catalog {
   Status GetTableMetrics(const std::string& db, const std::string& tbl,
       std::string* metrics);
 
+  /// Returns the Catalog server metrics in the response object. Refer to
+  /// TGetCatalogServerMetricsResponse definition for details.
+  Status GetCatalogServerMetrics(TGetCatalogServerMetricsResponse* response);
+
   /// Returns the current catalog usage that includes the most frequently accessed
   /// tables as well as the tables with the highest memory requirements.
   Status GetCatalogUsage(TGetCatalogUsageResponse* response);
@@ -139,6 +143,7 @@ class Catalog {
   jmethodID get_catalog_delta_id_;  // JniCatalog.getCatalogDelta()
   jmethodID get_catalog_version_id_;  // JniCatalog.getCatalogVersion()
   jmethodID get_catalog_usage_id_; // JniCatalog.getCatalogUsage()
+  jmethodID get_catalog_server_metrics_; // JniCatalog.getCatalogServerMetrics()
   jmethodID get_dbs_id_; // JniCatalog.getDbs()
   jmethodID get_table_names_id_; // JniCatalog.getTableNames()
   jmethodID get_table_metrics_id_; // JniCatalog.getTableMetrics()

@@ -19,10 +19,11 @@ package org.apache.impala.testutil;
 
 import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.catalog.AuthorizationPolicy;
-import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TUniqueId;
 
 /**

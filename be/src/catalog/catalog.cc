@@ -67,6 +67,7 @@ Catalog::Catalog() {
     {"getCatalogDelta", "([B)[B", &get_catalog_delta_id_},
     {"getCatalogUsage", "()[B", &get_catalog_usage_id_},
     {"getCatalogVersion", "()J", &get_catalog_version_id_},
+    {"getCatalogServerMetrics", "()[B", &get_catalog_server_metrics_},
     {"prioritizeLoad", "([B)V", &prioritize_load_id_},
     {"getPartitionStats", "([B)[B", &get_partition_stats_id_},
     {"updateTableUsage", "([B)V", &update_table_usage_id_},
@@ -156,6 +157,10 @@ Status Catalog::GetTableMetrics(const string& db, const string& tbl,
 
 Status Catalog::GetCatalogUsage(TGetCatalogUsageResponse* response) {
   return JniUtil::CallJniMethod(catalog_, get_catalog_usage_id_, response);
+}
+
+Status Catalog::GetCatalogServerMetrics(TGetCatalogServerMetricsResponse* response) {
+  return JniUtil::CallJniMethod(catalog_, get_catalog_server_metrics_, response);
 }
 
 Status Catalog::GetFunctions(const TGetFunctionsRequest& request,

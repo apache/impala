@@ -90,8 +90,14 @@ class CatalogServer {
   /// Metric that tracks the amount of time taken preparing a catalog update.
   StatsMetric<double>* topic_processing_time_metric_;
 
+  /// Tracks the partial fetch RPC call queue length on the Catalog server.
+  IntGauge* partial_fetch_rpc_queue_len_metric_;
+
   /// Thread that polls the catalog for any updates.
   std::unique_ptr<Thread> catalog_update_gathering_thread_;
+
+  /// Thread that periodically wakes up and refreshes certain Catalog metrics.
+  std::unique_ptr<Thread> catalog_metrics_refresh_thread_;
 
   /// Protects catalog_update_cv_, pending_topic_updates_,
   /// catalog_objects_to/from_version_, and last_sent_catalog_version.
@@ -142,6 +148,9 @@ class CatalogServer {
   /// each object. The results are stored in the shared catalog_objects_ data structure.
   /// Also, explicitly releases free memory back to the OS after each complete iteration.
   [[noreturn]] void GatherCatalogUpdatesThread();
+
+  /// Executed by the catalog_metrics_refresh_thread_. Refreshes certain catalog metrics.
+  [[noreturn]] void RefreshMetrics();
 
   /// Example output:
   /// "databases": [
@@ -200,6 +209,7 @@ class CatalogServer {
   /// <host>:25020/table_metrics?name=foo.bar
   void TableMetricsUrlCallback(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);
+
 };
 
 }

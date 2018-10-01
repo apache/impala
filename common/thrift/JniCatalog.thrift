@@ -732,3 +732,9 @@ struct TCommentOnParams {
   // Name of column to alter.
   4: optional TColumnName column_name
 }
+
+// Response to GetCatalogServerMetrics() call.
+struct TGetCatalogServerMetricsResponse {
+  // Partial fetch RPC queue length.
+  1: required i32 catalog_partial_fetch_rpc_queue_len
+}

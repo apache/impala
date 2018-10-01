@@ -119,6 +119,14 @@ public class BackendConfig {
     return backendCfg_.local_catalog_max_fetch_retries;
   }
 
+  public int getCatalogMaxParallelPartialFetchRpc() {
+    return backendCfg_.catalog_max_parallel_partial_fetch_rpc;
+  }
+
+  public long getCatalogPartialFetchRpcQueueTimeoutS() {
+    return backendCfg_.catalog_partial_fetch_rpc_queue_timeout_s;
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

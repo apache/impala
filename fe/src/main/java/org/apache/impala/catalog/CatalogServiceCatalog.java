@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -235,6 +236,17 @@ public class CatalogServiceCatalog extends Catalog {
   };
   final TopicMode topicMode_;
 
+  private final long PARTIAL_FETCH_RPC_QUEUE_TIMEOUT_S = BackendConfig.INSTANCE
+      .getCatalogPartialFetchRpcQueueTimeoutS();
+
+  private final int MAX_PARALLEL_PARTIAL_FETCH_RPC_COUNT = BackendConfig.INSTANCE
+      .getCatalogMaxParallelPartialFetchRpc();
+
+  // Controls concurrent access to doGetPartialCatalogObject() call. Limits the number
+  // of parallel requests to --catalog_max_parallel_partial_fetch_rpc.
+  private final Semaphore partialObjectFetchAccess_ =
+      new Semaphore(MAX_PARALLEL_PARTIAL_FETCH_RPC_COUNT, /*fair =*/ true);
+
   /**
    * Initialize the CatalogServiceCatalog. If 'loadInBackground' is true, table metadata
    * will be loaded in the background. 'initialHmsCnxnTimeoutSec' specifies the time (in
@@ -270,6 +282,7 @@ public class CatalogServiceCatalog extends Catalog {
         BackendConfig.INSTANCE.getBackendCfg().catalog_topic_mode.toUpperCase());
     catalogdTableInvalidator_ = CatalogdTableInvalidator.create(this,
         BackendConfig.INSTANCE);
+    Preconditions.checkState(PARTIAL_FETCH_RPC_QUEUE_TIMEOUT_S > 0);
   }
 
   // Timeout for acquiring a table lock
@@ -385,6 +398,10 @@ public class CatalogServiceCatalog extends Catalog {
         versionLock_.writeLock().unlock();
       }
     }
+  }
+
+  public int getPartialFetchRpcQueueLength() {
+    return partialObjectFetchAccess_.getQueueLength();
   }
 
   /**
@@ -2095,13 +2112,59 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * A wrapper around doGetPartialCatalogObject() that controls the number of concurrent
+   * invocations.
+   */
+  public TGetPartialCatalogObjectResponse getPartialCatalogObject(
+      TGetPartialCatalogObjectRequest req) throws CatalogException {
+    try {
+      if (!partialObjectFetchAccess_.tryAcquire(1,
+          PARTIAL_FETCH_RPC_QUEUE_TIMEOUT_S, TimeUnit.SECONDS)) {
+        // Timed out trying to acquire the semaphore permit.
+        throw new CatalogException("Timed out while fetching partial object metadata. " +
+            "Please check the metric 'catalog.partial-fetch-rpc.queue-len' for the " +
+            "current queue length and consider increasing " +
+            "'catalog_partial_fetch_rpc_queue_timeout_s' and/or " +
+            "'catalog_max_parallel_partial_fetch_rpc'");
+      }
+      // Acquired the permit at this point, should be released before we exit out of
+      // this method.
+      //
+      // Is there a chance that this thread can get interrupted at this point before it
+      // enters the try block, eventually leading to the semaphore permit not
+      // getting released? It can probably happen if the JVM is already in a bad shape.
+      // In the worst case, every permit is blocked and the subsequent requests throw
+      // the timeout exception and the user can monitor the queue metric to see that it
+      // is full, so the issue should be easy to diagnose.
+      // TODO: Figure out if such a race is possible.
+      try {
+        return doGetPartialCatalogObject(req);
+      } finally {
+        partialObjectFetchAccess_.release();
+      }
+    } catch (InterruptedException e) {
+      throw new CatalogException("Error running getPartialCatalogObject(): ", e);
+    }
+  }
+
+  /**
+   * Returns the number of currently running partial RPCs.
+   */
+  @VisibleForTesting
+  public int getConcurrentPartialRpcReqCount() {
+    // Calculated based on number of currently available semaphore permits.
+    return MAX_PARALLEL_PARTIAL_FETCH_RPC_COUNT - partialObjectFetchAccess_
+        .availablePermits();
+  }
+
+  /**
    * Return a partial view of information about a given catalog object. This services
    * the CatalogdMetaProvider running on impalads when they are configured in
    * "local-catalog" mode. If required objects are not present, for example, the database
    * from which a table is requested, the types of the missing objects will be set in the
    * response's lookup_status.
    */
-  public TGetPartialCatalogObjectResponse getPartialCatalogObject(
+  private TGetPartialCatalogObjectResponse doGetPartialCatalogObject(
       TGetPartialCatalogObjectRequest req) throws CatalogException {
     TCatalogObject objectDesc = Preconditions.checkNotNull(req.object_desc,
         "missing object_desc");

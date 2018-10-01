@@ -46,6 +46,7 @@ import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TGetCatalogDeltaResponse;
 import org.apache.impala.thrift.TGetCatalogDeltaRequest;
+import org.apache.impala.thrift.TGetCatalogServerMetricsResponse;
 import org.apache.impala.thrift.TGetDbsParams;
 import org.apache.impala.thrift.TGetDbsResult;
 import org.apache.impala.thrift.TGetFunctionsRequest;
@@ -319,5 +320,13 @@ public class JniCatalog {
     TUpdateTableUsageRequest thriftReq = new TUpdateTableUsageRequest();
     JniUtil.deserializeThrift(protocolFactory_, thriftReq, req);
     catalog_.updateTableUsage(thriftReq);
+  }
+
+  public byte[] getCatalogServerMetrics() throws ImpalaException, TException {
+    TGetCatalogServerMetricsResponse response = new TGetCatalogServerMetricsResponse();
+    response.setCatalog_partial_fetch_rpc_queue_len(
+        catalog_.getPartialFetchRpcQueueLength());
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    return serializer.serialize(response);
   }
 }

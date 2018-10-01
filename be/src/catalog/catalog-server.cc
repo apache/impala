@@ -62,6 +62,14 @@ DEFINE_validator(catalog_topic_mode, [](const char* name, const string& val) {
   return false;
 });
 
+DEFINE_int32_hidden(catalog_max_parallel_partial_fetch_rpc, 32, "Maximum number of "
+    "partial catalog object fetch RPCs that can run in parallel. Applicable only when "
+    "local catalog mode is configured.");
+
+DEFINE_int64_hidden(catalog_partial_fetch_rpc_queue_timeout_s, LLONG_MAX, "Maximum time "
+    "(in seconds) a partial catalog object fetch RPC spends in the queue waiting "
+    "to run. Must be set to a value greater than zero.");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);
@@ -73,12 +81,17 @@ string CatalogServer::IMPALA_CATALOG_TOPIC = "catalog-update";
 const string CATALOG_SERVER_TOPIC_PROCESSING_TIMES =
     "catalog-server.topic-processing-time-s";
 
+const string CATALOG_SERVER_PARTIAL_FETCH_RPC_QUEUE_LEN =
+    "catalog.partial-fetch-rpc.queue-len";
+
 const string CATALOG_WEB_PAGE = "/catalog";
 const string CATALOG_TEMPLATE = "catalog.tmpl";
 const string CATALOG_OBJECT_WEB_PAGE = "/catalog_object";
 const string CATALOG_OBJECT_TEMPLATE = "catalog_object.tmpl";
 const string TABLE_METRICS_WEB_PAGE = "/table_metrics";
 const string TABLE_METRICS_TEMPLATE = "table_metrics.tmpl";
+
+const int REFRESH_METRICS_INTERVAL_MS = 1000;
 
 // Implementation for the CatalogService thrift interface.
 class CatalogServiceThriftIf : public CatalogServiceIf {
@@ -218,6 +231,8 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
     catalog_objects_max_version_(0L) {
   topic_processing_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
       CATALOG_SERVER_TOPIC_PROCESSING_TIMES);
+  partial_fetch_rpc_queue_len_metric_ =
+      metrics->AddGauge(CATALOG_SERVER_PARTIAL_FETCH_RPC_QUEUE_LEN, 0);
 }
 
 Status CatalogServer::Start() {
@@ -230,13 +245,11 @@ Status CatalogServer::Start() {
 
   // This will trigger a full Catalog metadata load.
   catalog_.reset(new Catalog());
-  Status status = Thread::Create("catalog-server", "catalog-update-gathering-thread",
+  RETURN_IF_ERROR(Thread::Create("catalog-server", "catalog-update-gathering-thread",
       &CatalogServer::GatherCatalogUpdatesThread, this,
-      &catalog_update_gathering_thread_);
-  if (!status.ok()) {
-    status.AddDetail("CatalogService failed to start");
-    return status;
-  }
+      &catalog_update_gathering_thread_));
+  RETURN_IF_ERROR(Thread::Create("catalog-server", "catalog-metrics-refresh-thread",
+      &CatalogServer::RefreshMetrics, this, &catalog_metrics_refresh_thread_));
 
   statestore_subscriber_.reset(new StatestoreSubscriber(
      Substitute("catalog-server@$0", TNetworkAddressToString(server_address)),
@@ -249,7 +262,7 @@ Status CatalogServer::Start() {
   // prefix of any key. This saves a bit of network communication from the statestore
   // back to the catalog.
   string filter_prefix = "!";
-  status = statestore_subscriber_->AddTopic(IMPALA_CATALOG_TOPIC,
+  Status status = statestore_subscriber_->AddTopic(IMPALA_CATALOG_TOPIC,
       /* is_transient=*/ false, /* populate_min_subscriber_topic_version=*/ false,
       filter_prefix, cb);
   if (!status.ok()) {
@@ -328,7 +341,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
 }
 
 [[noreturn]] void CatalogServer::GatherCatalogUpdatesThread() {
-  while (1) {
+  while (true) {
     unique_lock<mutex> unique_lock(catalog_lock_);
     // Protect against spurious wake-ups by checking the value of topic_updates_ready_.
     // It is only safe to continue on and update the shared pending_topic_updates_
@@ -363,6 +376,20 @@ void CatalogServer::UpdateCatalogTopicCallback(
 
     topic_processing_time_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     topic_updates_ready_ = true;
+  }
+}
+
+[[noreturn]] void CatalogServer::RefreshMetrics() {
+  while (true) {
+    SleepForMs(REFRESH_METRICS_INTERVAL_MS);
+    TGetCatalogServerMetricsResponse response;
+    Status status = catalog_->GetCatalogServerMetrics(&response);
+    if (!status.ok()) {
+      LOG(ERROR) << "Error refreshing catalog metrics: " << status.GetDetail();
+      continue;
+    }
+    partial_fetch_rpc_queue_len_metric_->SetValue(
+        response.catalog_partial_fetch_rpc_queue_len);
   }
 }
 

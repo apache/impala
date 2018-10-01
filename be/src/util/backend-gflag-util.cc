@@ -65,6 +65,8 @@ DECLARE_double(invalidate_tables_fraction_on_memory_pressure);
 DECLARE_int32(local_catalog_max_fetch_retries);
 DECLARE_int64(kudu_scanner_thread_estimated_bytes_per_column);
 DECLARE_int64(kudu_scanner_thread_max_estimated_bytes);
+DECLARE_int32(catalog_max_parallel_partial_fetch_rpc);
+DECLARE_int64(catalog_partial_fetch_rpc_queue_timeout_s);
 
 namespace impala {
 
@@ -126,6 +128,10 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
       FLAGS_kudu_scanner_thread_estimated_bytes_per_column);
   cfg.__set_kudu_scanner_thread_max_estimated_bytes(
       FLAGS_kudu_scanner_thread_max_estimated_bytes);
+  cfg.__set_catalog_max_parallel_partial_fetch_rpc(
+      FLAGS_catalog_max_parallel_partial_fetch_rpc);
+  cfg.__set_catalog_partial_fetch_rpc_queue_timeout_s(
+      FLAGS_catalog_partial_fetch_rpc_queue_timeout_s);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }
