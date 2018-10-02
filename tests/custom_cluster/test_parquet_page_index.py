@@ -23,7 +23,7 @@ from collections import namedtuple
 from subprocess import check_call
 from parquet.ttypes import BoundaryOrder, ColumnIndex, OffsetIndex, PageHeader, PageType
 
-from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.get_parquet_metadata import (
@@ -36,9 +36,14 @@ PAGE_INDEX_MAX_STRING_LENGTH = 64
 
 
 @SkipIfLocal.parquet_file_size
-class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
+class TestHdfsParquetTableIndexWriter(CustomClusterTestSuite):
   """Since PARQUET-922 page statistics can be written before the footer.
   The tests in this class checks if Impala writes the page indices correctly.
+  It is temporarily a custom cluster test suite because we need to set the
+  enable_parquet_page_index_writing command-line flag for the Impala daemon
+  in order to make it write the page index.
+  TODO: IMPALA-5843 Once Impala is able to read the page index and also write it by
+  default, this test suite should be moved back to query tests.
   """
   @classmethod
   def get_workload(cls):
@@ -46,7 +51,7 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestHdfsParquetTableIndexWriter, cls).add_test_dimensions()
+    super(CustomClusterTestSuite, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
@@ -269,62 +274,54 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     qualified_table_name = "{0}.{1}".format(unique_database, table_name)
     self.execute_query("drop table if exists {0}".format(qualified_table_name))
     vector.get_value('exec_option')['num_nodes'] = 1
-    query = ("create table {0} (str string) stored as parquet").format(qualified_table_name)
+    query = ("create table {0} (str string) stored as parquet").format(
+        qualified_table_name)
     self.execute_query(query, vector.get_value('exec_option'))
     self.execute_query("insert into {0} values {1}".format(qualified_table_name,
         values_sql), vector.get_value('exec_option'))
     return get_fs_path('/test-warehouse/{0}.db/{1}/'.format(unique_database,
         table_name))
 
-  def test_write_index_alltypes(self, vector, unique_database, tmpdir):
-    """Test that writing a parquet file populates the rowgroup indexes with the correct
-    values.
-    """
+  @CustomClusterTestSuite.with_args("--enable_parquet_page_index_writing_debug_only")
+  def test_ctas_tables(self, vector, unique_database, tmpdir):
+    """Test different Parquet files created via CTAS statements."""
+
+    # Test that writing a parquet file populates the rowgroup indexes with the correct
+    # values.
     self._ctas_table_and_verify_index(vector, unique_database, "functional.alltypes",
         tmpdir)
 
-  def test_write_index_decimals(self, vector, unique_database, tmpdir):
-    """Test that writing a parquet file populates the rowgroup indexes with the correct
-    values, using decimal types.
-    """
+    # Test that writing a parquet file populates the rowgroup indexes with the correct
+    # values, using decimal types.
     self._ctas_table_and_verify_index(vector, unique_database, "functional.decimal_tbl",
         tmpdir)
 
-  def test_write_index_chars(self, vector, unique_database, tmpdir):
-    """Test that writing a parquet file populates the rowgroup indexes with the correct
-    values, using char types.
-    """
+    # Test that writing a parquet file populates the rowgroup indexes with the correct
+    # values, using char types.
     self._ctas_table_and_verify_index(vector, unique_database, "functional.chars_formats",
         tmpdir)
 
-  def test_write_index_null(self, vector, unique_database, tmpdir):
-    """Test that we don't write min/max values in the index for null columns.
-    Ensure null_count is set for columns with null values.
-    """
+    # Test that we don't write min/max values in the index for null columns.
+    # Ensure null_count is set for columns with null values.
     self._ctas_table_and_verify_index(vector, unique_database, "functional.nulltable",
         tmpdir)
 
-  def test_write_index_multi_page(self, vector, unique_database, tmpdir):
-    """Test that when a ColumnChunk is written across multiple pages, the index is
-    valid.
-    """
+    # Test that when a ColumnChunk is written across multiple pages, the index is
+    # valid.
     self._ctas_table_and_verify_index(vector, unique_database, "tpch.customer",
         tmpdir)
     self._ctas_table_and_verify_index(vector, unique_database, "tpch.orders",
         tmpdir)
 
-  def test_write_index_sorting_column(self, vector, unique_database, tmpdir):
-    """Test that when the schema has a sorting column, the index is valid."""
+    # Test that when the schema has a sorting column, the index is valid.
     self._ctas_table_and_verify_index(vector, unique_database,
         "functional_parquet.zipcode_incomes", tmpdir, "id")
 
-  def test_write_index_wide_table(self, vector, unique_database, tmpdir):
-    """Test table with wide row."""
+    # Test table with wide row.
     self._ctas_table_and_verify_index(vector, unique_database,
         "functional_parquet.widerow", tmpdir)
 
-  def test_write_index_many_columns_tables(self, vector, unique_database, tmpdir):
-    """Test tables with wide rows and many columns."""
+    # Test tables with wide rows and many columns.
     self._ctas_table_and_verify_index(vector, unique_database,
         "functional_parquet.widetable_250_cols", tmpdir)
     self._ctas_table_and_verify_index(vector, unique_database,
@@ -332,6 +329,7 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     self._ctas_table_and_verify_index(vector, unique_database,
         "functional_parquet.widetable_1000_cols", tmpdir)
 
+  @CustomClusterTestSuite.with_args("--enable_parquet_page_index_writing_debug_only")
   def test_max_string_values(self, vector, unique_database, tmpdir):
     """Test string values that are all 0xFFs or end with 0xFFs."""
 
@@ -351,7 +349,8 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     # should not write page statistics.
     too_long_tbl = "too_long_tbl"
     too_long_hdfs_path = self._create_string_table_with_values(vector, unique_database,
-        too_long_tbl, "(rpad('', {0}, chr(255)))".format(PAGE_INDEX_MAX_STRING_LENGTH + 1))
+        too_long_tbl, "(rpad('', {0}, chr(255)))".format(
+            PAGE_INDEX_MAX_STRING_LENGTH + 1))
     row_group_indexes = self._get_row_groups_from_hdfs_folder(too_long_hdfs_path,
         tmpdir.join(too_long_tbl))
     column = row_group_indexes[0][0]
