@@ -1356,33 +1356,36 @@ drop database temp;
         values such as <codeph>'1966-07-30'</codeph>, <codeph>'08:30:00'</codeph>,
         or <codeph>'1985-09-25 17:45:30.005'</codeph>.
       </p>
-      <p>Leading zeroes are not required in the numbers representing the date
+      <p>
+        Leading zeroes are not required in the numbers representing the date
         component, such as month and date, or the time component, such as
         hour, minute, and second. For example, Impala accepts both
         <codeph>"2018-1-1 01:02:03"</codeph> and
-          <codeph>"2018-01-01 1:2:3"</codeph> as valid.</p>
+          <codeph>"2018-01-01 1:2:3"</codeph> as valid.
+      </p>
+      <p>
+        In <codeph>STRING</codeph> to <codeph>TIMESTAMP</codeph> conversions,
+        leading and trailing white spaces, such as a space, a tab, a newline, or
+        a carriage return, are ignored. For example, Impala treats the following
+        as equivalent: '1999-12-01 01:02:03 ', ' 1999-12-01 01:02:03',
+        '1999-12-01 01:02:03\r\n\t'.
+      </p>
 
       <p id="cast_string_to_timestamp">
-        When you convert or cast a <codeph>STRING</codeph> literal to <codeph>TIMESTAMP</codeph>,
-        you can use the following separators between the date part and the time part:
+        When you convert or cast a
+          <codeph>STRING</codeph> literal to <codeph>TIMESTAMP</codeph>, you can
+        use the following separators between the date part and the time part:
         <ul>
           <li>
-            <p>
-              One or more space characters
-            </p>
-
-            <p>
-              Example: <codeph>CAST ('2001-01-09   01:05:01' AS TIMESTAMP)</codeph>
+            <p> One or more space characters </p>
+            <p> Example: <codeph>CAST ('2001-01-09 01:05:01' AS
+                TIMESTAMP)</codeph>
             </p>
           </li>
-
           <li>
-            <p>
-              The character “T”
-            </p>
-
-            <p>
-              Example: <codeph>CAST ('2001-01-09T01:05:01' AS TIMESTAMP)</codeph>
+            <p> The character “T” </p>
+            <p> Example: <codeph>CAST ('2001-01-09T01:05:01' AS
+                TIMESTAMP)</codeph>
             </p>
           </li>
         </ul>
