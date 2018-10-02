@@ -1331,23 +1331,23 @@ and t.bool_col = false
 ---- PLAN
 PLAN-ROOT SINK
 |
-03:HASH JOIN [RIGHT SEMI JOIN]
-|  hash predicates: g.id = t.id
-|  runtime filters: RF000 <- t.id
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t.id = g.id
+|  runtime filters: RF000 <- g.id
 |
-|--00:SCAN HDFS [functional.alltypestiny t]
-|     partitions=4/4 files=4 size=460B
-|     predicates: t.bool_col = FALSE
+|--02:AGGREGATE [FINALIZE]
+|  |  output: max(int_col)
+|  |  group by: g.id
+|  |  having: max(int_col) IS NULL
+|  |
+|  01:SCAN HDFS [functional.alltypesagg g]
+|     partitions=11/11 files=11 size=814.73KB
+|     predicates: g.int_col IS NULL
 |
-02:AGGREGATE [FINALIZE]
-|  output: max(int_col)
-|  group by: g.id
-|  having: max(int_col) IS NULL
-|
-01:SCAN HDFS [functional.alltypesagg g]
-   partitions=11/11 files=11 size=814.73KB
-   predicates: g.int_col IS NULL
-   runtime filters: RF000 -> g.id
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 files=4 size=460B
+   predicates: t.bool_col = FALSE
+   runtime filters: RF000 -> t.id
 ====
 # Complex expr with a scalar subquery
 select *

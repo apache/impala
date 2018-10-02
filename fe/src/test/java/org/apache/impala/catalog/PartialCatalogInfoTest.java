@@ -197,7 +197,7 @@ public class PartialCatalogInfoTest {
     assertEquals(11, stats.size());
     assertEquals("ColumnStatisticsObj(colName:id, colType:INT, " +
         "statsData:<ColumnStatisticsData longStats:LongColumnStatsData(" +
-        "numNulls:-1, numDVs:7300)>)", stats.get(0).toString());
+        "numNulls:0, numDVs:7300)>)", stats.get(0).toString());
   }
 
   @Test

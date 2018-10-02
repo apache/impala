@@ -78,6 +78,12 @@ public class CardinalityTest extends PlannerTestBase {
     verifyCardinality(
         "SELECT id FROM functional.alltypes WHERE nullvalue(int_col)", 730);
 
+    // IMPALA-7695: IS [NOT] NULL predicates should factor in null count.
+    verifyCardinality(
+        "select id from functional.alltypesagg where tinyint_col IS NULL", 2000);
+    verifyCardinality(
+        "select id from functional.alltypesagg where tinyint_col IS NOT NULL", 9000);
+
     // Grouping should reduce cardinality
     verifyCardinality(
         "SELECT COUNT(*) FROM functional.alltypes GROUP BY int_col", 10);

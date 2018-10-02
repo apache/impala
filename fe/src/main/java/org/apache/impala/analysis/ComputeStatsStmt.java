@@ -141,10 +141,6 @@ public class ComputeStatsStmt extends StatementBase {
   // We run the regular COMPUTE STATS for 0.0 and 1.0 where sampling has no benefit.
   protected double effectiveSamplePerc_ = -1;
 
-  // The Null count is not currently being used in optimization or run-time,
-  // and compute stats runs 2x faster in many cases when not counting NULLs.
-  private static final boolean COUNT_NULLS = false;
-
   // Query for getting the per-partition row count and the total row count.
   // Set during analysis.
   protected String tableStatsQueryStr_;
@@ -266,17 +262,9 @@ public class ComputeStatsStmt extends StatementBase {
         columnStatsSelectList.add("NDV(" + colRefSql + ") AS " + colRefSql);
       }
 
-      if (COUNT_NULLS) {
-        // Count the number of NULL values.
-        columnStatsSelectList.add("COUNT(IF(" + colRefSql + " IS NULL, 1, NULL))");
-      } else {
-        // Using -1 to indicate "unknown". We need cast to BIGINT because backend expects
-        // an i64Val as the number of NULLs returned by the COMPUTE STATS column stats
-        // child query. See CatalogOpExecutor::SetColumnStats(). If we do not cast, then
-        // the -1 will be treated as TINYINT resulting a 0 to be placed in the #NULLs
-        // column (see IMPALA-1068).
-        columnStatsSelectList.add("CAST(-1 as BIGINT)");
-      }
+      // Count the number of NULL values.
+      columnStatsSelectList.add("COUNT(CASE WHEN " + colRefSql +
+          " IS NULL THEN 1 ELSE NULL END)");
 
       // For STRING columns also compute the max and avg string length.
       Type type = c.getType();

@@ -192,7 +192,7 @@ public class LocalCatalogTest {
     // Verify expected stats for timestamp.
     stats = t.getColumn("timestamp_col").getStats();
     assertEquals(10210, stats.getNumDistinctValues());
-    assertEquals(-1, stats.getNumNulls());
+    assertEquals(0, stats.getNumNulls());
   }
 
   @Test
