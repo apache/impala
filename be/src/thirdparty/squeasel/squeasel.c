@@ -4298,11 +4298,37 @@ static int set_ssl_option(struct sq_context *ctx) {
     (void) SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, pem);
   }
 
-  if (ctx->config[SSL_CIPHERS] != NULL &&
-      (SSL_CTX_set_cipher_list(ctx->ssl_ctx, ctx->config[SSL_CIPHERS]) == 0)) {
-    cry(fc(ctx), "SSL_CTX_set_cipher_list: error setting ciphers (%s): %s",
-        ctx->config[SSL_CIPHERS], ssl_error());
-    return 0;
+  if (ctx->config[SSL_CIPHERS] != NULL) {
+    if (SSL_CTX_set_cipher_list(ctx->ssl_ctx, ctx->config[SSL_CIPHERS]) == 0) {
+      cry(fc(ctx), "SSL_CTX_set_cipher_list: error setting ciphers (%s): %s",
+          ctx->config[SSL_CIPHERS], ssl_error());
+      return 0;
+    }
+#ifndef OPENSSL_NO_ECDH
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
+    // OpenSSL 1.0.1 and below only support setting a single ECDH curve at once.
+    // We choose prime256v1 because it's the first curve listed in the "modern
+    // compatibility" section of the Mozilla Server Side TLS recommendations,
+    // accessed Feb. 2017.
+    EC_KEY* ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+    if (ecdh == NULL) {
+      cry(fc(ctx), "EC_KEY_new_by_curve_name: %s", ssl_error());
+    }
+
+    int rc = SSL_CTX_set_tmp_ecdh(ctx->ssl_ctx, ecdh);
+    if (rc <= 0) {
+      cry(fc(ctx), "SSL_CTX_set_tmp_ecdh: %s", ssl_error());
+    }
+#elif OPENSSL_VERSION_NUMBER < 0x10100000L
+    // OpenSSL 1.0.2 provides the set_ecdh_auto API which internally figures out
+    // the best curve to use.
+    int rc = SSL_CTX_set_ecdh_auto(ctx->ssl_ctx, 1);
+    if (rc <= 0) {
+      cry(fc(ctx), "SSL_CTX_set_ecdh_auto: %s", ssl_error());
+    }
+#endif
+#endif
+
   }
 
   return 1;
