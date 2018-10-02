@@ -19,7 +19,8 @@ import pytest
 from copy import copy
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
-from tests.common.test_dimensions import create_avro_snappy_dimension
+from tests.common.test_dimensions import (create_avro_snappy_dimension,
+    create_parquet_dimension)
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
@@ -364,3 +365,22 @@ class TestScanMemLimit(ImpalaTestSuite):
     # Remove num_nodes setting to allow .test file to set num_nodes.
     del vector.get_value('exec_option')['num_nodes']
     self.run_test_case('QueryTest/hdfs-scanner-thread-mem-scaling', vector)
+
+
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
+class TestExchangeMemUsage(ImpalaTestSuite):
+  """Targeted test for exchange memory limits."""
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestExchangeMemUsage, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension(cls.get_workload()))
+
+  def test_exchange_mem_usage_scaling(self, vector):
+    """Test behaviour of exchange nodes with different memory limits."""
+    self.run_test_case('QueryTest/exchange-mem-scaling', vector)

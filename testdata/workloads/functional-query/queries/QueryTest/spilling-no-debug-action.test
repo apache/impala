@@ -64,3 +64,47 @@ BIGINT
 ---- RUNTIME_PROFILE
 row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ====
+---- QUERY
+# Aggregation query that will OOM and fail to spill because of IMPALA-3304 without
+# any help from DEBUG_ACTION.
+set mem_limit=100m;
+select l_orderkey, group_concat(l_comment) comments
+from lineitem
+group by l_orderkey
+order by comments desc
+limit 5
+---- CATCH
+Memory limit exceeded
+====
+---- QUERY
+# Top-N query with large limit that will OOM because spilling is not implemented:
+# IMPALA-3471. It does not need any help from DEBUG_ACTION.
+set mem_limit=100m;
+select *
+from lineitem
+order by l_orderkey desc
+limit 6000000
+---- CATCH
+Memory limit exceeded
+====
+---- QUERY
+# Hash join that will fail to repartition and therefore fail from out-of-memory because
+# of a large number of duplicate keys on the build side: IMPALA-4857. It does not need
+# any help from DEBUG_ACTION.
+set mem_limit=150m;
+select straight_join *
+from supplier join /* +broadcast */ lineitem on s_suppkey = l_linenumber
+order by l_tax desc
+limit 5
+---- CATCH
+row_regex:.*Cannot perform hash join at node with id .*. Repartitioning did not reduce the size of a spilled partition.*
+====
+---- QUERY
+# Analytic query with certain kinds of large windows can't be spilled: IMPALA-5738. It
+# does not need any help from DEBUG_ACTION.
+set mem_limit=100m;
+select avg(l_tax) over (order by l_orderkey rows between 100000000 preceding and 10000000 following)
+from lineitem
+---- CATCH
+Memory limit exceeded
+====
