@@ -233,6 +233,66 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
   } while (next_permutation(toks->begin(), toks->end()));
 }
 
+// Checks that FromSubsecondUnixTime gives the correct result. Conversion to double
+// is lossy so the result is expected to be within a certain range of 'expected'.
+// The fraction part of 'nanos' can express sub-nanoseconds - the current logic is to
+// truncate to the next whole nanosecond (towards 0).
+void TestFromDoubleUnixTime(
+    int64_t seconds, int64_t millis, double nanos, const TimestampValue& expected) {
+  auto tz = TimezoneDatabase::GetUtcTimezone();
+  TimestampValue from_double = TimestampValue::FromSubsecondUnixTime(
+      1.0 * seconds + 0.001 * millis + nanos / NANOS_PER_SEC, tz);
+
+  if (!expected.HasDate()) EXPECT_FALSE(from_double.HasDate());
+  else {
+    // Conversion to double is lossy so the timestamp can be a bit different.
+    int64_t expected_rounded_to_micros, from_double_rounded_to_micros;
+    EXPECT_TRUE(expected.UtcToUnixTimeMicros(&expected_rounded_to_micros));
+    EXPECT_TRUE(from_double.UtcToUnixTimeMicros(&from_double_rounded_to_micros));
+    // The difference can be more than a microsec in case of timestamps far from 1970.
+    int64_t MARGIN_OF_ERROR = 8;
+    EXPECT_LT(abs(expected_rounded_to_micros - from_double_rounded_to_micros),
+        MARGIN_OF_ERROR);
+  }
+}
+
+// Checks that all sub-second From*UnixTime gives the same result and that the result
+// is the same as 'expected'.
+// If 'expected' is nullptr then the result is expected to be invalid (out of range).
+void TestFromSubSecondFunctions(int64_t seconds, int64_t millis, const char* expected) {
+  auto tz = TimezoneDatabase::GetUtcTimezone();
+
+  TimestampValue from_millis =
+      TimestampValue::UtcFromUnixTimeMillis(seconds * 1000 + millis);
+  if (expected == nullptr) EXPECT_FALSE(from_millis.HasDate());
+  else EXPECT_EQ(expected, from_millis.ToString());
+
+  EXPECT_EQ(from_millis, TimestampValue::UtcFromUnixTimeMicros(
+      seconds * MICROS_PER_SEC + millis * 1000));
+  EXPECT_EQ(from_millis, TimestampValue::FromUnixTimeMicros(
+      seconds * MICROS_PER_SEC + millis * 1000, tz));
+
+  // Check the same timestamp shifted with some sub-nanosecs.
+  vector<double> sub_nanosec_offsets =
+      {0.0, 0.1, 0.9, 0.000001, 0.999999, 2.2250738585072020e-308};
+  for (double sub_nanos: sub_nanosec_offsets) {
+    TestFromDoubleUnixTime(seconds, millis, sub_nanos, from_millis);
+    TestFromDoubleUnixTime(seconds, millis, -sub_nanos, from_millis);
+  }
+
+  // Test FromUnixTimeNanos with shifted sec + subsec pairs.
+  vector<int64_t> signs = {-1, 1};
+  vector<int64_t> offsets = {0, 1, 2, 60, 60*60, 24*60*60};
+  for (int64_t sign: signs) {
+    for (int64_t offset: offsets) {
+      int64_t shifted_seconds = seconds + sign * offset;
+      int64_t shifted_nanos = (millis - 1000 * sign * offset) * 1000 * 1000;
+      EXPECT_EQ(from_millis,
+          TimestampValue::FromUnixTimeNanos(shifted_seconds, shifted_nanos, tz));
+    }
+  }
+}
+
 TEST(TimestampTest, Basic) {
   // Fix current time to determine the behavior parsing 2-digit year format
   // Set it to 03/01 to test 02/29 edge cases.
@@ -671,12 +731,9 @@ TEST(TimestampTest, Basic) {
   // Sub-second FromUnixTime functions incorrectly accepted the last second of 1399
   // as valid, because validation logic checked the nearest second rounded towards 0
   // (IMPALA-5664).
-  EXPECT_FALSE(TimestampValue::FromSubsecondUnixTime(
-      MIN_DATE_AS_UNIX_TIME - 0.1, utc_tz).HasDate());
-  EXPECT_FALSE(TimestampValue::UtcFromUnixTimeMicros(
-      MIN_DATE_AS_UNIX_TIME * MICROS_PER_SEC - 2000).HasDate());
-  EXPECT_FALSE(TimestampValue::FromUnixTimeNanos(
-      MIN_DATE_AS_UNIX_TIME, -NANOS_PER_MICRO * 100, utc_tz).HasDate());
+  TestFromSubSecondFunctions(MIN_DATE_AS_UNIX_TIME, -100, nullptr);
+  TestFromSubSecondFunctions(MIN_DATE_AS_UNIX_TIME, 100,
+      "1400-01-01 00:00:00.100000000");
 
   // Test the max supported date that can be represented in seconds.
   const int64_t MAX_DATE_AS_UNIX_TIME = 253402300799;
@@ -719,20 +776,9 @@ TEST(TimestampTest, Basic) {
   EXPECT_FALSE(too_late.HasTime());
 
   // Checking sub-second FromUnixTime functions near 10000.01.01
-  EXPECT_TRUE(TimestampValue::FromSubsecondUnixTime(
-      MAX_DATE_AS_UNIX_TIME + 0.99, utc_tz).HasDate());
-  EXPECT_FALSE(TimestampValue::FromSubsecondUnixTime(
-      MAX_DATE_AS_UNIX_TIME + 1, utc_tz).HasDate());
-
-  EXPECT_TRUE(TimestampValue::UtcFromUnixTimeMicros(
-      MAX_DATE_AS_UNIX_TIME * MICROS_PER_SEC + MICROS_PER_SEC - 1).HasDate());
-  EXPECT_FALSE(TimestampValue::UtcFromUnixTimeMicros(
-      MAX_DATE_AS_UNIX_TIME * MICROS_PER_SEC + MICROS_PER_SEC).HasDate());
-
-  EXPECT_TRUE(TimestampValue::FromUnixTimeNanos(
-      MAX_DATE_AS_UNIX_TIME, NANOS_PER_SEC - 1, utc_tz).HasDate());
-  EXPECT_FALSE(TimestampValue::FromUnixTimeNanos(
-      MAX_DATE_AS_UNIX_TIME, NANOS_PER_SEC, utc_tz).HasDate());
+  TestFromSubSecondFunctions(MAX_DATE_AS_UNIX_TIME, MILLIS_PER_SEC - 1,
+      "9999-12-31 23:59:59.999000000");
+  TestFromSubSecondFunctions(MAX_DATE_AS_UNIX_TIME, MILLIS_PER_SEC, nullptr);
 
   // Regression tests for IMPALA-1676, Unix times overflow int32 during year 2038
   EXPECT_EQ("2038-01-19 03:14:08",
@@ -805,6 +851,49 @@ TEST(TimestampTest, Basic) {
   EXPECT_EQ(1382337792.07, result);
   EXPECT_EQ("1970-01-01 00:00:00.008000000",
       TimestampValue::FromSubsecondUnixTime(0.008, utc_tz).ToString());
+}
+
+// Test subsecond unix time conversion for non edge cases.
+TEST(TimestampTest, SubSecond) {
+  // Test with millisec precision.
+  TestFromSubSecondFunctions(0, 0, "1970-01-01 00:00:00");
+  TestFromSubSecondFunctions(0, 100, "1970-01-01 00:00:00.100000000");
+  TestFromSubSecondFunctions(0, 1100, "1970-01-01 00:00:01.100000000");
+  TestFromSubSecondFunctions(0, 24*60*60*1000, "1970-01-02 00:00:00");
+  TestFromSubSecondFunctions(0, 2*24*60*60*1000 + 100, "1970-01-03 00:00:00.100000000");
+
+  TestFromSubSecondFunctions(0, -100, "1969-12-31 23:59:59.900000000");
+  TestFromSubSecondFunctions(0, -1100, "1969-12-31 23:59:58.900000000");
+  TestFromSubSecondFunctions(0, -24*60*60*1000, "1969-12-31 00:00:00");
+  TestFromSubSecondFunctions(0, -2*24*60*60*1000 + 100, "1969-12-30 00:00:00.100000000");
+
+  TestFromSubSecondFunctions(-1, 0, "1969-12-31 23:59:59");
+  TestFromSubSecondFunctions(-1, 100, "1969-12-31 23:59:59.100000000");
+  TestFromSubSecondFunctions(-1, 1100, "1970-01-01 00:00:00.100000000");
+  TestFromSubSecondFunctions(-1, 24*60*60*1000, "1970-01-01 23:59:59");
+  TestFromSubSecondFunctions(-1, 2*24*60*60*1000 + 100, "1970-01-02 23:59:59.100000000");
+
+  TestFromSubSecondFunctions(-1, -100, "1969-12-31 23:59:58.900000000");
+  TestFromSubSecondFunctions(-1, -1100, "1969-12-31 23:59:57.900000000");
+  TestFromSubSecondFunctions(-1, -24*60*60*1000, "1969-12-30 23:59:59");
+  TestFromSubSecondFunctions(-1, -2*24*60*60*1000 + 100, "1969-12-29 23:59:59.100000000");
+
+  // A few test with sub-millisec precision.
+  auto tz = TimezoneDatabase::GetUtcTimezone();
+  EXPECT_EQ("1970-01-01 00:00:00.000001000",
+      TimestampValue::UtcFromUnixTimeMicros(1).ToString());
+  EXPECT_EQ("1969-12-31 23:59:59.999999000",
+      TimestampValue::UtcFromUnixTimeMicros(-1).ToString());
+
+  EXPECT_EQ("1970-01-01 00:00:00.000001000",
+      TimestampValue::FromUnixTimeMicros(1, tz).ToString());
+  EXPECT_EQ("1969-12-31 23:59:59.999999000",
+      TimestampValue::FromUnixTimeMicros(-1, tz).ToString());
+
+  EXPECT_EQ("1970-01-01 00:00:00.000000001",
+      TimestampValue::FromUnixTimeNanos(0, 1, tz).ToString());
+  EXPECT_EQ("1969-12-31 23:59:59.999999999",
+      TimestampValue::FromUnixTimeNanos(0, -1, tz).ToString());
 }
 
 }

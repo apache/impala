@@ -97,22 +97,15 @@ class TimestampValue {
   /// Return the corresponding timestamp in the 'local_tz' time zone if
   /// FLAGS_use_local_tz_for_unix_timestamp_conversions is true. Otherwise, return the
   /// corresponding timestamp in UTC.
-  static TimestampValue FromUnixTime(time_t unix_time, const Timezone& local_tz) {
-    return TimestampValue(UnixTimeToPtime(unix_time, local_tz));
-  }
+  static TimestampValue FromUnixTime(time_t unix_time, const Timezone& local_tz);
 
   /// Same as FromUnixTime() above, but adds the specified number of nanoseconds to the
   /// resulting TimestampValue. Handles negative nanoseconds and the case where
   /// abs(nanos) >= 1e9.
   static TimestampValue FromUnixTimeNanos(time_t unix_time, int64_t nanos,
-      const Timezone& local_tz) {
-    boost::posix_time::ptime temp = UnixTimeToPtime(unix_time, local_tz);
-    temp += boost::posix_time::nanoseconds(nanos);
-    return TimestampValue(temp);
-  }
+      const Timezone& local_tz);
 
-  /// Return the corresponding timestamp in 'local_tz' time zone for the Unix time
-  /// specified in microseconds.
+  /// Same as FromUnixTime(), but expects the time in microseconds.
   static TimestampValue FromUnixTimeMicros(int64_t unix_time_micros,
       const Timezone& local_tz);
 
@@ -120,17 +113,15 @@ class TimestampValue {
   /// microseconds.
   static TimestampValue UtcFromUnixTimeMicros(int64_t unix_time_micros);
 
+  /// Return the corresponding timestamp in UTC for the Unix time specified in
+  /// milliseconds.
+  static TimestampValue UtcFromUnixTimeMillis(int64_t unix_time_millis);
+
   /// Returns a TimestampValue  in 'local_tz' time zone where the integer part of the
   /// specified 'unix_time' specifies the number of seconds (see above), and the
   /// fractional part is converted to nanoseconds and added to the resulting
   /// TimestampValue.
-  static TimestampValue FromSubsecondUnixTime(double unix_time,
-      const Timezone& local_tz) {
-    const time_t unix_time_whole = unix_time;
-    boost::posix_time::ptime temp = UnixTimeToPtime(unix_time_whole, local_tz);
-    temp += boost::posix_time::nanoseconds((unix_time - unix_time_whole) / ONE_BILLIONTH);
-    return TimestampValue(temp);
-  }
+  static TimestampValue FromSubsecondUnixTime(double unix_time, const Timezone& local_tz);
 
   /// Returns a TimestampValue converted from a TimestampVal. The caller must ensure
   /// the TimestampVal does not represent a NULL.
@@ -245,7 +236,7 @@ class TimestampValue {
   void LocalToUtc(const Timezone& local_tz);
 
   void set_date(const boost::gregorian::date d) { date_ = d; Validate(); }
-  void set_time(const boost::posix_time::time_duration t) { time_ = t; }
+  void set_time(const boost::posix_time::time_duration t) { time_ = t; Validate(); }
   const boost::gregorian::date& date() const { return date_; }
   const boost::posix_time::time_duration& time() const { return time_; }
 
@@ -286,6 +277,19 @@ class TimestampValue {
     return HashUtil::Hash(&date_, sizeof(date_), hash);
   }
 
+  /// Divides 'ticks' with 'GRANULARITY' (truncated towards negative infinity) and
+  /// sets 'ticks' to the remainder.
+  template <int64_t GRANULARITY>
+  inline static int64_t SplitTime(int64_t* ticks) {
+    int64_t result = *ticks / GRANULARITY;
+    *ticks %= GRANULARITY;
+    if (*ticks < 0) {
+      result--;
+      *ticks += GRANULARITY;
+    }
+    return result;
+  }
+
   static const char* LLVM_CLASS_NAME;
 
  private:
@@ -294,7 +298,6 @@ class TimestampValue {
   /// Used when converting a time with fractional seconds which are stored as in integer
   /// to a Unix time stored as a double.
   static const double ONE_BILLIONTH;
-
   /// Boost ptime leaves a gap in the structure, so we swap the order to make it
   /// 12 contiguous bytes.  We then must convert to and from the boost ptime data type.
   /// See IMP-87 for more information on why using ptime with the 4 byte gap is
@@ -313,24 +316,21 @@ class TimestampValue {
   }
 
   /// Sets both date and time to invalid if date is outside the valid range.
+  /// Time's validity is only checked in debug builds.
+  /// TODO: This could be also checked in release, but I am a bit afraid that it would
+  ///       affect performance and probably break some scenarios that are
+  ///       currently working more or less correctly.
   inline void Validate() {
     if (HasDate() && UNLIKELY(!IsValidDate(date_))) SetToInvalidDateTime();
+    else if (HasTime()) DCHECK(IsValidTime(time_));
   }
 
-  /// Return a ptime representation of the given Unix time (seconds since the Unix epoch).
-  /// The time zone of the resulting ptime is determined by
-  /// FLAGS_use_local_tz_for_unix_timestamp_conversions. If the flag is true, the value
-  /// will be in the 'local_tz' time zone. If the flag is false, the value will be in UTC.
-  static boost::posix_time::ptime UnixTimeToPtime(time_t unix_time,
-      const Timezone& local_tz);
+  /// Converts 'unix_time' (in UTC seconds) to TimestampValue in timezone 'local_tz'.
+  static TimestampValue UnixTimeToLocal(time_t unix_time, const Timezone& local_tz);
 
-  /// Same as the above, but the time zone of the resulting ptime is always in the
-  /// 'local_tz' time zone.
-  static boost::posix_time::ptime UnixTimeToLocalPtime(time_t unix_time,
-      const Timezone& local_tz);
-
-  /// Same as the above, but the time zone of the resulting ptime is always in UTC.
-  static boost::posix_time::ptime UnixTimeToUtcPtime(time_t unix_time);
+  /// Converts 'unix_time_ticks'/TICKS_PER_SEC seconds to TimestampValue.
+  template <int32_t TICKS_PER_SEC>
+  static TimestampValue UtcFromUnixTimeTicks(int64_t unix_time_ticks);
 };
 
 /// This function must be called 'hash_value' to be picked up by boost.

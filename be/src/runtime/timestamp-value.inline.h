@@ -30,22 +30,52 @@
 
 namespace impala {
 
+template <int32_t TICKS_PER_SEC>
+inline TimestampValue TimestampValue::UtcFromUnixTimeTicks(int64_t unix_time_ticks) {
+  static const boost::gregorian::date EPOCH(1970,1,1);
+  int64_t days = SplitTime<(uint64_t)TICKS_PER_SEC*24*60*60>(&unix_time_ticks);
+
+  return TimestampValue(EPOCH + boost::gregorian::date_duration(days),
+      boost::posix_time::nanoseconds(unix_time_ticks*(NANOS_PER_SEC/TICKS_PER_SEC)));
+}
+
 inline TimestampValue TimestampValue::UtcFromUnixTimeMicros(int64_t unix_time_micros) {
-  int64_t ts_seconds = unix_time_micros / MICROS_PER_SEC;
-  int64_t micros_part = unix_time_micros - (ts_seconds * MICROS_PER_SEC);
-  boost::posix_time::ptime temp = UnixTimeToUtcPtime(ts_seconds);
-  temp += boost::posix_time::microseconds(micros_part);
-  return TimestampValue(temp);
+  return UtcFromUnixTimeTicks<MICROS_PER_SEC>(unix_time_micros);
 }
 
 inline TimestampValue TimestampValue::FromUnixTimeMicros(int64_t unix_time_micros,
     const Timezone& local_tz) {
-  int64_t ts_seconds = unix_time_micros / MICROS_PER_SEC;
-  int64_t micros_part = unix_time_micros - (ts_seconds * MICROS_PER_SEC);
-  boost::posix_time::ptime temp = UnixTimeToLocalPtime(ts_seconds, local_tz);
-  temp += boost::posix_time::microseconds(micros_part);
-  return TimestampValue(temp);
+  int64_t ts_seconds = SplitTime<MICROS_PER_SEC>(&unix_time_micros);
+  TimestampValue result = FromUnixTime(ts_seconds, local_tz);
+  if (result.HasDate()) result.time_ += boost::posix_time::microseconds(unix_time_micros);
+  return result;
 }
+
+inline TimestampValue TimestampValue::UtcFromUnixTimeMillis(int64_t unix_time_millis) {
+  return UtcFromUnixTimeTicks<MILLIS_PER_SEC>(unix_time_millis);
+}
+
+inline TimestampValue TimestampValue::FromSubsecondUnixTime(
+    double unix_time, const Timezone& local_tz) {
+  int64_t unix_time_whole = unix_time;
+  int64_t nanos = (unix_time - unix_time_whole) / ONE_BILLIONTH;
+  return FromUnixTimeNanos(unix_time_whole, nanos, local_tz);
+}
+
+inline TimestampValue TimestampValue::FromUnixTimeNanos(time_t unix_time, int64_t nanos,
+    const Timezone& local_tz) {
+  unix_time += SplitTime<NANOS_PER_SEC>(&nanos);
+  TimestampValue result = FromUnixTime(unix_time, local_tz);
+  // 'nanos' is guaranteed to be between [0,NANOS_PER_SEC) at this point, so the
+  // next addition cannot change the day or step to a different timezone.
+  if (result.HasDate()) {
+    DCHECK_GE(nanos, 0);
+    DCHECK_LT(nanos, NANOS_PER_SEC);
+    result.time_ += boost::posix_time::nanoseconds(nanos);
+  }
+  return result;
+}
+
 
 /// Interpret 'this' as a timestamp in UTC and convert to unix time.
 /// Returns false if the conversion failed ('unix_time' will be undefined), otherwise

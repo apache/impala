@@ -101,9 +101,28 @@ UnixTimeToLocalPtime:      Function  iters/ms   10%ile   50%ile   90%ile     10%
 UnixTimeToUtcPtime:        Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
                                                                          (relative) (relative) (relative)
 ---------------------------------------------------------------------------------------------------------
-                            (glibc)               18.8     19.2     19.5         1X         1X         1X
-                      (Google/CCTZ)                  8     8.14     8.27     0.425X     0.425X     0.424X
-                        (fast path)               29.5     30.2     30.8      1.57X      1.58X      1.58X
+                            (glibc)                 17     17.6     17.9         1X         1X         1X
+                      (Google/CCTZ)               6.45     6.71     6.81     0.379X     0.382X      0.38X
+                        (fast path)               25.1       26     26.4      1.47X      1.48X      1.48X
+                        (day split)               48.6     50.3     51.3      2.85X      2.87X      2.86X
+
+UtcFromUnixTimeMicros:     Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+                                                                         (relative) (relative) (relative)
+---------------------------------------------------------------------------------------------------------
+                  (sec split (old))               17.9     18.7     19.1         1X         1X         1X
+                        (day split)                111      116      118      6.21X      6.19X      6.19X
+
+FromUnixTimeNanos:         Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+                                                                         (relative) (relative) (relative)
+---------------------------------------------------------------------------------------------------------
+                  (sec split (old))               18.7     19.5     19.8         1X         1X         1X
+                  (sec split (new))                104      108      110      5.58X      5.55X      5.57X
+
+FromSubsecondUnixTime:     Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
+                                                                         (relative) (relative) (relative)
+---------------------------------------------------------------------------------------------------------
+                              (old)               18.7     18.7     18.7         1X         1X         1X
+                              (new)               73.5     74.1     74.1      3.94X      3.96X      3.96X
 
 Number of threads: 8
 
@@ -236,13 +255,16 @@ void bail_if_results_dont_match(const vector<const vector<T>*>& test_result_vec)
 
   auto b = test_result_vec.begin();
   for (auto it = b + 1; it != test_result_vec.end(); ++it) {
-    if (**b != **it) {
-      cerr << "Results don't match.";
-      exit(1);
+    auto& references = **b;
+    auto& results = **it;
+    for (int i = 0; i < references.size(); ++i) {
+      if (references[i] != results[i]) {
+        cerr << "Results don't match: " << references[i] << " vs " << results[i] << endl;
+        exit(1);
+      }
     }
   }
 }
-
 
 //
 // Test UtcToUnixTime (boost is expected to be the fastest, followed by CCTZ and glibc)
@@ -540,6 +562,68 @@ boost::posix_time::ptime cctz_optimized_unix_time_to_utc_ptime(const time_t& uni
   return cctz_unix_time_to_utc_ptime(unix_time);
 }
 
+boost::posix_time::ptime split_unix_time_to_utc_ptime(const time_t& unix_time) {
+  int64_t time = unix_time;
+  int32_t days = TimestampValue::SplitTime<24*60*60>(&time);
+
+  return boost::posix_time::ptime(
+      boost::gregorian::date(1970, 1, 1) + boost::gregorian::date_duration(days),
+      boost::posix_time::nanoseconds(time*NANOS_PER_SEC));
+}
+
+TimestampValue sec_split_utc_from_unix_time_micros(const int64_t& unix_time_micros) {
+  int64_t ts_seconds = unix_time_micros / MICROS_PER_SEC;
+  int64_t micros_part = unix_time_micros - (ts_seconds * MICROS_PER_SEC);
+  boost::posix_time::ptime temp = cctz_optimized_unix_time_to_utc_ptime(ts_seconds);
+  temp += boost::posix_time::microseconds(micros_part);
+  return TimestampValue(temp);
+}
+
+TimestampValue day_split_utc_from_unix_time_micros(const int64_t& unix_time_micros) {
+  static const boost::gregorian::date EPOCH(1970,1,1);
+  int64_t micros = unix_time_micros;
+  int32_t days = TimestampValue::SplitTime<24LL*60*60*MICROS_PER_SEC>(&micros);
+
+  return TimestampValue(
+      EPOCH + boost::gregorian::date_duration(days),
+      boost::posix_time::nanoseconds(micros*1000));
+}
+
+struct SplitNanoAndSecond {
+  int64_t seconds;
+  int64_t nanos;
+};
+
+TimestampValue old_split_utc_from_unix_time_nanos(const SplitNanoAndSecond& unix_time) {
+  boost::posix_time::ptime temp =
+      cctz_optimized_unix_time_to_utc_ptime(unix_time.seconds);
+  temp += boost::posix_time::nanoseconds(unix_time.nanos);
+  return TimestampValue(temp);
+}
+
+TimestampValue new_split_utc_from_unix_time_nanos(const SplitNanoAndSecond& unix_time) {
+  // The TimestampValue version is used as it is hard to reproduce the same logic without
+  // accessing private members.
+  return TimestampValue::FromUnixTimeNanos(unix_time.seconds, unix_time.nanos,
+      TimezoneDatabase::GetUtcTimezone());
+}
+
+TimestampValue from_subsecond_unix_time_old(const double& unix_time) {
+  const double ONE_BILLIONTH = 0.000000001;
+  const time_t unix_time_whole = unix_time;
+  boost::posix_time::ptime temp =
+      cctz_optimized_unix_time_to_utc_ptime(unix_time_whole);
+  temp += boost::posix_time::nanoseconds((unix_time - unix_time_whole) / ONE_BILLIONTH);
+  return TimestampValue(temp);
+}
+
+TimestampValue from_subsecond_unix_time_new(const double& unix_time) {
+  const double ONE_BILLIONTH = 0.000000001;
+  int64_t unix_time_whole = unix_time;
+  int64_t nanos = (unix_time - unix_time_whole) / ONE_BILLIONTH;
+  return TimestampValue::FromUnixTimeNanos(
+      unix_time_whole, nanos, TimezoneDatabase::GetUtcTimezone());
+}
 
 //
 // Test ToUtc (CCTZ is expected to be faster than boost)
@@ -749,6 +833,10 @@ int main(int argc, char* argv[]) {
       time_t,
       boost::posix_time::ptime,
       fastpath_unix_time_to_utc_ptime> fastpath_unix_time_to_utc_ptime_data = time_data;
+  TestData<
+      time_t,
+      boost::posix_time::ptime,
+      split_unix_time_to_utc_ptime> split_unix_time_to_utc_ptime_data = time_data;
 
   glibc_unix_time_to_utc_ptime_data.add_to_benchmark(bm_unix_time_to_utc_ptime,
       "(glibc)");
@@ -756,12 +844,91 @@ int main(int argc, char* argv[]) {
       "(Google/CCTZ)");
   fastpath_unix_time_to_utc_ptime_data.add_to_benchmark(bm_unix_time_to_utc_ptime,
       "(fast path)");
+  split_unix_time_to_utc_ptime_data.add_to_benchmark(bm_unix_time_to_utc_ptime,
+      "(day split)");
   cout << bm_unix_time_to_utc_ptime.Measure() << endl;
 
   bail_if_results_dont_match(vector<const vector<boost::posix_time::ptime>*>{
       &glibc_unix_time_to_utc_ptime_data.result(),
       &cctz_unix_time_to_utc_ptime_data.result(),
-      &fastpath_unix_time_to_utc_ptime_data.result()});
+      &fastpath_unix_time_to_utc_ptime_data.result(),
+      &split_unix_time_to_utc_ptime_data.result()});
+
+  // Benchmark UtcFromUnixTimeMicros improvement in IMPALA-7417.
+  vector<time_t> microsec_data;
+  for (int i = 0; i < tsvalue_data.size(); ++i) {
+    const TimestampValue& tsvalue = tsvalue_data[i];
+    time_t unix_time;
+    tsvalue.ToUnixTime(TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    int micros = (i * 1001) % MICROS_PER_SEC; // add some sub-second part
+    microsec_data.push_back(unix_time * MICROS_PER_SEC + micros);
+  }
+
+  Benchmark bm_utc_from_unix_time_micros("UtcFromUnixTimeMicros");
+  TestData<int64_t, TimestampValue, sec_split_utc_from_unix_time_micros>
+      sec_split_utc_from_unix_time_micros_data = microsec_data;
+  TestData<int64_t, TimestampValue, day_split_utc_from_unix_time_micros>
+      day_split_utc_from_unix_time_micros_data = microsec_data;
+
+  sec_split_utc_from_unix_time_micros_data.add_to_benchmark(bm_utc_from_unix_time_micros,
+      "(sec split (old))");
+  day_split_utc_from_unix_time_micros_data.add_to_benchmark(bm_utc_from_unix_time_micros,
+      "(day split)");
+  cout << bm_utc_from_unix_time_micros.Measure() << endl;
+
+  bail_if_results_dont_match(vector<const vector<TimestampValue>*>{
+      &sec_split_utc_from_unix_time_micros_data.result(),
+      &day_split_utc_from_unix_time_micros_data.result()});
+
+  // Benchmark FromUnixTimeNanos improvement in IMPALA-7417.
+  vector<SplitNanoAndSecond> nanosec_data;
+  for (int i = 0; i < tsvalue_data.size(); ++i) {
+    const TimestampValue& tsvalue = tsvalue_data[i];
+    time_t unix_time;
+    tsvalue.ToUnixTime(TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    int nanos = (i * 1001) % NANOS_PER_SEC; // add some sub-second part
+    nanosec_data.push_back(SplitNanoAndSecond {unix_time, nanos} );
+  }
+
+  Benchmark bm_utc_from_unix_time_nanos("FromUnixTimeNanos");
+  TestData<SplitNanoAndSecond, TimestampValue, old_split_utc_from_unix_time_nanos>
+      old_split_utc_from_unix_time_nanos_data = nanosec_data;
+  TestData<SplitNanoAndSecond, TimestampValue, new_split_utc_from_unix_time_nanos>
+      new_split_utc_from_unix_time_nanos_data = nanosec_data;
+
+  old_split_utc_from_unix_time_nanos_data.add_to_benchmark(bm_utc_from_unix_time_nanos,
+      "(sec split (old))");
+  new_split_utc_from_unix_time_nanos_data.add_to_benchmark(bm_utc_from_unix_time_nanos,
+      "(sec split (new))");
+  cout << bm_utc_from_unix_time_nanos.Measure() << endl;
+
+  bail_if_results_dont_match(vector<const vector<TimestampValue>*>{
+      &old_split_utc_from_unix_time_nanos_data.result(),
+      &new_split_utc_from_unix_time_nanos_data.result()});
+
+  // Benchmark FromSubsecondUnixTime before and after IMPALA-7417.
+  vector<double> double_data;
+  for (int i = 0; i < tsvalue_data.size(); ++i) {
+    const TimestampValue& tsvalue = tsvalue_data[i];
+    time_t unix_time;
+    tsvalue.ToUnixTime(TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    double nanos = (i * 1001) % NANOS_PER_SEC; // add some sub-second part
+    double_data.push_back((double)unix_time + nanos / NANOS_PER_SEC);
+  }
+
+  Benchmark from_subsecond_unix_time("FromSubsecondUnixTime");
+  TestData<double, TimestampValue, from_subsecond_unix_time_old>
+      from_subsecond_unix_time_old_data = double_data;
+  TestData<double, TimestampValue, from_subsecond_unix_time_new>
+      from_subsecond_unix_time_new_data = double_data;
+
+  from_subsecond_unix_time_old_data.add_to_benchmark(from_subsecond_unix_time, "(old)");
+  from_subsecond_unix_time_new_data.add_to_benchmark(from_subsecond_unix_time, "(new)");
+  cout << from_subsecond_unix_time.Measure() << endl;
+
+  bail_if_results_dont_match(vector<const vector<TimestampValue>*>{
+      &from_subsecond_unix_time_old_data.result(),
+      &from_subsecond_unix_time_new_data.result()});
 
   // If number of threads is specified, run multithreaded tests.
   int num_of_threads = (argc < 2) ? 0 : atoi(argv[1]);
