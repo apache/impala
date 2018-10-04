@@ -446,26 +446,23 @@ select factorial(-100);
 
         <dd>
           <indexterm audience="hidden">fmod() function</indexterm>
-          <b>Purpose:</b> Returns the modulus of a floating-point number. Equivalent to the <codeph>%</codeph> arithmetic operator.
-          <p>
-            <b>Return type:</b> <codeph>float</codeph> or <codeph>double</codeph>, depending on type of arguments
-          </p>
+          <b>Purpose:</b> Returns the modulus of a floating-point number.<p>
+            <b>Return type:</b>
+            <codeph>float</codeph> or <codeph>double</codeph>, depending on type
+            of arguments </p>
           <p conref="../shared/impala_common.xml#common/added_in_111"/>
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
-          <p>
-            Because this function operates on <codeph>DOUBLE</codeph> or <codeph>FLOAT</codeph>
-            values, it is subject to potential rounding errors for values that cannot be
-            represented precisely. Prefer to use whole numbers, or values that you know
-            can be represented precisely by the <codeph>DOUBLE</codeph> or <codeph>FLOAT</codeph>
-            types.
-          </p>
+          <p> Because this function operates on <codeph>DOUBLE</codeph> or
+              <codeph>FLOAT</codeph> values, it is subject to potential rounding
+            errors for values that cannot be represented precisely. Prefer to
+            use whole numbers, or values that you know can be represented
+            precisely by the <codeph>DOUBLE</codeph> or <codeph>FLOAT</codeph>
+            types. </p>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
-          <p>
-            The following examples show equivalent operations with the <codeph>fmod()</codeph>
-            function and the <codeph>%</codeph> arithmetic operator, for values not subject
-            to any rounding error.
-          </p>
-<codeblock>select fmod(10,3);
+          <p> The following examples show equivalent operations with the
+              <codeph>fmod()</codeph> function and the <codeph>%</codeph>
+            arithmetic operator, for values not subject to any rounding error. </p>
+          <codeblock>select fmod(10,3);
 +-------------+
 | fmod(10, 3) |
 +-------------+
@@ -493,17 +490,16 @@ select 5.5 % 2;
 | 1.5     |
 +---------+
 </codeblock>
-          <p>
-            The following examples show operations with the <codeph>fmod()</codeph>
-            function for values that cannot be represented precisely by the
-            <codeph>DOUBLE</codeph> or <codeph>FLOAT</codeph> types, and thus are
-            subject to rounding error. <codeph>fmod(9.9,3.0)</codeph> returns a value
-            slightly different than the expected 0.9 because of rounding.
-            <codeph>fmod(9.9,3.3)</codeph> returns a value quite different from
-            the expected value of 0 because of rounding error during intermediate
-            calculations.
-          </p>
-<codeblock>select fmod(9.9,3.0);
+          <p> The following examples show operations with the
+              <codeph>fmod()</codeph> function for values that cannot be
+            represented precisely by the <codeph>DOUBLE</codeph> or
+              <codeph>FLOAT</codeph> types, and thus are subject to rounding
+            error. <codeph>fmod(9.9,3.0)</codeph> returns a value slightly
+            different than the expected 0.9 because of rounding.
+              <codeph>fmod(9.9,3.3)</codeph> returns a value quite different
+            from the expected value of 0 because of rounding error during
+            intermediate calculations. </p>
+          <codeblock>select fmod(9.9,3.0);
 +--------------------+
 | fmod(9.9, 3.0)     |
 +--------------------+
@@ -826,31 +822,30 @@ select fmod(9.9,3.3);
 
         <dd rev="2.2.0">
           <indexterm audience="hidden">mod() function</indexterm>
-          <b>Purpose:</b> Returns the modulus of a number. Equivalent to the <codeph>%</codeph> arithmetic operator.
-          Works with any size integer type, any size floating-point type, and <codeph>DECIMAL</codeph>
-          with any precision and scale.
-          <p conref="../shared/impala_common.xml#common/return_type_same"/>
+          <b>Purpose:</b> Returns the modulus of a number. Equivalent to the
+            <codeph>%</codeph> arithmetic operator. Works with any size integer
+          type, any size floating-point type, and <codeph>DECIMAL</codeph> with
+          any precision and scale. <p
+            conref="../shared/impala_common.xml#common/return_type_same"/>
           <p conref="../shared/impala_common.xml#common/added_in_220"/>
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
-          <p>
-            Because this function works with <codeph>DECIMAL</codeph> values, prefer it over <codeph>fmod()</codeph>
-            when working with fractional values. It is not subject to the rounding errors that make
-            <codeph>fmod()</codeph> problematic with floating-point numbers.
-            The <codeph>%</codeph> arithmetic operator now uses the <codeph>mod()</codeph> function
-            in cases where its arguments can be interpreted as <codeph>DECIMAL</codeph> values,
-            increasing the accuracy of that operator.
-          </p>
+          <p> Because this function works with <codeph>DECIMAL</codeph> values,
+            prefer it over <codeph>fmod()</codeph> when working with fractional
+            values. It is not subject to the rounding errors that make
+              <codeph>fmod()</codeph> problematic with floating-point
+            numbers.</p><p rev="IMPALA-6202">Query plans shows the
+              <codeph>MOD()</codeph> function as the <codeph>%</codeph>
+            operator.</p>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
-          <p>
-            The following examples show how the <codeph>mod()</codeph> function works for
-            whole numbers and fractional values, and how the <codeph>%</codeph> operator
-            works the same way. In the case of <codeph>mod(9.9,3)</codeph>,
-            the type conversion for the second argument results in the first argument
-            being interpreted as <codeph>DOUBLE</codeph>, so to produce an accurate
-            <codeph>DECIMAL</codeph> result requires casting the second argument
-            or writing it as a <codeph>DECIMAL</codeph> literal, 3.0.
-          </p>
-<codeblock>select mod(10,3);
+          <p> The following examples show how the <codeph>mod()</codeph>
+            function works for whole numbers and fractional values, and how the
+              <codeph>%</codeph> operator works the same way. In the case of
+              <codeph>mod(9.9,3)</codeph>, the type conversion for the second
+            argument results in the first argument being interpreted as
+              <codeph>DOUBLE</codeph>, so to produce an accurate
+              <codeph>DECIMAL</codeph> result requires casting the second
+            argument or writing it as a <codeph>DECIMAL</codeph> literal, 3.0. </p>
+          <codeblock>select mod(10,3);
 +-------------+
 | fmod(10, 3) |
 +-------------+
