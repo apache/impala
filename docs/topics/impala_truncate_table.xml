@@ -66,9 +66,6 @@ under the License.
       effect. This capability is useful in standardized setup scripts that are
       might be run both before and after some of the tables exist. This clause
       is available in <keyword keyref="impala25_full"/> and higher. </p>
-    <p> Any HDFS data files removed by this statement go into the HDFS trashcan,
-      from which you can recover them within a defined time interval if this
-      operation turns out to be a mistake. </p>
     <p conref="../shared/impala_common.xml#common/disk_space_blurb"/>
     <p conref="../shared/impala_common.xml#common/s3_blurb"/>
     <p rev="2.2.0"> Although Impala cannot write new data to a table stored in
