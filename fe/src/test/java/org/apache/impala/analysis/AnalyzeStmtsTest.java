@@ -1822,25 +1822,38 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     }
   }
 
+  /**
+  * Checks warning message if applicable and
+  * returns true if straight_join hint is applied or false otherwise.
+  */
+  private boolean hasStraightJoin(String stmt, String expectedWarning){
+    AnalysisContext ctx = createAnalysisCtx();
+    AnalyzesOk(stmt,ctx, expectedWarning);
+    return ctx.getAnalyzer().isStraightJoin();
+  }
+
   @Test
   public void TestSelectListHints() throws AnalysisException {
     for (String[] hintStyle: hintStyles_) {
       String prefix = hintStyle[0];
       String suffix = hintStyle[1];
-      AnalyzesOk(String.format(
-          "select %sstraight_join%s * from functional.alltypes", prefix, suffix));
-      AnalyzesOk(String.format(
-          "select %sStrAigHt_jOiN%s * from functional.alltypes", prefix, suffix));
+      assertTrue(hasStraightJoin(String.format(
+          "select %sstraight_join%s * from functional.alltypes", prefix, suffix), null));
+      assertTrue(hasStraightJoin(String.format(
+          "select %sStrAigHt_jOiN%s * from functional.alltypes", prefix, suffix), null));
       if (!prefix.equals("")) {
         // Only warn on unrecognized hints for view-compatibility with Hive.
         // Legacy hint style does not parse.
-        AnalyzesOk(String.format(
+        assertFalse(hasStraightJoin(String.format(
             "select %sbadhint%s * from functional.alltypes", prefix, suffix),
-            "PLAN hint not recognized: badhint");
+            "PLAN hint not recognized: badhint"));
+        assertTrue(hasStraightJoin(String.format(
+             "select %sstraight_join%s * from functional.alltypes", prefix, suffix),
+             null));
         // Multiple hints. Legacy hint style does not parse.
-        AnalyzesOk(String.format(
-            "select %sstraight_join,straight_join%s * from functional.alltypes",
-            prefix, suffix));
+        assertTrue(hasStraightJoin(String.format(
+             "select %sstraight_join,straight_join%s * from functional.alltypes",
+              prefix, suffix), null));
       }
     }
   }

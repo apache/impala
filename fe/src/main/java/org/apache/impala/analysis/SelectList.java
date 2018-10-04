@@ -82,11 +82,12 @@ public class SelectList {
   public boolean hasPlanHints() { return !planHints_.isEmpty(); }
 
   public void analyzePlanHints(Analyzer analyzer) {
-    for (PlanHint hint: planHints_) {
-      if (!hint.is("straight_join")) {
+    for (PlanHint hint : planHints_) {
+      if (hint.is("straight_join")) {
+        analyzer.setIsStraightJoin();
+      } else {
         analyzer.addWarning("PLAN hint not recognized: " + hint);
       }
-      analyzer.setIsStraightJoin();
     }
   }
 
