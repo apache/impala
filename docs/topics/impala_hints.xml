@@ -359,31 +359,32 @@ UPSERT [{ /* +SHUFFLE */ | /* +NOSHUFFLE */ }]
     <p conref="../shared/impala_common.xml#common/kudu_hints"/>
 
     <p rev="IMPALA-2924">
-      <b>Hints for scheduling of HDFS blocks:</b>
+      <b>Hints for scheduling of scan ranges (HDFS data blocks or Kudu
+        tablets)</b>
     </p>
 
-    <p rev="IMPALA-2924">
-      The hints <codeph>/* +SCHEDULE_CACHE_LOCAL */</codeph>, <codeph>/* +SCHEDULE_DISK_LOCAL
-      */</codeph>, and <codeph>/* +SCHEDULE_REMOTE */</codeph> have the same effect as
-      specifying the <codeph>REPLICA_PREFERENCE</codeph> query option with the respective option
-      settings of <codeph>CACHE_LOCAL</codeph>, <codeph>DISK_LOCAL</codeph>, or
-      <codeph>REMOTE</codeph>. The hint <codeph>/* +RANDOM_REPLICA */</codeph> is the same as
-      enabling the <codeph>SCHEDULE_RANDOM_REPLICA</codeph> query option.
-    </p>
+    <p rev="IMPALA-2924"> The hints <codeph>/* +SCHEDULE_CACHE_LOCAL
+      */</codeph>, <codeph>/* +SCHEDULE_DISK_LOCAL */</codeph>, and <codeph>/*
+        +SCHEDULE_REMOTE */</codeph> have the same effect as specifying the
+        <codeph>REPLICA_PREFERENCE</codeph> query option with the respective
+      option settings of <codeph>CACHE_LOCAL</codeph>,
+        <codeph>DISK_LOCAL</codeph>, or <codeph>REMOTE</codeph>. </p>
+    <p rev="IMPALA-2924"> Specifying the replica preference as a query hint
+      always overrides the query option setting. </p>
+    <p rev="IMPALA-2924">The hint <codeph>/* +RANDOM_REPLICA */</codeph> is the
+      same as enabling the <codeph>SCHEDULE_RANDOM_REPLICA</codeph> query
+      option. </p>
 
-    <p rev="IMPALA-2924">
-      You can use these hints in combination by separating them with commas, for example,
-      <codeph>/* +SCHEDULE_CACHE_LOCAL,RANDOM_REPLICA */</codeph>. See
-      <xref keyref="replica_preference"/> and <xref keyref="schedule_random_replica"/> for
-      information about how these settings influence the way Impala processes HDFS data blocks.
-    </p>
-
-    <p rev="IMPALA-2924">
-      Specifying the replica preference as a query hint always overrides the query option
-      setting. Specifying either the <codeph>SCHEDULE_RANDOM_REPLICA</codeph> query option or
-      the corresponding <codeph>RANDOM_REPLICA</codeph> query hint enables the random
-      tie-breaking behavior when processing data blocks during the query.
-    </p>
+    <p rev="IMPALA-2924"> You can use these hints in combination by separating
+      them with commas, for example, <codeph>/*
+        +SCHEDULE_CACHE_LOCAL,RANDOM_REPLICA */</codeph>. See <xref
+        keyref="replica_preference"/> and <xref keyref="schedule_random_replica"
+      /> for information about how these settings influence the way Impala
+      processes HDFS data blocks or Kudu tablets. </p>
+    <p rev="IMPALA-2924">Specifying either the
+        <codeph>SCHEDULE_RANDOM_REPLICA</codeph> query option or the
+      corresponding <codeph>RANDOM_REPLICA</codeph> query hint enables the
+      random tie-breaking behavior when processing data blocks during the query. </p>
 
     <p>
       <b>Suggestions versus directives:</b>
