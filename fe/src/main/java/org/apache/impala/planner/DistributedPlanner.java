@@ -1054,7 +1054,7 @@ public class DistributedPlanner {
     Preconditions.checkState(node == childSortNode);
     if (hasLimit) {
       childSortNode.unsetLimit();
-      childSortNode.setLimit(limit + offset);
+      childSortNode.setLimit(PlanNode.checkedAdd(limit, offset));
     }
     childSortNode.setOffset(0);
     childSortNode.computeStats(ctx_.getRootAnalyzer());

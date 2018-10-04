@@ -79,6 +79,7 @@ Memory limit exceeded
 ---- QUERY
 # Top-N query with large limit that will OOM because spilling is not implemented:
 # IMPALA-3471. It does not need any help from DEBUG_ACTION.
+set topn_bytes_limit=-1;
 set mem_limit=100m;
 select *
 from lineitem

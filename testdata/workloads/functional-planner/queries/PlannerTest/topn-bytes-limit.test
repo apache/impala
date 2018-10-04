@@ -1,0 +1,23 @@
+# check that topn is triggered for low limits with the default value of topn_bytes_limit
+select id from functional.alltypestiny order by id limit 7
+---- PLAN
+PLAN-ROOT SINK
+|
+01:TOP-N [LIMIT=7]
+|  order by: id ASC
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|  limit: 7
+|
+01:TOP-N [LIMIT=7]
+|  order by: id ASC
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====

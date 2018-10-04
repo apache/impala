@@ -193,7 +193,21 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testTopN() {
-    runPlannerTestFile("topn");
+    TQueryOptions options = new TQueryOptions();
+    options.setTopn_bytes_limit(0);
+    runPlannerTestFile("topn", options);
+  }
+
+  @Test
+  public void testTopNBytesLimit() {
+    runPlannerTestFile("topn-bytes-limit");
+  }
+
+  @Test
+  public void testTopNBytesLimitSmall() {
+    TQueryOptions options = new TQueryOptions();
+    options.setTopn_bytes_limit(6);
+    runPlannerTestFile("topn-bytes-limit-small", options);
   }
 
   @Test

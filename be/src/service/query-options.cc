@@ -714,6 +714,12 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_cpu_limit_s(cpu_limit_s);
         break;
       }
+      case TImpalaQueryOptions::TOPN_BYTES_LIMIT: {
+        int64_t topn_bytes_limit;
+        RETURN_IF_ERROR(ParseMemValue(value, "topn bytes limit", &topn_bytes_limit));
+        query_options->__set_topn_bytes_limit(topn_bytes_limit);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

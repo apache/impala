@@ -16,11 +16,13 @@
 // under the License.
 
 package org.apache.impala.analysis;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.common.TreeNode;
+import org.apache.impala.planner.PlanNode;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -230,6 +232,18 @@ public class SortInfo {
       outputSmap_.put(srcExpr.clone(), new SlotRef(dstSlotDesc));
       materializedExprs_.add(srcExpr);
     }
+  }
+
+  /**
+   * Estimates the size of the data materialized in memory by the TopN operator. The
+   * method uses the formula <code>estimatedSize = estimated # of rows in memory *
+   * average tuple serialized size</code>. 'cardinality' is the cardinality of the TopN
+   * operator and 'offset' is the value in the 'OFFSET [x]' clause.
+   */
+  public long estimateTopNMaterializedSize(long cardinality, long offset) {
+    getSortTupleDescriptor().computeMemLayout();
+    return (long) Math.ceil(getSortTupleDescriptor().getAvgSerializedSize()
+        * (PlanNode.checkedAdd(cardinality, offset)));
   }
 
   /**

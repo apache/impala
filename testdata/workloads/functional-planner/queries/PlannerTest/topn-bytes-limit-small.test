@@ -1,0 +1,72 @@
+# topn_bytes_limit is set to 6 so a limit of 1 will return a single int
+# a single int is 4 bytes, which is under the limit of 6 so a TOP-N should be triggered
+select int_col from functional.alltypes order by 1 limit 1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:TOP-N [LIMIT=1]
+|  order by: int_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col ASC
+|  limit: 1
+|
+01:TOP-N [LIMIT=1]
+|  order by: int_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# returns 2 ints, with a total size of 8 bytes, which exceeds the limit of 6 and thus triggers a SORT
+select int_col from functional.alltypes order by 1 limit 2
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SORT [LIMIT=2]
+|  order by: int_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col ASC
+|  limit: 2
+|
+01:SORT [LIMIT=2]
+|  order by: int_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# test that offset is taken into account; the query only returns a single row but needs to sort two rows
+# sorting two ints requires 8 bytes of memory, which exceeds the threshold of 6
+select int_col from functional.alltypes order by 1 limit 1 offset 1
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SORT [LIMIT=1 OFFSET=1]
+|  order by: int_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 1
+|  order by: int_col ASC
+|  limit: 1
+|
+01:SORT [LIMIT=2]
+|  order by: int_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====

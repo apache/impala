@@ -164,7 +164,7 @@ public class SortNode extends PlanNode {
   @Override
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    cardinality_ = capAtLimit(getChild(0).cardinality_);
+    cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_);
     if (LOG.isTraceEnabled()) {
       LOG.trace("stats Sort: cardinality=" + Long.toString(cardinality_));
     }
@@ -257,9 +257,8 @@ public class SortNode extends PlanNode {
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {
     Preconditions.checkState(hasValidStats());
     if (type_ == TSortType.TOPN) {
-      long perInstanceMemEstimate =
-              (long) Math.ceil((cardinality_ + offset_) * avgRowSize_);
-      nodeResourceProfile_ = ResourceProfile.noReservation(perInstanceMemEstimate);
+      nodeResourceProfile_ = ResourceProfile.noReservation(
+          getSortInfo().estimateTopNMaterializedSize(cardinality_, offset_));
       return;
     }
 

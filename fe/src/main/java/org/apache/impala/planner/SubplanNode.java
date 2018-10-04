@@ -91,7 +91,7 @@ public class SubplanNode extends PlanNode {
     } else {
       cardinality_ = -1;
     }
-    cardinality_ = capAtLimit(cardinality_);
+    cardinality_ = capCardinalityAtLimit(cardinality_);
   }
 
   @Override
