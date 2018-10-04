@@ -249,7 +249,7 @@ public class AggregationNode extends PlanNode {
         cardinality_ = Math.min(getChild(0).getCardinality(), cardinality_);
       }
     }
-    cardinality_ = capAtLimit(cardinality_);
+    cardinality_ = capCardinalityAtLimit(cardinality_);
   }
 
   /**

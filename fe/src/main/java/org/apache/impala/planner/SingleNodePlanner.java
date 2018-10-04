@@ -48,6 +48,7 @@ import org.apache.impala.analysis.SingularRowSrcTableRef;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
@@ -294,26 +295,51 @@ public class SingleNodePlanner {
     }
 
     if (stmt.evaluateOrderBy() && sortHasMaterializedSlots) {
-      long limit = stmt.getLimit();
-      // TODO: External sort could be used for very large limits
-      // not just unlimited order-by
-      boolean useTopN = stmt.hasLimit() && !disableTopN;
-      if (useTopN) {
-        root = SortNode.createTopNSortNode(
-            ctx_.getNextNodeId(), root, stmt.getSortInfo(), stmt.getOffset());
-      } else {
-        root = SortNode.createTotalSortNode(
-            ctx_.getNextNodeId(), root, stmt.getSortInfo(), stmt.getOffset());
-      }
-      Preconditions.checkState(root.hasValidStats());
-      root.setLimit(limit);
-      root.init(analyzer);
+      root = createSortNode(analyzer, root, stmt.getSortInfo(), stmt.getLimit(),
+          stmt.getOffset(), stmt.hasLimit(), disableTopN);
     } else {
       root.setLimit(stmt.getLimit());
       root.computeStats(analyzer);
     }
 
     return root;
+  }
+
+  /**
+   * Creates and initializes either a SortNode or a TopNNode depending on various
+   * heuristics and configuration parameters.
+   */
+  private SortNode createSortNode(Analyzer analyzer, PlanNode root, SortInfo sortInfo,
+      long limit, long offset, boolean hasLimit, boolean disableTopN)
+      throws ImpalaException {
+    SortNode sortNode;
+    long topNBytesLimit = ctx_.getQueryOptions().topn_bytes_limit;
+
+    if (hasLimit && !disableTopN) {
+      if (topNBytesLimit <= 0) {
+        sortNode =
+            SortNode.createTopNSortNode(ctx_.getNextNodeId(), root, sortInfo, offset);
+      } else {
+        long topNCardinality = PlanNode.capCardinalityAtLimit(root.cardinality_, limit);
+        long estimatedTopNMaterializedSize =
+            sortInfo.estimateTopNMaterializedSize(topNCardinality, offset);
+
+        if (estimatedTopNMaterializedSize < topNBytesLimit) {
+          sortNode =
+              SortNode.createTopNSortNode(ctx_.getNextNodeId(), root, sortInfo, offset);
+        } else {
+          sortNode =
+              SortNode.createTotalSortNode(ctx_.getNextNodeId(), root, sortInfo, offset);
+        }
+      }
+    } else {
+      sortNode =
+          SortNode.createTotalSortNode(ctx_.getNextNodeId(), root, sortInfo, offset);
+    }
+    Preconditions.checkState(sortNode.hasValidStats());
+    sortNode.setLimit(limit);
+    sortNode.init(analyzer);
+    return sortNode;
   }
 
   /**

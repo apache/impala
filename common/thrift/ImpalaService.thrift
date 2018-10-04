@@ -339,6 +339,12 @@ enum TImpalaQueryOptions {
   // Note that until IMPALA-7318 is fixed, CPU usage can be very stale and this may not
   // terminate queries soon enough.
   CPU_LIMIT_S,
+
+  // The max number of estimated bytes a TopN operator is allowed to materialize, if the
+  // planner thinks a TopN operator will exceed this limit, it falls back to a TotalSort
+  // operator which is capable of spilling to disk (unlike the TopN operator which keeps
+  // everything in memory). 0 or -1 means this has no effect.
+  TOPN_BYTES_LIMIT,
 }
 
 // The summary of a DML statement.

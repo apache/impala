@@ -521,15 +521,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     if (!children_.isEmpty()) numNodes_ = getChild(0).numNodes_;
   }
 
-  protected long capAtLimit(long cardinality) {
+  protected long capCardinalityAtLimit(long cardinality) {
     if (hasLimit()) {
-      if (cardinality == -1) {
-        return limit_;
-      } else {
-        return Math.min(cardinality, limit_);
-      }
+      return capCardinalityAtLimit(cardinality, limit_);
     }
     return cardinality;
+  }
+
+  static long capCardinalityAtLimit(long cardinality, long limit) {
+    return cardinality == -1 ? limit : Math.min(cardinality, limit);
   }
 
   /**
