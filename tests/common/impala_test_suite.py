@@ -373,11 +373,13 @@ class ImpalaTestSuite(BaseTestSuite):
           .replace('$GROUP_NAME', group_name)
           .replace('$IMPALA_HOME', IMPALA_HOME)
           .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX)
-          .replace('$SECONDARY_FILESYSTEM', os.getenv("SECONDARY_FILESYSTEM") or str()))
+          .replace('$SECONDARY_FILESYSTEM', os.getenv("SECONDARY_FILESYSTEM") or str())
+          .replace('$USER', getuser()))
       if use_db: query = query.replace('$DATABASE', use_db)
 
       reserved_keywords = ["$DATABASE", "$FILESYSTEM_PREFIX", "$GROUP_NAME",
-                           "$IMPALA_HOME", "$NAMENODE", "$QUERY", "$SECONDARY_FILESYSTEM"]
+                           "$IMPALA_HOME", "$NAMENODE", "$QUERY", "$SECONDARY_FILESYSTEM",
+                           "$USER"]
 
       if test_file_vars:
         for key, value in test_file_vars.iteritems():

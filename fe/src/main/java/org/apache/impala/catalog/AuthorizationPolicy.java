@@ -491,7 +491,10 @@ public class AuthorizationPolicy implements PrivilegeCache {
    * Check if the filter matches the privilege.
    */
   private boolean isPrivilegeFiltered(TPrivilege filter, TPrivilege privilege) {
+    // Set the filter with privilege level and has grant option from the given privilege
+    // since those two fields don't matter for the filter.
     filter.setPrivilege_level(privilege.getPrivilege_level());
+    filter.setHas_grant_opt(privilege.isHas_grant_opt());
     String privName = PrincipalPrivilege.buildPrivilegeName(filter);
     return !privName.equalsIgnoreCase(PrincipalPrivilege.buildPrivilegeName(privilege));
   }

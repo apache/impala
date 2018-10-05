@@ -1,4 +1,11 @@
 ====
+---- QUERY
+show grant user $USER on database $DATABASE
+---- RESULTS
+'USER','$USER','database','$DATABASE','','','','owner',true,regex:.+
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
 ---- USER
 does_not_exist
 ---- QUERY
@@ -131,6 +138,15 @@ user2_shared2
 show grant user user2_shared2
 ---- RESULTS
 'USER','user2_shared2','table','$DATABASE','user2_shared2_tbl','','','owner',true,regex:.+
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- USER
+user_1group
+---- QUERY
+show grant user user_1group on table $DATABASE.user_1group_tbl
+---- RESULTS
+'USER','user_1group','table','$DATABASE','user_1group_tbl','','','owner',true,regex:.+
 ---- TYPES
 STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
