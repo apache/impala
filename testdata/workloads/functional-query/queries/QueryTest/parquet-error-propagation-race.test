@@ -1,0 +1,13 @@
+====
+---- QUERY
+# Add a valid file with a single row to the table.
+INSERT INTO bad_magic_number SELECT 'good';
+---- RESULTS
+: 1
+====
+---- QUERY
+set debug_action="0:SCANNER_ERROR:DELAY";
+SELECT * FROM bad_magic_number
+---- CATCH
+invalid version number
+====

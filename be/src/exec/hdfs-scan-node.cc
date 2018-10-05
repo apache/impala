@@ -338,6 +338,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
 
       // Abort the query. This is still holding the lock_, so done_ is known to be
       // false and status_ must be ok.
+      discard_result(ExecDebugAction(TExecNodePhase::SCANNER_ERROR, runtime_state_));
       SetDoneInternal(status);
       break;
     }
@@ -385,12 +386,6 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
     int num_unqueued_files = num_unqueued_files_.Load();
     ScanRange* scan_range;
     Status status = StartNextScanRange(&scanner_thread_reservation, &scan_range);
-    if (status.ok() && scan_range != nullptr) {
-      // Got a scan range. Process the range end to end (in this thread).
-      status = ProcessSplit(filter_status.ok() ? filter_ctxs : vector<FilterContext>(),
-          &expr_results_pool, scan_range, &scanner_thread_reservation);
-    }
-
     if (!status.ok()) {
       unique_lock<mutex> l(lock_);
       // If there was already an error, the main thread will do the cleanup
@@ -400,6 +395,11 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
       // RowBatchQueue) to ensure that GetNextInternal() notices the error.
       SetDoneInternal(status);
       break;
+    }
+    if (scan_range != nullptr) {
+      // Got a scan range. Process the range end to end (in this thread).
+      ProcessSplit(filter_status.ok() ? filter_ctxs : vector<FilterContext>(),
+          &expr_results_pool, scan_range, &scanner_thread_reservation);
     }
 
     // Done with range and it completed successfully
@@ -444,7 +444,7 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
   thread_state_.DecrementNumActive();
 }
 
-Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
+void HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     MemPool* expr_results_pool, ScanRange* scan_range,
     int64_t* scanner_thread_reservation) {
   DCHECK(scan_range != nullptr);
@@ -467,14 +467,14 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
       HdfsScanNodeBase::RangeComplete(partition->file_format(), desc->file_compression,
           true);
     }
-    return Status::OK();
+    return;
   }
 
   ScannerContext context(runtime_state_, this, buffer_pool_client(),
       *scanner_thread_reservation, partition, filter_ctxs, expr_results_pool);
   context.AddStream(scan_range, *scanner_thread_reservation);
   scoped_ptr<HdfsScanner> scanner;
-  Status status = CreateAndOpenScanner(partition, &context, &scanner);
+  Status status = CreateAndOpenScannerHelper(partition, &context, &scanner);
   if (!status.ok()) {
     // If preparation fails, avoid leaking unread buffers in the scan_range.
     scan_range->Cancel(status);
@@ -486,7 +486,12 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
       ss << endl << runtime_state_->ErrorLog();
       VLOG_QUERY << ss.str();
     }
-    return status;
+
+    // Ensure that the error is propagated before marking a range as complete (The
+    // scanner->Close() call marks a scan range as complete).
+    SetError(status);
+    if (scanner != nullptr) scanner->Close();
+    return;
   }
 
   status = scanner->ProcessSplit();
@@ -511,9 +516,7 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
     // HdfsScanNodeBase::status_ variable and notify other scanner threads. Ensure that
     // status_ is updated before marking a range as complete (The scanner->Close() call
     // marks a scan range as complete).
-    unique_lock<mutex> l(lock_);
-    // Update the status_ and set the done_ flag if this is the first non-ok status.
-    SetDoneInternal(status);
+    SetError(status);
   }
   // Transfer remaining resources to a final batch and add it to the row batch queue and
   // decrement progress_ to indicate that the scan range is complete.
@@ -521,7 +524,6 @@ Status HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
   // Reservation may have been increased by the scanner, e.g. Parquet may allocate
   // additional reservation to scan columns.
   *scanner_thread_reservation = context.total_reservation();
-  return status;
 }
 
 void HdfsScanNode::SetDoneInternal(const Status& status) {
@@ -537,4 +539,10 @@ void HdfsScanNode::SetDoneInternal(const Status& status) {
 void HdfsScanNode::SetDone() {
   unique_lock<mutex> l(lock_);
   SetDoneInternal(status_);
+}
+
+void HdfsScanNode::SetError(const Status& status) {
+  discard_result(ExecDebugAction(TExecNodePhase::SCANNER_ERROR, runtime_state_));
+  unique_lock<mutex> l(lock_);
+  SetDoneInternal(status);
 }

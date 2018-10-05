@@ -556,9 +556,14 @@ class HdfsScanNodeBase : public ScanNode {
   /// buffers.
   Status StartNextScanRange(int64_t* reservation, io::ScanRange** scan_range);
 
-  /// Create and open new scanner for this partition type.
-  /// If the scanner is successfully created and opened, it is returned in 'scanner'.
-  Status CreateAndOpenScanner(HdfsPartitionDescriptor* partition,
+  /// Helper for the CreateAndOpenScanner() implementations in the subclass. Creates and
+  /// opens a new scanner for this partition type. Depending on the outcome, the
+  /// behaviour differs:
+  /// - If the scanner is successfully created and opened, returns OK and sets *scanner.
+  /// - If the scanner cannot be created, returns an error and does not set *scanner.
+  /// - If the scanner is created but opening fails, returns an error and sets *scanner.
+  ///   The caller is then responsible for closing the scanner.
+  Status CreateAndOpenScannerHelper(HdfsPartitionDescriptor* partition,
       ScannerContext* context, boost::scoped_ptr<HdfsScanner>* scanner)
       WARN_UNUSED_RESULT;
 

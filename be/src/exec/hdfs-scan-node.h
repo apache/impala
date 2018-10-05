@@ -162,10 +162,11 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// thread. 'filter_ctxs' is a clone of the class-wide filter_ctxs_, used to filter rows
   /// in this split. 'scanner_thread_reservation' is an in/out argument that tracks the
   /// total reservation from 'buffer_pool_client_' that is allotted for this thread's
-  /// use.
-  Status ProcessSplit(const std::vector<FilterContext>& filter_ctxs,
+  /// use. If an error is encountered, calls SetDoneInternal() with the error to
+  /// initiate shutdown of the scan.
+  void ProcessSplit(const std::vector<FilterContext>& filter_ctxs,
       MemPool* expr_results_pool, io::ScanRange* scan_range,
-      int64_t* scanner_thread_reservation) WARN_UNUSED_RESULT;
+      int64_t* scanner_thread_reservation);
 
   /// Called by scanner thread to return some or all of its reservation that is not
   /// needed. Always holds onto at least the minimum reservation to avoid violating the
@@ -185,6 +186,11 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// Gets lock_ and calls SetDoneInternal(status_). Usually used after the scan node
   /// completes execution successfully.
   void SetDone();
+
+  /// Gets lock_ and calls SetDoneInternal(status). Called after a scanner hits an
+  /// error. Must be called before HdfsScanner::Close() to ensure that 'status'
+  /// is propagated before the scan range is marked as complete by HdfsScanner::Close().
+  void SetError(const Status& status);
 };
 
 }

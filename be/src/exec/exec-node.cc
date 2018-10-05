@@ -392,8 +392,7 @@ Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* s
     return Status::OK();
   } else if (debug_options_.action == TDebugAction::MEM_LIMIT_EXCEEDED) {
     return mem_tracker()->MemLimitExceeded(state, "Debug Action: MEM_LIMIT_EXCEEDED");
-  } else {
-    DCHECK_EQ(debug_options_.action, TDebugAction::SET_DENY_RESERVATION_PROBABILITY);
+  } else if (debug_options_.action == TDebugAction::SET_DENY_RESERVATION_PROBABILITY) {
     // We can only enable the debug action if the buffer pool client is registered.
     // If the buffer client is not registered at this point (e.g. if phase is PREPARE or
     // OPEN), then we will enable the debug action at the time when the client is
@@ -401,6 +400,10 @@ Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* s
     if (reservation_manager_.buffer_pool_client()->is_registered()) {
       RETURN_IF_ERROR(reservation_manager_.EnableDenyReservationDebugAction());
     }
+  } else {
+    DCHECK_EQ(debug_options_.action, TDebugAction::DELAY);
+    VLOG(1) << "DEBUG_ACTION: Sleeping";
+    SleepForMs(100);
   }
   return Status::OK();
 }

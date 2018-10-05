@@ -60,6 +60,9 @@ enum TExecNodePhase {
   GETNEXT,
   GETNEXT_SCANNER,
   CLOSE,
+  // After a scanner thread completes a range with an error but before it propagates the
+  // error.
+  SCANNER_ERROR,
   INVALID
 }
 
@@ -72,6 +75,8 @@ enum TDebugAction {
   // A floating point number in range [0.0, 1.0] that gives the probability of denying
   // each reservation increase request after the initial reservation.
   SET_DENY_RESERVATION_PROBABILITY,
+  // Delay for a short amount of time: 100ms
+  DELAY,
 }
 
 // Preference for replica selection

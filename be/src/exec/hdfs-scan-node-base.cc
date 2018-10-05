@@ -624,9 +624,10 @@ void* HdfsScanNodeBase::GetCodegenFn(THdfsFileFormat::type type) {
   return it->second;
 }
 
-Status HdfsScanNodeBase::CreateAndOpenScanner(HdfsPartitionDescriptor* partition,
+Status HdfsScanNodeBase::CreateAndOpenScannerHelper(HdfsPartitionDescriptor* partition,
     ScannerContext* context, scoped_ptr<HdfsScanner>* scanner) {
-  DCHECK(context != NULL);
+  DCHECK(context != nullptr);
+  DCHECK(scanner->get() == nullptr);
   THdfsCompression::type compression =
       context->GetStream()->file_desc()->file_compression;
 
@@ -663,19 +664,10 @@ Status HdfsScanNodeBase::CreateAndOpenScanner(HdfsPartitionDescriptor* partition
       return Status(Substitute("Unknown Hdfs file format type: $0",
           partition->file_format()));
   }
-  DCHECK(scanner->get() != NULL);
-  Status status = ScanNodeDebugAction(TExecNodePhase::PREPARE_SCANNER);
-  if (status.ok()) {
-    status = scanner->get()->Open(context);
-    if (!status.ok()) {
-      scanner->get()->Close(nullptr);
-      scanner->reset();
-    }
-  } else {
-    context->ClearStreams();
-    scanner->reset();
-  }
-  return status;
+  DCHECK(scanner->get() != nullptr);
+  RETURN_IF_ERROR(scanner->get()->Open(context));
+  // Inject the error after the scanner is opened, to test the scanner close path.
+  return ScanNodeDebugAction(TExecNodePhase::PREPARE_SCANNER);
 }
 
 Tuple* HdfsScanNodeBase::InitTemplateTuple(const vector<ScalarExprEvaluator*>& evals,

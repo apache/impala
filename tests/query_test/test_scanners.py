@@ -722,6 +722,21 @@ class TestParquet(ImpalaTestSuite):
 
     self.run_test_case("QueryTest/parquet-type-widening", vector, unique_database)
 
+  def test_error_propagation_race(self, vector, unique_database):
+    """IMPALA-7662: failed scan signals completion before error is propagated. To
+    reproduce, we construct a table with two Parquet files, one valid and another
+    invalid. The scanner thread for the invalid file must propagate the error
+    before we mark the whole scan complete."""
+    if vector.get_value('exec_option')['debug_action'] is not None:
+      pytest.skip(".test file needs to override debug action")
+    create_table_and_copy_files(self.client,
+        "CREATE TABLE {db}.{tbl} (s STRING) STORED AS PARQUET",
+        unique_database, "bad_magic_number", ["testdata/data/bad_magic_number.parquet"])
+    # We need the ranges to all be scheduled on the same impalad.
+    vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case("QueryTest/parquet-error-propagation-race", vector,
+                       unique_database)
+
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
 # 1. default scan range

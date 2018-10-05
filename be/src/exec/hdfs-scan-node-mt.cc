@@ -27,8 +27,9 @@
 
 #include "gen-cpp/PlanNodes_types.h"
 
+#include "common/names.h"
+
 using namespace impala::io;
-using std::stringstream;
 
 namespace impala {
 
@@ -124,6 +125,16 @@ Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* e
 
   if (*eos) StopAndFinalizeCounters();
   return Status::OK();
+}
+
+Status HdfsScanNodeMt::CreateAndOpenScanner(HdfsPartitionDescriptor* partition,
+    ScannerContext* context, scoped_ptr<HdfsScanner>* scanner) {
+  Status status = CreateAndOpenScannerHelper(partition, context, scanner);
+  if (!status.ok() && scanner->get() != nullptr) {
+    scanner->get()->Close(nullptr);
+    scanner->reset();
+  }
+  return status;
 }
 
 void HdfsScanNodeMt::Close(RuntimeState* state) {

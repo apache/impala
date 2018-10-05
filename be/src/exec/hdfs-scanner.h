@@ -148,6 +148,8 @@ class HdfsScanner {
   /// and memory in mem pools to the given row batch. If the row batch is NULL,
   /// those resources are released instead. In any case, releases all other resources
   /// that are not backing returned rows (e.g. temporary decompression buffers).
+  /// Also marks any associated scan ranges as complete by calling RangeComplete() on the
+  /// scan node.
   /// This function is not idempotent and must only be called once.
   virtual void Close(RowBatch* row_batch) = 0;
 
