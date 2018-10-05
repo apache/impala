@@ -17,6 +17,8 @@
 
 #include "exprs/operators.h"
 
+#include <functional>
+
 #include <boost/cstdint.hpp>
 
 #include "exprs/anyval-util.h"
@@ -48,14 +50,11 @@
 // of multiplication, addition, and subtraction are identical to the version of the signed
 // operation on a two's complement machine in which overflowing is not undefined, but
 // wraps.
-#define BINARY_OP_AS_UNSIGNED_FN(NAME, TYPE, OP)                                       \
-  TYPE Operators::NAME##_##TYPE##_##TYPE(                                              \
-      FunctionContext* c, const TYPE& v1, const TYPE& v2) {                            \
-    if (v1.is_null || v2.is_null) return TYPE::null();                                 \
-    using UNSIGNED = UnsignedType<decltype(TYPE::val)>;                                \
-    const UNSIGNED u1 = BitUtil::ToUnsigned(v1.val), u2 = BitUtil::ToUnsigned(v2.val); \
-    const UNSIGNED u0 = u1 OP u2;                                                      \
-    return TYPE(u0);                                                                   \
+#define BINARY_OP_AS_UNSIGNED_FN(NAME, TYPE, OP)                 \
+  TYPE Operators::NAME##_##TYPE##_##TYPE(                        \
+      FunctionContext* c, const TYPE& v1, const TYPE& v2) {      \
+    if (v1.is_null || v2.is_null) return TYPE::null();           \
+    return TYPE(ArithmeticUtil::AsUnsigned<OP>(v1.val, v2.val)); \
   }
 
 #define BINARY_OP_CHECK_ZERO_FN(NAME, TYPE, OP) \
@@ -191,9 +190,9 @@
 
 namespace impala {
 
-BINARY_OP_AS_UNSIGNED_TYPES(Add, +);
-BINARY_OP_AS_UNSIGNED_TYPES(Subtract, -);
-BINARY_OP_AS_UNSIGNED_TYPES(Multiply, *);
+BINARY_OP_AS_UNSIGNED_TYPES(Add, std::plus);
+BINARY_OP_AS_UNSIGNED_TYPES(Subtract, std::minus);
+BINARY_OP_AS_UNSIGNED_TYPES(Multiply, std::multiplies);
 
 BINARY_OP_FLOAT_TYPES(Add, +);
 BINARY_OP_FLOAT_TYPES(Subtract, -);

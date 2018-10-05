@@ -38,34 +38,6 @@
 
 namespace impala {
 
-/// Nested 'type' corresponds to the unsigned version of T.
-template <typename T>
-struct MakeUnsigned {
-  using type = std::make_unsigned_t<T>;
-};
-
-template <>
-struct MakeUnsigned<int128_t> {
-  using type = __uint128_t;
-};
-
-template <typename T>
-using UnsignedType = typename MakeUnsigned<T>::type;
-
-/// Nested 'type' corresponds to the signed version of T.
-template <typename T>
-struct MakeSigned {
-  using type = std::make_signed_t<T>;
-};
-
-template <>
-struct MakeSigned<__uint128_t> {
-  using type = __int128_t;
-};
-
-template <typename T>
-using SignedType = typename MakeSigned<T>::type;
-
 // Doubles the width of integer types (e.g. int32_t -> int64_t).
 // Currently only works with a few signed types.
 // Feel free to extend it to other types as well.
@@ -420,49 +392,7 @@ class BitUtil {
       return floor + 1;
     }
   }
-
-  // There are times when it is useful to treat the bits in a signed integer as if they
-  // represent an unsigned integer, or vice versa. This is known as "type punning".
-  //
-  // For type punning signed values to unsigned values we can use the assurance in the
-  // standard's [conv.integral] to convert by simply returning the value: "A prvalue of an
-  // integer type can be converted to a prvalue of another integer type. ... If the
-  // destination type is unsigned, the resulting value is the least unsigned integer
-  // congruent to the source integer (modulo 2n where n is the number of bits used to
-  // represent the unsigned type). [Note: In a two's complement representation, this
-  // conversion is conceptual and there is no change in the bit pattern (if there is no
-  // truncation).]"
-  //
-  // For the other direction, the conversion is implementation-defined: "If the
-  // destination type is signed, the value is unchanged if it can be represented in the
-  // destination type (and bit-field width); otherwise, the value is
-  // implementation-defined."
-  //
-  // In GCC, the docs promise that when "[t]he result of, or the signal raised by,
-  // converting an integer to a signed integer type when the value cannot be represented
-  // in an object of that type ... For conversion to a type of width N, the value is
-  // reduced modulo 2^N to be within range of the type". As such, the same method of
-  // converting by simply returning works.
-  //
-  // Note that Clang does not document its implementation-defined behavior,
-  // https://bugs.llvm.org/show_bug.cgi?id=11272, so the static_asserts below are
-  // important
-  template <typename T>
-  constexpr static inline SignedType<T> ToSigned(T x) {
-    return x;
-  }
-  template <typename T>
-  constexpr static inline UnsignedType<T> ToUnsigned(T x) {
-    return x;
-  }
 };
-
-static_assert(BitUtil::ToSigned<uint16_t>(0xffff) == -1
-        && BitUtil::ToSigned<uint16_t>(0x8000) == -0x8000,
-    "ToSigned is not a two's complement no-op");
-static_assert(BitUtil::ToUnsigned<int16_t>(-1) == 0xffff
-        && BitUtil::ToUnsigned<int16_t>(-0x8000) == 0x8000,
-    "ToUnsigned is not a two's complement no-op");
 
 template<>
 inline int256_t BitUtil::Sign(int256_t value) {

@@ -21,6 +21,7 @@
 #include "runtime/decimal-value.h"
 
 #include <cmath>
+#include <functional>
 #include <iomanip>
 #include <limits>
 #include <ostream>
@@ -257,7 +258,8 @@ inline int128_t AddLarge(int128_t x, int x_scale, int128_t y, int y_scale,
       left > (DecimalUtil::MAX_UNSCALED_DECIMAL16 - right) / mult)) {
     *overflow = true;
   }
-  return DecimalUtil::SafeMultiply(left, mult, *overflow) + right;
+  return ArithmeticUtil::AsUnsigned<std::plus>(
+      DecimalUtil::SafeMultiply(left, mult, *overflow), right);
 }
 
 // Subtracts numbers that are large enough so that we can't subtract directly. Neither

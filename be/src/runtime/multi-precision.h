@@ -46,7 +46,10 @@
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #endif
 
+#include <functional>
 #include <limits>
+
+#include "util/arithmetic-util.h"
 
 namespace impala {
 
@@ -103,10 +106,12 @@ inline int128_t ConvertToInt128(int256_t x, int128_t max_value, bool* overflow) 
     uint64_t v = (x % base).convert_to<uint64_t>();
     x /= base;
     *overflow |= (v > max_value / scale);
-    int128_t n = v * scale;
-    *overflow |= (result > max_value - n);
-    result += n;
-    scale *= base;
+    int128_t n =
+        ArithmeticUtil::AsUnsigned<std::multiplies>(static_cast<int128_t>(v), scale);
+    *overflow |= (result > ArithmeticUtil::AsUnsigned<std::minus>(max_value, n));
+    result = ArithmeticUtil::AsUnsigned<std::plus>(result, n);
+    scale =
+        ArithmeticUtil::AsUnsigned<std::multiplies>(scale, static_cast<int128_t>(base));
   }
   return negative ? -result : result;
 }

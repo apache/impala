@@ -19,6 +19,7 @@
 #ifndef IMPALA_UTIL_DECIMAL_UTIL_H
 #define IMPALA_UTIL_DECIMAL_UTIL_H
 
+#include <functional>
 #include <ostream>
 #include <string>
 #include <boost/cstdint.hpp>
@@ -46,7 +47,13 @@ class DecimalUtil {
   // if may_overflow is false.
   template <typename T>
   static T SafeMultiply(T a, T b, bool may_overflow) {
-    T result = a * b;
+    T result = ArithmeticUtil::AsUnsigned<std::multiplies>(a, b);
+    DCHECK(may_overflow || a == 0 || result / a == b);
+    return result;
+  }
+
+  static int256_t SafeMultiply(int256_t a, int256_t b, bool may_overflow) {
+    int256_t result = a * b;
     DCHECK(may_overflow || a == 0 || result / a == b);
     return result;
   }
