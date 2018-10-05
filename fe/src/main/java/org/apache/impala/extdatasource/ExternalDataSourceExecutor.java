@@ -145,8 +145,8 @@ public class ExternalDataSourceExecutor {
       c = cachedClasses_.get(cacheMapKey);
       if (c == null) {
         URL url = new File(jarPath_).toURI().toURL();
-        URLClassLoader loader = URLClassLoader.newInstance(
-            new URL[] { url }, getClass().getClassLoader());
+        URLClassLoader loader = URLClassLoader.newInstance( new URL[] { url },
+            getClass().getClassLoader());
         c = Class.forName(className_, true, loader);
         if (!ArrayUtils.contains(c.getInterfaces(), apiVersion_.getApiInterface())) {
           throw new ImpalaRuntimeException(String.format(

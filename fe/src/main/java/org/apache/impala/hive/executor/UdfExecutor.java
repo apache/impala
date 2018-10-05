@@ -18,6 +18,7 @@
 package org.apache.impala.hive.executor;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -577,9 +578,10 @@ public class UdfExecutor {
       Type retType, Type... parameterTypes) throws
       ImpalaRuntimeException {
     ArrayList<String> signatures = Lists.newArrayList();
+    ClassLoader loader = null;
     try {
       LOG.debug("Loading UDF '" + udfPath + "' from " + jarPath);
-      ClassLoader loader = getClassLoader(jarPath);
+      loader = getClassLoader(jarPath);
       Class<?> c = Class.forName(udfPath, true, loader);
       Class<? extends UDF> udfClass = c.asSubclass(UDF.class);
       Constructor<? extends UDF> ctor = udfClass.getConstructor();
@@ -637,6 +639,16 @@ public class UdfExecutor {
       throw new ImpalaRuntimeException("Unable to call create UDF instance.", e);
     } catch (InvocationTargetException e) {
       throw new ImpalaRuntimeException("Unable to call create UDF instance.", e);
+    } finally {
+      // Clean up
+      if (jarPath != null && loader instanceof URLClassLoader) {
+        try {
+          ((URLClassLoader)loader).close();
+        } catch (IOException e) {
+          // Log and ignore.
+          LOG.debug("Error closing the URLClassloader.", e);
+        }
+      }
     }
   }
 }
