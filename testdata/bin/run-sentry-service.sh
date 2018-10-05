@@ -24,13 +24,19 @@ setup_report_build_error
 . ${IMPALA_HOME}/bin/set-classpath.sh
 
 SENTRY_SERVICE_CONFIG=${SENTRY_SERVICE_CONFIG:-}
+SENTRY_LOG_DIR=${SENTRY_LOG_DIR:-}
 
 if [ -z ${SENTRY_SERVICE_CONFIG} ]
 then
   SENTRY_SERVICE_CONFIG=${SENTRY_CONF_DIR}/sentry-site.xml
 fi
 
-LOGDIR="${IMPALA_CLUSTER_LOGS_DIR}"/sentry
+if [ -z ${SENTRY_LOG_DIR} ]
+then
+  LOGDIR="${IMPALA_CLUSTER_LOGS_DIR}"/sentry
+else
+  LOGDIR=${SENTRY_LOG_DIR}
+fi
 
 mkdir -p "${LOGDIR}" || true
 

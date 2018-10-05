@@ -367,7 +367,8 @@ class TestAuthorization(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config=" + SENTRY_CONFIG_FILE,
       catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
-      log_dir=tempfile.mkdtemp(prefix="test_deprecated_none_", dir=os.getenv("LOG_DIR")))
+      impala_log_dir=tempfile.mkdtemp(prefix="test_deprecated_none_",
+      dir=os.getenv("LOG_DIR")))
   def test_deprecated_flag_doesnt_show(self):
     assert_no_files_in_dir_contain(self.impala_log_dir, "authorization_policy_file " +
         "flag is deprecated. Object Ownership feature is not supported")
@@ -377,7 +378,8 @@ class TestAuthorization(CustomClusterTestSuite):
       --authorization_policy_file=%s\
       --authorization_policy_provider_class=%s" % (AUTH_POLICY_FILE,
        "org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider"),
-      log_dir=tempfile.mkdtemp(prefix="test_deprecated_", dir=os.getenv("LOG_DIR")))
+      impala_log_dir=tempfile.mkdtemp(prefix="test_deprecated_",
+      dir=os.getenv("LOG_DIR")))
   def test_deprecated_flags(self):
     assert_file_in_dir_contains(self.impala_log_dir, "authorization_policy_file flag" +
         " is deprecated. Object Ownership feature is not supported")

@@ -97,7 +97,7 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
                             -redaction_rules_file=%s
                             -vmodule=%s'"""
             % (self.audit_dir, self.profile_dir, self.rules_file, vmodule)],
-        log_dir=self.log_dir,
+        impala_log_dir=self.log_dir,
         log_level=log_level)
     self.client = self.create_impala_client()
 

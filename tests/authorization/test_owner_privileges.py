@@ -127,14 +127,16 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
   @pytest.mark.execute_serially
   @SentryCacheTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config={0} "
-      "--authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider "
-      .format(SENTRY_CONFIG_FILE_OO),
+                   "--authorization_policy_provider_class="
+                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider "
+                   .format(SENTRY_CONFIG_FILE_OO),
       catalogd_args="--sentry_config={0} --authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider "
-      "--sentry_catalog_polling_frequency_s={1}".format(SENTRY_CONFIG_FILE_OO,
-      str(SENTRY_LONG_POLLING_FREQUENCY_S)),
-      sentry_config=SENTRY_CONFIG_FILE_OO)
+                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    " --sentry_catalog_polling_frequency_s={1}"
+                    .format(SENTRY_CONFIG_FILE_OO, str(SENTRY_LONG_POLLING_FREQUENCY_S)),
+      sentry_config=SENTRY_CONFIG_FILE_OO,
+      sentry_log_dir="{0}/test_owner_privileges_with_grant_log_poll"
+                     .format(SENTRY_BASE_LOG_DIR))
   def test_owner_privileges_with_grant_long_poll(self, vector, unique_database):
     self.__execute_owner_privilege_tests(TestObject(TestObject.DATABASE, "owner_priv_db",
         grant=True))
@@ -146,14 +148,16 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
   @pytest.mark.execute_serially
   @SentryCacheTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config={0} "
-      "--authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
-      .format(SENTRY_CONFIG_FILE_OO),
+                   "--authorization_policy_provider_class="
+                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                   .format(SENTRY_CONFIG_FILE_OO),
       catalogd_args="--sentry_config={0} --sentry_catalog_polling_frequency_s={1} "
-      "--authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
-      .format(SENTRY_CONFIG_FILE_OO, str(SENTRY_POLLING_FREQUENCY_S)),
-      sentry_config=SENTRY_CONFIG_FILE_OO)
+                    "--authorization_policy_provider_class="
+                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    .format(SENTRY_CONFIG_FILE_OO, str(SENTRY_POLLING_FREQUENCY_S)),
+      sentry_config=SENTRY_CONFIG_FILE_OO,
+      sentry_log_dir="{0}/test_owner_privileges_with_grant"
+                     .format(SENTRY_BASE_LOG_DIR))
   def test_owner_privileges_with_grant(self, vector, unique_database):
     self.__execute_owner_privilege_tests(TestObject(TestObject.DATABASE, "owner_priv_db",
         grant=True), sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
@@ -238,14 +242,17 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
   @pytest.mark.execute_serially
   @SentryCacheTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config={0} "
-      "--authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider "
-      .format(SENTRY_CONFIG_FILE_NO_OO),
+                   "--authorization_policy_provider_class="
+                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider "
+                   .format(SENTRY_CONFIG_FILE_NO_OO),
       catalogd_args="--sentry_config={0} --authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider "
-      "--sentry_catalog_polling_frequency_s={1}".format(SENTRY_CONFIG_FILE_NO_OO,
-      str(SENTRY_LONG_POLLING_FREQUENCY_S)),
-      sentry_config=SENTRY_CONFIG_FILE_NO_OO)
+                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    " --sentry_catalog_polling_frequency_s={1}"
+                    .format(SENTRY_CONFIG_FILE_NO_OO,
+                    str(SENTRY_LONG_POLLING_FREQUENCY_S)),
+      sentry_config=SENTRY_CONFIG_FILE_NO_OO,
+      sentry_log_dir="{0}/test_owner_privileges_disabled_log_poll"
+                     .format(SENTRY_BASE_LOG_DIR))
   def test_owner_privileges_disabled_long_poll(self, vector, unique_database):
     self.__execute_owner_privilege_tests_no_oo(TestObject(TestObject.DATABASE,
         "owner_priv_db"))
@@ -257,14 +264,16 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
   @pytest.mark.execute_serially
   @SentryCacheTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config={0} "
-      "--authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
-      .format(SENTRY_CONFIG_FILE_NO_OO),
+                   "--authorization_policy_provider_class="
+                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                   .format(SENTRY_CONFIG_FILE_NO_OO),
       catalogd_args="--sentry_config={0} --sentry_catalog_polling_frequency_s={1} "
-      "--authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
-      .format(SENTRY_CONFIG_FILE_NO_OO, str(SENTRY_POLLING_FREQUENCY_S)),
-      sentry_config=SENTRY_CONFIG_FILE_NO_OO)
+                    "--authorization_policy_provider_class="
+                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    .format(SENTRY_CONFIG_FILE_NO_OO, str(SENTRY_POLLING_FREQUENCY_S)),
+      sentry_config=SENTRY_CONFIG_FILE_NO_OO,
+      sentry_log_dir="{0}/test_owner_privileges_disabled"
+                     .format(SENTRY_BASE_LOG_DIR))
   def test_owner_privileges_disabled(self, vector, unique_database):
     self.__execute_owner_privilege_tests_no_oo(TestObject(TestObject.DATABASE,
         "owner_priv_db"), sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
@@ -311,14 +320,17 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
   @pytest.mark.execute_serially
   @SentryCacheTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config={0} "
-      "--authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider "
-      .format(SENTRY_CONFIG_FILE_OO_NOGRANT),
+                   "--authorization_policy_provider_class="
+                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                   .format(SENTRY_CONFIG_FILE_OO_NOGRANT),
       catalogd_args="--sentry_config={0} --authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider "
-      "--sentry_catalog_polling_frequency_s={1}".format(SENTRY_CONFIG_FILE_OO_NOGRANT,
-      str(SENTRY_LONG_POLLING_FREQUENCY_S)),
-      sentry_config=SENTRY_CONFIG_FILE_OO_NOGRANT)
+                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    " --sentry_catalog_polling_frequency_s={1}"
+                    .format(SENTRY_CONFIG_FILE_OO_NOGRANT,
+                    str(SENTRY_LONG_POLLING_FREQUENCY_S)),
+      sentry_config=SENTRY_CONFIG_FILE_OO_NOGRANT,
+      sentry_log_dir="{0}/test_owner_privileges_without_grant_log_poll"
+                     .format(SENTRY_BASE_LOG_DIR))
   def test_owner_privileges_without_grant_long_poll(self, vector, unique_database):
     self.__execute_owner_privilege_tests_oo_nogrant(TestObject(TestObject.DATABASE,
         "owner_priv_db"))
@@ -330,14 +342,17 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
   @pytest.mark.execute_serially
   @SentryCacheTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config={0} "
-      "--authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
-      .format(SENTRY_CONFIG_FILE_OO_NOGRANT),
+                   "--authorization_policy_provider_class="
+                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                   .format(SENTRY_CONFIG_FILE_OO_NOGRANT),
       catalogd_args="--sentry_config={0} --sentry_catalog_polling_frequency_s={1} "
-      "--authorization_policy_provider_class="
-      "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
-      .format(SENTRY_CONFIG_FILE_OO_NOGRANT, str(SENTRY_POLLING_FREQUENCY_S)),
-      sentry_config=SENTRY_CONFIG_FILE_OO_NOGRANT)
+                    "--authorization_policy_provider_class="
+                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    .format(SENTRY_CONFIG_FILE_OO_NOGRANT,
+                    str(SENTRY_POLLING_FREQUENCY_S)),
+      sentry_config=SENTRY_CONFIG_FILE_OO_NOGRANT,
+      sentry_log_dir="{0}/test_owner_privileges_without_grant"
+                     .format(SENTRY_BASE_LOG_DIR))
   def test_owner_privileges_without_grant(self, vector, unique_database):
     self.__execute_owner_privilege_tests_oo_nogrant(TestObject(TestObject.DATABASE,
         "owner_priv_db"), sentry_refresh_timeout_s=SENTRY_REFRESH_TIMEOUT_S)
