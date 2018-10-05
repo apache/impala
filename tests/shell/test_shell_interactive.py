@@ -231,14 +231,14 @@ class TestImpalaShellInteractive(object):
     num_sessions_target = get_num_open_sessions(target_impala_service)
     # Connect to localhost:21000 (default)
     p = ImpalaShell()
-    sleep(2)
+    sleep(5)
     # Make sure we're connected <hostname>:21000
     assert get_num_open_sessions(initial_impala_service) == num_sessions_initial + 1, \
         "Not connected to %s:21000" % hostname
     p.send_cmd("connect %s:21001" % hostname)
 
     # Wait for a little while
-    sleep(2)
+    sleep(5)
     # The number of sessions on the target impalad should have been incremented.
     assert get_num_open_sessions(target_impala_service) == num_sessions_target + 1, \
         "Not connected to %s:21001" % hostname
