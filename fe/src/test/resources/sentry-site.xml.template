@@ -73,9 +73,9 @@
   <name>sentry.store.jdbc.driver</name>
  <value>org.postgresql.Driver</value>
 </property>
-<!-- Empty means allow all privileges -->
+<!-- Use a space to mean allow all privileges. See SENTRY-2424 -->
 <property>
-<name>sentry.db.explicit.grants.permitted</name>
-<value></value>
+  <name>sentry.db.explicit.grants.permitted</name>
+  <value> </value>
 </property>
 </configuration>

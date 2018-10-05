@@ -91,10 +91,10 @@
     <name>sentry.hive.testing.mode</name>
     <value>true</value>
   </property>
-  <!-- Empty means allow all privileges -->
+  <!-- Use a space to mean allow all privileges. See SENTRY-2424 -->
   <property>
     <name>sentry.db.explicit.grants.permitted</name>
-    <value></value>
+    <value> </value>
   </property>
   <!-- Custom group mapping for custom cluster tests -->
   <property>
