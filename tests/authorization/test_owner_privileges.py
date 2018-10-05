@@ -38,6 +38,8 @@ SENTRY_LONG_POLLING_FREQUENCY_S = 60
 SENTRY_POLLING_FREQUENCY_S = 1
 # The timeout, in seconds, when waiting for a refresh of Sentry privileges.
 SENTRY_REFRESH_TIMEOUT_S = SENTRY_POLLING_FREQUENCY_S * 2
+# The timeout needed because of statestore refresh.
+STATESTORE_TIMEOUT_S = 3
 
 SENTRY_CONFIG_DIR = getenv('IMPALA_HOME') + '/fe/src/test/resources/'
 SENTRY_BASE_LOG_DIR = getenv('IMPALA_CLUSTER_LOGS_DIR') + "/sentry"
@@ -89,6 +91,15 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
       if col[0] == 'USER':
         total += 1
     return total
+
+  def _validate_user_privilege_count(self, client, query, user, delay_s, count):
+    start_time = time()
+    while time() - start_time < STATESTORE_TIMEOUT_S:
+      result = self.user_query(client, query, user=user, delay_s=delay_s)
+      if self.count_user_privileges(result) == count:
+        return True
+      sleep(1)
+    return False
 
   def _test_cleanup(self):
     # Admin for manipulation and cleaning up.
@@ -178,9 +189,8 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
     # Change the database owner and ensure oo_user1 does not have owner privileges.
     self.user_query(self.oo_user1_impalad_client, "alter %s %s set owner user oo_user2"
         % (test_obj.obj_type, test_obj.obj_name), user="oo_user1")
-    result = self.user_query(self.oo_user1_impalad_client, "show grant user oo_user1",
-        user="oo_user1", delay_s=sentry_refresh_timeout_s)
-    assert self.count_user_privileges(result) == 0
+    assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
+        "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
 
     # Ensure oo_user1 cannot drop database after owner change.
     self.user_query(self.oo_user1_impalad_client, "drop %s %s" % (test_obj.obj_type,
@@ -196,16 +206,14 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
     # privileges on the underlying table.
     self.execute_query("alter %s %s set owner user oo_user1" % (test_obj.obj_type,
         test_obj.obj_name))
-    result = self.user_query(self.oo_user2_impalad_client,
-        "show grant user oo_user2", user="oo_user2", delay_s=sentry_refresh_timeout_s)
-    assert self.count_user_privileges(result) == 0
+    assert self._validate_user_privilege_count(self.oo_user2_impalad_client,
+        "show grant user oo_user2", "oo_user2", sentry_refresh_timeout_s, 0)
     self.user_query(self.oo_user1_impalad_client,
         "alter %s %s set owner role owner_priv_test_owner_role"
         % (test_obj.obj_type, test_obj.obj_name), user="oo_user1")
     # Ensure oo_user1 does not have user privileges.
-    result = self.user_query(self.oo_user1_impalad_client, "show grant user oo_user1",
-        user="oo_user1", delay_s=sentry_refresh_timeout_s)
-    assert self.count_user_privileges(result) == 0
+    assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
+        "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
 
     # Ensure role has owner privileges.
     self.validate_privileges(self.oo_user1_impalad_client,
@@ -215,9 +223,8 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
     # Drop the object and ensure no role privileges.
     self.user_query(self.oo_user1_impalad_client, "drop %s %s " % (test_obj.obj_type,
         test_obj.obj_name), user="oo_user1")
-    result = self.user_query(self.oo_user1_impalad_client, "show grant role " +
-        "owner_priv_test_owner_role", user="oo_user1", delay_s=sentry_refresh_timeout_s)
-    assert self.count_user_privileges(result) == 0
+    assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
+        "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
 
     # Ensure user privileges are gone after drop.
     self.user_query(self.oo_user1_impalad_client, "create %s if not exists %s %s %s"
@@ -225,9 +232,8 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
         test_obj.view_select), user="oo_user1")
     self.user_query(self.oo_user1_impalad_client, "drop %s %s " % (test_obj.obj_type,
         test_obj.obj_name), user="oo_user1")
-    result = self.user_query(self.oo_user1_impalad_client, "show grant user oo_user1",
-        user="oo_user1")
-    assert self.count_user_privileges(result) == 0
+    assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
+        "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
 
   @pytest.mark.execute_serially
   @SentryCacheTestSuite.with_args(
@@ -373,6 +379,5 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
 
     self.user_query(self.oo_user1_impalad_client, "drop %s %s " % (test_obj.obj_type,
         test_obj.obj_name), user="oo_user1")
-    result = self.user_query(self.oo_user1_impalad_client, "show grant user oo_user1",
-        user="oo_user1")
-    assert self.count_user_privileges(result) == 0
+    assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
+        "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
