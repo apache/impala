@@ -107,8 +107,7 @@ public class ImpaladTableUsageTracker {
             FeSupport.NativeUpdateTableUsage(new TSerializer().serialize(reqToSend));
         TUpdateTableUsageResponse resp = new TUpdateTableUsageResponse();
         JniUtil.deserializeThrift(new TBinaryProtocol.Factory(), resp, byteResp);
-        if (resp.status.isSetStatus_code() &&
-            !resp.status.status_code.equals(TErrorCode.OK)) {
+        if (resp.isSetStatus() && !resp.status.status_code.equals(TErrorCode.OK)) {
           LOG.warn(
               updateFailureMessage + Joiner.on("\n").join(resp.status.getError_msgs()));
         }

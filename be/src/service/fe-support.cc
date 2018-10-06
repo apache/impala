@@ -540,7 +540,7 @@ Java_org_apache_impala_service_FeSupport_NativeUpdateTableUsage(
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
     status.AddDetail("Error making an RPC call to Catalog server.");
-    status.ToThrift(&result.status);
+    status.SetTStatus(&result);
   }
 
   jbyteArray result_bytes = nullptr;
@@ -583,7 +583,7 @@ Java_org_apache_impala_service_FeSupport_NativeGetPartitionStats(
   Status status = catalog_op_executor.GetPartitionStats(request, &result);
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
-    status.ToThrift(&result.status);
+    status.SetTStatus(&result);
   }
   jbyteArray result_bytes = nullptr;
   THROW_IF_ERROR_RET(SerializeThriftMsg(env, &result, &result_bytes), env,
