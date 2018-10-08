@@ -222,10 +222,6 @@ class BaseImpalaProcess(Process):
   def _get_webserver_port(self, default=None):
     return int(self._get_arg_value('webserver_port', default))
 
-  def _get_webserver_ssl(self):
-    """Returns true if the webserver is being run with ssl."""
-    return self._get_arg_value("webserver_certificate_file", "") != ""
-
   def _get_arg_value(self, arg_name, default=None):
     """Gets the argument value for given argument name"""
     for arg in self.cmd:
@@ -243,8 +239,7 @@ class ImpaladProcess(BaseImpalaProcess):
     self.service = ImpaladService(self.hostname, self._get_webserver_port(default=25000),
                                   self.__get_beeswax_port(default=21000),
                                   self.__get_be_port(default=22000),
-                                  self.__get_hs2_port(default=21050),
-                                  self._get_webserver_ssl())
+                                  self.__get_hs2_port(default=21050))
 
   def __get_beeswax_port(self, default=None):
     return int(self._get_arg_value('beeswax_port', default))
@@ -269,16 +264,16 @@ class ImpaladProcess(BaseImpalaProcess):
 class StateStoreProcess(BaseImpalaProcess):
   def __init__(self, cmd):
     super(StateStoreProcess, self).__init__(cmd, socket.gethostname())
-    self.service = StateStoredService(
-        self.hostname, self._get_webserver_port(default=25010), self._get_webserver_ssl())
+    self.service =\
+        StateStoredService(self.hostname, self._get_webserver_port(default=25010))
 
 
 # Represents a catalogd process
 class CatalogdProcess(BaseImpalaProcess):
   def __init__(self, cmd):
     super(CatalogdProcess, self).__init__(cmd, socket.gethostname())
-    self.service = CatalogdService(self.hostname, self._get_webserver_port(default=25020),
-        self._get_webserver_ssl(), self.__get_port(default=26000))
+    self.service = CatalogdService(self.hostname,
+        self._get_webserver_port(default=25020), self.__get_port(default=26000))
 
   def __get_port(self, default=None):
     return int(self._get_arg_value('catalog_service_port', default))

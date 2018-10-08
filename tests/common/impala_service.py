@@ -22,7 +22,6 @@
 import json
 import logging
 import re
-import ssl
 import urllib
 from time import sleep, time
 
@@ -42,24 +41,17 @@ LOG.setLevel(level=logging.DEBUG)
 # Base class for all Impala services
 # TODO: Refactor the retry/timeout logic into a common place.
 class BaseImpalaService(object):
-  def __init__(self, hostname, webserver_port, webserver_ssl=False):
+  def __init__(self, hostname, webserver_port):
     self.hostname = hostname
     self.webserver_port = webserver_port
-    self.webserver_ssl = webserver_ssl
 
   def open_debug_webpage(self, page_name, timeout=10, interval=1):
     start_time = time()
 
     while (time() - start_time < timeout):
       try:
-        protocol = "http"
-        context = None
-        if self.webserver_ssl:
-          protocol = "https"
-          context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-        url = "%s://%s:%d/%s" % \
-            (protocol, self.hostname, int(self.webserver_port), page_name)
-        return urllib.urlopen(url, context=context)
+        return urllib.urlopen("http://%s:%d/%s" %
+            (self.hostname, int(self.webserver_port), page_name))
       except Exception:
         LOG.info("Debug webpage not yet available.")
       sleep(interval)
@@ -174,8 +166,8 @@ class BaseImpalaService(object):
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
   def __init__(self, hostname, webserver_port=25000, beeswax_port=21000, be_port=22000,
-               hs2_port=21050, webserver_ssl=False):
-    super(ImpaladService, self).__init__(hostname, webserver_port, webserver_ssl)
+               hs2_port=21050):
+    super(ImpaladService, self).__init__(hostname, webserver_port)
     self.beeswax_port = beeswax_port
     self.be_port = be_port
     self.hs2_port = hs2_port
@@ -315,8 +307,8 @@ class ImpaladService(BaseImpalaService):
 # Allows for interacting with the StateStore service to perform operations such as
 # accessing the debug webpage.
 class StateStoredService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port, webserver_ssl):
-    super(StateStoredService, self).__init__(hostname, webserver_port, webserver_ssl)
+  def __init__(self, hostname, webserver_port):
+    super(StateStoredService, self).__init__(hostname, webserver_port)
 
   def wait_for_live_subscribers(self, num_subscribers, timeout=15, interval=1):
     self.wait_for_metric_value('statestore.live-backends', num_subscribers,
@@ -326,8 +318,8 @@ class StateStoredService(BaseImpalaService):
 # Allows for interacting with the Catalog service to perform operations such as
 # accessing the debug webpage.
 class CatalogdService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port, webserver_ssl, service_port):
-    super(CatalogdService, self).__init__(hostname, webserver_port, webserver_ssl)
+  def __init__(self, hostname, webserver_port, service_port):
+    super(CatalogdService, self).__init__(hostname, webserver_port)
     self.service_port = service_port
 
   def get_catalog_version(self, timeout=10, interval=1):
