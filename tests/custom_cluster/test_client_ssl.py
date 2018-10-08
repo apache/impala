@@ -19,6 +19,7 @@
 import logging
 import os
 import pytest
+import requests
 import signal
 import ssl
 import socket
@@ -110,13 +111,28 @@ class TestClientSsl(CustomClusterTestSuite):
     assert "Query Status: Cancelled" in result.stdout
     assert impalad.wait_for_num_in_flight_queries(0)
 
+  WEBSERVER_SSL_ARGS = ("--webserver_certificate_file=%(cert_dir)s/server-cert.pem "
+                        "--webserver_private_key_file=%(cert_dir)s/server-key.pem "
+                        "--hostname=localhost"  # Must match hostname in certificate
+                        % {'cert_dir': CERT_DIR})
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args=WEBSERVER_SSL_ARGS,
+                                    statestored_args=WEBSERVER_SSL_ARGS,
+                                    catalogd_args=WEBSERVER_SSL_ARGS)
+  def test_webserver_ssl(self):
+    "Tests that the debug web pages are reachable when run with ssl."
+    self._verify_ssl_webserver()
+
   # Test that the shell can connect to a ECDH only cluster.
-  TLS_ECDH_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
-                  "--ssl_server_certificate=%s/server-cert.pem "
-                  "--ssl_private_key=%s/server-key.pem "
-                  "--hostname=localhost "  # Required to match hostname in certificate"
-                  "--ssl_cipher_list=ECDHE-RSA-AES128-GCM-SHA256 "
-                  % (CERT_DIR, CERT_DIR, CERT_DIR))
+  TLS_ECDH_ARGS = ("--ssl_client_ca_certificate=%(cert_dir)s/server-cert.pem "
+                   "--ssl_server_certificate=%(cert_dir)s/server-cert.pem "
+                   "--ssl_private_key=%(cert_dir)s/server-key.pem "
+                   "--hostname=localhost "  # Must match hostname in certificate
+                   "--ssl_cipher_list=ECDHE-RSA-AES128-GCM-SHA256 "
+                   "--webserver_certificate_file=%(cert_dir)s/server-cert.pem "
+                   "--webserver_private_key_file=%(cert_dir)s/server-key.pem "
+                   % {'cert_dir': CERT_DIR})
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=TLS_ECDH_ARGS,
@@ -128,6 +144,7 @@ class TestClientSsl(CustomClusterTestSuite):
   def test_tls_ecdh(self, vector):
     self._verify_negative_cases()
     self._validate_positive_cases("%s/server-cert.pem" % self.CERT_DIR)
+    self._verify_ssl_webserver()
 
   # Test that the shell can connect to a TLS1.2 only cluster, and for good measure
   # restrict the cipher suite to just one choice.
@@ -209,3 +226,9 @@ class TestClientSsl(CustomClusterTestSuite):
       result = run_impala_shell_cmd(shell_options)
       for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
         assert msg in result.stderr
+
+  def _verify_ssl_webserver(self):
+    for port in ["25000", "25010", "25020"]:
+      url = "https://localhost:%s" % port
+      response = requests.get(url, verify="%s/server-cert.pem" % self.CERT_DIR)
+      assert response.status_code == requests.codes.ok, url

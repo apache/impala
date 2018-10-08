@@ -109,10 +109,9 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     # TODO: The HS2 interface may be better about exposing the query handle even if a
     #       query fails. Maybe investigate that after the switch to HS2.
     regex = re.compile(r'query_id=(\w+:\w+)')
-    for line in self.create_impala_service().open_debug_webpage('queries'):
-      match = regex.search(line)
-      if match:
-        return match.group(1)
+    match = regex.search(self.create_impala_service().read_debug_webpage('queries'))
+    if match:
+      return match.group(1)
     raise Exception('Unable to find any query id')
 
   def assert_server_fails_to_start(self, rules, start_options, expected_error_message):
@@ -147,9 +146,8 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
       for response_format in ('html', 'json'):
         # The 'html' param is actually ignored by the server.
         url = page + '?query_id=' + query_id + "&" + response_format
-        results = grep_file(impala_service.open_debug_webpage(url), unredacted_value)
-        assert not results, "Web page %s should not contain '%s' but does" \
-            % (url, unredacted_value)
+        assert unredacted_value not in impala_service.read_debug_webpage(url), \
+            "Web page %s should not contain '%s' but does" % (url, unredacted_value)
     # But the redacted value should be shown.
     self.assert_web_ui_contains(query_id, redacted_value)
 
@@ -159,17 +157,15 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     impala_service = self.create_impala_service()
     for page in ('queries', 'query_stmt', 'query_plan_text', 'query_profile'):
       url = '%s?query_id=%s' % (page, query_id)
-      results = grep_file(impala_service.open_debug_webpage(url), search)
-      assert results, "Web page %s should contain '%s' but does not" \
-          % (url, search)
+      assert search in impala_service.read_debug_webpage(url), \
+          "Web page %s should contain '%s' but does not" % (url, search)
 
   def assert_query_profile_contains(self, query_id, search):
     ''' Asserts that the query profile for 'query_id' contains 'search' string'''
     impala_service = self.create_impala_service()
     url = 'query_profile?query_id=%s' % query_id
-    results = grep_file(impala_service.open_debug_webpage(url), search)
-    assert results, "Query profile %s should contain '%s' but does not" \
-        % (url, search)
+    assert search in impala_service.read_debug_webpage(url), \
+        "Query profile %s should contain '%s' but does not" % (url, search)
 
   @pytest.mark.execute_serially
   def test_bad_rules(self):

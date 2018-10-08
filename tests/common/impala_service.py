@@ -22,7 +22,7 @@
 import json
 import logging
 import re
-import urllib
+import requests
 from time import sleep, time
 
 from tests.common.impala_connection import create_connection, create_ldap_connection
@@ -41,31 +41,36 @@ LOG.setLevel(level=logging.DEBUG)
 # Base class for all Impala services
 # TODO: Refactor the retry/timeout logic into a common place.
 class BaseImpalaService(object):
-  def __init__(self, hostname, webserver_port):
+  def __init__(self, hostname, webserver_port, webserver_certificate_file):
     self.hostname = hostname
     self.webserver_port = webserver_port
+    self.webserver_certificate_file = webserver_certificate_file
 
   def open_debug_webpage(self, page_name, timeout=10, interval=1):
     start_time = time()
 
     while (time() - start_time < timeout):
       try:
-        return urllib.urlopen("http://%s:%d/%s" %
-            (self.hostname, int(self.webserver_port), page_name))
-      except Exception:
-        LOG.info("Debug webpage not yet available.")
+        protocol = "http"
+        if self.webserver_certificate_file != "":
+          protocol = "https"
+        url = "%s://%s:%d/%s" % \
+            (protocol, self.hostname, int(self.webserver_port), page_name)
+        return requests.get(url, verify=self.webserver_certificate_file)
+      except Exception as e:
+        LOG.info("Debug webpage not yet available: %s", str(e))
       sleep(interval)
     assert 0, 'Debug webpage did not become available in expected time.'
 
   def read_debug_webpage(self, page_name, timeout=10, interval=1):
-    return self.open_debug_webpage(page_name, timeout=timeout, interval=interval).read()
+    return self.open_debug_webpage(page_name, timeout=timeout, interval=interval).text
 
   def get_thrift_profile(self, query_id, timeout=10, interval=1):
     """Returns thrift profile of the specified query ID, if available"""
     page_name = "query_profile_encoded?query_id=%s" % (query_id)
     try:
       response = self.open_debug_webpage(page_name, timeout=timeout, interval=interval)
-      tbuf = response.read()
+      tbuf = response.text
     except Exception as e:
       LOG.info("Thrift profile for query %s not yet available: %s", query_id, str(e))
       return None
@@ -166,8 +171,9 @@ class BaseImpalaService(object):
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
   def __init__(self, hostname, webserver_port=25000, beeswax_port=21000, be_port=22000,
-               hs2_port=21050):
-    super(ImpaladService, self).__init__(hostname, webserver_port)
+               hs2_port=21050, webserver_certificate_file=""):
+    super(ImpaladService, self).__init__(
+        hostname, webserver_port, webserver_certificate_file)
     self.beeswax_port = beeswax_port
     self.be_port = be_port
     self.hs2_port = hs2_port
@@ -327,8 +333,9 @@ class ImpaladService(BaseImpalaService):
 # Allows for interacting with the StateStore service to perform operations such as
 # accessing the debug webpage.
 class StateStoredService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port):
-    super(StateStoredService, self).__init__(hostname, webserver_port)
+  def __init__(self, hostname, webserver_port, webserver_certificate_file):
+    super(StateStoredService, self).__init__(
+        hostname, webserver_port, webserver_certificate_file)
 
   def wait_for_live_subscribers(self, num_subscribers, timeout=15, interval=1):
     self.wait_for_metric_value('statestore.live-backends', num_subscribers,
@@ -338,8 +345,9 @@ class StateStoredService(BaseImpalaService):
 # Allows for interacting with the Catalog service to perform operations such as
 # accessing the debug webpage.
 class CatalogdService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port, service_port):
-    super(CatalogdService, self).__init__(hostname, webserver_port)
+  def __init__(self, hostname, webserver_port, webserver_certificate_file, service_port):
+    super(CatalogdService, self).__init__(
+        hostname, webserver_port, webserver_certificate_file)
     self.service_port = service_port
 
   def get_catalog_version(self, timeout=10, interval=1):

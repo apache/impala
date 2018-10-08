@@ -215,12 +215,18 @@ class Process(object):
 
 # Base class for all Impala processes
 class BaseImpalaProcess(Process):
-  def __init__(self, cmd, hostname):
+  def __init__(self, cmd):
     super(BaseImpalaProcess, self).__init__(cmd)
-    self.hostname = hostname
+    self.hostname = self._get_hostname()
 
   def _get_webserver_port(self, default=None):
     return int(self._get_arg_value('webserver_port', default))
+
+  def _get_webserver_certificate_file(self):
+    return self._get_arg_value("webserver_certificate_file", "")
+
+  def _get_hostname(self):
+    return self._get_arg_value("hostname", socket.gethostname())
 
   def _get_arg_value(self, arg_name, default=None):
     """Gets the argument value for given argument name"""
@@ -235,11 +241,12 @@ class BaseImpalaProcess(Process):
 # Represents an impalad process
 class ImpaladProcess(BaseImpalaProcess):
   def __init__(self, cmd):
-    super(ImpaladProcess, self).__init__(cmd, socket.gethostname())
+    super(ImpaladProcess, self).__init__(cmd)
     self.service = ImpaladService(self.hostname, self._get_webserver_port(default=25000),
                                   self.__get_beeswax_port(default=21000),
                                   self.__get_be_port(default=22000),
-                                  self.__get_hs2_port(default=21050))
+                                  self.__get_hs2_port(default=21050),
+                                  self._get_webserver_certificate_file())
 
   def __get_beeswax_port(self, default=None):
     return int(self._get_arg_value('beeswax_port', default))
@@ -263,17 +270,17 @@ class ImpaladProcess(BaseImpalaProcess):
 # Represents a statestored process
 class StateStoreProcess(BaseImpalaProcess):
   def __init__(self, cmd):
-    super(StateStoreProcess, self).__init__(cmd, socket.gethostname())
-    self.service =\
-        StateStoredService(self.hostname, self._get_webserver_port(default=25010))
+    super(StateStoreProcess, self).__init__(cmd)
+    self.service = StateStoredService(self.hostname,
+        self._get_webserver_port(default=25010), self._get_webserver_certificate_file())
 
 
 # Represents a catalogd process
 class CatalogdProcess(BaseImpalaProcess):
   def __init__(self, cmd):
-    super(CatalogdProcess, self).__init__(cmd, socket.gethostname())
-    self.service = CatalogdService(self.hostname,
-        self._get_webserver_port(default=25020), self.__get_port(default=26000))
+    super(CatalogdProcess, self).__init__(cmd)
+    self.service = CatalogdService(self.hostname, self._get_webserver_port(default=25020),
+        self._get_webserver_certificate_file(), self.__get_port(default=26000))
 
   def __get_port(self, default=None):
     return int(self._get_arg_value('catalog_service_port', default))

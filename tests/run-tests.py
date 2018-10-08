@@ -214,10 +214,8 @@ def print_metrics(substring):
     print ">" * 80
     port = impalad._get_webserver_port()
     print "connections metrics for impalad at port {0}:".format(port)
-    debug_info = json.loads(ImpaladService(
-            impalad.hostname,
-            webserver_port=port)
-            .open_debug_webpage('metrics?json').read())
+    debug_info = json.loads(ImpaladService(impalad.hostname, webserver_port=port)
+        .read_debug_webpage('metrics?json'))
     for metric in debug_info['metric_group']['metrics']:
       if substring in metric['name']:
         print json.dumps(metric, indent=1)
