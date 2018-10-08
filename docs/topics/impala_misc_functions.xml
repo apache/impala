@@ -21,7 +21,13 @@ under the License.
 <concept id="misc_functions">
 
   <title>Impala Miscellaneous Functions</title>
-  <titlealts audience="PDF"><navtitle>Miscellaneous Functions</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>Miscellaneous Functions</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -36,23 +42,58 @@ under the License.
   <conbody>
 
     <p>
-      Impala supports the following utility functions that do not operate on a particular column or data type:
+      Impala supports the following utility functions that do not operate on a particular column
+      or data type:
     </p>
+
+    <ul>
+      <li>
+        <xref href="#misc_functions/current_database">CURRENT_DATABASE</xref>
+      </li>
+
+      <li>
+        <xref href="#misc_functions/effective_user">EFFECTIVE_USER</xref>
+      </li>
+
+      <li>
+        <xref href="#misc_functions/pid">PID</xref>
+      </li>
+
+      <li>
+        <xref href="#misc_functions/sleep">SLEEP</xref>
+      </li>
+
+      <li>
+        <xref href="#misc_functions/user">USER</xref>
+      </li>
+
+      <li>
+        <xref href="#misc_functions/uuid">UUID</xref>
+      </li>
+
+      <li>
+        <xref href="#misc_functions/version">VERSION</xref>
+      </li>
+
+      <li>
+        <xref href="#misc_functions/coordinator">COORDINATOR</xref>
+      </li>
+    </ul>
 
     <dl>
       <dlentry rev="1.3.0" id="current_database">
 
         <dt>
-          <codeph>current_database()</codeph>
+          CURRENT_DATABASE()
         </dt>
 
         <dd>
-          <indexterm audience="hidden">current_database() function</indexterm>
-          <b>Purpose:</b> Returns the database that the session is currently using, either <codeph>default</codeph>
-          if no database has been selected, or whatever database the session switched to through a
-          <codeph>USE</codeph> statement or the <cmdname>impalad</cmdname><codeph>-d</codeph> option.
+          <b>Purpose:</b> Returns the database that the session is currently using, either
+          <codeph>default</codeph> if no database has been selected, or whatever database the
+          session switched to through a <codeph>USE</codeph> statement or the
+          <cmdname>impalad</cmdname> <codeph>-d</codeph> option.
           <p>
-            <b>Return type:</b> <codeph>string</codeph>
+            <b>Return type:</b> <codeph>STRING</codeph>
           </p>
         </dd>
 
@@ -61,16 +102,16 @@ under the License.
       <dlentry rev="5.4.5" id="effective_user">
 
         <dt>
-          <codeph>effective_user()</codeph>
+          EFFECTIVE_USER()
         </dt>
 
         <dd>
-          <indexterm audience="hidden">effective_user() function</indexterm>
-          <b>Purpose:</b> Typically returns the same value as <codeph>user()</codeph>,
-          except if delegation is enabled, in which case it returns the ID of the delegated user.
+          <b>Purpose:</b> Typically returns the same value as <codeph>USER()</codeph>. If
+          delegation is enabled, it returns the ID of the delegated user.
           <p>
-            <b>Return type:</b> <codeph>string</codeph>
+            <b>Return type:</b> <codeph>STRING</codeph>
           </p>
+
           <p>
             <b>Added in:</b> <keyword keyref="impala225"/>
           </p>
@@ -81,37 +122,38 @@ under the License.
       <dlentry rev="1.3.0" id="pid">
 
         <dt>
-          <codeph>pid()</codeph>
+          PID()
         </dt>
 
         <dd>
-          <indexterm audience="hidden">pid() function</indexterm>
-          <b>Purpose:</b> Returns the process ID of the <cmdname>impalad</cmdname> daemon that the session is
-          connected to. You can use it during low-level debugging, to issue Linux commands that trace, show the
-          arguments, and so on the <cmdname>impalad</cmdname> process.
+          <b>Purpose:</b> Returns the process ID of the <cmdname>impalad</cmdname> daemon that
+          the session is connected to. You can use it during low-level debugging, to issue Linux
+          commands that trace, show the arguments, and so on the <cmdname>impalad</cmdname>
+          process.
           <p>
-            <b>Return type:</b> <codeph>int</codeph>
+            <b>Return type:</b> <codeph>INT</codeph>
           </p>
         </dd>
 
       </dlentry>
 
-      <dlentry audience="hidden" id="sleep">
+      <dlentry id="sleep">
 
         <dt>
-          <codeph>sleep(int ms)</codeph>
+          SLEEP(INT ms)
         </dt>
 
         <dd>
-          <indexterm audience="hidden">sleep() function</indexterm>
-          <b>Purpose:</b> Pauses the query for a specified number of milliseconds. For slowing down queries with
-          small result sets enough to monitor runtime execution, memory usage, or other factors that otherwise
-          would be difficult to capture during the brief interval of query execution. When used in the
-          <codeph>SELECT</codeph> list, it is called once for each row in the result set; adjust the number of
-          milliseconds accordingly. For example, a query <codeph>SELECT *, sleep(5) FROM
-          table_with_1000_rows</codeph> would take at least 5 seconds to complete (5 milliseconds * 1000 rows in
-          result set). To avoid an excessive number of concurrent queries, use this function for troubleshooting on
-          test and development systems, not for production queries.
+          <b>Purpose:</b> Pauses the query for a specified number of milliseconds. For slowing
+          down queries with small result sets enough to monitor runtime execution, memory usage,
+          or other factors that otherwise would be difficult to capture during the brief
+          interval of query execution. When used in the <codeph>SELECT</codeph> list, it is
+          called once for each row in the result set; adjust the number of milliseconds
+          accordingly. For example, a query <codeph>SELECT *, SLEEP(5) FROM
+          table_with_1000_rows</codeph> would take at least 5 seconds to complete (5
+          milliseconds * 1000 rows in result set). To avoid an excessive number of concurrent
+          queries, use this function for troubleshooting on test and development systems, not
+          for production queries.
           <p>
             <b>Return type:</b> N/A
           </p>
@@ -122,22 +164,25 @@ under the License.
       <dlentry rev="1.1" id="user">
 
         <dt>
-          <codeph>user()</codeph>
+          USER()
         </dt>
 
         <dd>
-          <indexterm audience="hidden">user() function</indexterm>
-          <b>Purpose:</b> Returns the username of the Linux user who is connected to the <cmdname>impalad</cmdname>
-          daemon. Typically called a single time, in a query without any <codeph>FROM</codeph> clause, to
-          understand how authorization settings apply in a security context; once you know the logged-in username,
-          you can check which groups that user belongs to, and from the list of groups you can check which roles
-          are available to those groups through the authorization policy file.
+          <b>Purpose:</b> Returns the username of the Linux user who is connected to the
+          <cmdname>impalad</cmdname> daemon. Typically called a single time, in a query without
+          any <codeph>FROM</codeph> clause, to understand how authorization settings apply in a
+          security context; once you know the logged-in username, you can check which groups
+          that user belongs to, and from the list of groups you can check which roles are
+          available to those groups through the authorization policy file.
           <p conref="../shared/impala_common.xml#common/user_kerberized"/>
+
           <p>
-            When delegation is enabled, consider calling the <codeph>effective_user()</codeph> function instead.
+            When delegation is enabled, consider calling the <codeph>EFFECTIVE_USER()</codeph>
+            function instead.
           </p>
+
           <p>
-            <b>Return type:</b> <codeph>string</codeph>
+            <b>Return type:</b> <codeph>STRING</codeph>
           </p>
         </dd>
 
@@ -146,25 +191,33 @@ under the License.
       <dlentry rev="2.5.0 IMPALA-1477" id="uuid">
 
         <dt>
-          <codeph>uuid()</codeph>
+          UUID()
         </dt>
 
         <dd>
-          <indexterm audience="hidden">uuid() function</indexterm>
-          <b>Purpose:</b> Returns a <xref href="https://en.wikipedia.org/wiki/Universally_unique_identifier" scope="external" format="html">universal unique identifier</xref>, a 128-bit value encoded as a string with groups of hexadecimal digits separated by dashes.
+          <b>Purpose:</b> Returns a
+          <xref
+            href="https://en.wikipedia.org/wiki/Universally_unique_identifier"
+            scope="external" format="html">universal
+          unique identifier</xref>, a 128-bit value encoded as a string with groups of
+          hexadecimal digits separated by dashes.
           <p>
-            <b>Return type:</b> <codeph>string</codeph>
+            <b>Return type:</b> <codeph>STRING</codeph>
           </p>
+
           <p conref="../shared/impala_common.xml#common/added_in_250"/>
+
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
           <p>
-            Ascending numeric sequences of type <codeph>BIGINT</codeph> are often used
-            as identifiers within a table, and as join keys across multiple tables.
-            The <codeph>uuid()</codeph> value is a convenient alternative that does not
-            require storing or querying the highest sequence number. For example, you
-            can use it to quickly construct new unique identifiers during a data import job,
-            or to combine data from different tables without the likelihood of ID collisions.
+            Ascending numeric sequences of type <codeph>BIGINT</codeph> are often used as
+            identifiers within a table, and as join keys across multiple tables. The
+            <codeph>UUID()</codeph> value is a convenient alternative that does not require
+            storing or querying the highest sequence number. For example, you can use it to
+            quickly construct new unique identifiers during a data import job, or to combine
+            data from different tables without the likelihood of ID collisions.
           </p>
+
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
 <codeblock>
 -- Each call to uuid() produces a new arbitrary value.
@@ -194,41 +247,44 @@ select uuid() from four_row_table;
       <dlentry id="version">
 
         <dt>
-          <codeph>version()</codeph>
+          VERSION()
         </dt>
 
         <dd>
-          <indexterm audience="hidden">version() function</indexterm>
-          <b>Purpose:</b> Returns information such as the precise version number and build date for the
-          <codeph>impalad</codeph> daemon that you are currently connected to. Typically used to confirm that you
-          are connected to the expected level of Impala to use a particular feature, or to connect to several nodes
-          and confirm they are all running the same level of <cmdname>impalad</cmdname>.
+          <b>Purpose:</b> Returns information such as the precise version number and build date
+          for the <codeph>impalad</codeph> daemon that you are currently connected to. Typically
+          used to confirm that you are connected to the expected level of Impala to use a
+          particular feature, or to connect to several nodes and confirm they are all running
+          the same level of <cmdname>impalad</cmdname>.
           <p>
-            <b>Return type:</b> <codeph>string</codeph> (with one or more embedded newlines)
+            <b>Return type:</b> <codeph>STRING</codeph> (with one or more embedded newlines)
           </p>
         </dd>
 
       </dlentry>
 
+      <dlentry id="coordinator" rev="IMPALA-589">
 
-
-      <dlentry id="coordinator">
         <dt>
-          <codeph>coordinator()</codeph>
+          COORDINATOR()
         </dt>
 
         <dd>
-          <indexterm audience="hidden">coordinator() function</indexterm>
           <b>Purpose:</b> Returns the name of the host which is running the
-          <codeph>impalad</codeph> daemon that is acting as the <codeph>coordinator</codeph>
-          for the curent query.
+          <codeph>impalad</codeph> daemon that is acting as the <codeph>coordinator</codeph> for
+          the current query.
           <p>
-            <b>Return type:</b> <codeph>string</codeph>
+            <b>Return type:</b> <codeph>STRING</codeph>
+          </p>
+
+          <p>
+            <b>Added in:</b> <keyword keyref="impala31"/>
           </p>
         </dd>
 
       </dlentry>
-
     </dl>
+
   </conbody>
+
 </concept>

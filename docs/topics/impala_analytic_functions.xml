@@ -43,16 +43,13 @@ under the License.
 
   <conbody>
 
-    <p rev="2.0.0">
-      <indexterm audience="hidden">analytic functions</indexterm>
-
-      <indexterm audience="hidden">window functions</indexterm>
-      Analytic functions (also known as window functions) are a special category of built-in functions. Like
-      aggregate functions, they examine the contents of multiple input rows to compute each output value. However,
-      rather than being limited to one result value per <codeph>GROUP BY</codeph> group, they operate on
-      <term>windows</term> where the input rows are ordered and grouped using flexible conditions expressed through
-      an <codeph>OVER()</codeph> clause.
-    </p>
+    <p rev="2.0.0"> Analytic functions (also known as window functions) are a
+      special category of built-in functions. Like aggregate functions, they
+      examine the contents of multiple input rows to compute each output value.
+      However, rather than being limited to one result value per <codeph>GROUP
+        BY</codeph> group, they operate on <term>windows</term> where the input
+      rows are ordered and grouped using flexible conditions expressed through
+      an <codeph>OVER()</codeph> clause. </p>
 
     <p conref="../shared/impala_common.xml#common/added_in_20"/>
 

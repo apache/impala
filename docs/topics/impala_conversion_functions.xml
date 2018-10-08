@@ -1,4 +1,5 @@
-<?xml version="1.0" encoding="UTF-8"?><!--
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
 Licensed to the Apache Software Foundation (ASF) under one
 or more contributor license agreements.  See the NOTICE file
 distributed with this work for additional information
@@ -20,7 +21,13 @@ under the License.
 <concept id="conversion_functions">
 
   <title>Impala Type Conversion Functions</title>
-  <titlealts audience="PDF"><navtitle>Type Conversion Functions</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>Type Conversion Functions</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -36,19 +43,20 @@ under the License.
   <conbody>
 
     <p>
-      Conversion functions are usually used in combination with other functions, to explicitly pass the expected
-      data types. Impala has strict rules regarding data types for function parameters. For example, Impala does
-      not automatically convert a <codeph>DOUBLE</codeph> value to <codeph>FLOAT</codeph>, a
-      <codeph>BIGINT</codeph> value to <codeph>INT</codeph>, or other conversion where precision could be lost or
-      overflow could occur. Also, for reporting or dealing with loosely defined schemas in big data contexts,
-      you might frequently need to convert values to or from the <codeph>STRING</codeph> type.
+      Conversion functions are usually used in combination with other functions, to explicitly
+      pass the expected data types. Impala has strict rules regarding data types for function
+      parameters. For example, Impala does not automatically convert a <codeph>DOUBLE</codeph>
+      value to <codeph>FLOAT</codeph>, a <codeph>BIGINT</codeph> value to <codeph>INT</codeph>,
+      or other conversion where precision could be lost or overflow could occur. Also, for
+      reporting or dealing with loosely defined schemas in big data contexts, you might
+      frequently need to convert values to or from the <codeph>STRING</codeph> type.
     </p>
 
     <note>
-      Although in <keyword keyref="impala23_full"/>, the <codeph>SHOW FUNCTIONS</codeph> output for
-      database <codeph>_IMPALA_BUILTINS</codeph> contains some function signatures
-      matching the pattern <codeph>castto*</codeph>, these functions are not intended
-      for public use and are expected to be hidden in future.
+      Although in <keyword keyref="impala23_full"/>, the <codeph>SHOW FUNCTIONS</codeph> output
+      for database <codeph>_IMPALA_BUILTINS</codeph> contains some function signatures matching
+      the pattern <codeph>castto*</codeph>, these functions are not intended for public use and
+      are expected to be hidden in future.
     </note>
 
     <p>
@@ -59,718 +67,138 @@ under the License.
       Impala supports the following type conversion functions:
     </p>
 
-<dl>
+    <ul>
+      <li>
+        <xref href="#conversion_functions/cast">CAST</xref>
+      </li>
 
-<dlentry id="cast">
-<dt>
-<codeph>cast(<varname>expr</varname> AS <varname>type</varname>)</codeph>
-</dt>
+      <li>
+        <xref href="#conversion_functions/typeof">TYPEOF</xref>
+      </li>
+    </ul>
 
-<dd>
-<indexterm audience="hidden">cast() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to any other type.
-If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Usage notes:</b>
-Use <codeph>CAST</codeph> when passing a column value or literal to a function that
-expects a parameter with a different type.
-Frequently used in SQL operations such as <codeph>CREATE TABLE AS SELECT</codeph>
-and <codeph>INSERT ... VALUES</codeph> to ensure that values from various sources
-are of the appropriate type for the destination columns.
-Where practical, do a one-time <codeph>CAST()</codeph> operation during the ingestion process
-to make each column into the appropriate type, rather than using many <codeph>CAST()</codeph>
-operations in each query; doing type conversions for each row during each query can be expensive
-for tables with millions or billions of rows.
-</p>
-    <p conref="../shared/impala_common.xml#common/timezone_conversion_caveat"/>
+    <dl>
+      <dlentry id="cast">
 
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock>select concat('Here are the first ',10,' results.'); -- Fails
-select concat('Here are the first ',cast(10 as string),' results.'); -- Succeeds
+        <dt>
+          CAST(expr AS type)
+        </dt>
+
+        <dd>
+          <b>Purpose:</b> Converts the value of an expression to any other type. If the
+          expression value is of a type that cannot be converted to the target type, the result
+          is <codeph>NULL</codeph>.
+          <p>
+            <b>Usage notes:</b> Use <codeph>CAST</codeph> when passing a column value or literal
+            to a function that expects a parameter with a different type. Frequently used in SQL
+            operations such as <codeph>CREATE TABLE AS SELECT</codeph> and <codeph>INSERT ...
+            VALUES</codeph> to ensure that values from various sources are of the appropriate
+            type for the destination columns. Where practical, do a one-time
+            <codeph>CAST()</codeph> operation during the ingestion process to make each column
+            into the appropriate type, rather than using many <codeph>CAST()</codeph> operations
+            in each query; doing type conversions for each row during each query can be
+            expensive for tables with millions or billions of rows.
+          </p>
+
+          <p
+            conref="../shared/impala_common.xml#common/timezone_conversion_caveat"/>
+
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>SELECT CONCAT('Here are the first ',10,' results.'); -- Fails
+SELECT CONCAT('Here are the first ',CAST(10 AS STRING),' results.'); -- Succeeds
 </codeblock>
-<p>
-The following example starts with a text table where every column has a type of <codeph>STRING</codeph>,
-which might be how you ingest data of unknown schema until you can verify the cleanliness of the underly values.
-Then it uses <codeph>CAST()</codeph> to create a new Parquet table with the same data, but using specific
-numeric data types for the columns with numeric data. Using numeric types of appropriate sizes can result in
-substantial space savings on disk and in memory, and performance improvements in queries,
-over using strings or larger-than-necessary numeric types.
-</p>
-<codeblock>create table t1 (name string, x string, y string, z string);
+          <p>
+            The following example starts with a text table where every column has a type of
+            <codeph>STRING</codeph>, which might be how you ingest data of unknown schema until
+            you can verify the cleanliness of the underlying values. Then it uses
+            <codeph>CAST()</codeph> to create a new Parquet table with the same data, but using
+            specific numeric data types for the columns with numeric data. Using numeric types
+            of appropriate sizes can result in substantial space savings on disk and in memory,
+            and performance improvements in queries, over using strings or larger-than-necessary
+            numeric types.
+          </p>
+<codeblock>CREATE TABLE t1 (name STRING, x STRING, y STRING, z STRING);
 
-create table t2 stored as parquet
-as select
+CREATE TABLE t2 STORED AS PARQUET
+AS SELECT
   name,
-  cast(x as bigint) x,
-  cast(y as timestamp) y,
-  cast(z as smallint) z
-from t1;
+  CAST(x AS BIGINT) x,
+  CAST(y AS TIMESTAMP) y,
+  CAST(z AS SMALLINT) z
+FROM t1;</codeblock>
+          <p conref="../shared/impala_common.xml#common/related_info"/>
 
-describe t2;
-+------+----------+---------+
-| name | type     | comment |
-+------+----------+---------+
-| name | string   |         |
-| x    | bigint   |         |
-| y    | smallint |         |
-| z    | tinyint  |         |
-+------+----------+---------+
-</codeblock>
-<p conref="../shared/impala_common.xml#common/related_info"/>
-<p>
-<!-- TK: Can you cast to or from MAP, ARRAY, STRUCT? -->
-  For details of casts from each kind of data type, see the description of
-  the appropriate type:
-  <xref href="impala_tinyint.xml#tinyint"/>,
-  <xref href="impala_smallint.xml#smallint"/>,
-  <xref href="impala_int.xml#int"/>,
-  <xref href="impala_bigint.xml#bigint"/>,
-  <xref href="impala_float.xml#float"/>,
-  <xref href="impala_double.xml#double"/>,
-  <xref href="impala_decimal.xml#decimal"/>,
-  <xref href="impala_string.xml#string"/>,
-  <xref href="impala_char.xml#char"/>,
-  <xref href="impala_varchar.xml#varchar"/>,
-  <xref href="impala_timestamp.xml#timestamp"/>,
-  <xref href="impala_boolean.xml#boolean"/>
-</p>
-</dd>
-</dlentry>
+          <p>
+            For details of casts from each kind of data type, see the description of the
+            appropriate type: <xref
+              href="impala_tinyint.xml#tinyint"/>,
+            <xref
+              href="impala_smallint.xml#smallint"/>,
+            <xref
+              href="impala_int.xml#int"/>,
+            <xref href="impala_bigint.xml#bigint"
+            />,
+            <xref href="impala_float.xml#float"/>,
+            <xref
+              href="impala_double.xml#double"/>,
+            <xref
+              href="impala_decimal.xml#decimal"/>,
+            <xref
+              href="impala_string.xml#string"/>,
+            <xref
+              href="impala_char.xml#char"/>,
+            <xref
+              href="impala_varchar.xml#varchar"/>,
+            <xref
+              href="impala_timestamp.xml#timestamp"/>,
+            <xref
+              href="impala_boolean.xml#boolean"/>
+          </p>
+        </dd>
 
-<dlentry rev="2.3.0" id="casttobigint" audience="hidden">
-<dt>
-<codeph>casttobigint(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttobigint() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>BIGINT</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>bigint</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>create table small_types (x tinyint, y smallint, z int);
+      </dlentry>
 
-create table big_types as
-  select casttobigint(x) as x, casttobigint(y) as y, casttobigint(z) as z
-    from small_types;
+      <dlentry rev="2.3.0" id="typeof">
 
-describe big_types;
-+------+--------+---------+
-| name | type   | comment |
-+------+--------+---------+
-| x    | bigint |         |
-| y    | bigint |         |
-| z    | bigint |         |
-+------+--------+---------+
-</codeblock>
-</dd>
-</dlentry>
+        <dt>
+          TYPEOF(type value)
+        </dt>
 
-<dlentry rev="2.3.0" id="casttoboolean" audience="hidden">
-<dt>
-<codeph>casttoboolean(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttoboolean() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>BOOLEAN</codeph>.
-Numeric values of 0 evaluate to <codeph>false</codeph>, and non-zero values evaluate to <codeph>true</codeph>.
-If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-In particular, <codeph>STRING</codeph> values (even <codeph>'1'</codeph>, <codeph>'0'</codeph>, <codeph>'true'</codeph>
-or <codeph>'false'</codeph>) always return <codeph>NULL</codeph> when converted to <codeph>BOOLEAN</codeph>.
-<p><b>Return type:</b> <codeph>boolean</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>select casttoboolean(0);
-+------------------+
-| casttoboolean(0) |
-+------------------+
-| false            |
-+------------------+
-
-select casttoboolean(1);
-+------------------+
-| casttoboolean(1) |
-+------------------+
-| true             |
-+------------------+
-
-select casttoboolean(99);
-+-------------------+
-| casttoboolean(99) |
-+-------------------+
-| true              |
-+-------------------+
-
-select casttoboolean(0.0);
-+--------------------+
-| casttoboolean(0.0) |
-+--------------------+
-| false              |
-+--------------------+
-
-select casttoboolean(0.5);
-+--------------------+
-| casttoboolean(0.5) |
-+--------------------+
-| true               |
-+--------------------+
-
-select casttoboolean('');
-+-------------------+
-| casttoboolean('') |
-+-------------------+
-| NULL              |
-+-------------------+
-
-select casttoboolean('yes');
-+----------------------+
-| casttoboolean('yes') |
-+----------------------+
-| NULL                 |
-+----------------------+
-
-select casttoboolean('0');
-+--------------------+
-| casttoboolean('0') |
-+--------------------+
-| NULL               |
-+--------------------+
-
-select casttoboolean('true');
-+-----------------------+
-| casttoboolean('true') |
-+-----------------------+
-| NULL                  |
-+-----------------------+
-
-select casttoboolean('false');
-+------------------------+
-| casttoboolean('false') |
-+------------------------+
-| NULL                   |
-+------------------------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="casttochar" audience="hidden">
-<dt>
-<codeph>casttochar(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttochar() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>CHAR</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>char</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>create table char_types as select casttochar('hello world') as c1, casttochar('xyz') as c2, casttochar('x') as c3;
-+-------------------+
-| summary           |
-+-------------------+
-| Inserted 1 row(s) |
-+-------------------+
-
-describe char_types;
-+------+--------+---------+
-| name | type   | comment |
-+------+--------+---------+
-| c1   | string |         |
-| c2   | string |         |
-| c3   | string |         |
-+------+--------+---------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="casttodecimal" audience="hidden">
-<dt>
-<codeph>casttodecimal(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttodecimal() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>DECIMAL</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>decimal</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>select casttodecimal(5.4);
-+--------------------+
-| casttodecimal(5.4) |
-+--------------------+
-| 5.4                |
-+--------------------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="casttodouble" audience="hidden">
-<dt>
-<codeph>casttodouble(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttodouble() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>DOUBLE</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>double</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>select casttodouble(5);
-+-----------------+
-| casttodouble(5) |
-+-----------------+
-| 5               |
-+-----------------+
-
-select casttodouble('3.141');
-+-----------------------+
-| casttodouble('3.141') |
-+-----------------------+
-| 3.141                 |
-+-----------------------+
-
-select casttodouble(1e6);
-+--------------------+
-| casttodouble(1e+6) |
-+--------------------+
-| 1000000            |
-+--------------------+
-
-select casttodouble(true);
-+--------------------+
-| casttodouble(true) |
-+--------------------+
-| 1                  |
-+--------------------+
-
-select casttodouble(now());
-+---------------------+
-| casttodouble(now()) |
-+---------------------+
-| 1447622306.031178   |
-+---------------------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="casttofloat" audience="hidden">
-<dt>
-<codeph>casttofloat(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttofloat() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>FLOAT</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>float</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>select casttofloat(5);
-+----------------+
-| casttofloat(5) |
-+----------------+
-| 5              |
-+----------------+
-
-select casttofloat('3.141');
-+----------------------+
-| casttofloat('3.141') |
-+----------------------+
-| 3.141000032424927    |
-+----------------------+
-
-select casttofloat(1e6);
-+-------------------+
-| casttofloat(1e+6) |
-+-------------------+
-| 1000000           |
-+-------------------+
-
-select casttofloat(true);
-+-------------------+
-| casttofloat(true) |
-+-------------------+
-| 1                 |
-+-------------------+
-
-select casttofloat(now());
-+--------------------+
-| casttofloat(now()) |
-+--------------------+
-| 1447622400         |
-+--------------------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="casttoint" audience="hidden">
-<dt>
-<codeph>casttoint(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttoint() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>INT</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>int</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>select casttoint(5.4);
-+----------------+
-| casttoint(5.4) |
-+----------------+
-| 5              |
-+----------------+
-
-select casttoint(true);
-+-----------------+
-| casttoint(true) |
-+-----------------+
-| 1               |
-+-----------------+
-
-select casttoint(now());
-+------------------+
-| casttoint(now()) |
-+------------------+
-| 1447622487       |
-+------------------+
-
-select casttoint('3.141');
-+--------------------+
-| casttoint('3.141') |
-+--------------------+
-| NULL               |
-+--------------------+
-
-select casttoint('3');
-+----------------+
-| casttoint('3') |
-+----------------+
-| 3              |
-+----------------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="casttosmallint" audience="hidden">
-<dt>
-<codeph>casttosmallint(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttosmallint() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>SMALLINT</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>smallint</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>create table big_types (x bigint, y int, z smallint);
-
-create table small_types as
-  select casttosmallint(x) as x, casttosmallint(y) as y, casttosmallint(z) as z
-    from big_types;
-
-describe small_types;
-+------+----------+---------+
-| name | type     | comment |
-+------+----------+---------+
-| x    | smallint |         |
-| y    | smallint |         |
-| z    | smallint |         |
-+------+----------+---------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="casttostring" audience="hidden">
-<dt>
-<codeph>casttostring(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttostring() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>STRING</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>string</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>create table numeric_types (x int, y bigint, z tinyint);
-
-create table string_types as
-  select casttostring(x) as x, casttostring(y) as y, casttostring(z) as z
-    from numeric_types;
-
-describe string_types;
-+------+--------+---------+
-| name | type   | comment |
-+------+--------+---------+
-| x    | string |         |
-| y    | string |         |
-| z    | string |         |
-+------+--------+---------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="casttotimestamp" audience="hidden">
-<dt>
-<codeph>casttotimestamp(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttotimestamp() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>TIMESTAMP</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>timestamp</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>select casttotimestamp(1000);
-+-----------------------+
-| casttotimestamp(1000) |
-+-----------------------+
-| 1970-01-01 00:16:40   |
-+-----------------------+
-
-select casttotimestamp(1000.0);
-+-------------------------+
-| casttotimestamp(1000.0) |
-+-------------------------+
-| 1970-01-01 00:16:40     |
-+-------------------------+
-
-select casttotimestamp('1000');
-+-------------------------+
-| casttotimestamp('1000') |
-+-------------------------+
-| NULL                    |
-+-------------------------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="casttotinyint" audience="hidden">
-<dt>
-<codeph>casttotinyint(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttotinyint() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>TINYINT</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>tinyint</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>create table big_types (x bigint, y int, z smallint);
-
-create table tiny_types as
-  select casttotinyint(x) as x, casttotinyint(y) as y, casttotinyint(z) as z
-    from big_types;
-
-describe tiny_types;
-+------+---------+---------+
-| name | type    | comment |
-+------+---------+---------+
-| x    | tinyint |         |
-| y    | tinyint |         |
-| z    | tinyint |         |
-+------+---------+---------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="casttovarchar" audience="hidden">
-<dt>
-<codeph>casttovarchar(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">casttovarchar() function</indexterm>
-<b>Purpose:</b> Converts the value of an expression to <codeph>VARCHAR</codeph>. If the expression value is of a type that cannot be converted to the target type, the result is <codeph>NULL</codeph>.
-<p><b>Return type:</b> <codeph>varchar</codeph></p>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_usage"/>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p conref="../shared/impala_common.xml#common/cast_convenience_fn_example"/>
-<codeblock>select casttovarchar('abcd');
-+-----------------------+
-| casttovarchar('abcd') |
-+-----------------------+
-| abcd                  |
-+-----------------------+
-
-select casttovarchar(999);
-+--------------------+
-| casttovarchar(999) |
-+--------------------+
-| 999                |
-+--------------------+
-
-select casttovarchar(999.5);
-+----------------------+
-| casttovarchar(999.5) |
-+----------------------+
-| 999.5                |
-+----------------------+
-
-select casttovarchar(now());
-+-------------------------------+
-| casttovarchar(now())          |
-+-------------------------------+
-| 2015-11-15 21:26:13.528073000 |
-+-------------------------------+
-
-select casttovarchar(true);
-+---------------------+
-| casttovarchar(true) |
-+---------------------+
-| 1                   |
-+---------------------+
-</codeblock>
-</dd>
-</dlentry>
-
-<dlentry rev="2.3.0" id="typeof">
-<dt>
-<codeph>typeof(type value)</codeph>
-</dt>
-<dd>
-<indexterm audience="hidden">typeof() function</indexterm>
-<b>Purpose:</b> Returns the name of the data type corresponding to an expression. For types with
-extra attributes, such as length for <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph>,
-or precision and scale for <codeph>DECIMAL</codeph>, includes the full specification of the type.
+        <dd>
+          <b>Purpose:</b> Returns the name of the data type corresponding to an expression. For
+          types with extra attributes, such as length for <codeph>CHAR</codeph> and
+          <codeph>VARCHAR</codeph>, or precision and scale for <codeph>DECIMAL</codeph>,
+          includes the full specification of the type.
 <!-- To do: How about for columns of complex types? Or fields within complex types? -->
-<p><b>Return type:</b> <codeph>string</codeph></p>
-<p><b>Usage notes:</b> Typically used in interactive exploration of a schema, or in application code that programmatically generates schema definitions such as <codeph>CREATE TABLE</codeph> statements.
-For example, previously, to understand the type of an expression such as
-<codeph>col1 / col2</codeph> or <codeph>concat(col1, col2, col3)</codeph>,
-you might have created a dummy table with a single row, using syntax such as <codeph>CREATE TABLE foo AS SELECT 5 / 3.0</codeph>,
-and then doing a <codeph>DESCRIBE</codeph> to see the type of the row.
-Or you might have done a <codeph>CREATE TABLE AS SELECT</codeph> operation to create a table and
-copy data into it, only learning the types of the columns by doing a <codeph>DESCRIBE</codeph> afterward.
-This technique is especially useful for arithmetic expressions involving <codeph>DECIMAL</codeph> types,
-because the precision and scale of the result is typically different than that of the operands.
-</p>
-<p conref="../shared/impala_common.xml#common/added_in_230"/>
-<p conref="../shared/impala_common.xml#common/example_blurb"/>
-<p>
-These examples show how to check the type of a simple literal or function value.
-Notice how adding even tiny integers together changes the data type of the result to
-avoid overflow, and how the results of arithmetic operations on <codeph>DECIMAL</codeph> values
-have specific precision and scale attributes.
-</p>
-<codeblock>select typeof(2)
-+-----------+
-| typeof(2) |
-+-----------+
-| TINYINT   |
-+-----------+
+          <p>
+            <b>Return type:</b> <codeph>STRING</codeph>
+          </p>
 
-select typeof(2+2)
-+---------------+
-| typeof(2 + 2) |
-+---------------+
-| SMALLINT      |
-+---------------+
+          <p>
+            <b>Usage notes:</b> Typically used in interactive exploration of a schema, or in
+            application code that programmatically generates schema definitions such as
+            <codeph>CREATE TABLE</codeph> statements, for example, to get the type of an
+            expression such as <codeph>col1 / col2</codeph> or <codeph>CONCAT(col1, col2,
+            col3)</codeph>. This function is especially useful for arithmetic expressions
+            involving <codeph>DECIMAL</codeph> types because the precision and scale of the
+            result is can be different than that of the operands.
+          </p>
 
-select typeof('xyz')
-+---------------+
-| typeof('xyz') |
-+---------------+
-| STRING        |
-+---------------+
+          <p conref="../shared/impala_common.xml#common/added_in_230"/>
 
-select typeof(now())
-+---------------+
-| typeof(now()) |
-+---------------+
-| TIMESTAMP     |
-+---------------+
-
-select typeof(5.3 / 2.1)
-+-------------------+
-| typeof(5.3 / 2.1) |
-+-------------------+
-| DECIMAL(6,4)      |
-+-------------------+
-
-select typeof(5.30001 / 2342.1);
-+--------------------------+
-| typeof(5.30001 / 2342.1) |
-+--------------------------+
-| DECIMAL(13,11)           |
-+--------------------------+
-
-select typeof(typeof(2+2))
-+-----------------------+
-| typeof(typeof(2 + 2)) |
-+-----------------------+
-| STRING                |
-+-----------------------+
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+<codeblock>SELECT TYPEOF(2), TYPEOF(2+2);
++-----------+---------------+
+| typeof(2) | typeof(2 + 2) |
++-----------+---------------+
+| TINYINT   | SMALLINT      |
++-----------+---------------+
 </codeblock>
+        </dd>
 
-<p>
-This example shows how even if you do not have a record of the type of a column,
-for example because the type was changed by <codeph>ALTER TABLE</codeph> after the
-original <codeph>CREATE TABLE</codeph>, you can still find out the type in a
-more compact form than examining the full <codeph>DESCRIBE</codeph> output.
-Remember to use <codeph>LIMIT 1</codeph> in such cases, to avoid an identical
-result value for every row in the table.
-</p>
-<codeblock>create table typeof_example (a int, b tinyint, c smallint, d bigint);
-
-/* Empty result set if there is no data in the table. */
-select typeof(a) from typeof_example;
-
-/* OK, now we have some data but the type of column A is being changed. */
-insert into typeof_example values (1, 2, 3, 4);
-alter table typeof_example change a a bigint;
-
-/* We can always find out the current type of that column without doing a full DESCRIBE. */
-select typeof(a) from typeof_example limit 1;
-+-----------+
-| typeof(a) |
-+-----------+
-| BIGINT    |
-+-----------+
-</codeblock>
-<p>
-This example shows how you might programmatically generate a <codeph>CREATE TABLE</codeph> statement
-with the appropriate column definitions to hold the result values of arbitrary expressions.
-The <codeph>typeof()</codeph> function lets you construct a detailed <codeph>CREATE TABLE</codeph> statement
-without actually creating the table, as opposed to <codeph>CREATE TABLE AS SELECT</codeph> operations
-where you create the destination table but only learn the column data types afterward through <codeph>DESCRIBE</codeph>.
-</p>
-<codeblock>describe typeof_example;
-+------+----------+---------+
-| name | type     | comment |
-+------+----------+---------+
-| a    | bigint   |         |
-| b    | tinyint  |         |
-| c    | smallint |         |
-| d    | bigint   |         |
-+------+----------+---------+
-
-/* An ETL or business intelligence tool might create variations on a table with different file formats,
-   different sets of columns, and so on. TYPEOF() lets an application introspect the types of the original columns. */
-select concat('create table derived_table (a ', typeof(a), ', b ', typeof(b), ', c ',
-    typeof(c), ', d ', typeof(d), ') stored as parquet;')
-  as 'create table statement'
-from typeof_example limit 1;
-+-------------------------------------------------------------------------------------------+
-| create table statement                                                                    |
-+-------------------------------------------------------------------------------------------+
-| create table derived_table (a BIGINT, b TINYINT, c SMALLINT, d BIGINT) stored as parquet; |
-+-------------------------------------------------------------------------------------------+
-</codeblock>
-</dd>
-</dlentry>
-
-</dl>
+      </dlentry>
+    </dl>
 
   </conbody>
+
 </concept>
