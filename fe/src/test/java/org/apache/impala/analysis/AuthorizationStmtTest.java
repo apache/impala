@@ -25,7 +25,6 @@ import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.AuthorizationException;
-import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
@@ -1220,18 +1219,18 @@ public class AuthorizationStmtTest extends FrontendTestBase {
               onTable("functional", "alltypes", privilege));
     }
     authzTest
-        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
-            onServer(allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
-            onDatabase("functional",allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
-            onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())))
         // In this test, since we only have column level privileges on "id", then
         // only the "id" column should show and the others should not.
         .okDescribe(tableName, describeOutput(style).includeStrings(new String[]{"id"})
             .excludeStrings(ALLTYPES_COLUMNS_WITHOUT_ID), onColumn("functional",
             "alltypes", "id", TPrivilegeLevel.SELECT))
-        .error(accessError("functional.alltypes"));
+        .error(accessError("functional.alltypes"))
+        .error(accessError("functional.alltypes"),
+            onServer(allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.alltypes"),
+            onDatabase("functional", allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.alltypes"),
+            onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())));
 
     // Describe table extended.
     tableName = new TTableName("functional", "alltypes");
@@ -1248,21 +1247,19 @@ public class AuthorizationStmtTest extends FrontendTestBase {
           .okDescribe(tableName, describeOutput(style).includeStrings(checkStrings),
               onTable("functional", "alltypes", privilege));
     }
-    // Describe table without VIEW_METADATA privilege should not show all columns and
-    // location.
     authzTest
-        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
-            onServer(allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
-            onDatabase("functional", allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
-            onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())))
         // Location should not appear with only column level auth.
         .okDescribe(tableName, describeOutput(style).includeStrings(new String[]{"id"})
             .excludeStrings((String[]) ArrayUtils.addAll(ALLTYPES_COLUMNS_WITHOUT_ID,
-            new String[]{"Location:"})), onColumn("functional", "alltypes", "id",
+                new String[]{"Location:"})), onColumn("functional", "alltypes", "id",
             TPrivilegeLevel.SELECT))
-        .error(accessError("functional.alltypes"));
+        .error(accessError("functional.alltypes"))
+        .error(accessError("functional.alltypes"),
+            onServer(allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.alltypes"),
+            onDatabase("functional.alltypes", allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.alltypes"),
+            onTable("functional", "alltypes", allExcept(viewMetadataPrivileges())));
 
     // Describe view.
     tableName = new TTableName("functional", "alltypes_view");
@@ -1278,11 +1275,13 @@ public class AuthorizationStmtTest extends FrontendTestBase {
               onTable("functional", "alltypes_view", privilege));
     }
     authzTest
-        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+        .error(accessError("functional.alltypes_view"))
+        .error(accessError("functional.alltypes_view"),
             onServer(allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
+        .error(accessError("functional.alltypes_view"),
             onDatabase("functional",allExcept(viewMetadataPrivileges())))
-        .error(accessError("functional.alltypes_view"));
+        .error(accessError("functional.alltypes_view"),
+            onTable("functional", "alltypes_view", allExcept(viewMetadataPrivileges())));
 
     // Describe view extended.
     tableName = new TTableName("functional", "alltypes_view");
@@ -1301,15 +1300,17 @@ public class AuthorizationStmtTest extends FrontendTestBase {
               onTable("functional", "alltypes_view", privilege));
     }
     authzTest
-        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
-            onServer(allExcept(viewMetadataPrivileges())))
-        .okDescribe(tableName, describeOutput(style).excludeStrings(ALLTYPES_COLUMNS),
-            onDatabase("functional",allExcept(viewMetadataPrivileges())))
-        .error(accessError("functional.alltypes_view"));
+        .error(accessError("functional.alltypes_view"))
+        .error(accessError("functional.alltypes_view"), onServer(
+            allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.alltypes_view"), onDatabase("functional",
+            allExcept(viewMetadataPrivileges())))
+        .error(accessError("functional.alltypes_view"), onTable("functional", "alltypes",
+            allExcept(viewMetadataPrivileges())));
 
     // Describe specific column on a table.
     authzTest = authorize("describe functional.allcomplextypes.int_struct_col");
-    for (TPrivilegeLevel privilege: TPrivilegeLevel.values()) {
+    for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
       authzTest.ok(onServer(privilege))
           .ok(onDatabase("functional", privilege))
           .ok(onTable("functional", "allcomplextypes", privilege));

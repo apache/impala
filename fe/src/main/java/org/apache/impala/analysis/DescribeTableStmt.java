@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.StructType;
@@ -111,8 +112,10 @@ public class DescribeTableStmt extends StatementBase {
     }
 
     table_ = path_.getRootTable();
+
     // Register authorization and audit events.
-    analyzer.getTable(table_.getTableName(), Privilege.ANY);
+    analyzer.getTable(table_.getTableName(), /* add column-level privilege */ true,
+        Privilege.VIEW_METADATA);
 
     // Describing a table.
     if (path_.destTable() != null) return;

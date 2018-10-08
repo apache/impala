@@ -100,7 +100,8 @@ public class DropTableOrViewStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     dbName_ = analyzer.getTargetDbName(tableName_);
     try {
-      FeTable table = analyzer.getTable(tableName_, true, Privilege.DROP);
+      FeTable table = analyzer.getTable(tableName_, /* add access event */ true,
+          /* add column-level privilege */ false, Privilege.DROP);
       Preconditions.checkNotNull(table);
       if (table instanceof FeView && dropTable_) {
         throw new AnalysisException(String.format(

@@ -2413,21 +2413,25 @@ public class Analyzer {
    * Returns the Table with the given name from the 'loadedTables' map in the global
    * analysis state. Throws an AnalysisException if the table or the db does not exist.
    * Throws a TableLoadingException if the registered table failed to load.
-   * Always registers privilege request(s) for the table at the given privilege level(s),
+   * When addColumnLevelPrivilege is set to true, always registers privilege request(s)
+   * for the columns at the given table.
+   * When addColumnLevelPrivilege is set to false, always registers privilege request(s)
+   * for the table at the given privilege level(s),
    * regardless of the state of the table (i.e. whether it exists, is loaded, etc.).
    * If addAccessEvent is true adds access event(s) for successfully loaded tables. When
    * multiple privileges are specified, all those privileges will be required for the
    * authorization check.
    */
   public FeTable getTable(TableName tableName, boolean addAccessEvent,
-      Privilege... privilege) throws AnalysisException, TableLoadingException {
+      boolean addColumnPrivilege, Privilege... privilege)
+      throws AnalysisException, TableLoadingException {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilege);
     tableName = getFqTableName(tableName);
     for (Privilege priv : privilege) {
-      if (priv == Privilege.ANY) {
+      if (priv == Privilege.ANY || addColumnPrivilege) {
         registerPrivReq(new PrivilegeRequestBuilder()
-            .any().onAnyColumn(tableName.getDb(), tableName.getTbl()).toRequest());
+            .allOf(priv).onAnyColumn(tableName.getDb(), tableName.getTbl()).toRequest());
       } else {
         registerPrivReq(new PrivilegeRequestBuilder()
             .allOf(priv).onTable(tableName.getDb(), tableName.getTbl()).toRequest());
@@ -2458,7 +2462,20 @@ public class Analyzer {
   public FeTable getTable(TableName tableName, Privilege... privilege)
       throws AnalysisException {
     try {
-      return getTable(tableName, true, privilege);
+      return getTable(tableName, true, false, privilege);
+    } catch (TableLoadingException e) {
+      throw new AnalysisException(e);
+    }
+  }
+
+  /**
+   * Sets the addColumnPrivilege to true to add column-level privilege(s) for a given
+   * table instead of table-level privilege(s).
+   */
+  public FeTable getTable(TableName tableName, boolean addColumnPrivilege,
+      Privilege... privilege) throws AnalysisException {
+    try {
+      return getTable(tableName, true, addColumnPrivilege, privilege);
     } catch (TableLoadingException e) {
       throw new AnalysisException(e);
     }
