@@ -579,27 +579,30 @@ under the License.
           and <filepath>llama-site.xml</filepath> configuration files.
         </p>
 
-        <p>
-          For an advanced configuration with multiple resource pools using different settings, set up the
-          <filepath>fair-scheduler.xml</filepath> and <filepath>llama-site.xml</filepath> configuration files
-          manually. Provide the paths to each one using the <cmdname>impalad</cmdname> command-line options,
-          <codeph>--fair_scheduler_allocation_path</codeph> and <codeph>--llama_site_path</codeph> respectively.
-        </p>
+        <p> For an advanced configuration with multiple resource pools using
+          different settings:<ol>
+            <li>Set up the <filepath>fair-scheduler.xml</filepath> and
+                <filepath>llama-site.xml</filepath> configuration files
+              manually.</li>
+            <li>Provide the paths to each one using the
+                <cmdname>impalad</cmdname> command-line options,
+                <codeph>--fair_scheduler_allocation_path</codeph> and
+                <codeph>--llama_site_path</codeph> respectively. </li>
+          </ol></p>
 
-        <p>
-          The Impala admission control feature only uses the Fair Scheduler configuration settings to determine how
-          to map users and groups to different resource pools. For example, you might set up different resource
-          pools with separate memory limits, and maximum number of concurrent and queued queries, for different
-          categories of users within your organization. For details about all the Fair Scheduler configuration
-          settings, see the
-          <xref href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" scope="external" format="html">Apache
-          wiki</xref>.
-        </p>
+        <p> The Impala admission control feature uses the Fair Scheduler
+          configuration settings to determine how to map users and groups to
+          different resource pools. For example, you might set up different
+          resource pools with separate memory limits, and maximum number of
+          concurrent and queued queries, for different categories of users
+          within your organization. For details about all the Fair Scheduler
+          configuration settings, see the <xref
+            href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration"
+            scope="external" format="html">Apache wiki</xref>. </p>
 
-        <p>
-          The Impala admission control feature only uses a small subset of possible settings from the
-          <filepath>llama-site.xml</filepath> configuration file:
-        </p>
+        <p> The Impala admission control feature uses a small subset of possible
+          settings from the <filepath>llama-site.xml</filepath> configuration
+          file: </p>
 
 <codeblock>llama.am.throttling.maximum.placed.reservations.<varname>queue_name</varname>
 llama.am.throttling.maximum.queued.reservations.<varname>queue_name</varname>
@@ -607,16 +610,17 @@ llama.am.throttling.maximum.queued.reservations.<varname>queue_name</varname>
 impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph>
 </codeblock>
 
-        <p rev="2.5.0 IMPALA-2538">
-          The <codeph>impala.admission-control.pool-queue-timeout-ms</codeph>
-          setting specifies the timeout value for this pool, in milliseconds.
-          The<codeph>impala.admission-control.pool-default-query-options</codeph>
+        <p rev="2.5.0 IMPALA-2538"> The
+            <codeph>impala.admission-control.pool-queue-timeout-ms</codeph>
+          setting specifies the timeout value for this pool in milliseconds. </p>
+        <p rev="2.5.0 IMPALA-2538"
+            >The<codeph>impala.admission-control.pool-default-query-options</codeph>
           settings designates the default query options for all queries that run
           in this pool. Its argument value is a comma-delimited string of
-          'key=value' pairs, for example,<codeph>'key1=val1,key2=val2'</codeph>.
-          For example, this is where you might set a default memory limit
-          for all queries in the pool, using an argument such as <codeph>MEM_LIMIT=5G</codeph>.
-        </p>
+          'key=value' pairs, <codeph>'key1=val1,key2=val2, ...'</codeph>. For
+          example, this is where you might set a default memory limit for all
+          queries in the pool, using an argument such as
+            <codeph>MEM_LIMIT=5G</codeph>. </p>
 
         <p rev="2.5.0 IMPALA-2538">
           The <codeph>impala.admission-control.*</codeph> configuration settings are available in
