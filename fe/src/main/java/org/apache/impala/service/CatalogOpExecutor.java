@@ -1028,8 +1028,8 @@ public class CatalogOpExecutor {
    * operations.
    */
   private void updateOwnerPrivileges(String databaseName, String tableName,
-        String serverName, String oldOwner, PrincipalType oldOwnerType, String newOwner,
-        PrincipalType newOwnerType, TDdlExecResponse resp) {
+      String serverName, String oldOwner, PrincipalType oldOwnerType, String newOwner,
+      PrincipalType newOwnerType, TDdlExecResponse resp) {
     if (catalog_.getSentryProxy() == null || !catalog_.getSentryProxy()
         .isObjectOwnershipEnabled()) return;
     Preconditions.checkNotNull(serverName);
@@ -1039,10 +1039,10 @@ public class CatalogOpExecutor {
     } else {
       filter = createTableOwnerPrivilegeFilter(databaseName, tableName, serverName);
     }
-    if(oldOwner != null && !oldOwner.isEmpty()) {
+    if (oldOwner != null && !oldOwner.isEmpty()) {
       removePrivilegeFromCatalog(oldOwner, oldOwnerType, filter, resp);
     }
-    if(newOwner != null && !newOwner.isEmpty()) {
+    if (newOwner != null && !newOwner.isEmpty()) {
       addPrivilegeToCatalog(newOwner, newOwnerType, filter, resp);
     }
   }
@@ -2865,8 +2865,11 @@ public class CatalogOpExecutor {
    */
   private void removePrivilegeFromCatalog(String ownerString, PrincipalType ownerType,
     TPrivilege filter, TDdlExecResponse response) {
+    Preconditions.checkNotNull(ownerString);
+    Preconditions.checkNotNull(ownerType);
+    Preconditions.checkNotNull(filter);
     try {
-      PrincipalPrivilege removedPrivilege;
+      PrincipalPrivilege removedPrivilege = null;
       switch (ownerType) {
         case ROLE:
           removedPrivilege = catalog_.removeRolePrivilege(ownerString,
@@ -2877,14 +2880,21 @@ public class CatalogOpExecutor {
               PrincipalPrivilege.buildPrivilegeName(filter));
           break;
         default:
-          throw new CatalogException("Unexpected ownerType: " + ownerType.name());
+          Preconditions.checkArgument(false,
+              "Unexpected PrincipalType: " + ownerType.name());
       }
       if (removedPrivilege != null) {
           response.result.addToRemoved_catalog_objects(removedPrivilege
               .toTCatalogObject());
       }
     } catch (CatalogException e) {
-      LOG.error("Error removing privilege: ", e);
+      // Failure removing an owner privilege is not an issue because it could be
+      // that Sentry refresh occurred while executing this method and this method
+      // is used as a a best-effort to do what Sentry refresh does to make the
+      // owner privilege available right away without having to wait for a Sentry
+      // refresh.
+      LOG.warn("Unable to remove owner privilege: " +
+          PrincipalPrivilege.buildPrivilegeName(filter), e);
     }
   }
 
@@ -2894,9 +2904,12 @@ public class CatalogOpExecutor {
    */
   private void addPrivilegeToCatalog(String ownerString, PrincipalType ownerType,
     TPrivilege filter, TDdlExecResponse response) {
+    Preconditions.checkNotNull(ownerString);
+    Preconditions.checkNotNull(ownerType);
+    Preconditions.checkNotNull(filter);
     try {
       Principal owner;
-      PrincipalPrivilege cPrivilege;
+      PrincipalPrivilege cPrivilege = null;
       if (ownerType == PrincipalType.USER) {
         Reference<Boolean> existingUser = new Reference<>();
         owner = catalog_.addUserIfNotExists(ownerString, existingUser);
@@ -2908,15 +2921,23 @@ public class CatalogOpExecutor {
         }
       } else if (ownerType == PrincipalType.ROLE) {
         owner = catalog_.getAuthPolicy().getRole(ownerString);
+        Preconditions.checkNotNull(owner);
         filter.setPrincipal_id(owner.getId());
         filter.setPrincipal_type(TPrincipalType.ROLE);
         cPrivilege = catalog_.addRolePrivilege(ownerString, filter);
       } else {
-        throw new CatalogException("Unexpected PrincipalType: " + ownerType.name());
+        Preconditions.checkArgument(false, "Unexpected PrincipalType: " +
+            ownerType.name());
       }
       response.result.addToUpdated_catalog_objects(cPrivilege.toTCatalogObject());
     } catch (CatalogException e) {
-      LOG.error("Error adding privilege: ", e);
+      // Failure adding an owner privilege is not an issue because it could be
+      // that Sentry refresh occurred while executing this method and this method
+      // is used as a a best-effort to do what Sentry refresh does to make the
+      // owner privilege available right away without having to wait for a Sentry
+      // refresh.
+      LOG.warn("Unable to add owner privilege: " +
+          PrincipalPrivilege.buildPrivilegeName(filter), e);
     }
   }
 
