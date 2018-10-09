@@ -56,6 +56,7 @@ from tests.performance.query_exec_functions import execute_using_jdbc
 from tests.performance.query_executor import JdbcQueryExecConfig
 from tests.util.filesystem_utils import (
     IS_S3,
+    IS_ABFS,
     IS_ADLS,
     S3_BUCKET_NAME,
     ADLS_STORE_NAME,
@@ -67,6 +68,7 @@ from tests.util.hdfs_util import (
   get_hdfs_client_from_conf,
   NAMENODE)
 from tests.util.s3_util import S3Client
+from tests.util.abfs_util import ABFSClient
 from tests.util.test_file_parser import (
   QueryTestSectionReader,
   parse_query_test_file,
@@ -162,6 +164,8 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.filesystem_client = cls.hdfs_client
     if IS_S3:
       cls.filesystem_client = S3Client(S3_BUCKET_NAME)
+    elif IS_ABFS:
+      cls.filesystem_client = ABFSClient()
     elif IS_ADLS:
       cls.filesystem_client = ADLSClient(ADLS_STORE_NAME)
 
@@ -789,7 +793,7 @@ class ImpalaTestSuite(BaseTestSuite):
     # If 'skip_hbase' is specified or the filesystem is isilon, s3 or local, we don't
     # need the hbase dimension.
     if pytest.config.option.skip_hbase or TARGET_FILESYSTEM.lower() \
-        in ['s3', 'isilon', 'local', 'adls']:
+        in ['s3', 'isilon', 'local', 'abfs', 'adls']:
       for tf_dimension in tf_dimensions:
         if tf_dimension.value.file_format == "hbase":
           tf_dimensions.remove(tf_dimension)

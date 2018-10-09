@@ -29,11 +29,13 @@ using namespace impala;
 using namespace impala::io;
 
 // TODO: Run perf tests and empirically settle on the most optimal default value for the
-// read buffer size. Currently setting it as 128k for the same reason as for S3, i.e.
+// read buffer sizes. Currently setting them as 128k for the same reason as for S3, i.e.
 // due to JNI array allocation and memcpy overhead, 128k was emperically found to have the
 // least overhead.
 DEFINE_int64(adls_read_chunk_size, 128 * 1024, "The maximum read chunk size to use when "
     "reading from ADLS.");
+DEFINE_int64(abfs_read_chunk_size, 128 * 1024, "The maximum read chunk size to use when "
+    "reading from ABFS.");
 
 // Implementation of the ScanRange functionality. Each ScanRange contains a queue
 // of ready buffers. For each ScanRange, there is only a single producer and
@@ -553,6 +555,10 @@ int64_t ScanRange::MaxReadChunkSize() const {
   if (disk_id_ == io_mgr_->RemoteAdlsDiskId()) {
     DCHECK(IsADLSPath(file()));
     return FLAGS_adls_read_chunk_size;
+  }
+  if (disk_id_ == io_mgr_->RemoteAbfsDiskId()) {
+    DCHECK(IsABFSPath(file()));
+    return FLAGS_abfs_read_chunk_size;
   }
   // The length argument of hdfsRead() is an int. Ensure we don't overflow it.
   return numeric_limits<int>::max();

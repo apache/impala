@@ -20,7 +20,7 @@ from subprocess import check_call
 
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_single_exec_option_dimension,
@@ -71,6 +71,7 @@ class TestComputeStats(ImpalaTestSuite):
       self.cleanup_db("parquet")
 
   @SkipIfS3.hive
+  @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive

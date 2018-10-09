@@ -33,6 +33,8 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
+import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
 import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
@@ -306,6 +308,7 @@ public class FileSystemUtil {
     if (isDistributedFileSystem(fs)) return true;
     // Blacklist FileSystems that are known to not to include storage UUIDs.
     return !(fs instanceof S3AFileSystem || fs instanceof LocalFileSystem ||
+        fs instanceof AzureBlobFileSystem || fs instanceof SecureAzureBlobFileSystem ||
         fs instanceof AdlFileSystem);
   }
 
@@ -335,6 +338,26 @@ public class FileSystemUtil {
    */
   public static boolean isADLFileSystem(Path path) throws IOException {
     return isADLFileSystem(path.getFileSystem(CONF));
+  }
+
+  /**
+   * Returns true iff the filesystem is AzureBlobFileSystem or
+   * SecureAzureBlobFileSystem. This function is unique in that there are 2
+   * distinct classes it checks for, but the ony functional difference is the
+   * use of wire encryption. Some features like OAuth authentication do require
+   * wire encryption but that does not matter in usages of this function.
+   */
+  public static boolean isABFSFileSystem(FileSystem fs) {
+    return fs instanceof AzureBlobFileSystem
+        || fs instanceof SecureAzureBlobFileSystem;
+  }
+
+  /**
+   * Returns true iff the path is on AzureBlobFileSystem or
+   * SecureAzureBlobFileSystem.
+   */
+  public static boolean isABFSFileSystem(Path path) throws IOException {
+    return isABFSFileSystem(path.getFileSystem(CONF));
   }
 
   /**
@@ -458,6 +481,7 @@ public class FileSystemUtil {
     return (FileSystemUtil.isDistributedFileSystem(path) ||
         FileSystemUtil.isLocalFileSystem(path) ||
         FileSystemUtil.isS3AFileSystem(path) ||
+        FileSystemUtil.isABFSFileSystem(path) ||
         FileSystemUtil.isADLFileSystem(path));
   }
 

@@ -25,7 +25,7 @@ from test_ddl_base import TestDdlBase
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIf, SkipIfADLS, SkipIfLocal
+from tests.common.skip import SkipIf, SkipIfABFS, SkipIfADLS, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE, IS_HDFS, IS_S3, IS_ADLS
 from tests.common.impala_cluster import ImpalaCluster
@@ -33,6 +33,7 @@ from tests.common.impala_cluster import ImpalaCluster
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):
   @SkipIfLocal.hdfs_client
+  @SkipIfABFS.trash
   def test_drop_table_with_purge(self, unique_database):
     """This test checks if the table data is permamently deleted in
     DROP TABLE <tbl> PURGE queries"""
@@ -425,6 +426,7 @@ class TestDdlStatements(TestDdlBase):
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
   @SkipIfLocal.hdfs_client
+  @SkipIfABFS.trash
   def test_drop_partition_with_purge(self, vector, unique_database):
     """Verfies whether alter <tbl> drop partition purge actually skips trash"""
     self.client.execute(

@@ -918,6 +918,7 @@ public class HdfsTable extends Table implements FeFsTable {
     // behavior. So ADLS ACLs are unsupported until the connector is able to map
     // permissions to hadoop users/groups (HADOOP-14437).
     if (FileSystemUtil.isADLFileSystem(fs)) return TAccessLevel.READ_WRITE;
+    if (FileSystemUtil.isABFSFileSystem(fs)) return TAccessLevel.READ_WRITE;
 
     while (location != null) {
       try {

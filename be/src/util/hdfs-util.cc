@@ -86,6 +86,14 @@ bool IsS3APath(const char* path) {
   return strncmp(path, "s3a://", 6) == 0;
 }
 
+bool IsABFSPath(const char* path) {
+  if (strstr(path, ":/") == NULL) {
+    return ExecEnv::GetInstance()->default_fs().compare(0, 7, "abfs://") == 0 ||
+        ExecEnv::GetInstance()->default_fs().compare(0, 8, "abfss://") == 0;
+  }
+  return strncmp(path, "abfs://", 7) == 0 || strncmp(path, "abfss://", 8) == 0;
+}
+
 bool IsADLSPath(const char* path) {
   if (strstr(path, ":/") == NULL) {
     return ExecEnv::GetInstance()->default_fs().compare(0, 6, "adl://") == 0;

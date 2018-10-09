@@ -26,6 +26,7 @@ from functools import partial
 
 from tests.common.environ import IMPALAD_BUILD
 from tests.util.filesystem_utils import (
+    IS_ABFS,
     IS_ADLS,
     IS_EC,
     IS_HDFS,
@@ -53,6 +54,27 @@ class SkipIfS3:
   datasrc = pytest.mark.skipif(IS_S3, reason="data sources not copied to S3")
   hbase = pytest.mark.skipif(IS_S3, reason="HBase not started with S3")
   qualified_path = pytest.mark.skipif(IS_S3,
+      reason="Tests rely on HDFS qualified paths, IMPALA-1872")
+
+
+class SkipIfABFS:
+
+  # These ones are skipped due to product limitations.
+  caching = pytest.mark.skipif(IS_ABFS, reason="SET CACHED not implemented for ABFS")
+  hive = pytest.mark.skipif(IS_ABFS, reason="Hive doesn't work with ABFS")
+  hdfs_block_size = pytest.mark.skipif(IS_ABFS, reason="ABFS uses it's own block size")
+  hdfs_acls = pytest.mark.skipif(IS_ABFS, reason="HDFS acls are not supported on ABFS")
+  jira = partial(pytest.mark.skipif, IS_ABFS)
+  hdfs_encryption = pytest.mark.skipif(IS_ABFS,
+      reason="HDFS encryption is not supported with ABFS")
+  trash = pytest.mark.skipif(IS_ABFS,
+      reason="Drop/purge not working as expected on ABFS, IMPALA-7726")
+
+  # These ones need test infra work to re-enable.
+  udfs = pytest.mark.skipif(IS_ABFS, reason="udas/udfs not copied to ABFS")
+  datasrc = pytest.mark.skipif(IS_ABFS, reason="data sources not copied to ABFS")
+  hbase = pytest.mark.skipif(IS_ABFS, reason="HBase not started with ABFS")
+  qualified_path = pytest.mark.skipif(IS_ABFS,
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")
 
 class SkipIfADLS:

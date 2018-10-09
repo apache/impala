@@ -22,12 +22,14 @@ from tests.common.environ import specific_build_type_timeout
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import (
     SkipIfS3,
+    SkipIfABFS,
     SkipIfADLS,
     SkipIfIsilon,
     SkipIfLocal)
 from tests.util.hive_utils import HiveDbWrapper
 
 @SkipIfS3.hive
+@SkipIfABFS.hive
 @SkipIfADLS.hive
 @SkipIfIsilon.hive
 @SkipIfLocal.hive

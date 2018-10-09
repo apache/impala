@@ -32,6 +32,8 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
+import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
 import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -799,6 +801,8 @@ public class JniFrontend {
       FileSystem fs = FileSystem.get(CONF);
       if (!(fs instanceof DistributedFileSystem ||
             fs instanceof S3AFileSystem ||
+            fs instanceof AzureBlobFileSystem ||
+            fs instanceof SecureAzureBlobFileSystem ||
             fs instanceof AdlFileSystem)) {
         return "Currently configured default filesystem: " +
             fs.getClass().getSimpleName() + ". " +

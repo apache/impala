@@ -26,6 +26,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (
     SkipIfIsilon,
     SkipIfS3,
+    SkipIfABFS,
     SkipIfADLS,
     SkipIfEC,
     SkipIfLocal,
@@ -95,6 +96,7 @@ class TestNestedTypes(ImpalaTestSuite):
 
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfLocal.hive
   def test_upper_case_field_name(self, unique_database):
@@ -568,6 +570,7 @@ class TestMaxNestingDepth(ImpalaTestSuite):
 
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfLocal.hive
   def test_load_hive_table(self, vector, unique_database):

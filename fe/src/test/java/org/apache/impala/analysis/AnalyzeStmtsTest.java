@@ -3204,7 +3204,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalysisError(String.format("load data inpath '%s' %s into table " +
           "tpch.lineitem", "file:///test-warehouse/test.out", overwrite),
           "INPATH location 'file:/test-warehouse/test.out' must point to an " +
-          "HDFS, S3A or ADL filesystem.");
+          "HDFS, S3A, ADL or ABFS filesystem.");
 
       // File type / table type mismatch.
       AnalyzesOk(String.format("load data inpath '%s' %s into table " +

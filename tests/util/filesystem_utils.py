@@ -30,6 +30,7 @@ IS_ISILON = FILESYSTEM == "isilon"
 IS_LOCAL = FILESYSTEM == "local"
 IS_HDFS = FILESYSTEM == "hdfs"
 IS_ADLS = FILESYSTEM == "adls"
+IS_ABFS = FILESYSTEM == "abfs"
 IS_EC = os.getenv("ERASURE_CODING") == "true"
 # This condition satisfies both the states where one can assume a default fs
 #   - The environment variable is set to an empty string.
@@ -44,7 +45,9 @@ ISILON_WEBHDFS_PORT = 8082
 # S3 specific values
 S3_BUCKET_NAME = os.getenv("S3_BUCKET")
 
-# ADLS specific values
+# ADLS / ABFS specific values
+ABFS_ACCOUNT_NAME = os.getenv("azure_storage_account_name")
+ABFS_CONTAINER_NAME = os.getenv("azure_storage_container_name")
 ADLS_STORE_NAME = os.getenv("azure_data_lake_store_name")
 ADLS_CLIENT_ID = os.getenv("azure_client_id")
 ADLS_TENANT_ID = os.getenv("azure_tenant_id")

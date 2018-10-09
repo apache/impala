@@ -263,6 +263,8 @@ export azure_tenant_id="${azure_tenant_id-DummyAdlsTenantId}"
 export azure_client_id="${azure_client_id-DummyAdlsClientId}"
 export azure_client_secret="${azure_client_secret-DummyAdlsClientSecret}"
 export azure_data_lake_store_name="${azure_data_lake_store_name-}"
+export azure_storage_account_name="${azure_storage_account_name-}"
+export azure_storage_container_name="${azure_storage_container_name-}"
 export HDFS_REPLICATION="${HDFS_REPLICATION-3}"
 export ISILON_NAMENODE="${ISILON_NAMENODE-}"
 export DEFAULT_FS="${DEFAULT_FS-hdfs://localhost:20500}"
@@ -351,6 +353,28 @@ elif [ "${TARGET_FILESYSTEM}" = "adls" ]; then
     return 1
   fi
   DEFAULT_FS="adl://${azure_data_lake_store_name}.azuredatalakestore.net"
+  export DEFAULT_FS
+elif [ "${TARGET_FILESYSTEM}" = "abfs" ]; then
+  # ABFS is also known as ADLS Gen2, and they can share credentials
+  # Basic error checking
+  if [[ "${azure_client_id}" = "DummyAdlsClientId" ||\
+        "${azure_tenant_id}" = "DummyAdlsTenantId" ||\
+        "${azure_client_secret}" = "DummyAdlsClientSecret" ]]; then
+    echo "All 3 of the following need to be assigned valid values and belong
+      to the owner of the Azure storage account in order to access the
+      filesystem: azure_client_id, azure_tenant_id, azure_client_secret."
+    return 1
+  fi
+  if [[ "${azure_storage_account_name}" = "" ]]; then
+    echo "azure_storage_account_name cannot be an empty string for ABFS"
+    return 1
+  fi
+  if [[ "${azure_storage_container_name}" = "" ]]; then
+    echo "azure_storage_container_name cannot be an empty string for ABFS"
+    return 1
+  fi
+  domain="${azure_storage_account_name}.dfs.core.windows.net"
+  DEFAULT_FS="abfss://${azure_storage_container_name}@${domain}"
   export DEFAULT_FS
 elif [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
   if [ "${ISILON_NAMENODE}" = "" ]; then

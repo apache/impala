@@ -36,6 +36,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.resource_pool_config import ResourcePoolConfig
 from tests.common.skip import (
     SkipIfS3,
+    SkipIfABFS,
     SkipIfADLS,
     SkipIfEC,
     SkipIfNotHdfsMinicluster)
@@ -439,6 +440,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           ".* is greater than pool max mem resources 10.00 MB", str(ex))
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfABFS.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfEC.fix_later
   @pytest.mark.execute_serially

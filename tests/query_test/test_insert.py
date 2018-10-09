@@ -22,7 +22,7 @@ import pytest
 from testdata.common import widetable
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfEC, SkipIfLocal, SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfLocal, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -112,6 +112,8 @@ class TestInsertQueries(ImpalaTestSuite):
   @pytest.mark.execute_serially
   # Erasure coding doesn't respect memory limit
   @SkipIfEC.fix_later
+  # ABFS partition names cannot end in periods
+  @SkipIfABFS.jira(reason="HADOOP-15860")
   def test_insert(self, vector):
     if (vector.get_value('table_format').file_format == 'parquet'):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \

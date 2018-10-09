@@ -286,6 +286,9 @@ class DiskIoMgr : public CacheLineAligned {
   /// The disk ID (and therefore disk_queues_ index) used for S3 accesses.
   int RemoteS3DiskId() const { return num_local_disks() + REMOTE_S3_DISK_OFFSET; }
 
+  /// The disk ID (and therefore disk_queues_ index) used for ABFS accesses.
+  int RemoteAbfsDiskId() const { return num_local_disks() + REMOTE_ABFS_DISK_OFFSET; }
+
   /// The disk ID (and therefore disk_queues_ index) used for ADLS accesses.
   int RemoteAdlsDiskId() const { return num_local_disks() + REMOTE_ADLS_DISK_OFFSET; }
 
@@ -335,6 +338,7 @@ class DiskIoMgr : public CacheLineAligned {
     REMOTE_DFS_DISK_OFFSET = 0,
     REMOTE_S3_DISK_OFFSET,
     REMOTE_ADLS_DISK_OFFSET,
+    REMOTE_ABFS_DISK_OFFSET,
     REMOTE_NUM_DISKS
   };
 

@@ -17,7 +17,7 @@
 
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.util.filesystem_utils import IS_EC
 import logging
 import pytest
@@ -63,6 +63,7 @@ class TestObservability(ImpalaTestSuite):
   @SkipIfS3.hbase
   @SkipIfLocal.hbase
   @SkipIfIsilon.hbase
+  @SkipIfABFS.hbase
   @SkipIfADLS.hbase
   def test_scan_summary(self):
     """IMPALA-4499: Checks that the exec summary for scans show the table name."""

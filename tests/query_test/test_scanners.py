@@ -35,6 +35,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
     SkipIf,
     SkipIfS3,
+    SkipIfABFS,
     SkipIfADLS,
     SkipIfEC,
     SkipIfIsilon,
@@ -351,6 +352,7 @@ class TestParquet(ImpalaTestSuite):
     assert len(result.data) == 1
     assert "4294967294" in result.data
 
+  @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
@@ -473,6 +475,7 @@ class TestParquet(ImpalaTestSuite):
         vector, unique_database)
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfABFS.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
@@ -530,6 +533,7 @@ class TestParquet(ImpalaTestSuite):
     assert total == num_scanners_with_no_reads
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfABFS.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
@@ -545,6 +549,7 @@ class TestParquet(ImpalaTestSuite):
     self._multiple_blocks_helper(table_name, 40000, ranges_per_node=2)
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfABFS.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
@@ -906,6 +911,7 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
 
 # Missing Coverage: No coverage for truncated files errors or scans.
 @SkipIfS3.hive
+@SkipIfABFS.hive
 @SkipIfADLS.hive
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
@@ -984,6 +990,7 @@ class TestOrc(ImpalaTestSuite):
       lambda v: v.get_value('table_format').file_format == 'orc')
 
   @SkipIfS3.hdfs_block_size
+  @SkipIfABFS.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfEC.fix_later
   @SkipIfIsilon.hdfs_block_size

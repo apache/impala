@@ -29,7 +29,8 @@ from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder
 from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIfEC, SkipIfIsilon, SkipIfLocal, SkipIfS3, SkipIfADLS
+from tests.common.skip import SkipIfEC, SkipIfIsilon, SkipIfLocal, SkipIfS3, SkipIfABFS, \
+    SkipIfADLS
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path
@@ -360,6 +361,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 @SkipIfS3.hive
+@SkipIfABFS.hive
 @SkipIfADLS.hive
 # TODO: Should we move this to test_parquet_stats.py?
 class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):

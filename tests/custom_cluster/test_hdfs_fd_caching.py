@@ -22,6 +22,7 @@ from tests.common.skip import SkipIfLocal, SkipIfEC
 from tests.util.filesystem_utils import (
     IS_ISILON,
     IS_S3,
+    IS_ABFS,
     IS_ADLS)
 from time import sleep
 
@@ -132,7 +133,8 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
 
     # Caching only applies to local HDFS files. If this is local HDFS, then verify
     # that caching works. Otherwise, verify that file handles are not cached.
-    if IS_S3 or IS_ADLS or IS_ISILON or pytest.config.option.testing_remote_cluster:
+    if IS_S3 or IS_ABFS or IS_ADLS or IS_ISILON or \
+        pytest.config.option.testing_remote_cluster:
       caching_expected = False
     else:
       caching_expected = True
@@ -148,7 +150,8 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     handle_timeout = 5
 
     # Only test eviction on platforms where caching is enabled.
-    if IS_S3 or IS_ADLS or IS_ISILON or pytest.config.option.testing_remote_cluster:
+    if IS_S3 or IS_ABFS or IS_ADLS or IS_ISILON or \
+        pytest.config.option.testing_remote_cluster:
       return
     caching_expected = True
     self.run_fd_caching_test(vector, caching_expected, cache_capacity, handle_timeout)

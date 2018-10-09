@@ -83,6 +83,8 @@ DEFINE_int32(num_remote_hdfs_io_threads, 8, "Number of remote HDFS I/O threads")
 // open to S3 and use of multiple CPU cores since S3 reads are relatively compute
 // expensive (SSL and JNI buffer overheads).
 DEFINE_int32(num_s3_io_threads, 16, "Number of S3 I/O threads");
+// The maximum number of ABFS I/O threads. TODO: choose the default empirically.
+DEFINE_int32(num_abfs_io_threads, 16, "Number of ABFS I/O threads");
 // The maximum number of ADLS I/O threads. This number is a good default to have for
 // clusters that may vary widely in size, due to an undocumented concurrency limit
 // enforced by ADLS for a cluster, which spans between 500-700. For smaller clusters
@@ -233,6 +235,9 @@ Status DiskIoMgr::Init() {
     } else if (i == RemoteS3DiskId()) {
       num_threads_per_disk = FLAGS_num_s3_io_threads;
       device_name = "S3 remote";
+    } else if (i == RemoteAbfsDiskId()) {
+      num_threads_per_disk = FLAGS_num_abfs_io_threads;
+      device_name = "ABFS remote";
     } else if (i == RemoteAdlsDiskId()) {
       num_threads_per_disk = FLAGS_num_adls_io_threads;
       device_name = "ADLS remote";
@@ -457,10 +462,12 @@ int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
       return RemoteDfsDiskId();
     }
     if (IsS3APath(file)) return RemoteS3DiskId();
+    if (IsABFSPath(file)) return RemoteAbfsDiskId();
     if (IsADLSPath(file)) return RemoteAdlsDiskId();
   }
   // Assign to a local disk queue.
   DCHECK(!IsS3APath(file)); // S3 is always remote.
+  DCHECK(!IsABFSPath(file)); // ABFS is always remote.
   DCHECK(!IsADLSPath(file)); // ADLS is always remote.
   if (disk_id == -1) {
     // disk id is unknown, assign it an arbitrary one.
