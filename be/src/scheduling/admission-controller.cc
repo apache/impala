@@ -626,7 +626,7 @@ Status AdmissionController::SubmitForAdmission(QuerySchedule* schedule,
         return Status::CANCELLED;
       }
       VLOG_QUERY << "Admitted query id=" << PrintId(schedule->query_id());
-      AdmitQuery(schedule, true);
+      AdmitQuery(schedule, false);
       VLOG_RPC << "Final: " << stats->DebugString();
       return Status::OK();
     }
@@ -997,7 +997,7 @@ void AdmissionController::DequeueLoop() {
           continue;
         }
         DCHECK_ENUM_EQ(outcome, AdmissionOutcome::ADMITTED);
-        AdmitQuery(schedule, false);
+        AdmitQuery(schedule, true);
       }
       pools_for_updates_.insert(pool_name);
     }

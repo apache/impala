@@ -758,6 +758,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Setup to queue a query.
     sleep_query_handle = self.client.execute_async("select sleep(10000)")
     self.client.wait_for_admission_control(sleep_query_handle)
+    self.__wait_for_change_to_profile(sleep_query_handle,
+                                      "Admission result: Admitted immediately")
     queued_query_handle = self.client.execute_async("select 1")
     self.__wait_for_change_to_profile(queued_query_handle, "Admission result: Queued")
 
@@ -802,6 +804,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Now change the config back to a reasonable value.
     config.set_config_value(pool_name, config_str, 0)
     self.client.wait_for_finished_timeout(queued_query_handle, 20)
+    self.__wait_for_change_to_profile(queued_query_handle,
+                                      "Admission result: Admitted (queued)")
     self.close_query(queued_query_handle)
 
   def __wait_for_change_to_profile(self, query_handle, search_string, timeout=20):
