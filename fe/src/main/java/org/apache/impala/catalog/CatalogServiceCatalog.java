@@ -2195,6 +2195,10 @@ public class CatalogServiceCatalog extends Catalog {
       }
       if (table == null) {
         return createGetPartialCatalogObjectError(CatalogLookupStatus.TABLE_NOT_FOUND);
+      } else if (!table.isLoaded()) {
+        // Table can still remain in an incomplete state if there was a concurrent
+        // invalidate request.
+        return createGetPartialCatalogObjectError(CatalogLookupStatus.TABLE_NOT_LOADED);
       }
       // TODO(todd): consider a read-write lock here.
       table.getLock().lock();

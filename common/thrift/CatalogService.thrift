@@ -378,6 +378,7 @@ enum CatalogLookupStatus {
   OK,
   DB_NOT_FOUND,
   TABLE_NOT_FOUND,
+  TABLE_NOT_LOADED,
   FUNCTION_NOT_FOUND
 }
 

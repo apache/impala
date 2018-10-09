@@ -20,6 +20,7 @@ package org.apache.impala.catalog;
 import java.util.List;
 import java.util.Set;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 
 import org.apache.impala.common.ImpalaException;
@@ -136,6 +137,7 @@ public class IncompleteTable extends Table {
   @Override
   public TGetPartialCatalogObjectResponse getPartialInfo(
       TGetPartialCatalogObjectRequest req) throws TableLoadingException {
+    Preconditions.checkNotNull(cause_);
     Throwables.propagateIfPossible(cause_, TableLoadingException.class);
     throw new TableLoadingException(cause_.getMessage());
   }
