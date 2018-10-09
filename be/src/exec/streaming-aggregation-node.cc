@@ -171,7 +171,7 @@ Status StreamingAggregationNode::GetRowsStreaming(
     child_batch_->Reset();
   } while (out_batch->num_rows() == 0 && !child_eos_);
 
-  if (child_eos_) {
+  if (child_eos_ && child_batch_processed_) {
     child(0)->Close(state);
     child_batch_.reset();
     for (auto& agg : aggs_) RETURN_IF_ERROR(agg->InputDone());

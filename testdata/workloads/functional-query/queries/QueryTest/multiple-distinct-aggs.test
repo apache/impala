@@ -422,3 +422,18 @@ BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ---- RESULTS
 8,2,2,2,2,2,2,2,8
 ====
+---- QUERY
+# IMPALA-7677: query that hits the path in StreamingAggregationNode where the final child
+# batch is not fully processed in a single GetNext() call.
+select
+  count(distinct o_totalprice),
+  count(distinct o_orderkey),
+  count(distinct o_orderdate)
+from tpch.orders
+where 1 not in
+  (select count(distinct o_custkey) from tpch.orders)
+---- TYPES
+BIGINT,BIGINT,BIGINT
+---- RESULTS
+1464556,1500000,2406
+====
