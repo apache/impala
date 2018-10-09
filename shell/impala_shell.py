@@ -543,32 +543,6 @@ class ImpalaShell(object, cmd.Cmd):
         print_to_stderr("Failed to reconnect and close (try %i/%i): %s" % (
             cancel_try + 1, ImpalaShell.CANCELLATION_TRIES, err_msg))
 
-  def _replace_variables(self, query):
-    """Replaces variable within the query text with their corresponding values"""
-    errors = False
-    matches = set(map(lambda v: v.upper(), re.findall(r'(?<!\\)\${([^}]+)}', query)))
-    for name in matches:
-      value = None
-      # Check if syntax is correct
-      var_name = self._get_var_name(name)
-      if var_name is None:
-        print_to_stderr('Error: Unknown substitution syntax (%s). ' % (name,) + \
-                        'Use ${VAR:var_name}.')
-        errors = True
-      else:
-        # Replaces variable value
-        if self.set_variables and var_name in self.set_variables:
-          value = self.set_variables[var_name]
-          regexp = re.compile(r'(?<!\\)\${%s}' % (name,), re.IGNORECASE)
-          query = regexp.sub(value, query)
-        else:
-          print_to_stderr('Error: Unknown variable %s' % (var_name))
-          errors = True
-    if errors:
-      return None
-    else:
-      return query
-
   def set_prompt(self, db):
     self.prompt = ImpalaShell.PROMPT_FORMAT.format(
         host=self.impalad[0], port=self.impalad[1], db=db)
@@ -598,7 +572,7 @@ class ImpalaShell(object, cmd.Cmd):
        the interactive case, when cmdloop is called.
     """
     # Replace variables in the statement before it's executed
-    line = self._replace_variables(line)
+    line = replace_variables(self.set_variables, line)
     # Cmd is an old-style class, hence we need to call the method directly
     # instead of using super()
     # TODO: This may have to be changed to a super() call once we move to Python 3
@@ -673,18 +647,6 @@ class ImpalaShell(object, cmd.Cmd):
     except KeyError:
       return False
 
-  def _get_var_name(self, name):
-    """Look for a namespace:var_name pattern in an option name.
-       Return the variable name if it's a match or None otherwise.
-    """
-    ns_match = re.match(r'^([^:]*):(.*)', name)
-    if ns_match is not None:
-      ns = ns_match.group(1)
-      var_name = ns_match.group(2)
-      if ns in ImpalaShell.VAR_PREFIXES:
-        return var_name
-    return None
-
   def _print_with_set(self, print_level):
     self._print_options(print_level)
     print "\nVariables:"
@@ -721,7 +683,7 @@ class ImpalaShell(object, cmd.Cmd):
         return CmdStatus.ERROR
     option_upper = tokens[0].upper()
     # Check if it's a variable
-    var_name = self._get_var_name(option_upper)
+    var_name = get_var_name(option_upper)
     if var_name is not None:
       # Set the variable
       self.set_variables[var_name] = tokens[1]
@@ -745,7 +707,7 @@ class ImpalaShell(object, cmd.Cmd):
       return CmdStatus.ERROR
     option = args.upper()
     # Check if it's a variable
-    var_name = self._get_var_name(option)
+    var_name = get_var_name(option)
     if var_name is not None:
       if self.set_variables.get(var_name):
         print 'Unsetting variable %s' % var_name
@@ -1539,8 +1501,52 @@ def parse_variables(keyvals):
         parser.print_help()
         sys.exit(1)
       else:
-        vars[match.groups()[0].upper()] = match.groups()[1]
+        vars[match.groups()[0].upper()] = replace_variables(vars, match.groups()[1])
   return vars
+
+
+def replace_variables(set_variables, string):
+  """Replaces variable within the string with their corresponding values using the
+  given set_variables."""
+  errors = False
+  matches = set(map(lambda v: v.upper(), re.findall(r'(?<!\\)\${([^}]+)}', string)))
+  for name in matches:
+    value = None
+    # Check if syntax is correct
+    var_name = get_var_name(name)
+    if var_name is None:
+      print_to_stderr('Error: Unknown substitution syntax (%s). ' % (name,) +
+                      'Use ${VAR:var_name}.')
+      errors = True
+    else:
+      # Replaces variable value
+      if set_variables and var_name in set_variables:
+        value = set_variables[var_name]
+        if value is None:
+          errors = True
+        else:
+          regexp = re.compile(r'(?<!\\)\${%s}' % (name,), re.IGNORECASE)
+          string = regexp.sub(value, string)
+      else:
+        print_to_stderr('Error: Unknown variable %s' % (var_name))
+        errors = True
+  if errors:
+    return None
+  else:
+    return string
+
+
+def get_var_name(name):
+  """Look for a namespace:var_name pattern in an option name.
+     Return the variable name if it's a match or None otherwise.
+  """
+  ns_match = re.match(r'^([^:]*):(.*)', name)
+  if ns_match is not None:
+    ns = ns_match.group(1)
+    var_name = ns_match.group(2)
+    if ns in ImpalaShell.VAR_PREFIXES:
+      return var_name
+  return None
 
 def execute_queries_non_interactive_mode(options, query_options):
   """Run queries in non-interactive mode."""

@@ -535,6 +535,31 @@ class TestImpalaShell(ImpalaTestSuite):
     assert ("Error: Could not parse key-value \"foo\". It must follow the pattern "
              "\"KEY=VALUE\".") in result.stderr
 
+    # IMPALA-7673: Test that variable substitution in command line can accept values
+    # from other variables just like the one in interactive shell.
+    result = run_impala_shell_cmd('--var="msg1=1" --var="msg2=${var:msg1}2" '
+                                  '--var="msg3=${var:msg1}${var:msg2}" '
+                                  '--query="select ${var:msg3}"')
+    self._validate_shell_messages(result.stderr, ['112', 'Fetched 1 row(s)'],
+                                  should_exist=True)
+
+    # Test with an escaped variable.
+    result = run_impala_shell_cmd('--var="msg1=1" --var="msg2=${var:msg1}2" '
+                                  '--var="msg3=\${var:msg1}${var:msg2}" '
+                                  '--query="select \'${var:msg3}\'"')
+    self._validate_shell_messages(result.stderr, ['${var:msg1}12', 'Fetched 1 row(s)'],
+                                  should_exist=True)
+
+    # Referencing a non-existent variable will result in an error.
+    result = run_impala_shell_cmd('--var="msg1=1" --var="msg2=${var:doesnotexist}2" '
+                                  '--var="msg3=\${var:msg1}${var:msg2}" '
+                                  '--query="select \'${var:msg3}\'"',
+                                  expect_success=False)
+    self._validate_shell_messages(result.stderr,
+                                  ['Error: Unknown variable DOESNOTEXIST',
+                                   'Could not execute command: select \'${var:msg3}\''],
+                                  should_exist=True)
+
   # Checks if 'messages' exists/does not exist in 'result_stderr' based on the value of
   # 'should_exist'
   def _validate_shell_messages(self, result_stderr, messages, should_exist=True):
