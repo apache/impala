@@ -205,30 +205,42 @@ Trying to re-register with state-store</codeblock>
 
     <conbody>
 
-      <p>
-        Sometimes, an Impala query might run for an unexpectedly long time,
-        tying up resources in the cluster. You can cancel the query explicitly,
-        independent of the timeout period, by going into the web UI for the
-          <cmdname>impalad</cmdname> host (on port 25000 by default), and using
-        the link on the <codeph>/queries</codeph> tab to cancel the running
-        query.
-      </p>
-
-      <p>
-        Various client applications let you interactively cancel queries
-        submitted or monitored through those applications. For example:
-        <ul>
-          <li>
-            Press <systemoutput>^C</systemoutput> in
-            <cmdname>impala-shell</cmdname>.
-          </li>
-          <li>
-            Click <b>Cancel</b> from the <b>Watch</b>page in Hue.
-          </li>
-        </ul>
-      </p>
+      <p> Sometimes, an Impala query might run for an unexpectedly long time,
+        tying up resources in the cluster. This section describes the options to
+        terminate the runaway queries.</p>
 
     </conbody>
+    <concept id="cancel_query_with_query_option">
+      <title>Setting a Time Limit on Query Execution</title>
+      <conbody>
+        <p>An Impala administrator can set a default value of the
+            <codeph>EXEC_TIME_LIMIT_S</codeph> query option for a resource pool.
+          If a user accidentally runs a large query that executes for longer
+          than the limit, it will be automatically killed after the time limit
+          expires and frees up resources. </p>
+        <p>Users can override the default value per query or per session if they
+          do not want the default <codeph>EXEC_TIME_LIMIT_S</codeph> value to
+          apply to a specific query or a session. See <xref
+            href="impala_exec_time_limit_s.xml#exec_time_limit_s"/> for the
+          details of the query option.</p>
+      </conbody>
+    </concept>
+    <concept id="cancel_query_in_webUI">
+      <title>Interactively Cancelling a Query </title>
+      <conbody>
+        <p> You can cancel the query explicitly, independent of the timeout
+          period, by going into the web UI for the <cmdname>impalad</cmdname>
+          host (on port 25000 by default), and using the link on the
+            <codeph>/queries</codeph> tab to cancel the running query. </p>
+        <p> Various client applications let you interactively cancel queries
+          submitted or monitored through those applications. For example: <ul>
+            <li> Press <systemoutput>^C</systemoutput> in
+                <cmdname>impala-shell</cmdname>. </li>
+            <li> Click <b>Cancel</b> from the <b>Watch</b>page in Hue. </li>
+          </ul>
+        </p>
+      </conbody>
+    </concept>
 
   </concept>
 
