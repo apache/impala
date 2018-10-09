@@ -204,11 +204,9 @@ Trying to re-register with state-store</codeblock>
     <title>Cancelling a Query</title>
 
     <conbody>
-
-      <p> Sometimes, an Impala query might run for an unexpectedly long time,
+      <p> Occasionally, an Impala query might run for an unexpectedly long time,
         tying up resources in the cluster. This section describes the options to
-        terminate the runaway queries.</p>
-
+        terminate such runaway queries.</p>
     </conbody>
     <concept id="cancel_query_with_query_option">
       <title>Setting a Time Limit on Query Execution</title>
@@ -216,11 +214,11 @@ Trying to re-register with state-store</codeblock>
         <p>An Impala administrator can set a default value of the
             <codeph>EXEC_TIME_LIMIT_S</codeph> query option for a resource pool.
           If a user accidentally runs a large query that executes for longer
-          than the limit, it will be automatically killed after the time limit
-          expires and frees up resources. </p>
-        <p>Users can override the default value per query or per session if they
-          do not want the default <codeph>EXEC_TIME_LIMIT_S</codeph> value to
-          apply to a specific query or a session. See <xref
+          than the limit, it will be automatically terminated after the time
+          limit expires to free up resources. </p>
+        <p>You can override the default value per query or per session if you do
+          not want to apply the default <codeph>EXEC_TIME_LIMIT_S</codeph> value
+          to a specific query or a session. See <xref
             href="impala_exec_time_limit_s.xml#exec_time_limit_s"/> for the
           details of the query option.</p>
       </conbody>
