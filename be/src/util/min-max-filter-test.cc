@@ -31,11 +31,10 @@ using namespace impala;
 // inserted into it, and that MinMaxFilter::Or works for bools.
 TEST(MinMaxFilterTest, TestBoolMinMaxFilter) {
   MemTracker mem_tracker;
-  MemPool mem_pool(&mem_tracker);
   ObjectPool obj_pool;
 
-  MinMaxFilter* filter =
-      MinMaxFilter::Create(ColumnType(PrimitiveType::TYPE_BOOLEAN), &obj_pool, &mem_pool);
+  MinMaxFilter* filter = MinMaxFilter::Create(
+      ColumnType(PrimitiveType::TYPE_BOOLEAN), &obj_pool, &mem_tracker);
   EXPECT_TRUE(filter->AlwaysFalse());
   bool b1 = true;
   filter->Insert(&b1);
@@ -58,6 +57,8 @@ TEST(MinMaxFilterTest, TestBoolMinMaxFilter) {
   MinMaxFilter::Or(tFilter1, &tFilter2);
   EXPECT_FALSE(tFilter2.min.bool_val);
   EXPECT_TRUE(tFilter2.max.bool_val);
+
+  filter->Close();
 }
 
 void CheckIntVals(MinMaxFilter* filter, int32_t min, int32_t max) {
@@ -73,11 +74,10 @@ void CheckIntVals(MinMaxFilter* filter, int32_t min, int32_t max) {
 // generated with maxcros and the logic is identical.
 TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   MemTracker mem_tracker;
-  MemPool mem_pool(&mem_tracker);
   ObjectPool obj_pool;
 
   ColumnType int_type(PrimitiveType::TYPE_INT);
-  MinMaxFilter* int_filter = MinMaxFilter::Create(int_type, &obj_pool, &mem_pool);
+  MinMaxFilter* int_filter = MinMaxFilter::Create(int_type, &obj_pool, &mem_tracker);
 
   // Test the behavior of an empty filter.
   EXPECT_TRUE(int_filter->AlwaysFalse());
@@ -89,7 +89,7 @@ TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   EXPECT_FALSE(tFilter.min.__isset.int_val);
   EXPECT_FALSE(tFilter.max.__isset.int_val);
   MinMaxFilter* empty_filter =
-      MinMaxFilter::Create(tFilter, int_type, &obj_pool, &mem_pool);
+      MinMaxFilter::Create(tFilter, int_type, &obj_pool, &mem_tracker);
   EXPECT_TRUE(empty_filter->AlwaysFalse());
   EXPECT_FALSE(empty_filter->AlwaysTrue());
 
@@ -113,7 +113,7 @@ TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   EXPECT_EQ(tFilter.min.int_val, i4);
   EXPECT_EQ(tFilter.max.int_val, i2);
   MinMaxFilter* int_filter2 =
-      MinMaxFilter::Create(tFilter, int_type, &obj_pool, &mem_pool);
+      MinMaxFilter::Create(tFilter, int_type, &obj_pool, &mem_tracker);
   CheckIntVals(int_filter2, i4, i2);
 
   // Check the behavior of Or.
@@ -126,6 +126,10 @@ TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   MinMaxFilter::Or(tFilter1, &tFilter2);
   EXPECT_EQ(tFilter2.min.int_val, 2);
   EXPECT_EQ(tFilter2.max.int_val, 8);
+
+  int_filter->Close();
+  empty_filter->Close();
+  int_filter2->Close();
 }
 
 void CheckStringVals(MinMaxFilter* filter, const string& min, const string& max) {
@@ -146,10 +150,9 @@ void CheckStringVals(MinMaxFilter* filter, const string& min, const string& max)
 TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   ObjectPool obj_pool;
   MemTracker mem_tracker;
-  MemPool mem_pool(&mem_tracker);
 
   ColumnType string_type(PrimitiveType::TYPE_STRING);
-  MinMaxFilter* filter = MinMaxFilter::Create(string_type, &obj_pool, &mem_pool);
+  MinMaxFilter* filter = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
 
   // Test the behavior of an empty filter.
   EXPECT_TRUE(filter->AlwaysFalse());
@@ -163,7 +166,7 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   EXPECT_FALSE(tFilter.always_true);
 
   MinMaxFilter* empty_filter =
-      MinMaxFilter::Create(tFilter, string_type, &obj_pool, &mem_pool);
+      MinMaxFilter::Create(tFilter, string_type, &obj_pool, &mem_tracker);
   EXPECT_TRUE(empty_filter->AlwaysFalse());
   EXPECT_FALSE(empty_filter->AlwaysTrue());
 
@@ -229,7 +232,7 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   EXPECT_EQ(tFilter.max.string_val, truncTrailMaxChar);
 
   MinMaxFilter* filter2 =
-      MinMaxFilter::Create(tFilter, string_type, &obj_pool, &mem_pool);
+      MinMaxFilter::Create(tFilter, string_type, &obj_pool, &mem_tracker);
   CheckStringVals(filter2, b1024, truncTrailMaxChar);
 
   // Check that if the entire string is the max char and therefore after truncating for
@@ -249,15 +252,12 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   EXPECT_TRUE(tFilter.always_true);
 
   MinMaxFilter* always_true_filter =
-      MinMaxFilter::Create(tFilter, string_type, &obj_pool, &mem_pool);
+      MinMaxFilter::Create(tFilter, string_type, &obj_pool, &mem_tracker);
   EXPECT_FALSE(always_true_filter->AlwaysFalse());
   EXPECT_TRUE(always_true_filter->AlwaysTrue());
 
-  mem_pool.FreeAll();
-
   // Check that a filter that hits the mem limit is disabled.
   MemTracker limit_mem_tracker(1);
-  MemPool limit_mem_pool(&limit_mem_tracker);
   // We do not want to start the webserver.
   FLAGS_enable_webserver = false;
   std::unique_ptr<TestEnv> env;
@@ -265,7 +265,7 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   ASSERT_OK(env->Init());
 
   MinMaxFilter* limit_filter =
-      MinMaxFilter::Create(string_type, &obj_pool, &limit_mem_pool);
+      MinMaxFilter::Create(string_type, &obj_pool, &limit_mem_tracker);
   EXPECT_FALSE(limit_filter->AlwaysTrue());
   limit_filter->Insert(&cVal);
   limit_filter->MaterializeValues();
@@ -288,6 +288,12 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   MinMaxFilter::Or(tFilter1, &tFilter2);
   EXPECT_EQ(tFilter2.min.string_val, "a");
   EXPECT_EQ(tFilter2.max.string_val, "e");
+
+  filter->Close();
+  empty_filter->Close();
+  filter2->Close();
+  limit_filter->Close();
+  always_true_filter->Close();
 }
 
 void CheckTimestampVals(
@@ -303,9 +309,8 @@ void CheckTimestampVals(
 TEST(MinMaxFilterTest, TestTimestampMinMaxFilter) {
   ObjectPool obj_pool;
   MemTracker mem_tracker;
-  MemPool mem_pool(&mem_tracker);
   ColumnType timestamp_type(PrimitiveType::TYPE_TIMESTAMP);
-  MinMaxFilter* filter = MinMaxFilter::Create(timestamp_type, &obj_pool, &mem_pool);
+  MinMaxFilter* filter = MinMaxFilter::Create(timestamp_type, &obj_pool, &mem_tracker);
 
   // Test the behavior of an empty filter.
   EXPECT_TRUE(filter->AlwaysFalse());
@@ -317,7 +322,7 @@ TEST(MinMaxFilterTest, TestTimestampMinMaxFilter) {
   EXPECT_FALSE(tFilter.min.__isset.timestamp_val);
   EXPECT_FALSE(tFilter.max.__isset.timestamp_val);
   MinMaxFilter* empty_filter =
-      MinMaxFilter::Create(tFilter, timestamp_type, &obj_pool, &mem_pool);
+      MinMaxFilter::Create(tFilter, timestamp_type, &obj_pool, &mem_tracker);
   EXPECT_TRUE(empty_filter->AlwaysFalse());
   EXPECT_FALSE(empty_filter->AlwaysTrue());
 
@@ -341,7 +346,7 @@ TEST(MinMaxFilterTest, TestTimestampMinMaxFilter) {
   EXPECT_EQ(TimestampValue::FromTColumnValue(tFilter.min), t2);
   EXPECT_EQ(TimestampValue::FromTColumnValue(tFilter.max), t3);
   MinMaxFilter* filter2 =
-      MinMaxFilter::Create(tFilter, timestamp_type, &obj_pool, &mem_pool);
+      MinMaxFilter::Create(tFilter, timestamp_type, &obj_pool, &mem_tracker);
   CheckTimestampVals(filter2, t2, t3);
 
   // Check the behavior of Or.
@@ -354,6 +359,10 @@ TEST(MinMaxFilterTest, TestTimestampMinMaxFilter) {
   MinMaxFilter::Or(tFilter1, &tFilter2);
   EXPECT_EQ(TimestampValue::FromTColumnValue(tFilter2.min), t2);
   EXPECT_EQ(TimestampValue::FromTColumnValue(tFilter2.max), t3);
+
+  filter->Close();
+  empty_filter->Close();
+  filter2->Close();
 }
 
 int main(int argc, char** argv) {

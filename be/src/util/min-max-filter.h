@@ -27,7 +27,7 @@
 
 namespace impala {
 
-class MemPool;
+class MemTacker;
 class ObjectPool;
 
 /// A MinMaxFilter tracks the min and max currently seen values in a data set for use in
@@ -42,6 +42,7 @@ class ObjectPool;
 class MinMaxFilter {
  public:
   virtual ~MinMaxFilter() {}
+  virtual void Close() {}
 
   /// Returns the min/max values in the tuple slot representation. It is not valid to call
   /// these functions if AlwaysFalse() returns true.
@@ -77,13 +78,13 @@ class MinMaxFilter {
 
   virtual std::string DebugString() const = 0;
 
-  /// Returns a new MinMaxFilter with the given type, allocated from 'pool'.
-  static MinMaxFilter* Create(ColumnType type, ObjectPool* pool, MemPool* mem_pool);
+  /// Returns a new MinMaxFilter with the given type, allocated from 'mem_tracker'.
+  static MinMaxFilter* Create(ColumnType type, ObjectPool* pool, MemTracker* mem_tracker);
 
   /// Returns a new MinMaxFilter created from the thrift representation, allocated from
-  /// 'pool'.
-  static MinMaxFilter* Create(
-      const TMinMaxFilter& thrift, ColumnType type, ObjectPool* pool, MemPool* mem_pool);
+  /// 'mem_tracker'.
+  static MinMaxFilter* Create(const TMinMaxFilter& thrift, ColumnType type,
+      ObjectPool* pool, MemTracker* mem_tracker);
 
   /// Computes the logical OR of 'in' with 'out' and stores the result in 'out'.
   static void Or(const TMinMaxFilter& in, TMinMaxFilter* out);
@@ -139,13 +140,15 @@ NUMERIC_MIN_MAX_FILTER(Double, double);
 
 class StringMinMaxFilter : public MinMaxFilter {
  public:
-  StringMinMaxFilter(MemPool* mem_pool)
-    : min_buffer_(mem_pool),
-      max_buffer_(mem_pool),
+  StringMinMaxFilter(MemTracker* mem_tracker)
+    : mem_pool_(mem_tracker),
+      min_buffer_(&mem_pool_),
+      max_buffer_(&mem_pool_),
       always_false_(true),
       always_true_(false) {}
-  StringMinMaxFilter(const TMinMaxFilter& thrift, MemPool* mem_pool);
+  StringMinMaxFilter(const TMinMaxFilter& thrift, MemTracker* mem_tracker);
   virtual ~StringMinMaxFilter() {}
+  virtual void Close() override { mem_pool_.FreeAll(); }
 
   virtual void* GetMin() override { return &min_; }
   virtual void* GetMax() override { return &max_; }
@@ -181,6 +184,9 @@ class StringMinMaxFilter : public MinMaxFilter {
   /// The maximum length of string to store in 'min_str_' or 'max_str_'. Strings inserted
   /// into this filter that are longer than this will be truncated.
   static const int MAX_BOUND_LENGTH;
+
+  /// MemPool that 'min_buffer_'/'max_buffer_' are allocated from.
+  MemPool mem_pool_;
 
   /// The min/max values. After a call to MaterializeValues() these will point to
   /// 'min_buffer_'/'max_buffer_'.

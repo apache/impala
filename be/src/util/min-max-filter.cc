@@ -199,8 +199,11 @@ NUMERIC_MIN_MAX_FILTER_NO_CAST(Double);
 const char* StringMinMaxFilter::LLVM_CLASS_NAME = "class.impala::StringMinMaxFilter";
 const int StringMinMaxFilter::MAX_BOUND_LENGTH = 1024;
 
-StringMinMaxFilter::StringMinMaxFilter(const TMinMaxFilter& thrift, MemPool* mem_pool)
-  : min_buffer_(mem_pool), max_buffer_(mem_pool) {
+StringMinMaxFilter::StringMinMaxFilter(
+    const TMinMaxFilter& thrift, MemTracker* mem_tracker)
+  : mem_pool_(mem_tracker),
+    min_buffer_(&mem_pool_),
+    max_buffer_(&mem_pool_) {
   always_false_ = thrift.always_false;
   always_true_ = thrift.always_true;
   if (!always_true_ && !always_false_) {
@@ -388,7 +391,8 @@ bool MinMaxFilter::GetCastIntMinMax(
   return true;
 }
 
-MinMaxFilter* MinMaxFilter::Create(ColumnType type, ObjectPool* pool, MemPool* mem_pool) {
+MinMaxFilter* MinMaxFilter::Create(
+    ColumnType type, ObjectPool* pool, MemTracker* mem_tracker) {
   switch (type.type) {
     case PrimitiveType::TYPE_BOOLEAN:
       return pool->Add(new BoolMinMaxFilter());
@@ -405,7 +409,7 @@ MinMaxFilter* MinMaxFilter::Create(ColumnType type, ObjectPool* pool, MemPool* m
     case PrimitiveType::TYPE_DOUBLE:
       return pool->Add(new DoubleMinMaxFilter());
     case PrimitiveType::TYPE_STRING:
-      return pool->Add(new StringMinMaxFilter(mem_pool));
+      return pool->Add(new StringMinMaxFilter(mem_tracker));
     case PrimitiveType::TYPE_TIMESTAMP:
       return pool->Add(new TimestampMinMaxFilter());
     default:
@@ -414,8 +418,8 @@ MinMaxFilter* MinMaxFilter::Create(ColumnType type, ObjectPool* pool, MemPool* m
   return nullptr;
 }
 
-MinMaxFilter* MinMaxFilter::Create(
-    const TMinMaxFilter& thrift, ColumnType type, ObjectPool* pool, MemPool* mem_pool) {
+MinMaxFilter* MinMaxFilter::Create(const TMinMaxFilter& thrift, ColumnType type,
+    ObjectPool* pool, MemTracker* mem_tracker) {
   switch (type.type) {
     case PrimitiveType::TYPE_BOOLEAN:
       return pool->Add(new BoolMinMaxFilter(thrift));
@@ -432,7 +436,7 @@ MinMaxFilter* MinMaxFilter::Create(
     case PrimitiveType::TYPE_DOUBLE:
       return pool->Add(new DoubleMinMaxFilter(thrift));
     case PrimitiveType::TYPE_STRING:
-      return pool->Add(new StringMinMaxFilter(thrift, mem_pool));
+      return pool->Add(new StringMinMaxFilter(thrift, mem_tracker));
     case PrimitiveType::TYPE_TIMESTAMP:
       return pool->Add(new TimestampMinMaxFilter(thrift));
     default:

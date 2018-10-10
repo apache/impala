@@ -50,7 +50,6 @@ RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* s
   : state_(state),
     filter_mem_tracker_(
         new MemTracker(-1, "Runtime Filter Bank", state->instance_mem_tracker(), false)),
-    mem_pool_(filter_mem_tracker_.get()),
     closed_(false),
     total_bloom_filter_mem_required_(total_filter_mem_required) {
   bloom_memory_allocated_ =
@@ -206,7 +205,8 @@ void RuntimeFilterBank::PublishGlobalFilter(const TPublishFilterParams& params) 
     DCHECK(it->second->is_min_max_filter());
     DCHECK(params.__isset.min_max_filter);
     min_max_filter = MinMaxFilter::Create(
-        params.min_max_filter, it->second->type(), &obj_pool_, &mem_pool_);
+        params.min_max_filter, it->second->type(), &obj_pool_, filter_mem_tracker_.get());
+    min_max_filters_.push_back(min_max_filter);
   }
   it->second->SetFilter(bloom_filter, min_max_filter);
   state_->runtime_profile()->AddInfoString(
@@ -247,7 +247,10 @@ MinMaxFilter* RuntimeFilterBank::AllocateScratchMinMaxFilter(
   RuntimeFilterMap::iterator it = produced_filters_.find(filter_id);
   DCHECK(it != produced_filters_.end()) << "Filter ID " << filter_id << " not registered";
 
-  return MinMaxFilter::Create(type, &obj_pool_, &mem_pool_);
+  MinMaxFilter* min_max_filter =
+      MinMaxFilter::Create(type, &obj_pool_, filter_mem_tracker_.get());
+  min_max_filters_.push_back(min_max_filter);
+  return min_max_filter;
 }
 
 bool RuntimeFilterBank::FpRateTooHigh(int64_t filter_size, int64_t observed_ndv) {
@@ -260,8 +263,8 @@ void RuntimeFilterBank::Close() {
   lock_guard<mutex> l(runtime_filter_lock_);
   closed_ = true;
   for (BloomFilter* filter : bloom_filters_) filter->Close();
+  for (MinMaxFilter* filter : min_max_filters_) filter->Close();
   obj_pool_.Clear();
-  mem_pool_.FreeAll();
   if (buffer_pool_client_.is_registered()) {
     VLOG_FILE << "RuntimeFilterBank (Fragment Id: "
               << PrintId(state_->fragment_instance_id())

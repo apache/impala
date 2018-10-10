@@ -152,9 +152,6 @@ class RuntimeFilterBank {
   /// MemTracker to track Bloom filter memory.
   boost::scoped_ptr<MemTracker> filter_mem_tracker_;
 
-  // Mem pool to track allocations made by filters.
-  MemPool mem_pool_;
-
   /// True iff Close() has been called. Used to prevent races between
   /// AllocateScratchBloomFilter() and Close().
   bool closed_;
@@ -166,8 +163,12 @@ class RuntimeFilterBank {
   long total_bloom_filter_mem_required_;
 
   /// Contains references to all the bloom filters generated. Used in Close() to safely
-  /// release all memory allocated for Bloomfilters.
+  /// release all memory allocated for BloomFilters.
   vector<BloomFilter*> bloom_filters_;
+
+  /// Contains references to all the min-max filters generated. Used in Close() to safely
+  /// release all memory allocated for MinMaxFilters.
+  vector<MinMaxFilter*> min_max_filters_;
 
   /// Buffer pool client for the filter bank. Initialized with the required reservation
   /// in ClaimBufferReservation(). Reservations are returned to the initial reservations

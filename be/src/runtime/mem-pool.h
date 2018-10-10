@@ -28,6 +28,7 @@
 
 #include "common/logging.h"
 #include "gutil/dynamic_annotations.h"
+#include "gutil/threading/thread_collision_warner.h"
 #include "util/bit-util.h"
 
 namespace impala {
@@ -88,6 +89,8 @@ class MemTracker;
 /// At this point p.total_allocated_bytes_ would be 0.
 /// The one remaining (empty) chunk is released:
 ///    delete p;
+//
+/// This class is not thread-safe. A DFAKE_MUTEX is used to help enforce correct usage.
 
 class MemPool {
  public:
@@ -104,6 +107,7 @@ class MemPool {
   /// of the the current chunk. Creates a new chunk if there aren't any chunks
   /// with enough capacity.
   uint8_t* Allocate(int64_t size) noexcept {
+    DFAKE_SCOPED_LOCK(mutex_);
     return Allocate<false>(size, DEFAULT_ALIGNMENT);
   }
 
@@ -112,12 +116,14 @@ class MemPool {
   /// The caller must handle the NULL case. This should be used for allocations
   /// where the size can be very big to bound the amount by which we exceed mem limits.
   uint8_t* TryAllocate(int64_t size) noexcept {
+    DFAKE_SCOPED_LOCK(mutex_);
     return Allocate<true>(size, DEFAULT_ALIGNMENT);
   }
 
   /// Same as TryAllocate() except a non-default alignment can be specified. It
   /// should be a power-of-two in [1, alignof(std::max_align_t)].
   uint8_t* TryAllocateAligned(int64_t size, int alignment) noexcept {
+    DFAKE_SCOPED_LOCK(mutex_);
     DCHECK_GE(alignment, 1);
     DCHECK_LE(alignment, alignof(std::max_align_t));
     DCHECK_EQ(BitUtil::RoundUpToPowerOfTwo(alignment), alignment);
@@ -126,6 +132,7 @@ class MemPool {
 
   /// Same as TryAllocate() except returned memory is not aligned at all.
   uint8_t* TryAllocateUnaligned(int64_t size) noexcept {
+    DFAKE_SCOPED_LOCK(mutex_);
     // Call templated implementation directly so that it is inlined here and the
     // alignment logic can be optimised out.
     return Allocate<true>(size, 1);
@@ -135,6 +142,7 @@ class MemPool {
   /// only be used to return either all or part of the previous allocation returned
   /// by Allocate().
   void ReturnPartialAllocation(int64_t byte_size) {
+    DFAKE_SCOPED_LOCK(mutex_);
     DCHECK_GE(byte_size, 0);
     DCHECK(current_chunk_idx_ != -1);
     ChunkInfo& info = chunks_[current_chunk_idx_];
@@ -207,6 +215,9 @@ class MemPool {
   /// reserved for allocation failures. It must be as aligned as max_align_t for
   /// TryAllocateAligned().
   static uint32_t zero_length_region_ alignas(std::max_align_t);
+
+  /// Ensures a MemPool is not used by two threads concurrently.
+  DFAKE_MUTEX(mutex_);
 
   /// chunk from which we served the last Allocate() call;
   /// always points to the last chunk that contains allocated data;

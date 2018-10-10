@@ -72,6 +72,7 @@ MemPool::~MemPool() {
 }
 
 void MemPool::Clear() {
+  DFAKE_SCOPED_LOCK(mutex_);
   current_chunk_idx_ = -1;
   for (auto& chunk: chunks_) {
     chunk.allocated_bytes = 0;
@@ -82,6 +83,7 @@ void MemPool::Clear() {
 }
 
 void MemPool::FreeAll() {
+  DFAKE_SCOPED_LOCK(mutex_);
   int64_t total_bytes_released = 0;
   for (auto& chunk: chunks_) {
     total_bytes_released += chunk.size;
@@ -162,6 +164,7 @@ bool MemPool::FindChunk(int64_t min_size, bool check_limits) noexcept {
 }
 
 void MemPool::AcquireData(MemPool* src, bool keep_current) {
+  DFAKE_SCOPED_LOCK(mutex_);
   DCHECK(src->CheckIntegrity(false));
   int num_acquired_chunks;
   if (keep_current) {
@@ -213,6 +216,7 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
 }
 
 void MemPool::SetMemTracker(MemTracker* new_tracker) {
+  DFAKE_SCOPED_LOCK(mutex_);
   mem_tracker_->TransferTo(new_tracker, total_reserved_bytes_);
   mem_tracker_ = new_tracker;
 }
@@ -236,6 +240,7 @@ string MemPool::DebugString() {
 }
 
 int64_t MemPool::GetTotalChunkSizes() const {
+  DFAKE_SCOPED_LOCK(mutex_);
   int64_t result = 0;
   for (int i = 0; i < chunks_.size(); ++i) {
     result += chunks_[i].size;

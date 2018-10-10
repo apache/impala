@@ -119,3 +119,27 @@ where a.tinyint_col = v.x
 ---- RESULTS
 730
 ====
+
+
+---- QUERY
+####################################################
+# Test case 4: Two StringMinMaxFilters generated in the same fragment (IMPALA-7272).
+###################################################
+select straight_join a.l_orderkey
+from tpch_kudu.lineitem a
+  inner join /* +shuffle */ tpch_kudu.lineitem b on a.l_comment = b.l_comment
+  inner join /* +shuffle */ tpch_kudu.lineitem c on b.l_comment = c.l_comment
+where a.l_orderkey = 1
+---- TYPES
+BIGINT
+---- RESULTS
+1
+1
+1
+1
+1
+1
+1
+1
+1
+====
