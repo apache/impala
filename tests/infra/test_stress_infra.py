@@ -55,4 +55,7 @@ class TestStressInfra(ImpalaTestSuite):
     Test that the stress test will properly load TPC workloads.
     """
     workload, count = count_map
-    assert count == len(load_tpc_queries(workload))
+    queries = load_tpc_queries(workload)
+    assert count == len(queries)
+    for name in queries:
+      assert name.startswith('q')

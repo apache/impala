@@ -1307,9 +1307,10 @@ def load_tpc_queries(workload):
   """Returns a list of TPC queries. 'workload' should either be 'tpch' or 'tpcds'."""
   LOG.info("Loading %s queries", workload)
   queries = []
-  for query_text in test_file_parser.load_tpc_queries(workload):
+  for query_name, query_sql in test_file_parser.load_tpc_queries(workload).iteritems():
     query = Query()
-    query.sql = query_text
+    query.name = query_name
+    query.sql = query_sql
     queries.append(query)
   return queries
 

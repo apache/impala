@@ -320,7 +320,7 @@ def write_test_file(test_file_name, test_file_sections, encoding=None):
 def load_tpc_queries(workload):
   """Returns a list of TPC queries. 'workload' should either be 'tpch' or 'tpcds'."""
   LOG.info("Loading %s queries", workload)
-  queries = list()
+  queries = dict()
   query_dir = os.path.join(
       os.environ['IMPALA_HOME'], "testdata", "workloads", workload, "queries")
   # IMPALA-6715 and others from the past: This pattern enforces the queries we actually
@@ -331,6 +331,7 @@ def load_tpc_queries(workload):
     match = file_name_pattern.search(query_file)
     if not match:
       continue
+    query_name = match.group(1)
     file_path = os.path.join(query_dir, query_file)
     test_cases = parse_query_test_file(file_path)
     file_queries = list()
@@ -341,5 +342,5 @@ def load_tpc_queries(workload):
       raise Exception(
           "Expected exactly 1 query to be in file %s but got %s"
           % (file_path, len(file_queries)))
-    queries.append(file_queries[0])
+    queries[query_name] = file_queries[0]
   return queries
