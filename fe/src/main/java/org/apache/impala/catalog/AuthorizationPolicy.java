@@ -437,7 +437,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
    * Returns a set of privilege strings in Sentry format.
    */
   @Override
-  public Set<String> listPrivileges(Set<String> groups, Set<String> users,
+  public synchronized Set<String> listPrivileges(Set<String> groups, Set<String> users,
       ActiveRoleSet roleSet) {
     Set<String> privileges = listPrivileges(groups, roleSet);
     for (String userName: users) {
