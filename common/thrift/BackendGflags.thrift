@@ -107,4 +107,6 @@ struct TBackendGflags {
   40: required i32 catalog_max_parallel_partial_fetch_rpc
 
   41: required i64 catalog_partial_fetch_rpc_queue_timeout_s
+
+  42: required i64 exchg_node_buffer_size_bytes
 }

@@ -68,6 +68,15 @@ import com.google.common.math.LongMath;
 abstract public class PlanNode extends TreeNode<PlanNode> {
   private final static Logger LOG = LoggerFactory.getLogger(PlanNode.class);
 
+  // The default row batch size used if the BATCH_SIZE query option is not set
+  // or is less than 1. Must be in sync with QueryState::DEFAULT_BATCH_SIZE.
+  protected final static int DEFAULT_ROWBATCH_SIZE = 1024;
+
+  // Max memory that a row batch can accumulate before it is considered at capacity.
+  // This is a soft capacity: row batches may exceed the capacity, preferably only by a
+  // row's worth of data. Must be in sync with RowBatch::AT_CAPACITY_MEM_USAGE.
+  protected final static int ROWBATCH_MAX_MEM_USAGE = 8 * 1024 * 1024;
+
   // String used for this node in getExplainString().
   protected String displayName_;
 
