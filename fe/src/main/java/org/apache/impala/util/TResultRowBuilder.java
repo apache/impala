@@ -48,6 +48,13 @@ public class TResultRowBuilder {
     return this;
   }
 
+  public TResultRowBuilder add(boolean val) {
+    TColumnValue colVal = new TColumnValue();
+    colVal.setBool_val(val);
+    row_.addToColVals(colVal);
+    return this;
+  }
+
   public TResultRowBuilder addBytes(long val) {
     TColumnValue colVal = new TColumnValue();
     colVal.setString_val(PrintUtils.printBytes(val));

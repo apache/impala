@@ -526,7 +526,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
     // URIs are case sensitive
     rowBuilder.add(Strings.nullToEmpty(privilege.getUri()));
     rowBuilder.add(privilege.getPrivilege_level().toString().toLowerCase());
-    rowBuilder.add(Boolean.toString(privilege.isHas_grant_opt()));
+    rowBuilder.add(privilege.isHas_grant_opt());
     if (privilege.getCreate_time_ms() == -1) {
       rowBuilder.add(null);
     } else {
