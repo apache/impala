@@ -83,7 +83,7 @@ class ResourcePoolConfig(object):
 
   def __find_xml_node(self, xml_root, pool_name, pool_attribute):
     """Returns the xml node corresponding to the 'pool_attribute' for the 'pool_name'"""
-    for property in xml_root.iter('property'):
+    for property in xml_root.getiterator('property'):
       try:
         name = property.find('name').text
         # eg. of name = impala.admission-control.max-query-mem-limit-bytes.root.pool_name
