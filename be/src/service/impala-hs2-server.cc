@@ -35,10 +35,11 @@
 #include "common/version.h"
 #include "rpc/thrift-util.h"
 #include "runtime/coordinator.h"
-#include "runtime/raw-value.h"
 #include "runtime/exec-env.h"
-#include "service/hs2-util.h"
+#include "runtime/raw-value.h"
+#include "scheduling/admission-controller.h"
 #include "service/client-request-state.h"
+#include "service/hs2-util.h"
 #include "service/query-options.h"
 #include "service/query-result-set.h"
 #include "util/auth-util.h"
@@ -826,6 +827,21 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   }
   // Report analysis errors
   ss << join(request_state->GetAnalysisWarnings(), "\n");
+  // Report queuing reason if the admission controller queued the query.
+  const string* admission_result = request_state->summary_profile()->GetInfoString(
+      AdmissionController::PROFILE_INFO_KEY_ADMISSION_RESULT);
+  if (admission_result != nullptr) {
+    if (*admission_result == AdmissionController::PROFILE_INFO_VAL_QUEUED) {
+      ss << AdmissionController::PROFILE_INFO_KEY_ADMISSION_RESULT << " : "
+         << *admission_result << "\n";
+      const string* queued_reason = request_state->summary_profile()->GetInfoString(
+          AdmissionController::PROFILE_INFO_KEY_LAST_QUEUED_REASON);
+      if (queued_reason != nullptr) {
+        ss << AdmissionController::PROFILE_INFO_KEY_LAST_QUEUED_REASON << " : "
+           << *queued_reason << "\n";
+      }
+    }
+  }
   if (coord != nullptr) {
     // Report execution errors
     ss << coord->GetErrorLog();

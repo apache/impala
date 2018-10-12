@@ -817,6 +817,47 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     assert False, "Timed out waiting for change to profile\nSearch " \
                   "String: {0}\nProfile:\n{1}".format(search_string, str(profile))
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=10,
+          pool_max_mem=1024 * 1024 * 1024))
+  @needs_session()
+  def test_hs2_admission_controller_logs(self):
+    """Test to verify that the GetLog() function invoked by the HS2 client returns the
+    reason for queuing of the query."""
+    # Start a long running query.
+    long_query_req = TCLIService.TExecuteStatementReq()
+    long_query_req.sessionHandle = self.session_handle
+    long_query_req.statement = "select sleep(1000000)"
+    long_query_resp = self.hs2_client.ExecuteStatement(long_query_req)
+    HS2TestSuite.check_response(long_query_resp)
+    # Ensure that the query is running.
+    self.wait_for_admission_control(long_query_resp.operationHandle)
+    # Submit another query.
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "select 1"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    HS2TestSuite.check_response(execute_statement_resp)
+    # Wait until the query is queued.
+    self.wait_for_operation_state(execute_statement_resp.operationHandle,
+            TCLIService.TOperationState.PENDING_STATE)
+    # Ensure that the log message contains the queuing reason.
+    get_log_req = TCLIService.TGetLogReq()
+    get_log_req.operationHandle = execute_statement_resp.operationHandle
+    log = self.hs2_client.GetLog(get_log_req).log
+    assert "Admission result : Queued" in log, log
+    assert "Latest admission queue reason : number of running queries 1 is at or over "
+    "limit 1" in log, log
+    # Close the running query.
+    close_operation_req = TCLIService.TCloseOperationReq()
+    close_operation_req.operationHandle = long_query_resp.operationHandle
+    HS2TestSuite.check_response(self.hs2_client.CloseOperation(close_operation_req))
+    # Close the queued query.
+    close_operation_req = TCLIService.TCloseOperationReq()
+    close_operation_req.operationHandle = execute_statement_resp.operationHandle
+    HS2TestSuite.check_response(self.hs2_client.CloseOperation(close_operation_req))
+
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions

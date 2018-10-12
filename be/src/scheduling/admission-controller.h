@@ -214,6 +214,19 @@ enum class AdmissionOutcome {
 
 class AdmissionController {
  public:
+  // Profile info strings
+  static const string PROFILE_INFO_KEY_ADMISSION_RESULT;
+  static const string PROFILE_INFO_VAL_ADMIT_IMMEDIATELY;
+  static const string PROFILE_INFO_VAL_QUEUED;
+  static const string PROFILE_INFO_VAL_CANCELLED_IN_QUEUE;
+  static const string PROFILE_INFO_VAL_ADMIT_QUEUED;
+  static const string PROFILE_INFO_VAL_REJECTED;
+  static const string PROFILE_INFO_VAL_TIME_OUT;
+  static const string PROFILE_INFO_KEY_INITIAL_QUEUE_REASON;
+  static const string PROFILE_INFO_VAL_INITIAL_QUEUE_REASON;
+  static const string PROFILE_INFO_KEY_LAST_QUEUED_REASON;
+  static const string PROFILE_INFO_KEY_ADMITTED_MEM;
+
   AdmissionController(StatestoreSubscriber* subscriber,
       RequestPoolService* request_pool_service, MetricGroup* metrics,
       const TNetworkAddress& host_addr);

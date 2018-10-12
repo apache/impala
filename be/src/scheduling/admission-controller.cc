@@ -102,17 +102,23 @@ const string QUERY_EVENT_QUEUED = "Queued";
 const string QUERY_EVENT_COMPLETED_ADMISSION = "Completed admission";
 
 // Profile info strings
-const string PROFILE_INFO_KEY_ADMISSION_RESULT = "Admission result";
-const string PROFILE_INFO_VAL_ADMIT_IMMEDIATELY = "Admitted immediately";
-const string PROFILE_INFO_VAL_QUEUED = "Queued";
-const string PROFILE_INFO_VAL_CANCELLED_IN_QUEUE= "Cancelled (queued)";
-const string PROFILE_INFO_VAL_ADMIT_QUEUED = "Admitted (queued)";
-const string PROFILE_INFO_VAL_REJECTED = "Rejected";
-const string PROFILE_INFO_VAL_TIME_OUT = "Timed out (queued)";
-const string PROFILE_INFO_KEY_INITIAL_QUEUE_REASON = "Initial admission queue reason";
-const string PROFILE_INFO_VAL_INITIAL_QUEUE_REASON = "waited $0 ms, reason: $1";
-const string PROFILE_INFO_KEY_LAST_QUEUED_REASON = "Latest admission queue reason";
-const string PROFILE_INFO_KEY_ADMITTED_MEM = "Cluster Memory Admitted";
+const string AdmissionController::PROFILE_INFO_KEY_ADMISSION_RESULT = "Admission result";
+const string AdmissionController::PROFILE_INFO_VAL_ADMIT_IMMEDIATELY =
+    "Admitted immediately";
+const string AdmissionController::PROFILE_INFO_VAL_QUEUED = "Queued";
+const string AdmissionController::PROFILE_INFO_VAL_CANCELLED_IN_QUEUE =
+    "Cancelled (queued)";
+const string AdmissionController::PROFILE_INFO_VAL_ADMIT_QUEUED = "Admitted (queued)";
+const string AdmissionController::PROFILE_INFO_VAL_REJECTED = "Rejected";
+const string AdmissionController::PROFILE_INFO_VAL_TIME_OUT = "Timed out (queued)";
+const string AdmissionController::PROFILE_INFO_KEY_INITIAL_QUEUE_REASON =
+    "Initial admission queue reason";
+const string AdmissionController::PROFILE_INFO_VAL_INITIAL_QUEUE_REASON =
+    "waited $0 ms, reason: $1";
+const string AdmissionController::PROFILE_INFO_KEY_LAST_QUEUED_REASON =
+    "Latest admission queue reason";
+const string AdmissionController::PROFILE_INFO_KEY_ADMITTED_MEM =
+    "Cluster Memory Admitted";
 
 // Error status string details
 const string REASON_MEM_LIMIT_TOO_LOW_FOR_RESERVATION =
