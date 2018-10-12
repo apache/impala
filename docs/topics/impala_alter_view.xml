@@ -65,7 +65,11 @@ under the License.
    AS <varname>select_statement</varname>;
 
 ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname>
-   RENAME TO [<varname>database_name</varname>.]<varname>view_name</varname>;</codeblock>
+   RENAME TO [<varname>database_name</varname>.]<varname>view_name</varname>;
+
+ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname> SET OWNER USER user_name;
+ALTER TABLE [<varname>database_name</varname>.]<varname>view_name</varname> SET OWNER ROLE role_name;
+</codeblock>
 
     <ul>
       <li>
@@ -93,6 +97,20 @@ ALTER VIEW v7 (c1 COMMENT 'Comment for c1', c2) AS SELECT t1.c1, t1.c2 FROM t1;
 <codeblock>ALTER VIEW db1.v1 RENAME TO db2.v2; -- Move the view to a different database with a new name.
 ALTER VIEW db1.v1 RENAME TO db1.v2;  -- Rename the view in the same database.
 ALTER VIEW db1.v1 RENAME TO db2.v1; -- Move the view to a difference database with the same view name.</codeblock>
+        </p>
+      </li>
+
+      <li rev="3.1 IMPALA-6988">
+        The <codeph>SET OWNER</codeph> clause transfers the ownership of the view from the
+        current owner to another user or a role.
+        <p>
+          The view owner is originally set to the user who creates the view. When object
+          ownership is enabled in Sentry, an owner of a view can have the <codeph>ALL</codeph>
+          with <codeph>GRANT</codeph> or <codeph>ALL</codeph> without <codeph>GRANT</codeph>
+          privilege. The term <codeph>OWNER</codeph> is used to differentiate between the
+          <codeph>ALL</codeph> privilege that is explicitly granted via the
+          <codeph>GRANT</codeph> statement and a privilege that is implicitly granted by the
+          <codeph>CREATE VIEW</codeph> statement.
         </p>
       </li>
     </ul>

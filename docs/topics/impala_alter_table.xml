@@ -21,7 +21,13 @@ under the License.
 <concept id="alter_table">
 
   <title>ALTER TABLE Statement</title>
-  <titlealts audience="PDF"><navtitle>ALTER TABLE</navtitle></titlealts>
+
+  <titlealts audience="PDF">
+
+    <navtitle>ALTER TABLE</navtitle>
+
+  </titlealts>
+
   <prolog>
     <metadata>
       <data name="Category" value="Impala"/>
@@ -42,14 +48,18 @@ under the License.
 
     <p>
       <indexterm audience="hidden">ALTER TABLE statement</indexterm>
-      The <codeph>ALTER TABLE</codeph> statement changes the structure or properties of an existing Impala table.
+      The <codeph>ALTER TABLE</codeph> statement changes the structure or properties of an
+      existing Impala table.
     </p>
+
     <p>
-      In Impala, this is primarily a logical operation that updates the table metadata in the metastore database that Impala
-      shares with Hive. Most <codeph>ALTER TABLE</codeph> operations do not actually rewrite, move, and so on the actual data
-      files. (The <codeph>RENAME TO</codeph> clause is the one exception; it can cause HDFS files to be moved to different paths.)
-      When you do an <codeph>ALTER TABLE</codeph> operation, you typically need to perform corresponding physical filesystem operations,
-      such as rewriting the data files to include extra fields, or converting them to a different file format.
+      In Impala, this is primarily a logical operation that updates the table metadata in the
+      metastore database that Impala shares with Hive. Most <codeph>ALTER TABLE</codeph>
+      operations do not actually rewrite, move, and so on the actual data files. (The
+      <codeph>RENAME TO</codeph> clause is the one exception; it can cause HDFS files to be
+      moved to different paths.) When you do an <codeph>ALTER TABLE</codeph> operation, you
+      typically need to perform corresponding physical filesystem operations, such as rewriting
+      the data files to include extra fields, or converting them to a different file format.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
@@ -62,6 +72,9 @@ ALTER TABLE <varname>name</varname> CHANGE <varname>column_name</varname> <varna
 
 ALTER TABLE <varname>name</varname> REPLACE COLUMNS (<varname>col_spec</varname>[, <varname>col_spec</varname> ...])
 
+<ph rev="3.1 IMPALA-6988">ALTER TABLE <varname>name</varname> SET OWNER USER <varname>user_name</varname>
+ALTER TABLE <varname>name</varname> SET OWNER ROLE <varname>role_name</varname>
+</ph>
 <ph rev="2.10.0 IMPALA-4622">-- Kudu tables only.
 ALTER TABLE <varname>name</varname> ALTER [COLUMN] <varname>column_name</varname>
   { SET <varname>kudu_storage_attr</varname> <varname>attr_value</varname>
@@ -132,51 +145,54 @@ statsKey ::= numDVs | numNulls | avgSize | maxSize</ph>
     <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
 
     <p rev="2.3.0">
-      In <keyword keyref="impala23_full"/> and higher, the <codeph>ALTER TABLE</codeph> statement can
-      change the metadata for tables containing complex types (<codeph>ARRAY</codeph>,
-      <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>).
-      For example, you can use an <codeph>ADD COLUMNS</codeph>, <codeph>DROP COLUMN</codeph>, or <codeph>CHANGE</codeph>
-      clause to modify the table layout for complex type columns.
-      Although Impala queries only work for complex type columns in Parquet tables, the complex type support in the
-      <codeph>ALTER TABLE</codeph> statement applies to all file formats.
-      For example, you can use Impala to update metadata for a staging table in a non-Parquet file format where the
-      data is populated by Hive. Or you can use <codeph>ALTER TABLE SET FILEFORMAT</codeph> to change the format
-      of an existing table to Parquet so that Impala can query it. Remember that changing the file format for a table does
-      not convert the data files within the table; you must prepare any Parquet data files containing complex types
-      outside Impala, and bring them into the table using <codeph>LOAD DATA</codeph> or updating the table's
-      <codeph>LOCATION</codeph> property.
-      See <xref href="impala_complex_types.xml#complex_types"/> for details about using complex types.
+      In <keyword keyref="impala23_full"/> and higher, the <codeph>ALTER TABLE</codeph>
+      statement can change the metadata for tables containing complex types
+      (<codeph>ARRAY</codeph>, <codeph>STRUCT</codeph>, and <codeph>MAP</codeph>). For example,
+      you can use an <codeph>ADD COLUMNS</codeph>, <codeph>DROP COLUMN</codeph>, or
+      <codeph>CHANGE</codeph> clause to modify the table layout for complex type columns.
+      Although Impala queries only work for complex type columns in Parquet tables, the complex
+      type support in the <codeph>ALTER TABLE</codeph> statement applies to all file formats.
+      For example, you can use Impala to update metadata for a staging table in a non-Parquet
+      file format where the data is populated by Hive. Or you can use <codeph>ALTER TABLE SET
+      FILEFORMAT</codeph> to change the format of an existing table to Parquet so that Impala
+      can query it. Remember that changing the file format for a table does not convert the data
+      files within the table; you must prepare any Parquet data files containing complex types
+      outside Impala, and bring them into the table using <codeph>LOAD DATA</codeph> or updating
+      the table's <codeph>LOCATION</codeph> property. See
+      <xref
+        href="impala_complex_types.xml#complex_types"/> for details about using
+      complex types.
     </p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
     <p>
-      Whenever you specify partitions in an <codeph>ALTER TABLE</codeph> statement, through the <codeph>PARTITION
-      (<varname>partition_spec</varname>)</codeph> clause, you must include all the partitioning columns in the
-      specification.
+      Whenever you specify partitions in an <codeph>ALTER TABLE</codeph> statement, through the
+      <codeph>PARTITION (<varname>partition_spec</varname>)</codeph> clause, you must include
+      all the partitioning columns in the specification.
     </p>
 
     <p>
-      Most of the <codeph>ALTER TABLE</codeph> operations work the same for internal tables (managed by Impala) as
-      for external tables (with data files located in arbitrary locations). The exception is renaming a table; for
-      an external table, the underlying data directory is not renamed or moved.
+      Most of the <codeph>ALTER TABLE</codeph> operations work the same for internal tables
+      (managed by Impala) as for external tables (with data files located in arbitrary
+      locations). The exception is renaming a table; for an external table, the underlying data
+      directory is not renamed or moved.
     </p>
 
     <p>
-      <b>Dropping or altering multiple partitions:</b>
+      <b>To drop or alter multiple partitions:</b>
     </p>
 
     <p rev="IMPALA-1654">
-      In <keyword keyref="impala28_full"/> and higher,
-      the expression for the partition clause with a <codeph>DROP</codeph> or <codeph>SET</codeph>
-      operation can include comparison operators such as <codeph>&lt;</codeph>, <codeph>IN</codeph>,
-      or <codeph>BETWEEN</codeph>, and Boolean operators such as <codeph>AND</codeph>
-      and <codeph>OR</codeph>.
+      In <keyword keyref="impala28_full"/> and higher, the expression for the partition clause
+      with a <codeph>DROP</codeph> or <codeph>SET</codeph> operation can include comparison
+      operators such as <codeph>&lt;</codeph>, <codeph>IN</codeph>, or <codeph>BETWEEN</codeph>,
+      and Boolean operators such as <codeph>AND</codeph> and <codeph>OR</codeph>.
     </p>
 
     <p rev="IMPALA-1654">
-      For example, you might drop a group of partitions corresponding to a particular date
-      range after the data <q>ages out</q>:
+      For example, you might drop a group of partitions corresponding to a particular date range
+      after the data <q>ages out</q>:
     </p>
 
 <codeblock><![CDATA[
@@ -186,9 +202,9 @@ alter table historical_data drop partition (year = 1996 and month between 1 and 
 </codeblock>
 
     <p rev="IMPALA-1654">
-      For tables with multiple partition keys columns, you can specify multiple
-      conditions separated by commas, and the operation only applies to the partitions
-      that match all the conditions (similar to using an <codeph>AND</codeph> clause):
+      For tables with multiple partition keys columns, you can specify multiple conditions
+      separated by commas, and the operation only applies to the partitions that match all the
+      conditions (similar to using an <codeph>AND</codeph> clause):
     </p>
 
 <codeblock><![CDATA[
@@ -197,9 +213,9 @@ alter table historical_data drop partition (year < 1995, last_name like 'A%');
 </codeblock>
 
     <p rev="IMPALA-1654">
-      This technique can also be used to change the file format of groups of partitions,
-      as part of an ETL pipeline that periodically consolidates and rewrites the underlying
-      data files in a different file format:
+      This technique can also be used to change the file format of groups of partitions, as part
+      of an ETL pipeline that periodically consolidates and rewrites the underlying data files
+      in a different file format:
     </p>
 
 <codeblock><![CDATA[
@@ -209,40 +225,43 @@ alter table fast_growing_data partition (year = 2016, month in (10,11,12)) set f
 
     <note>
       <p rev="IMPALA-1654">
-        The extended syntax involving comparison operators and multiple partitions
-        applies to the <codeph>SET FILEFORMAT</codeph>, <codeph>SET TBLPROPERTIES</codeph>,
-        <codeph>SET SERDEPROPERTIES</codeph>, and <codeph>SET [UN]CACHED</codeph> clauses.
-        You can also use this syntax with the <codeph>PARTITION</codeph> clause
-        in the <codeph>COMPUTE INCREMENTAL STATS</codeph> statement, and with the
-        <codeph>PARTITION</codeph> clause of the <codeph>SHOW FILES</codeph> statement.
-        Some forms of <codeph>ALTER TABLE</codeph> still only apply to one partition
-        at a time: the <codeph>SET LOCATION</codeph> and <codeph>ADD PARTITION</codeph>
-        clauses. The <codeph>PARTITION</codeph> clauses in the <codeph>LOAD DATA</codeph>
-        and <codeph>INSERT</codeph> statements also only apply to one partition at a time.
+        The extended syntax involving comparison operators and multiple partitions applies to
+        the <codeph>SET FILEFORMAT</codeph>, <codeph>SET TBLPROPERTIES</codeph>, <codeph>SET
+        SERDEPROPERTIES</codeph>, and <codeph>SET [UN]CACHED</codeph> clauses. You can also use
+        this syntax with the <codeph>PARTITION</codeph> clause in the <codeph>COMPUTE
+        INCREMENTAL STATS</codeph> statement, and with the <codeph>PARTITION</codeph> clause of
+        the <codeph>SHOW FILES</codeph> statement. Some forms of <codeph>ALTER TABLE</codeph>
+        still only apply to one partition at a time: the <codeph>SET LOCATION</codeph> and
+        <codeph>ADD PARTITION</codeph> clauses. The <codeph>PARTITION</codeph> clauses in the
+        <codeph>LOAD DATA</codeph> and <codeph>INSERT</codeph> statements also only apply to one
+        partition at a time.
       </p>
+
       <p>
-        A DDL statement that applies to multiple partitions is considered successful
-        (resulting in no changes) even if no partitions match the conditions.
-        The results are the same as if the <codeph>IF EXISTS</codeph> clause was specified.
+        A DDL statement that applies to multiple partitions is considered successful (resulting
+        in no changes) even if no partitions match the conditions. The results are the same as
+        if the <codeph>IF EXISTS</codeph> clause was specified.
       </p>
+
       <p>
-        The performance and scalability of this technique is similar to
-        issuing a sequence of single-partition <codeph>ALTER TABLE</codeph>
-        statements in quick succession. To minimize bottlenecks due to
-        communication with the metastore database, or causing other
-        DDL operations on the same table to wait, test the effects of
-        performing <codeph>ALTER TABLE</codeph> statements that affect
-        large numbers of partitions.
+        The performance and scalability of this technique is similar to issuing a sequence of
+        single-partition <codeph>ALTER TABLE</codeph> statements in quick succession. To
+        minimize bottlenecks due to communication with the metastore database, or causing other
+        DDL operations on the same table to wait, test the effects of performing <codeph>ALTER
+        TABLE</codeph> statements that affect large numbers of partitions.
       </p>
     </note>
 
     <p conref="../shared/impala_common.xml#common/s3_blurb"/>
 
     <p rev="2.6.0 IMPALA-1878">
-      You can specify an <codeph>s3a://</codeph> prefix on the <codeph>LOCATION</codeph> attribute of a table or partition
-      to make Impala query data from the Amazon S3 filesystem. In <keyword keyref="impala26_full"/> and higher, Impala automatically
-      handles creating or removing the associated folders when you issue <codeph>ALTER TABLE</codeph> statements
-      with the <codeph>ADD PARTITION</codeph> or <codeph>DROP PARTITION</codeph> clauses.
+      You can specify an <codeph>s3a://</codeph> prefix on the <codeph>LOCATION</codeph>
+      attribute of a table or partition to make Impala query data from the Amazon S3 filesystem.
+      In <keyword
+        keyref="impala26_full"/> and higher, Impala automatically handles
+      creating or removing the associated folders when you issue <codeph>ALTER TABLE</codeph>
+      statements with the <codeph>ADD PARTITION</codeph> or <codeph>DROP PARTITION</codeph>
+      clauses.
     </p>
 
     <p conref="../shared/impala_common.xml#common/s3_ddl"/>
@@ -252,19 +271,18 @@ alter table fast_growing_data partition (year = 2016, month in (10,11,12)) set f
     </p>
 
     <p rev="1.4.0">
-      If you specify the <codeph>CACHED IN</codeph> clause, any existing or future data files in the table
-      directory or the partition subdirectories are designated to be loaded into memory with the HDFS caching
-      mechanism. See <xref href="impala_perf_hdfs_caching.xml#hdfs_caching"/> for details about using the HDFS
-      caching feature.
+      If you specify the <codeph>CACHED IN</codeph> clause, any existing or future data files in
+      the table directory or the partition subdirectories are designated to be loaded into
+      memory with the HDFS caching mechanism. See
+      <xref
+        href="impala_perf_hdfs_caching.xml#hdfs_caching"/> for details about using
+      the HDFS caching feature.
     </p>
 
-    <p conref="../shared/impala_common.xml#common/impala_cache_replication_factor"/>
+    <p
+      conref="../shared/impala_common.xml#common/impala_cache_replication_factor"/>
 
     <p conref="../shared/impala_common.xml#common/sync_ddl_blurb"/>
-
-    <p>
-      The following sections show examples of the use cases for various <codeph>ALTER TABLE</codeph> clauses.
-    </p>
 
     <p>
       <b>To rename a table (RENAME TO clause):</b>
@@ -275,15 +293,15 @@ alter table fast_growing_data partition (year = 2016, month in (10,11,12)) set f
 -->
 
     <p>
-      The <codeph>RENAME TO</codeph> clause lets you change the name of an existing table, and optionally which
-      database it is located in.
+      The <codeph>RENAME TO</codeph> clause lets you change the name of an existing table, and
+      optionally which database it is located in.
     </p>
 
     <p>
-      For internal tables, this operation physically renames the directory within HDFS that contains the data files;
-      the original directory name no longer exists. By qualifying the table names with database names, you can use
-      this technique to move an internal table (and its associated data directory) from one database to another.
-      For example:
+      For internal tables, this operation physically renames the directory within HDFS that
+      contains the data files; the original directory name no longer exists. By qualifying the
+      table names with database names, you can use this technique to move an internal table (and
+      its associated data directory) from one database to another. For example:
     </p>
 
 <codeblock>create database d1;
@@ -298,27 +316,46 @@ use d1;
 -- Move table from one database to another.
 alter table d2.mobile rename to d3.mobile;</codeblock>
 
+    <p rev="3.1 IMPALA-6988">
+      <b>To change the owner of a table:</b>
+    </p>
+
+<codeblock>ALTER TABLE <varname>name</varname> SET OWNER USER <varname>user_name;</varname>
+ALTER TABLE <varname>name</varname> SET OWNER ROLE <varname>role_name;</varname>
+</codeblock>
+
     <p>
-      For external tables,
+      The table owner is originally set to the user who creates the table. When object ownership
+      is enabled in Sentry, an owner of a table can have the <codeph>ALL</codeph> with
+      <codeph>GRANT</codeph> or <codeph>ALL</codeph> without <codeph>GRANT</codeph> privilege.
+      The term <codeph>OWNER</codeph> is used to differentiate between the <codeph>ALL</codeph>
+      privilege that is explicitly granted via the <codeph>GRANT</codeph> statement and a
+      privilege that is implicitly granted by the <codeph>CREATE TABLE</codeph> statement.
     </p>
 
     <p>
-      <b>To change the physical location where Impala looks for data files associated with a table or
-      partition:</b>
+      Use the <codeph>ALTER TABLE SET OWNER</codeph> to transfer the ownership from the current
+      owner to another user or a role.
+    </p>
+
+    <p>
+      <b>To change the physical location where Impala looks for data files associated with a
+      table or partition:</b>
     </p>
 
 <codeblock>ALTER TABLE <varname>table_name</varname> [PARTITION (<varname>partition_spec</varname>)] SET LOCATION '<varname>hdfs_path_of_directory</varname>';</codeblock>
 
     <p>
-      The path you specify is the full HDFS path where the data files reside, or will be created. Impala does not
-      create any additional subdirectory named after the table. Impala does not move any data files to this new
-      location or change any data files that might already exist in that directory.
+      The path you specify is the full HDFS path where the data files reside, or will be
+      created. Impala does not create any additional subdirectory named after the table. Impala
+      does not move any data files to this new location or change any data files that might
+      already exist in that directory.
     </p>
 
     <p>
-      To set the location for a single partition, include the <codeph>PARTITION</codeph> clause. Specify all the
-      same partitioning columns for the table, with a constant value for each, to precisely identify the single
-      partition affected by the statement:
+      To set the location for a single partition, include the <codeph>PARTITION</codeph> clause.
+      Specify all the same partitioning columns for the table, with a constant value for each,
+      to precisely identify the single partition affected by the statement:
     </p>
 
 <codeblock>create table p1 (s string) partitioned by (month int, day int);
@@ -335,22 +372,24 @@ alter table p1 partition (month=1, day=1) set location '/usr/external_data/new_y
     <note conref="../shared/impala_common.xml#common/add_partition_set_location"/>
 
     <p rev="2.3.0 IMPALA-1568">
-      <b>To automatically detect new partition directories added through Hive or HDFS operations:</b>
+      <b>To automatically detect new partition directories added through Hive or HDFS
+      operations:</b>
     </p>
 
     <p rev="2.3.0 IMPALA-1568">
-      In <keyword keyref="impala23_full"/> and higher, the <codeph>RECOVER PARTITIONS</codeph> clause scans
-      a partitioned table to detect if any new partition directories were added outside of Impala,
-      such as by Hive <codeph>ALTER TABLE</codeph> statements or by <cmdname>hdfs dfs</cmdname>
-      or <cmdname>hadoop fs</cmdname> commands. The <codeph>RECOVER PARTITIONS</codeph> clause
-      automatically recognizes any data files present in these new directories, the same as
-      the <codeph>REFRESH</codeph> statement does.
+      In <keyword keyref="impala23_full"/> and higher, the <codeph>RECOVER PARTITIONS</codeph>
+      clause scans a partitioned table to detect if any new partition directories were added
+      outside of Impala, such as by Hive <codeph>ALTER TABLE</codeph> statements or by
+      <cmdname>hdfs dfs</cmdname> or <cmdname>hadoop fs</cmdname> commands. The <codeph>RECOVER
+      PARTITIONS</codeph> clause automatically recognizes any data files present in these new
+      directories, the same as the <codeph>REFRESH</codeph> statement does.
     </p>
 
     <p rev="2.3.0 IMPALA-1568">
-      For example, here is a sequence of examples showing how you might create a partitioned table in Impala,
-      create new partitions through Hive, copy data files into the new partitions with the <cmdname>hdfs</cmdname>
-      command, and have Impala recognize the new partitions and new data:
+      For example, here is a sequence of examples showing how you might create a partitioned
+      table in Impala, create new partitions through Hive, copy data files into the new
+      partitions with the <cmdname>hdfs</cmdname> command, and have Impala recognize the new
+      partitions and new data:
     </p>
 
     <p rev="2.3.0 IMPALA-1568">
@@ -374,8 +413,8 @@ quit;
 </codeblock>
 
     <p rev="2.3.0 IMPALA-1568">
-      In Hive, create some new partitions. In a real use case, you might create the
-      partitions and populate them with data as the final stages of an ETL pipeline.
+      In Hive, create some new partitions. In a real use case, you might create the partitions
+      and populate them with data as the final stages of an ETL pipeline.
     </p>
 
 <codeblock rev="2.3.0 IMPALA-1568">
@@ -391,8 +430,8 @@ hive> quit;
 </codeblock>
 
     <p rev="2.3.0 IMPALA-1568">
-      For demonstration purposes, manually copy data (a single row) into these
-      new partitions, using manual HDFS operations:
+      For demonstration purposes, manually copy data (a single row) into these new partitions,
+      using manual HDFS operations:
     </p>
 
 <codeblock rev="2.3.0 IMPALA-1568">
@@ -422,10 +461,9 @@ hive> quit;
 </codeblock>
 
     <p rev="2.3.0 IMPALA-1568">
-      In Impala, initially the partitions and data are not visible.
-      Running <codeph>ALTER TABLE</codeph> with the <codeph>RECOVER PARTITIONS</codeph>
-      clause scans the table data directory to find any new partition directories, and
-      the data files inside them:
+      In Impala, initially the partitions and data are not visible. Running <codeph>ALTER
+      TABLE</codeph> with the <codeph>RECOVER PARTITIONS</codeph> clause scans the table data
+      directory to find any new partition directories, and the data files inside them:
     </p>
 
 <codeblock rev="2.3.0 IMPALA-1568">
@@ -457,27 +495,26 @@ select * from t1;
 ALTER TABLE <varname>table_name</varname> SET SERDEPROPERTIES ('<varname>key1</varname>'='<varname>value1</varname>', '<varname>key2</varname>'='<varname>value2</varname>'[, ...]);</codeblock>
 
     <p>
-      The <codeph>TBLPROPERTIES</codeph> clause is primarily a way to associate arbitrary user-specified data items
-      with a particular table.
+      The <codeph>TBLPROPERTIES</codeph> clause is primarily a way to associate arbitrary
+      user-specified data items with a particular table.
     </p>
 
     <p>
-      The <codeph>SERDEPROPERTIES</codeph> clause sets up metadata defining
-      how tables are read or written, needed in some cases by Hive but not used
-      extensively by Impala. You would use this clause primarily to change the
-      delimiter in an existing text table or partition, by setting the
-        <codeph>'serialization.format'</codeph> and
-        <codeph>'field.delim'</codeph> property values to the new delimiter
-      character: The <codeph>SERDEPROPERTIES</codeph> clause does not change the
-      existing data in the table. The change only affects the future insert into
-      the table.
+      The <codeph>SERDEPROPERTIES</codeph> clause sets up metadata defining how tables are read
+      or written, needed in some cases by Hive but not used extensively by Impala. You would use
+      this clause primarily to change the delimiter in an existing text table or partition, by
+      setting the <codeph>'serialization.format'</codeph> and <codeph>'field.delim'</codeph>
+      property values to the new delimiter character: The <codeph>SERDEPROPERTIES</codeph>
+      clause does not change the existing data in the table. The change only affects the future
+      insert into the table.
     </p>
 
     <p>
-      Use the <codeph>DESCRIBE FORMATTED</codeph> statement to see the current
-      values of these properties for an existing table. See <xref
-        href="impala_create_table.xml#create_table"/> for more details about
-      these clauses.
+      Use the <codeph>DESCRIBE FORMATTED</codeph> statement to see the current values of these
+      properties for an existing table. See
+      <xref
+        href="impala_create_table.xml#create_table"/> for more details about these
+      clauses.
     </p>
 
     <p>
@@ -485,27 +522,26 @@ ALTER TABLE <varname>table_name</varname> SET SERDEPROPERTIES ('<varname>key1</v
     </p>
 
     <p>
-      Although for most tables the <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL STATS</codeph>
-      statement is all you need to keep table and column statistics up to date for a table,
-      sometimes for a very large table or one that is updated frequently, the length of time to recompute
-      all the statistics might make it impractical to run those statements as often as needed.
-      As a workaround, you can use the <codeph>ALTER TABLE</codeph> statement to set table statistics
-      at the level of the entire table or a single partition, or column statistics at the level of
-      the entire table.
+      Although for most tables the <codeph>COMPUTE STATS</codeph> or <codeph>COMPUTE INCREMENTAL
+      STATS</codeph> statement is all you need to keep table and column statistics up to date
+      for a table, sometimes for a very large table or one that is updated frequently, the
+      length of time to recompute all the statistics might make it impractical to run those
+      statements as often as needed. As a workaround, you can use the <codeph>ALTER
+      TABLE</codeph> statement to set table statistics at the level of the entire table or a
+      single partition, or column statistics at the level of the entire table.
     </p>
 
     <p>
       You can set the <codeph>numrows</codeph> value for table statistics by changing the
-      <codeph>TBLPROPERTIES</codeph> setting for a table or partition.
-      For example:
+      <codeph>TBLPROPERTIES</codeph> setting for a table or partition. For example:
 <codeblock conref="../shared/impala_common.xml#common/set_numrows_example"/>
 <codeblock conref="../shared/impala_common.xml#common/set_numrows_partitioned_example"/>
       See <xref href="impala_perf_stats.xml#perf_table_stats_manual"/> for details.
     </p>
 
     <p rev="2.6.0 IMPALA-3369">
-      In <keyword keyref="impala26_full"/> and higher, you can use the <codeph>SET COLUMN STATS</codeph> clause
-      to set a specific stats value for a particular column.
+      In <keyword keyref="impala26_full"/> and higher, you can use the <codeph>SET COLUMN
+      STATS</codeph> clause to set a specific stats value for a particular column.
     </p>
 
     <p conref="../shared/impala_common.xml#common/set_column_stats_example"/>
@@ -520,22 +556,23 @@ ALTER TABLE <varname>table_name</varname> CHANGE <varname>column_name</varname> 
 ALTER TABLE <varname>table_name</varname> DROP <varname>column_name</varname>;</codeblock>
 
     <p>
-      The <varname>column_spec</varname> is the same as in the <codeph>CREATE TABLE</codeph> statement: the column
-      name, then its data type, then an optional comment. You can add multiple columns at a time. The parentheses
-      are required whether you add a single column or multiple columns. When you replace columns, all the original
-      column definitions are discarded. You might use this technique if you receive a new set of data files with
-      different data types or columns in a different order. (The data files are retained, so if the new columns are
-      incompatible with the old ones, use <codeph>INSERT OVERWRITE</codeph> or <codeph>LOAD DATA OVERWRITE</codeph>
-      to replace all the data before issuing any further queries.)
+      The <varname>column_spec</varname> is the same as in the <codeph>CREATE TABLE</codeph>
+      statement: the column name, then its data type, then an optional comment. You can add
+      multiple columns at a time. The parentheses are required whether you add a single column
+      or multiple columns. When you replace columns, all the original column definitions are
+      discarded. You might use this technique if you receive a new set of data files with
+      different data types or columns in a different order. (The data files are retained, so if
+      the new columns are incompatible with the old ones, use <codeph>INSERT OVERWRITE</codeph>
+      or <codeph>LOAD DATA OVERWRITE</codeph> to replace all the data before issuing any further
+      queries.)
     </p>
 
     <p rev="">
-      For example, here is how you might add columns to an existing table.
-      The first <codeph>ALTER TABLE</codeph> adds two new columns, and the second
-      <codeph>ALTER TABLE</codeph> adds one new column.
-      A single Impala query reads both the old and new data files, containing different numbers of columns.
-      For any columns not present in a particular data file, all the column values are
-      considered to be <codeph>NULL</codeph>.
+      For example, here is how you might add columns to an existing table. The first
+      <codeph>ALTER TABLE</codeph> adds two new columns, and the second <codeph>ALTER
+      TABLE</codeph> adds one new column. A single Impala query reads both the old and new data
+      files, containing different numbers of columns. For any columns not present in a
+      particular data file, all the column values are considered to be <codeph>NULL</codeph>.
     </p>
 
 <codeblock rev="">
@@ -560,20 +597,23 @@ select * from t1 order by x;
 </codeblock>
 
     <p>
-      You might use the <codeph>CHANGE</codeph> clause to rename a single column, or to treat an existing column as
-      a different type than before, such as to switch between treating a column as <codeph>STRING</codeph> and
-      <codeph>TIMESTAMP</codeph>, or between <codeph>INT</codeph> and <codeph>BIGINT</codeph>. You can only drop a
-      single column at a time; to drop multiple columns, issue multiple <codeph>ALTER TABLE</codeph> statements, or
-      define the new set of columns with a single <codeph>ALTER TABLE ... REPLACE COLUMNS</codeph> statement.
+      You might use the <codeph>CHANGE</codeph> clause to rename a single column, or to treat an
+      existing column as a different type than before, such as to switch between treating a
+      column as <codeph>STRING</codeph> and <codeph>TIMESTAMP</codeph>, or between
+      <codeph>INT</codeph> and <codeph>BIGINT</codeph>. You can only drop a single column at a
+      time; to drop multiple columns, issue multiple <codeph>ALTER TABLE</codeph> statements, or
+      define the new set of columns with a single <codeph>ALTER TABLE ... REPLACE
+      COLUMNS</codeph> statement.
     </p>
 
     <p rev="">
-      The following examples show some safe operations to drop or change columns. Dropping the final column
-      in a table lets Impala ignore the data causing any disruption to existing data files. Changing the type
-      of a column works if existing data values can be safely converted to the new type. The type conversion
-      rules depend on the file format of the underlying table. For example, in a text table, the same value
-      can be interpreted as a <codeph>STRING</codeph> or a numeric value, while in a binary format such as
-      Parquet, the rules are stricter and type conversions only work between certain sizes of integers.
+      The following examples show some safe operations to drop or change columns. Dropping the
+      final column in a table lets Impala ignore the data causing any disruption to existing
+      data files. Changing the type of a column works if existing data values can be safely
+      converted to the new type. The type conversion rules depend on the file format of the
+      underlying table. For example, in a text table, the same value can be interpreted as a
+      <codeph>STRING</codeph> or a numeric value, while in a binary format such as Parquet, the
+      rules are stricter and type conversions only work between certain sizes of integers.
     </p>
 
 <codeblock rev="">
@@ -618,21 +658,24 @@ select s, upper(x) from int_to_string;
 </codeblock>
 
     <p rev="">
-      Remember that Impala does not actually do any conversion for the underlying data files as a result of
-      <codeph>ALTER TABLE</codeph> statements. If you use <codeph>ALTER TABLE</codeph> to create a table
-      layout that does not agree with the contents of the underlying files, you must replace the files
-      yourself, such as using <codeph>LOAD DATA</codeph> to load a new set of data files, or
-      <codeph>INSERT OVERWRITE</codeph> to copy from another table and replace the original data.
+      Remember that Impala does not actually do any conversion for the underlying data files as
+      a result of <codeph>ALTER TABLE</codeph> statements. If you use <codeph>ALTER
+      TABLE</codeph> to create a table layout that does not agree with the contents of the
+      underlying files, you must replace the files yourself, such as using <codeph>LOAD
+      DATA</codeph> to load a new set of data files, or <codeph>INSERT OVERWRITE</codeph> to
+      copy from another table and replace the original data.
     </p>
 
     <p rev="">
-      The following example shows what happens if you delete the middle column from a Parquet table containing three columns.
-      The underlying data files still contain three columns of data. Because the columns are interpreted based on their positions in
-      the data file instead of the specific column names, a <codeph>SELECT *</codeph> query now reads the first and second
-      columns from the data file, potentially leading to unexpected results or conversion errors.
-      For this reason, if you expect to someday drop a column, declare it as the last column in the table, where its data
-      can be ignored by queries after the column is dropped. Or, re-run your ETL process and create new data files
-      if you drop or change the type of a column in a way that causes problems with existing data files.
+      The following example shows what happens if you delete the middle column from a Parquet
+      table containing three columns. The underlying data files still contain three columns of
+      data. Because the columns are interpreted based on their positions in the data file
+      instead of the specific column names, a <codeph>SELECT *</codeph> query now reads the
+      first and second columns from the data file, potentially leading to unexpected results or
+      conversion errors. For this reason, if you expect to someday drop a column, declare it as
+      the last column in the table, where its data can be ignored by queries after the column is
+      dropped. Or, re-run your ETL process and create new data files if you drop or change the
+      type of a column in a way that causes problems with existing data files.
     </p>
 
 <codeblock rev="">
@@ -692,37 +735,38 @@ optional int32 x [i:1 d:1 r:0]
 </codeblock>
 
     <p rev="IMPALA-3092">
-      In <keyword keyref="impala26_full"/> and higher, if an Avro table is created without column definitions in the
-      <codeph>CREATE TABLE</codeph> statement, and columns are later
-      added through <codeph>ALTER TABLE</codeph>, the resulting
-      table is now queryable. Missing values from the newly added
-      columns now default to <codeph>NULL</codeph>.
+      In <keyword keyref="impala26_full"/> and higher, if an Avro table is created without
+      column definitions in the <codeph>CREATE TABLE</codeph> statement, and columns are later
+      added through <codeph>ALTER TABLE</codeph>, the resulting table is now queryable. Missing
+      values from the newly added columns now default to <codeph>NULL</codeph>.
     </p>
 
     <p>
-      <b>To change the file format that Impala expects data to be in, for a table or partition:</b>
+      <b>To change the file format that Impala expects data to be in, for a table or
+      partition:</b>
     </p>
 
     <p>
-      Use an <codeph>ALTER TABLE ... SET FILEFORMAT</codeph> clause. You can include an optional <codeph>PARTITION
-      (<varname>col1</varname>=<varname>val1</varname>, <varname>col2</varname>=<varname>val2</varname>,
-      ...</codeph> clause so that the file format is changed for a specific partition rather than the entire table.
+      Use an <codeph>ALTER TABLE ... SET FILEFORMAT</codeph> clause. You can include an optional
+      <codeph>PARTITION (<varname>col1</varname>=<varname>val1</varname>,
+      <varname>col2</varname>=<varname>val2</varname>, ...</codeph> clause so that the file
+      format is changed for a specific partition rather than the entire table.
     </p>
 
     <p>
-      Because this operation only changes the table metadata, you must do any conversion of existing data using
-      regular Hadoop techniques outside of Impala. Any new data created by the Impala <codeph>INSERT</codeph>
-      statement will be in the new format. You cannot specify the delimiter for Text files; the data files must be
-      comma-delimited.
+      Because this operation only changes the table metadata, you must do any conversion of
+      existing data using regular Hadoop techniques outside of Impala. Any new data created by
+      the Impala <codeph>INSERT</codeph> statement will be in the new format. You cannot specify
+      the delimiter for Text files; the data files must be comma-delimited.
 <!-- Although Impala can read Avro tables
         created through Hive, you cannot specify the Avro file format in an Impala
         <codeph>ALTER TABLE</codeph> statement. -->
     </p>
 
     <p>
-      To set the file format for a single partition, include the <codeph>PARTITION</codeph> clause. Specify all the
-      same partitioning columns for the table, with a constant value for each, to precisely identify the single
-      partition affected by the statement:
+      To set the file format for a single partition, include the <codeph>PARTITION</codeph>
+      clause. Specify all the same partitioning columns for the table, with a constant value for
+      each, to precisely identify the single partition affected by the statement:
     </p>
 
 <codeblock>create table p1 (s string) partitioned by (month int, day int);
@@ -735,72 +779,113 @@ alter table p1 add partition (month=2, day=2);
 -- in this format for this specific partition.
 alter table p1 partition (month=2, day=2) set fileformat parquet;
 </codeblock>
-    <p><b>To change the row format with different delimiter characters:</b></p>
-    <p> Use the <codeph>SET ROW FORMAT DELIMITED</codeph> clause to ingest data
-      files that use a different delimiter character or a different line end
-      character. When specifying delimiter and line end characters with the
-        <codeph>FIELDS TERMINATED BY</codeph>, <codeph>ESCAPED BY</codeph>, and
-        <codeph>LINES TERMINATED BY</codeph> clauses, you can use the following:<ul>
-        <li>A regular ASCII character surrounded by single or double quotation
-          marks.</li>
-        <li>An octal sequence,  such as <codeph>'\054'</codeph> representing a
-          comma or <codeph>'\0'</codeph> for ASCII null (hex 00).</li>
-        <li>Special characters, such as:<ul>
-            <li><codeph>'\t'</codeph> for tab</li>
-            <li><codeph>'\n'</codeph> for newline or linefeed</li>
-            <li><codeph>'\r'</codeph> for carriage return</li>
-          </ul></li>
-        <li>An integer in the range '-127'..'128' (with quotation marks but no
-            backslash)<p>Negative values are subtracted from 256. For example,
-              <codeph>FIELDS TERMINATED BY '-2'</codeph> sets the field
-            delimiter to ASCII code 254.</p></li>
-      </ul></p>
-    <p>For more examples of text tables, see <xref
-        href="impala_txtfile.xml#txtfile"/>. </p>
-    <p> For the <codeph>ESCAPED BY</codeph> clause, choose an escape character
-      that is not used anywhere else in the file. The character following the
-      escape character is taken literally as part of a field value. </p>
-    <p>Surrounding field values with quotation marks does not help Impala to
-      parse fields with embedded delimiter characters as the quotation marks are
-      considered to be part of the column value. </p>
-    <p>If you want to use <codeph>\</codeph> as the escape character, specify
-      the clause in <cmdname>impala-shell</cmdname> as <codeph>ESCAPED BY
-        '\\'</codeph>. </p>
 
     <p>
-      <b>To add or drop partitions for a table</b>, the table must already be partitioned (that is, created with a
-      <codeph>PARTITIONED BY</codeph> clause). The partition is a physical directory in HDFS, with a name that
-      encodes a particular column value (the <b>partition key</b>). The Impala <codeph>INSERT</codeph> statement
-      already creates the partition if necessary, so the <codeph>ALTER TABLE ... ADD PARTITION</codeph> is
-      primarily useful for importing data by moving or copying existing data files into the HDFS directory
-      corresponding to a partition. (You can use the <codeph>LOAD DATA</codeph> statement to move files into the
-      partition directory, or <codeph>ALTER TABLE ... PARTITION (...) SET LOCATION</codeph> to point a partition at
-      a directory that already contains data files.
+      <b>To change the row format with different delimiter characters:</b>
     </p>
 
     <p>
-      The <codeph>DROP PARTITION</codeph> clause is used to remove the HDFS directory and associated data files for
-      a particular set of partition key values; for example, if you always analyze the last 3 months worth of data,
-      at the beginning of each month you might drop the oldest partition that is no longer needed. Removing
-      partitions reduces the amount of metadata associated with the table and the complexity of calculating the
-      optimal query plan, which can simplify and speed up queries on partitioned tables, particularly join queries.
-      Here is an example showing the <codeph>ADD PARTITION</codeph> and <codeph>DROP PARTITION</codeph> clauses.
+      Use the <codeph>SET ROW FORMAT DELIMITED</codeph> clause to ingest data files that use a
+      different delimiter character or a different line end character. When specifying delimiter
+      and line end characters with the <codeph>FIELDS TERMINATED BY</codeph>, <codeph>ESCAPED
+      BY</codeph>, and <codeph>LINES TERMINATED BY</codeph> clauses, you can use the following:
+      <ul>
+        <li>
+          A regular ASCII character surrounded by single or double quotation marks.
+        </li>
+
+        <li>
+          An octal sequence, such as <codeph>'\054'</codeph> representing a comma or
+          <codeph>'\0'</codeph> for ASCII null (hex 00).
+        </li>
+
+        <li>
+          Special characters, such as:
+          <ul>
+            <li>
+              <codeph>'\t'</codeph> for tab
+            </li>
+
+            <li>
+              <codeph>'\n'</codeph> for newline or linefeed
+            </li>
+
+            <li>
+              <codeph>'\r'</codeph> for carriage return
+            </li>
+          </ul>
+        </li>
+
+        <li>
+          An integer in the range '-127'..'128' (with quotation marks but no backslash)
+          <p>
+            Negative values are subtracted from 256. For example, <codeph>FIELDS TERMINATED BY
+            '-2'</codeph> sets the field delimiter to ASCII code 254.
+          </p>
+        </li>
+      </ul>
     </p>
 
     <p>
-      To avoid errors while adding or dropping partitions whose existence is not certain,
-      add the optional <codeph>IF [NOT] EXISTS</codeph> clause between the <codeph>ADD</codeph> or
-      <codeph>DROP</codeph> keyword and the <codeph>PARTITION</codeph> keyword. That is, the entire
-      clause becomes <codeph>ADD IF NOT EXISTS PARTITION</codeph> or <codeph>DROP IF EXISTS PARTITION</codeph>.
-      The following example shows how partitions can be created automatically through <codeph>INSERT</codeph>
-      statements, or manually through <codeph>ALTER TABLE</codeph> statements. The <codeph>IF [NOT] EXISTS</codeph>
-      clauses let the <codeph>ALTER TABLE</codeph> statements succeed even if a new requested partition already
-      exists, or a partition to be dropped does not exist.
+      For more examples of text tables, see <xref
+        href="impala_txtfile.xml#txtfile"/>.
     </p>
 
-<p>
-Inserting 2 year values creates 2 partitions:
-</p>
+    <p>
+      For the <codeph>ESCAPED BY</codeph> clause, choose an escape character that is not used
+      anywhere else in the file. The character following the escape character is taken literally
+      as part of a field value.
+    </p>
+
+    <p>
+      Surrounding field values with quotation marks does not help Impala to parse fields with
+      embedded delimiter characters as the quotation marks are considered to be part of the
+      column value.
+    </p>
+
+    <p>
+      If you want to use <codeph>\</codeph> as the escape character, specify the clause in
+      <cmdname>impala-shell</cmdname> as <codeph>ESCAPED BY '\\'</codeph>.
+    </p>
+
+    <p>
+      <b>To add or drop partitions for a table</b>, the table must already be partitioned (that
+      is, created with a <codeph>PARTITIONED BY</codeph> clause). The partition is a physical
+      directory in HDFS, with a name that encodes a particular column value (the <b>partition
+      key</b>). The Impala <codeph>INSERT</codeph> statement already creates the partition if
+      necessary, so the <codeph>ALTER TABLE ... ADD PARTITION</codeph> is primarily useful for
+      importing data by moving or copying existing data files into the HDFS directory
+      corresponding to a partition. (You can use the <codeph>LOAD DATA</codeph> statement to
+      move files into the partition directory, or <codeph>ALTER TABLE ... PARTITION (...) SET
+      LOCATION</codeph> to point a partition at a directory that already contains data files.
+    </p>
+
+    <p>
+      The <codeph>DROP PARTITION</codeph> clause is used to remove the HDFS directory and
+      associated data files for a particular set of partition key values; for example, if you
+      always analyze the last 3 months worth of data, at the beginning of each month you might
+      drop the oldest partition that is no longer needed. Removing partitions reduces the amount
+      of metadata associated with the table and the complexity of calculating the optimal query
+      plan, which can simplify and speed up queries on partitioned tables, particularly join
+      queries. Here is an example showing the <codeph>ADD PARTITION</codeph> and <codeph>DROP
+      PARTITION</codeph> clauses.
+    </p>
+
+    <p>
+      To avoid errors while adding or dropping partitions whose existence is not certain, add
+      the optional <codeph>IF [NOT] EXISTS</codeph> clause between the <codeph>ADD</codeph> or
+      <codeph>DROP</codeph> keyword and the <codeph>PARTITION</codeph> keyword. That is, the
+      entire clause becomes <codeph>ADD IF NOT EXISTS PARTITION</codeph> or <codeph>DROP IF
+      EXISTS PARTITION</codeph>. The following example shows how partitions can be created
+      automatically through <codeph>INSERT</codeph> statements, or manually through
+      <codeph>ALTER TABLE</codeph> statements. The <codeph>IF [NOT] EXISTS</codeph> clauses let
+      the <codeph>ALTER TABLE</codeph> statements succeed even if a new requested partition
+      already exists, or a partition to be dropped does not exist.
+    </p>
+
+    <p>
+      Inserting 2 year values creates 2 partitions:
+    </p>
 
 <codeblock>
 create table partition_t (s string) partitioned by (y int);
@@ -815,19 +900,20 @@ show partitions partition_t;
 +-------+-------+--------+------+--------------+-------------------+--------+-------+
 </codeblock>
 
-<p>
-Without the <codeph>IF NOT EXISTS</codeph> clause, an attempt to add a new partition might fail:
-</p>
+    <p>
+      Without the <codeph>IF NOT EXISTS</codeph> clause, an attempt to add a new partition might
+      fail:
+    </p>
 
 <codeblock>
 alter table partition_t add partition (y=2000);
 ERROR: AnalysisException: Partition spec already exists: (y=2000).
 </codeblock>
 
-<p>
-The <codeph>IF NOT EXISTS</codeph> clause makes the statement succeed whether or not there was already a
-partition with the specified key value:
-</p>
+    <p>
+      The <codeph>IF NOT EXISTS</codeph> clause makes the statement succeed whether or not there
+      was already a partition with the specified key value:
+    </p>
 
 <codeblock>
 alter table partition_t add if not exists partition (y=2000);
@@ -843,10 +929,10 @@ show partitions partition_t;
 +-------+-------+--------+------+--------------+-------------------+--------+-------+
 </codeblock>
 
-<p>
-Likewise, the <codeph>IF EXISTS</codeph> clause lets <codeph>DROP PARTITION</codeph> succeed whether or not the partition is already
-in the table:
-</p>
+    <p>
+      Likewise, the <codeph>IF EXISTS</codeph> clause lets <codeph>DROP PARTITION</codeph>
+      succeed whether or not the partition is already in the table:
+    </p>
 
 <codeblock>
 alter table partition_t drop if exists partition (y=2000);
@@ -861,16 +947,17 @@ show partitions partition_t;
 +-------+-------+--------+------+--------------+-------------------+--------+-------+
 </codeblock>
 
-    <p rev="2.3.0"> The optional <codeph>PURGE</codeph> keyword, available in
+    <p rev="2.3.0">
+      The optional <codeph>PURGE</codeph> keyword, available in
       <keyword keyref="impala23_full"/> and higher, is used with the <codeph>DROP
-        PARTITION</codeph> clause to remove associated HDFS data files
-      immediately rather than going through the HDFS trashcan mechanism. Use
-      this keyword when dropping a partition if it is crucial to remove the data
-      as quickly as possible to free up space, or if there is a problem with the
-      trashcan, such as the trash cannot being configured or being in a
-      different HDFS encryption zone than the data files. </p>
+      PARTITION</codeph> clause to remove associated HDFS data files immediately rather than
+      going through the HDFS trashcan mechanism. Use this keyword when dropping a partition if
+      it is crucial to remove the data as quickly as possible to free up space, or if there is a
+      problem with the trashcan, such as the trash cannot being configured or being in a
+      different HDFS encryption zone than the data files.
+    </p>
 
-    <!--
+<!--
         To do: Make example more general by partitioning by year/month/day.
         Then could show inserting into fixed year, variable month and day;
         dropping particular year/month/day partition.
@@ -897,8 +984,8 @@ alter table part_t add partition (month=3) set fileformat=parquet;
 </codeblock>
 
     <p>
-      The value specified for a partition key can be an arbitrary constant expression, without any references to
-      columns. For example:
+      The value specified for a partition key can be an arbitrary constant expression, without
+      any references to columns. For example:
     </p>
 
 <codeblock>alter table time_data add partition (month=concat('Decem','ber'));
@@ -906,11 +993,12 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
 
     <note>
       <p>
-        An alternative way to reorganize a table and its associated data files is to use <codeph>CREATE
-        TABLE</codeph> to create a variation of the original table, then use <codeph>INSERT</codeph> to copy the
-        transformed or reordered data to the new table. The advantage of <codeph>ALTER TABLE</codeph> is that it
-        avoids making a duplicate copy of the data files, allowing you to reorganize huge volumes of data in a
-        space-efficient way using familiar Hadoop techniques.
+        An alternative way to reorganize a table and its associated data files is to use
+        <codeph>CREATE TABLE</codeph> to create a variation of the original table, then use
+        <codeph>INSERT</codeph> to copy the transformed or reordered data to the new table. The
+        advantage of <codeph>ALTER TABLE</codeph> is that it avoids making a duplicate copy of
+        the data files, allowing you to reorganize huge volumes of data in a space-efficient way
+        using familiar Hadoop techniques.
       </p>
     </note>
 
@@ -918,59 +1006,62 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
       <b>To switch a table between internal and external:</b>
     </p>
 
-    <p conref="../shared/impala_common.xml#common/switch_internal_external_table"/>
+    <p
+      conref="../shared/impala_common.xml#common/switch_internal_external_table"/>
 
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
 
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
+
     <p rev="">
-      Most <codeph>ALTER TABLE</codeph> clauses do not actually
-      read or write any HDFS files, and so do not depend on
-      specific HDFS permissions. For example, the <codeph>SET FILEFORMAT</codeph>
-      clause does not actually check the file format existing data files or
-      convert them to the new format, and the <codeph>SET LOCATION</codeph> clause
-      does not require any special permissions on the new location.
-      (Any permission-related failures would come later, when you
-      actually query or insert into the table.)
+      Most <codeph>ALTER TABLE</codeph> clauses do not actually read or write any HDFS files,
+      and so do not depend on specific HDFS permissions. For example, the <codeph>SET
+      FILEFORMAT</codeph> clause does not actually check the file format existing data files or
+      convert them to the new format, and the <codeph>SET LOCATION</codeph> clause does not
+      require any special permissions on the new location. (Any permission-related failures
+      would come later, when you actually query or insert into the table.)
     </p>
+
 <!-- Haven't rigorously tested all the assertions in the following paragraph. -->
+
 <!-- Most testing so far has been around RENAME TO clause. -->
+
     <p>
-      In general, <codeph>ALTER TABLE</codeph> clauses that do touch
-      HDFS files and directories require the same HDFS permissions
-      as corresponding <codeph>CREATE</codeph>, <codeph>INSERT</codeph>,
-      or <codeph>SELECT</codeph> statements.
-      The permissions allow
-      the user ID that the <cmdname>impalad</cmdname> daemon runs under,
-      typically the <codeph>impala</codeph> user, to read or write
-      files or directories, or (in the case of the execute bit) descend into a directory.
-      The <codeph>RENAME TO</codeph> clause requires read, write, and execute permission in the
-      source and destination database directories and in the table data directory,
-      and read and write permission for the data files within the table.
-      The <codeph>ADD PARTITION</codeph> and <codeph>DROP PARTITION</codeph> clauses
+      In general, <codeph>ALTER TABLE</codeph> clauses that do touch HDFS files and directories
+      require the same HDFS permissions as corresponding <codeph>CREATE</codeph>,
+      <codeph>INSERT</codeph>, or <codeph>SELECT</codeph> statements. The permissions allow the
+      user ID that the <cmdname>impalad</cmdname> daemon runs under, typically the
+      <codeph>impala</codeph> user, to read or write files or directories, or (in the case of
+      the execute bit) descend into a directory. The <codeph>RENAME TO</codeph> clause requires
+      read, write, and execute permission in the source and destination database directories and
+      in the table data directory, and read and write permission for the data files within the
+      table. The <codeph>ADD PARTITION</codeph> and <codeph>DROP PARTITION</codeph> clauses
       require write and execute permissions for the associated partition directory.
     </p>
 
     <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
 
     <p rev="kudu IMPALA-2890">
-      Because of the extra constraints and features of Kudu tables, such as the <codeph>NOT NULL</codeph>
-      and <codeph>DEFAULT</codeph> attributes for columns, <codeph>ALTER TABLE</codeph> has specific
-      requirements related to Kudu tables:
+      Because of the extra constraints and features of Kudu tables, such as the <codeph>NOT
+      NULL</codeph> and <codeph>DEFAULT</codeph> attributes for columns, <codeph>ALTER
+      TABLE</codeph> has specific requirements related to Kudu tables:
       <ul>
         <li>
           <p>
-            In an <codeph>ADD COLUMNS</codeph> operation, you can specify the <codeph>NULL</codeph>,
-            <codeph>NOT NULL</codeph>, and <codeph>DEFAULT <varname>default_value</varname></codeph>
-            column attributes.
+            In an <codeph>ADD COLUMNS</codeph> operation, you can specify the
+            <codeph>NULL</codeph>, <codeph>NOT NULL</codeph>, and <codeph>DEFAULT
+            <varname>default_value</varname></codeph> column attributes.
           </p>
         </li>
+
         <li>
           <p rev="2.9.0 IMPALA-4616">
-            In <keyword keyref="impala29_full"/> and higher, you can also specify the <codeph>ENCODING</codeph>,
-            <codeph>COMPRESSION</codeph>, and <codeph>BLOCK_SIZE</codeph> attributes when adding a column.
+            In <keyword keyref="impala29_full"/> and higher, you can also specify the
+            <codeph>ENCODING</codeph>, <codeph>COMPRESSION</codeph>, and
+            <codeph>BLOCK_SIZE</codeph> attributes when adding a column.
           </p>
         </li>
+
         <li>
           <p>
             If you add a column with a <codeph>NOT NULL</codeph> attribute, it must also have a
@@ -978,23 +1069,27 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
             column for all existing rows.
           </p>
         </li>
+
         <li>
           <p>
             The <codeph>DROP COLUMN</codeph> clause works the same for a Kudu table as for other
             kinds of tables.
           </p>
         </li>
+
         <li>
           <p>
-            Although you can change the name of a column with the <codeph>CHANGE</codeph> clause,
-            you cannot change the type of a column in a Kudu table.
+            Although you can change the name of a column with the <codeph>CHANGE</codeph>
+            clause, you cannot change the type of a column in a Kudu table.
           </p>
         </li>
+
         <li>
           <p>
             You cannot change the nullability of existing columns in a Kudu table.
           </p>
         </li>
+
         <li>
           <p rev="2.10.0 IMPALA-4622">
             In <keyword keyref="impala210_full"/>, you can change the default value, encoding,
@@ -1002,24 +1097,27 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
             <codeph>SET</codeph> clause.
           </p>
         </li>
+
         <li>
           <p>
             You cannot use the <codeph>REPLACE COLUMNS</codeph> clause with a Kudu table.
           </p>
         </li>
-        <li> The <codeph>RENAME TO</codeph> clause for a Kudu table only affects
-          the name stored in the metastore database that Impala uses to refer to
-          the table. To change which underlying Kudu table is associated with an
-          Impala table name, you must change the <codeph>TBLPROPERTIES</codeph>
-          property of the table: <codeph>SET
-              TBLPROPERTIES('kudu.table_name'='<varname>kudu_tbl_name</varname>)</codeph>.
-          You can only change underlying Kudu tables for the external
-          tables.</li>
+
+        <li>
+          The <codeph>RENAME TO</codeph> clause for a Kudu table only affects the name stored in
+          the metastore database that Impala uses to refer to the table. To change which
+          underlying Kudu table is associated with an Impala table name, you must change the
+          <codeph>TBLPROPERTIES</codeph> property of the table: <codeph>SET
+          TBLPROPERTIES('kudu.table_name'='<varname>kudu_tbl_name</varname>)</codeph>. You can
+          only change underlying Kudu tables for the external tables.
+        </li>
       </ul>
     </p>
 
     <p>
-      The following are some examples of using the <codeph>ADD COLUMNS</codeph> clause for a Kudu table:
+      The following are some examples of using the <codeph>ADD COLUMNS</codeph> clause for a
+      Kudu table:
     </p>
 
 <codeblock rev="2.9.0 IMPALA-4616">
@@ -1033,7 +1131,8 @@ ALTER TABLE t1 ADD COLUMNS (a STRING NOT NULL DEFAULT '', t TIMESTAMP COMPRESSIO
 </codeblock>
 
     <p rev="2.10.0 IMPALA-4622">
-      The following are some examples of modifying column defaults and storage attributes for a Kudu table:
+      The following are some examples of modifying column defaults and storage attributes for a
+      Kudu table:
     </p>
 
 <codeblock rev="2.10.0 IMPALA-4622">
@@ -1082,19 +1181,29 @@ desc kt;
 </codeblock>
 
     <p rev="kudu">
-      Kudu tables all use an underlying partitioning mechanism. The partition syntax is different than for non-Kudu
-      tables. You can use the <codeph>ALTER TABLE</codeph> statement to add and drop <term>range partitions</term>
-      from a Kudu table. Any new range must not overlap with any existing ranges. Dropping a range removes all the associated
-      rows from the table. See <xref href="impala_kudu.xml#kudu_partitioning"/> for details.
+      Kudu tables all use an underlying partitioning mechanism. The partition syntax is
+      different than for non-Kudu tables. You can use the <codeph>ALTER TABLE</codeph> statement
+      to add and drop <term>range partitions</term> from a Kudu table. Any new range must not
+      overlap with any existing ranges. Dropping a range removes all the associated rows from
+      the table. See <xref href="impala_kudu.xml#kudu_partitioning"/> for details.
     </p>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
       <xref href="impala_tables.xml#tables"/>,
-      <xref href="impala_create_table.xml#create_table"/>, <xref href="impala_drop_table.xml#drop_table"/>,
-      <xref href="impala_partitioning.xml#partitioning"/>, <xref href="impala_tables.xml#internal_tables"/>,
-      <xref href="impala_tables.xml#external_tables"/>
+      <xref
+        href="impala_create_table.xml#create_table"/>,
+      <xref
+        href="impala_drop_table.xml#drop_table"/>,
+      <xref
+        href="impala_partitioning.xml#partitioning"/>,
+      <xref
+        href="impala_tables.xml#internal_tables"/>,
+      <xref
+        href="impala_tables.xml#external_tables"/>
     </p>
+
   </conbody>
+
 </concept>
