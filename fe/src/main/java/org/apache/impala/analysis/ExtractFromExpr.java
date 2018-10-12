@@ -98,13 +98,13 @@ public class ExtractFromExpr extends FunctionCallExpr {
   }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     StringBuilder strBuilder = new StringBuilder();
     strBuilder.append(getFnName().toString().toUpperCase());
     strBuilder.append("(");
     strBuilder.append(((StringLiteral)getChild(1)).getValueWithOriginalEscapes());
     strBuilder.append(" FROM ");
-    strBuilder.append(getChild(0).toSql());
+    strBuilder.append(getChild(0).toSql(options));
     strBuilder.append(")");
     return strBuilder.toString();
   }

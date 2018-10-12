@@ -47,7 +47,7 @@ public class ShowCreateFunctionStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     return "SHOW CREATE " +
         (category_ == TFunctionCategory.AGGREGATE ? "AGGREGATE " : "") +
         "FUNCTION " + functionName_;

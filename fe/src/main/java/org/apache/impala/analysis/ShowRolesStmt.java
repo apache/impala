@@ -46,7 +46,7 @@ public class ShowRolesStmt extends AuthorizationStmt {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     if (groupName_ == null) {
       return isShowCurrentRoles_ ? "SHOW CURRENT ROLES" : "SHOW ROLES";
     } else {

@@ -47,7 +47,7 @@ public class DropDataSrcStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder();
     sb.append("DROP DATA SOURCE ");
     if (ifExists_) sb.append("IF EXISTS ");

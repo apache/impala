@@ -69,7 +69,7 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder();
     sb.append("CREATE VIEW ");
     if (ifNotExists_) sb.append("IF NOT EXISTS ");
@@ -77,7 +77,7 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
     sb.append(tableName_.getTbl());
     if (columnDefs_ != null) sb.append("(" + getColumnNames() + ")");
     sb.append(" AS ");
-    sb.append(viewDefStmt_.toSql());
+    sb.append(viewDefStmt_.toSql(options));
     return sb.toString();
   }
 }

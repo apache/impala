@@ -1231,14 +1231,14 @@ public class HdfsScanNode extends ScanNode {
       output.append("\n");
       if (!conjuncts_.isEmpty()) {
         output.append(String.format("%spredicates: %s\n", detailPrefix,
-            getExplainString(conjuncts_)));
+            getExplainString(conjuncts_, detailLevel)));
       }
       if (!collectionConjuncts_.isEmpty()) {
         for (Map.Entry<TupleDescriptor, List<Expr>> entry:
           collectionConjuncts_.entrySet()) {
           String alias = entry.getKey().getAlias();
-          output.append(String.format("%spredicates on %s: %s\n",
-              detailPrefix, alias, getExplainString(entry.getValue())));
+          output.append(String.format("%spredicates on %s: %s\n", detailPrefix, alias,
+              getExplainString(entry.getValue(), detailLevel)));
         }
       }
       if (!runtimeFilters_.isEmpty()) {
@@ -1267,15 +1267,16 @@ public class HdfsScanNode extends ScanNode {
             scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_));
       }
       // Groups the min max original conjuncts by tuple descriptor.
-      output.append(getMinMaxOriginalConjunctsExplainString(detailPrefix));
+      output.append(getMinMaxOriginalConjunctsExplainString(detailPrefix, detailLevel));
       // Groups the dictionary filterable conjuncts by tuple descriptor.
-      output.append(getDictionaryConjunctsExplainString(detailPrefix));
+      output.append(getDictionaryConjunctsExplainString(detailPrefix, detailLevel));
     }
     return output.toString();
   }
 
   // Helper method that prints min max original conjuncts by tuple descriptor.
-  private String getMinMaxOriginalConjunctsExplainString(String prefix) {
+  private String getMinMaxOriginalConjunctsExplainString(
+      String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     for (Map.Entry<TupleDescriptor, List<Expr>> entry :
         minMaxOriginalConjuncts_.entrySet()) {
@@ -1283,17 +1284,18 @@ public class HdfsScanNode extends ScanNode {
       List<Expr> exprs = entry.getValue();
       if (tupleDesc == getTupleDesc()) {
         output.append(String.format("%sparquet statistics predicates: %s\n", prefix,
-            getExplainString(exprs)));
+            getExplainString(exprs, detailLevel)));
       } else {
-        output.append(String.format("%sparquet statistics predicates on %s: %s\n",
-            prefix, tupleDesc.getAlias(), getExplainString(exprs)));
+        output.append(String.format("%sparquet statistics predicates on %s: %s\n", prefix,
+            tupleDesc.getAlias(), getExplainString(exprs, detailLevel)));
       }
     }
     return output.toString();
   }
 
   // Helper method that prints the dictionary filterable conjuncts by tuple descriptor.
-  private String getDictionaryConjunctsExplainString(String prefix) {
+  private String getDictionaryConjunctsExplainString(
+      String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     Map<TupleDescriptor, List<Integer>> perTupleConjuncts = Maps.newLinkedHashMap();
     for (Map.Entry<SlotDescriptor, List<Integer>> entry :
@@ -1329,8 +1331,8 @@ public class HdfsScanNode extends ScanNode {
         Preconditions.checkState(idx.intValue() < conjuncts.size());
         exprList.add(conjuncts.get(idx));
       }
-      output.append(String.format("%sparquet dictionary predicates%s: %s\n",
-          prefix, tupleName, getExplainString(exprList)));
+      output.append(String.format("%sparquet dictionary predicates%s: %s\n", prefix,
+          tupleName, getExplainString(exprList, detailLevel)));
     }
     return output.toString();
   }

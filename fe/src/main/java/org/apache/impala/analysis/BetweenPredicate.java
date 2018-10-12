@@ -18,7 +18,6 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.catalog.ScalarType;
-import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
 
@@ -98,10 +97,10 @@ public class BetweenPredicate extends Predicate {
   }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     String notStr = (isNotBetween_) ? "NOT " : "";
-    return children_.get(0).toSql() + " " + notStr + "BETWEEN " +
-        children_.get(1).toSql() + " AND " + children_.get(2).toSql();
+    return children_.get(0).toSql(options) + " " + notStr + "BETWEEN "
+        + children_.get(1).toSql(options) + " AND " + children_.get(2).toSql(options);
   }
 
   @Override

@@ -59,14 +59,14 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partitions=24/24 files=24 size=188.92KB
-   predicates: id < 10
+   predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   parquet statistics predicates: id < 10
-   parquet dictionary predicates: id < 10
+   parquet statistics predicates: id < CAST(10 AS INT)
+   parquet dictionary predicates: id < CAST(10 AS INT)
    mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=unavailable
    in pipelines: 00(GETNEXT)
@@ -114,14 +114,14 @@ Per-Host Resources: mem-estimate=432.00MB mem-reservation=102.07MB thread-reserv
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
    partitions=24/24 files=24 size=188.92KB
-   predicates: id < 10
+   predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   parquet statistics predicates: id < 10
-   parquet dictionary predicates: id < 10
+   parquet statistics predicates: id < CAST(10 AS INT)
+   parquet dictionary predicates: id < CAST(10 AS INT)
    mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=0
    tuple-ids=0 row-size=16B cardinality=unavailable
    in pipelines: 00(GETNEXT)
@@ -153,14 +153,14 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partitions=24/24 files=24 size=188.92KB
-   predicates: id < 10
+   predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   parquet statistics predicates: id < 10
-   parquet dictionary predicates: id < 10
+   parquet statistics predicates: id < CAST(10 AS INT)
+   parquet dictionary predicates: id < CAST(10 AS INT)
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
    tuple-ids=0 row-size=8B cardinality=unavailable
    in pipelines: 00(GETNEXT)
@@ -201,14 +201,14 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 Per-Host Resources: mem-estimate=48.00MB mem-reservation=48.00KB thread-reservation=3
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
    partitions=24/24 files=24 size=188.92KB
-   predicates: id < 10
+   predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   parquet statistics predicates: id < 10
-   parquet dictionary predicates: id < 10
+   parquet statistics predicates: id < CAST(10 AS INT)
+   parquet dictionary predicates: id < CAST(10 AS INT)
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
    tuple-ids=0 row-size=8B cardinality=unavailable
    in pipelines: 00(GETNEXT)
@@ -269,19 +269,19 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=288.98MB
-   predicates: c_custkey < 10, !empty(c.c_orders)
-   predicates on o: !empty(o.o_lineitems), o_orderkey < 5
-   predicates on o_lineitems: l_linenumber < 3
+   predicates: c_custkey < CAST(10 AS BIGINT), !empty(c.c_orders)
+   predicates on o: !empty(o.o_lineitems), o_orderkey < CAST(5 AS BIGINT)
+   predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
    stored statistics:
      table: rows=150000 size=288.98MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44229
-   parquet statistics predicates: c_custkey < 10
-   parquet statistics predicates on o: o_orderkey < 5
-   parquet statistics predicates on o_lineitems: l_linenumber < 3
-   parquet dictionary predicates: c_custkey < 10
-   parquet dictionary predicates on o: o_orderkey < 5
-   parquet dictionary predicates on o_lineitems: l_linenumber < 3
+   extrapolated-rows=disabled max-scan-range-rows=44227
+   parquet statistics predicates: c_custkey < CAST(10 AS BIGINT)
+   parquet statistics predicates on o: o_orderkey < CAST(5 AS BIGINT)
+   parquet statistics predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
+   parquet dictionary predicates: c_custkey < CAST(10 AS BIGINT)
+   parquet dictionary predicates on o: o_orderkey < CAST(5 AS BIGINT)
+   parquet dictionary predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
    mem-estimate=88.00MB mem-reservation=88.00MB thread-reservation=0
    tuple-ids=0 row-size=254B cardinality=15000
    in pipelines: 00(GETNEXT)
@@ -344,19 +344,19 @@ Per-Host Resources: mem-estimate=264.00MB mem-reservation=264.00MB thread-reserv
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
    partitions=1/1 files=4 size=288.98MB
-   predicates: c_custkey < 10, !empty(c.c_orders)
-   predicates on o: !empty(o.o_lineitems), o_orderkey < 5
-   predicates on o_lineitems: l_linenumber < 3
+   predicates: c_custkey < CAST(10 AS BIGINT), !empty(c.c_orders)
+   predicates on o: !empty(o.o_lineitems), o_orderkey < CAST(5 AS BIGINT)
+   predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
    stored statistics:
      table: rows=150000 size=288.98MB
      columns missing stats: c_orders
    extrapolated-rows=disabled max-scan-range-rows=44229
-   parquet statistics predicates: c_custkey < 10
-   parquet statistics predicates on o: o_orderkey < 5
-   parquet statistics predicates on o_lineitems: l_linenumber < 3
-   parquet dictionary predicates: c_custkey < 10
-   parquet dictionary predicates on o: o_orderkey < 5
-   parquet dictionary predicates on o_lineitems: l_linenumber < 3
+   parquet statistics predicates: c_custkey < CAST(10 AS BIGINT)
+   parquet statistics predicates on o: o_orderkey < CAST(5 AS BIGINT)
+   parquet statistics predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
+   parquet dictionary predicates: c_custkey < CAST(10 AS BIGINT)
+   parquet dictionary predicates on o: o_orderkey < CAST(5 AS BIGINT)
+   parquet dictionary predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
    mem-estimate=88.00MB mem-reservation=88.00MB thread-reservation=0
    tuple-ids=0 row-size=254B cardinality=15000
    in pipelines: 00(GETNEXT)
@@ -409,13 +409,13 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
-   predicates on o1: o1.o_orderkey < 5
+   predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    stored statistics:
      table: rows=150000 size=288.98MB
      columns missing stats: c_orders, c_orders
    extrapolated-rows=disabled max-scan-range-rows=44229
-   parquet statistics predicates on o1: o1.o_orderkey < 5
-   parquet dictionary predicates on o1: o1.o_orderkey < 5
+   parquet statistics predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
+   parquet dictionary predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=0
    tuple-ids=0 row-size=270B cardinality=150000
    in pipelines: 00(GETNEXT)
@@ -470,13 +470,13 @@ Per-Host Resources: mem-estimate=269.81MB mem-reservation=53.81MB thread-reserva
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
    partitions=1/1 files=4 size=288.98MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
-   predicates on o1: o1.o_orderkey < 5
+   predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    stored statistics:
      table: rows=150000 size=288.98MB
      columns missing stats: c_orders, c_orders
    extrapolated-rows=disabled max-scan-range-rows=44229
-   parquet statistics predicates on o1: o1.o_orderkey < 5
-   parquet dictionary predicates on o1: o1.o_orderkey < 5
+   parquet statistics predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
+   parquet dictionary predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=0
    tuple-ids=0 row-size=270B cardinality=150000
    in pipelines: 00(GETNEXT)

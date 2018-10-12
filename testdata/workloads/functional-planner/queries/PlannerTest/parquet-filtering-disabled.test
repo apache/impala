@@ -21,7 +21,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partitions=24/24 files=24 size=188.29KB
-   predicates: int_col IS NULL, int_col > 1, int_col > tinyint_col, int_col * rand() > 50
+   predicates: int_col IS NULL, int_col > CAST(1 AS INT), int_col > CAST(tinyint_col AS INT), CAST(int_col AS DOUBLE) * rand() > CAST(50 AS DOUBLE)
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -58,7 +58,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partitions=22/24 files=22 size=172.28KB
-   predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, int_col % 2 = 1, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
+   predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/22 rows=unavailable
@@ -88,7 +88,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partitions=24/24 files=24 size=188.29KB
-   predicates: id IN (int_col), id NOT IN (0, 1, 2), int_col % 50 IN (0, 1), string_col IN ('aaaa', 'bbbb', 'cccc', NULL)
+   predicates: id IN (int_col), id NOT IN (CAST(0 AS INT), CAST(1 AS INT), CAST(2 AS INT)), int_col % CAST(50 AS INT) IN (CAST(0 AS INT), CAST(1 AS INT)), string_col IN ('aaaa', 'bbbb', 'cccc', NULL)
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -157,7 +157,7 @@ PLAN-ROOT SINK
    partitions=1/1 files=2 size=6.92KB
    predicates: !empty(c.nested_struct.c.d)
    predicates on cn: !empty(cn.item)
-   predicates on a: a.item.e < -10
+   predicates on a: a.item.e < CAST(-10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      columns missing stats: id
@@ -223,9 +223,9 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=288.98MB
-   predicates: c_custkey > 0, !empty(c.c_orders)
-   predicates on o: !empty(o.o_lineitems), o.o_orderkey > 0
-   predicates on l: l.l_partkey > 0
+   predicates: c_custkey > CAST(0 AS BIGINT), !empty(c.c_orders)
+   predicates on o: !empty(o.o_lineitems), o.o_orderkey > CAST(0 AS BIGINT)
+   predicates on l: l.l_partkey > CAST(0 AS BIGINT)
    stored statistics:
      table: rows=150000 size=288.98MB
      columns missing stats: c_orders
@@ -334,7 +334,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesmixedformat]
    partitions=4/4 files=4 size=66.61KB
-   predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, int_col % 2 = 1, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
+   predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/4 rows=unavailable

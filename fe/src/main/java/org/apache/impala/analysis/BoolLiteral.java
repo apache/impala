@@ -70,7 +70,7 @@ public class BoolLiteral extends LiteralExpr {
   public boolean getValue() { return value_; }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     return getStringValue();
   }
 

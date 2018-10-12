@@ -112,7 +112,7 @@ public class CreateTableLikeStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("CREATE ");
     if (isExternal_) sb.append("EXTERNAL ");
     sb.append("TABLE ");

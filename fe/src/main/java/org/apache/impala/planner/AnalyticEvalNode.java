@@ -234,8 +234,8 @@ public class AnalyticEvalNode extends PlanNode {
       }
 
       if (!conjuncts_.isEmpty()) {
-        output.append(
-            detailPrefix + "predicates: " + getExplainString(conjuncts_) + "\n");
+        output.append(detailPrefix
+            + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
       }
     }
     return output.toString();

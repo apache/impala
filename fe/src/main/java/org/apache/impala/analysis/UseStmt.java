@@ -35,7 +35,7 @@ public class UseStmt extends StatementBase {
   public String getDatabase() { return database_; }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     return "USE " + database_;
   }
 

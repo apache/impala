@@ -35,6 +35,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Represents a privilege spec from a GRANT/REVOKE statement.
  * A privilege spec may correspond to one or more privileges. Currently, a privilege spec
@@ -149,7 +151,12 @@ public class PrivilegeSpec implements ParseNode {
   }
 
   @Override
-  public String toSql() {
+  public final String toSql() {
+    return toSql(DEFAULT);
+  }
+
+  @Override
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder(privilegeLevel_.toString());
     sb.append(" ON ");
     sb.append(scope_.toString());

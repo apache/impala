@@ -451,8 +451,8 @@ public class HBaseScanNode extends ScanNode {
         output.append('\n');
       }
       if (!conjuncts_.isEmpty()) {
-        output.append(
-            detailPrefix + "predicates: " + getExplainString(conjuncts_) + "\n");
+        output.append(detailPrefix
+            + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
       }
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {

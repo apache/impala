@@ -147,19 +147,19 @@ public class AnalyticExpr extends Expr {
   public Expr clone() { return new AnalyticExpr(this); }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     if (sqlString_ != null) return sqlString_;
     StringBuilder sb = new StringBuilder();
-    sb.append(fnCall_.toSql()).append(" OVER (");
+    sb.append(fnCall_.toSql(options)).append(" OVER (");
     boolean needsSpace = false;
     if (!partitionExprs_.isEmpty()) {
-      sb.append("PARTITION BY ").append(Expr.toSql(partitionExprs_));
+      sb.append("PARTITION BY ").append(Expr.toSql(partitionExprs_, options));
       needsSpace = true;
     }
     if (!orderByElements_.isEmpty()) {
       List<String> orderByStrings = Lists.newArrayList();
       for (OrderByElement e: orderByElements_) {
-        orderByStrings.add(e.toSql());
+        orderByStrings.add(e.toSql(options));
       }
       if (needsSpace) sb.append(" ");
       sb.append("ORDER BY ").append(Joiner.on(", ").join(orderByStrings));
@@ -167,7 +167,7 @@ public class AnalyticExpr extends Expr {
     }
     if (window_ != null) {
       if (needsSpace) sb.append(" ");
-      sb.append(window_.toSql());
+      sb.append(window_.toSql(options));
     }
     sb.append(")");
     return sb.toString();

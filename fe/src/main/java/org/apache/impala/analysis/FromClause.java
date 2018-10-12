@@ -26,6 +26,8 @@ import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Wraps a list of TableRef instances that form a FROM clause, allowing them to be
  * analyzed independently of the statement using them. To increase the flexibility of
@@ -112,16 +114,16 @@ public class FromClause implements ParseNode, Iterable<TableRef> {
   }
 
   @Override
-  public String toSql() {
-    return toSql(false);
+  public final String toSql() {
+    return toSql(DEFAULT);
   }
 
-  public String toSql(boolean rewritten) {
+  public String toSql(ToSqlOptions options) {
     StringBuilder builder = new StringBuilder();
     if (!tableRefs_.isEmpty()) {
       builder.append(" FROM ");
       for (int i = 0; i < tableRefs_.size(); ++i) {
-        builder.append(tableRefs_.get(i).toSql(rewritten));
+        builder.append(tableRefs_.get(i).toSql(options));
       }
     }
     return builder.toString();

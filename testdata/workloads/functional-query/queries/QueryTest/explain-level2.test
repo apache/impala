@@ -7,6 +7,8 @@ from tpch.lineitem join tpch.orders on l_orderkey = o_orderkey;
 ---- RESULTS: VERIFY_IS_EQUAL
 row_regex:.*Max Per-Host Resource Reservation: Memory=[0-9.]*MB Threads=[0-9]*.*
 row_regex:.*Per-Host Resource Estimates: Memory=[0-9.]*MB.*
+'Analyzed query: SELECT * FROM tpch.lineitem INNER JOIN tpch.orders ON l_orderkey'
+'= o_orderkey'
 ''
 'F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*|  Per-Host Resources: mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=1

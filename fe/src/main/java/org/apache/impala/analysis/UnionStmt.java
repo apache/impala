@@ -558,25 +558,25 @@ public class UnionStmt extends QueryStmt {
   }
 
   @Override
-  public String toSql(boolean rewritten) {
-    if (!rewritten && toSqlString_ != null) return toSqlString_;
+  public String toSql(ToSqlOptions options) {
+    if (!options.showRewritten() && toSqlString_ != null) return toSqlString_;
 
     StringBuilder strBuilder = new StringBuilder();
     Preconditions.checkState(operands_.size() > 0);
 
     if (withClause_ != null) {
-      strBuilder.append(withClause_.toSql(rewritten));
+      strBuilder.append(withClause_.toSql(options));
       strBuilder.append(" ");
     }
 
-    strBuilder.append(operands_.get(0).getQueryStmt().toSql(rewritten));
+    strBuilder.append(operands_.get(0).getQueryStmt().toSql(options));
     for (int i = 1; i < operands_.size() - 1; ++i) {
       strBuilder.append(" UNION " +
           ((operands_.get(i).getQualifier() == Qualifier.ALL) ? "ALL " : ""));
       if (operands_.get(i).getQueryStmt() instanceof UnionStmt) {
         strBuilder.append("(");
       }
-      strBuilder.append(operands_.get(i).getQueryStmt().toSql(rewritten));
+      strBuilder.append(operands_.get(i).getQueryStmt().toSql(options));
       if (operands_.get(i).getQueryStmt() instanceof UnionStmt) {
         strBuilder.append(")");
       }
@@ -591,21 +591,21 @@ public class UnionStmt extends QueryStmt {
             !lastQueryStmt.hasLimit() && !lastQueryStmt.hasOffset() &&
             !lastQueryStmt.hasOrderByClause())) {
       strBuilder.append("(");
-      strBuilder.append(lastQueryStmt.toSql(rewritten));
+      strBuilder.append(lastQueryStmt.toSql(options));
       strBuilder.append(")");
     } else {
-      strBuilder.append(lastQueryStmt.toSql(rewritten));
+      strBuilder.append(lastQueryStmt.toSql(options));
     }
     // Order By clause
     if (hasOrderByClause()) {
       strBuilder.append(" ORDER BY ");
       for (int i = 0; i < orderByElements_.size(); ++i) {
-        strBuilder.append(orderByElements_.get(i).toSql());
+        strBuilder.append(orderByElements_.get(i).toSql(options));
         strBuilder.append((i+1 != orderByElements_.size()) ? ", " : "");
       }
     }
     // Limit clause.
-    strBuilder.append(limitElement_.toSql());
+    strBuilder.append(limitElement_.toSql(options));
     return strBuilder.toString();
   }
 

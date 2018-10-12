@@ -27,9 +27,10 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TRangePartition;
 import org.apache.impala.util.KuduUtil;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Represents a range partition of a Kudu table.
@@ -216,18 +217,23 @@ public class RangePartition implements ParseNode {
   }
 
   @Override
-  public String toSql() {
+  public final String toSql() {
+    return toSql(DEFAULT);
+  }
+
+  @Override
+  public String toSql(ToSqlOptions options) {
     StringBuilder output = new StringBuilder();
     output.append("PARTITION ");
     if (isSingletonRange_) {
       output.append("VALUE = ");
       if (lowerBound_.size() > 1) output.append("(");
-      output.append(Expr.toSql(lowerBound_));
+      output.append(Expr.toSql(lowerBound_, options));
       if (lowerBound_.size() > 1) output.append(")");
     } else {
       if (!lowerBound_.isEmpty()) {
         if (lowerBound_.size() > 1) output.append("(");
-        output.append(Expr.toSql(lowerBound_));
+        output.append(Expr.toSql(lowerBound_, options));
         if (lowerBound_.size() > 1) output.append(")");
         output.append(lowerBoundInclusive_ ? " <= " : " < ");
       }
@@ -235,7 +241,7 @@ public class RangePartition implements ParseNode {
       if (!upperBound_.isEmpty()) {
         output.append(upperBoundInclusive_ ? " <= " : " < ");
         if (upperBound_.size() > 1) output.append("(");
-        output.append(Expr.toSql(upperBound_));
+        output.append(Expr.toSql(upperBound_, options));
         if (upperBound_.size() > 1) output.append(")");
       }
     }

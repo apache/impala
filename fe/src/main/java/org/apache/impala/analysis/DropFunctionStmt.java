@@ -55,7 +55,7 @@ public class DropFunctionStmt extends StatementBase {
   private boolean hasSignature() { return fnArgs_ != null; }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("DROP FUNCTION");
     if (ifExists_) sb.append(" IF EXISTS ");
     sb.append(desc_.signatureString());

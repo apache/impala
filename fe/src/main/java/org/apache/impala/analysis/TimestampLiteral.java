@@ -66,7 +66,7 @@ public class TimestampLiteral extends LiteralExpr {
   public int hashCode() { return Arrays.hashCode(value_); }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     // ANSI Timestamp Literal format.
     return "TIMESTAMP '" + getStringValue() + "'";
   }

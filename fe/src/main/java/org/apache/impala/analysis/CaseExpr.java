@@ -35,6 +35,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * CASE and DECODE are represented using this class. The backend implementation is
  * always the "case" function. CASE always returns the THEN corresponding to the leftmost
@@ -196,23 +198,27 @@ public class CaseExpr extends Expr {
   }
 
   @Override
-  public String toSqlImpl() {
-    return (decodeExpr_ == null) ? toCaseSql() : decodeExpr_.toSqlImpl();
+  public String toSqlImpl(ToSqlOptions options) {
+    return (decodeExpr_ == null) ? toCaseSql(options) : decodeExpr_.toSqlImpl(options);
   }
 
   @VisibleForTesting
-  String toCaseSql() {
+  final String toCaseSql() {
+    return toCaseSql(DEFAULT);
+  }
+
+  String toCaseSql(ToSqlOptions options) {
     StringBuilder output = new StringBuilder("CASE");
     int childIdx = 0;
     if (hasCaseExpr_) {
-      output.append(" " + children_.get(childIdx++).toSql());
+      output.append(" " + children_.get(childIdx++).toSql(options));
     }
     while (childIdx + 2 <= children_.size()) {
-      output.append(" WHEN " + children_.get(childIdx++).toSql());
-      output.append(" THEN " + children_.get(childIdx++).toSql());
+      output.append(" WHEN " + children_.get(childIdx++).toSql(options));
+      output.append(" THEN " + children_.get(childIdx++).toSql(options));
     }
     if (hasElseExpr_) {
-      output.append(" ELSE " + children_.get(children_.size() - 1).toSql());
+      output.append(" ELSE " + children_.get(children_.size() - 1).toSql(options));
     }
     output.append(" END");
     return output.toString();

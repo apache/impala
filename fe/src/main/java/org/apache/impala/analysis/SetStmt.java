@@ -51,7 +51,7 @@ public class SetStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     if (key_ == null) {
       if (isSetAll_) return "SET ALL";
       return "SET";

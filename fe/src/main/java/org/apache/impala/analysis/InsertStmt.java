@@ -923,10 +923,10 @@ public class InsertStmt extends StatementBase {
   }
 
   @Override
-  public String toSql(boolean rewritten) {
+  public String toSql(ToSqlOptions options) {
     StringBuilder strBuilder = new StringBuilder();
 
-    if (withClause_ != null) strBuilder.append(withClause_.toSql(rewritten) + " ");
+    if (withClause_ != null) strBuilder.append(withClause_.toSql(options) + " ");
 
     strBuilder.append(getOpName());
     if (!planHints_.isEmpty() && hintLoc_ == HintLocation.Start) {
@@ -946,8 +946,8 @@ public class InsertStmt extends StatementBase {
     if (partitionKeyValues_ != null) {
       List<String> values = Lists.newArrayList();
       for (PartitionKeyValue pkv: partitionKeyValues_) {
-        values.add(pkv.getColName() +
-            (pkv.getValue() != null ? ("=" + pkv.getValue().toSql()) : ""));
+        values.add(pkv.getColName()
+            + (pkv.getValue() != null ? ("=" + pkv.getValue().toSql(options)) : ""));
       }
       strBuilder.append(" PARTITION (" + Joiner.on(", ").join(values) + ")");
     }
@@ -955,7 +955,7 @@ public class InsertStmt extends StatementBase {
       strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(getPlanHints()));
     }
     if (!needsGeneratedQueryStatement_) {
-      strBuilder.append(" " + queryStmt_.toSql(rewritten));
+      strBuilder.append(" " + queryStmt_.toSql(options));
     }
     return strBuilder.toString();
   }

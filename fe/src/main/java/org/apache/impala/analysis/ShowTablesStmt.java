@@ -88,7 +88,7 @@ public class ShowTablesStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     if (pattern_ == null) {
       if (parsedDb_ == null) {
         return "SHOW TABLES";

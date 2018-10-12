@@ -52,6 +52,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Root of the expr node hierarchy.
  *
@@ -681,15 +683,22 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   @Override
-  public String toSql() {
-    return (printSqlInParens_) ? "(" + toSqlImpl() + ")" : toSqlImpl();
+  public final String toSql() {
+    return toSql(DEFAULT);
+  }
+
+  @Override
+  public String toSql(ToSqlOptions options) {
+    return (printSqlInParens_) ? "(" + toSqlImpl(options) + ")" : toSqlImpl(options);
   }
 
   /**
    * Returns a SQL string representing this expr. Subclasses should override this method
    * instead of toSql() to ensure that parenthesis are properly added around the toSql().
    */
-  protected abstract String toSqlImpl();
+  protected abstract String toSqlImpl(ToSqlOptions options);
+
+  protected String toSqlImpl() { return toSqlImpl(DEFAULT); };
 
   // Convert this expr, including all children, to its Thrift representation.
   public TExpr treeToThrift() {
@@ -767,10 +776,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return isAggregatePredicate_.apply(this);
   }
 
-  public List<String> childrenToSql() {
+  public List<String> childrenToSql(ToSqlOptions options) {
     List<String> result = Lists.newArrayList();
     for (Expr child: children_) {
-      result.add(child.toSql());
+      result.add(child.toSql(options));
     }
     return result;
   }
@@ -788,11 +797,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return Joiner.on(" ").join(strings);
   }
 
-  public static String toSql(List<? extends Expr> exprs) {
+  public static String toSql(List<? extends Expr> exprs, ToSqlOptions options) {
     if (exprs == null || exprs.isEmpty()) return "";
     List<String> strings = Lists.newArrayList();
     for (Expr expr: exprs) {
-      strings.add(expr.toSql());
+      strings.add(expr.toSql(options));
     }
     return Joiner.on(", ").join(strings);
   }
@@ -1540,12 +1549,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Generates a comma-separated string from the toSql() string representations of
    * 'exprs'.
    */
-  public static String listToSql(List<Expr> exprs) {
+  public static String listToSql(List<Expr> exprs, ToSqlOptions options) {
     com.google.common.base.Function<Expr, String> toSql =
         new com.google.common.base.Function<Expr, String>() {
         @Override
         public String apply(Expr arg) {
-          return arg.toSql();
+          return arg.toSql(options);
         }
     };
     return Joiner.on(",").join(Iterables.transform(exprs, toSql));

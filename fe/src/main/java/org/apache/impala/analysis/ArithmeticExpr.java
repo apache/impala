@@ -133,17 +133,18 @@ public class ArithmeticExpr extends Expr {
   }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     if (children_.size() == 1) {
       if (op_.getPos() == OperatorPosition.UNARY_PREFIX) {
-        return op_.toString() + getChild(0).toSql();
+        return op_.toString() + getChild(0).toSql(options);
       } else {
         assert(op_.getPos() == OperatorPosition.UNARY_POSTFIX);
-        return getChild(0).toSql() + op_.toString();
+        return getChild(0).toSql(options) + op_.toString();
       }
     } else {
       Preconditions.checkState(children_.size() == 2);
-      return getChild(0).toSql() + " " + op_.toString() + " " + getChild(1).toSql();
+      return getChild(0).toSql(options) + " " + op_.toString() + " "
+          + getChild(1).toSql(options);
     }
   }
 

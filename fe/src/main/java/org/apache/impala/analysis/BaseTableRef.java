@@ -71,14 +71,14 @@ public class BaseTableRef extends TableRef {
   }
 
   @Override
-  protected String tableRefToSql() {
+  protected String tableRefToSql(ToSqlOptions options) {
     // Enclose the alias in quotes if Hive cannot parse it without quotes.
     // This is needed for view compatibility between Impala and Hive.
     String aliasSql = "";
     String alias = getExplicitAlias();
     if (alias != null) aliasSql = " " + ToSqlUtils.getIdentSql(alias);
     String tableSampleSql = "";
-    if (sampleParams_ != null) tableSampleSql = " " + sampleParams_.toSql();
+    if (sampleParams_ != null) tableSampleSql = " " + sampleParams_.toSql(options);
     String tableHintsSql = ToSqlUtils.getPlanHintsSql(tableHints_);
     return getTable().getTableName().toSql() + aliasSql + tableSampleSql + tableHintsSql;
   }

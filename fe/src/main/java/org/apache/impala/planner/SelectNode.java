@@ -94,8 +94,8 @@ public class SelectNode extends PlanNode {
     output.append(String.format("%s%s:%s\n", prefix, id_.toString(), displayName_));
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       if (!conjuncts_.isEmpty()) {
-        output.append(detailPrefix + "predicates: " +
-            getExplainString(conjuncts_) + "\n");
+        output.append(detailPrefix
+            + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
       }
     }
     return output.toString();

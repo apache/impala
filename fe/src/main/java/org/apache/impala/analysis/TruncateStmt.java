@@ -70,7 +70,7 @@ public class TruncateStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     return "TRUNCATE TABLE " + (ifExists_ ? " IF EXISTS " : "") + tableName_;
   }
 

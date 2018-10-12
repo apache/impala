@@ -34,6 +34,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Superclass of all table references, including references to views, base tables
  * (Hdfs, HBase or DataSource tables), and nested collections. Contains the join
@@ -572,7 +574,9 @@ public class TableRef implements ParseNode {
     if (onClause_ != null) onClause_ = rewriter.rewrite(onClause_, analyzer);
   }
 
-  protected String tableRefToSql() {
+  protected String tableRefToSql() { return tableRefToSql(DEFAULT); }
+
+  protected String tableRefToSql(ToSqlOptions options) {
     String aliasSql = null;
     String alias = getExplicitAlias();
     if (alias != null) aliasSql = ToSqlUtils.getIdentSql(alias);
@@ -581,29 +585,26 @@ public class TableRef implements ParseNode {
     return ToSqlUtils.getPathSql(path) + ((aliasSql != null) ? " " + aliasSql : "");
   }
 
-  protected String tableRefToSql(boolean rewritten) {
-    return tableRefToSql();
+  @Override
+  public final String toSql() {
+    return toSql(DEFAULT);
   }
 
   @Override
-  public String toSql() {
-    return toSql(false);
-  }
-
-  public String toSql(boolean rewritten) {
+  public String toSql(ToSqlOptions options) {
     if (joinOp_ == null) {
       // prepend "," if we're part of a sequence of table refs w/o an
       // explicit JOIN clause
-      return (leftTblRef_ != null ? ", " : "") + tableRefToSql(rewritten);
+      return (leftTblRef_ != null ? ", " : "") + tableRefToSql(options);
     }
 
     StringBuilder output = new StringBuilder(" " + joinOp_.toString() + " ");
     if(!joinHints_.isEmpty()) output.append(ToSqlUtils.getPlanHintsSql(joinHints_) + " ");
-    output.append(tableRefToSql(rewritten));
+    output.append(tableRefToSql(options));
     if (usingColNames_ != null) {
       output.append(" USING (").append(Joiner.on(", ").join(usingColNames_)).append(")");
     } else if (onClause_ != null) {
-      output.append(" ON ").append(onClause_.toSql());
+      output.append(" ON ").append(onClause_.toSql(options));
     }
     return output.toString();
   }

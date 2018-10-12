@@ -47,7 +47,7 @@ public class DescribeDbStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("DESCRIBE DATABASE ");
     if (outputStyle_ != TDescribeOutputStyle.MINIMAL) {
       sb.append(outputStyle_.toString() + " ");

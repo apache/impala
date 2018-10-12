@@ -28,6 +28,8 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TPartitionDef;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Represents a partition definition used in ALTER TABLE ADD PARTITION consisting of
  * partition key-value pairs and an optional location and optional caching options.
@@ -57,10 +59,15 @@ public class PartitionDef implements ParseNode {
   public PartitionSpec getPartitionSpec() { return partitionSpec_; }
 
   @Override
-  public String toSql() {
-    StringBuilder sb = new StringBuilder(partitionSpec_.toSql());
+  public final String toSql() {
+    return toSql(DEFAULT);
+  }
+
+  @Override
+  public String toSql(ToSqlOptions options) {
+    StringBuilder sb = new StringBuilder(partitionSpec_.toSql(options));
     if (location_ != null) sb.append(String.format(" LOCATION '%s'", location_));
-    if (cacheOp_ != null) sb.append(" " + cacheOp_.toSql());
+    if (cacheOp_ != null) sb.append(" " + cacheOp_.toSql(options));
     return sb.toString();
   }
 

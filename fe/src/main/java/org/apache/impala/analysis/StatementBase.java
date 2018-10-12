@@ -28,6 +28,8 @@ import org.apache.impala.rewrite.ExprRewriter;
 
 import com.google.common.base.Preconditions;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Base class for all Impala SQL statements.
  */
@@ -130,13 +132,19 @@ public abstract class StatementBase implements ParseNode {
   public Analyzer getAnalyzer() { return analyzer_; }
   public boolean isAnalyzed() { return analyzer_ != null; }
 
-  public String toSql() { return toSql(false); }
+  @Override
+  public final String toSql() {
+    return toSql(DEFAULT);
+  }
+
   /**
-   * If rewritten is true, returns the rewritten SQL only if the statement was
-   * rewritten. Otherwise, the original SQL will be returned instead. It is the caller's
-   * responsibility to know if/when the statement was indeed rewritten.
+   * If ToSqlOptions.REWRITTEN is passed, then this returns the rewritten SQL only if
+   * the statement was rewritten. Otherwise, the original SQL will be returned instead.
+   * It is the caller's responsibility to know if/when the statement was indeed rewritten.
+   * @param options
    */
-  public String toSql(boolean rewritten) { return ""; }
+  public String toSql(ToSqlOptions options) { return ""; }
+
   public void setIsExplain() { isExplain_ = true; }
   public boolean isExplain() { return isExplain_; }
 

@@ -994,13 +994,13 @@ public class SelectStmt extends QueryStmt {
   }
 
   @Override
-  public String toSql(boolean rewritten) {
+  public String toSql(ToSqlOptions options) {
     // Return the SQL string before inline-view expression substitution.
-    if (!rewritten && sqlString_ != null) return sqlString_;
+    if (!options.showRewritten() && sqlString_ != null) return sqlString_;
 
     StringBuilder strBuilder = new StringBuilder();
     if (withClause_ != null) {
-      strBuilder.append(withClause_.toSql(rewritten));
+      strBuilder.append(withClause_.toSql(options));
       strBuilder.append(" ");
     }
 
@@ -1013,41 +1013,41 @@ public class SelectStmt extends QueryStmt {
       strBuilder.append(ToSqlUtils.getPlanHintsSql(selectList_.getPlanHints()) + " ");
     }
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
-      strBuilder.append(selectList_.getItems().get(i).toSql());
+      strBuilder.append(selectList_.getItems().get(i).toSql(options));
       strBuilder.append((i+1 != selectList_.getItems().size()) ? ", " : "");
     }
     // From clause
     if (!fromClause_.isEmpty()) {
-      strBuilder.append(fromClause_.toSql(rewritten));
+      strBuilder.append(fromClause_.toSql(options));
     }
     // Where clause
     if (whereClause_ != null) {
       strBuilder.append(" WHERE ");
-      strBuilder.append(whereClause_.toSql());
+      strBuilder.append(whereClause_.toSql(options));
     }
     // Group By clause
     if (groupingExprs_ != null) {
       strBuilder.append(" GROUP BY ");
       for (int i = 0; i < groupingExprs_.size(); ++i) {
-        strBuilder.append(groupingExprs_.get(i).toSql());
+        strBuilder.append(groupingExprs_.get(i).toSql(options));
         strBuilder.append((i+1 != groupingExprs_.size()) ? ", " : "");
       }
     }
     // Having clause
     if (havingClause_ != null) {
       strBuilder.append(" HAVING ");
-      strBuilder.append(havingClause_.toSql());
+      strBuilder.append(havingClause_.toSql(options));
     }
     // Order By clause
     if (orderByElements_ != null) {
       strBuilder.append(" ORDER BY ");
       for (int i = 0; i < orderByElements_.size(); ++i) {
-        strBuilder.append(orderByElements_.get(i).toSql());
+        strBuilder.append(orderByElements_.get(i).toSql(options));
         strBuilder.append((i+1 != orderByElements_.size()) ? ", " : "");
       }
     }
     // Limit clause.
-    strBuilder.append(limitElement_.toSql());
+    strBuilder.append(limitElement_.toSql(options));
     return strBuilder.toString();
   }
 

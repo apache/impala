@@ -18,12 +18,8 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.permission.FsAction;
 
 import org.apache.impala.authorization.Privilege;
@@ -50,7 +46,7 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     ArrayList<String> colsSql = Lists.newArrayList();
     ArrayList<String> partitionColsSql = Lists.newArrayList();
     HdfsCompression compression = HdfsCompression.fromFileName(

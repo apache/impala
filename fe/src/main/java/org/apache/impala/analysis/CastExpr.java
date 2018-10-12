@@ -171,9 +171,17 @@ public class CastExpr extends Expr {
   }
 
   @Override
-  public String toSqlImpl() {
-    if (isImplicit_) return getChild(0).toSql();
-    return "CAST(" + getChild(0).toSql() + " AS " + targetTypeDef_.toString() + ")";
+  public String toSqlImpl(ToSqlOptions options) {
+    if (isImplicit_) {
+      if (options.showImplictCasts()) {
+        // for implicit casts, targetTypeDef_ is null
+        return "CAST(" + getChild(0).toSql(options) + " AS " + type_.toSql() + ")";
+      } else {
+        return getChild(0).toSql(options);
+      }
+    }
+    return "CAST(" + getChild(0).toSql(options) + " AS " + targetTypeDef_.toString()
+        + ")";
   }
 
   @Override

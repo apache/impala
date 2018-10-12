@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalogUtils;
@@ -39,7 +38,6 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PartitionStatsUtil;
-import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.PrintUtils;
@@ -919,7 +917,7 @@ public class ComputeStatsStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     if (!isIncremental_) {
       StringBuilder columnList = new StringBuilder();
       if (columnWhitelist_ != null) {
@@ -928,11 +926,11 @@ public class ComputeStatsStmt extends StatementBase {
         columnList.append(")");
       }
       String tblsmpl = "";
-      if (sampleParams_ != null) tblsmpl = " " + sampleParams_.toSql();
+      if (sampleParams_ != null) tblsmpl = " " + sampleParams_.toSql(options);
       return "COMPUTE STATS " + tableName_.toSql() + columnList.toString() + tblsmpl;
     } else {
-      return "COMPUTE INCREMENTAL STATS " + tableName_.toSql() +
-          (partitionSet_ == null ? "" : partitionSet_.toSql());
+      return "COMPUTE INCREMENTAL STATS " + tableName_.toSql()
+          + (partitionSet_ == null ? "" : partitionSet_.toSql(options));
     }
   }
 

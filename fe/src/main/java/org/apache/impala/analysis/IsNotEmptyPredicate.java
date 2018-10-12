@@ -57,7 +57,9 @@ public class IsNotEmptyPredicate extends Predicate {
   }
 
   @Override
-  public String toSqlImpl() { return "!empty(" + getChild(0).toSql() + ")"; }
+  public String toSqlImpl(ToSqlOptions options) {
+    return "!empty(" + getChild(0).toSql(options) + ")";
+  }
 
   @Override
   protected void toThrift(TExprNode msg) {

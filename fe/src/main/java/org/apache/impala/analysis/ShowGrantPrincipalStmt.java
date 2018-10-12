@@ -27,7 +27,6 @@ import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TShowGrantPrincipalParams;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * Represents "SHOW GRANT ROLE <role>" [ON <privilegeSpec>]" and
@@ -85,11 +84,11 @@ public class ShowGrantPrincipalStmt extends AuthorizationStmt {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder(String.format("SHOW GRANT %s ",
         Principal.toString(principalType_).toUpperCase()));
     sb.append(name_);
-    if (privilegeSpec_ != null) sb.append(" " + privilegeSpec_.toSql());
+    if (privilegeSpec_ != null) sb.append(" " + privilegeSpec_.toSql(options));
     return sb.toString();
   }
 

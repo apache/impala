@@ -53,7 +53,7 @@ public class ShowDbsStmt extends StatementBase {
   public String getPattern() { return pattern_; }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     if (pattern_ == null) {
       return "SHOW DATABASES";
     } else {

@@ -77,19 +77,19 @@ public class UpdateStmt extends ModifyStmt {
   }
 
   @Override
-  public String toSql(boolean rewritten) {
-    if (!rewritten && sqlString_ != null) return sqlString_;
+  public String toSql(ToSqlOptions options) {
+    if (!options.showRewritten() && sqlString_ != null) return sqlString_;
 
     StringBuilder b = new StringBuilder();
     b.append("UPDATE ");
 
     if (fromClause_ == null) {
-      b.append(targetTableRef_.toSql(rewritten));
+      b.append(targetTableRef_.toSql(options));
     } else {
       if (targetTableRef_.hasExplicitAlias()) {
         b.append(targetTableRef_.getExplicitAlias());
       } else {
-        b.append(targetTableRef_.toSql(rewritten));
+        b.append(targetTableRef_.toSql(options));
       }
     }
     b.append(" SET");
@@ -101,16 +101,14 @@ public class UpdateStmt extends ModifyStmt {
       } else {
         first = false;
       }
-      b.append(format(" %s = %s",
-          i.first.toSql(),
-          i.second.toSql()));
+      b.append(format(" %s = %s", i.first.toSql(options), i.second.toSql(options)));
     }
 
-    b.append(fromClause_.toSql(rewritten));
+    b.append(fromClause_.toSql(options));
 
     if (wherePredicate_ != null) {
       b.append(" WHERE ");
-      b.append(wherePredicate_.toSql());
+      b.append(wherePredicate_.toSql(options));
     }
     return b.toString();
   }

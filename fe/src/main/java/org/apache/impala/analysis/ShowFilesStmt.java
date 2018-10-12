@@ -50,10 +50,10 @@ public class ShowFilesStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder strBuilder = new StringBuilder();
     strBuilder.append("SHOW FILES IN " + tableName_.toString());
-    if (partitionSet_ != null) strBuilder.append(" " + partitionSet_.toSql());
+    if (partitionSet_ != null) strBuilder.append(" " + partitionSet_.toSql(options));
     return strBuilder.toString();
   }
 

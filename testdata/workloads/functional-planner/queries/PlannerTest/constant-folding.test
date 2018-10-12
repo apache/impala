@@ -4,6 +4,10 @@ from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
 where 5 + 5 < c_custkey and o_orderkey = (2 + 2)
   and (coalesce(2, 3, 4) * 10) + l_linenumber < (0 * 1)
 ---- PLAN
+Analyzed query: SELECT CAST(1 AS TINYINT) FROM tpch_nested_parquet.customer c,
+c.c_orders o, o.o_lineitems WHERE c_custkey > CAST(10 AS BIGINT) AND o_orderkey
+= CAST(4 AS BIGINT) AND CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) <
+CAST(0 AS BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=264.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
@@ -55,18 +59,18 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=289.00MB
-   predicates: c_custkey > 10, !empty(c.c_orders)
-   predicates on o: !empty(o.o_lineitems), o_orderkey = 4
-   predicates on o_lineitems: 20 + l_linenumber < 0
+   predicates: c_custkey > CAST(10 AS BIGINT), !empty(c.c_orders)
+   predicates on o: !empty(o.o_lineitems), o_orderkey = CAST(4 AS BIGINT)
+   predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    stored statistics:
      table: rows=150000 size=289.00MB
      columns missing stats: c_orders
    extrapolated-rows=disabled max-scan-range-rows=44227
-   parquet statistics predicates: c_custkey > 10
-   parquet statistics predicates on o: o_orderkey = 4
-   parquet dictionary predicates: c_custkey > 10
-   parquet dictionary predicates on o: o_orderkey = 4
-   parquet dictionary predicates on o_lineitems: 20 + l_linenumber < 0
+   parquet statistics predicates: c_custkey > CAST(10 AS BIGINT)
+   parquet statistics predicates on o: o_orderkey = CAST(4 AS BIGINT)
+   parquet dictionary predicates: c_custkey > CAST(10 AS BIGINT)
+   parquet dictionary predicates on o: o_orderkey = CAST(4 AS BIGINT)
+   parquet dictionary predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    mem-estimate=264.00MB mem-reservation=16.00MB thread-reservation=1
    tuple-ids=0 row-size=24B cardinality=15000
    in pipelines: 00(GETNEXT)
@@ -76,6 +80,8 @@ select * from functional_hbase.stringids
 where string_col = cast(4 as string) and 2 + 3 = tinyint_col
   and id between concat('1', '0') and upper('20')
 ---- PLAN
+Analyzed query: SELECT * FROM functional_hbase.stringids WHERE string_col = '4'
+AND tinyint_col = CAST(5 AS TINYINT) AND id >= '10' AND id <= '20'
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
@@ -85,7 +91,7 @@ PLAN-ROOT SINK
    start key: 10
    stop key: 20\0
    hbase filters: d:string_col EQUAL '4'
-   predicates: tinyint_col = 5, string_col = '4'
+   predicates: tinyint_col = CAST(5 AS TINYINT), string_col = '4'
    stored statistics:
      table: rows=10000
      columns: all
@@ -97,14 +103,17 @@ PLAN-ROOT SINK
 select * from functional.alltypes_datasource
 where tinyint_col < (pow(2, 8)) and float_col != 0 and 1 + 1 > int_col
 ---- PLAN
+Analyzed query: SELECT * FROM functional.alltypes_datasource WHERE
+CAST(tinyint_col AS DOUBLE) < CAST(256 AS DOUBLE) AND float_col != CAST(0 AS
+FLOAT) AND int_col < CAST(2 AS INT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=1.00GB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
-data source predicates: tinyint_col < 256, int_col < 2
-predicates: float_col != 0
+data source predicates: CAST(tinyint_col AS DOUBLE) < CAST(256 AS DOUBLE), int_col < CAST(2 AS INT)
+predicates: float_col != CAST(0 AS FLOAT)
    mem-estimate=1.00GB mem-reservation=0B thread-reservation=0
    tuple-ids=0 row-size=116B cardinality=500
    in pipelines: 00(GETNEXT)
@@ -117,15 +126,21 @@ having 1024 * 1024 * count(*) % 2 = 0
   and (sum(1 + 1 + id) > 1 or sum(1 + 1 + id) > 1)
   and (sum(1 + 1 + id) between 5 and 10)
 ---- PLAN
+Analyzed query: SELECT sum(CAST(2 AS BIGINT) + CAST(id AS BIGINT)) FROM
+functional.alltypes GROUP BY timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
+HAVING CAST(1048576 AS BIGINT) * count(*) % CAST(2 AS BIGINT) = CAST(0 AS
+BIGINT) AND sum(CAST(2 AS BIGINT) + CAST(id AS BIGINT)) > CAST(1 AS BIGINT) AND
+sum(CAST(2 AS BIGINT) + CAST(id AS BIGINT)) >= CAST(5 AS BIGINT) AND sum(CAST(2
+AS BIGINT) + CAST(id AS BIGINT)) <= CAST(10 AS BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.97MB thread-reservation=2
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum(2 + id), count(*)
+|  output: sum(CAST(2 AS BIGINT) + CAST(id AS BIGINT)), count(*)
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
-|  having: sum(2 + id) <= 10, sum(2 + id) > 1, sum(2 + id) >= 5, 1048576 * count(*) % 2 = 0
+|  having: sum(2 + id) <= CAST(10 AS BIGINT), sum(2 + id) > CAST(1 AS BIGINT), sum(2 + id) >= CAST(5 AS BIGINT), CAST(1048576 AS BIGINT) * count(*) % CAST(2 AS BIGINT) = CAST(0 AS BIGINT)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=1 row-size=17B cardinality=0
 |  in pipelines: 01(GETNEXT), 00(OPEN)
@@ -148,6 +163,12 @@ left outer join functional.alltypes b
       a.int_col between 0 + 0 + 0 + b.bigint_col and b.bigint_col + ascii('a'))
 where round(1.11 + 2.22 + 3.33 + 4.44, 1) < cast(b.double_col as decimal(3, 2))
 ---- PLAN
+Analyzed query: SELECT CAST(1 AS TINYINT) FROM functional.alltypes a LEFT OUTER
+JOIN functional.alltypes b ON (CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) =
+CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) AND CAST(a.int_col AS BIGINT) >= CAST(0
+AS BIGINT) + b.bigint_col AND CAST(a.int_col AS BIGINT) <= b.bigint_col +
+CAST(97 AS BIGINT)) WHERE CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS
+DECIMAL(6,1))
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=257.94MB mem-reservation=2.00MB thread-reservation=3
 PLAN-ROOT SINK
@@ -156,15 +177,15 @@ PLAN-ROOT SINK
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: 2 + a.id = b.id - 2
 |  fk/pk conjuncts: assumed fk/pk
-|  other join predicates: a.int_col <= b.bigint_col + 97, a.int_col >= 0 + b.bigint_col
-|  other predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
+|  other join predicates: CAST(a.int_col AS BIGINT) <= b.bigint_col + CAST(97 AS BIGINT), CAST(a.int_col AS BIGINT) >= CAST(0 AS BIGINT) + b.bigint_col
+|  other predicates: CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS DECIMAL(6,1))
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1N row-size=28B cardinality=7300
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
+|     predicates: CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS DECIMAL(6,1))
 |     stored statistics:
 |       table: rows=7300 size=478.45KB
 |       partitions: 24/24 rows=7300
@@ -193,21 +214,27 @@ left outer join functional.alltypes b
       a.int_col between 0 + 0 + 0 + b.bigint_col and b.bigint_col + ascii('a'))
 where cast(b.double_col as decimal(3, 2)) > round(1.11 + 2.22 + 3.33 + 4.44, 1)
 ---- PLAN
+Analyzed query: SELECT CAST(1 AS TINYINT) FROM functional.alltypes a LEFT OUTER
+JOIN functional.alltypes b ON (CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) =
+CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) >= CAST(0
+AS BIGINT) + b.bigint_col AND CAST(a.int_col AS BIGINT) <= b.bigint_col +
+CAST(97 AS BIGINT)) WHERE CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS
+DECIMAL(6,1))
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=256.01MB mem-reservation=64.00KB thread-reservation=3
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:NESTED LOOP JOIN [LEFT OUTER JOIN]
-|  join predicates: (2 + a.id = b.id - 2 OR a.int_col >= 0 + b.bigint_col AND a.int_col <= b.bigint_col + 97)
-|  predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
+|  join predicates: (CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) = CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) >= CAST(0 AS BIGINT) + b.bigint_col AND CAST(a.int_col AS BIGINT) <= b.bigint_col + CAST(97 AS BIGINT))
+|  predicates: CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS DECIMAL(6,1))
 |  mem-estimate=14.26KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=0,1N row-size=28B cardinality=7300
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: CAST(b.double_col AS DECIMAL(3,2)) > 11.1
+|     predicates: CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS DECIMAL(6,1))
 |     stored statistics:
 |       table: rows=7300 size=478.45KB
 |       partitions: 24/24 rows=7300
@@ -234,6 +261,10 @@ from functional.alltypes
 group by timestamp_col = cast('2015-11-15' as timestamp) + interval 1 year
 having 1024 * 1024 * count(*) % 2 = 0
 ---- PLAN
+Analyzed query: SELECT sum(DISTINCT CAST(2 AS BIGINT) + CAST(id AS BIGINT)) FROM
+functional.alltypes GROUP BY timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
+HAVING CAST(1048576 AS BIGINT) * count(*) % CAST(2 AS BIGINT) = CAST(0 AS
+BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=3.88MB thread-reservation=2
 PLAN-ROOT SINK
@@ -242,14 +273,14 @@ PLAN-ROOT SINK
 02:AGGREGATE [FINALIZE]
 |  output: sum(2 + id), count:merge(*)
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
-|  having: 1048576 * count(*) % 2 = 0
+|  having: CAST(1048576 AS BIGINT) * count(*) % CAST(2 AS BIGINT) = CAST(0 AS BIGINT)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=2 row-size=17B cardinality=0
 |  in pipelines: 02(GETNEXT), 01(OPEN)
 |
 01:AGGREGATE
 |  output: count(*)
-|  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00', 2 + id
+|  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00', CAST(2 AS BIGINT) + CAST(id AS BIGINT)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=1 row-size=17B cardinality=7300
 |  in pipelines: 01(GETNEXT), 00(OPEN)
@@ -270,6 +301,9 @@ select sum(distinct 1 + 1 + id)
 from functional.alltypes
 having 1024 * 1024 * count(*) % 2 = 0
 ---- PLAN
+Analyzed query: SELECT sum(DISTINCT CAST(2 AS BIGINT) + CAST(id AS BIGINT)) FROM
+functional.alltypes HAVING CAST(1048576 AS BIGINT) * count(*) % CAST(2 AS
+BIGINT) = CAST(0 AS BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.97MB thread-reservation=2
 PLAN-ROOT SINK
@@ -277,14 +311,14 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: sum(2 + id), count:merge(*)
-|  having: 1048576 * zeroifnull(count(*)) % 2 = 0
+|  having: CAST(1048576 AS BIGINT) * zeroifnull(count(*)) % CAST(2 AS BIGINT) = CAST(0 AS BIGINT)
 |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=16B cardinality=0
 |  in pipelines: 02(GETNEXT), 01(OPEN)
 |
 01:AGGREGATE
 |  output: count(*)
-|  group by: 2 + id
+|  group by: CAST(2 AS BIGINT) + CAST(id AS BIGINT)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=1 row-size=16B cardinality=7300
 |  in pipelines: 01(GETNEXT), 00(OPEN)
@@ -306,6 +340,9 @@ select first_value(1 + 1 + int_col - (1 - 1)) over
    order by greatest(greatest(10, 20), bigint_col))
 from functional.alltypes
 ---- PLAN
+Analyzed query: SELECT first_value(1 + 1 + int_col - (1 - 1)) OVER (PARTITION BY
+concat(concat('a', 'b'), string_col) ORDER BY greatest(greatest(10, 20),
+bigint_col) ASC) FROM functional.alltypes
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.03MB thread-reservation=2
 PLAN-ROOT SINK
@@ -342,6 +379,8 @@ PLAN-ROOT SINK
 select int_col from functional.alltypes
 order by id * abs((factorial(5) / power(2, 4)))
 ---- PLAN
+Analyzed query: SELECT int_col FROM functional.alltypes ORDER BY id * CAST(7.5
+AS DOUBLE) ASC
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=134.00MB mem-reservation=6.03MB thread-reservation=2
 PLAN-ROOT SINK
@@ -369,6 +408,9 @@ insert into functional.alltypes (id, int_col) partition(year,month)
 select id, int_col, cast(1 + 1 + 1 + year as int), cast(month - (1 - 1 - 1) as int)
 from functional.alltypessmall
 ---- PLAN
+Analyzed query: SELECT id, int_col, CAST(CAST(3 AS BIGINT) + CAST(year AS
+BIGINT) AS INT), CAST(CAST(month AS BIGINT) - CAST(-1 AS BIGINT) AS INT) FROM
+functional.alltypessmall
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=38.00MB mem-reservation=6.01MB thread-reservation=2
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(CAST(3 + year AS INT),CAST(month - -1 AS INT))]
@@ -400,13 +442,17 @@ select sum(id + c3) from
     ) v2
   ) v3
 ---- PLAN
+Analyzed query: SELECT sum(CAST(id AS BIGINT) + CAST(c3 AS BIGINT)) FROM (SELECT
+id, CAST(10 AS INT) + CAST(c2 AS INT) c3 FROM (SELECT id, CAST(20 AS SMALLINT) +
+CAST(c1 AS SMALLINT) c2 FROM (SELECT id, CAST(30 AS TINYINT) c1 FROM
+functional.alltypes LIMIT CAST(2 AS TINYINT)) v1) v2) v3
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum(id + 10 + 20 + 30)
+|  output: sum(CAST(id AS BIGINT) + CAST(CAST(10 AS INT) + CAST(CAST(20 AS SMALLINT) + CAST(30 AS SMALLINT) AS INT) AS BIGINT))
 |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=8B cardinality=1
 |  in pipelines: 01(GETNEXT), 00(OPEN)

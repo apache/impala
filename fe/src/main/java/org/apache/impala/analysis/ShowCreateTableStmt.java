@@ -48,7 +48,7 @@ public class ShowCreateTableStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     return "SHOW CREATE " + objectType_.name() + " " + tableName_;
   }
 

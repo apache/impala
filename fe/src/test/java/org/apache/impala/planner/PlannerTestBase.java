@@ -744,15 +744,22 @@ public class PlannerTestBase extends FrontendTestBase {
   }
 
   /**
-   * If required by 'testOptions', strip out all or part of the the header containing
-   * resource estimates and the warning about missing stats from the given explain plan.
+   * Strip out all or part of the the explain header.
+   * This can be used to remove lines containing resource estimates and the warning about
+   * missing stats from the given explain plan.
+   * explain is the original explain output
+   * testOptions controls which parts of the header to include
    */
   private String removeExplainHeader(String explain, Set<PlannerTestOption> testOptions) {
     if (testOptions.contains(PlannerTestOption.INCLUDE_EXPLAIN_HEADER)) return explain;
     boolean keepResources =
         testOptions.contains(PlannerTestOption.INCLUDE_RESOURCE_HEADER);
+    boolean keepQueryWithImplicitCasts =
+        testOptions.contains(PlannerTestOption.INCLUDE_QUERY_WITH_IMPLICIT_CASTS);
     StringBuilder builder = new StringBuilder();
     boolean inHeader = true;
+    boolean inImplictCasts = false;
+
     for (String line: explain.split("\n")) {
       if (inHeader) {
         // The first empty line indicates the end of the header.
@@ -760,6 +767,13 @@ public class PlannerTestBase extends FrontendTestBase {
           inHeader = false;
         } else if (keepResources && line.contains("Resource")) {
           builder.append(line).append("\n");
+        } else if (keepQueryWithImplicitCasts) {
+          inImplictCasts |= line.contains("Analyzed query:");
+          if (inImplictCasts) {
+            // Keep copying the query with implicit casts.
+            // This works because this is the last thing in the header.
+            builder.append(line).append("\n");
+          }
         }
       } else {
         builder.append(line).append("\n");
@@ -780,6 +794,9 @@ public class PlannerTestBase extends FrontendTestBase {
     // Include the part of the explain header that has top-level resource consumption.
     // If INCLUDE_EXPLAIN_HEADER is enabled, these are already included.
     INCLUDE_RESOURCE_HEADER,
+    // Include the part of the extended explain header that has the query including
+    // implicit casts. Equivalent to enabling INCLUDE_EXPLAIN_HEADER and EXTENDED_EXPLAIN.
+    INCLUDE_QUERY_WITH_IMPLICIT_CASTS,
     // Validate the values of resource requirement values within the plan (default is to
     // ignore differences in resource values). Operator- and fragment-level resource
     // requirements are only included if EXTENDED_EXPLAIN is also enabled.

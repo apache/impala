@@ -40,7 +40,7 @@ public class GrantRevokeRoleStmt extends AuthorizationStmt {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     if (isGrantStmt_) {
       return String.format("GRANT ROLE %s TO %s", roleName_, groupName_);
     } else {

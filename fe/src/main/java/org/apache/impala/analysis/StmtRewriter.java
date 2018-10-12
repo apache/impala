@@ -32,6 +32,9 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+import static org.apache.impala.analysis.ToSqlOptions.REWRITTEN;
+
 /**
  * Class representing a statement rewriter. The base class traverses the stmt tree and
  * the specific rewrite rules are implemented in the subclasses and are called by the
@@ -97,7 +100,7 @@ public class StmtRewriter {
     // Currently only SubqueryRewriter touches the where clause. Recurse into the where
     // clause when the need arises.
     rewriteSelectStmtHook(stmt, analyzer);
-    if (LOG.isTraceEnabled()) LOG.trace("Rewritten SQL: " + stmt.toSql(true));
+    if (LOG.isTraceEnabled()) LOG.trace("Rewritten SQL: " + stmt.toSql(REWRITTEN));
   }
 
   /**
@@ -719,9 +722,9 @@ public class StmtRewriter {
             .filter(correlatedPredicates,
                 Predicates.and(Expr.IS_NOT_EQ_BINARY_PREDICATE, isBoundBySubqueryTids)));
         if (!unsupportedPredicates.isEmpty()) {
-          throw new AnalysisException("Unsupported aggregate subquery with " +
-              "non-equality correlated predicates: " +
-              Expr.listToSql(unsupportedPredicates));
+          throw new AnalysisException("Unsupported aggregate subquery with "
+              + "non-equality correlated predicates: "
+              + Expr.listToSql(unsupportedPredicates, DEFAULT));
         }
       }
     }

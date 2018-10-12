@@ -10,7 +10,7 @@ aggregation(SUM, NumStatsFilteredRowGroups): 4
 set explain_level=2;
 explain select id, bool_col from functional_parquet.alltypessmall where int_col < 0;
 ---- RESULTS: VERIFY_IS_SUBSET
-'   parquet statistics predicates: int_col < 0'
+'   parquet statistics predicates: int_col < CAST(0 AS INT)'
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where tinyint_col < 0
@@ -160,7 +160,7 @@ aggregation(SUM, NumStatsFilteredRowGroups): 4
 set explain_level=2;
 explain select count(*) from functional_parquet.alltypessmall where tinyint_col = 10
 ---- RESULTS: VERIFY_IS_SUBSET
-'   parquet statistics predicates: tinyint_col = 10'
+'   parquet statistics predicates: tinyint_col = CAST(10 AS TINYINT)'
 ====
 ---- QUERY
 select count(*) from functional_parquet.alltypessmall where id >= 30 and id <= 80

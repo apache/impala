@@ -20,14 +20,14 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partitions=24/24 files=24 size=188.92KB
-   predicates: int_col IS NULL, int_col > 1, int_col > tinyint_col, int_col * rand() > 50
+   predicates: int_col IS NULL, int_col > CAST(1 AS INT), int_col > CAST(tinyint_col AS INT), CAST(int_col AS DOUBLE) * rand() > CAST(50 AS DOUBLE)
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   parquet statistics predicates: int_col > 1
-   parquet dictionary predicates: int_col > 1
+   parquet statistics predicates: int_col > CAST(1 AS INT)
+   parquet dictionary predicates: int_col > CAST(1 AS INT)
    mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
    tuple-ids=0 row-size=5B cardinality=unavailable
    in pipelines: 00(GETNEXT)
@@ -50,7 +50,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   predicates: int_col IS NULL, int_col > 1, int_col > tinyint_col, int_col * rand() > 50
+   predicates: int_col IS NULL, int_col > CAST(1 AS INT), int_col > CAST(tinyint_col AS INT), CAST(int_col AS DOUBLE) * rand() > CAST(50 AS DOUBLE)
    stored statistics:
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300
@@ -82,14 +82,14 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partitions=22/24 files=22 size=172.93KB
-   predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, int_col % 2 = 1, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
+   predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/22 rows=unavailable
      columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   parquet statistics predicates: bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), date_string_col > '1993-10-01'
-   parquet dictionary predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, int_col % 2 = 1, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
+   parquet statistics predicates: bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), date_string_col > '1993-10-01'
+   parquet dictionary predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    mem-estimate=128.00MB mem-reservation=88.00KB thread-reservation=1
    tuple-ids=0 row-size=80B cardinality=unavailable
    in pipelines: 00(GETNEXT)
@@ -116,7 +116,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=22/24 files=22 size=437.72KB
-   predicates: id = 1, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, tinyint_col < 50, int_col % 2 = 1, timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
+   predicates: id = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    stored statistics:
      table: rows=7300 size=478.45KB
      partitions: 22/22 rows=6680
@@ -149,13 +149,13 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partitions=24/24 files=24 size=188.92KB
-   predicates: id IN (int_col), id NOT IN (0, 1, 2), int_col % 50 IN (0, 1), string_col IN ('aaaa', 'bbbb', 'cccc', NULL)
+   predicates: id IN (int_col), id NOT IN (CAST(0 AS INT), CAST(1 AS INT), CAST(2 AS INT)), int_col % CAST(50 AS INT) IN (CAST(0 AS INT), CAST(1 AS INT)), string_col IN ('aaaa', 'bbbb', 'cccc', NULL)
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   parquet dictionary predicates: id NOT IN (0, 1, 2), int_col % 50 IN (0, 1), string_col IN ('aaaa', 'bbbb', 'cccc', NULL)
+   parquet dictionary predicates: id NOT IN (CAST(0 AS INT), CAST(1 AS INT), CAST(2 AS INT)), int_col % CAST(50 AS INT) IN (CAST(0 AS INT), CAST(1 AS INT)), string_col IN ('aaaa', 'bbbb', 'cccc', NULL)
    mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
    tuple-ids=0 row-size=24B cardinality=unavailable
    in pipelines: 00(GETNEXT)
@@ -219,13 +219,13 @@ PLAN-ROOT SINK
    partitions=1/1 files=2 size=6.92KB
    predicates: !empty(c.nested_struct.c.d)
    predicates on cn: !empty(cn.item)
-   predicates on a: a.item.e < -10
+   predicates on a: a.item.e < CAST(-10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      columns missing stats: id
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   parquet statistics predicates on a: a.item.e < -10
-   parquet dictionary predicates on a: a.item.e < -10
+   parquet statistics predicates on a: a.item.e < CAST(-10 AS INT)
+   parquet dictionary predicates on a: a.item.e < CAST(-10 AS INT)
    mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
    tuple-ids=0 row-size=24B cardinality=unavailable
    in pipelines: 00(GETNEXT)
@@ -254,7 +254,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  |--06:NESTED LOOP JOIN [RIGHT OUTER JOIN]
-|  |  |  predicates: a.item.e < -10
+|  |  |  predicates: a.item.e < CAST(-10 AS INT)
 |  |  |  mem-estimate=40B mem-reservation=0B thread-reservation=0
 |  |  |  tuple-ids=2N,1,0 row-size=44B cardinality=1
 |  |  |  in pipelines: 00(GETNEXT)
@@ -291,7 +291,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.complextypestbl c]
    partitions=1/1 files=2 size=6.92KB
    predicates: !empty(c.nested_struct.c.d)
-   predicates on a: a.item.e < -10
+   predicates on a: a.item.e < CAST(-10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      columns missing stats: id
@@ -357,7 +357,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.complextypestbl c]
    partitions=1/1 files=2 size=6.92KB
-   predicates on a: a.item.e < -10
+   predicates on a: a.item.e < CAST(-10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      columns missing stats: id
@@ -421,19 +421,19 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=288.98MB
-   predicates: c_custkey > 0, !empty(c.c_orders)
-   predicates on o: !empty(o.o_lineitems), o.o_orderkey > 0
-   predicates on l: l.l_partkey > 0
+   predicates: c_custkey > CAST(0 AS BIGINT), !empty(c.c_orders)
+   predicates on o: !empty(o.o_lineitems), o.o_orderkey > CAST(0 AS BIGINT)
+   predicates on l: l.l_partkey > CAST(0 AS BIGINT)
    stored statistics:
      table: rows=150000 size=288.98MB
      columns missing stats: c_orders
    extrapolated-rows=disabled max-scan-range-rows=44229
-   parquet statistics predicates: c_custkey > 0
-   parquet statistics predicates on o: o.o_orderkey > 0
-   parquet statistics predicates on l: l.l_partkey > 0
-   parquet dictionary predicates: c_custkey > 0
-   parquet dictionary predicates on o: o.o_orderkey > 0
-   parquet dictionary predicates on l: l.l_partkey > 0
+   parquet statistics predicates: c_custkey > CAST(0 AS BIGINT)
+   parquet statistics predicates on o: o.o_orderkey > CAST(0 AS BIGINT)
+   parquet statistics predicates on l: l.l_partkey > CAST(0 AS BIGINT)
+   parquet dictionary predicates: c_custkey > CAST(0 AS BIGINT)
+   parquet dictionary predicates on o: o.o_orderkey > CAST(0 AS BIGINT)
+   parquet dictionary predicates on l: l.l_partkey > CAST(0 AS BIGINT)
    mem-estimate=264.00MB mem-reservation=16.00MB thread-reservation=1
    tuple-ids=0 row-size=24B cardinality=15000
    in pipelines: 00(GETNEXT)
@@ -478,7 +478,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.complextypestbl c]
    partitions=1/1 files=2 size=6.92KB
-   predicates on int_array: item > 10
+   predicates on int_array: item > CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      columns: unavailable
@@ -582,14 +582,14 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesmixedformat]
    partitions=4/4 files=4 size=66.61KB
-   predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50,  int_col % 2 = 1, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
+   predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/4 rows=unavailable
      columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   parquet statistics predicates: bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), date_string_col > '1993-10-01'
-   parquet dictionary predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50,  int_col % 2 = 1, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
+   parquet statistics predicates: bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), date_string_col > '1993-10-01'
+   parquet dictionary predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    mem-estimate=128.00MB mem-reservation=88.00KB thread-reservation=1
    tuple-ids=0 row-size=80B cardinality=unavailable
    in pipelines: 00(GETNEXT)
@@ -617,7 +617,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesmixedformat]
    partitions=0/4 files=0 size=0B
-   predicates: bool_col, bigint_col < 5000, double_col > 100.00, float_col > 50.00, id = 1, tinyint_col < 50, int_col % 2 = 1, string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (1, 2, 3, 4, 5), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = 1, date_string_col > '1993-10-01'
+   predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/0 rows=unavailable

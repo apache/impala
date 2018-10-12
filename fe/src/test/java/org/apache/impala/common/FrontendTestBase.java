@@ -363,16 +363,16 @@ public class FrontendTestBase {
           }
         }
         if (!matchedWarning) {
-          fail(String.format("Did not produce expected warning.\n" +
-              "Expected warning:\n%s.\nActual warnings:\n%s",
-              expectedWarning, Joiner.on("\n").join(actualWarnings)));
+          fail(String.format("Did not produce expected warning.\n"
+                  + "Expected warning:\n%s.\nActual warnings:\n%s\nsql:\n%s",
+              expectedWarning, Joiner.on("\n").join(actualWarnings), stmt));
         }
       }
       Preconditions.checkNotNull(analysisResult.getStmt());
       return analysisResult.getStmt();
     } catch (Exception e) {
       e.printStackTrace();
-      fail("Error:\n" + e.toString());
+      fail("Error during analysis:\n" + e.toString() + "\nsql:\n" + stmt);
     }
     return null;
   }

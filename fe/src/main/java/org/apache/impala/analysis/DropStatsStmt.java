@@ -53,7 +53,7 @@ public class DropStatsStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("DROP ");
     if (partitionSet_ == null) {
       sb.append(" STATS ");
@@ -63,7 +63,7 @@ public class DropStatsStmt extends StatementBase {
       sb.append(" INCREMENTAL STATS ");
       if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
       sb.append(tableName_.toSql());
-      sb.append(partitionSet_.toSql());
+      sb.append(partitionSet_.toSql(options));
     }
     return sb.toString();
   }

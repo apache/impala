@@ -63,7 +63,8 @@ public class PlannerTest extends PlannerTestBase {
     // Note that not all Exprs are printed in the explain plan, so validating those
     // via this test is currently not possible.
     runPlannerTestFile("constant-folding",
-        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN));
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
+            PlannerTestOption.INCLUDE_QUERY_WITH_IMPLICIT_CASTS));
   }
 
   @Test

@@ -24,6 +24,8 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Base class for PartitionSpec and PartitionSet containing the partition
  * specifications of related DDL operations.
@@ -92,5 +94,10 @@ public abstract class PartitionSpecBase implements ParseNode {
   }
 
   @Override
-  public abstract String toSql();
+  public final String toSql() {
+    return toSql(DEFAULT);
+  }
+
+  @Override
+  public abstract String toSql(ToSqlOptions options);
 }

@@ -47,7 +47,7 @@ public class ShowStatsStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     return getSqlPrefix() + " " + tableName_.toString();
   }
 

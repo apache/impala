@@ -136,10 +136,10 @@ public class PartitionSpec extends PartitionSpecBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     List<String> partitionSpecStr = Lists.newArrayList();
     for (PartitionKeyValue kv: partitionSpec_) {
-      partitionSpecStr.add(kv.getColName() + "=" + kv.getValue().toSql());
+      partitionSpecStr.add(kv.getColName() + "=" + kv.getValue().toSql(options));
     }
     return String.format("PARTITION (%s)", Joiner.on(", ").join(partitionSpecStr));
   }

@@ -202,14 +202,14 @@ public class InPredicate extends Predicate {
   }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     StringBuilder strBuilder = new StringBuilder();
     String notStr = (isNotIn_) ? "NOT " : "";
-    strBuilder.append(getChild(0).toSql() + " " + notStr + "IN ");
+    strBuilder.append(getChild(0).toSql(options) + " " + notStr + "IN ");
     boolean hasSubquery = contains(Subquery.class);
     if (!hasSubquery) strBuilder.append("(");
     for (int i = 1; i < children_.size(); ++i) {
-      strBuilder.append(getChild(i).toSql());
+      strBuilder.append(getChild(i).toSql(options));
       strBuilder.append((i+1 != children_.size()) ? ", " : "");
     }
     if (!hasSubquery) strBuilder.append(")");

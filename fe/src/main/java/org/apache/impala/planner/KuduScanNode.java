@@ -312,12 +312,12 @@ public class KuduScanNode extends ScanNode {
       case EXTENDED: // Fallthrough intended.
       case VERBOSE: {
         if (!conjuncts_.isEmpty()) {
-          result.append(detailPrefix + "predicates: " + getExplainString(conjuncts_)
-              + "\n");
+          result.append(detailPrefix
+              + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
         }
         if (!kuduConjuncts_.isEmpty()) {
-          result.append(detailPrefix + "kudu predicates: " + getExplainString(
-              kuduConjuncts_) + "\n");
+          result.append(detailPrefix + "kudu predicates: "
+              + getExplainString(kuduConjuncts_, detailLevel) + "\n");
         }
         if (!runtimeFilters_.isEmpty()) {
           result.append(detailPrefix + "runtime filters: ");

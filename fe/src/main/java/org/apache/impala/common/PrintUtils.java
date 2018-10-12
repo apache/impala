@@ -26,7 +26,7 @@ import static org.apache.impala.common.ByteUnits.TERABYTE;
 import java.text.DecimalFormat;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.impala.planner.PlanFragmentId;
+import org.apache.commons.lang3.text.WordUtils;
 
 /**
  * Utility functions for pretty printing.
@@ -100,5 +100,22 @@ public class PrintUtils {
       }
       matrixStr.append("\n");
     }
+  }
+
+  /**
+   * Wrap a string by inserting newlines so that no line exceeds a given length.
+   * Any newlines in the input are maintained.
+   */
+  public static String wrapString(String s, int wrapLength) {
+    StringBuilder ret = new StringBuilder(s.length());
+    String[] split = s.split("\n");
+    for (int i = 0; i < split.length; i++) {
+      String line = split[i];
+      String wrappedLine = WordUtils.wrap(line, wrapLength, null, true);
+      // we keep any existing newlines in text - these should be commented hints
+      ret.append(wrappedLine);
+      if (i < split.length - 1) ret.append("\n");
+    }
+    return ret.toString();
   }
 }

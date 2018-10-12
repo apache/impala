@@ -187,10 +187,10 @@ public class PartitionSet extends PartitionSpecBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     List<String> partitionExprStr = Lists.newArrayList();
     for (Expr e : partitionExprs_) {
-      partitionExprStr.add(e.toSql());
+      partitionExprStr.add(e.toSql(options));
     }
     return String.format("PARTITION (%s)", Joiner.on(", ").join(partitionExprStr));
   }

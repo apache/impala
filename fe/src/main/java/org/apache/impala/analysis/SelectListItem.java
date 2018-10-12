@@ -22,6 +22,8 @@ import java.util.List;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 class SelectListItem {
   private Expr expr_;
   private String alias_;
@@ -70,14 +72,16 @@ class SelectListItem {
     }
   }
 
-  public String toSql() {
+  public final String toSql() { return toSql(DEFAULT); }
+
+  public String toSql(ToSqlOptions options) {
     if (!isStar_) {
       Preconditions.checkNotNull(expr_);
       // Enclose aliases in quotes if Hive cannot parse them without quotes.
       // This is needed for view compatibility between Impala and Hive.
       String aliasSql = null;
       if (alias_ != null) aliasSql = ToSqlUtils.getIdentSql(alias_);
-      return expr_.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
+      return expr_.toSql(options) + ((aliasSql != null) ? " " + aliasSql : "");
     } else if (rawPath_ != null) {
       Preconditions.checkState(isStar_);
       StringBuilder result = new StringBuilder();

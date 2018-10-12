@@ -74,7 +74,7 @@ public class CreateDataSrcStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder();
     sb.append("CREATE DATA SOURCE ");
     if (ifNotExists_) sb.append("IF NOT EXISTS ");

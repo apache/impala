@@ -55,6 +55,7 @@ explain select id from alltypes;
 row_regex:.*Max Per-Host Resource Reservation: Memory=.*
 row_regex:.*Per-Host Resource Estimates: Memory=.*
 'Codegen disabled by planner'
+row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes.*
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
@@ -81,6 +82,8 @@ explain select id from alltypes where month in (1, 2, 3);
 row_regex:.*Max Per-Host Resource Reservation: Memory=.*
 row_regex:.*Per-Host Resource Estimates: Memory=.*
 'Codegen disabled by planner'
+row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes WHERE.*
+'month IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT))'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*mem-estimate=.* mem-reservation=.*
@@ -108,6 +111,7 @@ explain select id from alltypes;
 ---- RESULTS: VERIFY_IS_EQUAL
 row_regex:.*Max Per-Host Resource Reservation: Memory=.*
 row_regex:.*Per-Host Resource Estimates: Memory=.*
+row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes.*
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
@@ -136,6 +140,8 @@ explain select id from alltypes where year = 2010;
 row_regex:.*Max Per-Host Resource Reservation: Memory=.*
 row_regex:.*Per-Host Resource Estimates: Memory=16MB.*
 'Codegen disabled by planner'
+row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes WHERE.*
+'year = CAST(2010 AS INT)'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
@@ -163,6 +169,8 @@ explain select id from alltypes where year = 2010;
 row_regex:.*Max Per-Host Resource Reservation: Memory=.*
 row_regex:.*Per-Host Resource Estimates: Memory=16MB.*
 'Codegen disabled by planner'
+row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes WHERE.*
+'year = CAST(2010 AS INT)'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*

@@ -48,7 +48,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=12/24 files=12 size=239.26KB
-   predicates: id < 10
+   predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=7300 size=478.45KB
      partitions: 24/24 rows=7300

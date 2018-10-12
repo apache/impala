@@ -79,11 +79,11 @@ public class KuduPartitionExpr extends Expr {
   protected float computeEvalCost() { return UNKNOWN_COST; }
 
   @Override
-  protected String toSqlImpl() {
+  protected String toSqlImpl(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("KuduPartition(");
     for (int i = 0; i < children_.size(); ++i) {
       if (i != 0) sb.append(", ");
-      sb.append(children_.get(i).toSql());
+      sb.append(children_.get(i).toSql(options));
     }
     sb.append(")");
     return sb.toString();

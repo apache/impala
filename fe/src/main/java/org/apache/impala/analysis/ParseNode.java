@@ -25,10 +25,17 @@ public interface ParseNode {
    * Perform semantic analysis of node and all of its children.
    * Throws exception if any semantic errors were found.
    */
-  public void analyze(Analyzer analyzer) throws AnalysisException;
+  void analyze(Analyzer analyzer) throws AnalysisException;
 
   /**
-   * Returns the SQL string corresponding to this node.
+   * Returns the SQL string corresponding to this node and its descendants.
    */
-  public String toSql();
+  String toSql(ToSqlOptions options);
+
+  /**
+   * Returns the SQL string corresponding to this node and its descendants.
+   * This should return the same result as calling toSql(ToSqlOptions.DEFAULT).
+   * TODO use an interface default method to implement this when we fully move to Java8.
+   */
+  String toSql();
 }

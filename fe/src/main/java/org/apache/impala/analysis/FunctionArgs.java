@@ -24,6 +24,8 @@ import org.apache.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 // Wrapper class around argument types and if it has varArgs
 public class FunctionArgs implements ParseNode {
   private final ArrayList<TypeDef> argTypeDefs_;
@@ -63,5 +65,12 @@ public class FunctionArgs implements ParseNode {
   public boolean hasVarArgs() { return hasVarArgs_; }
 
   @Override
-  public String toSql() { return null; }
+  public final String toSql() {
+    return toSql(DEFAULT);
+  }
+
+  @Override
+  public String toSql(ToSqlOptions options) {
+    return null;
+  }
 }

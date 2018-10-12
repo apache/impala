@@ -316,5 +316,5 @@ public abstract class ModifyStmt extends StatementBase {
   public QueryStmt getQueryStmt() { return sourceStmt_; }
   public abstract DataSink createDataSink();
   @Override
-  public abstract String toSql(boolean rewritten);
+  public abstract String toSql(ToSqlOptions options);
 }

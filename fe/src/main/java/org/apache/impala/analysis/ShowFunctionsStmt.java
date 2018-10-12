@@ -68,7 +68,7 @@ public class ShowFunctionsStmt extends StatementBase {
   public String getPattern() { return pattern_; }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     String fnCategory = (fnCategory_ == null) ? "" : fnCategory_.toString() + " ";
     if (pattern_ == null) {
       return "SHOW " + fnCategory + "FUNCTIONS";

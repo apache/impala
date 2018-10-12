@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.catalog.Db;
@@ -102,12 +101,13 @@ public class CompoundPredicate extends Predicate {
   }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     if (children_.size() == 1) {
       Preconditions.checkState(op_ == Operator.NOT);
-      return "NOT " + getChild(0).toSql();
+      return "NOT " + getChild(0).toSql(options);
     } else {
-      return getChild(0).toSql() + " " + op_.toString() + " " + getChild(1).toSql();
+      return getChild(0).toSql(options) + " " + op_.toString() + " "
+          + getChild(1).toSql(options);
     }
   }
 

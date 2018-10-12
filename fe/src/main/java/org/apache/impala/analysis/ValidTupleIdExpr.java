@@ -81,7 +81,9 @@ public class ValidTupleIdExpr extends Expr {
   }
 
   @Override
-  protected String toSqlImpl() { return "valid_tid()"; }
+  protected String toSqlImpl(ToSqlOptions options) {
+    return "valid_tid()";
+  }
 
   @Override
   public boolean isBoundByTupleIds(List<TupleId> tids) {

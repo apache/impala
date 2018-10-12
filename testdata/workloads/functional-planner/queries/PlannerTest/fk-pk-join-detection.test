@@ -146,7 +146,7 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [tpcds.store_returns]
 |     partitions=1/1 files=1 size=31.19MB
-|     predicates: sr_return_quantity < 10
+|     predicates: sr_return_quantity < CAST(10 AS INT)
 |     stored statistics:
 |       table: rows=287514 size=31.19MB
 |       columns: all
@@ -317,7 +317,7 @@ PLAN-ROOT SINK
 |  |
 |  |--03:SCAN HDFS [tpcds.date_dim d1]
 |  |     partitions=1/1 files=1 size=9.84MB
-|  |     predicates: d1.d_fy_week_seq = 1000
+|  |     predicates: d1.d_fy_week_seq = CAST(1000 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73049 size=9.84MB
 |  |       columns: all

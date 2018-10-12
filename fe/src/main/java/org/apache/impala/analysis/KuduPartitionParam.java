@@ -30,6 +30,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Represents the partitioning of a Kudu table as defined in the PARTITION BY
  * clause of a CREATE TABLE statement. The partitioning can be hash-based or
@@ -142,7 +144,12 @@ public class KuduPartitionParam implements ParseNode {
   }
 
   @Override
-  public String toSql() {
+  public final String toSql() {
+    return toSql(DEFAULT);
+  }
+
+  @Override
+  public String toSql(ToSqlOptions options) {
     StringBuilder builder = new StringBuilder(type_.toString());
     if (!colNames_.isEmpty()) {
       builder.append(" (");
@@ -156,7 +163,7 @@ public class KuduPartitionParam implements ParseNode {
       if (rangePartitions_ != null) {
         List<String> partsSql = Lists.newArrayList();
         for (RangePartition rangePartition: rangePartitions_) {
-          partsSql.add(rangePartition.toSql());
+          partsSql.add(rangePartition.toSql(options));
         }
         builder.append(Joiner.on(", ").join(partsSql));
       } else {
@@ -168,7 +175,9 @@ public class KuduPartitionParam implements ParseNode {
   }
 
   @Override
-  public String toString() { return toSql(); }
+  public String toString() {
+    return toSql(DEFAULT);
+  }
 
   public TKuduPartitionParam toThrift() {
     TKuduPartitionParam result = new TKuduPartitionParam();

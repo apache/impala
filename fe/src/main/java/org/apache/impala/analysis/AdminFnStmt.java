@@ -60,11 +60,11 @@ public class AdminFnStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder();
     sb.append(":").append(fnName_).append("(");
     List<String> paramsSql = Lists.newArrayList();
-    for (Expr param: params_) paramsSql.add(param.toSql());
+    for (Expr param : params_) paramsSql.add(param.toSql(options));
     sb.append(Joiner.on(", ").join(paramsSql));
     sb.append(")");
     return sb.toString();

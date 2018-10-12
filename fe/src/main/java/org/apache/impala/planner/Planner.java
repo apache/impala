@@ -55,6 +55,8 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+import static org.apache.impala.analysis.ToSqlOptions.SHOW_IMPLICIT_CASTS;
+
 /**
  * Creates an executable plan from an analyzed parse tree and query options.
  */
@@ -264,6 +266,7 @@ public class Planner {
       TQueryExecRequest request, TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
     boolean hasHeader = false;
+
     // Only some requests (queries, DML, etc) have a resource profile.
     if (request.isSetMax_per_host_min_mem_reservation()) {
       Preconditions.checkState(request.isSetMax_per_host_thread_reservation());
@@ -326,6 +329,18 @@ public class Planner {
           "is missing relevant stats, and no plan hints were given.\n");
       hasHeader = true;
     }
+
+    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      // In extended explain include the analyzed query text showing implicit casts
+      String queryText = ctx_.getQueryStmt().toSql(SHOW_IMPLICIT_CASTS);
+      String wrappedText = PrintUtils.wrapString("Analyzed query: " + queryText, 80);
+      str.append(wrappedText).append("\n");
+      hasHeader = true;
+    }
+    // Note that the analyzed query text must be the last thing in the header.
+    // This is to help tests that parse the header.
+
+    // Add the blank line that indicates the end of the header
     if (hasHeader) str.append("\n");
 
     if (explainLevel.ordinal() < TExplainLevel.VERBOSE.ordinal()) {

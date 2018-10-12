@@ -21,6 +21,7 @@ import java.util.List;
 
 import com.google.common.collect.Lists;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Combination of expr, ASC/DESC, and nulls ordering.
@@ -64,9 +65,11 @@ public class OrderByElement {
   public Boolean getNullsFirstParam() { return nullsFirstParam_; }
   public boolean nullsFirst() { return nullsFirst(nullsFirstParam_, isAsc_); }
 
-  public String toSql() {
+  public final String toSql() { return toSql(DEFAULT); }
+
+  public String toSql(ToSqlOptions options) {
     StringBuilder strBuilder = new StringBuilder();
-    strBuilder.append(expr_.toSql());
+    strBuilder.append(expr_.toSql(options));
     strBuilder.append(isAsc_ ? " ASC" : " DESC");
     // When ASC and NULLS LAST or DESC and NULLS FIRST, we do not print NULLS FIRST/LAST
     // because it is the default behavior and we want to avoid printing NULLS FIRST/LAST

@@ -36,8 +36,6 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Most predicates with two operands.
@@ -138,8 +136,9 @@ public class BinaryPredicate extends Predicate {
   public void setIsInferred() { isInferred_ = true; }
 
   @Override
-  public String toSqlImpl() {
-    return getChild(0).toSql() + " " + op_.toString() + " " + getChild(1).toSql();
+  public String toSqlImpl(ToSqlOptions options) {
+    return getChild(0).toSql(options) + " " + op_.toString() + " "
+        + getChild(1).toSql(options);
   }
 
   @Override

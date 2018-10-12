@@ -301,7 +301,8 @@ public class UnionNode extends PlanNode {
     // A UnionNode may have predicates if a union is used inside an inline view,
     // and the enclosing select stmt has predicates referring to the inline view.
     if (!conjuncts_.isEmpty()) {
-      output.append(detailPrefix + "predicates: " + getExplainString(conjuncts_) + "\n");
+      output.append(detailPrefix
+          + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
     }
     if (!constExprLists_.isEmpty()) {
       output.append(detailPrefix + "constant-operands=" + constExprLists_.size() + "\n");

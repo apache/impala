@@ -32,6 +32,8 @@ import org.apache.impala.compat.MetastoreShim;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Represents an anonymous type definition, e.g., used in DDL and CASTs.
  */
@@ -154,5 +156,12 @@ public class TypeDef implements ParseNode {
   public String toString() { return parsedType_.toSql(); }
 
   @Override
-  public String toSql() { return parsedType_.toSql(); }
+  public final String toSql() {
+    return toSql(DEFAULT);
+  }
+
+  @Override
+  public String toSql(ToSqlOptions options) {
+    return parsedType_.toSql();
+  }
 }

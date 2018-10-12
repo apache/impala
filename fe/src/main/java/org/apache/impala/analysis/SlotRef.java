@@ -147,7 +147,7 @@ public class SlotRef extends Expr {
   }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     if (label_ != null) return label_;
     if (rawPath_ != null) return ToSqlUtils.getPathSql(rawPath_);
     return "<slot " + Integer.toString(desc_.getId().asInt()) + ">";

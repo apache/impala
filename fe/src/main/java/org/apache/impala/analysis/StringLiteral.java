@@ -70,7 +70,9 @@ public class StringLiteral extends LiteralExpr {
   public int hashCode() { return value_.hashCode(); }
 
   @Override
-  public String toSqlImpl() { return "'" + getNormalizedValue() + "'"; }
+  public String toSqlImpl(ToSqlOptions options) {
+    return "'" + getNormalizedValue() + "'";
+  }
 
   @Override
   protected void toThrift(TExprNode msg) {

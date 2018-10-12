@@ -53,6 +53,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.ImmutableList;
 
+import static org.apache.impala.analysis.ToSqlOptions.REWRITTEN;
+
 /**
  * Wrapper class for parsing, analyzing and rewriting a SQL stmt.
  */
@@ -486,7 +488,7 @@ public class AnalysisContext {
     } catch (AnalysisException e) {
       LOG.error(String.format("Error analyzing the rewritten query.\n" +
           "Original SQL: %s\nRewritten SQL: %s", analysisResult_.stmt_.toSql(),
-          analysisResult_.stmt_.toSql(true)));
+          analysisResult_.stmt_.toSql(REWRITTEN)));
       throw e;
     }
 
@@ -494,7 +496,7 @@ public class AnalysisContext {
     analysisResult_.stmt_.castResultExprs(origResultTypes);
     analysisResult_.stmt_.setColLabels(origColLabels);
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Rewritten SQL: " + analysisResult_.stmt_.toSql(true));
+      LOG.trace("Rewritten SQL: " + analysisResult_.stmt_.toSql(REWRITTEN));
     }
 
     // Restore privilege requests found during the first pass

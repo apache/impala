@@ -409,38 +409,41 @@ public class AggregationNode extends PlanNode {
 
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       if (aggInfos_.size() == 1) {
-        output.append(getAggInfoExplainString(detailPrefix, aggInfos_.get(0)));
+        output.append(
+            getAggInfoExplainString(detailPrefix, aggInfos_.get(0), detailLevel));
       } else {
         for (int i = 0; i < aggInfos_.size(); ++i) {
           AggregateInfo aggInfo = aggInfos_.get(i);
           output.append(String.format("%sClass %d\n", detailPrefix, i));
-          output.append(getAggInfoExplainString(detailPrefix + "  ", aggInfo));
+          output.append(
+              getAggInfoExplainString(detailPrefix + "  ", aggInfo, detailLevel));
         }
       }
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix)
             .append("having: ")
-            .append(getExplainString(conjuncts_))
+            .append(getExplainString(conjuncts_, detailLevel))
             .append("\n");
       }
     }
     return output.toString();
   }
 
-  private StringBuilder getAggInfoExplainString(String prefix, AggregateInfo aggInfo) {
+  private StringBuilder getAggInfoExplainString(
+      String prefix, AggregateInfo aggInfo, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     List<FunctionCallExpr> aggExprs = aggInfo.getMaterializedAggregateExprs();
     List<Expr> groupingExprs = aggInfo.getGroupingExprs();
     if (!aggExprs.isEmpty()) {
       output.append(prefix)
           .append("output: ")
-          .append(getExplainString(aggExprs))
+          .append(getExplainString(aggExprs, detailLevel))
           .append("\n");
     }
     if (!groupingExprs.isEmpty()) {
       output.append(prefix)
           .append("group by: ")
-          .append(getExplainString(groupingExprs))
+          .append(getExplainString(groupingExprs, detailLevel))
           .append("\n");
     }
     return output;

@@ -20,14 +20,11 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TExprNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -47,7 +44,9 @@ public class Subquery extends Expr {
   public QueryStmt getStatement() { return stmt_; }
 
   @Override
-  public String toSqlImpl() { return "(" + stmt_.toSql() + ")"; }
+  public String toSqlImpl(ToSqlOptions options) {
+    return "(" + stmt_.toSql(options) + ")";
+  }
 
   /**
    * C'tor that initializes a Subquery from a QueryStmt.

@@ -128,13 +128,13 @@ public class ResetMetadataStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder result = new StringBuilder();
     if (isRefresh_) {
       result.append("REFRESH");
       if (database_ == null) {
         result.append(" ").append(tableName_);
-        if (partitionSpec_ != null) result.append(" " + partitionSpec_.toSql());
+        if (partitionSpec_ != null) result.append(" " + partitionSpec_.toSql(options));
       } else {
         result.append(" FUNCTIONS ").append(database_);
       }

@@ -109,8 +109,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
   public InsertStmt getInsertStmt() { return insertStmt_; }
   public CreateTableStmt getCreateStmt() { return createStmt_; }
   @Override
-  public String toSql(boolean rewritten) {
-    return ToSqlUtils.getCreateTableSql(this, rewritten);
+  public String toSql(ToSqlOptions options) {
+    return ToSqlUtils.getCreateTableSql(this, options);
   }
 
   @Override

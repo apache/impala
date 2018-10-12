@@ -49,7 +49,7 @@ public class DropDbStmt extends StatementBase {
   public boolean getCascade() { return cascade_; }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("DROP DATABASE");
     if (ifExists_) sb.append(" IF EXISTS ");
     sb.append(getDb());

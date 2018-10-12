@@ -30,6 +30,7 @@ import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.util.TColumnValueUtil;
 import com.google.common.base.Preconditions;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Windowing clause of an analytic expr
@@ -140,9 +141,11 @@ public class AnalyticWindow {
       offsetValue_ = offsetValue;
     }
 
-    public String toSql() {
+    public final String toSql() { return toSql(DEFAULT); }
+
+    public String toSql(ToSqlOptions options) {
       StringBuilder sb = new StringBuilder();
-      if (expr_ != null) sb.append(expr_.toSql()).append(" ");
+      if (expr_ != null) sb.append(expr_.toSql(options)).append(" ");
       sb.append(type_.toString());
       return sb.toString();
     }
@@ -232,15 +235,17 @@ public class AnalyticWindow {
     return new AnalyticWindow(type_, newLeftBoundary, newRightBoundary);
   }
 
-  public String toSql() {
+  public final String toSql() { return toSql(DEFAULT); }
+
+  public String toSql(ToSqlOptions options) {
     if (toSqlString_ != null) return toSqlString_;
     StringBuilder sb = new StringBuilder();
     sb.append(type_.toString()).append(" ");
     if (rightBoundary_ == null) {
-      sb.append(leftBoundary_.toSql());
+      sb.append(leftBoundary_.toSql(options));
     } else {
-      sb.append("BETWEEN ").append(leftBoundary_.toSql()).append(" AND ");
-      sb.append(rightBoundary_.toSql());
+      sb.append("BETWEEN ").append(leftBoundary_.toSql(options)).append(" AND ");
+      sb.append(rightBoundary_.toSql(options));
     }
     return sb.toString();
   }

@@ -28,6 +28,7 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.ToSqlOptions;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.ImpalaException;
@@ -594,12 +595,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return output.toString();
   }
 
-  protected String getExplainString(List<? extends Expr> exprs) {
+  protected String getExplainString(
+      List<? extends Expr> exprs, TExplainLevel detailLevel) {
     if (exprs == null) return "";
+    ToSqlOptions toSqlOptions =
+        detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal() ?
+        ToSqlOptions.SHOW_IMPLICIT_CASTS :
+        ToSqlOptions.DEFAULT;
     StringBuilder output = new StringBuilder();
     for (int i = 0; i < exprs.size(); ++i) {
       if (i > 0) output.append(", ");
-      output.append(exprs.get(i).toSql());
+      output.append(exprs.get(i).toSql(toSqlOptions));
     }
     return output.toString();
   }

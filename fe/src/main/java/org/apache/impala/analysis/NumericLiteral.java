@@ -149,7 +149,12 @@ public class NumericLiteral extends LiteralExpr {
   public int hashCode() { return value_.hashCode(); }
 
   @Override
-  public String toSqlImpl() { return getStringValue(); }
+  public String toSqlImpl(ToSqlOptions options) {
+    if (options.showImplictCasts()) {
+      return "CAST(" + getStringValue() + " AS " + type_.toSql() + ")";
+    }
+    return getStringValue();
+  }
 
   @Override
   public String getStringValue() {

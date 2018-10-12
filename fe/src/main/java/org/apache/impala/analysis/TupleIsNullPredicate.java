@@ -91,7 +91,9 @@ public class TupleIsNullPredicate extends Predicate {
   }
 
   @Override
-  protected String toSqlImpl() { return "TupleIsNull()"; }
+  protected String toSqlImpl(ToSqlOptions options) {
+    return "TupleIsNull()";
+  }
 
   public Set<TupleId> getTupleIds() { return tupleIds_; }
 

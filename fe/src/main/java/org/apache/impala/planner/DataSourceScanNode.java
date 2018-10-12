@@ -350,11 +350,12 @@ public class DataSourceScanNode extends ScanNode {
         displayName_, table_.getFullName(), aliasStr));
 
     if (!acceptedConjuncts_.isEmpty()) {
-      output.append(prefix + "data source predicates: " +
-          getExplainString(acceptedConjuncts_) + "\n");
+      output.append(prefix + "data source predicates: "
+          + getExplainString(acceptedConjuncts_, detailLevel) + "\n");
     }
     if (!conjuncts_.isEmpty()) {
-      output.append(prefix + "predicates: " + getExplainString(conjuncts_) + "\n");
+      output.append(
+          prefix + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
     }
 
     // Add table and column stats in verbose mode.

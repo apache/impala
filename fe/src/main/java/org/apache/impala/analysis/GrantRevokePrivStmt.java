@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 
-import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
@@ -71,10 +70,10 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder(isGrantPrivStmt_ ? "GRANT " : "REVOKE ");
     if (!isGrantPrivStmt_ && hasGrantOpt_) sb.append("GRANT OPTION FOR ");
-    sb.append(privilegeSpec_.toSql());
+    sb.append(privilegeSpec_.toSql(options));
     sb.append(isGrantPrivStmt_ ? " TO " : " FROM ");
     sb.append(roleName_);
     if (isGrantPrivStmt_ && hasGrantOpt_) sb.append(" WITH GRANT OPTION");

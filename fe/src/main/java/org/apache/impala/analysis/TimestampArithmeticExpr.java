@@ -181,14 +181,14 @@ public class TimestampArithmeticExpr extends Expr {
   public ArithmeticExpr.Operator getOp() { return op_; }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     StringBuilder strBuilder = new StringBuilder();
     if (funcName_ != null) {
       // Function-call like version.
       strBuilder.append(funcName_.toUpperCase() + "(");
-      strBuilder.append(getChild(0).toSql() + ", ");
+      strBuilder.append(getChild(0).toSql(options) + ", ");
       strBuilder.append("INTERVAL ");
-      strBuilder.append(getChild(1).toSql());
+      strBuilder.append(getChild(1).toSql(options));
       strBuilder.append(" " + timeUnitIdent_);
       strBuilder.append(")");
       return strBuilder.toString();
@@ -196,16 +196,16 @@ public class TimestampArithmeticExpr extends Expr {
     if (intervalFirst_) {
       // Non-function-call like version with interval as first operand.
       strBuilder.append("INTERVAL ");
-      strBuilder.append(getChild(1).toSql() + " ");
+      strBuilder.append(getChild(1).toSql(options) + " ");
       strBuilder.append(timeUnitIdent_);
       strBuilder.append(" " + op_.toString() + " ");
-      strBuilder.append(getChild(0).toSql());
+      strBuilder.append(getChild(0).toSql(options));
     } else {
       // Non-function-call like version with interval as second operand.
-      strBuilder.append(getChild(0).toSql());
+      strBuilder.append(getChild(0).toSql(options));
       strBuilder.append(" " + op_.toString() + " ");
       strBuilder.append("INTERVAL ");
-      strBuilder.append(getChild(1).toSql() + " ");
+      strBuilder.append(getChild(1).toSql(options) + " ");
       strBuilder.append(timeUnitIdent_);
     }
     return strBuilder.toString();

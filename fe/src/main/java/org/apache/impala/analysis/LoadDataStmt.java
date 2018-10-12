@@ -87,12 +87,12 @@ public class LoadDataStmt extends StatementBase {
    * @see org.apache.impala.parser.ParseNode#toSql()
    */
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("LOAD DATA INPATH '");
     sb.append(sourceDataPath_ + "' ");
     if (overwrite_) sb.append("OVERWRITE ");
     sb.append("INTO TABLE " + tableName_.toString());
-    if (partitionSpec_ != null) sb.append(" " + partitionSpec_.toSql());
+    if (partitionSpec_ != null) sb.append(" " + partitionSpec_.toSql(options));
     return sb.toString();
   }
 

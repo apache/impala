@@ -65,7 +65,7 @@ public class CreateDbStmt extends StatementBase {
   public boolean getIfNotExists() { return ifNotExists_; }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("CREATE DATABASE");
     if (ifNotExists_) sb.append(" IF NOT EXISTS");
     sb.append(dbName_);

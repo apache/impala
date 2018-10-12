@@ -79,7 +79,7 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder();
     sb.append("ALTER VIEW ");
     if (tableName_.getDb() != null) {
@@ -87,7 +87,7 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
     }
     sb.append(tableName_.getTbl());
     if (columnDefs_ != null) sb.append("(" + getColumnNames() + ")");
-    sb.append(" AS " + viewDefStmt_.toSql());
+    sb.append(" AS " + viewDefStmt_.toSql(options));
     return sb.toString();
   }
 }

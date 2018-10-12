@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ToSqlOptions;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
@@ -28,6 +29,8 @@ import org.apache.impala.thrift.TJoinBuildSink;
 import org.apache.impala.thrift.TQueryOptions;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 /**
  * Sink to materialize the build side of a join.
@@ -79,7 +82,7 @@ public class JoinBuildSink extends DataSink {
             + " cohort-id=" + fragment_.getCohortId().toString() + "\n");
       if (!buildExprs_.isEmpty()) {
         output.append(detailPrefix + "build expressions: ")
-            .append(Expr.toSql(buildExprs_) + "\n");
+            .append(Expr.toSql(buildExprs_, DEFAULT) + "\n");
       }
     }
   }

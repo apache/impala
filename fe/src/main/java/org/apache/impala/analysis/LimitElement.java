@@ -21,6 +21,8 @@ import org.apache.impala.common.AnalysisException;
 
 import com.google.common.base.Preconditions;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Combination of limit and offset expressions.
  */
@@ -82,17 +84,19 @@ class LimitElement {
     return offset_;
   }
 
-  public String toSql() {
+  public final String toSql() { return toSql(DEFAULT); }
+
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder();
     if (limitExpr_ != null) {
       sb.append(" LIMIT ");
-      sb.append(limitExpr_.toSql());
+      sb.append(limitExpr_.toSql(options));
     }
     // Don't add the offset if it is the default value. However, we do print it if it
     // hasn't been analyzed yet because we need to output the expression used in errors.
     if (offsetExpr_ != null && (offset_ != 0 || !isAnalyzed_)) {
       sb.append(" OFFSET ");
-      sb.append(offsetExpr_.toSql());
+      sb.append(offsetExpr_.toSql(options));
     }
     return sb.toString();
   }

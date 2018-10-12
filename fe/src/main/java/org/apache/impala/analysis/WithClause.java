@@ -29,6 +29,8 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+
 /**
  * Representation of the WITH clause that may appear before a query statement or insert
  * statement. A WITH clause contains a list of named view definitions that may be
@@ -116,11 +118,12 @@ public class WithClause implements ParseNode {
   public WithClause clone() { return new WithClause(this); }
 
   @Override
-  public String toSql() {
-    return toSql(false);
+  public final String toSql() {
+    return toSql(DEFAULT);
   }
 
-  public String toSql(boolean rewritten) {
+  @Override
+  public String toSql(ToSqlOptions options) {
     List<String> viewStrings = Lists.newArrayList();
     for (View view: views_) {
       // Enclose the view alias and explicit labels in quotes if Hive cannot parse it
@@ -130,7 +133,7 @@ public class WithClause implements ParseNode {
         aliasSql += "(" + Joiner.on(", ").join(
             ToSqlUtils.getIdentSqlList(view.getOriginalColLabels())) + ")";
       }
-      viewStrings.add(aliasSql + " AS (" + view.getQueryStmt().toSql(rewritten) + ")");
+      viewStrings.add(aliasSql + " AS (" + view.getQueryStmt().toSql(options) + ")");
     }
     return "WITH " + Joiner.on(",").join(viewStrings);
   }

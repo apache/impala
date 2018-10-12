@@ -103,8 +103,9 @@ public class LikePredicate extends Predicate {
   }
 
   @Override
-  public String toSqlImpl() {
-    return getChild(0).toSql() + " " + op_.toString() + " " + getChild(1).toSql();
+  public String toSqlImpl(ToSqlOptions options) {
+    return getChild(0).toSql(options) + " " + op_.toString() + " "
+        + getChild(1).toSql(options);
   }
 
   @Override

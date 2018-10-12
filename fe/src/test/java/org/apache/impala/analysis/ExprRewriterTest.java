@@ -30,6 +30,10 @@ import org.junit.Test;
 
 import com.google.common.base.Preconditions;
 
+import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
+import static org.apache.impala.analysis.ToSqlOptions.REWRITTEN;
+import static org.apache.impala.analysis.ToSqlOptions.SHOW_IMPLICIT_CASTS;
+
 /**
  * Tests that the ExprRewriter framework covers all clauses as well as nested statements.
  * It also tests some specific rewrite rules.
@@ -306,35 +310,146 @@ public class ExprRewriterTest extends AnalyzerTest {
 
     if (RuntimeEnv.INSTANCE.isKuduSupported()) {
       // Update.
-      assertToSql(ctx, "update functional_kudu.alltypes " +
-          "set string_col = 'test' where id = (select 1 + 1)",
-          "UPDATE functional_kudu.alltypes SET string_col = 'test' " +
-          "FROM functional_kudu.alltypes WHERE id = (SELECT 1 + 1)",
-          "UPDATE functional_kudu.alltypes SET string_col = 'test' " +
-          "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) " +
-          "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 1 + 1)");
+      assertToSql(ctx,
+          "update functional_kudu.alltypes "
+              + "set string_col = 'test' where id = (select 1 + 1)",
+          "UPDATE functional_kudu.alltypes SET string_col = 'test' "
+              + "FROM functional_kudu.alltypes WHERE id = (SELECT 1 + 1)",
+          "UPDATE functional_kudu.alltypes SET string_col = 'test' "
+              + "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) "
+              + "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 2)");
 
       // Delete
-      assertToSql(ctx, "delete functional_kudu.alltypes " +
-          "where id = (select 1 + 1)",
-          "DELETE FROM functional_kudu.alltypes " +
-          "WHERE id = (SELECT 1 + 1)",
-          "DELETE functional_kudu.alltypes " +
-          "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) " +
-          "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 1 + 1)");
+      assertToSql(ctx,
+          "delete functional_kudu.alltypes "
+              + "where id = (select 1 + 1)",
+          "DELETE FROM functional_kudu.alltypes "
+              + "WHERE id = (SELECT 1 + 1)",
+          "DELETE functional_kudu.alltypes "
+              + "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) "
+              + "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 2)");
     }
 
     // We don't do any rewrite for WITH clause.
     StatementBase stmt = (StatementBase) AnalyzesOk("with t as (select 1 + 1) " +
         "select id from functional.alltypes union select id from functional.alltypesagg",
         ctx);
-    Assert.assertEquals(stmt.toSql(), stmt.toSql(true));
+    Assert.assertEquals(stmt.toSql(), stmt.toSql());
+  }
+
+  @Test
+  /**
+   * Test printing of implicit casts
+   */
+  public void TestToSqlWithImplicitCasts() {
+    TQueryOptions options = new TQueryOptions();
+    options.setEnable_expr_rewrites(true);
+    AnalysisContext ctx = createAnalysisCtx(options);
+
+    assertToSqlWithImplicitCasts(ctx,
+        "select * from functional_kudu.alltypestiny where bigint_col < "
+            + "1000 / 100",
+        "SELECT * FROM functional_kudu.alltypestiny WHERE "
+            + "CAST(bigint_col AS DOUBLE) < CAST(10 AS DOUBLE)");
+    assertToSqlWithImplicitCasts(ctx,
+        "select float_col + 1.1 from functional.alltypestiny",
+        "SELECT CAST(float_col AS DECIMAL(38,9)) + CAST(1.1 AS DECIMAL(2,1)) "
+            + "FROM functional.alltypestiny");
+    assertToSqlWithImplicitCasts(
+        ctx, "select cast(2 as bigint)", "SELECT CAST(2 AS BIGINT)");
+    assertToSqlWithImplicitCasts(ctx, "select cast(2 as decimal(38,37))",
+        "SELECT CAST(2.0000000000000000000000000000000000000 AS DECIMAL(38,37))");
+    assertToSqlWithImplicitCasts(ctx, "select d1 - 1.1 from functional.decimal_tbl",
+        "SELECT d1 - CAST(1.1 AS DECIMAL(2,1)) FROM functional.decimal_tbl");
+    assertToSqlWithImplicitCasts(ctx, "select round(1.2345, 2) * pow(10, 10)",
+        "SELECT CAST(12300000000 AS DOUBLE)");
+    assertToSqlWithImplicitCasts(ctx,
+        "select * from functional.alltypes where "
+            + "double_col in (int_col, bigint_col)",
+        "SELECT * FROM functional.alltypes WHERE double_col IN "
+            + "(CAST(int_col AS DOUBLE), CAST(bigint_col AS DOUBLE))");
+    assertToSqlWithImplicitCasts(ctx,
+        "select * from functional.alltypes "
+            + "where double_col between smallint_col and int_col",
+        "SELECT * FROM functional.alltypes WHERE double_col >= "
+            + "CAST(smallint_col AS DOUBLE) AND double_col <= CAST(int_col AS DOUBLE)");
+    assertToSqlWithImplicitCasts(ctx,
+        "select * from "
+            + "(select 10 as i, 2 as j, 2013 as s) as t "
+            + "where t.i < 10",
+        "SELECT * FROM "
+            + "(SELECT CAST(10 AS TINYINT) i, CAST(2 AS TINYINT) j, "
+            + "CAST(2013 AS SMALLINT) s) t "
+            + "WHERE t.i < CAST(10 AS TINYINT)");
+    assertToSqlWithImplicitCasts(ctx,
+        "select * from (select id, int_col, year,  sum(int_col) "
+            + " over(partition by year order by id) as s from functional.alltypes) v "
+            + " where year = 2009 and id = 1 and"
+            + " int_col < 10 and s = 4",
+        "SELECT * FROM (SELECT id, int_col, year, sum(int_col)"
+            + " OVER (PARTITION BY year ORDER BY id ASC) s FROM functional.alltypes) v"
+            + " WHERE year = CAST(2009 AS INT) AND id = CAST(1 AS INT) AND"
+            + " int_col < CAST(10 AS INT) AND s = CAST(4 AS BIGINT)");
+    assertToSqlWithImplicitCasts(ctx,
+        "select * from functional.alltypes where "
+            + "int_col = 1 or int_col = 2 "
+            + "or tinyint_col > 5 AND "
+            + "(float_col = 5 or double_col = 6)",
+        "SELECT * FROM functional.alltypes WHERE "
+            + "int_col IN (CAST(1 AS INT), CAST(2 AS INT)) "
+            + "OR tinyint_col > CAST(5 AS TINYINT) AND "
+            + "(float_col = CAST(5 AS FLOAT) OR double_col = CAST(6 AS DOUBLE))");
+
+    checkNumericLiteralCasts(ctx, "tinyint_col", "1", "TINYINT");
+    checkNumericLiteralCasts(ctx, "smallint_col", "1", "TINYINT");
+    checkNumericLiteralCasts(ctx, "smallint_col", "1000", "SMALLINT");
+    checkNumericLiteralCasts(ctx, "int_col", "1", "TINYINT");
+    checkNumericLiteralCasts(ctx, "int_col", "1000", "SMALLINT");
+    checkNumericLiteralCasts(ctx, "int_col", "1000000", "INT");
+    checkNumericLiteralCasts(ctx, "bigint_col", "1", "TINYINT");
+    checkNumericLiteralCasts(ctx, "bigint_col", "1000", "SMALLINT");
+    checkNumericLiteralCasts(ctx, "bigint_col", "1000000", "INT");
+    checkNumericLiteralCasts(ctx, "bigint_col", "10000000000", "BIGINT");
+    checkNumericLiteralCasts(ctx, "float_col", "1", "TINYINT");
+    checkNumericLiteralCasts(ctx, "float_col", "1.0", "DECIMAL(2,1)");
+    checkNumericLiteralCasts(ctx, "float_col", "100000.001", "DECIMAL(9,3)");
+    checkNumericLiteralCasts(ctx, "double_col", "1", "TINYINT");
+    checkNumericLiteralCasts(ctx, "double_col", "1.0", "DECIMAL(2,1)");
+    checkNumericLiteralCasts(ctx, "double_col", "100000.001", "DECIMAL(9,3)");
+  }
+
+  /**
+   * Generate an insert query into a column and check that the toSql() with implicit casts
+   * looks as expected.
+   * columnName is the name of a column in functional.alltypesnopart.
+   * data is the literal value to insert.
+   * castColumn is the type to which the literal is expected to be cast.
+   */
+  private void checkNumericLiteralCasts(
+      AnalysisContext ctx, String columnName, String data, String castColumn) {
+    String query = "insert into table functional.alltypesnopart (" + columnName + ") "
+        + "values(" + data + ")";
+    String expectedToSql = "INSERT INTO TABLE "
+        + "functional.alltypesnopart(" + columnName + ") "
+        + "SELECT CAST(" + data + " AS " + castColumn + ")"
+        + " UNION "
+        + "SELECT CAST(" + data + " AS " + castColumn + ")";
+    assertToSqlWithImplicitCasts(ctx, query, expectedToSql);
   }
 
   private void assertToSql(AnalysisContext ctx, String query, String expectedToSql,
       String expectedToRewrittenSql) {
     StatementBase stmt = (StatementBase) AnalyzesOk(query, ctx);
+    Assert.assertEquals(expectedToSql, stmt.toSql(DEFAULT));
     Assert.assertEquals(expectedToSql, stmt.toSql());
-    Assert.assertEquals(expectedToRewrittenSql, stmt.toSql(true));
+    Assert.assertEquals(expectedToRewrittenSql, stmt.toSql(REWRITTEN));
+  }
+
+  private void assertToSqlWithImplicitCasts(
+      AnalysisContext ctx, String query, String expectedToSqlWithImplicitCasts) {
+    StatementBase stmt = (StatementBase) AnalyzesOk(query, ctx);
+    String actual = stmt.toSql(SHOW_IMPLICIT_CASTS);
+    Assert.assertEquals("Bad sql with implicit casts from original query:\n" + query,
+        expectedToSqlWithImplicitCasts, actual);
   }
 }

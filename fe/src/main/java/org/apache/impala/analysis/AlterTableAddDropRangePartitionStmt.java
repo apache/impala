@@ -63,11 +63,11 @@ public class AlterTableAddDropRangePartitionStmt extends AlterTableStmt {
   }
 
   @Override
-  public String toSql() {
+  public String toSql(ToSqlOptions options) {
     StringBuilder sb = new StringBuilder("ALTER TABLE " + getTbl());
     sb.append(" " + operation_.name());
     if (ignoreErrors_) sb.append(" " + operation_.option());
-    sb.append(" " + rangePartitionSpec_.toSql());
+    sb.append(" " + rangePartitionSpec_.toSql(options));
     return sb.toString();
   }
 

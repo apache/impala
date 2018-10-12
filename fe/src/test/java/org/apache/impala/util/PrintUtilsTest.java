@@ -78,4 +78,83 @@ public class PrintUtilsTest {
     assertEquals("-10B", PrintUtils.printBytesRoundedToMb(-10L));
     assertEquals("-123456789B", PrintUtils.printBytesRoundedToMb(-123456789L));
   }
+
+  /**
+   * Wrap length for testWrapText() - less than 80 to make test layout nicer.
+   */
+  private static final int WRAP_LENGTH = 60;
+
+  /**
+   * Test for PrintUtils.wrapString().
+   */
+  @Test
+  public void testWrapText() {
+    // Simple query wrapping.
+    assertWrap(
+        "Analyzed query: SELECT * FROM functional_kudu.alltypestiny WHERE CAST(bigint_col"
+            + " AS DOUBLE) < CAST(10 AS DOUBLE)",
+        "Analyzed query: SELECT * FROM functional_kudu.alltypestiny\n"
+            + "WHERE CAST(bigint_col AS DOUBLE) < CAST(10 AS DOUBLE)");
+    // Simple query with a hint retains newlines surrounding hint.
+    assertWrap("SELECT \n"
+            + "-- +straight_join\n"
+            + " * FROM tpch_parquet.orders INNER JOIN \n"
+            + "-- +shuffle\n"
+            + " tpch_parquet.customer ON o_custkey = c_custkey",
+        "SELECT \n"
+            + "-- +straight_join\n"
+            + "* FROM tpch_parquet.orders INNER JOIN \n"
+            + "-- +shuffle\n"
+            + "tpch_parquet.customer ON o_custkey = c_custkey");
+    // test that a long string of blanks prints OK, some may be lost for clarity
+    assertWrap("insert into foo values ('                                      "
+            + "                                                                          "
+            + "                                ')",
+        "insert into foo values ('                                   \n"
+            + "')");
+    // test that long words are broken up for clarity
+    assertWrap("select xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            + "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            + "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "select\n"
+            + "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
+            + "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
+            + "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n"
+            + "xxxxxxxxxxxxxxxxxxxxxxxxx");
+  }
+
+  /**
+   * Check that code that has been wrapped is correctly formatted.
+   * @param expected what it should be
+   */
+  private void assertWrap(String input, String expected) {
+    String actual = PrintUtils.wrapString(input, WRAP_LENGTH);
+    assertEquals(expected, actual);
+    assertNoBlankLines(actual);
+    assertNoTerminatingNewline(actual);
+    assertNoLongLines(actual);
+  }
+
+  /**
+   * Assert that all lines of wrapped output are 80 chars or less.
+   */
+  private void assertNoLongLines(String s) {
+    for (String line : s.split("\n")) {
+      assertTrue("line too long: " + line, line.length() <= WRAP_LENGTH);
+    }
+  }
+
+  /**
+   * Assert that the wrapped output does not end in a newline.
+   */
+  private void assertNoTerminatingNewline(String s) {
+    assertFalse("wrapped string ends in newline: " + s, s.endsWith("\n"));
+  }
+
+  /**
+   * Assert that there are no blank liones embedded in the wrapped output.
+   */
+  private void assertNoBlankLines(String s) {
+    assertFalse("output contains blank line " + s, s.contains("\n\n"));
+  }
 }

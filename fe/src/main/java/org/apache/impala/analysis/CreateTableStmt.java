@@ -148,7 +148,9 @@ public class CreateTableStmt extends StatementBase {
   }
 
   @Override
-  public String toSql() { return ToSqlUtils.getCreateTableSql(this); }
+  public String toSql(ToSqlOptions options) {
+    return ToSqlUtils.getCreateTableSql(this);
+  }
 
   public TCreateTableParams toThrift() {
     TCreateTableParams params = new TCreateTableParams();

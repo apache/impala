@@ -207,7 +207,7 @@ public class FunctionCallExpr extends Expr {
   }
 
   @Override
-  public String toSqlImpl() {
+  public String toSqlImpl(ToSqlOptions options) {
     if (label_ != null) return label_;
     // Merge agg fns should have an explicit label.
     Preconditions.checkState(!isMergeAggFn());
@@ -215,7 +215,7 @@ public class FunctionCallExpr extends Expr {
     sb.append(fnName_).append("(");
     if (params_.isStar()) sb.append("*");
     if (params_.isDistinct()) sb.append("DISTINCT ");
-    sb.append(Joiner.on(", ").join(childrenToSql()));
+    sb.append(Joiner.on(", ").join(childrenToSql(options)));
     if (params_.isIgnoreNulls()) sb.append(" IGNORE NULLS");
     sb.append(")");
     return sb.toString();
