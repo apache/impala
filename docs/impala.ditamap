@@ -129,6 +129,7 @@ under the License.
     <topicref href="topics/impala_langref_sql.xml">
       <topicref href="topics/impala_ddl.xml"/>
       <topicref href="topics/impala_dml.xml"/>
+      <topicref href="topics/impala_alter_database.xml"/>
       <topicref href="topics/impala_alter_table.xml"/>
       <topicref href="topics/impala_alter_view.xml"/>
       <topicref href="topics/impala_comment.xml"/>

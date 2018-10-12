@@ -359,14 +359,14 @@ adl://<varname>your_account</varname>.azuredatalakestore.net/<varname>rest_of_di
         and tables are created.
       </p>
 
-      <p>
-        You can switch whether an existing table or partition points to data in HDFS or ADLS. For example, if you
-        have an Impala table or partition pointing to data files in HDFS or ADLS, and you later transfer those data
-        files to the other filesystem, use an <codeph>ALTER TABLE</codeph> statement to adjust the
-        <codeph>LOCATION</codeph> attribute of the corresponding table or partition to reflect that change. Because
-        Impala does not have an <codeph>ALTER DATABASE</codeph> statement, this location-switching technique is not
-        practical for entire databases that have a custom <codeph>LOCATION</codeph> attribute.
-      </p>
+      <p> You can switch whether an existing table or partition points to data
+        in HDFS or ADLS. For example, if you have an Impala table or partition
+        pointing to data files in HDFS or ADLS, and you later transfer those
+        data files to the other filesystem, use an <codeph>ALTER TABLE</codeph>
+        statement to adjust the <codeph>LOCATION</codeph> attribute of the
+        corresponding table or partition to reflect that change. This
+        location-switching technique is not practical for entire databases that
+        have a custom <codeph>LOCATION</codeph> attribute. </p>
 
     </conbody>
 

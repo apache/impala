@@ -42,10 +42,11 @@ under the License.
       databases can contain tables with identical names.
     </p>
 
-    <p>
-      Creating a database is a lightweight operation. There are minimal database-specific properties to configure,
-      only <codeph>LOCATION</codeph> and <codeph>COMMENT</codeph>.  There is no <codeph>ALTER DATABASE</codeph> statement.
-    </p>
+    <p> Creating a database is a lightweight operation. There are minimal
+      database-specific properties to configure, such as
+        <codeph>LOCATION</codeph> and <codeph>COMMENT</codeph>. </p>
+    <p>You can change the owner of a database with the <codeph>ALTER
+        DATABASE</codeph> statement. </p>
 
     <p>
       Typically, you create a separate database for each project or application, to avoid naming conflicts between
