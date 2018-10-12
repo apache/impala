@@ -83,8 +83,6 @@ using namespace apache::thrift;
 // the columns and run that function over row batches.
 // TODO: we need to pass in the compression from the FE/metadata
 
-DECLARE_bool(enable_parquet_page_index_writing_debug_only);
-
 namespace impala {
 
 // Base class for column writers. This contains most of the logic except for
@@ -206,58 +204,6 @@ class HdfsParquetTableWriter::BaseColumnWriter {
 
  protected:
   friend class HdfsParquetTableWriter;
-
-  Status AddMemoryConsumptionForPageIndex(int64_t new_memory_allocation) {
-    if (UNLIKELY(!table_sink_mem_tracker_->TryConsume(new_memory_allocation))) {
-      return table_sink_mem_tracker_->MemLimitExceeded(parent_->state_,
-          "Failed to allocate memory for Parquet page index.", new_memory_allocation);
-    }
-    page_index_memory_consumption_ += new_memory_allocation;
-    return Status::OK();
-  }
-
-  Status ReserveOffsetIndex(int64_t capacity) {
-    if (!FLAGS_enable_parquet_page_index_writing_debug_only) return Status::OK();
-    RETURN_IF_ERROR(
-        AddMemoryConsumptionForPageIndex(capacity * sizeof(parquet::PageLocation)));
-    offset_index_.page_locations.reserve(capacity);
-    return Status::OK();
-  }
-
-  void AddLocationToOffsetIndex(const parquet::PageLocation& location) {
-    if (!FLAGS_enable_parquet_page_index_writing_debug_only) return;
-    offset_index_.page_locations.push_back(location);
-  }
-
-  Status AddPageStatsToColumnIndex() {
-    if (!FLAGS_enable_parquet_page_index_writing_debug_only) return Status::OK();
-    parquet::Statistics page_stats;
-    page_stats_base_->EncodeToThrift(&page_stats);
-    // If pages_stats contains min_value and max_value, then append them to min_values_
-    // and max_values_ and also mark the page as not null. In case min and max values are
-    // not set, push empty strings to maintain the consistency of the index and mark the
-    // page as null. Always push the null_count.
-    string min_val;
-    string max_val;
-    if ((page_stats.__isset.min_value) && (page_stats.__isset.max_value)) {
-      Status s_min = TruncateDown(page_stats.min_value, PAGE_INDEX_MAX_STRING_LENGTH,
-          &min_val);
-      Status s_max = TruncateUp(page_stats.max_value, PAGE_INDEX_MAX_STRING_LENGTH,
-          &max_val);
-      if (!s_min.ok() || !s_max.ok()) valid_column_index_ = false;
-      column_index_.null_pages.push_back(false);
-    } else {
-      DCHECK(!page_stats.__isset.min_value && !page_stats.__isset.max_value);
-      column_index_.null_pages.push_back(true);
-      DCHECK_EQ(page_stats.null_count, num_values_);
-    }
-    RETURN_IF_ERROR(
-        AddMemoryConsumptionForPageIndex(min_val.capacity() + max_val.capacity()));
-    column_index_.min_values.emplace_back(std::move(min_val));
-    column_index_.max_values.emplace_back(std::move(max_val));
-    column_index_.null_counts.push_back(page_stats.null_count);
-    return Status::OK();
-  }
 
   // Encodes value into the current page output buffer and updates the column statistics
   // aggregates. Returns true if the value was appended successfully to the current page.
@@ -699,10 +645,11 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
 
   *first_data_page = *file_pos;
   int64_t current_row_group_index = 0;
-  RETURN_IF_ERROR(ReserveOffsetIndex(num_data_pages_));
+  offset_index_.page_locations.resize(num_data_pages_);
 
   // Write data pages
-  for (const DataPage& page : pages_) {
+  for (int i = 0; i < num_data_pages_; ++i) {
+    DataPage& page = pages_[i];
     parquet::PageLocation location;
 
     if (page.header.data_page_header.num_values == 0) {
@@ -710,7 +657,7 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
       location.offset = -1;
       location.compressed_page_size = 0;
       location.first_row_index = -1;
-      AddLocationToOffsetIndex(location);
+      offset_index_.page_locations[i] = location;
       continue;
     }
 
@@ -730,7 +677,7 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
     // its name suggests. On the other hand, parquet::PageLocation::compressed_page_size
     // also includes the size of the page header.
     location.compressed_page_size = page.header.compressed_page_size + len;
-    AddLocationToOffsetIndex(location);
+    offset_index_.page_locations[i] = location;
 
     // Write the page data
     RETURN_IF_ERROR(parent_->Write(page.data, page.header.compressed_page_size));
@@ -807,7 +754,37 @@ Status HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
   }
 
   DCHECK(page_stats_base_ != nullptr);
-  RETURN_IF_ERROR(AddPageStatsToColumnIndex());
+  parquet::Statistics page_stats;
+  page_stats_base_->EncodeToThrift(&page_stats);
+  {
+    // If pages_stats contains min_value and max_value, then append them to min_values_
+    // and max_values_ and also mark the page as not null. In case min and max values are
+    // not set, push empty strings to maintain the consistency of the index and mark the
+    // page as null. Always push the null_count.
+    string min_val;
+    string max_val;
+    if ((page_stats.__isset.min_value) && (page_stats.__isset.max_value)) {
+      Status s_min = TruncateDown(page_stats.min_value, PAGE_INDEX_MAX_STRING_LENGTH,
+          &min_val);
+      Status s_max = TruncateUp(page_stats.max_value, PAGE_INDEX_MAX_STRING_LENGTH,
+          &max_val);
+      if (!s_min.ok() || !s_max.ok()) valid_column_index_ = false;
+      column_index_.null_pages.push_back(false);
+    } else {
+      DCHECK(!page_stats.__isset.min_value && !page_stats.__isset.max_value);
+      column_index_.null_pages.push_back(true);
+      DCHECK_EQ(page_stats.null_count, num_values_);
+    }
+    int64_t new_memory_allocation = min_val.capacity() + max_val.capacity();
+    if (UNLIKELY(!table_sink_mem_tracker_->TryConsume(new_memory_allocation))) {
+      return table_sink_mem_tracker_->MemLimitExceeded(parent_->state_,
+          "Failed to allocate memory for Parquet page index.", new_memory_allocation);
+    }
+    page_index_memory_consumption_ += new_memory_allocation;
+    column_index_.min_values.emplace_back(std::move(min_val));
+    column_index_.max_values.emplace_back(std::move(max_val));
+    column_index_.null_counts.push_back(page_stats.null_count);
+  }
 
   // Update row group statistics from page statistics.
   DCHECK(row_group_stats_base_ != nullptr);
@@ -1160,7 +1137,6 @@ Status HdfsParquetTableWriter::Finalize() {
 
   RETURN_IF_ERROR(FlushCurrentRowGroup());
   RETURN_IF_ERROR(WritePageIndex());
-  for (auto& column : columns_) column->Reset();
   RETURN_IF_ERROR(WriteFileFooter());
   stats_.__set_parquet_stats(parquet_insert_stats_);
   COUNTER_ADD(parent_->rows_inserted_counter(), row_count_);
@@ -1273,8 +1249,6 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
 }
 
 Status HdfsParquetTableWriter::WritePageIndex() {
-  if (!FLAGS_enable_parquet_page_index_writing_debug_only) return Status::OK();
-
   // Currently Impala only write Parquet files with a single row group. The current
   // page index logic depends on this behavior as it only keeps one row group's
   // statistics in memory.
@@ -1310,6 +1284,8 @@ Status HdfsParquetTableWriter::WritePageIndex() {
     row_group->columns[i].__set_offset_index_length(len);
     file_pos_ += len;
   }
+  // Reset column writers.
+  for (auto& column : columns_) column->Reset();
   return Status::OK();
 }
 
