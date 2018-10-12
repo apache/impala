@@ -210,11 +210,11 @@ DEFINE_bool_hidden(disable_catalog_data_ops_debug_only, false,
 // same way, is error prone. One fix for this flag is to set it only on
 // catalogd, propagate the setting as a property of the Catalog object, and let
 // impalad uses act on this setting.
-DEFINE_bool(pull_incremental_statistics, false,
+DEFINE_bool(pull_incremental_statistics, true,
     "When set, impalad coordinators pull incremental statistics from catalogd on-demand "
     "and catalogd does not broadcast incremental statistics via statestored to "
     "coordinators. If used, the flag must be set on both catalogd and all impalad "
-    "coordinators.");
+    "coordinators. This feature should not be used when --use_local_catalog is true.");
 
 DEFINE_int32(invalidate_tables_timeout_s, 0, "If a table has not been referenced in a "
     "SQL statement for more than the configured amount of time, the catalog server will "

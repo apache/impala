@@ -615,7 +615,12 @@ public class ComputeStatsStmt extends StatementBase {
     int expectedNumStats = partitions.size() - excludedPartitions.size();
     Preconditions.checkArgument(expectedNumStats >= 0);
 
+    // Incremental stats are fetched only when configured to do so except
+    // when also using a local catalog or when testing. When using a local
+    // catalog, it makes more sense to use the getPartitions api which is
+    // designed to fetch specific fields and specific partitions.
     if (BackendConfig.INSTANCE.pullIncrementalStatistics()
+        && !BackendConfig.INSTANCE.getBackendCfg().use_local_catalog
         && !RuntimeEnv.INSTANCE.isTestEnv()) {
       // We're configured to fetch the statistics from catalogd, so collect the relevant
       // partition ids.

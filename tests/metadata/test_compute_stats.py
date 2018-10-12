@@ -18,6 +18,7 @@
 import pytest
 from subprocess import check_call
 
+from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import (
@@ -117,6 +118,54 @@ class TestComputeStats(ImpalaTestSuite):
       self.execute_query("show table stats %s.%s" % (unique_database, table_name))
     assert(len(show_result.data) == 2)
     assert("1\tpval\t8" in show_result.data[0])
+
+  def test_pull_stats_profile(self, vector, unique_database):
+    """Checks that the frontend profile includes metrics when computing
+       incremental statistics.
+    """
+    try:
+      client = ImpalaCluster().impalads[0].service.create_beeswax_client()
+      create = "create table test like functional.alltypes"
+      load = "insert into test partition(year, month) select * from functional.alltypes"
+      insert = """insert into test partition(year=2009, month=1) values
+                  (29349999, true, 4, 4, 4, 40,4.400000095367432,40.4,
+                  "10/21/09","4","2009-10-21 03:24:09.600000000")"""
+      stats_all = "compute incremental stats test"
+      stats_part = "compute incremental stats test partition (year=2009,month=1)"
+
+      # Checks that profile does not have metrics for incremental stats when
+      # the operation is not 'compute incremental stats'.
+      self.execute_query_expect_success(client, "use %s" % unique_database)
+      profile = self.execute_query_expect_success(client, create).runtime_profile
+      assert profile.count("StatsFetch") == 0
+      # Checks that incremental stats metrics are present when 'compute incremental
+      # stats' is run. Since the table has no stats, expect that no bytes are fetched.
+      self.execute_query_expect_success(client, load)
+      profile = self.execute_query_expect_success(client, stats_all).runtime_profile
+      assert profile.count("StatsFetch") > 1
+      assert profile.count("StatsFetch.CompressedBytes: 0") == 1
+      # Checks that bytes fetched is non-zero since incremental stats are present now
+      # and should have been fetched.
+      self.execute_query_expect_success(client, insert)
+      profile = self.execute_query_expect_success(client, stats_part).runtime_profile
+      assert profile.count("StatsFetch") > 1
+      assert profile.count("StatsFetch.CompressedBytes") == 1
+      assert profile.count("StatsFetch.CompressedBytes: 0") == 0
+      # Adds a partition, computes stats, and checks that the metrics in the profile
+      # reflect the operation.
+      alter = "alter table test add partition(year=2011, month=1)"
+      insert_new_partition = """
+          insert into test partition(year=2011, month=1) values
+          (29349999, true, 4, 4, 4, 40,4.400000095367432,40.4,
+          "10/21/09","4","2009-10-21 03:24:09.600000000")
+          """
+      self.execute_query_expect_success(client, alter)
+      self.execute_query_expect_success(client, insert_new_partition)
+      profile = self.execute_query_expect_success(client, stats_all).runtime_profile
+      assert profile.count("StatsFetch.TotalPartitions: 25") == 1
+      assert profile.count("StatsFetch.NumPartitionsWithStats: 24") == 1
+    finally:
+      client.close()
 
 # Tests compute stats on HBase tables. This test is separate from TestComputeStats,
 # because we want to use the existing machanism to disable running tests on hbase/none
