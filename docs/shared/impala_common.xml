@@ -127,6 +127,8 @@ under the License.
               <codeph>INSERT</codeph>, <codeph>CREATE</codeph>,
               <codeph>ALTER</codeph>, <codeph>DROP</codeph>, <b><i>and</i></b>
             <codeph>REFRESH</codeph> privileges.</li>
+          <li>The owner of an object effectively has the ALL privilege on the
+            object.</li>
           <li>The parent levels of the specified scope are implicitly supported
             where a scope refers to the specific level in the object hierarchy
             that the privilege is granted. For example, if a privilege is listed
@@ -266,8 +268,8 @@ under the License.
                 <entry>TABLE</entry>
               </row>
               <row>
-                <entry>ALTER DATABASE</entry>
-                <entry>ALTER</entry>
+                <entry>ALTER DATABASE SET OWNER</entry>
+                <entry>ALL WITH GRANT</entry>
                 <entry>DATABASE</entry>
               </row>
               <row>
@@ -296,6 +298,11 @@ under the License.
                 <entry>TABLE</entry>
               </row>
               <row>
+                <entry>ALTER TABLE SET OWNER</entry>
+                <entry>ALL WITH GRANT</entry>
+                <entry>TABLE</entry>
+              </row>
+              <row>
                 <entry>ALTER VIEW</entry>
                 <entry>ALTER</entry>
                 <entry>TABLE</entry>
@@ -314,6 +321,11 @@ under the License.
                 <entry/>
                 <entry>ALL</entry>
                 <entry>TABLE</entry>
+              </row>
+              <row>
+                <entry>ALTER VIEW SET OWNER</entry>
+                <entry>ALL WITH GRANT</entry>
+                <entry>VIEW</entry>
               </row>
               <row>
                 <entry>DROP DATABASE</entry>
