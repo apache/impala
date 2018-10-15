@@ -155,6 +155,8 @@ def main():
       action='store_true', default=True,
       help="Whether to remove image when done.")
   group.add_argument('--no-cleanup-image', dest="cleanup_image", action='store_false')
+  parser.add_argument('--base-image', dest="base_image", default="ubuntu:16.04",
+      help="Base OS image to use. ubuntu:16.04 and centos:6 are known to work.")
   parser.add_argument(
       '--build-image', metavar='IMAGE',
       help='Skip building, and run tests on pre-existing image.')
@@ -203,7 +205,7 @@ def main():
       suite_concurrency=args.suite_concurrency,
       impalad_mem_limit_bytes=args.impalad_mem_limit_bytes,
       tail=args.tail,
-      env=args.env)
+      env=args.env, base_image=args.base_image)
 
   fh = logging.FileHandler(os.path.join(_make_dir_if_not_exist(t.log_dir), "log.txt"))
   fh.setFormatter(logging.Formatter(LOG_FORMAT))
@@ -436,7 +438,7 @@ class TestWithDocker(object):
   def __init__(self, build_image, suite_names, name, cleanup_containers,
                cleanup_image, ccache_dir, test_mode,
                suite_concurrency, parallel_test_concurrency,
-               impalad_mem_limit_bytes, tail, env):
+               impalad_mem_limit_bytes, tail, env, base_image):
     self.build_image = build_image
     self.name = name
     self.containers = []
@@ -473,6 +475,7 @@ class TestWithDocker(object):
     self.impalad_mem_limit_bytes = impalad_mem_limit_bytes
     self.tail = tail
     self.env = env
+    self.base_image = base_image
 
     # Map suites back into objects; we ignore case for this mapping.
     suites = []
@@ -509,9 +512,18 @@ class TestWithDocker(object):
       extras = ["-e", "TEST_TEST_WITH_DOCKER=true"] + extras
 
     # According to localtime(5), /etc/localtime is supposed
-    # to be a symlink to somewhere inside /usr/share/zoneinfo
+    # to be a symlink to somewhere inside /usr/share/zoneinfo.
+    # Note that sometimes the symlink tree may be
+    # complicated, e.g.:
+    #  /etc/localtime ->
+    #    /usr/share/zoneinfo/America/Los_Angeles ->  (readlink)
+    #      ../US/Pacific-New                         (realpath)
+    # Using both readlink and realpath should work, but we've
+    # encountered one scenario (centos:6) where the Java tzdata
+    # database doesn't have US/Pacific-New, but has America/Los_Angeles.
+    # This is deemed sufficient to tip the scales to using readlink.
     assert os.path.islink("/etc/localtime")
-    localtime_link_target = os.path.realpath("/etc/localtime")
+    localtime_link_target = os.readlink("/etc/localtime")
     assert localtime_link_target.startswith("/usr/share/zoneinfo")
 
     # Workaround for what appears to be https://github.com/moby/moby/issues/13885
@@ -624,7 +636,7 @@ class TestWithDocker(object):
   def _create_build_image(self):
     """Creates the "build image", with Impala compiled and data loaded."""
     container = self._create_container(
-        image="ubuntu:16.04", name=self.name + "-build",
+        image=self.base_image, name=self.name + "-build",
         logdir="build",
         logname="log-build.txt",
         # entrypoint.sh will create a user with our uid; this
@@ -769,6 +781,7 @@ class TestSuiteRunner(object):
     # io-file-mgr-test expects a real-ish file system at /tmp;
     # we mount a temporary directory into the container to appease it.
     tmpdir = tempfile.mkdtemp(prefix=test_with_docker.name + "-" + self.name)
+    os.chmod(tmpdir, 01777)
     # Container names are sometimes used as hostnames, and DNS names shouldn't
     # have underscores.
     container_name = test_with_docker.name + "-" + self.name.replace("_", "-")

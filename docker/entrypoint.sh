@@ -67,12 +67,24 @@ function build() {
     paste <(cut -d : -f3 /etc/passwd) <(cut -d : -f1 /etc/passwd) | sort -n
     exit 1
   fi
-  apt-get update
-  apt-get install -y sudo git lsb-release python
+  if which apt-get > /dev/null; then
+    apt-get update
+    apt-get install -y sudo git lsb-release python
+  else
+    yum -y install sudo git python
+  fi
 
-  adduser --disabled-password --gecos "" --uid $1 impdev
-  echo "impdev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+  if ! id impdev; then
+    # Adduser is slightly different on CentOS and Ubuntu
+    if which apt-get; then
+      adduser --disabled-password --gecos "" --uid $1 impdev
+    else
+      adduser --uid $1 impdev
+    fi
+    echo "impdev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+  fi
 
+  ulimit -a
   su impdev -c "$0 build_impdev"
 }
 
@@ -120,7 +132,11 @@ function start_minicluster {
   sudo service postgresql start
 
   # Required for starting HBase
-  sudo service ssh start
+  if [ -f /etc/redhat-release ]; then
+    sudo service sshd start
+  else
+    sudo service ssh start
+  fi
 
   (echo ">>> Copying Kudu Data") 2> /dev/null
   # Move around Kudu's WALs to avoid issue with Docker filesystems (aufs and
@@ -161,6 +177,11 @@ function start_minicluster {
 function build_impdev() {
   # Assert we're impdev now.
   [ "$(id -un)" = impdev ]
+
+  # Bump "Max processes" ulimit to the hard limit; default
+  # on CentOS 6 can be 1024, which isn't enough for minicluster.
+  ulimit -u $(cat /proc/self/limits | grep 'Max processes' | awk '{ print $4 }')
+  ulimit -a
 
   # Link in ccache from host.
   ln -s /ccache /home/impdev/.ccache
@@ -376,6 +397,7 @@ function main() {
   echo ">>> ${CMD} $@ (begin)"
   # Dump environment, for debugging
   env | grep -vE "AWS_(SECRET_)?ACCESS_KEY"
+  ulimit -a
   set -x
   # The "| cat" here avoids "set -e"/errexit from exiting the
   # script right away.
