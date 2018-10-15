@@ -40,9 +40,11 @@ public class CompressionUtil {
   public static byte[] deflateCompress(byte[] input) {
     if (input == null) return null;
     ByteArrayOutputStream bos = new ByteArrayOutputStream(input.length);
-    // TODO: Benchmark other compression levels.
+    // Experiments on a wide partitioned table with incremental stats showed that the
+    // Deflater with 'BEST_SPEED' level provided reasonable compression ratios at much
+    // faster speeds compared to other modes like BEST_COMPRESSION/DEFAULT_COMPRESSION.
     DeflaterOutputStream stream =
-        new DeflaterOutputStream(bos, new Deflater(Deflater.BEST_COMPRESSION));
+        new DeflaterOutputStream(bos, new Deflater(Deflater.BEST_SPEED));
     try {
       stream.write(input);
       stream.close();
