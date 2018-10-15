@@ -68,6 +68,12 @@ parser.add_option("--force_kill", dest="force_kill", action="store_true", defaul
 parser.add_option("-r", "--restart_impalad_only", dest="restart_impalad_only",
                   action="store_true", default=False,
                   help="Restarts only the impalad processes")
+parser.add_option("--restart_catalogd_only", dest="restart_catalogd_only",
+                  action="store_true", default=False,
+                  help="Restarts only the catalogd process")
+parser.add_option("--restart_statestored_only", dest="restart_statestored_only",
+                  action="store_true", default=False,
+                  help="Restarts only the statestored process")
 parser.add_option("--in-process", dest="inprocess", action="store_true", default=False,
                   help="Start all Impala backends and state store in a single process.")
 parser.add_option("--log_dir", dest="log_dir",
@@ -459,13 +465,26 @@ if __name__ == "__main__":
         log_dir=options.log_dir))
     sys.exit(1)
 
-  # Kill existing cluster processes based on the current configuration.
-  if options.restart_impalad_only:
+  restart_only_count = len([opt for opt in [options.restart_impalad_only,
+                                            options.restart_statestored_only,
+                                            options.restart_catalogd_only] if opt])
+  if restart_only_count > 1:
+    LOG.error("--restart_impalad_only, --restart_catalogd_only, and "
+              "--restart_statestored_only options are mutually exclusive")
+    sys.exit(1)
+  elif restart_only_count == 1:
     if options.inprocess:
       LOG.error(
-          "Cannot perform individual component restarts using an in-process cluster")
+        "Cannot perform individual component restarts using an in-process cluster")
       sys.exit(1)
+
+  # Kill existing cluster processes based on the current configuration.
+  if options.restart_impalad_only:
     kill_matching_processes(["impalad"], force=options.force_kill)
+  elif options.restart_catalogd_only:
+    kill_matching_processes(["catalogd"], force=options.force_kill)
+  elif options.restart_statestored_only:
+    kill_matching_processes(["statestored"], force=options.force_kill)
   else:
     kill_cluster_processes(force=options.force_kill)
 
@@ -496,11 +515,18 @@ if __name__ == "__main__":
     wait_for_cluster = wait_for_cluster_cmdline
 
   try:
-    if not options.restart_impalad_only:
+    if options.restart_catalogd_only:
+      start_catalogd()
+    elif options.restart_statestored_only:
+      start_statestore()
+    elif options.restart_impalad_only:
+      start_impalad_instances(options.cluster_size, options.num_coordinators,
+                              options.use_exclusive_coordinators)
+    else:
       start_statestore()
       start_catalogd()
-    start_impalad_instances(options.cluster_size, options.num_coordinators,
-                            options.use_exclusive_coordinators)
+      start_impalad_instances(options.cluster_size, options.num_coordinators,
+                              options.use_exclusive_coordinators)
     # Sleep briefly to reduce log spam: the cluster takes some time to start up.
     sleep(3)
 
