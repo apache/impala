@@ -811,59 +811,49 @@ The above raises an error at parse-time.
         HBase tables.
       </p>
 
-      <p id="boolean_functions_vs_expressions" rev="2.11.0 IMPALA-1767">
-        In <keyword keyref="impala211_full"/> and higher, you can use
-        the operators <codeph>IS [NOT] TRUE</codeph> and
-        <codeph>IS [NOT] FALSE</codeph> as equivalents for the built-in
-        functions <codeph>istrue()</codeph>, <codeph>isnottrue()</codeph>,
-        <codeph>isfalse()</codeph>, and <codeph>isnotfalse()</codeph>.
-      </p>
+      <p id="boolean_functions_vs_expressions" rev="2.11.0 IMPALA-1767"> In
+          <keyword keyref="impala211_full"/> and higher, you can use the
+        operators <codeph>IS [NOT] TRUE</codeph> and <codeph>IS [NOT]
+          FALSE</codeph> as equivalents for the built-in functions
+          <codeph>ISTRUE()</codeph>, <codeph>ISNOTTRUE()</codeph>,
+          <codeph>ISFALSE()</codeph>, and <codeph>ISNOTFALSE()</codeph>. </p>
 
-      <p id="base64_charset">
-        The set of characters that can be generated as output
-        from <codeph>base64encode()</codeph>, or specified in
-        the argument string to <codeph>base64decode()</codeph>,
-        are the ASCII uppercase and lowercase letters (A-Z, a-z),
-        digits (0-9), and the punctuation characters
-        <codeph>+</codeph>, <codeph>/</codeph>, and <codeph>=</codeph>.
-      </p>
+      <p id="base64_charset"> The set of characters that can be generated as
+        output from <codeph>BASE64ENCODE()</codeph>, or specified in the
+        argument string to <codeph>BASE64DECODE()</codeph>, are the ASCII
+        uppercase and lowercase letters (A-Z, a-z), digits (0-9), and the
+        punctuation characters <codeph>+</codeph>, <codeph>/</codeph>, and
+          <codeph>=</codeph>. </p>
 
-      <p id="base64_error_handling">
-        If the argument string to <codeph>base64decode()</codeph> does
-        not represent a valid base64-encoded value, subject to the
-        constraints of the Impala implementation such as the allowed
-        character set, the function returns <codeph>NULL</codeph>.
-      </p>
+      <p id="base64_error_handling"> If the argument string to
+          <codeph>BASE64DECODE()</codeph> does not represent a valid
+        base64-encoded value, subject to the constraints of the Impala
+        implementation such as the allowed character set, the function returns
+          <codeph>NULL</codeph>. </p>
 
-      <p id="base64_use_cases">
-        The functions <codeph>base64encode()</codeph> and
-        <codeph>base64decode()</codeph> are typically used
-        in combination, to store in an Impala table string data that is
-        problematic to store or transmit. For example, you could use
-        these functions to store string data that uses an encoding
-        other than UTF-8, or to transform the values in contexts that
-        require ASCII values, such as for partition key columns.
-        Keep in mind that base64-encoded values produce different results
-        for string functions such as <codeph>LENGTH()</codeph>,
-        <codeph>MAX()</codeph>, and <codeph>MIN()</codeph> than when
-        those functions are called with the unencoded string values.
-      </p>
+      <p id="base64_use_cases"> The functions <codeph>BASE64ENCODE()</codeph>
+        and <codeph>BASE64DECODE()</codeph> are typically used in combination,
+        to store in an Impala table string data that is problematic to store or
+        transmit. For example, you could use these functions to store string
+        data that uses an encoding other than UTF-8, or to transform the values
+        in contexts that require ASCII values, such as for partition key
+        columns. Keep in mind that base64-encoded values produce different
+        results for string functions such as <codeph>LENGTH()</codeph>,
+          <codeph>MAX()</codeph>, and <codeph>MIN()</codeph> than when those
+        functions are called with the unencoded string values. </p>
 
-      <p id="base64_alignment">
-        All return values produced by <codeph>base64encode()</codeph>
-        are a multiple of 4 bytes in length. All argument values
-        supplied to <codeph>base64decode()</codeph> must also be a
-        multiple of 4 bytes in length. If a base64-encoded value
-        would otherwise have a different length, it can be padded
-        with trailing <codeph>=</codeph> characters to reach a length
-        that is a multiple of 4 bytes.
-      </p>
+      <p id="base64_alignment"> All return values produced by
+          <codeph>BASE64ENCODE()</codeph> are a multiple of 4 bytes in length.
+        All argument values supplied to <codeph>BASE64DECODE()</codeph> must
+        also be a multiple of 4 bytes in length. If a base64-encoded value would
+        otherwise have a different length, it can be padded with trailing
+          <codeph>=</codeph> characters to reach a length that is a multiple of
+        4 bytes. </p>
 
-      <p id="base64_examples">
-        The following examples show how to use <codeph>base64encode()</codeph>
-        and <codeph>base64decode()</codeph> together to store and retrieve
-        string values:
-<codeblock>
+      <p id="base64_examples"> The following examples show how to use
+          <codeph>BASE64ENCODE()</codeph> and <codeph>BASE64DECODE()</codeph>
+        together to store and retrieve string values:
+        <codeblock>
 -- An arbitrary string can be encoded in base 64.
 -- The length of the output is a multiple of 4 bytes,
 -- padded with trailing = characters if necessary.
@@ -884,11 +874,9 @@ select base64decode('aGVsbG8gd29ybGQ=') as decoded;
 | hello world |
 +-------------+
 </codeblock>
-
-      These examples demonstrate incorrect encoded values that
-      produce <codeph>NULL</codeph> return values when decoded:
-
-<codeblock>
+        These examples demonstrate incorrect encoded values that produce
+          <codeph>NULL</codeph> return values when decoded:
+        <codeblock>
 -- The input value to base64decode() must be a multiple of 4 bytes.
 -- In this case, leaving off the trailing = padding character
 -- produces a NULL return value.
@@ -911,13 +899,11 @@ select base64decode('abc$');
 +----------------------+
 WARNINGS: UDF WARNING: Could not base64 decode input in space 4; actual output length 0
 </codeblock>
-
-      These examples demonstrate <q>round-tripping</q> of an original string to an
-      encoded string, and back again. This technique is applicable if the original
-      source is in an unknown encoding, or if some intermediate processing stage
-      might cause national characters to be misrepresented:
-
-<codeblock>
+        These examples demonstrate <q>round-tripping</q> of an original string
+        to an encoded string, and back again. This technique is applicable if
+        the original source is in an unknown encoding, or if some intermediate
+        processing stage might cause national characters to be misrepresented:
+        <codeblock>
 select 'circumflex accents: â, ê, î, ô, û' as original,
   base64encode('circumflex accents: â, ê, î, ô, û') as encoded;
 +-----------------------------------+------------------------------------------------------+

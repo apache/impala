@@ -171,8 +171,9 @@ under the License.
         </dt>
 
         <dd>
-          <b>Purpose:</b> Tests whether any of a sequence of expressions is true, and returns a
-          corresponding result for the first true expression.
+          <b>Purpose:</b> Tests whether any of a sequence of expressions is
+          <codeph>TRUE</codeph>, and returns a corresponding result for the first true
+          expression.
           <p
             conref="../shared/impala_common.xml#common/return_same_type"/>
 
@@ -308,7 +309,8 @@ under the License.
 
         <dd>
           <b>Purpose:</b> Tests an expression and returns a corresponding result depending on
-          whether the result is true, false, or <codeph>NULL</codeph>.
+          whether the result is <codeph>TRUE</codeph>, <codeph>FALSE</codeph>, or
+          <codeph>NULL</codeph>.
           <p>
             <b>Return type:</b> Same as the <codeph>ifTrue</codeph> argument value
           </p>
@@ -337,12 +339,18 @@ under the License.
         </dt>
 
         <dd>
-          <b>Purpose:</b> Tests if a Boolean expression is <codeph>false</codeph> or not.
-          Returns <codeph>true</codeph> if so. If the argument is <codeph>NULL</codeph>, returns
-          <codeph>false</codeph>. Similar to <codeph>ISNOTTRUE()</codeph>, except it returns the
-          opposite value for a <codeph>NULL</codeph> argument.
-          <p
-            conref="../shared/impala_common.xml#common/return_type_boolean"/>
+          <b>Purpose:</b> Returns <codeph>TRUE</codeph> if the expression is
+          <codeph>FALSE</codeph>. Returns <codeph>FALSE</codeph> if the expression is
+          <codeph>TRUE</codeph> or <codeph>NULL</codeph>.
+          <p>
+            Same as the <codeph>IS FALSE</codeph> operator.
+          </p>
+          <p>
+            Similar to <codeph>ISNOTTRUE()</codeph>, except it returns the opposite value for a
+            <codeph>NULL</codeph> argument.
+          </p>
+
+          <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
 
           <p conref="../shared/impala_common.xml#common/added_in_220"/>
 
@@ -362,11 +370,16 @@ under the License.
         </dt>
 
         <dd>
-          <b>Purpose:</b> Tests if a Boolean expression is not <codeph>false</codeph> (that is,
-          either <codeph>true</codeph> or <codeph>NULL</codeph>). Returns <codeph>true</codeph>
-          if so. If the argument is <codeph>NULL</codeph>, returns <codeph>true</codeph>.
-          Similar to <codeph>ISTRUE()</codeph>, except it returns the opposite value for a
-          <codeph>NULL</codeph> argument.
+          <b>Purpose:</b> Tests if a Boolean expression is not <codeph>FALSE</codeph> (that is,
+          either <codeph>TRUE</codeph> or <codeph>NULL</codeph>). Returns <codeph>TRUE</codeph>
+          if so. If the argument is <codeph>NULL</codeph>, returns <codeph>TRUE</codeph>.
+          <p>
+            Same as the <codeph>IS NOT FALSE</codeph> operator.
+          </p>
+          <p>
+            Similar to <codeph>ISTRUE()</codeph>, except it returns the opposite value for a
+            <codeph>NULL</codeph> argument.
+          </p>
           <p
             conref="../shared/impala_common.xml#common/return_type_boolean"/>
 
@@ -390,11 +403,16 @@ under the License.
         </dt>
 
         <dd>
-          <b>Purpose:</b> Tests if a Boolean expression is not <codeph>true</codeph> (that is,
-          either <codeph>false</codeph> or <codeph>NULL</codeph>). Returns <codeph>true</codeph>
-          if so. If the argument is <codeph>NULL</codeph>, returns <codeph>true</codeph>.
-          Similar to <codeph>ISFALSE()</codeph>, except it returns the opposite value for a
-          <codeph>NULL</codeph> argument.
+          <b>Purpose:</b> Tests if a Boolean expression is not <codeph>TRUE</codeph> (that is,
+          either <codeph>FALSE</codeph> or <codeph>NULL</codeph>). Returns <codeph>TRUE</codeph>
+          if so. If the argument is <codeph>NULL</codeph>, returns <codeph>TRUE</codeph>.
+          <p>
+            Same as the <codeph>IS NOT TRUE</codeph> operator.
+          </p>
+          <p>
+            Similar to <codeph>ISFALSE()</codeph>, except it returns the opposite value for a
+            <codeph>NULL</codeph> argument.
+          </p>
           <p
             conref="../shared/impala_common.xml#common/return_type_boolean"/>
 
@@ -439,12 +457,18 @@ under the License.
         </dt>
 
         <dd>
-          <b>Purpose:</b> Tests if a Boolean expression is <codeph>true</codeph> or not. Returns
-          <codeph>true</codeph> if so. If the argument is <codeph>NULL</codeph>, returns
-          <codeph>false</codeph>. Similar to <codeph>ISNOTFALSE()</codeph>, except it returns
-          the opposite value for a <codeph>NULL</codeph> argument.
-          <p
-            conref="../shared/impala_common.xml#common/return_type_boolean"/>
+          <b>Purpose:</b> Returns <codeph>TRUE</codeph> if the expression is
+          <codeph>TRUE</codeph>. Returns <codeph>FALSE</codeph> if the expression is
+          <codeph>FALSE</codeph> or <codeph>NULL</codeph>.
+          <p>
+            Same as the <codeph>IS TRUE</codeph> operator.
+          </p>
+          <p>
+            Similar to <codeph>ISNOTFALSE()</codeph>, except it returns the opposite value for a
+            <codeph>NULL</codeph> argument.
+          </p>
+
+          <p conref="../shared/impala_common.xml#common/return_type_boolean"/>
 
           <p conref="../shared/impala_common.xml#common/for_compatibility_only"/>
 
@@ -466,8 +490,16 @@ under the License.
         </dt>
 
         <dd>
-          <b>Purpose:</b> Tests if an expression (of any type) is <codeph>NULL</codeph> or not.
-          Returns <codeph>false</codeph> if so. The converse of <codeph>NULLVALUE()</codeph>.
+          <b>Purpose:</b> Returns <codeph>TRUE</codeph> if the expression is non-null and
+          returns <codeph>FALSE</codeph> if the expression is <codeph>NULL</codeph>.
+          <p>
+            Same as the <codeph>IS NOT NULL</codeph> operator.
+          </p>
+
+          <p>
+            The converse of <codeph>NULLVALUE()</codeph>.
+          </p>
+
           <p
             conref="../shared/impala_common.xml#common/return_type_boolean"/>
 
@@ -549,8 +581,16 @@ END</codeblock>
         </dt>
 
         <dd>
-          <b>Purpose:</b> Tests if an expression (of any type) is <codeph>NULL</codeph> or not.
-          Returns <codeph>true</codeph> if so. The converse of <codeph>NONNULLVALUE()</codeph>.
+          <b>Purpose:</b> Returns <codeph>TRUE</codeph> if the expression is
+          <codeph>NULL</codeph>, and returns <codeph>FALSE</codeph> otherwise.
+          <p>
+            Same as the <codeph>IS NULL</codeph> operator.
+          </p>
+
+          <p>
+            The converse of <codeph>NONNULLVALUE()</codeph>.
+          </p>
+
           <p
             conref="../shared/impala_common.xml#common/return_type_boolean"/>
 
