@@ -383,3 +383,58 @@ class TestAuthorization(CustomClusterTestSuite):
   def test_deprecated_flags(self):
     assert_file_in_dir_contains(self.impala_log_dir, "authorization_policy_file flag" +
         " is deprecated. Object Ownership feature is not supported")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server_name=server1 --sentry_config=%s" % SENTRY_CONFIG_FILE,
+    catalogd_args="--sentry_config=%s" % SENTRY_CONFIG_FILE,
+    impala_log_dir=tempfile.mkdtemp(prefix="test_catalog_restart_",
+                                    dir=os.getenv("LOG_DIR")))
+  def test_catalog_restart(self, unique_role):
+    """IMPALA-7713: Tests that a catalogd restart when authorization is enabled should
+    reset the previous privileges stored in impalad's catalog to avoid stale privilege
+    data in the impalad's catalog."""
+    def assert_privileges():
+      result = self.client.execute("show grant role %s_foo" % unique_role)
+      TestAuthorization._check_privileges(result, [["database", "functional",
+                                                    "", "", "", "all", "false"]])
+
+      result = self.client.execute("show grant role %s_bar" % unique_role)
+      TestAuthorization._check_privileges(result, [["database", "functional_kudu",
+                                                    "", "", "", "all", "false"]])
+
+      result = self.client.execute("show grant role %s_baz" % unique_role)
+      TestAuthorization._check_privileges(result, [["database", "functional_avro",
+                                                    "", "", "", "all", "false"]])
+
+    self.role_cleanup(unique_role)
+    try:
+      self.client.execute("create role %s_foo" % unique_role)
+      self.client.execute("create role %s_bar" % unique_role)
+      self.client.execute("create role %s_baz" % unique_role)
+      self.client.execute("grant all on database functional to role %s_foo" %
+                          unique_role)
+      self.client.execute("grant all on database functional_kudu to role %s_bar" %
+                          unique_role)
+      self.client.execute("grant all on database functional_avro to role %s_baz" %
+                          unique_role)
+
+      assert_privileges()
+      self._start_impala_cluster(["--catalogd_args=--sentry_config=%s" %
+                                  SENTRY_CONFIG_FILE, "--restart_catalogd_only"])
+      assert_privileges()
+    finally:
+      self.role_cleanup(unique_role)
+
+  def role_cleanup(self, role_name_match):
+    """Cleans up any roles that match the given role name."""
+    for role_name in self.client.execute("show roles").data:
+      if role_name_match in role_name:
+        self.client.execute("drop role %s" % role_name)
+
+  @staticmethod
+  def _check_privileges(result, expected):
+    def columns(row):
+      cols = row.split("\t")
+      return cols[0:len(cols) - 1]
+    assert map(columns, result.data) == expected

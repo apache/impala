@@ -329,6 +329,18 @@ def unique_database(request, testid_checksum):
   return first_db_name
 
 
+@pytest.fixture
+def unique_role(request, testid_checksum):
+  """Returns a unique role to any test using the fixture. The fixture does not create
+  a role."""
+  role_name_prefix = request.function.__name__
+  fixture_params = getattr(request, 'param', None)
+  if fixture_params is not None:
+    if 'name_prefix' in fixture_params:
+      role_name_prefix = fixture_params['name_prefix']
+  return '{0}_{1}_role'.format(role_name_prefix, testid_checksum)
+
+
 @pytest.yield_fixture
 def kudu_client():
   """Provides a new Kudu client as a pytest fixture. The client only exists for the
