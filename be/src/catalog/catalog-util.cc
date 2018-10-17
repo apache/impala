@@ -17,6 +17,7 @@
 
 
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string_regex.hpp>
 #include <sstream>
 
 #include "catalog/catalog-util.h"
@@ -24,6 +25,7 @@
 #include "util/compress.h"
 #include "util/jni-util.h"
 #include "util/debug-util.h"
+#include "util/string-parser.h"
 
 #include "common/names.h"
 
@@ -35,6 +37,10 @@ jclass JniCatalogCacheUpdateIterator::pair_cl;
 jmethodID JniCatalogCacheUpdateIterator::pair_ctor;
 jclass JniCatalogCacheUpdateIterator::boolean_cl;
 jmethodID JniCatalogCacheUpdateIterator::boolean_ctor;
+
+/// Populates a TPrivilegeLevel::type based on the given object name string.
+Status TPrivilegeLevelFromObjectName(const std::string& object_name,
+    TPrivilegeLevel::type* privilege_level);
 
 Status JniCatalogCacheUpdateIterator::InitJNI() {
   JNIEnv* env = getJNIEnv();
@@ -202,16 +208,40 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       catalog_object->principal.__set_principal_name(object_name);
       break;
     case TCatalogObjectType::PRIVILEGE: {
-      int pos = object_name.find(".");
-      if (pos == string::npos || pos >= object_name.size() - 1) {
+      // The format is <privilege name>.<principal ID>.<principal type>
+      vector<string> split;
+      boost::split(split, object_name, [](char c){ return c == '.'; });
+      if (split.size() != 3) {
         stringstream error_msg;
         error_msg << "Invalid privilege name: " << object_name;
         return Status(error_msg.str());
       }
+      string privilege_name = split[0];
+      string principal_id = split[1];
+      string principal_type = split[2];
       catalog_object->__set_type(object_type);
-      catalog_object->__set_privilege(TPrivilege());
-      catalog_object->privilege.__set_principal_id(
-          atoi(object_name.substr(0, pos).c_str()));
+      TPrivilege privilege;
+      Status status = TPrivilegeFromObjectName(privilege_name, &privilege);
+      if (!status.ok()) return status;
+      catalog_object->__set_privilege(privilege);
+      StringParser::ParseResult result;
+      int32_t pid = StringParser::StringToInt<int32_t>(principal_id.c_str(),
+          principal_id.length(), &result);
+      if (result != StringParser::PARSE_SUCCESS) {
+        stringstream error_msg;
+        error_msg << "Invalid principal ID: " << principal_id;
+        return Status(error_msg.str());
+      }
+      catalog_object->privilege.__set_principal_id(pid);
+      if (principal_type == "ROLE") {
+        catalog_object->privilege.__set_principal_type(TPrincipalType::ROLE);
+      } else if (principal_type == "USER") {
+        catalog_object->privilege.__set_principal_type(TPrincipalType::USER);
+      } else {
+        stringstream error_msg;
+        error_msg << "Invalid principal type: " << principal_type;
+        return Status(error_msg.str());
+      }
       break;
     }
     case TCatalogObjectType::CATALOG:
@@ -220,6 +250,64 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       stringstream error_msg;
       error_msg << "Unexpected object type: " << object_type;
       return Status(error_msg.str());
+  }
+  return Status::OK();
+}
+
+Status TPrivilegeFromObjectName(const string& object_name, TPrivilege* privilege) {
+  DCHECK(privilege != nullptr);
+  // Format:
+  // server=val->action=val->grantoption=[true|false]
+  // server=val->uri=val->action=val->grantoption=[true|false]
+  // server=val->db=val->action=val->grantoption=[true|false]
+  // server=val->db=val->table=val->action=val->grantoption=[true|false]
+  // server=val->db=val->table=val->column=val->action=val->grantoption=[true|false]
+  vector<string> split;
+  boost::algorithm::split_regex(split, object_name, boost::regex("->"));
+  for (const auto& s: split) {
+    vector<string> key_value;
+    boost::split(key_value, s, [](char c){ return c == '='; });
+    if (key_value.size() != 2) {
+      stringstream error_msg;
+      error_msg << "Invalid field name/value format: " << s;
+      return Status(error_msg.str());
+    }
+
+    if (key_value[0] == "server") {
+      privilege->__set_server_name(key_value[1]);
+      privilege->__set_scope(TPrivilegeScope::SERVER);
+    } else if (key_value[0] == "uri") {
+      privilege->__set_uri(key_value[1]);
+      privilege->__set_scope(TPrivilegeScope::URI);
+    } else if (key_value[0] == "db") {
+      privilege->__set_db_name(key_value[1]);
+      privilege->__set_scope(TPrivilegeScope::DATABASE);
+    } else if (key_value[0] == "table") {
+      privilege->__set_table_name(key_value[1]);
+      privilege->__set_scope(TPrivilegeScope::TABLE);
+    } else if (key_value[0] == "column") {
+      privilege->__set_column_name(key_value[1]);
+      privilege->__set_scope(TPrivilegeScope::COLUMN);
+    } else if (key_value[0] == "action") {
+      TPrivilegeLevel::type privilege_level;
+      Status status = TPrivilegeLevelFromObjectName(key_value[1], &privilege_level);
+      if (!status.ok()) return status;
+      privilege->__set_privilege_level(privilege_level);
+    } else if (key_value[0] == "grantoption") {
+      if (key_value[1] == "true") {
+        privilege->__set_has_grant_opt(true);
+      } else if (key_value[1] == "false") {
+        privilege->__set_has_grant_opt(false);
+      } else {
+        stringstream error_msg;
+        error_msg << "Invalid grant option: " << key_value[1];
+        return Status(error_msg.str());
+      }
+    } else {
+      stringstream error_msg;
+      error_msg << "Invalid privilege field name: " << key_value[0];
+      return Status(error_msg.str());
+    }
   }
   return Status::OK();
 }
@@ -249,6 +337,33 @@ Status DecompressCatalogObject(const uint8_t* src, uint32_t size, string* dst) {
   uint8_t* decompressed_data_ptr = reinterpret_cast<uint8_t*>(&((*dst)[0]));
   RETURN_IF_ERROR(decompressor->ProcessBlock(true, size - sizeof(uint32_t),
       src + sizeof(uint32_t), &decompressed_len, &decompressed_data_ptr));
+  return Status::OK();
+}
+
+Status TPrivilegeLevelFromObjectName(const std::string& object_name,
+    TPrivilegeLevel::type* privilege_level) {
+  DCHECK(privilege_level != nullptr);
+  if (object_name == "all") {
+    *privilege_level = TPrivilegeLevel::ALL;
+  } else if (object_name == "insert") {
+    *privilege_level = TPrivilegeLevel::INSERT;
+  } else if (object_name == "select") {
+    *privilege_level = TPrivilegeLevel::SELECT;
+  } else if (object_name == "refresh") {
+    *privilege_level = TPrivilegeLevel::REFRESH;
+  } else if (object_name == "create") {
+    *privilege_level = TPrivilegeLevel::CREATE;
+  } else if (object_name == "alter") {
+    *privilege_level = TPrivilegeLevel::ALTER;
+  } else if (object_name == "drop") {
+    *privilege_level = TPrivilegeLevel::DROP;
+  } else if (object_name == "owner") {
+    *privilege_level = TPrivilegeLevel::OWNER;
+  } else {
+    stringstream error_msg;
+    error_msg << "Invalid privilege level: " << object_name;
+    return Status(error_msg.str());
+  }
   return Status::OK();
 }
 

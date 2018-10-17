@@ -23,6 +23,9 @@ import shutil
 import tempfile
 import json
 import grp
+import re
+import urllib
+
 from time import sleep, time
 from getpass import getuser
 from ImpalaService import ImpalaHiveServer2Service
@@ -438,3 +441,40 @@ class TestAuthorization(CustomClusterTestSuite):
       cols = row.split("\t")
       return cols[0:len(cols) - 1]
     assert map(columns, result.data) == expected
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server_name=server1 --sentry_config=%s" % SENTRY_CONFIG_FILE,
+    catalogd_args="--sentry_config=%s" % SENTRY_CONFIG_FILE,
+    impala_log_dir=tempfile.mkdtemp(prefix="test_catalog_restart_",
+                                    dir=os.getenv("LOG_DIR")))
+  def test_catalog_object(self, unique_role):
+    """IMPALA-7721: Tests /catalog_object web API for principal and privilege"""
+    self.role_cleanup(unique_role)
+    try:
+      self.client.execute("create role %s" % unique_role)
+      self.client.execute("grant select on database functional to role %s" % unique_role)
+      for service in [self.cluster.catalogd.service,
+                      self.cluster.get_first_impalad().service]:
+        obj_dump = service.get_catalog_object_dump("PRINCIPAL", unique_role)
+        assert "catalog_version" in obj_dump
+
+        # Get the privilege associated with that principal ID.
+        principal_id = re.search(r"principal_id \(i32\) = (\d+)", obj_dump)
+        assert principal_id is not None
+        obj_dump = service.get_catalog_object_dump("PRIVILEGE", urllib.quote(
+            "server=server1->db=functional->action=select->grantoption=false.%s.ROLE" %
+            principal_id.group(1)))
+        assert "catalog_version" in obj_dump
+
+        # Get the principal that does not exist.
+        obj_dump = service.get_catalog_object_dump("PRINCIPAL", "doesnotexist")
+        assert "CatalogException" in obj_dump
+
+        # Get the privilege that does not exist.
+        obj_dump = service.get_catalog_object_dump("PRIVILEGE", urllib.quote(
+            "server=server1->db=doesntexist->action=select->grantoption=false.%s.ROLE" %
+            principal_id.group(1)))
+        assert "CatalogException" in obj_dump
+    finally:
+      self.role_cleanup(unique_role)

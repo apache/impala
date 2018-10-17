@@ -98,6 +98,9 @@ TCatalogObjectType::type TCatalogObjectTypeFromName(const std::string& name);
 Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
     const std::string& object_name, TCatalogObject* catalog_object);
 
+/// Populates a TPrivilege based on the given object name string.
+Status TPrivilegeFromObjectName(const std::string& object_name, TPrivilege* privilege);
+
 /// Compresses a serialized catalog object using LZ4 and stores it back in 'dst'. Stores
 /// the size of the uncompressed catalog object in the first sizeof(uint32_t) bytes of
 /// 'dst'. The compression fails if the uncompressed data size exceeds 0x7E000000 bytes.
@@ -109,7 +112,6 @@ Status CompressCatalogObject(const uint8_t* src, uint32_t size, std::string* dst
 /// catalog object.
 Status DecompressCatalogObject(const uint8_t* src, uint32_t size, std::string* dst)
     WARN_UNUSED_RESULT;
-
 }
 
 #endif

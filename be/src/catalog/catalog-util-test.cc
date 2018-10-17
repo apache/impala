@@ -15,11 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <gutil/strings/substitute.h>
+
 #include "catalog/catalog-util.h"
 #include "testutil/gtest-util.h"
 
 using namespace impala;
 using namespace std;
+using namespace strings;
 
 void CompressAndDecompress(const std::string& input) {
   string compressed;
@@ -32,7 +35,6 @@ void CompressAndDecompress(const std::string& input) {
   ASSERT_EQ(input, decompressed);
 }
 
-
 TEST(CatalogUtil, TestCatalogCompression) {
   CompressAndDecompress("");
   CompressAndDecompress("deadbeef");
@@ -43,6 +45,92 @@ TEST(CatalogUtil, TestCatalogCompression) {
     large_string.push_back(static_cast<char>(rand() % (1 + numeric_limits<char>::max())));
   }
   CompressAndDecompress(large_string);
+}
+
+TEST(CatalogUtil, TestTPrivilegeFromObjectName) {
+  vector<tuple<string, TPrivilegeLevel::type>> actions = {
+      make_tuple("all", TPrivilegeLevel::ALL),
+      make_tuple("insert", TPrivilegeLevel::INSERT),
+      make_tuple("select", TPrivilegeLevel::SELECT),
+      make_tuple("refresh", TPrivilegeLevel::REFRESH),
+      make_tuple("create", TPrivilegeLevel::CREATE),
+      make_tuple("alter", TPrivilegeLevel::ALTER),
+      make_tuple("drop", TPrivilegeLevel::DROP),
+      make_tuple("owner", TPrivilegeLevel::OWNER)
+  };
+  vector<tuple<string, bool>> grant_options = {
+      make_tuple("true", true),
+      make_tuple("false", false)
+  };
+
+  for (const auto& action: actions) {
+    for (const auto& grant_option: grant_options) {
+      TPrivilege server_privilege;
+      ASSERT_OK(TPrivilegeFromObjectName(Substitute(
+          "server=server1->action=$0->grantoption=$1",
+          get<0>(action), get<0>(grant_option)), &server_privilege));
+      ASSERT_EQ(TPrivilegeScope::SERVER, server_privilege.scope);
+      ASSERT_EQ(get<1>(action), server_privilege.privilege_level);
+      ASSERT_EQ(get<1>(grant_option), server_privilege.has_grant_opt);
+      ASSERT_EQ("server1", server_privilege.server_name);
+
+      TPrivilege uri_privilege;
+      ASSERT_OK(TPrivilegeFromObjectName(Substitute(
+          "server=server1->uri=/test-warehouse->action=$0->grantoption=$1",
+          get<0>(action), get<0>(grant_option)), &uri_privilege));
+      ASSERT_EQ(TPrivilegeScope::URI, uri_privilege.scope);
+      ASSERT_EQ(get<1>(action), uri_privilege.privilege_level);
+      ASSERT_EQ(get<1>(grant_option), uri_privilege.has_grant_opt);
+      ASSERT_EQ("server1", uri_privilege.server_name);
+      ASSERT_EQ("/test-warehouse", uri_privilege.uri);
+
+      TPrivilege db_privilege;
+      ASSERT_OK(TPrivilegeFromObjectName(Substitute(
+          "server=server1->db=functional->action=$0->grantoption=$1",
+          get<0>(action), get<0>(grant_option)), &db_privilege));
+      ASSERT_EQ(TPrivilegeScope::DATABASE, db_privilege.scope);
+      ASSERT_EQ(get<1>(action), db_privilege.privilege_level);
+      ASSERT_EQ(get<1>(grant_option), db_privilege.has_grant_opt);
+      ASSERT_EQ("server1", db_privilege.server_name);
+      ASSERT_EQ("functional", db_privilege.db_name);
+
+      TPrivilege table_privilege;
+      ASSERT_OK(TPrivilegeFromObjectName(Substitute(
+          "server=server1->db=functional->table=alltypes->action=$0->grantoption=$1",
+          get<0>(action), get<0>(grant_option)), &table_privilege));
+      ASSERT_EQ(TPrivilegeScope::TABLE, table_privilege.scope);
+      ASSERT_EQ(get<1>(action), table_privilege.privilege_level);
+      ASSERT_EQ(get<1>(grant_option), table_privilege.has_grant_opt);
+      ASSERT_EQ("server1", table_privilege.server_name);
+      ASSERT_EQ("functional", table_privilege.db_name);
+      ASSERT_EQ("alltypes", table_privilege.table_name);
+
+      TPrivilege column_privilege;
+      ASSERT_OK(TPrivilegeFromObjectName(Substitute(
+          "server=server1->db=functional->table=alltypes->column=id->action=$0->"
+          "grantoption=$1", get<0>(action), get<0>(grant_option)), &column_privilege));
+      ASSERT_EQ(TPrivilegeScope::COLUMN, column_privilege.scope);
+      ASSERT_EQ(get<1>(action), column_privilege.privilege_level);
+      ASSERT_EQ(get<1>(grant_option), column_privilege.has_grant_opt);
+      ASSERT_EQ("server1", column_privilege.server_name);
+      ASSERT_EQ("functional", column_privilege.db_name);
+      ASSERT_EQ("alltypes", column_privilege.table_name);
+      ASSERT_EQ("id", column_privilege.column_name);
+    }
+  }
+
+  TPrivilege privilege;
+  EXPECT_ERROR(TPrivilegeFromObjectName("abc=server1->action=select->grantoption=true",
+      &privilege), TErrorCode::GENERAL);
+  EXPECT_ERROR(TPrivilegeFromObjectName("server=server1->action=foo->grantoption=true",
+      &privilege), TErrorCode::GENERAL);
+  EXPECT_ERROR(TPrivilegeFromObjectName("server=server1->action=select->grantoption=foo",
+      &privilege), TErrorCode::GENERAL);
+  EXPECT_ERROR(TPrivilegeFromObjectName("", &privilege), TErrorCode::GENERAL);
+  EXPECT_ERROR(TPrivilegeFromObjectName("SERVER=server1->action=select->grantoption=true",
+      &privilege), TErrorCode::GENERAL);
+  EXPECT_ERROR(TPrivilegeFromObjectName("server;server1->action=select->grantoption=true",
+      &privilege), TErrorCode::GENERAL);
 }
 
 IMPALA_TEST_MAIN();

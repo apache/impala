@@ -512,11 +512,11 @@ public abstract class Catalog {
         break;
       case PRIVILEGE:
         Principal tmpPrincipal = authPolicy_.getPrincipal(
-            objectDesc.getPrincipal().getPrincipal_id(),
-            objectDesc.getPrincipal().getPrincipal_type());
+            objectDesc.getPrivilege().getPrincipal_id(),
+            objectDesc.getPrivilege().getPrincipal_type());
         if (tmpPrincipal == null) {
           throw new CatalogException(String.format("No %s associated with ID: %d",
-              Principal.toString(objectDesc.getPrincipal().getPrincipal_type())
+              Principal.toString(objectDesc.getPrivilege().getPrincipal_type())
                   .toLowerCase(), objectDesc.getPrivilege().getPrincipal_id()));
         }
         String privilegeName = PrincipalPrivilege.buildPrivilegeName(
@@ -561,11 +561,13 @@ public abstract class Catalog {
         return "PRINCIPAL:" + catalogObject.getPrincipal().getPrincipal_name()
             .toLowerCase();
       case PRIVILEGE:
-        // The combination of privilege name + principal ID is guaranteed to be unique.
+        // The combination of privilege name + principal ID + principal type is
+        // guaranteed to be unique.
         return "PRIVILEGE:" +
             PrincipalPrivilege.buildPrivilegeName(catalogObject.getPrivilege())
                 .toLowerCase() + "." +
-            Integer.toString(catalogObject.getPrivilege().getPrincipal_id());
+            Integer.toString(catalogObject.getPrivilege().getPrincipal_id()) + "." +
+            catalogObject.getPrivilege().getPrincipal_type();
       case HDFS_CACHE_POOL:
         return "HDFS_CACHE_POOL:" +
             catalogObject.getCache_pool().getPool_name().toLowerCase();

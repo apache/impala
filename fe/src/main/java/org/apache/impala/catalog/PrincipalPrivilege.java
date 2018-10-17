@@ -146,7 +146,7 @@ public class PrincipalPrivilege extends CatalogObjectImpl {
   @Override
   public String getUniqueName() {
     return "PRIVILEGE:" + getName().toLowerCase() + "." + Integer.toString(
-        getPrincipalId());
+        getPrincipalId()) + "." + getPrincipalType().toString();
   }
 
   public TCatalogObject toTCatalogObject() {
