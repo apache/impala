@@ -195,8 +195,9 @@ public class HdfsTable extends Table implements FeFsTable {
   @VisibleForTesting
   HdfsPartition prototypePartition_;
 
-  // Estimate (in bytes) of the incremental stats size per column per partition
-  public static final long STATS_SIZE_PER_COLUMN_BYTES = 400;
+  // Empirical estimate (in bytes) of the incremental stats size per column per
+  // partition.
+  public static final long STATS_SIZE_PER_COLUMN_BYTES = 200;
 
   // Bi-directional map between an integer index and a unique datanode
   // TNetworkAddresses, each of which contains blocks of 1 or more
@@ -1753,8 +1754,6 @@ public class HdfsTable extends Table implements FeFsTable {
    * fetch from catalogd).
    */
   private boolean shouldSendIncrementalStats(int numPartitions) {
-    // TODO(bharath): Revisit the constant STATS_SIZE_PER_COLUMN_BYTES after the
-    // new incremental stats in-memory representation changes.
     long statsSizeEstimate =
         numPartitions * getColumns().size() * STATS_SIZE_PER_COLUMN_BYTES;
     return statsSizeEstimate < BackendConfig.INSTANCE.getIncStatsMaxSize()
