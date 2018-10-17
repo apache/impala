@@ -68,7 +68,7 @@ ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname>
    RENAME TO [<varname>database_name</varname>.]<varname>view_name</varname>;
 
 ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname> SET OWNER USER user_name;
-ALTER TABLE [<varname>database_name</varname>.]<varname>view_name</varname> SET OWNER ROLE role_name;
+ALTER VIEW [<varname>database_name</varname>.]<varname>view_name</varname> SET OWNER ROLE role_name;
 </codeblock>
 
     <ul>
