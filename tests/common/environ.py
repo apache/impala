@@ -56,9 +56,11 @@ class SpecificImpaladBuildTypes:
   TSAN = 'tsan'
   # ./buildall.sh -ubsan
   UBSAN = 'ubsan'
+  # ./buildall.sh -full_ubsan
+  UBSAN_FULL = 'ubsan_full'
 
   VALID_BUILD_TYPES = [ADDRESS_SANITIZER, DEBUG, CODE_COVERAGE_DEBUG, RELEASE,
-      CODE_COVERAGE_RELEASE, TSAN, UBSAN]
+      CODE_COVERAGE_RELEASE, TSAN, UBSAN, UBSAN_FULL]
 
   @classmethod
   def detect(cls, impala_build_root):

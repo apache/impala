@@ -158,6 +158,8 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "TIDY")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_TIDY}")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_UBSAN}")
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN_FULL")
+  SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_UBSAN}")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_TSAN}")
 else()
@@ -184,6 +186,7 @@ if (CCACHE AND NOT DEFINED ENV{DISABLE_CCACHE})
   if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER"
       OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY"
       OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN"
+      OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN_FULL"
       OR "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
     # Need to set CCACHE_CPP so that ccache calls clang with the original source file for
     # both preprocessing and compilation. Otherwise, ccache will use clang to preprocess
@@ -234,7 +237,7 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
   SET(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-DNDEBUG")
 endif()
 
-if (UBSAN_CODEGEN)
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN_FULL")
   set(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-DUNDEFINED_SANITIZER"
     "-fno-omit-frame-pointer" "-fsanitize=undefined" "-fno-wrapv" "-ggdb3"
     "-fno-sanitize=alignment,function,vptr,float-divide-by-zero,float-cast-overflow"
@@ -330,6 +333,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN_FULL" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/debug/")
 else()

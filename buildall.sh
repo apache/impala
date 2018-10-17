@@ -66,6 +66,7 @@ BUILD_ASAN=0
 BUILD_FE_ONLY=0
 BUILD_TIDY=0
 BUILD_UBSAN=0
+BUILD_UBSAN_FULL=0
 BUILD_TSAN=0
 # Export MAKE_CMD so it is visible in scripts that invoke make, e.g. copy-udfs-udas.sh
 export MAKE_CMD=make
@@ -126,8 +127,7 @@ do
       BUILD_UBSAN=1
       ;;
     -full_ubsan)
-      BUILD_UBSAN=1
-      MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -ubsan_codegen"
+      BUILD_UBSAN_FULL=1
       ;;
     -tsan)
       BUILD_TSAN=1
@@ -289,6 +289,9 @@ if [[ ${BUILD_TIDY} -eq 1 ]]; then
 fi
 if [[ ${BUILD_UBSAN} -eq 1 ]]; then
   CMAKE_BUILD_TYPE=UBSAN
+fi
+if [[ ${BUILD_UBSAN_FULL} -eq 1 ]]; then
+  CMAKE_BUILD_TYPE=UBSAN_FULL
 fi
 if [[ ${BUILD_TSAN} -eq 1 ]]; then
   CMAKE_BUILD_TYPE=TSAN
