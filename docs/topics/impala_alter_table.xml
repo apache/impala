@@ -531,13 +531,10 @@ ALTER TABLE <varname>table_name</varname> SET SERDEPROPERTIES ('<varname>key1</v
       single partition, or column statistics at the level of the entire table.
     </p>
 
-    <p>
-      You can set the <codeph>numrows</codeph> value for table statistics by changing the
-      <codeph>TBLPROPERTIES</codeph> setting for a table or partition. For example:
-<codeblock conref="../shared/impala_common.xml#common/set_numrows_example"/>
-<codeblock conref="../shared/impala_common.xml#common/set_numrows_partitioned_example"/>
-      See <xref href="impala_perf_stats.xml#perf_table_stats_manual"/> for details.
-    </p>
+    <p> You can set the <codeph>numrows</codeph> value for table statistics by
+      changing the <codeph>TBLPROPERTIES</codeph> setting for a table or
+      partition. For example: <codeblock conref="../shared/impala_common.xml#common/set_numrows_example"/>
+      <codeblock conref="../shared/impala_common.xml#common/set_numrows_partitioned_example"/></p>
 
     <p rev="2.6.0 IMPALA-3369">
       In <keyword keyref="impala26_full"/> and higher, you can use the <codeph>SET COLUMN
