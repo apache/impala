@@ -340,63 +340,24 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
       replans_seen = [0]
       replans_seen_lock = threading.Lock()
 
-      def stress_thread(client):
-        while replans_seen[0] == 0:
-          # TODO(todd) EXPLAIN queries don't currently yield a profile, so
-          # we have to actually run a COUNT query.
-          q = random.choice([
-              'refresh functional.alltypes',
-              'select count(*) from functional.alltypes where month=4',
-              'select count(*) from functional.alltypes where month=5'])
-          ret = self.execute_query_expect_success(client, q)
-          if RETRY_PROFILE_MSG in ret.runtime_profile:
-            with replans_seen_lock:
-              replans_seen[0] += 1
-
-      threads = [threading.Thread(target=stress_thread, args=(c,))
-                 for c in [client1, client2]]
-      for t in threads:
-        t.start()
-      for t in threads:
-        t.join(30)
-      assert replans_seen[0] > 0, "Did not trigger any re-plans"
-
-    finally:
-      client1.close()
-      client2.close()
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      impalad_args="--use_local_catalog=true",
-      catalogd_args="--catalog_topic_mode=minimal")
-  def test_concurrent_invalidate_with_queries(self, unique_database):
-    """
-    Tests that the queries are replanned when they clash with concurrent invalidates.
-    """
-    # TODO: Merge this with the above test after fixing IMPALA-7717
-    try:
-      impalad1 = self.cluster.impalads[0]
-      impalad2 = self.cluster.impalads[1]
-      client1 = impalad1.service.create_beeswax_client()
-      client2 = impalad2.service.create_beeswax_client()
-
-      # Track the number of replans.
-      replans_seen = [0]
-      replans_seen_lock = threading.Lock()
-
       # Queue to propagate exceptions from failed queries, if any.
       failed_queries = Queue.Queue()
 
       def stress_thread(client):
         while replans_seen[0] == 0:
+          # TODO(todd) EXPLAIN queries don't currently yield a profile, so
+          # we have to actually run a COUNT query.
           q = random.choice([
-              'invalidate metadata functional.alltypesnopart',
-              'select count(*) from functional.alltypesnopart',
-              'select count(*) from functional.alltypesnopart'])
+              'invalidate metadata functional.alltypes',
+              'select count(*) from functional.alltypes where month=4',
+              'select count(*) from functional.alltypes where month=5'])
+
           try:
             ret = self.execute_query_expect_success(client, q)
           except Exception as e:
             failed_queries.put((q, str(e)))
+            continue
+
           if RETRY_PROFILE_MSG in ret.runtime_profile:
             with replans_seen_lock:
               replans_seen[0] += 1
@@ -407,8 +368,8 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
         t.start()
       for t in threads:
         t.join(30)
-      assert failed_queries.empty(),\
-          "Failed query count non zero: %s" % list(failed_queries.queue)
+      assert failed_queries.empty(), "Failed queries encountered: %s" %\
+          list(failed_queries.queue)
       assert replans_seen[0] > 0, "Did not trigger any re-plans"
 
     finally:

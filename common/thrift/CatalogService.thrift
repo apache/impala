@@ -379,7 +379,12 @@ enum CatalogLookupStatus {
   DB_NOT_FOUND,
   TABLE_NOT_FOUND,
   TABLE_NOT_LOADED,
-  FUNCTION_NOT_FOUND
+  FUNCTION_NOT_FOUND,
+  // Partial fetch RPCs currently look up partitions by IDs instead of names. These IDs
+  // change over the lifetime of a table with queries like invalidate metadata. In such
+  // cases this lookup status is set and the caller can retry the fetch.
+  // TODO: Fix partition lookup logic to not do it with IDs.
+  PARTITION_NOT_FOUND
 }
 
 // RPC response for GetPartialCatalogObject.

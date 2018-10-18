@@ -63,6 +63,7 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -1709,8 +1710,12 @@ public class HdfsTable extends Table implements FeFsTable {
       resp.table_info.partitions = Lists.newArrayListWithCapacity(partIds.size());
       for (long partId : partIds) {
         HdfsPartition part = partitionMap_.get(partId);
-        Preconditions.checkArgument(part != null, "Partition id %s does not exist",
-            partId);
+        if (part == null) {
+          LOG.warn(String.format("Missing partition ID: %s, Table: %s", partId,
+              getFullName()));
+          return new TGetPartialCatalogObjectResponse().setLookup_status(
+              CatalogLookupStatus.PARTITION_NOT_FOUND);
+        }
         TPartialPartitionInfo partInfo = new TPartialPartitionInfo(partId);
 
         if (req.table_info_selector.want_partition_names) {

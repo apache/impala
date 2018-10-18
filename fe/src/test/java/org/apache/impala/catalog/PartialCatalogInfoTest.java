@@ -36,6 +36,7 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -175,12 +176,8 @@ public class PartialCatalogInfoTest {
     req.table_info_selector = new TTableInfoSelector();
     req.table_info_selector.want_partition_metadata = true;
     req.table_info_selector.partition_ids = ImmutableList.of(-12345L); // non-existent
-    try {
-      sendRequest(req);
-      fail("did not throw exception for missing partition");
-    } catch (IllegalArgumentException iae) {
-      assertEquals("Partition id -12345 does not exist", iae.getMessage());
-    }
+    TGetPartialCatalogObjectResponse resp = sendRequest(req);
+    assertEquals(resp.lookup_status, CatalogLookupStatus.PARTITION_NOT_FOUND);
   }
 
   @Test

@@ -345,6 +345,7 @@ public class CatalogdMetaProvider implements MetaProvider {
       case FUNCTION_NOT_FOUND:
       case TABLE_NOT_FOUND:
       case TABLE_NOT_LOADED:
+      case PARTITION_NOT_FOUND:
         invalidateCacheForObject(req.object_desc);
         throw new InconsistentMetadataFetchException(
             String.format("Fetching %s failed. Could not find %s",
