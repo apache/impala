@@ -38,8 +38,6 @@ SENTRY_LONG_POLLING_FREQUENCY_S = 60
 SENTRY_POLLING_FREQUENCY_S = 1
 # The timeout, in seconds, when waiting for a refresh of Sentry privileges.
 SENTRY_REFRESH_TIMEOUT_S = SENTRY_POLLING_FREQUENCY_S * 2
-# The timeout needed because of statestore refresh.
-STATESTORE_TIMEOUT_S = 3
 
 SENTRY_CONFIG_DIR = getenv('IMPALA_HOME') + '/fe/src/test/resources/'
 SENTRY_BASE_LOG_DIR = getenv('IMPALA_CLUSTER_LOGS_DIR') + "/sentry"
@@ -93,13 +91,8 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
     return total
 
   def _validate_user_privilege_count(self, client, query, user, delay_s, count):
-    start_time = time()
-    while time() - start_time < STATESTORE_TIMEOUT_S:
-      result = self.user_query(client, query, user=user, delay_s=delay_s)
-      if self.count_user_privileges(result) == count:
-        return True
-      sleep(1)
-    return False
+    result = self.user_query(client, query, user=user, delay_s=delay_s)
+    return self.count_user_privileges(result) == count
 
   def _test_cleanup(self):
     # Admin for manipulation and cleaning up.
@@ -191,14 +184,17 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
         % (test_obj.grant_name, test_obj.obj_name), user="oo_user1")
 
     # Change the database owner and ensure oo_user1 does not have owner privileges.
+    # Use a delay to avoid cache consistency issue that could occur after create.
     self.user_query(self.oo_user1_impalad_client, "alter %s %s set owner user oo_user2"
-        % (test_obj.obj_type, test_obj.obj_name), user="oo_user1")
+        % (test_obj.obj_type, test_obj.obj_name), user="oo_user1",
+        delay_s=sentry_refresh_timeout_s)
     assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
         "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
 
     # Ensure oo_user1 cannot drop database after owner change.
+    # Use a delay to avoid cache consistency issue that could occur after alter.
     self.user_query(self.oo_user1_impalad_client, "drop %s %s" % (test_obj.obj_type,
-        test_obj.obj_name), user="oo_user1",
+        test_obj.obj_name), user="oo_user1", delay_s=sentry_refresh_timeout_s,
         error_msg="does not have privileges to execute 'DROP'")
 
     # oo_user2 should have privileges for object now.
@@ -212,9 +208,11 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
         test_obj.obj_name))
     assert self._validate_user_privilege_count(self.oo_user2_impalad_client,
         "show grant user oo_user2", "oo_user2", sentry_refresh_timeout_s, 0)
+    # Use a delay to avoid cache consistency issue that could occur after alter.
     self.user_query(self.oo_user1_impalad_client,
         "alter %s %s set owner role owner_priv_test_owner_role"
-        % (test_obj.obj_type, test_obj.obj_name), user="oo_user1")
+        % (test_obj.obj_type, test_obj.obj_name), user="oo_user1",
+        delay_s=sentry_refresh_timeout_s)
     # Ensure oo_user1 does not have user privileges.
     assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
         "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
@@ -225,17 +223,20 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
         "oo_user1")
 
     # Drop the object and ensure no role privileges.
+    # Use a delay to avoid cache consistency issue that could occur after alter.
     self.user_query(self.oo_user1_impalad_client, "drop %s %s " % (test_obj.obj_type,
-        test_obj.obj_name), user="oo_user1")
+        test_obj.obj_name), user="oo_user1", delay_s=sentry_refresh_timeout_s)
     assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
         "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
 
     # Ensure user privileges are gone after drop.
+    # Use a delay to avoid cache consistency issue that could occur after drop.
     self.user_query(self.oo_user1_impalad_client, "create %s if not exists %s %s %s"
         % (test_obj.obj_type, test_obj.obj_name, test_obj.table_def,
-        test_obj.view_select), user="oo_user1")
+        test_obj.view_select), user="oo_user1", delay_s=sentry_refresh_timeout_s)
+    # Use a delay to avoid cache consistency issue that could occur after create.
     self.user_query(self.oo_user1_impalad_client, "drop %s %s " % (test_obj.obj_type,
-        test_obj.obj_name), user="oo_user1")
+        test_obj.obj_name), user="oo_user1", delay_s=sentry_refresh_timeout_s)
     assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
         "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
 
@@ -312,6 +313,7 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
         error_msg="does not have privileges with 'GRANT OPTION'")
 
     # Ensure oo_user1 cannot drop database.
+    # Use a delay to avoid cache consistency issue that could occur after alter.
     self.user_query(self.oo_user1_impalad_client, "drop %s %s" % (test_obj.obj_type,
         test_obj.obj_name), user="oo_user1",
         error_msg="does not have privileges to execute 'DROP'",
@@ -388,11 +390,14 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
         % (test_obj.grant_name, test_obj.obj_name), user="oo_user1",
         error_msg="does not have privileges to execute: REVOKE_PRIVILEGE")
 
+    # Use a delay to avoid cache consistency issue that could occur after create.
     self.user_query(self.oo_user1_impalad_client, "alter %s %s set owner user oo_user2"
         % (test_obj.obj_type, test_obj.obj_name), user="oo_user1",
+        delay_s=sentry_refresh_timeout_s,
         error_msg="does not have privileges with 'GRANT OPTION'")
 
+    # Use a delay to avoid cache consistency issue that could occur after alter.
     self.user_query(self.oo_user1_impalad_client, "drop %s %s " % (test_obj.obj_type,
-        test_obj.obj_name), user="oo_user1")
+        test_obj.obj_name), user="oo_user1", delay_s=sentry_refresh_timeout_s)
     assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
         "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
