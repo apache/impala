@@ -43,12 +43,7 @@ row_regex:.*terminated due to CPU limit of 1s000ms.*
 ---- QUERY
 # Query should fail due to exceeding time limit.
 set EXEC_TIME_LIMIT_S=2;
-set CPU_LIMIT_S=10000;
-set SCAN_BYTES_LIMIT="100G";
-select count(*) from tpch.lineitem l1,tpch.lineitem l2, tpch.lineitem l3 where
-            l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey and
-            l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment
-            having count(*) = 99
+select sleep(10000)
 ---- CATCH
 row_regex:.*expired due to execution time limit of 2s000ms.*
 ====
