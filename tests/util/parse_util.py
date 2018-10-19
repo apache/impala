@@ -17,6 +17,7 @@
 
 import re
 from datetime import datetime
+from RuntimeProfile.ttypes import TSummaryStatsCounter
 
 # IMPALA-6715: Every so often the stress test or the TPC workload directories get
 # changed, and the stress test loses the ability to run the full set of queries. Set
@@ -125,3 +126,53 @@ def match_memory_estimate(explain_lines):
   if None in (mem_limit, units):
     raise Exception('could not parse explain string:\n' + '\n'.join(explain_lines))
   return mem_limit, units
+
+
+def get_bytes_summary_stats_counter(counter_name, runtime_profile):
+  """Extracts a list of TSummaryStatsCounters from a given runtime profile where the units
+     are in bytes. Each entry in the returned list corresponds to a single occurrence of
+     the counter in the profile. If the counter is present, but it has not been updated,
+     an empty TSummaryStatsCounter is returned for that entry. If the counter is not in
+     the given profile, an empty list is returned. Here is an example of how this method
+     should be used:
+
+       # A single line in a runtime profile used for example purposes.
+       runtime_profile = "- ExampleCounter: (Avg: 8.00 KB (8192) ; " \
+                                            "Min: 8.00 KB (8192) ; " \
+                                            "Max: 8.00 KB (8192) ; " \
+                                            "Number of samples: 4)"
+       summary_stats = get_bytes_summary_stats_counter("ExampleCounter",
+                                                      runtime_profile)
+       assert len(summary_stats) == 1
+       assert summary_stats[0].sum == summary_stats[0].min_value == \
+              summary_stats[0].max_value == 8192 and \
+              summary_stats[0].total_num_values == 1
+  """
+
+  regex_summary_stat = re.compile(r"""\(
+    Avg:[^\(]*\((?P<avg>[0-9]+)\)\s;\s # Matches Avg: [?].[?] [?]B (?)
+    Min:[^\(]*\((?P<min>[0-9]+)\)\s;\s # Matches Min: [?].[?] [?]B (?)
+    Max:[^\(]*\((?P<max>[0-9]+)\)\s;\s # Matches Max: [?].[?] [?]B (?)
+    Number\sof\ssamples:\s(?P<samples>[0-9]+)\) # Matches Number of samples: ?)""",
+                                  re.VERBOSE)
+
+  # First, find all lines that contain the counter name, and then extract the summary
+  # stats from each line. If the summary stats cannot be extracted, return a dictionary
+  # with values of 0 for all keys.
+  summary_stats = []
+  for counter in re.findall(counter_name + ".*", runtime_profile):
+    summary_stat = re.search(regex_summary_stat, counter)
+    # We need to special-case when the counter has not been updated at all because empty
+    # summary counters have a different format than updated ones.
+    if not summary_stat:
+      assert "0 (Number of samples: 0)" in counter
+      summary_stats.append(TSummaryStatsCounter(sum=0, total_num_values=0, min_value=0,
+                                                max_value=0))
+    else:
+      summary_stat = summary_stat.groupdict()
+      num_samples = int(summary_stat['samples'])
+      summary_stats.append(TSummaryStatsCounter(sum=num_samples *
+          int(summary_stat['avg']), total_num_values=num_samples,
+          min_value=int(summary_stat['min']), max_value=int(summary_stat['max'])))
+
+  return summary_stats

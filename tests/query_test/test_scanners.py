@@ -55,6 +55,7 @@ from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
 from tests.util.hdfs_util import NAMENODE
 from tests.util.get_parquet_metadata import get_parquet_metadata
+from tests.util.parse_util import get_bytes_summary_stats_counter
 from tests.util.test_file_parser import QueryTestSectionReader
 
 # Test scanners with denial of reservations at varying frequency. This will affect the
@@ -535,9 +536,8 @@ class TestParquet(ImpalaTestSuite):
     assert (not result.log and not log_prefix) or \
         (log_prefix and result.log.startswith(log_prefix))
 
-    runtime_profile = str(result.runtime_profile)
     num_scanners_with_no_reads_list = re.findall(
-        'NumScannersWithNoReads: ([0-9]*)', runtime_profile)
+        'NumScannersWithNoReads: ([0-9]*)', result.runtime_profile)
 
     # This will fail if the number of impalads != 3
     # The fourth fragment is the "Averaged Fragment"
@@ -594,11 +594,11 @@ class TestParquet(ImpalaTestSuite):
     assert len(result.data) == 1
     assert result.data[0] == str(rows_in_table)
 
-    runtime_profile = str(result.runtime_profile)
-    num_row_groups_list = re.findall('NumRowGroups: ([0-9]*)', runtime_profile)
+    num_row_groups_list = re.findall('NumRowGroups: ([0-9]*)', result.runtime_profile)
     scan_ranges_complete_list = re.findall(
-        'ScanRangesComplete: ([0-9]*)', runtime_profile)
-    num_rows_read_list = re.findall('RowsRead: [0-9.K]* \(([0-9]*)\)', runtime_profile)
+        'ScanRangesComplete: ([0-9]*)', result.runtime_profile)
+    num_rows_read_list = re.findall('RowsRead: [0-9.K]* \(([0-9]*)\)',
+        result.runtime_profile)
 
     REGEX_UNIT_SECOND = "[0-9]*[s]*[0-9]*[.]*[0-9]*[nm]*[s]*"
     REGEX_MIN_MAX_FOOTER_PROCESSING_TIME = \
@@ -606,7 +606,7 @@ class TestParquet(ImpalaTestSuite):
             "Number of samples: %s\)" % (REGEX_UNIT_SECOND, REGEX_UNIT_SECOND,
             REGEX_UNIT_SECOND, "[0-9]*"))
     footer_processing_time_list = re.findall(
-        REGEX_MIN_MAX_FOOTER_PROCESSING_TIME, runtime_profile)
+        REGEX_MIN_MAX_FOOTER_PROCESSING_TIME, result.runtime_profile)
 
     # This will fail if the number of impalads != 3
     # The fourth fragment is the "Averaged Fragment"
@@ -806,6 +806,90 @@ class TestParquet(ImpalaTestSuite):
 
     self.run_test_case(
         'QueryTest/parquet-int64-timestamps', vector, unique_database)
+
+  def _is_summary_stats_counter_empty(self, counter):
+    """Returns true if the given TSummaryStatCounter is empty, false otherwise"""
+    return counter.max_value == counter.min_value == counter.sum ==\
+           counter.total_num_values == 0
+
+  def test_page_size_counters(self, vector):
+    """IMPALA-6964: Test that the counter Parquet[Un]compressedPageSize is updated
+       when reading [un]compressed Parquet files, and that the counter
+       Parquet[Un]compressedPageSize is not updated."""
+    # lineitem_sixblocks is not compressed so ParquetCompressedPageSize should be empty,
+    # but ParquetUncompressedPageSize should have been updated
+    result = self.client.execute("select * from functional_parquet.lineitem_sixblocks"
+                                 " limit 10")
+
+    compressed_page_size_summaries = get_bytes_summary_stats_counter(
+        "ParquetCompressedPageSize", result.runtime_profile)
+
+    assert len(compressed_page_size_summaries) > 0
+    for summary in compressed_page_size_summaries:
+      assert self._is_summary_stats_counter_empty(summary)
+
+    uncompressed_page_size_summaries = get_bytes_summary_stats_counter(
+        "ParquetUncompressedPageSize", result.runtime_profile)
+
+    # validate that some uncompressed data has been read; we don't validate the exact
+    # amount as the value can change depending on Parquet format optimizations, Impala
+    # scanner optimizations, etc.
+    assert len(uncompressed_page_size_summaries) > 0
+    for summary in uncompressed_page_size_summaries:
+      assert not self._is_summary_stats_counter_empty(summary)
+
+    # alltypestiny is compressed so both ParquetCompressedPageSize and
+    # ParquetUncompressedPageSize should have been updated
+    result = self.client.execute("select * from functional_parquet.alltypestiny"
+                                 " limit 10")
+
+    for summary_name in ("ParquetCompressedPageSize", "ParquetUncompressedPageSize"):
+      page_size_summaries = get_bytes_summary_stats_counter(
+          summary_name, result.runtime_profile)
+      assert len(page_size_summaries) > 0
+      for summary in page_size_summaries:
+        assert not self._is_summary_stats_counter_empty(summary)
+
+  def test_bytes_read_per_column(self, vector):
+    """IMPALA-6964: Test that the counter Parquet[Un]compressedBytesReadPerColumn is
+       updated when reading [un]compressed Parquet files, and that the counter
+       Parquet[Un]CompressedBytesReadPerColumn is not updated."""
+    # lineitem_sixblocks is not compressed so ParquetCompressedBytesReadPerColumn should
+    # be empty, but ParquetUncompressedBytesReadPerColumn should have been updated
+    result = self.client.execute("select * from functional_parquet.lineitem_sixblocks"
+                                 " limit 10")
+
+    compressed_bytes_read_per_col_summaries = get_bytes_summary_stats_counter(
+        "ParquetCompressedBytesReadPerColumn", result.runtime_profile)
+
+    assert len(compressed_bytes_read_per_col_summaries) > 0
+    for summary in compressed_bytes_read_per_col_summaries:
+      assert self._is_summary_stats_counter_empty(summary)
+
+    uncompressed_bytes_read_per_col_summaries = get_bytes_summary_stats_counter(
+        "ParquetUncompressedBytesReadPerColumn", result.runtime_profile)
+
+    assert len(uncompressed_bytes_read_per_col_summaries) > 0
+    for summary in uncompressed_bytes_read_per_col_summaries:
+      assert not self._is_summary_stats_counter_empty(summary)
+      # There are 16 columns in lineitem_sixblocks so there should be 16 samples
+      assert summary.total_num_values == 16
+
+    # alltypestiny is compressed so both ParquetCompressedBytesReadPerColumn and
+    # ParquetUncompressedBytesReadPerColumn should have been updated
+    result = self.client.execute("select * from functional_parquet.alltypestiny"
+                                 " limit 10")
+
+    for summary_name in ("ParquetCompressedBytesReadPerColumn",
+                         "ParquetUncompressedBytesReadPerColumn"):
+      bytes_read_per_col_summaries = get_bytes_summary_stats_counter(summary_name,
+          result.runtime_profile)
+      assert len(bytes_read_per_col_summaries) > 0
+      for summary in bytes_read_per_col_summaries:
+        assert not self._is_summary_stats_counter_empty(summary)
+        # There are 11 columns in alltypestiny so there should be 11 samples
+        assert summary.total_num_values == 11
+
 
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
@@ -1121,9 +1205,8 @@ class TestOrc(ImpalaTestSuite):
     result = self.client.execute(query)
     assert len(result.data) == rows_in_table
 
-    runtime_profile = str(result.runtime_profile)
     num_scanners_with_no_reads_list = re.findall(
-      'NumScannersWithNoReads: ([0-9]*)', runtime_profile)
+      'NumScannersWithNoReads: ([0-9]*)', result.runtime_profile)
 
     # This will fail if the number of impalads != 3
     # The fourth fragment is the "Averaged Fragment"

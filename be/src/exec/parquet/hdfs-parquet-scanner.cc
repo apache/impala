@@ -100,6 +100,8 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     num_row_groups_counter_(nullptr),
     num_scanners_with_no_reads_counter_(nullptr),
     num_dict_filtered_row_groups_counter_(nullptr),
+    parquet_compressed_page_size_counter_(nullptr),
+    parquet_uncompressed_page_size_counter_(nullptr),
     coll_items_read_counter_(0),
     codegend_process_scratch_batch_fn_(nullptr) {
   assemble_rows_timer_.Stop();
@@ -121,6 +123,10 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       ADD_COUNTER(scan_node_->runtime_profile(), "NumDictFilteredRowGroups", TUnit::UNIT);
   process_footer_timer_stats_ =
       ADD_SUMMARY_STATS_TIMER(scan_node_->runtime_profile(), "FooterProcessingTime");
+  parquet_compressed_page_size_counter_ = ADD_SUMMARY_STATS_COUNTER(
+      scan_node_->runtime_profile(), "ParquetCompressedPageSize", TUnit::BYTES);
+  parquet_uncompressed_page_size_counter_ = ADD_SUMMARY_STATS_COUNTER(
+      scan_node_->runtime_profile(), "ParquetUncompressedPageSize", TUnit::BYTES);
 
   codegend_process_scratch_batch_fn_ = reinterpret_cast<ProcessScratchBatchFn>(
       scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET));
@@ -1680,5 +1686,14 @@ ParquetTimestampDecoder HdfsParquetScanner::CreateTimestampDecoder(
 
   return ParquetTimestampDecoder(element, &state_->local_time_zone(),
       timestamp_conversion_needed_for_int96_timestamps);
+}
+
+void HdfsParquetScanner::UpdateCompressedPageSizeCounter(int64_t compressed_page_size) {
+  parquet_compressed_page_size_counter_->UpdateCounter(compressed_page_size);
+}
+
+void HdfsParquetScanner::UpdateUncompressedPageSizeCounter(
+    int64_t uncompressed_page_size) {
+  parquet_uncompressed_page_size_counter_->UpdateCounter(uncompressed_page_size);
 }
 }

@@ -363,6 +363,12 @@ class HdfsScanNodeBase : public ScanNode {
   int64_t IncreaseReservationIncrementally(int64_t curr_reservation,
       int64_t ideal_reservation);
 
+  /// Update the number of [un]compressed bytes read for the given SlotId. This is used
+  /// to track the number of bytes read per column and is meant to be called by
+  /// individual scanner classes.
+  void UpdateBytesRead(
+      SlotId slot_id, int64_t uncompressed_bytes_read, int64_t compressed_bytes_read);
+
  protected:
   friend class ScannerContext;
   friend class HdfsScanner;
@@ -545,6 +551,15 @@ class HdfsScanNodeBase : public ScanNode {
   RuntimeProfile::SummaryStatsCounter* initial_range_ideal_reservation_stats_ = nullptr;
   RuntimeProfile::SummaryStatsCounter* initial_range_actual_reservation_stats_ = nullptr;
 
+  /// Track stats about the number of bytes read per column. Each sample in the counter is
+  /// the size of a single column that is scanned by the scan node. The scan node tracks
+  /// the number of bytes read for each column it processes, and when the scan node is
+  /// closed, it updates these counters with the size of each column.
+  RuntimeProfile::SummaryStatsCounter* compressed_bytes_read_per_column_counter_ =
+      nullptr;
+  RuntimeProfile::SummaryStatsCounter* uncompressed_bytes_read_per_column_counter_ =
+      nullptr;
+
   /// Pool for allocating some amounts of memory that is shared between scanners.
   /// e.g. partition key tuple and their string buffers
   boost::scoped_ptr<MemPool> scan_node_pool_;
@@ -553,6 +568,24 @@ class HdfsScanNodeBase : public ScanNode {
   /// Returned in GetNext() if an error occurred.  An non-ok status triggers cleanup
   /// scanner threads.
   Status status_;
+
+  /// Struct that tracks the uncompressed and compressed bytes read. Used by the map
+  /// bytes_read_per_col_ to track the [un]compressed bytes read per column. Types are
+  /// atomic as the struct may be updated concurrently.
+  struct BytesRead {
+    AtomicInt64 uncompressed_bytes_read;
+    AtomicInt64 compressed_bytes_read;
+  };
+
+  /// Map from SlotId (column identifer) to a pair where the first entry is the number of
+  /// uncompressed bytes read for the column and the second entry is the number of
+  /// compressed bytes read for the column. This map is used to update the
+  /// [un]compressed_bytes_read_per_column counter.
+  std::unordered_map<SlotId, BytesRead> bytes_read_per_col_;
+
+  /// Lock that controls access to bytes_read_per_col_ so that multiple scanners
+  /// can update the map concurrently
+  boost::shared_mutex bytes_read_per_col_lock_;
 
   /// Performs dynamic partition pruning, i.e., applies runtime filters to files, and
   /// issues initial ranges for all file types. Waits for runtime filters if necessary.

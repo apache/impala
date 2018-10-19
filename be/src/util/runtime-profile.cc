@@ -795,7 +795,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
     for (const SummaryStatsCounterMap::value_type& v: summary_stats_map_) {
       if (v.second->TotalNumValues() == 0) {
         // No point printing all the stats if number of samples is zero.
-        stream << prefix << "  - " << v.first << ": "
+        stream << prefix << "   - " << v.first << ": "
                << PrettyPrinter::Print(v.second->value(), v.second->unit(), true)
                << " (Number of samples: " << v.second->TotalNumValues() << ")" << endl;
       } else {

@@ -373,6 +373,11 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   initial_range_actual_reservation_stats_ = ADD_SUMMARY_STATS_COUNTER(runtime_profile(),
       "InitialRangeActualReservation", TUnit::BYTES);
 
+  uncompressed_bytes_read_per_column_counter_ = ADD_SUMMARY_STATS_COUNTER(
+      runtime_profile(), "ParquetUncompressedBytesReadPerColumn", TUnit::BYTES);
+  compressed_bytes_read_per_column_counter_ = ADD_SUMMARY_STATS_COUNTER(
+      runtime_profile(), "ParquetCompressedBytesReadPerColumn", TUnit::BYTES);
+
   bytes_read_local_ = ADD_COUNTER(runtime_profile(), "BytesReadLocal",
       TUnit::BYTES);
   bytes_read_short_circuit_ = ADD_COUNTER(runtime_profile(), "BytesReadShortCircuit",
@@ -892,6 +897,25 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
   runtime_profile()->AppendExecOption(
       Substitute("Codegen enabled: $0 out of $1", num_enabled, total));
 
+  // Locking here should not be necessary since bytes_read_per_col_ is only updated inside
+  // column readers, and all column readers should have completed at this point; however,
+  // we acquire a read lock in case the update semantics of bytes_read_per_col_ change
+  {
+    shared_lock<shared_mutex> bytes_read_per_col_guard_read_lock(
+        bytes_read_per_col_lock_);
+    for (const auto& bytes_read : bytes_read_per_col_) {
+      int64_t uncompressed_bytes_read = bytes_read.second.uncompressed_bytes_read.Load();
+      if (uncompressed_bytes_read > 0) {
+        uncompressed_bytes_read_per_column_counter_->UpdateCounter(
+            uncompressed_bytes_read);
+      }
+      int64_t compressed_bytes_read = bytes_read.second.compressed_bytes_read.Load();
+      if (compressed_bytes_read > 0) {
+        compressed_bytes_read_per_column_counter_->UpdateCounter(compressed_bytes_read);
+      }
+    }
+  }
+
   if (reader_context_ != nullptr) {
     bytes_read_local_->Set(reader_context_->bytes_read_local());
     bytes_read_short_circuit_->Set(reader_context_->bytes_read_short_circuit());
@@ -925,4 +949,25 @@ void HdfsScanNodeBase::StopAndFinalizeCounters() {
 
 Status HdfsScanNodeBase::ScanNodeDebugAction(TExecNodePhase::type phase) {
   return ExecDebugAction(phase, runtime_state_);
+}
+
+void HdfsScanNodeBase::UpdateBytesRead(
+    SlotId slot_id, int64_t uncompressed_bytes_read, int64_t compressed_bytes_read) {
+  // Acquire a read lock first and check if the slot_id is in bytes_read_per_col_, if it
+  // is then update the value and release the read lock; if not then release the read
+  // lock, acquire the write lock, and then initialize the slot_id with the give value for
+  // bytes_read
+  shared_lock<shared_mutex> bytes_read_per_col_guard_read_lock(
+      bytes_read_per_col_lock_);
+  auto bytes_read_itr = bytes_read_per_col_.find(slot_id);
+  if (bytes_read_itr != bytes_read_per_col_.end()) {
+    bytes_read_itr->second.uncompressed_bytes_read.Add(uncompressed_bytes_read);
+    bytes_read_itr->second.compressed_bytes_read.Add(compressed_bytes_read);
+  } else {
+    bytes_read_per_col_guard_read_lock.unlock();
+    lock_guard<shared_mutex> bytes_read_per_col_guard_write_lock(
+        bytes_read_per_col_lock_);
+    bytes_read_per_col_[slot_id].uncompressed_bytes_read.Add(uncompressed_bytes_read);
+    bytes_read_per_col_[slot_id].compressed_bytes_read.Add(compressed_bytes_read);
+  }
 }

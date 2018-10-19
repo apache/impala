@@ -452,6 +452,16 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Number of row groups skipped due to dictionary filter
   RuntimeProfile::Counter* num_dict_filtered_row_groups_counter_;
 
+  /// Tracks the size of any compressed pages read. If no compressed pages are read, this
+  /// counter is empty
+  RuntimeProfile::SummaryStatsCounter* parquet_compressed_page_size_counter_;
+
+  /// Tracks the size of any de-compressed pages reads. This counter is updated in two
+  /// places: (1) when a compressed page is de-compressed, the de-compressed size is added
+  /// to this counter, (2) when a page that is not compressed is read, its size is added
+  /// to this counter
+  RuntimeProfile::SummaryStatsCounter* parquet_uncompressed_page_size_counter_;
+
   /// Number of collection items read in current row batch. It is a scanner-local counter
   /// used to reduce the frequency of updating HdfsScanNode counter. It is updated by the
   /// callees of AssembleRows() and is merged into the HdfsScanNode counter at the end of
@@ -640,6 +650,14 @@ class HdfsParquetScanner : public HdfsScanner {
   /// no values that pass the relevant conjuncts, then the row group can be skipped.
   Status EvalDictionaryFilters(const parquet::RowGroup& row_group,
       bool* skip_row_group) WARN_UNUSED_RESULT;
+
+  /// Updates the counter parquet_compressed_page_size_counter_ with the given compressed
+  /// page size. Called by ParquetColumnReader for each page read.
+  void UpdateCompressedPageSizeCounter(int64_t compressed_page_size);
+
+  /// Updates the counter parquet_uncompressed_page_size_counter_ with the given
+  /// uncompressed page size. Called by ParquetColumnReader for each page read.
+  void UpdateUncompressedPageSizeCounter(int64_t uncompressed_page_size);
 };
 
 } // namespace impala

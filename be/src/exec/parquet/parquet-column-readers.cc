@@ -1355,6 +1355,13 @@ Status BaseScalarColumnReader::ReadDataPage() {
       data_ = decompressed_buffer;
       data_size = current_page_header_.uncompressed_page_size;
       data_end_ = data_ + data_size;
+      if (slot_desc() != nullptr) {
+        parent_->scan_node_->UpdateBytesRead(slot_desc()->id(), uncompressed_size,
+            current_page_header_.compressed_page_size);
+        parent_->UpdateUncompressedPageSizeCounter(uncompressed_size);
+        parent_->UpdateCompressedPageSizeCounter(
+            current_page_header_.compressed_page_size);
+      }
     } else {
       DCHECK_EQ(metadata_->codec, parquet::CompressionCodec::UNCOMPRESSED);
       if (current_page_header_.compressed_page_size != uncompressed_size) {
@@ -1372,6 +1379,10 @@ Status BaseScalarColumnReader::ReadDataPage() {
         memcpy(copy_buffer, data_, uncompressed_size);
         data_ = copy_buffer;
         data_end_ = data_ + uncompressed_size;
+      }
+      if (slot_desc() != nullptr) {
+        parent_->scan_node_->UpdateBytesRead(slot_desc()->id(), uncompressed_size, 0);
+        parent_->UpdateUncompressedPageSizeCounter(uncompressed_size);
       }
     }
 
