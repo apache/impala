@@ -91,7 +91,7 @@ Memory limit exceeded
 # Hash join that will fail to repartition and therefore fail from out-of-memory because
 # of a large number of duplicate keys on the build side: IMPALA-4857. It does not need
 # any help from DEBUG_ACTION.
-set mem_limit=150m;
+set mem_limit=250m;
 select straight_join *
 from supplier join /* +broadcast */ lineitem on s_suppkey = l_linenumber
 order by l_tax desc
