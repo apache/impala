@@ -39,7 +39,7 @@ public abstract class Principal extends CatalogObjectImpl {
   private static AtomicInteger principalId_ = new AtomicInteger(0);
 
   private final CatalogObjectCache<PrincipalPrivilege> principalPrivileges_ =
-      new CatalogObjectCache<>();
+      new CatalogObjectCache<>(isCaseInsensitiveKeys());
 
   protected Principal(String principalName, TPrincipalType type,
       Set<String> grantGroups) {
@@ -53,6 +53,11 @@ public abstract class Principal extends CatalogObjectImpl {
   protected Principal(TPrincipal principal) {
     principal_ = principal;
   }
+
+  /**
+   * Returns true if the keys in the catalog to be treated as case insensitive.
+   */
+  protected abstract boolean isCaseInsensitiveKeys();
 
   /**
    * Adds a privilege to the principal. Returns true if the privilege was added

@@ -169,6 +169,7 @@ public class SentryProxy {
       // Assume all roles should be removed. Then query the Policy Service and remove
       // roles from this set that actually exist.
       Set<String> rolesToRemove = catalog_.getAuthPolicy().getAllRoleNames();
+      // The keys (role names) in listAllRolesPrivileges here are always in lower case.
       Map<String, Set<TSentryPrivilege>> allRolesPrivileges =
           sentryPolicyService_.listAllRolesPrivileges(processUser_);
       // Read the full policy, adding new/modified roles to "updatedRoles".
@@ -195,7 +196,9 @@ public class SentryProxy {
         } else {
           role = catalog_.addRole(sentryRole.getRoleName(), grantGroups);
         }
-        refreshPrivilegesInCatalog(role, allRolesPrivileges);
+        // allRolesPrivileges keys and sentryRole.getName() are used here since they both
+        // come from Sentry so they agree in case.
+        refreshPrivilegesInCatalog(sentryRole.getRoleName(), role, allRolesPrivileges);
       }
       return rolesToRemove;
     }
@@ -211,6 +214,7 @@ public class SentryProxy {
       // Assume all users should be removed. Then query the Policy Service and remove
       // users from this set that actually exist.
       Set<String> usersToRemove = catalog_.getAuthPolicy().getAllUserNames();
+      // The keys (user names) in listAllUsersPrivileges here are always in lower case.
       Map<String, Set<TSentryPrivilege>> allUsersPrivileges =
           sentryPolicyService_.listAllUsersPrivileges(processUser_);
       for (Map.Entry<String, Set<TSentryPrivilege>> userPrivilegesEntry:
@@ -226,24 +230,33 @@ public class SentryProxy {
         if (existingUser.getRef() && resetVersions_) {
           user.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
         }
-        refreshPrivilegesInCatalog(user, allUsersPrivileges);
+        // allUsersPrivileges keys and userPrivilegesEntry.getKey() are used here since
+        // they both come from Sentry so they agree in case.
+        refreshPrivilegesInCatalog(userPrivilegesEntry.getKey(), user,
+            allUsersPrivileges);
       }
       return usersToRemove;
     }
 
     /**
      * Updates the privileges for a given principal in the catalog since the last Sentry
-     * sync update.
+     * sync update. The sentryPrincipalName is used to match against the key in
+     * allPrincipalPrivileges, which both come from Sentry, so they should have the
+     * same case sensitivity.
      */
-    private void refreshPrivilegesInCatalog(Principal principal,
-        Map<String, Set<TSentryPrivilege>> allPrincipalPrivileges)
+    private void refreshPrivilegesInCatalog(String sentryPrincipalName,
+        Principal principal, Map<String, Set<TSentryPrivilege>> allPrincipalPrivileges)
         throws CatalogException {
       // Assume all privileges should be removed. Privileges that still exist are
       // deleted from this set and we are left with the set of privileges that need
       // to be removed.
       Set<String> privilegesToRemove = principal.getPrivilegeNames();
+      // It is important to get a set of privileges using sentryPrincipalName
+      // and not principal.getName() because principal.getName() may return a
+      // principal name with a different case than the principal names stored
+      // in allPrincipalPrivileges. See IMPALA-7729 for more information.
       Set<TSentryPrivilege> sentryPrivileges = allPrincipalPrivileges.get(
-          principal.getName());
+          sentryPrincipalName);
       if (sentryPrivileges == null) return;
       // Check all the privileges that are part of this principal.
       for (TSentryPrivilege sentryPriv: sentryPrivileges) {
