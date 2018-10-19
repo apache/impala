@@ -23,6 +23,7 @@
 #include "common/compiler-util.h"
 #include "util/bit-stream-utils.inline.h"
 #include "util/bit-util.h"
+#include "util/test-info.h"
 
 namespace impala {
 
@@ -43,8 +44,8 @@ namespace impala {
 ///    literal-indicator := varint_encode( number_of_groups << 1 | 1)
 ///    repeated-indicator := varint_encode( number_of_repetitions << 1 )
 //
-/// Each run is preceded by a varint. The varint's least significant bit is
-/// used to indicate whether the run is a literal run or a repeated run. The rest
+/// Each run is preceded by a varint. The varint's least significant bit is used to
+/// indicate whether the run is a literal run (lsb=1) or a repeated run (lsb=0). The rest
 /// of the varint is used to determine the length of the run (eg how many times the
 /// value repeats).
 //
@@ -59,9 +60,9 @@ namespace impala {
 /// without the need for additional checks.
 //
 /// There is a break-even point when it is more storage efficient to do run length
-/// encoding.  For 1 bit-width values, that point is 8 values.  They require 2 bytes
-/// for both the repeated encoding or the literal encoding.  This value can always
-/// be computed based on the bit-width.
+/// encoding. This value is computed based on the bit-width (by
+/// RleEncoder::MinRepeatedRunLength).
+///
 /// TODO: think about how to use this for strings.  The bit packing isn't quite the same.
 //
 /// Examples with bit-width 1 (eg encoding booleans):
@@ -74,6 +75,8 @@ namespace impala {
 /// 200 ints = 25 groups of 8
 /// <varint((25 << 1) | 1)> <25 bytes of values, bitpacked>
 /// (total 26 bytes, 1 byte overhead)
+///
+/// See https://github.com/apache/parquet-format/blob/master/Encodings.md#RLE
 //
 
 /// RLE decoder with a batch-oriented interface that enables fast decoding.
@@ -192,49 +195,102 @@ class RleBatchDecoder {
       int32_t max_to_output, OutType* dict, int64_t dict_len, OutType* values);
 };
 
-/// Class to incrementally build the rle data.   This class does not allocate any memory.
+/// Class to incrementally build the rle data. This class does not allocate any memory.
 /// The encoding has two modes: encoding repeated runs and literal runs.
 /// If the run is sufficiently short, it is more efficient to encode as a literal run.
-/// This class does so by buffering 8 values at a time.  If they are not all the same
-/// they are added to the literal run.  If they are the same, they are added to the
-/// repeated run.  When we switch modes, the previous run is flushed out.
+/// This class does this by buffering a number of values at a time in a circular buffer.
+/// If the values are not all the same then they are added to the literal run.
+/// If the values are all the same, they are added to the repeated run.
+/// When we switch modes, the previous run is flushed out.
+/// When the buffer is full, then some multiple of eight data values must be flushed to
+/// the BitWriter. If buffering more than eight values, and if there is a current run of
+/// repeated values, then only eight values are flushed, and the start of the circular
+/// buffer moves forward by eight.
 class RleEncoder {
  public:
   /// buffer/buffer_len: preallocated output buffer.
   /// bit_width: max number of bits for value.
-  /// TODO: consider adding a min_repeated_run_length so the caller can control
-  /// when values should be encoded as repeated runs.  Currently this is derived
-  /// based on the bit_width, which can determine a storage optimal choice.
+  /// min_repeated_run_length: the smallest number of repeated values that will be used
+  /// for run length encoding. If this is zero, which is the required choice for non-test
+  /// code, then a default length will be chosen, based on the bit_width.
+  /// min_repeated_run_length must be a multiple of 8 and less than or equal to
+  /// MAX_RUN_LENGTH_BUFFER.
   /// TODO: allow 0 bit_width (and have dict encoder use it)
-  RleEncoder(uint8_t* buffer, int buffer_len, int bit_width)
+  RleEncoder(
+      uint8_t* buffer, int buffer_len, int bit_width, int min_repeated_run_length = 0)
     : bit_width_(bit_width),
-      bit_writer_(buffer, buffer_len) {
+      bit_writer_(buffer, buffer_len),
+      min_repeated_run_length_(min_repeated_run_length) {
     DCHECK_GE(bit_width_, 0);
     DCHECK_LE(bit_width_, 64);
+    if (min_repeated_run_length == 0) {
+      // Choose a good value for min_repeated_run_length_, based on the bit_width.
+      min_repeated_run_length_ = DefaultRunLength(bit_width);
+    } else {
+      DCHECK(TestInfo::is_test()) << "Only tests should specify min_repeated_run_length";
+    }
+    DCHECK_EQ(min_repeated_run_length_ % 8, 0);
+    DCHECK_LE(min_repeated_run_length_, MAX_RUN_LENGTH_BUFFER);
+    DCHECK_GT(min_repeated_run_length_, 0);
     max_run_byte_size_ = MinBufferSize(bit_width);
     DCHECK_GE(buffer_len, max_run_byte_size_) << "Input buffer not big enough.";
     Clear();
   }
 
-  /// Returns the minimum buffer size needed to use the encoder for 'bit_width'
-  /// This is the maximum length of a single run for 'bit_width'.
+  /// Returns the minimum buffer size needed to use the encoder for 'bit_width'.
+  /// This is the maximum length that RleEncoder can fill when it finally flushes a
+  /// literal run (which is when it checks if the buffer is full).
   /// It is not valid to pass a buffer less than this length.
   static int MinBufferSize(int bit_width) {
-    /// 1 indicator byte and MAX_VALUES_PER_LITERAL_RUN 'bit_width' values.
-    int max_literal_run_size = 1 +
-        BitUtil::Ceil(MAX_VALUES_PER_LITERAL_RUN * bit_width, 8);
-    /// Up to MAX_VLQ_BYTE_LEN indicator and a single 'bit_width' value.
-    int max_repeated_run_size =
-        BatchedBitReader::MAX_VLQ_BYTE_LEN + BitUtil::Ceil(bit_width, 8);
+    DCHECK_EQ(MAX_VALUES_PER_LITERAL_RUN % 8, 0);
+    // 1 indicator byte +
+    // the size in bytes to hold the longest possible literal run of 'bit_width' values +
+    // the maximum size in bytes required to flush any buffered values after a partial
+    // write.
+    int max_literal_run_size = 1 + ((MAX_VALUES_PER_LITERAL_RUN * bit_width) / 8)
+        + (MAX_RUN_LENGTH_BUFFER / 8) - 1;
+    // Up to MAX_VLQ_BYTE_LEN bytes for the indicator, and a single 'bit_width' value.
+    int max_repeated_run_size = static_cast<int>(
+        BatchedBitReader::MAX_VLQ_BYTE_LEN + BitUtil::Ceil(bit_width, 8));
     return std::max(max_literal_run_size, max_repeated_run_size);
   }
 
-  /// Returns the maximum byte size it could take to encode 'num_values'.
+  /// Returns the maximum byte size it could take to encode 'num_values' of 'bit_width'.
   static int MaxBufferSize(int bit_width, int num_values) {
-    int bytes_per_run = BitUtil::Ceil(bit_width * MAX_VALUES_PER_LITERAL_RUN, 8.0);
-    int num_runs = BitUtil::Ceil(num_values, MAX_VALUES_PER_LITERAL_RUN);
-    int literal_max_size = num_runs + num_runs * bytes_per_run;
-    return std::max(MinBufferSize(bit_width), literal_max_size);
+    if (bit_width > 2) {
+      // The largest encoded size is for all long literals with no repeated runs.
+      int bytes_per_run = (bit_width * MAX_VALUES_PER_LITERAL_RUN) / 8;
+      int num_runs =
+          static_cast<int>(BitUtil::Ceil(num_values, MAX_VALUES_PER_LITERAL_RUN));
+      int literal_max_size = num_runs * (1 + bytes_per_run);
+      return std::max(MinBufferSize(bit_width), literal_max_size);
+    }
+    int encoded_size;
+    int num_bytes = static_cast<int>(BitUtil::Ceil(num_values * bit_width, 8));
+    if (bit_width == 1) {
+      // Worst case is we use 4 bytes for every 3 of the input e.g. for L8 R16 L8 R16 L8.
+      encoded_size = 1 + static_cast<int>(BitUtil::Ceil(num_bytes * 4, 3));
+    } else { // bit_width == 2
+      // Worst case is we use 3 bytes for every 2 of the input e.g. for L8 R8 L8 R8 L8.
+      encoded_size = 1 + static_cast<int>(BitUtil::Ceil(num_bytes * 3, 2));
+    }
+    return std::max(MinBufferSize(bit_width), encoded_size);
+  }
+
+  /// Returns the best value for min_repeated_run_length for the given bit_width.
+  static int DefaultRunLength(int bit_width) {
+    if (bit_width == 1) {
+      // Using min_repeated_run_length=16 is never worse than 8.
+      // There are cases where min_repeated_run_length=24 is better than 16, but this
+      // depends on the data that is being encoded.
+      return 16;
+    }
+    // For bit_width=2 there are cases where min_repeated_run_length=16 is better than 8,
+    // but this depends on the data that is being encoded.
+
+    // For other bit widths, any run length of 8 is more efficient than a literal
+    // encoding.
+    return 8;
   }
 
   /// Encode value.  Returns true if the value fits in buffer, false otherwise.
@@ -253,20 +309,24 @@ class RleEncoder {
   int32_t len() { return bit_writer_.bytes_written(); }
   bool buffer_full() const { return buffer_full_; }
 
+  /// The maximum number of values that can be buffered by RleEncoder.
+  /// The actual number of values that is buffered is the value of
+  /// min_repeated_run_length_.
+  static const int MAX_RUN_LENGTH_BUFFER = 16;
+
  private:
   /// Flushes any buffered values.  If this is part of a repeated run, this is largely
   /// a no-op.
   /// If it is part of a literal run, this will call FlushLiteralRun, which writes
   /// out the buffered literal values.
-  /// If 'done' is true, the current run would be written even if it would normally
-  /// have been buffered more.  This should only be called at the end, when the
-  /// encoder has received all values even if it would normally continue to be
-  /// buffered.
-  void FlushBufferedValues(bool done);
+  void FlushBufferedValues();
 
-  /// Flushes literal values to the underlying buffer.  If update_indicator_byte,
-  /// then the current literal run is complete and the indicator byte is updated.
-  void FlushLiteralRun(bool update_indicator_byte);
+  /// Flushes literal values to the underlying buffer.
+  /// update_indicator_byte: if set then the current literal run is complete and the
+  /// indicator byte is updated.
+  /// count_to_flush: number of value to flush from the start of the buffer.
+  /// This can be 0.
+  void FlushLiteralRun(bool update_indicator_byte, int count_to_flush);
 
   /// Flushes a repeated run to the underlying buffer.
   void FlushRepeatedRun();
@@ -275,9 +335,18 @@ class RleEncoder {
   /// make sure there are enough bytes remaining to encode the next run.
   void CheckBufferFull();
 
+  /// Flush out 8 values from the buffer.
+  /// This may flush the whole buffer, or just part of it.
+  void FlushEightValues();
+
+  /// Get the offset into buffered_values_ by offsetting from index by start_.
+  int BufferOffset(int index);
+
+  /// The maximum number of groups encodable by a 1-byte indicator.
+  static const int MAX_ENCODABLE_GROUPS = 1 << 6;
+
   /// The maximum number of values in a single literal run
-  /// (number of groups encodable by a 1-byte indicator * 8)
-  static const int MAX_VALUES_PER_LITERAL_RUN = (1 << 6) * 8;
+  static const int MAX_VALUES_PER_LITERAL_RUN = MAX_ENCODABLE_GROUPS * 8;
 
   /// Number of bits needed to encode the value. Must be between 0 and 64.
   const int bit_width_;
@@ -291,19 +360,24 @@ class RleEncoder {
   /// The maximum byte size a single run can take.
   int max_run_byte_size_;
 
-  /// We need to buffer at most 8 values for literals.  This happens when the
-  /// bit_width is 1 (so 8 values fit in one byte).
-  /// TODO: generalize this to other bit widths
-  int64_t buffered_values_[8];
+  /// We need to buffer at most MAX_RUN_LENGTH_BUFFER values to detect runs that can be
+  /// encoded.
+  /// This is a circular buffer. The current front of the buffer is at index start_.
+  /// The amount of the buffer that can be used is the value of min_repeated_run_length_.
+  uint64_t buffered_values_[MAX_RUN_LENGTH_BUFFER];
 
   /// Number of values in buffered_values_
   int num_buffered_values_;
 
-  /// The current (also last) value that was written and the count of how
-  /// many times in a row that value has been seen.  This is maintained even
-  /// if we are in a literal run.  If the repeat_count_ get high enough, we switch
-  /// to encoding repeated runs.
+  /// The offset in buffered_values_ that is the current start of the buffer.
+  int start_;
+
+  /// The current (also last) value that was written.
   int64_t current_value_;
+
+  /// The count of how many times in a row that current_value_ has been seen.
+  /// This is maintained even if we are in a literal run.
+  /// If the repeat_count_ gets high enough, then we switch to encoding repeated runs.
   int repeat_count_;
 
   /// Number of literals in the current run.  This does not include the literals
@@ -315,10 +389,19 @@ class RleEncoder {
   /// This is reserved as soon as we need a literal run but the value is written
   /// when the literal run is complete.
   uint8_t* literal_indicator_byte_;
+
+  /// The length of buffered_values_ that is used to buffer values in an attempt
+  /// to accumulate repeated values to encode as runs.
+  int min_repeated_run_length_;
 };
 
-/// This function buffers input values 8 at a time.  After seeing all 8 values,
-/// it decides whether they should be encoded as a literal or repeated run.
+/// This function buffers input values until it has accumulated a number equal to
+/// min_repeated_run_length_. After seeing all min_repeated_run_length_ values, it
+/// decides whether they should be encoded as a literal or as a repeated run.
+/// When buffering more than 8 values, RleEncoder uses a circular buffer to store data,
+/// so that runs of length greater than 8 can be detected. In this case, when the buffer
+/// is full, then 8 items of data are flushed, and the logical start of the buffer
+/// (start_) moves ahead by 8 through the circular buffer.
 inline bool RleEncoder::Put(uint64_t value) {
   DCHECK(bit_width_ == 64 || value < (1LL << bit_width_));
   if (UNLIKELY(buffer_full_)) return false;
@@ -326,14 +409,14 @@ inline bool RleEncoder::Put(uint64_t value) {
   if (LIKELY(current_value_ == value
       && repeat_count_ <= std::numeric_limits<int32_t>::max())) {
     ++repeat_count_;
-    if (repeat_count_ > 8) {
+    if (repeat_count_ > min_repeated_run_length_) {
       // This is just a continuation of the current run, no need to buffer the
-      // values.
+      // values as buffered_values_ is already full.
       // Note that this is the fast path for long repeated runs.
       return true;
     }
   } else {
-    if (repeat_count_ >= 8) {
+    if (repeat_count_ >= min_repeated_run_length_) {
       // We had a run that was long enough but it ended, either because of a different
       // value or because it exceeded the maximum run length. Flush the current repeated
       // run.
@@ -344,15 +427,16 @@ inline bool RleEncoder::Put(uint64_t value) {
     current_value_ = value;
   }
 
-  buffered_values_[num_buffered_values_] = value;
-  if (++num_buffered_values_ == 8) {
+  buffered_values_[BufferOffset(num_buffered_values_)] = value;
+  if (++num_buffered_values_ == min_repeated_run_length_) {
     DCHECK_EQ(literal_count_ % 8, 0);
-    FlushBufferedValues(false);
+    // The buffer is full, so we need to flush something.
+    FlushBufferedValues();
   }
   return true;
 }
 
-inline void RleEncoder::FlushLiteralRun(bool update_indicator_byte) {
+inline void RleEncoder::FlushLiteralRun(bool update_indicator_byte, int count_to_flush) {
   if (literal_indicator_byte_ == NULL) {
     // The literal indicator byte has not been reserved yet, get one now.
     literal_indicator_byte_ = bit_writer_.GetNextBytePtr();
@@ -360,11 +444,11 @@ inline void RleEncoder::FlushLiteralRun(bool update_indicator_byte) {
   }
 
   // Write all the buffered values as bit packed literals
-  for (int i = 0; i < num_buffered_values_; ++i) {
-    bool success = bit_writer_.PutValue(buffered_values_[i], bit_width_);
+  for (int i = 0; i < count_to_flush; ++i) {
+    bool success = bit_writer_.PutValue(buffered_values_[BufferOffset(i)], bit_width_);
     DCHECK(success) << "There is a bug in using CheckBufferFull()";
   }
-  num_buffered_values_ = 0;
+  num_buffered_values_ -= count_to_flush;
 
   if (update_indicator_byte) {
     // At this point we need to write the indicator byte for the literal run.
@@ -375,7 +459,7 @@ inline void RleEncoder::FlushLiteralRun(bool update_indicator_byte) {
     int num_groups = literal_count_ / 8;
     int32_t indicator_value = (num_groups << 1) | 1;
     DCHECK_EQ(indicator_value & 0xFFFFFF00, 0);
-    *literal_indicator_byte_ = indicator_value;
+    *literal_indicator_byte_ = static_cast<uint8_t>(indicator_value);
     literal_indicator_byte_ = NULL;
     literal_count_ = 0;
     CheckBufferFull();
@@ -383,22 +467,47 @@ inline void RleEncoder::FlushLiteralRun(bool update_indicator_byte) {
 }
 
 inline void RleEncoder::FlushRepeatedRun() {
-  DCHECK_GT(repeat_count_, 0);
+  DCHECK_GT(repeat_count_, 0) << "repeat_count_=" << repeat_count_
+                              << " min_repeated_run_length_=" << min_repeated_run_length_;
   bool result = true;
   // The lsb of 0 indicates this is a repeated run
   uint32_t indicator_value = static_cast<uint32_t>(repeat_count_) << 1;
   result &= bit_writer_.PutUleb128Int(indicator_value);
-  result &= bit_writer_.PutAligned(current_value_, BitUtil::Ceil(bit_width_, 8));
+  result &= bit_writer_.PutAligned(
+      current_value_, static_cast<int>(BitUtil::Ceil(bit_width_, 8)));
   DCHECK(result);
   num_buffered_values_ = 0;
   repeat_count_ = 0;
   CheckBufferFull();
 }
 
-/// Flush the values that have been buffered.  At this point we decide whether
+inline void RleEncoder::FlushEightValues() {
+  literal_count_ += 8;
+  DCHECK_EQ(literal_count_ % 8, 0);
+  int num_groups = literal_count_ / 8;
+  DCHECK_LE(num_groups + 1, MAX_ENCODABLE_GROUPS) << "The Literal run is too large";
+  if (num_groups + 1 == MAX_ENCODABLE_GROUPS) {
+    // We need to start a new literal run because the indicator byte we've reserved
+    // cannot store more values.
+    DCHECK(literal_indicator_byte_ != NULL);
+    FlushLiteralRun(true, 8); // updates num_buffered_values_
+  } else {
+    FlushLiteralRun(false, 8); // updates num_buffered_values_
+  }
+
+  // Move start_ (the current offset into buffered_values_) on by 8.
+  start_ = BufferOffset(8);
+
+  if (repeat_count_ > num_buffered_values_) {
+    repeat_count_ = num_buffered_values_;
+  }
+}
+
+/// Flush some values that have been buffered.  At this point we decide whether
 /// we need to switch between the run types or continue the current one.
-inline void RleEncoder::FlushBufferedValues(bool done) {
-  if (repeat_count_ >= 8) {
+inline void RleEncoder::FlushBufferedValues() {
+  if (repeat_count_ >= min_repeated_run_length_) {
+    // The buffer is entirely full of repeated values.
     // Clear the buffered values.  They are part of the repeated run now and we
     // don't want to flush them out as literals.
     num_buffered_values_ = 0;
@@ -406,25 +515,19 @@ inline void RleEncoder::FlushBufferedValues(bool done) {
       // There was a current literal run.  All the values in it have been flushed
       // but we still need to update the indicator byte.
       DCHECK_EQ(literal_count_ % 8, 0);
-      DCHECK_EQ(repeat_count_, 8);
-      FlushLiteralRun(true);
+      DCHECK_EQ(repeat_count_, min_repeated_run_length_);
+      FlushLiteralRun(true, 0 /* num_buffered_values_ */);
     }
-    DCHECK_EQ(literal_count_, 0);
+    DCHECK_EQ(literal_count_, num_buffered_values_);
     return;
   }
+  // The buffer is full, but there is a current run of repeated values, but we do not yet
+  // have enough for an encoded run. Flush out eight values.
+  FlushEightValues();
+}
 
-  literal_count_ += num_buffered_values_;
-  DCHECK_EQ(literal_count_ % 8, 0);
-  int num_groups = literal_count_ / 8;
-  if (num_groups + 1 >= (1 << 6)) {
-    // We need to start a new literal run because the indicator byte we've reserved
-    // cannot store more values.
-    DCHECK(literal_indicator_byte_ != NULL);
-    FlushLiteralRun(true);
-  } else {
-    FlushLiteralRun(done);
-  }
-  repeat_count_ = 0;
+inline int RleEncoder::BufferOffset(int index) {
+  return (index + start_) % min_repeated_run_length_;
 }
 
 inline int RleEncoder::Flush() {
@@ -436,13 +539,19 @@ inline int RleEncoder::Flush() {
       FlushRepeatedRun();
     } else  {
       DCHECK_EQ(literal_count_ % 8, 0);
-      // Buffer the last group of literals to 8 by padding with 0s.
-      for (; num_buffered_values_ != 0 && num_buffered_values_ < 8;
-          ++num_buffered_values_) {
-        buffered_values_[num_buffered_values_] = 0;
+      // Pad the last group of literals by adding 0's up to the byte boundary.
+      while (num_buffered_values_ % 8 != 0) {
+        buffered_values_[BufferOffset(num_buffered_values_++)] = 0;
       }
-      literal_count_ += num_buffered_values_;
-      FlushLiteralRun(true);
+      DCHECK_EQ(num_buffered_values_ % 8, 0);
+
+      // Flush out all of the buffer.
+      int num_flushes = num_buffered_values_ / 8;
+      for (int flush = 0; flush < num_flushes; flush++) {
+        FlushEightValues();
+      }
+      // Force the end of any exiting literal run.
+      FlushLiteralRun(true, 0);
       repeat_count_ = 0;
     }
   }
@@ -456,7 +565,11 @@ inline int RleEncoder::Flush() {
 
 inline void RleEncoder::CheckBufferFull() {
   int bytes_written = bit_writer_.bytes_written();
-  if (bytes_written + max_run_byte_size_ > bit_writer_.buffer_len()) {
+  DCHECK_EQ(num_buffered_values_ % 8, 0);
+  // Is there enough space that we would be able to flush all buffered values
+  // plus the longest possible run we cold write? If not then we must refuse more data.
+  if (bytes_written + (num_buffered_values_ / 8) + max_run_byte_size_
+      > bit_writer_.buffer_len()) {
     buffer_full_ = true;
   }
 }
@@ -467,6 +580,7 @@ inline void RleEncoder::Clear() {
   repeat_count_ = 0;
   num_buffered_values_ = 0;
   literal_count_ = 0;
+  start_ = 0;
   literal_indicator_byte_ = NULL;
   bit_writer_.Clear();
 }
