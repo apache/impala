@@ -59,6 +59,7 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tmp-file-mgr.h"
+#include "scheduling/admission-controller.h"
 #include "scheduling/scheduler.h"
 #include "service/impala-http-handler.h"
 #include "service/impala-internal-service.h"
@@ -738,6 +739,18 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
       RETURN_IF_ERROR(CheckProfileAccess(user, request_state->effective_user(),
           request_state->user_has_profile_access()));
       if (request_state->operation_state() == TOperationState::PENDING_STATE) {
+        const string* admission_result = request_state->summary_profile()->GetInfoString(
+            AdmissionController::PROFILE_INFO_KEY_ADMISSION_RESULT);
+        if (admission_result != nullptr) {
+          if (*admission_result == AdmissionController::PROFILE_INFO_VAL_QUEUED) {
+            result->__set_is_queued(true);
+            const string* queued_reason = request_state->summary_profile()->GetInfoString(
+                AdmissionController::PROFILE_INFO_KEY_LAST_QUEUED_REASON);
+            if (queued_reason != nullptr) {
+              result->__set_queued_reason(*queued_reason);
+            }
+          }
+        }
         return Status::OK();
       } else if (request_state->GetCoordinator() != nullptr) {
         request_state->GetCoordinator()->GetTExecSummary(result);

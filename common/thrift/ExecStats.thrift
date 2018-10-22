@@ -100,4 +100,11 @@ struct TExecSummary {
 
   // Optional record indicating the query progress
   6: optional TExecProgress progress
+
+  // Set to true if the query is currently queued by admission control.
+  7: optional bool is_queued
+
+  // Contains the latest queuing reason if the query is currently queued by admission
+  // control.
+  8: optional string queued_reason
 }

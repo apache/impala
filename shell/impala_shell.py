@@ -963,7 +963,16 @@ class ImpalaShell(object, cmd.Cmd):
     checkpoint = time.time()
     if checkpoint - self.last_summary > self.PROGRESS_UPDATE_INTERVAL:
       summary = self.imp_client.get_summary(self.last_query_handle)
-      if summary and summary.progress:
+      if not summary:
+        return
+
+      if summary.is_queued:
+        queued_msg = "Query queued. Latest queuing reason: %s\n" % summary.queued_reason
+        self.progress_stream.write(queued_msg)
+        self.last_summary = time.time()
+        return
+
+      if summary.progress:
         progress = summary.progress
 
         # If the data is not complete return and wait for a good result.

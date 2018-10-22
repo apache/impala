@@ -824,41 +824,39 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       impalad_args=impalad_admission_ctrl_flags(max_requests=1, max_queued=10,
           pool_max_mem=1024 * 1024 * 1024))
   @needs_session()
-  def test_hs2_admission_controller_logs(self):
-    """Test to verify that the GetLog() function invoked by the HS2 client returns the
-    reason for queuing of the query."""
+  def test_queuing_status_through_query_log_and_exec_summary(self):
+    """Test to verify that the HS2 client's GetLog() call and the ExecSummary expose
+    the query's queuing status, that is, whether the query was queued and what was the
+    latest queuing reason."""
     # Start a long running query.
-    long_query_req = TCLIService.TExecuteStatementReq()
-    long_query_req.sessionHandle = self.session_handle
-    long_query_req.statement = "select sleep(1000000)"
-    long_query_resp = self.hs2_client.ExecuteStatement(long_query_req)
-    HS2TestSuite.check_response(long_query_resp)
-    # Ensure that the query is running.
+    long_query_resp = self.execute_statement("select sleep(10000)")
+    # Ensure that the query has started executing.
     self.wait_for_admission_control(long_query_resp.operationHandle)
     # Submit another query.
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "select 1"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    HS2TestSuite.check_response(execute_statement_resp)
+    queued_query_resp = self.execute_statement("select 1")
     # Wait until the query is queued.
-    self.wait_for_operation_state(execute_statement_resp.operationHandle,
+    self.wait_for_operation_state(queued_query_resp.operationHandle,
             TCLIService.TOperationState.PENDING_STATE)
-    # Ensure that the log message contains the queuing reason.
+    # Check whether the query log message correctly exposes the queuing status.
     get_log_req = TCLIService.TGetLogReq()
-    get_log_req.operationHandle = execute_statement_resp.operationHandle
+    get_log_req.operationHandle = queued_query_resp.operationHandle
     log = self.hs2_client.GetLog(get_log_req).log
     assert "Admission result : Queued" in log, log
     assert "Latest admission queue reason : number of running queries 1 is at or over "
     "limit 1" in log, log
+    # Now check the same for ExecSummary.
+    summary_req = ImpalaHiveServer2Service.TGetExecSummaryReq()
+    summary_req.operationHandle = queued_query_resp.operationHandle
+    summary_req.sessionHandle = self.session_handle
+    exec_summary_resp = self.hs2_client.GetExecSummary(summary_req)
+    assert exec_summary_resp.summary.is_queued
+    assert "number of running queries 1 is at or over limit 1" in \
+           exec_summary_resp.summary.queued_reason,\
+      exec_summary_resp.summary.queued_reason
     # Close the running query.
-    close_operation_req = TCLIService.TCloseOperationReq()
-    close_operation_req.operationHandle = long_query_resp.operationHandle
-    HS2TestSuite.check_response(self.hs2_client.CloseOperation(close_operation_req))
+    self.close(long_query_resp.operationHandle)
     # Close the queued query.
-    close_operation_req = TCLIService.TCloseOperationReq()
-    close_operation_req.operationHandle = execute_statement_resp.operationHandle
-    HS2TestSuite.check_response(self.hs2_client.CloseOperation(close_operation_req))
+    self.close(queued_query_resp.operationHandle)
 
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
