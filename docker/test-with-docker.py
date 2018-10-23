@@ -653,6 +653,9 @@ class TestWithDocker(object):
       self.image = _check_output(
           ["docker", "commit",
            "-c", "LABEL pwd=" + self.git_root,
+           "-c", "USER impdev",
+           "-c", "WORKDIR /home/impdev/Impala",
+           "-c", 'CMD ["/home/impdev/Impala/docker/entrypoint.sh", "shell"]',
            container.id, "impala:built-" + self.name]).strip()
       logging.info("Committed docker image: %s", self.image)
     finally:

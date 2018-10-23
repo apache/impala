@@ -145,16 +145,18 @@ function start_minicluster {
   # presumably because there's only one layer involved. See
   # https://issues.apache.org/jira/browse/KUDU-1419.
   set -x
-  pushd /home/impdev/Impala/testdata
-  for x in cluster/cdh*/node-*/var/lib/kudu/*/wal; do
-    echo $x
-    # This mv takes time, as it's actually copying into the latest layer.
-    mv $x $x-orig
-    mkdir $x
-    mv $x-orig/* $x
-    rmdir $x-orig
-  done
-  popd
+  if [ "true" = $KUDU_IS_SUPPORTED ]; then
+    pushd /home/impdev/Impala/testdata
+    for x in cluster/cdh*/node-*/var/lib/kudu/*/wal; do
+      echo $x
+      # This mv takes time, as it's actually copying into the latest layer.
+      mv $x $x-orig
+      mkdir $x
+      mv $x-orig/* $x
+      rmdir $x-orig
+    done
+    popd
+  fi
 
   # Wait for postgresql to really start; if it doesn't, Hive Metastore will fail to start.
   for i in {1..120}; do
@@ -387,12 +389,55 @@ function configure_timezone() {
   fi
 }
 
+# Exposes a shell, with the container booted with
+# a minicluster.
+function shell() {
+  echo "Starting minicluster and Impala."
+  # Logs is typically a symlink; remove it if so.
+  rm logs || true
+  mkdir -p logs
+  boot_container
+  impala_environment
+  # Kudu requires --privileged for the Docker container; see
+  # https://issues.apache.org/jira/browse/KUDU-2000. Because
+  # our goal here is convenience for new developers, we
+  # skip kudu if "ntptime" doesn't work, which is a good
+  # proxy for Kudu won't start.
+  if ! ntptime > /dev/null; then
+    export KUDU_IS_SUPPORTED=false
+    KUDU_MSG="Kudu is not started."
+  fi
+  start_minicluster
+  bin/start-impala-cluster.py
+  cat <<"EOF"
+
+==========================================================
+Welcome to the Impala development environment.
+
+The "minicluster" is running; i.e., HDFS, HBase, Hive,
+etc. are running. $KUDU_MSG
+
+To get started, perhaps run:
+  impala-shell.sh -q 'select count(*) from tpcds.web_page'
+==========================================================
+
+EOF
+  exec bash
+}
+
 function main() {
   set -e
 
   # Run given command
   CMD="$1"
   shift
+
+  # Treat shell specialy to avoid the extra logging and | cat below.
+  if [[ $CMD = "shell" ]]; then
+    shell
+    # shell shoud have exec'd, so if we get here, it's a failure.
+    exit 1
+  fi
 
   echo ">>> ${CMD} $@ (begin)"
   # Dump environment, for debugging
