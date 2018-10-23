@@ -261,39 +261,78 @@ under the License.
         </dt>
 
         <dd>
-          <b>Purpose:</b> Compares an expression to one or more possible values, and returns a
-          corresponding result when a match is found.
-          <p
-            conref="../shared/impala_common.xml#common/return_same_type"/>
+          <b>Purpose:</b> Compares the first argument, <codeph>expression</codeph>, to the
+          <codeph>search</codeph> expressions using the <codeph>IS NOT DISTINCT</codeph>
+          operator, and returns:
+          <ul>
+            <li>
+              The corresponding <codeph>result</codeph> when a match is found.
+            </li>
+
+            <li>
+              The first corresponding <codeph>result</codeph> if there are more than one
+              matching <codeph>search</codeph> expressions.
+            </li>
+
+            <li>
+              The <codeph>default</codeph> expression if none of the search expressions matches
+              the first argument <codeph>expression</codeph>.
+            </li>
+
+            <li>
+              <codeph>NULL</codeph> if the final <codeph>default</codeph> expression is omitted
+              and none of the <codeph>search</codeph> expressions matches the first argument.
+            </li>
+          </ul>
+          <p>
+            <b>Return type:</b> Same as the first argument with the following exceptions:
+            <ul>
+              <li>
+                Integer values are promoted to <codeph>BIGINT</codeph>.
+              </li>
+
+              <li>
+                Floating-point values are promoted to <codeph>DOUBLE</codeph>.
+              </li>
+
+              <li>
+                Use <codeph>CAST()</codeph> when inserting into a smaller numeric column.
+              </li>
+            </ul>
+          </p>
 
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <ul>
+            <li>
+              Can be used as shorthand for a <codeph>CASE</codeph> expression.
+            </li>
 
-          <p>
-            Can be used as shorthand for a <codeph>CASE</codeph> expression.
-          </p>
+            <li>
+              The first argument, <codeph>expression</codeph>, and the search expressions must
+              be of the same type or convertible types.
+            </li>
 
-          <p>
-            The original expression and the search expressions must of the same type or
-            convertible types. The result expression can be a different type, but all result
-            expressions must be of the same type.
-          </p>
+            <li>
+              The result expression can be a different type, but all result expressions must be
+              of the same type.
+            </li>
 
-          <p>
-            Returns a successful match If the original expression is <codeph>NULL</codeph> and a
-            search expression is also <codeph>NULL</codeph>. the
-          </p>
+            <li>
+              Returns a successful match if the first argument is <codeph>NULL</codeph> and a
+              search expression is also <codeph>NULL</codeph>.
+            </li>
 
-          <p>
-            Returns <codeph>NULL</codeph> if the final <codeph>default</codeph> value is omitted
-            and none of the search expressions match the original expression.
-          </p>
-
+            <li>
+              <codeph>NULL</codeph> can be used as a search expression.
+            </li>
+          </ul>
           <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
           <p>
-            The following example translates numeric day values into descriptive names:
+            The following example translates numeric day values into weekday names, such as 1 to
+            Monday, 2 to Tuesday, etc.
           </p>
-<codeblock>SELECT event, decode(day_of_week, 1, "Monday", 2, "Tuesday", 3, "Wednesday",
+<codeblock>SELECT event, DECODE(day_of_week, 1, "Monday", 2, "Tuesday", 3, "Wednesday",
   4, "Thursday", 5, "Friday", 6, "Saturday", 7, "Sunday", "Unknown day")
   FROM calendar;
 </codeblock>
@@ -345,6 +384,7 @@ under the License.
           <p>
             Same as the <codeph>IS FALSE</codeph> operator.
           </p>
+
           <p>
             Similar to <codeph>ISNOTTRUE()</codeph>, except it returns the opposite value for a
             <codeph>NULL</codeph> argument.
@@ -376,10 +416,12 @@ under the License.
           <p>
             Same as the <codeph>IS NOT FALSE</codeph> operator.
           </p>
+
           <p>
             Similar to <codeph>ISTRUE()</codeph>, except it returns the opposite value for a
             <codeph>NULL</codeph> argument.
           </p>
+
           <p
             conref="../shared/impala_common.xml#common/return_type_boolean"/>
 
@@ -409,10 +451,12 @@ under the License.
           <p>
             Same as the <codeph>IS NOT TRUE</codeph> operator.
           </p>
+
           <p>
             Similar to <codeph>ISFALSE()</codeph>, except it returns the opposite value for a
             <codeph>NULL</codeph> argument.
           </p>
+
           <p
             conref="../shared/impala_common.xml#common/return_type_boolean"/>
 
@@ -463,6 +507,7 @@ under the License.
           <p>
             Same as the <codeph>IS TRUE</codeph> operator.
           </p>
+
           <p>
             Similar to <codeph>ISNOTFALSE()</codeph>, except it returns the opposite value for a
             <codeph>NULL</codeph> argument.
@@ -608,11 +653,14 @@ END</codeblock>
         </dt>
 
         <dd>
-          <b>Purpose:</b> Alias for the <codeph>ISNULL()</codeph> function. Tests if an
-          expression is <codeph>NULL</codeph>, and returns the expression result value if not.
-          If the first argument is <codeph>NULL</codeph>, returns the second argument.
-          Equivalent to the <codeph>NVL()</codeph> function from Oracle Database or
-          <codeph>IFNULL()</codeph> from MySQL.
+          <b>Purpose:</b> Alias for the <codeph>ISNULL()</codeph> function. Returns the first
+          argument if the first argument is not <codeph>NULL</codeph>. Returns the second
+          argument if the first argument is <codeph>NULL</codeph>.
+          <p>
+            Equivalent to the <codeph>NVL()</codeph> function in Oracle Database or
+            <codeph>IFNULL()</codeph> in MySQL.
+          </p>
+
           <p>
             <b>Return type:</b> Same as the first argument value
           </p>
@@ -625,51 +673,28 @@ END</codeblock>
       <dlentry id="nvl2" rev="2.9.0 IMPALA-5030">
 
         <dt>
-          NVL2(type a, type ifNull, type ifNotNull)
+          NVL2(type a, type ifNotNull, type ifNull)
         </dt>
 
         <dd>
-          <b>Purpose:</b> Enhanced variant of the <codeph>NVL()</codeph> function. Tests an
-          expression and returns different result values depending on whether it is
-          <codeph>NULL</codeph> or not. If the first argument is <codeph>NULL</codeph>, returns
-          the second argument. If the first argument is not <codeph>NULL</codeph>, returns the
-          third argument. Equivalent to the <codeph>NVL2()</codeph> function from Oracle
-          Database.
+          <b>Purpose:</b> Returns the second argument, <codeph>ifNotNull</codeph>, if the first
+          argument is not <codeph>NULL</codeph>. Returns the third argument,
+          <codeph>ifNull</codeph>, if the first argument is <codeph>NULL</codeph>.
+          <p>
+            Equivalent to the <codeph>NVL2()</codeph> function in Oracle Database.
+          </p>
+
           <p>
             <b>Return type:</b> Same as the first argument value
           </p>
 
           <p conref="../shared/impala_common.xml#common/added_in_290"/>
 
-          <p conref="../shared/impala_common.xml#common/example_blurb"/>
-
-          <p>
-            The following examples show how a query can use special indicator values to
-            represent null and not-null expression values. The first example tests an
-            <codeph>INT</codeph> column and so uses special integer values. The second example
-            tests a <codeph>STRING</codeph> column and so uses special string values.
-          </p>
+          <p conref="../shared/impala_common.xml#common/example_blurb"
+          />
 <codeblock>
-select x, nvl2(x, 999, 0) from nvl2_demo;
-+------+---------------------------+
-| x    | if(x is not null, 999, 0) |
-+------+---------------------------+
-| NULL | 0                         |
-| 1    | 999                       |
-| NULL | 0                         |
-| 2    | 999                       |
-+------+---------------------------+
-
-select s, nvl2(s, 'is not null', 'is null') from nvl2_demo;
-+------+---------------------------------------------+
-| s    | if(s is not null, 'is not null', 'is null') |
-+------+---------------------------------------------+
-| NULL | is null                                     |
-| one  | is not null                                 |
-| NULL | is null                                     |
-| two  | is not null                                 |
-+------+---------------------------------------------+
-</codeblock>
+SELECT NVL2(NULL, 999, 0); -- Returns 0
+SELECT NVL2('ABC', 'Is Null', 'Is Not Null); -- Returns 'Is Not Null'</codeblock>
         </dd>
 
       </dlentry>
