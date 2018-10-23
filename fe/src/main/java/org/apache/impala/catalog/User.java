@@ -36,11 +36,4 @@ public class User extends Principal {
     Preconditions.checkArgument(
         thriftPrincipal.getPrincipal_type() == TPrincipalType.USER);
   }
-
-  @Override
-  protected boolean isCaseInsensitiveKeys() {
-    // If Sentry changes the user name to be case sensitive, make sure to update
-    // this code to return false.
-    return true;
-  }
 }

@@ -76,8 +76,8 @@ public class AuthorizationPolicy implements PrivilegeCache {
   // Cache of role names (case-insensitive) to role objects.
   private final CatalogObjectCache<Role> roleCache_ = new CatalogObjectCache<>();
 
-  // Cache of user names (case-insensitive) to user objects.
-  private final CatalogObjectCache<User> userCache_ = new CatalogObjectCache<>();
+  // Cache of user names (case-sensitive) to user objects.
+  private final CatalogObjectCache<User> userCache_ = new CatalogObjectCache<>(false);
 
   // Map of principal ID -> user/role name. Used to match privileges to users/roles.
   private final Map<Integer, String> principalIds_ = Maps.newHashMap();

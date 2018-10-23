@@ -401,3 +401,62 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
         test_obj.obj_name), user="oo_user1", delay_s=sentry_refresh_timeout_s)
     assert self._validate_user_privilege_count(self.oo_user1_impalad_client,
         "show grant user oo_user1", "oo_user1", sentry_refresh_timeout_s, 0)
+
+  @pytest.mark.execute_serially
+  @SentryCacheTestSuite.with_args(
+    impalad_args="--server_name=server1 --sentry_config={0} "
+                 "--authorization_policy_provider_class="
+                 "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                 .format(SENTRY_CONFIG_FILE_OO),
+    catalogd_args="--sentry_config={0} --sentry_catalog_polling_frequency_s={1} "
+                  "--authorization_policy_provider_class="
+                  "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                  .format(SENTRY_CONFIG_FILE_OO, str(SENTRY_POLLING_FREQUENCY_S)),
+    sentry_config=SENTRY_CONFIG_FILE_OO,
+    sentry_log_dir="{0}/test_owner_privileges_different_cases"
+                   .format(SENTRY_BASE_LOG_DIR))
+  def test_owner_privileges_different_cases(self, vector, unique_database):
+    """IMPALA-7742: Tests that only user names that differ only in case are not
+    authorized to access the database/table/view unless the user is the owner."""
+    # Use two different clients so that the sessions will use two different user names.
+    foobar_impalad_client = self.create_impala_client()
+    FOOBAR_impalad_client = self.create_impala_client()
+    role_name = "owner_priv_diff_cases_role"
+    try:
+      self.execute_query("create role %s" % role_name)
+      self.execute_query("grant role %s to group foobar" % role_name)
+      self.execute_query("grant all on server to role %s" % role_name)
+
+      self.user_query(foobar_impalad_client, "create database %s_db" %
+                      unique_database, user="foobar")
+      # FOOBAR user should not be allowed to create a table in the foobar's database.
+      self.user_query(FOOBAR_impalad_client, "create table %s_db.test_tbl(i int)" %
+                      unique_database, user="FOOBAR",
+                      error_msg="User 'FOOBAR' does not have privileges to execute "
+                                "'CREATE' on: %s_db" % unique_database)
+
+      self.user_query(foobar_impalad_client, "create table %s.owner_case_tbl(i int)" %
+                      unique_database, user="foobar")
+      # FOOBAR user should not be allowed to select foobar's table.
+      self.user_query(FOOBAR_impalad_client, "select * from %s.owner_case_tbl" %
+                      unique_database, user="FOOBAR",
+                      error_msg="User 'FOOBAR' does not have privileges to execute "
+                                "'SELECT' on: %s.owner_case_tbl" % unique_database)
+
+      self.user_query(foobar_impalad_client,
+                      "create view %s.owner_case_view as select 1" % unique_database,
+                      user="foobar")
+      # FOOBAR user should not be allowed to select foobar's view.
+      self.user_query(FOOBAR_impalad_client, "select * from %s.owner_case_view" %
+                      unique_database, user="FOOBAR",
+                      error_msg="User 'FOOBAR' does not have privileges to execute "
+                                "'SELECT' on: %s.owner_case_view" % unique_database)
+
+      # FOOBAR user should not be allowed to see foobar's privileges.
+      self.user_query(FOOBAR_impalad_client, "show grant user foobar", user="FOOBAR",
+                      error_msg="User 'FOOBAR' does not have privileges to access the "
+                                "requested policy metadata")
+    finally:
+      self.user_query(foobar_impalad_client, "drop database %s_db cascade" %
+                      unique_database, user="foobar")
+      self.execute_query("drop role %s" % role_name)

@@ -36,11 +36,4 @@ public class Role extends Principal {
     Preconditions.checkArgument(
         thriftPrincipal.getPrincipal_type() == TPrincipalType.ROLE);
   }
-
-  @Override
-  protected boolean isCaseInsensitiveKeys() {
-    // If Sentry changes the role name to be case sensitive, make sure to update
-    // this code to return false.
-    return true;
-  }
 }

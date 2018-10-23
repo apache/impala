@@ -51,9 +51,12 @@ public class CustomClusterGroupMapper implements GroupMappingService {
     groupsMap_.put("user1_shared2", Sets.newHashSet("group_4a","group_4b"));
     groupsMap_.put("user2_shared2", Sets.newHashSet("group_4a"));
 
-    // User to grpups for test_owner_privilege tests.
+    // User to groups for test_owner_privilege tests.
     groupsMap_.put("oo_user1", Sets.newHashSet("oo_group1"));
     groupsMap_.put("oo_user2", Sets.newHashSet("oo_group2"));
+
+    groupsMap_.put("foobar", Sets.newHashSet("foobar"));
+    groupsMap_.put("FOOBAR", Sets.newHashSet("FOOBAR"));
   }
 
   @Override
