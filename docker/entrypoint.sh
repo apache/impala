@@ -252,6 +252,24 @@ function build_impdev() {
   # Shut down things cleanly.
   testdata/bin/kill-all.sh
 
+  # "Compress" HDFS data by de-duplicating blocks. As a result of
+  # having three datanodes, our data load is 3x larger than it needs
+  # to be. To alleviate this (to the tune of ~20GB savings), we
+  # use hardlinks to link together the identical blocks. This is absolutely
+  # taking advantage of an implementation detail of HDFS.
+  echo "Hardlinking duplicate HDFS block data."
+  set +x
+  for x in $(find testdata/cluster/*/node-1/data/dfs/dn/current/ -name 'blk_*[0-9]'); do
+    for n in 2 3; do
+      xn=${x/node-1/node-$n}
+      if [ -f $xn ]; then
+        rm $xn
+        ln $x $xn
+      fi
+    done
+  done
+  set -x
+
   # Shutting down PostgreSQL nicely speeds up it's start time for new containers.
   _pg_ctl stop
 
