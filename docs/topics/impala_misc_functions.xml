@@ -56,6 +56,10 @@ under the License.
       </li>
 
       <li>
+        <xref href="#misc_functions/logged_in_user">LOGGED_IN_USER</xref>
+      </li>
+
+      <li>
         <xref href="#misc_functions/pid">PID</xref>
       </li>
 
@@ -119,25 +123,25 @@ under the License.
 
       </dlentry>
 
-      <dlentry rev="3.1">
+      <dlentry rev="3.1" id="logged_in_user">
 
         <dt>
           LOGGED_IN_USER()
         </dt>
 
         <dd>
-          <b>Purpose:</b> Typically returns the same value as
-            <codeph>USER()</codeph>. If delegation is enabled, it returns the ID
-          of the delegated user. <p>
-            <codeph>LOGGED_IN_USER()</codeph> is an alias of
-              <codeph>EFFECTIVE_USER()</codeph>. </p>
+          <b>Purpose:</b> Typically returns the same value as <codeph>USER()</codeph>. If
+          delegation is enabled, it returns the ID of the delegated user.
           <p>
-            <b>Return type:</b>
-            <codeph>STRING</codeph>
+            <codeph>LOGGED_IN_USER()</codeph> is an alias of <codeph>EFFECTIVE_USER()</codeph>.
           </p>
+
           <p>
-            <b>Added in:</b>
-            <keyword keyref="impala31"/>
+            <b>Return type:</b> <codeph>STRING</codeph>
+          </p>
+
+          <p>
+            <b>Added in:</b> <keyword keyref="impala31"/>
           </p>
         </dd>
 
