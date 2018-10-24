@@ -197,7 +197,7 @@ Status PartitionedHashJoinNode::AcquireResourcesForBuild(RuntimeState* state) {
   return Status::OK();
 }
 
-Status PartitionedHashJoinNode::Reset(RuntimeState* state) {
+Status PartitionedHashJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     null_probe_output_idx_ = -1;
     matched_null_probe_.clear();
@@ -205,35 +205,41 @@ Status PartitionedHashJoinNode::Reset(RuntimeState* state) {
   }
   state_ = PARTITIONING_BUILD;
   ht_ctx_->set_level(0);
-  CloseAndDeletePartitions();
-  builder_->Reset();
+  CloseAndDeletePartitions(row_batch);
+  builder_->Reset(row_batch);
   memset(hash_tbls_, 0, sizeof(HashTable*) * PARTITION_FANOUT);
+  if (output_unmatched_batch_ != nullptr) {
+    output_unmatched_batch_->TransferResourceOwnership(row_batch);
+  }
   output_unmatched_batch_.reset();
   output_unmatched_batch_iter_.reset();
-  return ExecNode::Reset(state);
+  return BlockingJoinNode::Reset(state, row_batch);
 }
 
-void PartitionedHashJoinNode::CloseAndDeletePartitions() {
+void PartitionedHashJoinNode::CloseAndDeletePartitions(RowBatch* row_batch) {
   // Close all the partitions and clean up all references to them.
   for (unique_ptr<ProbePartition>& partition : probe_hash_partitions_) {
-    if (partition != NULL) partition->Close(NULL);
+    if (partition != NULL) partition->Close(row_batch);
   }
   probe_hash_partitions_.clear();
   for (unique_ptr<ProbePartition>& partition : spilled_partitions_) {
-    partition->Close(NULL);
+    partition->Close(row_batch);
   }
   spilled_partitions_.clear();
   if (input_partition_ != NULL) {
-    input_partition_->Close(NULL);
+    input_partition_->Close(row_batch);
     input_partition_.reset();
   }
   if (null_aware_probe_partition_ != NULL) {
-    null_aware_probe_partition_->Close(NULL);
+    null_aware_probe_partition_->Close(row_batch);
     null_aware_probe_partition_.reset();
+  }
+  for (PhjBuilder::Partition* partition : output_build_partitions_) {
+    partition->Close(row_batch);
   }
   output_build_partitions_.clear();
   if (null_probe_rows_ != NULL) {
-    null_probe_rows_->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+    null_probe_rows_->Close(row_batch, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
     null_probe_rows_.reset();
   }
 }
@@ -245,7 +251,7 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   output_null_aware_probe_rows_running_ = false;
   output_unmatched_batch_.reset();
   output_unmatched_batch_iter_.reset();
-  CloseAndDeletePartitions();
+  CloseAndDeletePartitions(nullptr);
   if (builder_ != nullptr) builder_->Close(state);
   ScalarExprEvaluator::Close(other_join_conjunct_evals_, state);
   ScalarExpr::Close(build_exprs_);

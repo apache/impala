@@ -180,7 +180,7 @@ Status StreamingAggregationNode::GetRowsStreaming(
   return Status::OK();
 }
 
-Status StreamingAggregationNode::Reset(RuntimeState* state) {
+Status StreamingAggregationNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   DCHECK(false) << "Cannot reset preaggregation";
   return Status("Cannot reset preaggregation");
 }

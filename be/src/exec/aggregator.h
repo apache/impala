@@ -74,7 +74,7 @@ class Aggregator {
   virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
   virtual Status GetNext(
       RuntimeState* state, RowBatch* row_batch, bool* eos) WARN_UNUSED_RESULT = 0;
-  virtual Status Reset(RuntimeState* state) WARN_UNUSED_RESULT = 0;
+  virtual Status Reset(RuntimeState* state, RowBatch* row_batch) WARN_UNUSED_RESULT = 0;
   virtual void Close(RuntimeState* state);
 
   /// Adds all of the rows in 'batch' to the aggregation.

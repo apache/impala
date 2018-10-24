@@ -175,9 +175,9 @@ Status UnnestNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
   return Status::OK();
 }
 
-Status UnnestNode::Reset(RuntimeState* state) {
+Status UnnestNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   item_idx_ = 0;
-  return ExecNode::Reset(state);
+  return ExecNode::Reset(state, row_batch);
 }
 
 void UnnestNode::Close(RuntimeState* state) {

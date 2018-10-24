@@ -212,12 +212,14 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK();
 }
 
-Status TopNNode::Reset(RuntimeState* state) {
+Status TopNNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   priority_queue_.clear();
   num_rows_skipped_ = 0;
+  // Transfer ownership of tuple data to output batch.
+  row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
   // We deliberately do not free the tuple_pool_ here to allow selective transferring
   // of resources in the future.
-  return ExecNode::Reset(state);
+  return ExecNode::Reset(state, row_batch);
 }
 
 void TopNNode::Close(RuntimeState* state) {

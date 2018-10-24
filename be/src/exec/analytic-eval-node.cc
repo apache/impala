@@ -810,7 +810,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   return Status::OK();
 }
 
-Status AnalyticEvalNode::Reset(RuntimeState* state) {
+Status AnalyticEvalNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   result_tuples_.clear();
   window_tuples_.clear();
   last_result_idx_ = -1;
@@ -818,11 +818,9 @@ Status AnalyticEvalNode::Reset(RuntimeState* state) {
   prev_pool_last_result_idx_ = -1;
   prev_pool_last_window_idx_ = -1;
   input_eos_ = false;
-  // TODO: The Reset() contract allows calling Reset() even if eos has not been reached,
-  // but the analytic eval node currently does not support that. In practice, we only
-  // call Reset() after eos.
-  DCHECK_EQ(curr_tuple_pool_->total_allocated_bytes(), 0);
-  DCHECK_EQ(prev_tuple_pool_->total_allocated_bytes(), 0);
+  // Transfer the ownership of all row-backing resources.
+  row_batch->tuple_data_pool()->AcquireData(prev_tuple_pool_.get(), false);
+  row_batch->tuple_data_pool()->AcquireData(curr_tuple_pool_.get(), false);
   // Call Finalize() to clear evaluator allocations, but do not Close() them,
   // so we can keep evaluating them.
   if (curr_tuple_init_) {
@@ -831,12 +829,14 @@ Status AnalyticEvalNode::Reset(RuntimeState* state) {
   }
   // The following members will be re-created in Open().
   // input_stream_ should have been closed by last GetNext() call.
-  DCHECK(input_stream_ == nullptr || input_stream_->is_closed());
+  if (input_stream_ != nullptr && !input_stream_->is_closed()) {
+    input_stream_->Close(row_batch, RowBatch::FlushMode::FLUSH_RESOURCES);
+  }
   input_stream_.reset();
   prev_input_tuple_ = nullptr;
   prev_input_tuple_pool_->Clear();
   curr_child_batch_->Reset();
-  return ExecNode::Reset(state);
+  return ExecNode::Reset(state, row_batch);
 }
 
 void AnalyticEvalNode::Close(RuntimeState* state) {

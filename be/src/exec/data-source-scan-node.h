@@ -55,7 +55,7 @@ class DataSourceScanNode : public ScanNode {
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
 
   /// NYI
-  virtual Status Reset(RuntimeState* state) override;
+  virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override;
 
   /// Close the scanner, and report errors.
   virtual void Close(RuntimeState* state) override;

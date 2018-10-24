@@ -57,6 +57,9 @@ class BlockingJoinNode : public ExecNode {
   /// Calls ExecNode::Open() and initializes 'eos_' and 'probe_side_eos_'.
   virtual Status Open(RuntimeState* state);
 
+  /// Transfers resources from 'probe_batch_' to 'row_batch'.
+  virtual Status Reset(RuntimeState* state, RowBatch* row_batch);
+
   /// Subclasses should close any other structures and then call
   /// BlockingJoinNode::Close().
   virtual void Close(RuntimeState* state);

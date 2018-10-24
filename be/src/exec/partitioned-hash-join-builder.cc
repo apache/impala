@@ -236,7 +236,7 @@ Status PhjBuilder::FlushFinal(RuntimeState* state) {
 
 void PhjBuilder::Close(RuntimeState* state) {
   if (closed_) return;
-  CloseAndDeletePartitions();
+  CloseAndDeletePartitions(nullptr);
   if (ht_ctx_ != nullptr) ht_ctx_->Close(state);
   ht_ctx_.reset();
   for (const FilterContext& ctx : filter_ctxs_) {
@@ -249,10 +249,10 @@ void PhjBuilder::Close(RuntimeState* state) {
   closed_ = true;
 }
 
-void PhjBuilder::Reset() {
+void PhjBuilder::Reset(RowBatch* row_batch) {
   expr_results_pool_->Clear();
   non_empty_build_ = false;
-  CloseAndDeletePartitions();
+  CloseAndDeletePartitions(row_batch);
 }
 
 Status PhjBuilder::CreateAndPreparePartition(int level, Partition** partition) {
@@ -441,14 +441,14 @@ vector<unique_ptr<BufferedTupleStream>> PhjBuilder::TransferProbeStreams() {
   return std::move(spilled_partition_probe_streams_);
 }
 
-void PhjBuilder::CloseAndDeletePartitions() {
+void PhjBuilder::CloseAndDeletePartitions(RowBatch* row_batch) {
   // Close all the partitions and clean up all references to them.
-  for (unique_ptr<Partition>& partition : all_partitions_) partition->Close(NULL);
+  for (unique_ptr<Partition>& partition : all_partitions_) partition->Close(row_batch);
   all_partitions_.clear();
   hash_partitions_.clear();
   null_aware_partition_ = NULL;
   for (unique_ptr<BufferedTupleStream>& stream : spilled_partition_probe_streams_) {
-    stream->Close(NULL, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+    stream->Close(row_batch, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
   spilled_partition_probe_streams_.clear();
 }

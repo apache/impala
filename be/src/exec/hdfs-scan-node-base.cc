@@ -403,7 +403,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   return Status::OK();
 }
 
-Status HdfsScanNodeBase::Reset(RuntimeState* state) {
+Status HdfsScanNodeBase::Reset(RuntimeState* state, RowBatch* row_batch) {
   DCHECK(false) << "Internal error: Scan nodes should not appear in subplans.";
   return Status("Internal error: Scan nodes should not appear in subplans.");
 }

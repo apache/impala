@@ -137,6 +137,11 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
+Status BlockingJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+  probe_batch_->TransferResourceOwnership(row_batch);
+  return ExecNode::Reset(state, row_batch);
+}
+
 void BlockingJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   build_batch_.reset();

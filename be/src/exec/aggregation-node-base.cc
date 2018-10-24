@@ -73,10 +73,10 @@ void AggregationNodeBase::Codegen(RuntimeState* state) {
   for (auto& agg : aggs_) agg->Codegen(state);
 }
 
-Status AggregationNodeBase::Reset(RuntimeState* state) {
-  for (auto& agg : aggs_) RETURN_IF_ERROR(agg->Reset(state));
+Status AggregationNodeBase::Reset(RuntimeState* state, RowBatch* row_batch) {
+  for (auto& agg : aggs_) RETURN_IF_ERROR(agg->Reset(state, row_batch));
   curr_output_agg_idx_ = 0;
-  return ExecNode::Reset(state);
+  return ExecNode::Reset(state, row_batch);
 }
 
 Status AggregationNodeBase::SplitMiniBatches(

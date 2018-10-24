@@ -107,7 +107,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
-  virtual Status Reset(RuntimeState* state) override;
+  virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override;
   virtual void Close(RuntimeState* state) override;
 
  protected:
@@ -383,8 +383,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   Status NullAwareAntiJoinError(BufferedTupleStream* rows);
 
   /// Calls Close() on every probe partition, destroys the partitions and cleans up any
-  /// references to the partitions. Also closes and destroys 'null_probe_rows_'.
-  void CloseAndDeletePartitions();
+  /// references to the partitions. Also closes and destroys 'null_probe_rows_'. If
+  /// 'row_batch' is not NULL, transfers ownership of all row-backing resources to it.
+  void CloseAndDeletePartitions(RowBatch* row_batch);
 
   /// Prepares for probing the next batch.
   void ResetForProbe();

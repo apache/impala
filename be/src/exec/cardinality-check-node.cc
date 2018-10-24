@@ -95,9 +95,9 @@ Status CardinalityCheckNode::GetNext(RuntimeState* state, RowBatch* output_row_b
   return Status::OK();
 }
 
-Status CardinalityCheckNode::Reset(RuntimeState* state) {
+Status CardinalityCheckNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   row_batch_->Reset();
-  return ExecNode::Reset(state);
+  return ExecNode::Reset(state, row_batch);
 }
 
 void CardinalityCheckNode::Close(RuntimeState* state) {

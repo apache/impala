@@ -111,11 +111,11 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
   return Status::OK();
 }
 
-Status SelectNode::Reset(RuntimeState* state) {
-  child_row_batch_->Reset();
+Status SelectNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+  child_row_batch_->TransferResourceOwnership(row_batch);
   child_row_idx_ = 0;
   child_eos_ = false;
-  return ExecNode::Reset(state);
+  return ExecNode::Reset(state, row_batch);
 }
 
 void SelectNode::Close(RuntimeState* state) {
