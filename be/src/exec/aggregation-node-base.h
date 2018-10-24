@@ -35,7 +35,7 @@ class AggregationNodeBase : public ExecNode {
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
   virtual Status Prepare(RuntimeState* state) override;
   virtual void Codegen(RuntimeState* state) override;
-  virtual Status Reset(RuntimeState* state) override;
+  virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override;
 
  protected:
   /// If true, the input to this node should be passed into each Aggregator in 'aggs_'.

@@ -364,12 +364,17 @@ void GroupingAggregator::CleanupHashTbl(
   }
 }
 
-Status GroupingAggregator::Reset(RuntimeState* state) {
+Status GroupingAggregator::Reset(RuntimeState* state, RowBatch* row_batch) {
   DCHECK(!is_streaming_preagg_) << "Cannot reset preaggregation";
   partition_eos_ = false;
   streaming_idx_ = 0;
   // Reset the HT and the partitions for this grouping agg.
   ht_ctx_->set_level(0);
+  if (output_partition_ != nullptr) {
+    // Attach all buffers referenced by previously-returned rows.
+    output_partition_->aggregated_row_stream->Close(
+        row_batch, RowBatch::FlushMode::FLUSH_RESOURCES);
+  }
   ClosePartitions();
   return Status::OK();
 }

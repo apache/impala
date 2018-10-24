@@ -48,7 +48,9 @@ class NonGroupingAggregator : public Aggregator {
   virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
-  virtual Status Reset(RuntimeState* state) override { return Status::OK(); }
+  virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override {
+    return Status::OK();
+  }
   virtual void Close(RuntimeState* state) override;
 
   virtual Status AddBatch(RuntimeState* state, RowBatch* batch) override;

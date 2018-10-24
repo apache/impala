@@ -111,7 +111,8 @@ class ExecNode {
   /// Resets the stream of row batches to be retrieved by subsequent GetNext() calls.
   /// Clears all internal state, returning this node to the state it was in after calling
   /// Prepare() and before calling Open(). This function must not clear memory
-  /// still owned by this node that is backing rows returned in GetNext().
+  /// still owned by this node that is backing rows returned in GetNext(). 'row_batch' can
+  /// be used to transfer ownership of any such memory.
   /// Prepare() and Open() must have already been called before calling Reset().
   /// GetNext() may have optionally been called (not necessarily until eos).
   /// Close() must not have been called.
@@ -121,7 +122,7 @@ class ExecNode {
   /// implementation calls Reset() on children.
   /// Note that this function may be called many times (proportional to the input data),
   /// so should be fast.
-  virtual Status Reset(RuntimeState* state) WARN_UNUSED_RESULT;
+  virtual Status Reset(RuntimeState* state, RowBatch* row_batch) WARN_UNUSED_RESULT;
 
   /// Close() will get called for every exec node, regardless of what else is called and
   /// the status of these calls (i.e. Prepare() may never have been called, or

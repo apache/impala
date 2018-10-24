@@ -141,9 +141,9 @@ Status PartialSortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   return Status::OK();
 }
 
-Status PartialSortNode::Reset(RuntimeState* state) {
+Status PartialSortNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   DCHECK(false) << "PartialSortNode cannot be part of a subplan.";
-  return ExecNode::Reset(state);
+  return Status("Cannot reset partial sort");
 }
 
 void PartialSortNode::Close(RuntimeState* state) {

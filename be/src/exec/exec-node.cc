@@ -145,10 +145,10 @@ Status ExecNode::Open(RuntimeState* state) {
   return ScalarExprEvaluator::Open(conjunct_evals_, state);
 }
 
-Status ExecNode::Reset(RuntimeState* state) {
+Status ExecNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   num_rows_returned_ = 0;
   for (int i = 0; i < children_.size(); ++i) {
-    RETURN_IF_ERROR(children_[i]->Reset(state));
+    RETURN_IF_ERROR(children_[i]->Reset(state, row_batch));
   }
   return Status::OK();
 }

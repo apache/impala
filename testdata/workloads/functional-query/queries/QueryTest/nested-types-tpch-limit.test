@@ -1,0 +1,30 @@
+====
+---- QUERY
+use tpch_nested_parquet
+====
+---- QUERY
+# IMPALA-3652: test limit on a hash join in a subplan where resources need to be
+# transfered in Reset()
+select count(*)
+from customer c,
+  (select o1.o_orderkey, o2.o_orderdate
+   from c.c_orders o1, c.c_orders o2, c.c_orders o3
+   where o1.o_orderkey = o2.o_orderkey and o1.o_orderkey = o3.o_orderkey
+   limit 1) v
+where c_custkey = 113644;
+---- RESULTS
+1
+====
+---- QUERY
+# IMPALA-3652: test limit on a nested loop join in a subplan where resources need to be
+# transfered in Reset()
+select count(*)
+from customer c,
+  (select o1.o_orderkey, o2.o_orderdate
+   from c.c_orders o1 join /* +broadcast */ c.c_orders o2, c.c_orders o3
+   where o1.o_orderkey < o2.o_orderkey and o1.o_orderkey < o3.o_orderkey
+   limit 1) v
+where c_custkey = 113644;
+---- RESULTS
+1
+====

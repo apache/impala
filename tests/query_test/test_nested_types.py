@@ -83,6 +83,11 @@ class TestNestedTypes(ImpalaTestSuite):
     """Queries over the larger nested TPCH dataset."""
     self.run_test_case('QueryTest/nested-types-tpch', vector)
 
+  def test_tpch_limit(self, vector):
+    """Queries over the larger nested TPCH dataset with limits in their subplan."""
+    vector.get_value('exec_option')['batch_size'] = 10
+    self.run_test_case('QueryTest/nested-types-tpch-limit', vector)
+
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_tpch_mem_limit(self, vector):
     """Queries over the larger nested TPCH dataset with memory limits tuned for

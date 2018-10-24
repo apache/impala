@@ -50,7 +50,7 @@ class StreamingAggregationNode : public AggregationNodeBase {
 
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
-  virtual Status Reset(RuntimeState* state) override;
+  virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override;
   virtual void Close(RuntimeState* state) override;
 
   virtual void DebugString(int indentation_level, std::stringstream* out) const override;

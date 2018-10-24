@@ -142,10 +142,10 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK();
 }
 
-Status SortNode::Reset(RuntimeState* state) {
+Status SortNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   num_rows_skipped_ = 0;
   if (sorter_.get() != NULL) sorter_->Reset();
-  return ExecNode::Reset(state);
+  return ExecNode::Reset(state, row_batch);
 }
 
 void SortNode::Close(RuntimeState* state) {

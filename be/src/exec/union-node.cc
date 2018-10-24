@@ -313,7 +313,7 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK();
 }
 
-Status UnionNode::Reset(RuntimeState* state) {
+Status UnionNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   child_idx_ = 0;
   child_batch_.reset();
   child_row_idx_ = 0;
@@ -322,7 +322,7 @@ Status UnionNode::Reset(RuntimeState* state) {
   // Since passthrough is disabled in subplans, verify that there is no passthrough child
   // that needs to be closed.
   DCHECK_EQ(to_close_child_idx_, -1);
-  return ExecNode::Reset(state);
+  return ExecNode::Reset(state, row_batch);
 }
 
 void UnionNode::Close(RuntimeState* state) {

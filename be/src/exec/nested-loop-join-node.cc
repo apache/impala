@@ -124,14 +124,14 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-Status NestedLoopJoinNode::Reset(RuntimeState* state) {
+Status NestedLoopJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   builder_->Reset();
   build_batches_ = NULL;
   matched_probe_ = false;
   current_probe_row_ = NULL;
   probe_batch_pos_ = 0;
   process_unmatched_build_rows_ = false;
-  return BlockingJoinNode::Reset(state);
+  return BlockingJoinNode::Reset(state, row_batch);
 }
 
 void NestedLoopJoinNode::Close(RuntimeState* state) {

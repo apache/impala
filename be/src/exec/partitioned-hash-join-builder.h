@@ -98,7 +98,7 @@ class PhjBuilder : public DataSink {
   /////////////////////////////////////////
 
   /// Reset the builder to the same state as it was in after calling Open().
-  void Reset();
+  void Reset(RowBatch* row_batch);
 
   /// Transfer ownership of the probe streams to the caller. One stream was allocated per
   /// spilled partition in FlushFinal(). The probe streams are empty but prepared for
@@ -333,8 +333,9 @@ class PhjBuilder : public DataSink {
   Status InitSpilledPartitionProbeStreams() WARN_UNUSED_RESULT;
 
   /// Calls Close() on every Partition, deletes them, and cleans up any pointers that
-  /// may reference them. Also cleans up 'spilled_partition_probe_streams_'.
-  void CloseAndDeletePartitions();
+  /// may reference them. Also cleans up 'spilled_partition_probe_streams_'. If
+  /// 'row_batch' if not NULL, transfers the ownership of all row-backing resources to it.
+  void CloseAndDeletePartitions(RowBatch* row_batch);
 
   /// For each filter in filters_, allocate a bloom_filter from the fragment-local
   /// RuntimeFilterBank and store it in runtime_filters_ to populate during the build

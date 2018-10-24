@@ -152,7 +152,8 @@ class HdfsScanNodeBase : public ScanNode {
   virtual Status Prepare(RuntimeState* state) override WARN_UNUSED_RESULT;
   virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override WARN_UNUSED_RESULT;
-  virtual Status Reset(RuntimeState* state) override WARN_UNUSED_RESULT;
+  virtual Status Reset(
+      RuntimeState* state, RowBatch* row_batch) override WARN_UNUSED_RESULT;
   virtual void Close(RuntimeState* state) override;
 
   /// Returns true if this node uses separate threads for scanners that append RowBatches

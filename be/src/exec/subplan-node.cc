@@ -87,9 +87,9 @@ Status SubplanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos)
   while (true) {
     if (subplan_is_open_) {
       if (subplan_eos_) {
-        // Reset the subplan before opening it again. At this point, all resources from
-        // the subplan are assumed to have been transferred to the output row_batch.
-        RETURN_IF_ERROR(child(1)->Reset(state));
+        // Reset the subplan before opening it again. 'row_batch' is passed in to allow
+        // any remaining resources to be transferred to it.
+        RETURN_IF_ERROR(child(1)->Reset(state, row_batch));
         subplan_is_open_ = false;
       } else {
         // Continue fetching rows from the open subplan into the output row_batch.
@@ -140,16 +140,17 @@ Status SubplanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos)
   return Status::OK();
 }
 
-Status SubplanNode::Reset(RuntimeState* state) {
+Status SubplanNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+  input_batch_->TransferResourceOwnership(row_batch);
   input_eos_ = false;
   input_row_idx_ = 0;
   subplan_eos_ = false;
   num_rows_returned_ = 0;
-  RETURN_IF_ERROR(child(0)->Reset(state));
+  RETURN_IF_ERROR(child(0)->Reset(state, row_batch));
   // If child(1) is not open it means that we have just Reset() it and returned from
   // GetNext() without opening it again. It is not safe to call Reset() on the same
   // exec node twice in a row.
-  if (subplan_is_open_) RETURN_IF_ERROR(child(1)->Reset(state));
+  if (subplan_is_open_) RETURN_IF_ERROR(child(1)->Reset(state, row_batch));
   return Status::OK();
 }
 
