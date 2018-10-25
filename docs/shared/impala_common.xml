@@ -1422,13 +1422,15 @@ drop database temp;
         for the first time on a given table.
       </p>
 
-      <p id="incremental_stats_caveats">
-        For a table with a huge number of partitions and many columns, the approximately 400 bytes
-        of metadata per column per partition can add up to significant memory overhead, as it must
-        be cached on the <cmdname>catalogd</cmdname> host and on every <cmdname>impalad</cmdname> host
-        that is eligible to be a coordinator. If this metadata for all tables combined exceeds 2 GB,
-        you might experience service downtime.
-      </p>
+      <p id="incremental_stats_caveats"> In Impala 3.0 and lower, approximately
+        400 bytes of metadata per column per partition are needed for caching.
+        Tables with a big number of partitions and many columns can add up to a
+        significant memory overhead as the metadata must be cached on the
+          <cmdname>catalogd</cmdname> host and on every
+          <cmdname>impalad</cmdname> host that is eligible to be a coordinator.
+        If this metadata for all tables exceeds 2 GB, you might experience
+        service downtime. In Impala 3.1 and higher, the issue was alleviated
+        with an improved handling of incremental stats.</p>
 
       <p id="incremental_partition_spec">
         The <codeph>PARTITION</codeph> clause is only allowed in combination with the <codeph>INCREMENTAL</codeph>

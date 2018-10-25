@@ -581,8 +581,10 @@ show column stats year_month_day;
         </p>
 
         <note type="important">
-          <p conref="../shared/impala_common.xml#common/incremental_stats_caveats"/>
-          <p conref="../shared/impala_common.xml#common/incremental_stats_after_full"/>
+          <p
+            conref="../shared/impala_common.xml#common/incremental_stats_caveats"/>
+          <p
+            conref="../shared/impala_common.xml#common/incremental_stats_after_full"/>
         </note>
 
         <p>
@@ -629,12 +631,13 @@ show column stats year_month_day;
           <li>
             <p>
               <codeph>COMPUTE INCREMENTAL STATS</codeph> uses some memory in the
-              <cmdname>catalogd</cmdname> process, proportional to the number of partitions and
-              number of columns in the applicable table. The memory overhead is approximately 400
-              bytes for each column in each partition. This memory is reserved in the
-              <cmdname>catalogd</cmdname> daemon, the <cmdname>statestored</cmdname> daemon, and
-              in each instance of the <cmdname>impalad</cmdname> daemon.
-            </p>
+                <cmdname>catalogd</cmdname> process, proportional to the number
+              of partitions and number of columns in the applicable table. The
+              memory overhead is approximately 400 bytes for each column in each
+              partition. This memory is reserved in the
+                <cmdname>catalogd</cmdname> daemon, the
+                <cmdname>statestored</cmdname> daemon, and in each instance of
+              the impalad daemon. </p>
           </li>
 
           <li>
@@ -705,42 +708,66 @@ show column stats year_month_day;
       <concept id="inc_stats_size_limit_bytes">
         <title>Maximum Serialized Stats Size</title>
         <conbody>
-          <p>
-            When executing <codeph>COMPUTE INCREMENTAL STATS</codeph> on
-            very large tables, use the configuration setting
-              <codeph>inc_stats_size_limit_bytes</codeph> to prevent Impala from
-            running out of memory while updating table metadata. If this limit
-            is reached, Impala will stop loading the table and return an error.
-            The error serves as an indication that <codeph>COMPUTE INCREMENTAL
-              STATS</codeph> should not be used on the particular table.
-            Consider spitting the table and using regular <codeph>COMPUTE
-              STATS</codeph> ]if possible.
-          </p>
+          <p>In Impala 3.0 and lower, when executing <codeph>COMPUTE INCREMENTAL
+              STATS</codeph> on very large tables, use the configuration setting
+              <codeph>--inc_stats_size_limit_bytes</codeph> to prevent Impala
+            from running out of memory while updating table metadata. If this
+            limit is reached, Impala will stop loading the table and return an
+            error. The error serves as an indication that <codeph>COMPUTE
+              INCREMENTAL STATS</codeph> should not be used on the particular
+            table. Consider spitting the table and using regular <codeph>COMPUTE
+              STATS</codeph> ]if possible. </p>
 
-          <p>
-            The <codeph>inc_stats_size_limit_bytes</codeph> limit is set as a
-            safety check, to prevent Impala from hitting the maximum limit for
+          <p> The <codeph>--inc_stats_size_limit_bytes</codeph> limit is set as
+            a safety check, to prevent Impala from hitting the maximum limit for
             the table metadata. Note that this limit is only one part of the
-            entire table's metadata all of which together must be below 2 GB.
-          </p>
+            entire table's metadata all of which together must be below 2 GB. </p>
 
-          <p>
-            The default value for <codeph>inc_stats_size_limit_bytes</codeph>
-            is 209715200, 200 MB.
-          </p>
+          <p> The default value for
+              <codeph>--inc_stats_size_limit_bytes</codeph> is 209715200, 200
+            MB. </p>
 
-          <p> To change the <codeph>inc_stats_size_limit_bytes</codeph> value,
-            restart <codeph>impalad</codeph> and <codeph>catalogd</codeph> with
-            the new value specified in bytes, for example, 1048576000 for 1 GB.
-            See <xref href="impala_config_options.xml#config_options"/> for the
-            steps to change the option and restart Impala daemons. </p>
+          <p> To change the <codeph>--inc_stats_size_limit_bytes</codeph> value,
+            restart impalad and catalogd with the new value specified in bytes,
+            for example, 1048576000 for 1 GB. See <xref
+              href="impala_config_options.xml#config_options"/> for the steps to
+            change the option and restart Impala daemons. </p>
 
-          <note type="attention">
-            The <codeph>inc_stats_size_limit_bytes</codeph> setting should be
+          <note type="attention"> The
+              <codeph>--inc_stats_size_limit_bytes</codeph> setting should be
             increased with care. A big value for the setting, such as 1 GB or
             more, can result in a spike in heap usage as well as a crash of
-            Impala.
-          </note>
+            Impala. </note>
+          <p>In Impala 3.1 and higher, Impala improved how metadata is updated
+            when executing <codeph>COMPUTE INCREMENTAL STATS</codeph>,
+            significantly reducing the need for
+              <codeph>--inc_stats_size_limit_bytes</codeph>. </p>
+        </conbody>
+      </concept>
+      <concept id="pull_incremental_statistics">
+        <title>Loading Incremental Statistics from Catalogd</title>
+        <conbody>
+          <p>
+            Starting in Impala 3.1, a new configuration setting,
+              <codeph>--pull_incremental_statistics</codeph>, was added and set
+            to <codeph>true</codeph> by default. When you start Impala catalogd
+            and impalad coordinators with this setting enabled:
+          </p>
+          <ul>
+            <li> Newly created incremental stats will be smaller in size thus
+              reducing memory pressure on the catalogd daemon. Your users can
+              keep more tables and partitions in the same catalog and have lower
+              chances of crashing catalogd due to out-of-memory issues. </li>
+            <li>
+              Incremental stats will not be replicated to impalad and will be
+              accessed on demand from catalogd, resulting in a reduced memory
+              footprint of impalad.
+            </li>
+          </ul>
+          <p>
+            We do not recommend you change the default setting of
+              <codeph>--pull_incremental_statistics</codeph>.
+          </p>
         </conbody>
       </concept>
 
@@ -980,8 +1007,7 @@ alter table <varname>table_name</varname> partition (<varname>keycol1</varname>=
           frequently enough to keep up with data changes for a huge table.
         </p>
 
-        <p conref="../shared/impala_common.xml#common/set_column_stats_example"
-        />
+        <p conref="../shared/impala_common.xml#common/set_column_stats_example"/>
 
       </conbody>
 
