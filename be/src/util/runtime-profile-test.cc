@@ -318,6 +318,102 @@ TEST(CountersTest, MergeAndUpdateChildOrder) {
   deserialized_profile->PrettyPrint(&dummy);
 }
 
+TEST(CountersTest, TotalTimeCounters) {
+  ObjectPool pool;
+
+  // Set up a three layer profile: parent -> child1 -> child2
+  RuntimeProfile* parent = RuntimeProfile::Create(&pool, "Parent");
+  RuntimeProfile* child1 = RuntimeProfile::Create(&pool, "Child1");
+  RuntimeProfile* child2 = RuntimeProfile::Create(&pool, "Child2");
+  child1->AddChild(child2);
+  parent->AddChild(child1);
+
+  // Part 1: Test accumulation of time up from child2 to child1 to parent
+  // One millisecond passes in child2
+  int64_t one_milli_ns = 1 * NANOS_PER_MICRO * MICROS_PER_MILLI;
+  child2->total_time_counter()->Add(1 * NANOS_PER_MICRO * MICROS_PER_MILLI);
+  parent->ComputeTimeInProfile();
+  EXPECT_EQ(child2->total_time(), one_milli_ns);
+  EXPECT_EQ(child2->local_time(), one_milli_ns);
+
+  // Child1 is a parent of child2, so it is expected to contain at least as much time
+  // as in child2. In this case, it is equal. However, none of the time is local.
+  EXPECT_EQ(child1->total_time(), one_milli_ns);
+  EXPECT_EQ(child1->local_time(), 0);
+
+  // The parent is in the same situation as child1
+  EXPECT_EQ(parent->total_time(), one_milli_ns);
+  EXPECT_EQ(parent->local_time(), 0);
+
+  // Time now accumulates up to child1
+  child1->total_time_counter()->Add(child2->total_time());
+  parent->ComputeTimeInProfile();
+
+  // This doesn't change anything for anyone
+  EXPECT_EQ(child2->total_time(), one_milli_ns);
+  EXPECT_EQ(child2->local_time(), one_milli_ns);
+  EXPECT_EQ(child1->total_time(), one_milli_ns);
+  EXPECT_EQ(child1->local_time(), 0);
+  EXPECT_EQ(parent->total_time(), one_milli_ns);
+  EXPECT_EQ(parent->local_time(), 0);
+
+  // Time now accumulates up to parent
+  parent->total_time_counter()->Add(child1->total_time());
+  parent->ComputeTimeInProfile();
+
+  // This doesn't change anything for the parent
+  EXPECT_EQ(child2->total_time(), one_milli_ns);
+  EXPECT_EQ(child2->local_time(), one_milli_ns);
+  EXPECT_EQ(child1->total_time(), one_milli_ns);
+  EXPECT_EQ(child1->local_time(), 0);
+  EXPECT_EQ(parent->total_time(), one_milli_ns);
+  EXPECT_EQ(parent->local_time(), 0);
+
+  // Part 2: Time accumulated in middle child
+  // Add 1ms to the middle child
+  child1->total_time_counter()->Add(one_milli_ns);
+  parent->ComputeTimeInProfile();
+
+  // Child2 did not change
+  EXPECT_EQ(child2->total_time(), one_milli_ns);
+  EXPECT_EQ(child2->local_time(), one_milli_ns);
+
+  // Child1 has 1ms more of total time and local time
+  EXPECT_EQ(child1->total_time(), 2 * one_milli_ns);
+  EXPECT_EQ(child1->local_time(), one_milli_ns);
+
+  // Parent has more total time, but no local time
+  EXPECT_EQ(parent->total_time(), 2 * one_milli_ns);
+  EXPECT_EQ(parent->local_time(), 0);
+
+  // Accumulate the middle child up to the parent
+  parent->total_time_counter()->Add(one_milli_ns);
+  parent->ComputeTimeInProfile();
+
+  // Doesn't change anything
+  EXPECT_EQ(child2->total_time(), one_milli_ns);
+  EXPECT_EQ(child2->local_time(), one_milli_ns);
+  EXPECT_EQ(child1->total_time(), 2 * one_milli_ns);
+  EXPECT_EQ(child1->local_time(), one_milli_ns);
+  EXPECT_EQ(parent->total_time(), 2 * one_milli_ns);
+  EXPECT_EQ(parent->local_time(), 0);
+
+  // Part 3: Time accumulated at parent
+  // Add 1ms to the parent
+  parent->total_time_counter()->Add(one_milli_ns);
+  parent->ComputeTimeInProfile();
+
+  // Child1 and child2 don't change
+  EXPECT_EQ(child2->total_time(), one_milli_ns);
+  EXPECT_EQ(child2->local_time(), one_milli_ns);
+  EXPECT_EQ(child1->total_time(), 2 * one_milli_ns);
+  EXPECT_EQ(child1->local_time(), one_milli_ns);
+
+  // Parent has 1ms more total time and local time
+  EXPECT_EQ(parent->total_time(), 3 * one_milli_ns);
+  EXPECT_EQ(parent->local_time(), one_milli_ns);
+}
+
 TEST(CountersTest, HighWaterMarkCounters) {
   ObjectPool pool;
   RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");

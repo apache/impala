@@ -265,6 +265,7 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   Counter* total_time_counter() { return counter_map_[TOTAL_TIME_COUNTER_NAME]; }
   Counter* inactive_timer() { return counter_map_[INACTIVE_TIME_COUNTER_NAME]; }
   int64_t local_time() { return local_time_ns_; }
+  int64_t total_time() { return total_time_ns_; }
 
   /// Prints the contents of the profile in a name: value format.
   /// Does not hold locks when it makes any function calls.
@@ -483,6 +484,11 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Time spent in this node (not including the children). Computed in
   /// ComputeTimeInProfile()
   int64_t local_time_ns_;
+
+  /// Total time spent in this node. Computed in ComputeTimeInProfile() and is
+  /// the maximum of the total time spent in children and the value of
+  /// counter_total_time_.
+  int64_t total_time_ns_;
 
   /// The Exec Summary
   TExecSummary t_exec_summary_;

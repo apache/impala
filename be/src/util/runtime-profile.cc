@@ -408,7 +408,26 @@ void RuntimeProfile::ComputeTimeInProfile() {
 }
 
 void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
-  if (total == 0) return;
+  // Recurse on children. After this, childrens' total time is up to date.
+  {
+    lock_guard<SpinLock> l(children_lock_);
+    for (int i = 0; i < children_.size(); ++i) {
+      children_[i].first->ComputeTimeInProfile();
+    }
+  }
+
+  // Get total time from children
+  int64_t children_total_time = 0;
+  {
+    lock_guard<SpinLock> l(children_lock_);
+    for (int i = 0; i < children_.size(); ++i) {
+      children_total_time += children_[i].first->total_time();
+    }
+  }
+  // IMPALA-5200: Take the max, because the parent includes all of the time from the
+  // children, whether or not its total time counter has been updated recently enough
+  // to see this.
+  total_time_ns_ = max(children_total_time, total_time_counter()->value());
 
   // If a local time counter exists, use its value as local time. Otherwise, derive the
   // local time from total time and the child time.
@@ -421,14 +440,9 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
       has_local_time_counter = true;
     }
   }
+
   if (!has_local_time_counter) {
-    // Add all the total times of all the children.
-    int64_t total_child_time = 0;
-    lock_guard<SpinLock> l(children_lock_);
-    for (int i = 0; i < children_.size(); ++i) {
-      total_child_time += children_[i].first->total_time_counter()->value();
-    }
-    local_time_ns_ = total_time_counter()->value() - total_child_time;
+    local_time_ns_ = total_time_ns_ - children_total_time;
     if (!is_averaged_profile_) {
       local_time_ns_ -= inactive_timer()->value();
     }
@@ -436,16 +450,8 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
   // Counters have some margin, set to 0 if it was negative.
   local_time_ns_ = ::max<int64_t>(0, local_time_ns_);
   local_time_percent_ =
-      static_cast<double>(local_time_ns_) / total_time_counter()->value();
+      static_cast<double>(local_time_ns_) / total_time_ns_;
   local_time_percent_ = ::min(1.0, local_time_percent_) * 100;
-
-  // Recurse on children
-  {
-    lock_guard<SpinLock> l(children_lock_);
-    for (int i = 0; i < children_.size(); ++i) {
-      children_[i].first->ComputeTimeInProfile(total);
-    }
-  }
 }
 
 void RuntimeProfile::AddChild(RuntimeProfile* child, bool indent, RuntimeProfile* loc) {
