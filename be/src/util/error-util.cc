@@ -24,6 +24,8 @@
 #include "common/logging.h"
 #include "common/names.h"
 
+using apache::hive::service::cli::thrift::TStatusCode;
+
 namespace impala {
 
 string GetStrErrMsg() {
@@ -214,6 +216,22 @@ string ErrorMsg::GetFullMessageDetails() const {
     ss << details_[i] << "\n";
   }
   return ss.str();
+}
+
+TErrorCode::type HS2TStatusCodeToTErrorCode(const TStatusCode::type& hs2Code) {
+  // There is no one-one mapping between HS2 error codes and TStatusCode types.
+  // So we return a "GENERAL" error type for ERROR_STATUS code. This lets the callers
+  // pick their own error message for substitution.
+  switch (hs2Code) {
+    case TStatusCode::SUCCESS_STATUS:
+      return TErrorCode::OK;
+    case TStatusCode::ERROR_STATUS:
+      return TErrorCode::GENERAL;
+    default:
+      DCHECK(false) << "Unexpected hs2Code: " << hs2Code;
+  }
+  LOG(ERROR) << "Unexpected hs2Code encountered: " << hs2Code;
+  return TErrorCode::UNUSED;
 }
 
 }

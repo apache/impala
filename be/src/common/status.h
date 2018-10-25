@@ -199,9 +199,6 @@ class NODISCARD Status {
   /// Retains the TErrorCode value and the message
   Status& operator=(const TStatus& status);
 
-  /// Retains the TErrorCode value and the message
-  Status& operator=(const apache::hive::service::cli::thrift::TStatus& hs2_status);
-
   bool ALWAYS_INLINE ok() const { return msg_ == NULL; }
 
   /// Return true if this is a user-initiated or internal cancellation.

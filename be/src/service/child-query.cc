@@ -39,7 +39,6 @@ Status ChildQuery::ExecAndFetch() {
              << PrintId(session_id);
 
   // Create HS2 request and response structs.
-  Status status;
   TExecuteStatementResp exec_stmt_resp;
   TExecuteStatementReq exec_stmt_req;
   ImpalaServer::TUniqueIdToTHandleIdentifier(session_id, session_id,
@@ -66,24 +65,23 @@ Status ChildQuery::ExecAndFetch() {
     lock_guard<mutex> l(lock_);
     is_running_ = true;
   }
-  status = exec_stmt_resp.status;
-  RETURN_IF_ERROR(status);
+  RETURN_IF_ERROR(Status(exec_stmt_resp.status));
 
   TGetResultSetMetadataReq meta_req;
   meta_req.operationHandle = exec_stmt_resp.operationHandle;
   RETURN_IF_ERROR(IsCancelled());
   parent_server_->GetResultSetMetadata(meta_resp_, meta_req);
-  status = meta_resp_.status;
-  RETURN_IF_ERROR(status);
+  RETURN_IF_ERROR(Status(meta_resp_.status));
 
   // Fetch all results.
   TFetchResultsReq fetch_req;
   fetch_req.operationHandle = exec_stmt_resp.operationHandle;
   fetch_req.maxRows = 1024;
+  Status status;
   do {
     RETURN_IF_ERROR(IsCancelled());
     parent_server_->FetchResults(fetch_resp_, fetch_req);
-    status = fetch_resp_.status;
+    status = Status(fetch_resp_.status);
   } while (status.ok() && fetch_resp_.hasMoreRows);
   RETURN_IF_ERROR(IsCancelled());
 
@@ -99,7 +97,7 @@ Status ChildQuery::ExecAndFetch() {
 
   // Don't overwrite error from fetch. A failed fetch unregisters the query and we want to
   // preserve the original error status (e.g., CANCELLED).
-  if (status.ok()) status = close_resp.status;
+  if (status.ok()) status = Status(close_resp.status);
   return status;
 }
 

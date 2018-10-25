@@ -27,6 +27,7 @@
 #include "gen-cpp/ErrorCodes_constants.h"
 #include "gen-cpp/ErrorCodes_types.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
+#include "gen-cpp/TCLIService_types.h"
 #include "gutil/strings/substitute.h"
 
 namespace impala {
@@ -170,6 +171,9 @@ size_t ErrorCount(const ErrorLogMap& errors);
 /// PrintErrorMap, but returns a string instead of using a stream.
 std::string PrintErrorMapToString(const ErrorLogMap& errors);
 
+/// Maps the HS2 TStatusCode types to the corresponding TErrorCode.
+TErrorCode::type HS2TStatusCodeToTErrorCode(
+    const apache::hive::service::cli::thrift::TStatusCode::type& hs2Code);
 }
 
 #endif

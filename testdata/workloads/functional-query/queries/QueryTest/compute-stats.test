@@ -2197,3 +2197,11 @@ show column stats widetable_1000_cols
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
+---- QUERY
+# Tests that the child query error status is propagated back to the parent
+# compute stats query. Forces an error by setting low mem limit.
+set mem_limit=1m;
+compute stats tpch_parquet.customer;
+---- CATCH
+Rejected query from pool default-pool: minimum memory reservation is greater than memory available to the query for buffer reservations
+====

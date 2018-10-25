@@ -16,12 +16,11 @@
 // under the License.
 
 #include <boost/algorithm/string/join.hpp>
-
 #include <ostream>
 
 #include "common/status.h"
-#include "util/debug-util.h"
 
+#include "util/debug-util.h"
 #include "common/names.h"
 #include "gen-cpp/common.pb.h"
 #include "gen-cpp/ErrorCodes_types.h"
@@ -164,22 +163,8 @@ Status::Status(const apache::hive::service::cli::thrift::TStatus& hs2_status)
   : msg_(
       hs2_status.statusCode
         == apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS ? NULL
-          : new ErrorMsg(
-              static_cast<TErrorCode::type>(hs2_status.statusCode),
+          : new ErrorMsg(HS2TStatusCodeToTErrorCode(hs2_status.statusCode),
               hs2_status.errorMessage)) {
-}
-
-Status& Status::operator=(
-    const apache::hive::service::cli::thrift::TStatus& hs2_status) {
-  delete msg_;
-  if (hs2_status.statusCode
-        == apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS) {
-    msg_ = NULL;
-  } else {
-    msg_ = new ErrorMsg(
-        static_cast<TErrorCode::type>(hs2_status.statusCode), hs2_status.errorMessage);
-  }
-  return *this;
 }
 
 Status Status::Expected(const ErrorMsg& error_msg) {
