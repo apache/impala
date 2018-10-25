@@ -257,7 +257,9 @@ public class SentryProxy {
       // in allPrincipalPrivileges. See IMPALA-7729 for more information.
       Set<TSentryPrivilege> sentryPrivileges = allPrincipalPrivileges.get(
           sentryPrincipalName);
-      if (sentryPrivileges == null) return;
+      if (sentryPrivileges == null) {
+        sentryPrivileges = Sets.newHashSet();
+      }
       // Check all the privileges that are part of this principal.
       for (TSentryPrivilege sentryPriv: sentryPrivileges) {
         TPrivilege thriftPriv =
