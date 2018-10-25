@@ -98,8 +98,8 @@ static bool DumpCallback(const google_breakpad::MinidumpDescriptor& descriptor,
 
 /// Signal handler to write a minidump file outside of crashes.
 static void HandleSignal(int signum, siginfo_t* info, void* context) {
-  LOG(INFO) << "Caught signal: SIGUSR1. Sender UID: " << info->si_uid
-            << ", PID: " << info->si_pid;
+  const char* msg = "Caught signal: SIGUSR1\n";
+  sys_write(STDOUT_FILENO, msg, strlen(msg));
   minidump_exception_handler->WriteMinidump(FLAGS_minidump_path, DumpCallback, NULL);
 }
 

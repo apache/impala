@@ -20,6 +20,7 @@
 #include <csignal>
 #include <gperftools/heap-profiler.h>
 #include <gperftools/malloc_extension.h>
+#include <third_party/lss/linux_syscall_support.h>
 
 #include "common/global-flags.h"
 #include "common/logging.h"
@@ -187,9 +188,11 @@ static void PauseMonitorLoop() {
 
 // Signal handler for SIGTERM, that prints the message before doing an exit.
 [[noreturn]] static void HandleSigTerm(int signum, siginfo_t* info, void* context) {
-  LOG(INFO) << "Caught signal: SIGTERM. Daemon will exit. Sender UID: " << info->si_uid
-            << ", PID: " << info->si_pid;
-  exit(0);
+  const char* msg = "Caught signal: SIGTERM. Daemon will exit.\n";
+  sys_write(STDOUT_FILENO, msg, strlen(msg));
+  // _exit() is async signal safe and is equivalent to the behaviour of the default
+  // SIGTERM handler. exit() can run arbitrary code and is *not* safe to use here.
+  _exit(0);
 }
 
 void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,

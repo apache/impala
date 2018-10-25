@@ -250,7 +250,7 @@ class TestBreakpadExhaustive(TestBreakpadBase):
     uid = os.getuid()
     # There should be a SIGTERM message in the log now
     # since we raised one above.
-    log_str = 'Caught signal: SIGTERM. Daemon will exit. Sender UID: ' + str(uid)
+    log_str = 'Caught signal: SIGTERM. Daemon will exit.'
     self.assert_impalad_log_contains('INFO', log_str, expected_count=1)
 
   @pytest.mark.execute_serially
