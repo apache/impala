@@ -172,14 +172,14 @@ insert into table insertalltypesagg (id, string_col) values (99999999, 'William\
 ---- QUERY
 select id, string_col from insertalltypesagg where id = 99999999
 ---- RESULTS
-99999999,'William's'
+99999999,'William''s'
 ---- TYPES
 INT, STRING
 ====
 ---- QUERY
 select id, string_col from insertalltypesagg where string_col = 'William\'s'
 ---- RESULTS
-99999999,'William's'
+99999999,'William''s'
 ---- TYPES
 INT, STRING
 ====

@@ -1,0 +1,26 @@
+====
+---- QUERY
+# Reproduces IMPALA-6734. Before fixing this would pass if the results had a single
+# quote for each value instead of the correct string.
+select "a comma,"
+from alltypestiny
+---- RESULTS
+'a comma,'
+'a comma,'
+'a comma,'
+'a comma,'
+'a comma,'
+'a comma,'
+'a comma,'
+'a comma,'
+---- TYPES
+STRING
+====
+---- QUERY
+# Test that escaping single quotes in result string works.
+select "'"
+---- RESULTS
+''''
+---- TYPES
+STRING
+====

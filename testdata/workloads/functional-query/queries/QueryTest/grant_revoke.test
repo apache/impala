@@ -149,8 +149,8 @@ show create function grant_rev_db.fn
 ---- RESULTS: MULTI_LINE
 ['CREATE FUNCTION grant_rev_db.fn()
  RETURNS INT
- LOCATION '$NAMENODE/test-warehouse/libTestUdfs.so'
- SYMBOL='_Z2FnPN10impala_udf15FunctionContextE'
+ LOCATION ''$NAMENODE/test-warehouse/libTestUdfs.so''
+ SYMBOL=''_Z2FnPN10impala_udf15FunctionContextE''
 ']
 ---- TYPES
 STRING
@@ -183,8 +183,8 @@ show create function _impala_builtins.sin
 ---- RESULTS: MULTI_LINE
 ['CREATE FUNCTION _impala_builtins.sin(DOUBLE)
  RETURNS DOUBLE
- LOCATION 'null'
- SYMBOL='_ZN6impala13MathFunctions3SinEPN10impala_udf15FunctionContextERKNS1_9DoubleValE'
+ LOCATION ''null''
+ SYMBOL=''_ZN6impala13MathFunctions3SinEPN10impala_udf15FunctionContextERKNS1_9DoubleValE''
 ']
 ---- TYPES
 STRING

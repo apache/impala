@@ -62,6 +62,12 @@ class TestExprs(ImpalaTestSuite):
     current_db = self.execute_scalar('select current_database()', vector=vector)
     assert current_db == QueryTestSectionReader.get_db_name(table_format)
 
+  def test_special_strings(self, vector):
+    """Test handling of expressions with "special" strings."""
+    vector.get_value('exec_option')['enable_expr_rewrites'] = \
+        vector.get_value('enable_expr_rewrites')
+    self.run_test_case('QueryTest/special-strings', vector)
+
 # Tests very deep expression trees and expressions with many children. Impala defines
 # a 'safe' upper bound on the expr depth and the number of expr children in the
 # FE Expr.java and any changes to those limits should be reflected in this test.

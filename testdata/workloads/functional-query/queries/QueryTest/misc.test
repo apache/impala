@@ -104,7 +104,7 @@ string, string, string, string
 # Test query filed in IMPALA-65
 SELECT "quote \"", 'quote \''
 ---- RESULTS
-'quote "','quote ''
+'quote "','quote '''
 ---- TYPES
 string, string
 ====
