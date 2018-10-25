@@ -1120,4 +1120,50 @@ StringVal StringFunctions::GetJsonObject(FunctionContext *ctx, const StringVal &
     const StringVal &path_str) {
   return GetJsonObjectImpl(ctx, json_str, path_str);
 }
+
+IntVal StringFunctions::Levenshtein(
+    FunctionContext* ctx, const StringVal& s1, const StringVal& s2) {
+  // Adapted from https://bit.ly/2SbDgN4
+  // under the Creative Commons Attribution-ShareAlike License
+
+  int s1len = s1.len;
+  int s2len = s2.len;
+
+  // error if either input exceeds 255 characters
+  if (s1len > 255 || s2len > 255) {
+    ctx->SetError("levenshtein argument exceeds maximum length of 255 characters");
+    return IntVal(-1);
+  }
+
+  // short cut cases:
+  // - null strings
+  // - zero length strings
+  // - identical length and value strings
+  if (s1.is_null || s2.is_null) return IntVal::null();
+  if (s1len == 0) return IntVal(s2len);
+  if (s2len == 0) return IntVal(s1len);
+  if (s1len == s2len && memcmp(s1.ptr, s2.ptr, s1len) == 0) return IntVal(0);
+
+  int column_start = 1;
+
+  auto column = reinterpret_cast<int*>(ctx->Allocate(sizeof(int) * (s1len + 1)));
+
+  std::iota(column + column_start - 1, column + s1len + 1, column_start - 1);
+
+  for (int x = column_start; x <= s2len; x++) {
+    column[0] = x;
+    int last_diagonal = x - column_start;
+    for (int y = column_start; y <= s1len; y++) {
+      int old_diagonal = column[y];
+      auto possibilities = {column[y] + 1, column[y - 1] + 1,
+          last_diagonal + (s1.ptr[y - 1] == s2.ptr[x - 1] ? 0 : 1)};
+      column[y] = std::min(possibilities);
+      last_diagonal = old_diagonal;
+    }
+  }
+  int result = column[s1len];
+  ctx->Free(reinterpret_cast<uint8_t*>(column));
+
+  return IntVal(result);
+}
 }

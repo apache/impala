@@ -513,6 +513,8 @@ visible_functions = [
    '_ZN6impala15StringFunctions9TrimCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
   [['get_json_object'], 'STRING', ['STRING', 'STRING'],
    'impala::StringFunctions::GetJsonObject'],
+  [['levenshtein', 'le_dst'], 'INT', ['STRING', 'STRING'],
+   '_ZN6impala15StringFunctions11LevenshteinEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
 
   # Conditional Functions
   # Some of these have empty symbols because the BE special-cases them based on the

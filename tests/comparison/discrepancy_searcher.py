@@ -57,7 +57,7 @@ from tests.comparison.query import (
     SelectItem)
 from tests.comparison.query_flattener import QueryFlattener
 from tests.comparison.statement_generator import get_generator
-from tests.comparison import db_connection
+from tests.comparison import db_connection, compat
 
 LOG = getLogger(__name__)
 
@@ -74,14 +74,16 @@ class QueryResultComparator(object):
   def __init__(self, query_profile, ref_conn,
       test_conn, query_timeout_seconds, flatten_dialect=None):
     '''test/ref_conn arguments should be an instance of DbConnection'''
-    ref_cursor = ref_conn.cursor()
-    test_cursor = test_conn.cursor()
-
     self.ref_conn = ref_conn
     self.ref_sql_writer = SqlWriter.create(
         dialect=ref_conn.db_type, nulls_order_asc=query_profile.nulls_order_asc())
     self.test_conn = test_conn
     self.test_sql_writer = SqlWriter.create(dialect=test_conn.db_type)
+
+    compat.setup_ref_database(self.ref_conn)
+
+    ref_cursor = ref_conn.cursor()
+    test_cursor = test_conn.cursor()
 
     self.query_executor = QueryExecutor(
         [ref_cursor, test_cursor],

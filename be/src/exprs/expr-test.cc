@@ -3736,6 +3736,38 @@ TEST_F(ExprTest, InPredicate) {
 }
 
 TEST_F(ExprTest, StringFunctions) {
+  TestValue("levenshtein('levenshtein', 'frankenstein')", TYPE_INT, 6);
+  TestValue("levenshtein('example', 'samples')", TYPE_INT, 3);
+  TestValue("levenshtein('sturgeon', 'urgently')", TYPE_INT, 6);
+  TestValue("levenshtein('distance', 'difference')", TYPE_INT, 5);
+  TestValue("levenshtein('kitten', 'sitting')", TYPE_INT, 3);
+  TestValue("levenshtein('levenshtein', 'levenshtein')", TYPE_INT, 0);
+  TestValue("levenshtein('', 'levenshtein')", TYPE_INT, 11);
+  TestValue("levenshtein('levenshtein', '')", TYPE_INT, 11);
+  TestIsNull("levenshtein('foo', NULL)", TYPE_INT);
+  TestIsNull("levenshtein(NULL, 'foo')", TYPE_INT);
+  TestIsNull("levenshtein(NULL, NULL)", TYPE_INT);
+  TestErrorString("levenshtein('z', repeat('x', 256))",
+      "levenshtein argument exceeds maximum length of 255 characters\n");
+  TestErrorString("levenshtein(repeat('x', 256), 'z')",
+      "levenshtein argument exceeds maximum length of 255 characters\n");
+
+  TestValue("le_dst('levenshtein', 'frankenstein')", TYPE_INT, 6);
+  TestValue("le_dst('example', 'samples')", TYPE_INT, 3);
+  TestValue("le_dst('sturgeon', 'urgently')", TYPE_INT, 6);
+  TestValue("le_dst('distance', 'difference')", TYPE_INT, 5);
+  TestValue("le_dst('kitten', 'sitting')", TYPE_INT, 3);
+  TestValue("le_dst('levenshtein', 'levenshtein')", TYPE_INT, 0);
+  TestValue("le_dst('', 'levenshtein')", TYPE_INT, 11);
+  TestValue("le_dst('levenshtein', '')", TYPE_INT, 11);
+  TestIsNull("le_dst('foo', NULL)", TYPE_INT);
+  TestIsNull("le_dst(NULL, 'foo')", TYPE_INT);
+  TestIsNull("le_dst(NULL, NULL)", TYPE_INT);
+  TestErrorString("le_dst('z', repeat('x', 256))",
+      "levenshtein argument exceeds maximum length of 255 characters\n");
+  TestErrorString("le_dst(repeat('x', 256), 'z')",
+      "levenshtein argument exceeds maximum length of 255 characters\n");
+
   TestStringValue("substring('Hello', 1)", "Hello");
   TestStringValue("substring('Hello', -2)", "lo");
   TestStringValue("substring('Hello', cast(0 as bigint))", "");

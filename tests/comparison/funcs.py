@@ -583,6 +583,10 @@ create_func('Concat',
 create_func('Trim', accepts=[Char])
 create_func('Length', returns=Int, accepts=[Char])
 
+# In order to use the levenshtein() function in Postgres this needs to be run:
+# CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
+create_func('Levenshtein', returns=Int, accepts=[Arg(Char), Arg(Char)])
+
 for interval in ['Year', 'Month', 'Day', 'Hour', 'Minute', 'Second']:
   create_func('Extract' + interval,
       returns=Int, accepts=[Arg(Timestamp, can_be_null_literal=False)])

@@ -155,6 +155,9 @@ class StringFunctions {
   static StringVal GetJsonObjectImpl(FunctionContext* ctx, const StringVal& json_str,
       const StringVal& path_str);
 
+  static IntVal Levenshtein(
+      FunctionContext* context, const StringVal& s1, const StringVal& s2);
+
  private:
   /// Templatized implementation of the actual string trimming function.
   /// The first parameter, 'D', is one of StringFunctions::TrimPosition values.
