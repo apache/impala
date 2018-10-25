@@ -13,6 +13,7 @@ org.eclipse.jdt.ui.prefs
 load-*-generated.sql
 bin/version.info
 bin/impala-config-local.sh
+.cache
 .cdh
 
 # distcc options
@@ -56,9 +57,25 @@ hs_err_pid*.log
 
 # Binaries disallowed by ASF rules
 *.jar
+*.so
 
 # Vim related files
+.swp
 .*.swn
+.*.swm
 .*.swo
 .*.swp
 .vimrc
+
+# GDB default log file
+gdb.txt
+.gdbinit
+
+# IntelliJ artifacts
+.idea
+*.iml
+*.ipr
+*.iws
+
+# OS X Artifacts
+.DS_Store

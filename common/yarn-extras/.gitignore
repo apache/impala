@@ -1,0 +1,10 @@
+target
+
+# Eclipse artifacts
+.classpath
+.settings
+.project
+*.launch
+
+# emacs backup files
+*~
