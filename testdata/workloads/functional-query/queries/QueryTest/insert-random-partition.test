@@ -1,0 +1,33 @@
+====
+---- QUERY
+create table t (i int) partitioned by (p string)
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# IMPALA-402: dynamic partitioning with random functions should behave sanely. Use uuid()
+# to guarantee that the partition keys will be unique.
+insert into t partition(p)
+select id, uuid() from functional.alltypestiny
+====
+---- QUERY
+select count(distinct p)
+from t
+---- TYPES
+BIGINT
+---- RESULTS
+8
+====
+---- QUERY
+# IMPALA-402: also test without clustering
+insert into t partition(p) /*+noclustered*/
+select id, uuid() from functional.alltypestiny
+====
+---- QUERY
+select count(distinct p)
+from t
+---- TYPES
+BIGINT
+---- RESULTS
+16
+====

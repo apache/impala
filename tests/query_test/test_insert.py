@@ -22,6 +22,7 @@ import pytest
 from testdata.common import widetable
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfLocal, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
@@ -148,6 +149,13 @@ class TestInsertQueries(ImpalaTestSuite):
     if vector.get_value('exec_option')['disable_codegen']:
       self.run_test_case('QueryTest/insert_bad_expr', vector,
           multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_insert_random_partition(self, vector, unique_database):
+    """Regression test for IMPALA-402: partitioning by rand() leads to strange behaviour
+    or crashes."""
+    self.run_test_case('QueryTest/insert-random-partition', vector, unique_database,
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
 class TestInsertWideTable(ImpalaTestSuite):
   @classmethod
