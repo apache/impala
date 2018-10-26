@@ -262,30 +262,6 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
     </conbody>
 
-    <concept audience="hidden" id="config_options_statestored_details">
-
-      <title>Configuration Options for statestored Daemon</title>
-
-      <conbody>
-
-        <p></p>
-
-      </conbody>
-
-    </concept>
-
-    <concept audience="hidden" id="config_options_catalogd_details">
-
-      <title>Configuration Options for catalogd Daemon</title>
-
-      <conbody>
-
-        <p></p>
-
-      </conbody>
-
-    </concept>
-
   </concept>
 
   <concept id="config_options_checking">
@@ -348,11 +324,10 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
     <conbody>
 
-      <p>
-        The <cmdname>statestored</cmdname> daemon implements the Impala statestore service,
-        which monitors the availability of Impala services across the cluster, and handles
-        situations such as nodes becoming unavailable or becoming available again.
-      </p>
+      <p> The <cmdname>statestored</cmdname> daemon implements the Impala
+        StateStore service, which monitors the availability of Impala services
+        across the cluster, and handles situations such as nodes becoming
+        unavailable or becoming available again. </p>
 
     </conbody>
 
@@ -364,16 +339,42 @@ Starting Impala Catalog Server:                            [  OK  ]</codeblock>
 
     <conbody>
 
-      <p>
-        The <cmdname>catalogd</cmdname> daemon implements the Impala catalog service, which
-        broadcasts metadata changes to all the Impala nodes when Impala creates a table, inserts
-        data, or performs other kinds of DDL and DML operations.
-      </p>
+      <p> The <cmdname>catalogd</cmdname> daemon implements the Impala Catalog
+        service, which broadcasts metadata changes to all the Impala nodes when
+        Impala creates a table, inserts data, or performs other kinds of DDL and
+        DML operations. </p>
 
       <p conref="../shared/impala_common.xml#common/load_catalog_in_background"/>
 
     </conbody>
 
+  </concept>
+  <concept id="auto_invalidate_metadata">
+    <title>Startup Options for Automatic Invalidation of Metadata</title>
+    <conbody>
+      <p>To keep the size of metadata small, <codeph>catalogd</codeph>
+        periodically scans all the tables and invalidates those not recently
+        used. There are two types of configurations in
+        <codeph>catalogd</codeph>.</p>
+      <ul>
+        <li>Time-based invalidation with the
+            <codeph>--invalidate_tables_timeout_s</codeph> flag:
+            <codeph>Catalogd</codeph> invalidates tables that are not recently
+          used in the specified time period. This flag needs to be applied to
+          both <codeph>impalad</codeph> and <codeph>catalogd</codeph>.</li>
+        <li>Java garbage collection-based invalidation with the
+            <codeph>--invalidate_tables_on_memory_pressure</codeph> flag: When
+          the memory pressure is high after a Java garbage collection in
+            <codeph>catalogd</codeph>, Impala invalidates a certain fraction of
+          the least recently used tables. This flag needs to be applied to both
+            <codeph>impalad</codeph> and <codeph>catalogd</codeph>.</li>
+      </ul>
+      <p>Automatic invalidation of metadata provides more stability with lower
+        chances of running out of memory, but the feature could potentially
+        cause performance risks.</p>
+      <note>This is a preview feature in Impala 3.1 and not generally
+        available.</note>
+    </conbody>
   </concept>
 
 </concept>
