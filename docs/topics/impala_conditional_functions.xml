@@ -677,24 +677,19 @@ END</codeblock>
         </dt>
 
         <dd>
-          <b>Purpose:</b> Returns the second argument, <codeph>ifNotNull</codeph>, if the first
-          argument is not <codeph>NULL</codeph>. Returns the third argument,
-          <codeph>ifNull</codeph>, if the first argument is <codeph>NULL</codeph>.
+          <b>Purpose:</b> Returns the second argument,
+            <codeph>ifNotNull</codeph>, if the first argument is not
+            <codeph>NULL</codeph>. Returns the third argument,
+            <codeph>ifNull</codeph>, if the first argument is
+            <codeph>NULL</codeph>. <p> Equivalent to the <codeph>NVL2()</codeph>
+            function in Oracle Database. </p>
           <p>
-            Equivalent to the <codeph>NVL2()</codeph> function in Oracle Database.
-          </p>
-
-          <p>
-            <b>Return type:</b> Same as the first argument value
-          </p>
-
+            <b>Return type:</b> Same as the first argument value </p>
           <p conref="../shared/impala_common.xml#common/added_in_290"/>
-
-          <p conref="../shared/impala_common.xml#common/example_blurb"
-          />
-<codeblock>
+          <p conref="../shared/impala_common.xml#common/example_blurb"/>
+          <codeblock>
 SELECT NVL2(NULL, 999, 0); -- Returns 0
-SELECT NVL2('ABC', 'Is Null', 'Is Not Null); -- Returns 'Is Not Null'</codeblock>
+SELECT NVL2('ABC', 'Is Not Null', 'Is Null'); -- Returns 'Is Not Null'</codeblock>
         </dd>
 
       </dlentry>
