@@ -2194,3 +2194,31 @@ CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (i1 integer)
 STORED AS {file_format}
 TBLPROPERTIES('skip.header.line.count'='2');
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+strings_with_quotes
+---- COLUMNS
+s string
+i int
+---- ROW_FORMAT
+delimited fields terminated by ','  escaped by '\\'
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/strings_with_quotes.csv'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT s, i
+FROM {db_name}.{table_name};
+---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE TABLE {db_name}{db_suffix}.{table_name} (
+  s string PRIMARY KEY,
+  i int
+)
+PARTITION BY HASH (s) PARTITIONS 3 STORED AS KUDU;
+---- DEPENDENT_LOAD_KUDU
+INSERT into TABLE {db_name}{db_suffix}.{table_name}
+SELECT s, i
+FROM {db_name}.{table_name};
+====

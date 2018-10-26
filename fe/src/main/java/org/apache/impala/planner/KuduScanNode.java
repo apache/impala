@@ -415,7 +415,7 @@ public class KuduScanNode extends ScanNode {
       case VARCHAR:
       case CHAR: {
         kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
-            ((StringLiteral)literal).getStringValue());
+            ((StringLiteral)literal).getUnescapedValue());
         break;
       }
       case TIMESTAMP: {
@@ -523,7 +523,7 @@ public class KuduScanNode extends ScanNode {
       case BIGINT: return ((NumericLiteral) e).getLongValue();
       case FLOAT: return (float) ((NumericLiteral) e).getDoubleValue();
       case DOUBLE: return ((NumericLiteral) e).getDoubleValue();
-      case STRING: return ((StringLiteral) e).getValue();
+      case STRING: return ((StringLiteral) e).getUnescapedValue();
       case TIMESTAMP: {
         try {
           // TODO: Simplify when Impala supports a 64-bit TIMESTAMP type.

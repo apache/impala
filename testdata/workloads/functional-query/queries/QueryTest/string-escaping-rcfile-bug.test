@@ -1,0 +1,66 @@
+# This file contains the current output for queries against strings_with_quotes
+# for RCFile. The output is different because of a bug in the RCFile scanner.
+# This file can be removed once IMPALA-7778 is fixed.
+====
+---- QUERY
+# Check that all strings in the table are returned correctly.
+# IMPALA-7778: escapes are ignored so output is incorrect
+select s
+from strings_with_quotes
+---- RESULTS
+'"'
+'""'
+'\\\\"'
+''''''
+''''
+'foo'''
+'''foo'
+'"foo"'
+'"foo'
+'foo"bar'
+'foo\\\\"bar'
+---- TYPES
+STRING
+====
+---- QUERY
+# Regression test for IMPALA-7586: predicate pushed down with incorrect string escaping.
+select s
+from strings_with_quotes
+where s = '"'
+---- RESULTS
+'"'
+---- TYPES
+STRING
+====
+---- QUERY
+# Regression test for IMPALA-7586: predicate pushed down with incorrect string escaping.
+# IMPALA-7778: escapes are ignored so output is incorrect
+select s
+from strings_with_quotes
+where s = '\\"'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+# Regression test for IMPALA-7586: predicate pushed down with incorrect string escaping.
+select s
+from strings_with_quotes
+where s in ('"', 'foo"bar')
+---- RESULTS
+'"'
+'foo"bar'
+---- TYPES
+STRING
+====
+---- QUERY
+# Regression test for IMPALA-7586: predicate pushed down with incorrect string escaping.
+# IMPALA-7778: escapes are ignored so output is incorrect
+select s
+from strings_with_quotes
+where s in ('\\"', 'foo"bar')
+---- RESULTS
+'foo"bar'
+---- TYPES
+STRING
+====

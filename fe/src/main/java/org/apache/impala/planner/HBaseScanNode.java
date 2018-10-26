@@ -166,7 +166,7 @@ public class HBaseScanNode extends ScanNode {
             analyzer.getQueryCtx());
         if (val instanceof StringLiteral) {
           StringLiteral litVal = (StringLiteral) val;
-          startKey_ = convertToBytes(litVal.getStringValue(),
+          startKey_ = convertToBytes(litVal.getUnescapedValue(),
               !rowRange.getLowerBoundInclusive());
         } else {
           // lower bound is null.
@@ -182,7 +182,7 @@ public class HBaseScanNode extends ScanNode {
             analyzer.getQueryCtx());
         if (val instanceof StringLiteral) {
           StringLiteral litVal = (StringLiteral) val;
-          stopKey_ = convertToBytes(litVal.getStringValue(),
+          stopKey_ = convertToBytes(litVal.getUnescapedValue(),
               rowRange.getUpperBoundInclusive());
         } else {
           // lower bound is null.
