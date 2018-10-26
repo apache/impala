@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="max_mem_estimate_for_admission">
+
+  <title>MAX_MEM_ESTIMATE_FOR_ADMISSION Query Option</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>MAX_MEM_ESTIMATE_FOR_ADMISSION</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Use the <codeph>MAX_MEM_ESTIMATE_FOR_ADMISSION</codeph> query option to set an upper limit
+      on the memory estimates of a query as a workaround for over-estimates precluding a query
+      from being admitted.
+    </p>
+
+    <p>
+      The query option takes effect when all of the below conditions are met:
+    </p>
+
+    <ul>
+      <li>
+        Memory-based admission control is enabled for the pool.
+      </li>
+
+      <li>
+        The <codeph>MEM_LIMIT</codeph> query option is not set at the query, session, resource
+        pool, or global level.
+      </li>
+    </ul>
+
+    <p>
+      When the above conditions are met, MIN(<codeph>MAX_MEM_ESTIMATE_FOR_ADMISSION</codeph>,
+      mem_estimate) is used for admission control.
+    </p>
+
+    <p>
+      Setting the <codeph>MEM_LIMIT</codeph> query option is usually a better option. Use the
+      <codeph>MAX_MEM_ESTIMATE_FOR_ADMISSION</codeph> query option when it is not feasible to
+      set <codeph>MEM_LIMIT</codeph> for each individual query.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/type_integer"/>
+
+    <p conref="../shared/impala_common.xml#common/default_blurb"/>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala31"/>
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/related_info"/>
+
+  </conbody>
+
+</concept>

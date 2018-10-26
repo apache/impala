@@ -200,6 +200,7 @@ under the License.
           <topicref href="topics/impala_live_progress.xml"/>
           <topicref href="topics/impala_live_summary.xml"/>
           <topicref href="topics/impala_max_errors.xml"/>
+          <topicref rev="3.1 IMPALA-6847" href="topics/impala_max_mem_estimate_for_admission.xml"/>
           <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_max_row_size.xml"/>
           <topicref rev="2.5.0" href="topics/impala_max_num_runtime_filters.xml"/>
           <topicref href="topics/impala_max_scan_range_length.xml"/>
