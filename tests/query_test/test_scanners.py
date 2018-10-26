@@ -97,6 +97,14 @@ class TestScannersAllTableFormats(ImpalaTestSuite):
       pytest.skip()
     self.run_test_case('QueryTest/hdfs_scanner_profile', vector)
 
+  def test_string_escaping(self, vector):
+    """Test handling of string escape sequences."""
+    if vector.get_value('table_format').file_format == 'rc':
+      # IMPALA-7778: RCFile scanner incorrectly ignores escapes for now.
+      self.run_test_case('QueryTest/string-escaping-rcfile-bug', vector)
+    else:
+      self.run_test_case('QueryTest/string-escaping', vector)
+
 # Test all the scanners with a simple limit clause. The limit clause triggers
 # cancellation in the scanner code paths.
 class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):

@@ -135,7 +135,7 @@ public class LikePredicate extends Predicate {
       // TODO: this checks that it's a Java-supported regex, but the syntax supported
       // by the backend is Posix; add a call to the backend to check the re syntax
       try {
-        Pattern.compile(((StringLiteral) getChild(1)).getValue());
+        Pattern.compile(((StringLiteral) getChild(1)).getValueWithOriginalEscapes());
       } catch (PatternSyntaxException e) {
         throw new AnalysisException(
             "invalid regular expression in '" + this.toSql() + "'");
@@ -148,7 +148,8 @@ public class LikePredicate extends Predicate {
   protected float computeEvalCost() {
     if (!hasChildCosts()) return UNKNOWN_COST;
     if (getChild(1).isLiteral() && !getChild(1).isNullLiteral() &&
-      Pattern.matches("[%_]*[^%_]*[%_]*", ((StringLiteral) getChild(1)).getValue())) {
+      Pattern.matches("[%_]*[^%_]*[%_]*",
+          ((StringLiteral) getChild(1)).getValueWithOriginalEscapes())) {
       // This pattern only has wildcards as leading or trailing character,
       // so it is linear.
       return getChildCosts() +

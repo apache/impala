@@ -117,7 +117,7 @@ public class AdminFnStmt extends StatementBase {
         throw new AnalysisException(
             "Invalid backend, must be a string literal: " + backendExpr.toSql());
       }
-      backend_ = parseBackendAddress(((StringLiteral) backendExpr).getValue());
+      backend_ = parseBackendAddress(((StringLiteral) backendExpr).getUnescapedValue());
     }
     if (deadlineExpr != null) {
       deadlineSecs_ = deadlineExpr.evalToNonNegativeInteger(analyzer, "deadline");

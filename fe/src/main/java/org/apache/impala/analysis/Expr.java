@@ -1486,7 +1486,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         return DEFAULT_AVG_STRING_LENGTH;
       }
     } else if (e instanceof StringLiteral) {
-      return ((StringLiteral) e).getValue().length();
+      return ((StringLiteral) e).getUnescapedValue().length();
     } else {
       // TODO(tmarshall): Extend this to support other string Exprs, such as
       // function calls that return string.

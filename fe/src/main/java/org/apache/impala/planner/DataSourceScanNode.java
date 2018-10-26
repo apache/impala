@@ -129,7 +129,8 @@ public class DataSourceScanNode extends ScanNode {
         return new TColumnValue().setDouble_val(
             ((NumericLiteral) expr).getDoubleValue());
       case STRING:
-        return new TColumnValue().setString_val(((StringLiteral) expr).getValue());
+        return new TColumnValue().setString_val(
+            ((StringLiteral) expr).getUnescapedValue());
       case DECIMAL:
       case DATE:
       case DATETIME:

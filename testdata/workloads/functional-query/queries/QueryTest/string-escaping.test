@@ -1,0 +1,62 @@
+====
+---- QUERY
+# Check that all strings in the table are returned correctly.
+select s
+from strings_with_quotes
+---- RESULTS
+'"'
+'""'
+'\\"'
+''''''
+''''
+'foo'''
+'''foo'
+'"foo"'
+'"foo'
+'foo"bar'
+'foo\\"bar'
+---- TYPES
+STRING
+====
+---- QUERY
+# Regression test for IMPALA-7586: predicate pushed down with incorrect string escaping.
+select s
+from strings_with_quotes
+where s = '"'
+---- RESULTS
+'"'
+---- TYPES
+STRING
+====
+---- QUERY
+# Regression test for IMPALA-7586: predicate pushed down with incorrect string escaping.
+select s
+from strings_with_quotes
+where s = '\\"'
+---- RESULTS
+'\\"'
+---- TYPES
+STRING
+====
+---- QUERY
+# Regression test for IMPALA-7586: predicate pushed down with incorrect string escaping.
+select s
+from strings_with_quotes
+where s in ('"', 'foo"bar')
+---- RESULTS
+'"'
+'foo"bar'
+---- TYPES
+STRING
+====
+---- QUERY
+# Regression test for IMPALA-7586: predicate pushed down with incorrect string escaping.
+select s
+from strings_with_quotes
+where s in ('\\"', 'foo"bar')
+---- RESULTS
+'\\"'
+'foo"bar'
+---- TYPES
+STRING
+====

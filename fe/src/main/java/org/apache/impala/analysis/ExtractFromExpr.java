@@ -20,7 +20,6 @@ package org.apache.impala.analysis;
 import java.util.Set;
 
 import org.apache.impala.catalog.BuiltinsDb;
-import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExtractField;
@@ -81,7 +80,8 @@ public class ExtractFromExpr extends FunctionCallExpr {
 
     super.analyzeImpl(analyzer);
 
-    String extractFieldIdent = ((StringLiteral)children_.get(1)).getValue();
+    String extractFieldIdent =
+        ((StringLiteral)children_.get(1)).getValueWithOriginalEscapes();
     Preconditions.checkNotNull(extractFieldIdent);
     if (!EXTRACT_FIELDS.contains(extractFieldIdent.toUpperCase())) {
       throw new AnalysisException("Time unit '" + extractFieldIdent + "' in expression '"
@@ -102,7 +102,7 @@ public class ExtractFromExpr extends FunctionCallExpr {
     StringBuilder strBuilder = new StringBuilder();
     strBuilder.append(getFnName().toString().toUpperCase());
     strBuilder.append("(");
-    strBuilder.append(((StringLiteral)getChild(1)).getValue());
+    strBuilder.append(((StringLiteral)getChild(1)).getValueWithOriginalEscapes());
     strBuilder.append(" FROM ");
     strBuilder.append(getChild(0).toSql());
     strBuilder.append(")");

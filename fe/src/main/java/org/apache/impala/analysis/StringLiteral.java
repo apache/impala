@@ -79,7 +79,11 @@ public class StringLiteral extends LiteralExpr {
     msg.string_literal = new TStringLiteral(val);
   }
 
-  public String getValue() { return value_; }
+  /**
+   * Returns the original value that the string literal was constructed with,
+   * without escaping or unescaping it.
+   */
+  public String getValueWithOriginalEscapes() { return value_; }
 
   public String getUnescapedValue() {
     // Unescape string exactly like Hive does. Hive's method assumes
@@ -126,7 +130,7 @@ public class StringLiteral extends LiteralExpr {
 
   @Override
   public String getStringValue() {
-    return value_;
+    return getValueWithOriginalEscapes();
   }
 
   @Override
