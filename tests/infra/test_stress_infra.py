@@ -58,4 +58,4 @@ class TestStressInfra(ImpalaTestSuite):
     queries = load_tpc_queries(workload)
     assert count == len(queries)
     for name in queries:
-      assert name.startswith('q')
+      assert name is not None

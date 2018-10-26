@@ -4,9 +4,9 @@
 SELECT count(*), min(l_linenumber), max(l_quantity), round(sum(l_tax), 2)
 FROM lineitem
 ---- RESULTS
-6001215,1,50,240129.67
+6001215,1,50.00,240129.67
 ---- TYPES
-BIGINT, INT, DOUBLE, DOUBLE
+BIGINT, INT, DECIMAL, DECIMAL
 ====
 ---- QUERY: PERF_AGG-Q2
 -- Group by l_shipmode - 7 groups
@@ -2667,4 +2667,41 @@ C1, C2
 18005322964949,600229457837
 ---- TYPES
 BIGINT, BIGINT
+====
+---- QUERY: PERF_AGG-Q8
+-- Query with multiple DISTINCT classes.
+SELECT
+  count(distinct l_orderkey) agg1,
+  count(distinct l_partkey) agg2,
+  count(l_comment) agg3
+FROM
+  lineitem
+---- LABELS
+AGG1,AGG2,AGG3
+---- RESULTS
+1500000,200000,6001215
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====
+---- QUERY: PERF_AGG-Q9
+-- Query with multiple DISTINCT classes and outer group by.
+SELECT
+  count(distinct l_orderkey) agg1,
+  count(distinct l_partkey) agg2,
+  count(l_comment) agg3
+FROM
+  lineitem
+GROUP BY l_shipmode
+---- LABELS
+AGG1,AGG2,AGG3
+---- RESULTS
+651562,197327,857324
+651000,197338,856484
+650624,197228,856998
+652393,197228,858104
+651159,197241,856868
+651548,197267,857401
+651953,197337,858036
+----TYPES
+BIGINT,BIGINT,BIGINT
 ====

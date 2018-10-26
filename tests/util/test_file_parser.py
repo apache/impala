@@ -318,7 +318,17 @@ def write_test_file(test_file_name, test_file_sections, encoding=None):
 
 
 def load_tpc_queries(workload):
-  """Returns a list of TPC queries. 'workload' should either be 'tpch' or 'tpcds'."""
+  """
+  Returns a list of queries for the given workload. 'workload' should either be 'tpch',
+  'tpcds', or 'tpch_nested'. Two types of queries are returned:
+  - 'standard' queries, i.e. from the spec for that workload. These queries will have
+    filenames like '{workload}-q*.test' and one query per file.
+  - 'targeted' queries, which run against data from the workkload but were designed to
+    stress specific aspects of Impala. These queries have filenames like
+    '{workload}-stress-*.test' and may have multiple queries per file.
+  All queries are required to have a name specified, i.e. each test case should have:
+    ---- QUERY: WORKLOAD-<QUERY_NAME>
+  """
   LOG.info("Loading %s queries", workload)
   queries = dict()
   query_dir = os.path.join(
@@ -326,21 +336,26 @@ def load_tpc_queries(workload):
   # IMPALA-6715 and others from the past: This pattern enforces the queries we actually
   # find. Both workload directories contain other queries that are not part of the TPC
   # spec.
-  file_name_pattern = re.compile(r"^{0}-(q.*).test$".format(workload))
+  file_name_pattern = re.compile(r"^{0}-(q.*|stress-.*).test$".format(workload))
+  query_name_pattern = re.compile(r"^{0}-(.*)$".format(workload.upper()))
+  if workload == "tpch_nested":
+    query_name_pattern = re.compile(r"^TPCH-(.*)$")
   for query_file in os.listdir(query_dir):
     match = file_name_pattern.search(query_file)
     if not match:
       continue
-    query_name = match.group(1)
     file_path = os.path.join(query_dir, query_file)
     test_cases = parse_query_test_file(file_path)
-    file_queries = list()
     for test_case in test_cases:
       query_sql = remove_comments(test_case["QUERY"])
-      file_queries.append(query_sql)
-    if len(file_queries) != 1:
+      query_name = query_name_pattern.search(test_case["QUERY_NAME"]).group(1).lower()
+      # For standard queries, we require that the query name matches the file name.
+      if "stress" not in query_file: assert match.group(1) == query_name
+      queries[query_name] = query_sql
+
+    # The standard tpc queries must have one query per file.
+    if "stress" not in query_file and len(test_cases) != 1:
       raise Exception(
           "Expected exactly 1 query to be in file %s but got %s"
           % (file_path, len(file_queries)))
-    queries[query_name] = file_queries[0]
   return queries

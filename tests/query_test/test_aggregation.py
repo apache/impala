@@ -421,3 +421,6 @@ class TestTPCHAggregationQueries(ImpalaTestSuite):
 
   def test_tpch_passthrough_aggregations(self, vector):
     self.run_test_case('tpch-passthrough-aggregations', vector)
+
+  def test_tpch_stress(self, vector):
+    self.run_test_case('tpch-stress-aggregations', vector)

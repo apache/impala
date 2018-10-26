@@ -24,7 +24,7 @@ from datetime import datetime
 # use are there.
 EXPECTED_TPCDS_QUERIES_COUNT = 71
 EXPECTED_TPCH_NESTED_QUERIES_COUNT = 22
-EXPECTED_TPCH_QUERIES_COUNT = 22
+EXPECTED_TPCH_QUERIES_COUNT = 25
 # Regex to extract the estimated memory from an explain plan.
 # The unit prefixes can be found in
 # fe/src/main/java/org/apache/impala/common/PrintUtils.java

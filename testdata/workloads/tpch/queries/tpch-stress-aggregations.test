@@ -1,0 +1,44 @@
+====
+---- QUERY: TPCH-AGG1
+# Query with a large number of distinct classes
+select
+  count(distinct l1.l_partkey),
+  count(distinct l2.l_suppkey),
+  sum(distinct l1.l_linenumber),
+  avg(distinct l2.l_tax),
+  count(l1.l_comment)
+from
+  lineitem l1,
+  lineitem l2
+where
+  l1.l_orderkey = l2.l_orderkey
+  and l1.l_orderkey % 2 = 0
+---- RESULTS
+200000,10000,28,0.040000,15008534
+---- TYPES
+BIGINT,BIGINT,BIGINT,DECIMAL,BIGINT
+====
+---- QUERY: TPCH-AGG2
+# Query with count(DISTINCT) over a large number of columns
+select
+  count(distinct l1.l_partkey, l1.l_suppkey, l1.l_linenumber, l1.l_tax, l1.l_returnflag,
+      l1.l_commitdate)
+from
+  lineitem l1
+---- RESULTS
+6001091
+---- TYPES
+BIGINT
+====
+---- QUERY: TPCH-AGG3
+# Query with count(DISTINCT) over input with only 1 or 2 distinct values
+select
+  count(distinct v.one_value),
+  count(distinct v.two_values)
+from
+  (select 1 one_value, l_orderkey % 2 two_values from lineitem) v
+---- RESULTS
+1,2
+---- TYPES
+BIGINT,BIGINT
+====
