@@ -3318,8 +3318,8 @@ order by
   o_orderdate
 limit 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=92.25MB Threads=5
-Per-Host Resource Estimates: Memory=868MB
+Max Per-Host Resource Reservation: Memory=111.50MB Threads=5
+Per-Host Resource Estimates: Memory=898MB
 PLAN-ROOT SINK
 |
 09:TOP-N [LIMIT=100]
@@ -3360,8 +3360,8 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000 -> tpch.lineitem.l_orderkey, RF004 -> l_orderkey
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=191.12MB Threads=11
-Per-Host Resource Estimates: Memory=1.02GB
+Max Per-Host Resource Reservation: Memory=220.38MB Threads=11
+Per-Host Resource Estimates: Memory=1.04GB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3424,8 +3424,8 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=718.94MB
    runtime filters: RF000 -> tpch.lineitem.l_orderkey, RF004 -> l_orderkey
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=336.88MB Threads=13
-Per-Host Resource Estimates: Memory=1.01GB
+Max Per-Host Resource Reservation: Memory=353.88MB Threads=13
+Per-Host Resource Estimates: Memory=1.03GB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]

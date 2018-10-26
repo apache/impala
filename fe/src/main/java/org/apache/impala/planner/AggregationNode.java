@@ -471,9 +471,10 @@ public class AggregationNode extends PlanNode {
     if (perInstanceCardinality == -1) {
       perInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
     } else {
-      // Per-instance cardinality cannot be greater than the total output cardinality.
-      if (cardinality_ != -1) {
-        perInstanceCardinality = Math.min(perInstanceCardinality, cardinality_);
+      // Per-instance cardinality cannot be greater than the total input cardinality.
+      long inputCardinality = getChild(0).getCardinality();
+      if (inputCardinality != -1) {
+        perInstanceCardinality = Math.min(perInstanceCardinality, inputCardinality);
       }
       perInstanceDataBytes = (long)Math.ceil(perInstanceCardinality * avgRowSize_);
       perInstanceMemEstimate = (long)Math.max(perInstanceDataBytes *
