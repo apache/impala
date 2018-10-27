@@ -108,7 +108,7 @@ class StreamingSampler {
     boost::lock_guard<SpinLock> l(lock_);
     period_ = period;
     samples_collected_ = samples.size();
-    memcpy(samples_, samples.data(), sizeof(T) * samples_collected_);
+    Ubsan::MemCpy(samples_, samples.data(), sizeof(T) * samples_collected_);
     current_sample_sum_ = 0;
     current_sample_count_ = 0;
     current_sample_total_time_ = 0;
