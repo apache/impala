@@ -99,6 +99,57 @@ class ArithmeticUtil {
     const auto a = ToUnsigned(x), b = ToUnsigned(y);
     return ToSigned(Operator<UnsignedType<T>>()(a, b));
   }
+
+  // Compute() is meant to be used like AsUnsigned(), but when the template context does
+  // not enforce that the type T is integral. For floating point types, it performs
+  // Operator (i.e. std::plus) without modification, and for integral types it calls
+  // AsUnsigned().
+  //
+  // It is needed because AsUnsigned<std::plus>(1.0, 2.0) does not compile, since
+  // UnsignedType<float> is not a valid type. In contrast, Compute<std::plus>(1.0, 2.0)
+  // does compile and performs the usual addition on 1.0 and 2.0 to produce 3.0.
+  template <template <typename> class Operator, typename T>
+  static T Compute(T x, T y) {
+    return OperateOn<T>::template Compute<Operator>(x, y);
+  }
+
+ private:
+  // Ring and OperateOn are used for compile-time dispatching on how Compute() should
+  // perform an arithmetic operation: as an unsigned integer operation, as a
+  // floating-point operation, or not at all.
+  //
+  // For example, OperatorOn<int>::Compute<std::plus> is really just an alias for
+  // AsUnsigned<std::plus, int>, while OperatorOn<float>::Compute<std::plus> is really
+  // just an alias for the usual addition operator on floats.
+  enum class Ring { INTEGER, FLOAT, NEITHER };
+
+  template <typename T,
+      Ring R = std::is_integral<T>::value ?
+          Ring::INTEGER :
+          (std::is_floating_point<T>::value ? Ring::FLOAT : Ring::NEITHER)>
+  struct OperateOn;
+};
+
+template <typename T>
+struct ArithmeticUtil::OperateOn<T, ArithmeticUtil::Ring::FLOAT> {
+  template <template <typename> class Operator>
+  static T Compute(T a, T b) {
+    return Operator<T>()(a, b);
+  }
+};
+
+template <typename T>
+struct ArithmeticUtil::OperateOn<T, ArithmeticUtil::Ring::INTEGER> {
+  template <template <typename> class Operator>
+  static T Compute(T x, T y) {
+    return AsUnsigned<Operator>(x, y);
+  }
+};
+
+template <typename T>
+struct ArithmeticUtil::OperateOn<T, ArithmeticUtil::Ring::NEITHER> {
+  template <template <typename> class Operator>
+  static T Compute(T x, T y) = delete;
 };
 
 class ArithmeticUtilTest {

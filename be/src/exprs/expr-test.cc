@@ -943,11 +943,11 @@ class ExprTest : public testing::Test {
     string a_str = LiteralToString<Result>(cast_a);
     string b_str = LiteralToString<Result>(cast_b);
     TestValue(a_str + " + " + b_str, expected_type,
-        static_cast<Result>(cast_a + cast_b));
+        ArithmeticUtil::Compute<std::plus>(cast_a, cast_b));
     TestValue(a_str + " - " + b_str, expected_type,
-        static_cast<Result>(cast_a - cast_b));
+         ArithmeticUtil::Compute<std::minus>(cast_a, cast_b));
     TestValue(a_str + " * " + b_str, expected_type,
-        static_cast<Result>(cast_a * cast_b));
+        ArithmeticUtil::Compute<std::multiplies>(cast_a, cast_b));
     TestValue(a_str + " / " + b_str, TYPE_DOUBLE,
         static_cast<double>(a) / static_cast<double>(b));
   }
