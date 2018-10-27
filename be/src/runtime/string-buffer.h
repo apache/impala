@@ -23,6 +23,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
+#include "util/ubsan.h"
 
 namespace impala {
 
@@ -51,7 +52,7 @@ class StringBuffer {
   Status Append(const char* str, int64_t str_len) WARN_UNUSED_RESULT {
     int64_t new_len = len_ + str_len;
     if (UNLIKELY(new_len > buffer_size_)) RETURN_IF_ERROR(GrowBuffer(new_len));
-    memcpy(buffer_ + len_, str, str_len);
+    Ubsan::MemCpy(buffer_ + len_, str, str_len);
     len_ += str_len;
     return Status::OK();
   }
