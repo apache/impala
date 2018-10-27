@@ -240,7 +240,7 @@ class RowBatchSerializeTest : public testing::Test {
             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             "abcdefghijklmnopqrstuvwxyz";
         int len = rand() % (MAX_STRING_LEN + 1);
-        char buf[len];
+        char buf[MAX_STRING_LEN];
         for (int i = 0; i < len; ++i) {
           buf[i] = chars[rand() % (sizeof(chars) - 1)];
         }
