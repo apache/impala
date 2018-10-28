@@ -21,6 +21,15 @@
 set -euo pipefail
 trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)' ERR
 
+if test -v CMAKE_BUILD_TYPE && [[ "${CMAKE_BUILD_TYPE}" =~ 'UBSAN' ]] \
+    && [ "${UBSAN_FAIL}" = "error" ] \
+    && { grep -rI ": runtime error: " "${IMPALA_HOME}/logs" 2>&1 | sort | uniq \
+     | tee logs/ubsan.txt ; }
+then
+  "${IMPALA_HOME}"/bin/generate_junitxml.py --step UBSAN \
+      --stderr "${IMPALA_HOME}"/logs/ubsan.txt --error "Undefined C++ behavior"
+fi
+
 rm -rf "${IMPALA_HOME}"/logs_system
 mkdir -p "${IMPALA_HOME}"/logs_system
 dmesg > "${IMPALA_HOME}"/logs_system/dmesg

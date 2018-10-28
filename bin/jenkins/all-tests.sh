@@ -26,6 +26,40 @@ cd "${IMPALA_HOME}"
 
 export IMPALA_MAVEN_OPTIONS="-U"
 
+# When UBSAN_FAIL is "death", the logs are monitored for UBSAN errors. Any errors will
+# then cause this script to exit.
+#
+# When UBSAN_FAIL is "error", monitoring is delayed until tests have finished running.
+#
+# Any other value ignores UBSAN errors.
+: ${UBSAN_FAIL:=error}
+export UBSAN_FAIL
+
+if test -v CMAKE_BUILD_TYPE && [[ "${CMAKE_BUILD_TYPE}" =~ 'UBSAN' ]] \
+    && [ "${UBSAN_FAIL}" = "death" ]
+then
+  export PID_TO_KILL="$(echo $$)"
+  mkdir -p "${IMPALA_HOME}/logs"
+
+  function killer {
+    while ! grep -rI ": runtime error: " "${IMPALA_HOME}/logs"
+    do
+      sleep 1
+      if ! test -e "/proc/$PID_TO_KILL"
+      then
+        return
+      fi
+    done
+    >&2 echo "Killing process $PID_TO_KILL because it invoked undefined behavior"
+    kill -9 $PID_TO_KILL
+  }
+
+  killer &
+  export KILLER_PID="$(echo $!)"
+  disown
+  trap "kill -i $KILLER_PID" EXIT
+fi
+
 source bin/bootstrap_development.sh
 
 RET_CODE=0
