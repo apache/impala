@@ -730,11 +730,17 @@ class TestImpalaShell(ImpalaTestSuite):
     finally:
       os.remove(sql_path)
 
+  @pytest.mark.skipif(pytest.config.option.testing_remote_cluster,
+                      reason='Test assumes a minicluster.')
   def test_default_timezone(self):
     """Test that the default TIMEZONE query option is a valid timezone.
 
        It would be nice to check that the default timezone is the system's timezone,
        but doing this reliably on different Linux distributions is quite hard.
+
+       We skip this test on non-local clusters because the result_set from the
+       cluster is platform specific, but there's no guarantee the local machine
+       is the same OS, and the assert fails if there's a mismatch.
     """
     result_set = run_impala_shell_cmd('-q "set;"')
     tzname = find_query_option("TIMEZONE", result_set.stdout)
