@@ -105,12 +105,6 @@ under the License.
           rather than the <codeph>EXPLODE()</codeph> keyword.
           See <xref href="impala_complex_types.xml#complex_types"/> for details about Impala support for complex types.
         </li>
-
-        <li>
-          Multiple <codeph>DISTINCT</codeph> clauses per query, although Impala includes some workarounds for this
-          limitation.
-          <note conref="../shared/impala_common.xml#common/multiple_count_distinct"/>
-        </li>
       </ul>
 
       <p>

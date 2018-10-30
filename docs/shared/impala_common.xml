@@ -2117,33 +2117,6 @@ show functions in _impala_builtins like '*<varname>substring</varname>*';
         <codeph>--insert_inherit_permissions</codeph> startup option for the <cmdname>impalad</cmdname> daemon.
       </p>
 
-      <note id="multiple_count_distinct">
-        <p>
-          By default, Impala only allows a single <codeph>COUNT(DISTINCT <varname>columns</varname>)</codeph>
-          expression in each query.
-        </p>
-        <p>
-          If you do not need precise accuracy, you can produce an estimate of the distinct values for a column by
-          specifying <codeph>NDV(<varname>column</varname>)</codeph>; a query can contain multiple instances of
-          <codeph>NDV(<varname>column</varname>)</codeph>. To make Impala automatically rewrite
-          <codeph>COUNT(DISTINCT)</codeph> expressions to <codeph>NDV()</codeph>, enable the
-          <codeph>APPX_COUNT_DISTINCT</codeph> query option.
-        </p>
-        <p>
-          To produce the same result as multiple <codeph>COUNT(DISTINCT)</codeph> expressions, you can use the
-          following technique for queries involving a single table:
-        </p>
-<codeblock xml:space="preserve">select v1.c1 result1, v2.c1 result2 from
-  (select count(distinct col1) as c1 from t1) v1
-    cross join
-  (select count(distinct col2) as c1 from t1) v2;
-</codeblock>
-        <p>
-          Because <codeph>CROSS JOIN</codeph> is an expensive operation, prefer to use the <codeph>NDV()</codeph>
-          technique wherever practical.
-        </p>
-      </note>
-
       <p>
         <ph id="union_all_vs_union">Prefer <codeph>UNION ALL</codeph> over <codeph>UNION</codeph> when you know the
         data sets are disjoint or duplicate values are not a problem; <codeph>UNION ALL</codeph> is more efficient

@@ -108,12 +108,6 @@ table_reference := { <varname>table_name</varname> | (<varname>subquery</varname
       </li>
 
       <li>
-        By default, one <codeph>DISTINCT</codeph> clause per query. See <xref href="impala_distinct.xml#distinct"/>
-        for details. See <xref href="impala_appx_count_distinct.xml#appx_count_distinct"/> for a query option to
-        allow multiple <codeph>COUNT(DISTINCT)</codeph> impressions in the same query.
-      </li>
-
-      <li>
         Subqueries in a <codeph>FROM</codeph> clause. In <keyword keyref="impala20_full"/> and higher,
         subqueries can also go in the <codeph>WHERE</codeph> clause, for example with the
         <codeph>IN()</codeph>, <codeph>EXISTS</codeph>, and <codeph>NOT EXISTS</codeph> operators.

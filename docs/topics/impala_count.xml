@@ -242,8 +242,6 @@ ERROR: AnalysisException: RANGE is only supported with both the lower and upper 
 </codeblock>
     </p>
 
-    <note conref="../shared/impala_common.xml#common/multiple_count_distinct"/>
-
     <p conref="../shared/impala_common.xml#common/related_info"/>
 
     <p>
