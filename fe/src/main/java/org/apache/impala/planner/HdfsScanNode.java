@@ -398,15 +398,28 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Throws if the table schema contains a complex type and we need to scan
+   * Throws NotImplementedException if we do not support scanning the partition.
+   * Specifically:
+   * 1) if the table schema contains a complex type and we need to scan
    * a partition that has a format for which we do not support complex types,
    * regardless of whether a complex-typed column is actually referenced
    * in the query.
+   * 2) if we are scanning ORC partitions and the ORC scanner is disabled.
    */
   @Override
   protected void checkForSupportedFileFormats() throws NotImplementedException {
     Preconditions.checkNotNull(desc_);
     Preconditions.checkNotNull(desc_.getTable());
+
+    if (!BackendConfig.INSTANCE.isOrcScannerEnabled()) {
+      for (FeFsPartition part: partitions_) {
+        if (part.getInputFormatDescriptor().getFileFormat() == HdfsFileFormat.ORC) {
+          throw new NotImplementedException(
+              "ORC scans are disabled by --enable_orc_scanner flag");
+        }
+      }
+    }
+
     Column firstComplexTypedCol = null;
     for (Column col: desc_.getTable().getColumns()) {
       if (col.getType().isComplexType()) {

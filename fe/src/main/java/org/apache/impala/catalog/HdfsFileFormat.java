@@ -103,23 +103,19 @@ public enum HdfsFileFormat {
       "parquet.hive.MapredParquetInputFormat"
   };
 
-  private static Map<String, HdfsFileFormat> VALID_INPUT_FORMATS;
-  public static void init(boolean enableOrcScanner) {
-    ImmutableMap.Builder<String, HdfsFileFormat> builder =
-        ImmutableMap.<String, HdfsFileFormat>builder()
-            .put(RC_FILE.inputFormat(), RC_FILE)
-            .put(TEXT.inputFormat(), TEXT)
-            .put(LZO_TEXT.inputFormat(), TEXT)
-            .put(SEQUENCE_FILE.inputFormat(), SEQUENCE_FILE)
-            .put(AVRO.inputFormat(), AVRO)
-            .put(PARQUET.inputFormat(), PARQUET)
-            .put(PARQUET_LEGACY_INPUT_FORMATS[0], PARQUET)
-            .put(PARQUET_LEGACY_INPUT_FORMATS[1], PARQUET)
-            .put(PARQUET_LEGACY_INPUT_FORMATS[2], PARQUET)
-            .put(KUDU.inputFormat(), KUDU);
-    if (enableOrcScanner) builder.put(ORC.inputFormat(), ORC);
-    VALID_INPUT_FORMATS = builder.build();
-  }
+  private static Map<String, HdfsFileFormat> VALID_INPUT_FORMATS =
+      ImmutableMap.<String, HdfsFileFormat>builder()
+      .put(RC_FILE.inputFormat(), RC_FILE)
+      .put(TEXT.inputFormat(), TEXT)
+      .put(LZO_TEXT.inputFormat(), TEXT)
+      .put(SEQUENCE_FILE.inputFormat(), SEQUENCE_FILE)
+      .put(AVRO.inputFormat(), AVRO)
+      .put(PARQUET.inputFormat(), PARQUET)
+      .put(PARQUET_LEGACY_INPUT_FORMATS[0], PARQUET)
+      .put(PARQUET_LEGACY_INPUT_FORMATS[1], PARQUET)
+      .put(PARQUET_LEGACY_INPUT_FORMATS[2], PARQUET)
+      .put(KUDU.inputFormat(), KUDU)
+      .put(ORC.inputFormat(), ORC).build();
 
   /**
    * Returns true if the string describes an input format class that we support.

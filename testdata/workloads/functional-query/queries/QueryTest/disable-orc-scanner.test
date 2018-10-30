@@ -1,0 +1,7 @@
+====
+---- QUERY
+# Test that running with ORC scanner disabled fails gracefully.
+select * from functional_orc_def.alltypes
+---- CATCH
+ORC scans are disabled by --enable_orc_scanner flag
+====
