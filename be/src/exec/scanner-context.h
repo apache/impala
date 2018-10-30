@@ -108,9 +108,10 @@ class ScannerContext {
     ///  - If peek is true, the scan range position is not incremented (i.e. repeated calls
     ///    with peek = true will return the same data).
     ///  - *buffer on return is a pointer to the buffer.  The memory is owned by
-    ///    the ScannerContext and should not be modified.  If the buffer is entirely
-    ///    from one disk io buffer, a pointer inside that buffer is returned directly.
-    ///    If the requested buffer straddles io buffers, a copy is done here.
+    ///    the ScannerContext and should not be modified. The contents of the buffer are
+    ///    invalidated after subsequent calls to GetBytes()/ReadBytes(). If the buffer
+    ///    is entirely from one disk io buffer, a pointer inside that buffer is returned
+    ///    directly. If the requested buffer straddles io buffers, a copy is done here.
     ///  - *out_len is the number of bytes returned.
     ///  - *status is set if there is an error.
     /// Returns true if the call was successful (i.e. status->ok())
@@ -191,8 +192,10 @@ class ScannerContext {
     bool SkipBytes(int64_t length, Status* status) WARN_UNUSED_RESULT;
 
     /// Read length bytes into the supplied buffer.  The returned buffer is owned
-    /// by this object. Returns true on success, otherwise returns false and sets 'status'
-    /// to indicate the error.
+    /// by this object The memory is owned by and should not be modified. The contents
+    /// of the buffer are invalidated after subsequent calls to GetBytes()/ReadBytes().
+    /// Returns true on success, otherwise returns false and sets 'status' to
+    /// indicate the error.
     bool ReadBytes(int64_t length, uint8_t** buf, Status* status, bool peek = false)
         WARN_UNUSED_RESULT;
 

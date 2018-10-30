@@ -146,6 +146,7 @@ inline bool ScannerContext::Stream::ReadVLong(int64_t* value, Status* status) {
   RETURN_IF_FALSE(ReadBytes(1, reinterpret_cast<uint8_t**>(&firstbyte), status));
 
   int len = ReadWriteUtil::DecodeVIntSize(*firstbyte);
+  bool is_negative = ReadWriteUtil::IsNegativeVInt(*firstbyte);
   if (len > ReadWriteUtil::MAX_VINT_LEN) {
     *status = Status("ReadVLong: size is too big");
     return false;
@@ -165,9 +166,8 @@ inline bool ScannerContext::Stream::ReadVLong(int64_t* value, Status* status) {
     *value = (*value << 8) | (bytes[i] & 0xFF);
   }
 
-  if (ReadWriteUtil::IsNegativeVInt(*firstbyte)) {
-    *value = *value ^ (static_cast<int64_t>(-1));
-  }
+  if (is_negative) *value = *value ^ (static_cast<int64_t>(-1));
+
   return true;
 }
 
