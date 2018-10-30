@@ -43,6 +43,8 @@ mkdir -p "${LOGDIR}" || true
 # First kill any running instances of the service.
 $IMPALA_HOME/testdata/bin/kill-sentry-service.sh
 
+export HADOOP_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=30020"
+
 # Sentry picks up JARs from the HADOOP_CLASSPATH and not the CLASSPATH.
 export HADOOP_CLASSPATH=${POSTGRES_JDBC_DRIVER}:$IMPALA_HOME/fe/target/test-classes
 # Start the service.

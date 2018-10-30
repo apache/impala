@@ -63,6 +63,8 @@ done
 # Kill for a clean start.
 ${CLUSTER_BIN}/kill-hive-server.sh &> /dev/null
 
+export HIVE_METASTORE_HADOOP_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=30010"
+
 # Starts a Hive Metastore Server on the specified port.
 # To debug log4j2 loading issues, add to HADOOP_CLIENT_OPTS:
 #   -Dorg.apache.logging.log4j.simplelog.StatusLogger.level=TRACE
