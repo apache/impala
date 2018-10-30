@@ -26,7 +26,9 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
@@ -34,6 +36,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.thrift.TFunctionCategory;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -3952,5 +3955,28 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError(": shutdown(-1)", "deadline must be a non-negative integer: -1 = -1");
     AnalysisError(": shutdown(1.234)",
         "deadline expression must be an integer type but is 'DECIMAL(4,3)': 1.234");
+  }
+
+  @Test
+  public void TestImpalaBuiltinCastFunctions() throws ImpalaException {
+    // Other builtins work
+    AnalyzesOk("select random(1000)");
+    // Builtin cast functions throw exception.
+    String expectedErrorSuffix =
+        " is reserved for internal use only. Use 'cast(expr AS type)' instead.";
+    List<Function> fns = BuiltinsDb.getInstance().getFunctions(TFunctionCategory.SCALAR,
+        "castto");
+    for (Function fn : fns) {
+      // The analysis throws an exception on the function name before it even gets to
+      // checking the argument types, so it doesnt matter what argument we pass
+      // to it.
+      String fn_sql_str = fn.getName() + "(\"foo\")";
+      AnalysisError("select " + fn_sql_str, fn_sql_str + expectedErrorSuffix);
+      AnalysisError("select _impala_builtins." + fn_sql_str, fn_sql_str +
+          expectedErrorSuffix);
+    }
+    // Function that starts with 'castto' but does not exist should throw the
+    // right error msg.
+    AnalysisError("select casttobar(\"foo\")", "default.casttobar() unknown");
   }
 }

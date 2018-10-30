@@ -43,6 +43,9 @@ public class CastExpr extends Expr {
   // True if this cast does not change the type.
   private boolean noOp_ = false;
 
+  // Prefix for naming cast functions.
+  protected final static String CAST_FUNCTION_PREFIX = "castto";
+
   /**
    * C'tor for "pre-analyzed" implicit casts.
    */
@@ -96,7 +99,7 @@ public class CastExpr extends Expr {
   }
 
   private static String getFnName(Type targetType) {
-    return "castTo" + targetType.getPrimitiveType().toString();
+    return CAST_FUNCTION_PREFIX + targetType.getPrimitiveType().toString();
   }
 
   public static void initBuiltins(Db db) {

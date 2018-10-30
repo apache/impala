@@ -178,6 +178,14 @@ public class FunctionCallExpr extends Expr {
 
   public boolean isMergeAggFn() { return mergeAggInputFn_ != null; }
 
+  /**
+   *  Returns true if this is a call to an Impala builtin cast function.
+   */
+  private boolean isBuiltinCastFunction() {
+    return fnName_.isBuiltin() &&
+        fnName_.getFunction().startsWith(CastExpr.CAST_FUNCTION_PREFIX);
+  }
+
   @Override
   public void resetAnalysisState() {
     super.resetAnalysisState();
@@ -486,6 +494,11 @@ public class FunctionCallExpr extends Expr {
     FeDb db = analyzer.getDb(fnName_.getDb(), Privilege.VIEW_METADATA, true);
     if (!db.containsFunction(fnName_.getFunction())) {
       throw new AnalysisException(fnName_ + "() unknown");
+    }
+
+    if (isBuiltinCastFunction()) {
+      throw new AnalysisException(toSql() +
+          " is reserved for internal use only. Use 'cast(expr AS type)' instead.");
     }
 
     if (fnName_.getFunction().equals("count") && params_.isDistinct()) {
