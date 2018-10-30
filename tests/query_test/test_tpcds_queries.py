@@ -32,19 +32,19 @@ class TestTpcdsQuery(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTpcdsQuery, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and\
-        v.get_value('table_format').compression_codec in ['none', 'snap'] and\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and
+        v.get_value('table_format').compression_codec in ['none', 'snap'] and
         v.get_value('table_format').compression_type != 'record')
     cls.ImpalaTestMatrix.add_mandatory_exec_option('decimal_v2', 0)
 
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on the execution time for these tests in core by running only
       # against parquet.
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
           v.get_value('table_format').file_format in ['parquet'])
 
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('exec_option')['batch_size'] == 0)
 
   @pytest.mark.execute_serially
@@ -274,18 +274,18 @@ class TestTpcdsDecimalV2Query(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestTpcdsDecimalV2Query, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and\
-        v.get_value('table_format').compression_codec in ['none', 'snap'] and\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and
+        v.get_value('table_format').compression_codec in ['none', 'snap'] and
         v.get_value('table_format').compression_type != 'record')
 
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on the execution time for these tests in core by running only
       # against parquet.
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
           v.get_value('table_format').file_format in ['parquet'])
 
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('exec_option')['batch_size'] == 0)
 
   def test_tpcds_q1(self, vector):
@@ -514,7 +514,7 @@ class TestTpcdsInsert(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestTpcdsInsert, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         is_supported_insert_format(v.get_value('table_format')))
     if cls.exploration_strategy() == 'core' and not pytest.config.option.table_formats:
       # Don't run on core, unless the user explicitly wants to validate a specific table
@@ -524,3 +524,32 @@ class TestTpcdsInsert(ImpalaTestSuite):
 
   def test_tpcds_partitioned_insert(self, vector):
     self.run_test_case('partitioned-insert', vector)
+
+
+class TestTpcdsUnmodified(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'tpcds-unmodified'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTpcdsUnmodified, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format not in ['rc', 'hbase', 'kudu'] and
+        v.get_value('table_format').compression_codec in ['none', 'snap'] and
+        v.get_value('table_format').compression_type != 'record')
+
+    if cls.exploration_strategy() != 'exhaustive':
+      # Cut down on the execution time for these tests in core by running only
+      # against parquet.
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('table_format').file_format in ['parquet'])
+
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('exec_option')['batch_size'] == 0)
+
+  def test_tpcds_q35a(self, vector):
+    self.run_test_case('tpcds-q35a', vector)
+
+  def test_tpcds_q48(self, vector):
+    self.run_test_case('tpcds-q48', vector)
