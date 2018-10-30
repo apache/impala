@@ -637,6 +637,9 @@ class ImpalaServer : public ImpalaServiceIf,
   Status GetExecSummary(const TUniqueId& query_id, const std::string& user,
       TExecSummary* result) WARN_UNUSED_RESULT;
 
+  /// Collect ExecSummary and update it to the profile in request_state
+  void UpdateExecSummary(std::shared_ptr<ClientRequestState> request_state) const;
+
   /// Initialize "default_configs_" to show the default values for ImpalaQueryOptions and
   /// "support_start_over/false" to indicate that Impala does not support start over
   /// in the fetch call.

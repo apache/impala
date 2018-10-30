@@ -664,6 +664,9 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
       lock_guard<mutex> l(*request_state->lock());
       RETURN_IF_ERROR(CheckProfileAccess(user, request_state->effective_user(),
           request_state->user_has_profile_access()));
+      if (request_state->GetCoordinator() != nullptr) {
+        UpdateExecSummary(request_state);
+      }
       if (format == TRuntimeProfileFormat::BASE64) {
         RETURN_IF_ERROR(request_state->profile()->SerializeToArchiveString(output));
       } else if (format == TRuntimeProfileFormat::THRIFT) {
@@ -1110,6 +1113,18 @@ Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
   return Status::OK();
 }
 
+void ImpalaServer::UpdateExecSummary(
+    std::shared_ptr<ClientRequestState> request_state) const {
+  DCHECK(request_state->GetCoordinator() != nullptr);
+  TExecSummary t_exec_summary;
+  request_state->GetCoordinator()->GetTExecSummary(&t_exec_summary);
+  request_state->summary_profile()->SetTExecSummary(t_exec_summary);
+  string exec_summary = PrintExecSummary(t_exec_summary);
+  request_state->summary_profile()->AddInfoStringRedacted("ExecSummary", exec_summary);
+  request_state->summary_profile()->AddInfoStringRedacted("Errors",
+      request_state->GetCoordinator()->GetErrorLog());
+}
+
 Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
     const Status* cause) {
   VLOG_QUERY << "UnregisterQuery(): query_id=" << PrintId(query_id);
@@ -1154,13 +1169,7 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
   }
 
   if (request_state->GetCoordinator() != nullptr) {
-    TExecSummary t_exec_summary;
-    request_state->GetCoordinator()->GetTExecSummary(&t_exec_summary);
-    request_state->summary_profile()->SetTExecSummary(t_exec_summary);
-    string exec_summary = PrintExecSummary(t_exec_summary);
-    request_state->summary_profile()->AddInfoStringRedacted("ExecSummary", exec_summary);
-    request_state->summary_profile()->AddInfoStringRedacted("Errors",
-        request_state->GetCoordinator()->GetErrorLog());
+    UpdateExecSummary(request_state);
   }
 
   if (request_state->schedule() != nullptr) {

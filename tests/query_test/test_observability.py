@@ -216,6 +216,29 @@ class TestObservability(ImpalaTestSuite):
     # fetch an exec_summary.
     assert exec_summary is not None and exec_summary.nodes is not None
 
+  def test_exec_summary_in_runtime_profile(self):
+    """Test that the exec summary is populated in runtime profile correctly in every
+    query state"""
+    query = "select count(*) from functional.alltypes"
+    handle = self.execute_query_async(query,
+        {"debug_action": "CRS_BEFORE_ADMISSION:SLEEP@1000"})
+
+    # If ExecuteStatement() has completed and the query is paused in the admission control
+    # phase, then the coordinator has not started yet and exec_summary should be empty.
+    profile = self.client.get_runtime_profile(handle)
+    assert "ExecSummary:" not in profile, profile
+    # After completion of the admission control phase, the coordinator would have started
+    # and we should get a populated exec_summary.
+    self.client.wait_for_admission_control(handle)
+    profile = self.client.get_runtime_profile(handle)
+    assert "ExecSummary:" in profile, profile
+
+    self.client.fetch(query, handle)
+    # After fetching the results and reaching finished state, we should still be able to
+    # fetch an exec_summary in profile.
+    profile = self.client.get_runtime_profile(handle)
+    assert "ExecSummary:" in profile, profile
+
   @SkipIfLocal.multiple_impalad
   def test_profile_fragment_instances(self):
     """IMPALA-6081: Test that the expected number of fragment instances and their exec
