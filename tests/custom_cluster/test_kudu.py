@@ -21,6 +21,7 @@ from kudu.schema import INT32
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
+from tests.common.skip import SkipIfKudu
 from tests.common.test_dimensions import add_exec_option_dimension
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
@@ -42,6 +43,7 @@ class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=\
       "--use_local_tz_for_unix_timestamp_conversions=true")
+  @SkipIfKudu.no_hybrid_clock
   def test_local_tz_conversion_ops(self, vector, unique_database):
     """IMPALA-5539: Test Kudu timestamp reads/writes are correct with the
        use_local_tz_for_unix_timestamp_conversions flag."""

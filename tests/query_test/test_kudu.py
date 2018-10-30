@@ -39,7 +39,7 @@ from pytz import utc
 
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
@@ -59,6 +59,7 @@ class TestKuduOperations(KuduTestSuite):
     # these tests.
     add_exec_option_dimension(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
 
+  @SkipIfKudu.no_hybrid_clock
   def test_out_of_range_timestamps(self, vector, cursor, kudu_client, unique_database):
     """Test timestamp values that are outside of Impala's supported date range."""
     cursor.execute("""CREATE TABLE %s.times (a INT PRIMARY KEY, ts TIMESTAMP)
@@ -86,40 +87,51 @@ class TestKuduOperations(KuduTestSuite):
     self.run_test_case('QueryTest/kudu-overflow-ts-abort-on-error', vector,
         use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_scan_node(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_insert(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_insert', vector, use_db=unique_database)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_insert_mem_limit(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_insert_mem_limit', vector, use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_update(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_update', vector, use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_upsert(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_upsert', vector, use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_delete(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_delete', vector, use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_partition_ddl(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_partition_ddl', vector, use_db=unique_database)
 
   @pytest.mark.skipif(pytest.config.option.testing_remote_cluster,
                       reason="Test references hardcoded hostnames: IMPALA-4873")
   @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_alter_table(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_alter', vector, use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_stats', vector, use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_describe(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_describe', vector, use_db=unique_database)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_limit(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_limit', vector, use_db=unique_database)
 
@@ -305,6 +317,7 @@ class TestKuduOperations(KuduTestSuite):
     cursor.execute("SELECT * FROM %s.foo" % (unique_database))
     assert cursor.fetchall() == [(0, 0)]
 
+  @SkipIfKudu.no_hybrid_clock
   def test_kudu_col_removed(self, cursor, kudu_client, unique_database):
     """Test removing a Kudu column outside of Impala."""
     cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
@@ -365,7 +378,7 @@ class TestKuduOperations(KuduTestSuite):
       if kudu_client.table_exists(name):
         kudu_client.delete_table(name)
 
-
+  @SkipIfKudu.no_hybrid_clock
   def test_column_storage_attributes(self, cursor, unique_database):
     """Tests that for every valid combination of column type, encoding, and compression,
        we can insert a value and scan it back from Kudu."""
@@ -642,6 +655,7 @@ class TestCreateExternalTable(KuduTestSuite):
       except Exception as e:
         assert "Table does not exist in Kudu: '%s'" % table_name in str(e)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_table_without_partitioning(self, cursor, kudu_client, unique_database):
     """Test a Kudu table created without partitioning (i.e. equivalent to a single
        unbounded partition). It is not possible to create such a table in Impala, but
@@ -676,6 +690,7 @@ class TestCreateExternalTable(KuduTestSuite):
       if kudu_client.table_exists(name):
         kudu_client.delete_table(name)
 
+  @SkipIfKudu.no_hybrid_clock
   def test_column_name_case(self, cursor, kudu_client, unique_database):
     """IMPALA-5286: Tests that an external Kudu table that was created with a column name
        containing upper case letters is handled correctly."""

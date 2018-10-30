@@ -25,6 +25,7 @@ import pytest
 from functools import partial
 
 from tests.common.environ import IMPALA_TEST_CLUSTER_PROPERTIES
+from tests.common.kudu_test_suite import get_kudu_master_flag
 from tests.util.filesystem_utils import (
     IS_ABFS,
     IS_ADLS,
@@ -100,6 +101,9 @@ class SkipIfADLS:
 class SkipIfKudu:
   unsupported_env = pytest.mark.skipif(os.environ["KUDU_IS_SUPPORTED"] == "false",
       reason="Kudu is not supported in this environment")
+  no_hybrid_clock = pytest.mark.skipif(
+      get_kudu_master_flag("--use_hybrid_clock") == "false",
+      reason="Test relies on --use_hybrid_clock=true in Kudu.")
 
 class SkipIf:
   skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,

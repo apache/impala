@@ -16,8 +16,9 @@
 # under the License.
 
 import os
-import string
 import pytest
+import requests
+import string
 from contextlib import contextmanager
 from kudu.schema import (
     BOOL,
@@ -36,8 +37,31 @@ from random import choice, sample
 from string import ascii_lowercase, digits
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIf
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+
+DEFAULT_KUDU_MASTER_WEBUI_PORT = os.getenv('KUDU_MASTER_WEBUI_PORT', '8051')
+
+
+def get_kudu_master_webpage(page_name):
+  kudu_master = pytest.config.option.kudu_master_hosts
+
+  if "," in kudu_master:
+    raise NotImplementedError("Multi-master not supported yet")
+  if ":" in kudu_master:
+    kudu_master_host = kudu_master.split(":")[0]
+  else:
+    kudu_master_host = kudu_master
+  url = "http://%s:%s/%s" % (kudu_master_host, DEFAULT_KUDU_MASTER_WEBUI_PORT, page_name)
+  return requests.get(url).text
+
+
+def get_kudu_master_flag(flag):
+  varz = get_kudu_master_webpage("varz")
+  for line in varz.split("\n"):
+    split = line.split("=")
+    if len(split) == 2 and split[0] == flag:
+      return split[1]
+  assert False, "Failed to find Kudu master flag: %s" % flag
 
 class KuduTestSuite(ImpalaTestSuite):
 

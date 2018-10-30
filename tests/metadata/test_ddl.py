@@ -25,7 +25,7 @@ from test_ddl_base import TestDdlBase
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIf, SkipIfABFS, SkipIfADLS, SkipIfLocal
+from tests.common.skip import SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import WAREHOUSE, IS_HDFS, IS_S3, IS_ADLS
 from tests.common.impala_cluster import ImpalaCluster
@@ -282,6 +282,7 @@ class TestDdlStatements(TestDdlBase):
 
   @SkipIf.kudu_not_supported
   @UniqueDatabase.parametrize(sync_ddl=True)
+  @SkipIfKudu.no_hybrid_clock
   def test_create_kudu(self, vector, unique_database):
     vector.get_value('exec_option')['abort_on_error'] = False
     vector.get_value('exec_option')['kudu_read_mode'] = "READ_AT_SNAPSHOT"
