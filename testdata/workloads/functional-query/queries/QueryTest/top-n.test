@@ -1384,3 +1384,11 @@ select cast(string_col as char(20)) from alltypes order by 1 limit 5
 ---- TYPES
 CHAR
 ====
+---- QUERY
+# Test queries with the maximum value for the limit and offset
+select string_col from alltypes order by 1 limit 9223372036854775807
+offset 9223372036854775807
+---- RESULTS
+---- TYPES
+STRING
+====

@@ -221,7 +221,7 @@ Status ExchangeNode::GetNextMerging(RuntimeState* state, RowBatch* output_batch,
   while (num_rows_skipped_ < offset_) {
     num_rows_skipped_ += output_batch->num_rows();
     // Throw away rows in the output batch until the offset is skipped.
-    int rows_to_keep = num_rows_skipped_ - offset_;
+    int64_t rows_to_keep = num_rows_skipped_ - offset_;
     if (rows_to_keep > 0) {
       output_batch->CopyRows(0, output_batch->num_rows() - rows_to_keep, rows_to_keep);
       output_batch->set_num_rows(rows_to_keep);
