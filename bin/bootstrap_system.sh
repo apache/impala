@@ -124,6 +124,29 @@ ubuntu apt-get --yes install ccache g++ gcc libffi-dev liblzo2-dev libkrb5-dev \
         ntpdate python-dev python-setuptools postgresql ssh wget vim-common psmisc \
         lsof openjdk-8-jdk openjdk-8-source openjdk-8-dbg apt-utils git
 
+if [[ "$UBUNTU" == true ]]; then
+  # Don't use openjdk-8-jdk 8u181-b13-1ubuntu0.16.04.1 which is known to break the
+  # surefire tests. If we detect that version, we downgrade to the last known good one.
+  # See https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=911925 for details.
+  JDK_BAD_VERSION="8u181-b13-1ubuntu0.16.04.1"
+  if dpkg -l openjdk-8-jdk | grep -q $JDK_BAD_VERSION; then
+    JDK_TARGET_VERSION="8u181-b13-0ubuntu0.16.04.1"
+    DEB_DIR=$(mktemp -d)
+    pushd $DEB_DIR
+    wget --no-verbose \
+        "https://launchpadlibrarian.net/380913637/openjdk-8-jdk_8u181-b13-0ubuntu0.16.04.1_amd64.deb" \
+        "https://launchpadlibrarian.net/380913636/openjdk-8-jdk-headless_8u181-b13-0ubuntu0.16.04.1_amd64.deb" \
+        "https://launchpadlibrarian.net/380913641/openjdk-8-jre_8u181-b13-0ubuntu0.16.04.1_amd64.deb" \
+        "https://launchpadlibrarian.net/380913638/openjdk-8-jre-headless_8u181-b13-0ubuntu0.16.04.1_amd64.deb" \
+        "https://launchpadlibrarian.net/380913642/openjdk-8-source_8u181-b13-0ubuntu0.16.04.1_all.deb" \
+        "https://launchpadlibrarian.net/380913633/openjdk-8-dbg_8u181-b13-0ubuntu0.16.04.1_amd64.deb"
+    sudo dpkg -i *.deb
+    popd
+    rm -rf $DEB_DIR
+  fi
+fi
+
+
 redhat sudo yum install -y curl gcc gcc-c++ git krb5-devel krb5-server krb5-workstation \
         libevent-devel libffi-devel make ntp ntpdate openssl-devel cyrus-sasl \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
