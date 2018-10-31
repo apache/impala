@@ -330,7 +330,7 @@ class RowBatch {
 
   /// Copy 'num_rows' rows from 'src' to 'dest' within the batch. Useful for exec
   /// nodes that skip an offset and copied more than necessary.
-  void CopyRows(int dest, int src, int num_rows) {
+  void CopyRows(int64_t dest, int64_t src, int64_t num_rows) {
     DCHECK_LE(dest, src);
     DCHECK_LE(src + num_rows, capacity_);
     memmove(tuple_ptrs_ + num_tuples_per_row_ * dest,
