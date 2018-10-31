@@ -17,20 +17,7 @@
 #
 # Base class for test that need to run with both just privilege
 # cache as well as Sentry privilege refresh.
-# There are two variables (delay_s timeout) used in these methods.
-# The first is the timeout when validating privileges. This is
-# needed to ensure that the privileges returned have been updated
-# from Sentry. The second is the delay_s before executing a query.
-# This is needed to ensure Sentry has been updated before running
-# the query. The reason for both is because the timeout can
-# be short circuited upon successful results. Using the delay_s
-# for every query and test would add significant time. As an
-# example, if a revoke is called, the expectation is the privilege
-# would not be in the result. If the cache is updated correctly,
-# but Sentry was not, using the timeout check, we would miss that
-# Sentry was not updated correctly.
 
-from time import sleep, time
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 
@@ -40,12 +27,10 @@ class SentryCacheTestSuite(CustomClusterTestSuite):
     return val.lower() == 'true'
 
   @staticmethod
-  def __check_privileges(result, test_obj, null_create_date=True, show_user=False):
+  def check_privileges(result, test_obj, null_create_date, show_user):
     """
-    This method validates privileges. Most validations are assertions, but for
-    null_create_date, we just return False to indicate the privilege cannot
-    be validated because it has not been refreshed from Sentry yet. If the query is
-    for "show grant user" then we need to account for the two extra columns.
+    This method validates privileges. If the query is for "show grant user" then we need
+    to account for the two extra columns.
     """
     # results should have the following columns for offset 0
     # scope, database, table, column, uri, privilege, grant_option, create_time
@@ -69,41 +54,30 @@ class SentryCacheTestSuite(CustomClusterTestSuite):
         return False
     return True
 
-  def validate_privileges(self, client, query, test_obj, timeout_sec=None, user=None,
-      delay_s=0):
-    """Validate privileges. If timeout_sec is > 0 then retry until create_date is not null
-    or the timeout_sec is reached. If delay_s is > 0 then wait that long before running.
+  def validate_privileges(self, client, query, test_obj, user=None,
+                          invalidate_metadata=False):
+    """Validate privileges. When invalidate_metadata is set to True, this function
+    will call "invalidate metadata" to ensure the privileges get refreshed from Sentry.
     """
     show_user = True if 'show grant user' in query else False
-    if delay_s > 0:
-      sleep(delay_s)
-    if timeout_sec is None or timeout_sec <= 0:
-      self.__check_privileges(self.execute_query_expect_success(client, query,
-          user=user), test_obj, show_user=show_user)
-    else:
-      start_time = time()
-      while time() - start_time < timeout_sec:
-        result = self.execute_query_expect_success(client, query, user=user)
-        success = self.__check_privileges(result, test_obj, null_create_date=False,
-            show_user=show_user)
-        if success:
-          return True
-        sleep(1)
-      return False
+    if invalidate_metadata: self.execute_query('invalidate metadata')
+    result = self.execute_query_expect_success(client, query, user=user)
+    return SentryCacheTestSuite.check_privileges(result, test_obj,
+                                                 null_create_date=not invalidate_metadata,
+                                                 show_user=show_user)
 
-  def user_query(self, client, query, user=None, delay_s=0, error_msg=None):
+  def user_query(self, client, query, user=None, error_msg=None):
     """
-    Executes a query with the root user client. If delay_s is > 0 then wait before
-    running the query. This is used to wait for Sentry refresh. If error_msg is
-    set, then expect a failure. Returns None when there is no error_msg.
+    Executes a query with the specified user client. If error_msg is set, then expect a
+    failure. Returns None when there is no error_msg.
     """
-    if delay_s > 0:
-      sleep(delay_s)
     if error_msg is not None:
-      e = self.execute_query_expect_failure(client, query, user=user)
-      self.verify_exceptions(error_msg, str(e))
+      e = self.execute_query_expect_failure(client, query, query_options={"sync_ddl": 1},
+                                            user=user)
+      SentryCacheTestSuite.verify_exceptions(error_msg, str(e))
       return None
-    return self.execute_query_expect_success(client, query, user=user)
+    return self.execute_query_expect_success(client, query, query_options={"sync_ddl": 1},
+                                             user=user)
 
   @staticmethod
   def verify_exceptions(expected_str, actual_str):
