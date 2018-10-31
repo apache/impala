@@ -548,8 +548,17 @@ class TestTpcdsUnmodified(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('exec_option')['batch_size'] == 0)
 
+  def test_tpcds_q31(self, vector):
+    self.run_test_case('tpcds-q31', vector)
+
   def test_tpcds_q35a(self, vector):
     self.run_test_case('tpcds-q35a', vector)
 
   def test_tpcds_q48(self, vector):
     self.run_test_case('tpcds-q48', vector)
+
+  def test_tpcds_q59(self, vector):
+    self.run_test_case('tpcds-q59', vector)
+
+  def test_tpcds_q89(self, vector):
+    self.run_test_case('tpcds-q89', vector)
