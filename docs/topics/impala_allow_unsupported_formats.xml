@@ -31,11 +31,8 @@ under the License.
   </prolog>
 
   <conbody>
-
-    <p>
-      An obsolete query option from early work on support for file formats. Do not use. Might be removed in the
-      future.
-    </p>
+    <note>This query option was removed in <keyword keyref="impala31"/> and no
+      longer has any effect. Do not use.</note>
 
     <p conref="../shared/impala_common.xml#common/type_boolean"/>
     <p conref="../shared/impala_common.xml#common/default_false_0"/>

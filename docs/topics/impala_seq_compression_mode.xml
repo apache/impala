@@ -33,15 +33,8 @@ under the License.
   <conbody>
 
     <p rev="2.5.0">
-      <indexterm audience="hidden">RM_INITIAL_MEM query option</indexterm>
-    </p>
-
-    <p>
-      <b>Type:</b>
-    </p>
-
-    <p>
-      <b>Default:</b>
+      <note>This query option was removed in <keyword keyref="impala31"/> and no
+        longer has any effect. Do not use.</note>
     </p>
   </conbody>
 </concept>
