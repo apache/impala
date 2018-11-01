@@ -36,6 +36,7 @@
 #include "util/debug-util.h"
 #include "util/logging-support.h"
 #include "util/openssl-util.h"
+#include "util/test-info.h"
 #include "util/time.h"
 #include "util/uid-util.h"
 #include "util/webserver.h"
@@ -1046,6 +1047,16 @@ void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
 }
 
 void Statestore::MainLoop() {
+  subscriber_topic_update_threadpool_.Join();
+  subscriber_priority_topic_update_threadpool_.Join();
+  subscriber_heartbeat_threadpool_.Join();
+}
+
+void Statestore::ShutdownForTesting() {
+  CHECK(TestInfo::is_be_test()) << "Only valid to call in backend tests.";
+  subscriber_topic_update_threadpool_.Shutdown();
+  subscriber_priority_topic_update_threadpool_.Shutdown();
+  subscriber_heartbeat_threadpool_.Shutdown();
   subscriber_topic_update_threadpool_.Join();
   subscriber_priority_topic_update_threadpool_.Join();
   subscriber_heartbeat_threadpool_.Join();

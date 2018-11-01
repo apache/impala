@@ -34,77 +34,94 @@ DECLARE_int32(state_store_port);
 
 namespace impala {
 
+// Object pool containing all objects that must live for the duration of the process.
+// E.g. objects that are singletons and never destroyed in a real daemon (so don't support
+// tear-down logic), but which we create multiple times in unit tests. We leak this pool
+// instead of destroying it to avoid destroying the contained objects.
+static ObjectPool* perm_objects;
+
 TEST(StatestoreTest, SmokeTest) {
   // All allocations done by 'new' to avoid problems shutting down Thrift servers
   // gracefully.
-  scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
-  Statestore* statestore = new Statestore(metrics.get());
+  MetricGroup* metrics = perm_objects->Add(new MetricGroup("statestore"));
+  Statestore* statestore = perm_objects->Add(new Statestore(metrics));
   // Thrift will internally pick an ephemeral port if we pass in 0 as the port.
   int statestore_port = 0;
-  IGNORE_LEAKING_OBJECT(statestore);
   ASSERT_OK(statestore->Init(statestore_port));
 
-  scoped_ptr<MetricGroup> metrics_2(new MetricGroup("statestore_2"));
+  MetricGroup* metrics_2 = perm_objects->Add(new MetricGroup("statestore_2"));
   // Port already in use
-  Statestore* statestore_wont_start = new Statestore(metrics_2.get());
+  Statestore* statestore_wont_start = perm_objects->Add(new Statestore(metrics_2));
   ASSERT_FALSE(statestore_wont_start->Init(statestore->port()).ok());
 
-  StatestoreSubscriber* sub_will_start =
+  StatestoreSubscriber* sub_will_start = perm_objects->Add(
       new StatestoreSubscriber("sub1", MakeNetworkAddress("localhost", 0),
-          MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
-  IGNORE_LEAKING_OBJECT(sub_will_start);
+          MakeNetworkAddress("localhost", statestore->port()), new MetricGroup("")));
   ASSERT_OK(sub_will_start->Start());
 
   // Confirm that a subscriber trying to use an in-use port will fail to start.
-  StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("sub3",
-      MakeNetworkAddress("localhost", sub_will_start->heartbeat_port()),
-      MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
-  IGNORE_LEAKING_OBJECT(sub_will_not_start);
+  StatestoreSubscriber* sub_will_not_start = perm_objects->Add(new StatestoreSubscriber(
+      "sub3", MakeNetworkAddress("localhost", sub_will_start->heartbeat_port()),
+      MakeNetworkAddress("localhost", statestore->port()), new MetricGroup("")));
   ASSERT_FALSE(sub_will_not_start->Start().ok());
+
+  statestore->ShutdownForTesting();
 }
 
-TEST(StatestoreSslTest, SmokeTest) {
+// Runs an SSL smoke test with provided parameters.
+void SslSmokeTestHelper(const string& server_ca_certificate,
+    const string& client_ca_certificate, bool sub_should_start) {
   string impala_home(getenv("IMPALA_HOME"));
   stringstream server_cert;
   server_cert << impala_home << "/be/src/testutil/server-cert.pem";
-  FLAGS_ssl_server_certificate = server_cert.str();
-  FLAGS_ssl_client_ca_certificate = server_cert.str();
+  // Override flags for the duration of this test. Modifying them while the statestore
+  // is running is unsafe.
+  FLAGS_ssl_server_certificate = server_ca_certificate;
+  FLAGS_ssl_client_ca_certificate = client_ca_certificate;
   stringstream server_key;
   server_key << impala_home << "/be/src/testutil/server-key.pem";
   FLAGS_ssl_private_key = server_key.str();
 
   // Thrift will internally pick an ephemeral port if we pass in 0 as the port.
   int statestore_port = 0;
-  scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
-  Statestore* statestore = new Statestore(metrics.get());
-  IGNORE_LEAKING_OBJECT(statestore);
+  MetricGroup* metrics = perm_objects->Add(new MetricGroup("statestore"));
+  Statestore* statestore = perm_objects->Add(new Statestore(metrics));
   ASSERT_OK(statestore->Init(statestore_port));
 
-  StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("smoke_sub1",
-      MakeNetworkAddress("localhost", 0),
-      MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
-  IGNORE_LEAKING_OBJECT(sub_will_start);
-  ASSERT_OK(sub_will_start->Start());
+  StatestoreSubscriber* sub = perm_objects->Add(
+      new StatestoreSubscriber("smoke_sub", MakeNetworkAddress("localhost", 0),
+          MakeNetworkAddress("localhost", statestore->port()), new MetricGroup("")));
+  Status sub_status = sub->Start();
+  ASSERT_EQ(sub_should_start, sub_status.ok());
 
+  statestore->ShutdownForTesting();
+}
+
+string GetValidServerCert() {
+  string impala_home(getenv("IMPALA_HOME"));
+  stringstream server_cert;
+  server_cert << impala_home << "/be/src/testutil/server-cert.pem";
+  return server_cert.str();
+}
+
+TEST(StatestoreSslTest, ValidCertSmokeTest) {
+  string valid_cert = GetValidServerCert();
+  SslSmokeTestHelper(valid_cert, valid_cert, true);
+}
+
+TEST(StatestoreSslTest, InvalidCertSmokeTest) {
+  string impala_home(getenv("IMPALA_HOME"));
   stringstream invalid_server_cert;
   invalid_server_cert << impala_home << "/be/src/testutil/invalid-server-cert.pem";
-  FLAGS_ssl_client_ca_certificate = invalid_server_cert.str();
-
-  StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("smoke_sub2",
-      MakeNetworkAddress("localhost", 0),
-      MakeNetworkAddress("localhost", statestore->port()), new MetricGroup(""));
-  IGNORE_LEAKING_OBJECT(sub_will_not_start);
-  ASSERT_FALSE(sub_will_not_start->Start().ok());
+  SslSmokeTestHelper(GetValidServerCert(), invalid_server_cert.str(), false);
 }
 
-}
+} // namespace impala
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
-  int rc = RUN_ALL_TESTS();
-  // IMPALA-5291: statestore services and subscribers may still be running at this point
-  // and accessing global state. Exit without running global destructors to avoid
-  // races with other threads when tearing down the proces.
-  _exit(rc);
+  perm_objects = new ObjectPool;
+  IGNORE_LEAKING_OBJECT(perm_objects);
+  return RUN_ALL_TESTS();
 }
