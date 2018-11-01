@@ -38,14 +38,12 @@ under the License.
 
   <conbody>
 
-    <p>
-      <indexterm audience="hidden">file formats</indexterm>
-      <indexterm audience="hidden">compression</indexterm>
-      Impala supports several familiar file formats used in Apache Hadoop. Impala can load and query data files
-      produced by other Hadoop components such as Pig or MapReduce, and data files produced by Impala can be used
-      by other components also. The following sections discuss the procedures, limitations, and performance
-      considerations for using each file format with Impala.
-    </p>
+    <p>Impala supports several familiar file formats used in Apache Hadoop.
+      Impala can load and query data files produced by other Hadoop components
+      such as Pig or MapReduce, and data files produced by Impala can be used by
+      other components also. The following sections discuss the procedures,
+      limitations, and performance considerations for using each file format
+      with Impala. </p>
 
     <p>
       The file format used for an Impala table has significant performance consequences. Some file formats include
@@ -143,14 +141,11 @@ under the License.
               format is uncompressed text, with values separated by ASCII <codeph>0x01</codeph> characters
               (typically represented as Ctrl-A).
             </entry>
-            <entry>
-              Yes: <codeph>CREATE TABLE</codeph>, <codeph>INSERT</codeph>, <codeph>LOAD DATA</codeph>, and query.
-              If LZO compression is used, you must create the table and load data in Hive. If other kinds of
-              compression are used, you must load data through <codeph>LOAD DATA</codeph>, Hive, or manually in
-              HDFS.
-
-<!--            <ph rev="2.0.0">Impala 2.0 and higher can write LZO-compressed text data; for earlier Impala releases,  you must create the table and load data in Hive.</ph> -->
-            </entry>
+            <entry> Yes: <codeph>CREATE TABLE</codeph>, <codeph>INSERT</codeph>,
+                <codeph>LOAD DATA</codeph>, and query. If LZO compression is
+              used, you must create the table and load data in Hive. If other
+              kinds of compression are used, you must load data through
+                <codeph>LOAD DATA</codeph>, Hive, or manually in HDFS.</entry>
           </row>
           <row id="avro_support">
             <entry>
@@ -162,9 +157,8 @@ under the License.
             <entry>
               Snappy, gzip, deflate, bzip2
             </entry>
-            <entry rev="1.4.0">
-              Yes, in Impala 1.4.0 and higher. Before that, create the table using Hive.
-            </entry>
+            <entry rev="1.4.0"> Yes, in Impala 1.4.0 and higher. In lower
+              versions, create the table using Hive. </entry>
             <entry>
               No. Import data by using <codeph>LOAD DATA</codeph> on data files already in the right format, or use
               <codeph>INSERT</codeph> in Hive followed by <codeph>REFRESH <varname>table_name</varname></codeph> in Impala.

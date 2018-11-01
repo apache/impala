@@ -34,12 +34,10 @@ under the License.
 
   <conbody>
 
-    <p rev="1.4.0">
-      <indexterm audience="hidden">Avro support in Impala</indexterm>
-      Impala supports using tables whose data files use the Avro file format. Impala can query Avro
-      tables, and in Impala 1.4.0 and higher can create them, but currently cannot insert data into them. For
-      insert operations, use Hive, then switch back to Impala to run queries.
-    </p>
+    <p rev="1.4.0"> Impala supports using tables whose data files use the Avro
+      file format. Impala can query Avro tables. In Impala 1.4.0 and higher,
+      Impala can create Avro tables, but cannot insert data into them. For
+      insert operations, use Hive, then switch back to Impala to run queries. </p>
 
     <table>
       <title>Avro Format Support in Impala</title>
@@ -191,15 +189,6 @@ hive> CREATE TABLE hive_avro_table
         Each field of the record becomes a column of the table. Note that any other information, such as the record
         name, is ignored.
       </p>
-
-<!-- Have not got a working example of this syntax yet from Lenni.
-<p>
-The schema can be specified either through the <codeph>TBLPROPERTIES</codeph> clause or the
-<codeph>WITH SERDEPROPERTIES</codeph> clause.
-For best compatibility with future versions of Hive, use the <codeph>WITH SERDEPROPERTIES</codeph> clause
-for this information.
-</p>
--->
 
       <note>
         For nullable Avro columns, make sure to put the <codeph>"null"</codeph> entry before the actual type name.

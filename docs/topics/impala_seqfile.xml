@@ -34,10 +34,7 @@ under the License.
 
   <conbody>
 
-    <p>
-      <indexterm audience="hidden">SequenceFile support in Impala</indexterm>
-      Impala supports using SequenceFile data files.
-    </p>
+    <p> Impala supports using SequenceFile data files. </p>
 
     <table>
       <title>SequenceFile Format Support in Impala</title>
@@ -160,12 +157,11 @@ Returned 3 row(s) in 0.23s</codeblock>
 
     <conbody>
 
-      <p>
-        <indexterm audience="hidden">compression</indexterm>
-        You may want to enable compression on existing tables. Enabling compression provides performance gains in
-        most cases and is supported for SequenceFile tables. For example, to enable Snappy compression, you would
-        specify the following additional settings when loading data through the Hive shell:
-      </p>
+      <p> You may want to enable compression on existing tables. Enabling
+        compression provides performance gains in most cases and is supported
+        for SequenceFile tables. For example, to enable Snappy compression, you
+        would specify the following additional settings when loading data
+        through the Hive shell: </p>
 
 <codeblock>hive&gt; SET hive.exec.compress.output=true;
 hive&gt; SET mapred.max.split.size=256000000;
@@ -222,16 +218,6 @@ hive&gt; INSERT OVERWRITE TABLE tbl_seq PARTITION(year) SELECT * FROM tbl;</code
           You could elect to specify alternative codecs such as <codeph>GzipCodec</codeph> here.
         </p>
       </note>
-    </conbody>
-  </concept>
-
-  <concept audience="hidden" id="seqfile_data_types">
-
-    <title>Data Type Considerations for SequenceFile Tables</title>
-
-    <conbody>
-
-      <p></p>
     </conbody>
   </concept>
 
