@@ -1837,8 +1837,8 @@ PLAN-ROOT SINK
    partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=130.70MB Threads=17
-Per-Host Resource Estimates: Memory=462MB
+Max Per-Host Resource Reservation: Memory=96.70MB Threads=17
+Per-Host Resource Estimates: Memory=428MB
 PLAN-ROOT SINK
 |
 24:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1923,8 +1923,8 @@ PLAN-ROOT SINK
    partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=259.52MB Threads=19
-Per-Host Resource Estimates: Memory=458MB
+Max Per-Host Resource Reservation: Memory=158.52MB Threads=19
+Per-Host Resource Estimates: Memory=362MB
 PLAN-ROOT SINK
 |
 24:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3601,7 +3601,7 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=136.32MB Threads=16
-Per-Host Resource Estimates: Memory=530MB
+Per-Host Resource Estimates: Memory=467MB
 PLAN-ROOT SINK
 |
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3684,8 +3684,8 @@ PLAN-ROOT SINK
    partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=272.64MB Threads=17
-Per-Host Resource Estimates: Memory=596MB
+Max Per-Host Resource Reservation: Memory=204.64MB Threads=17
+Per-Host Resource Estimates: Memory=401MB
 PLAN-ROOT SINK
 |
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3878,7 +3878,7 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=12.60MB
    runtime filters: RF000 -> c_customer_sk
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=61.82MB Threads=13
+Max Per-Host Resource Reservation: Memory=57.95MB Threads=13
 Per-Host Resource Estimates: Memory=347MB
 PLAN-ROOT SINK
 |
@@ -3944,7 +3944,7 @@ PLAN-ROOT SINK
    partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=106.64MB Threads=15
+Max Per-Host Resource Reservation: Memory=95.02MB Threads=15
 Per-Host Resource Estimates: Memory=290MB
 PLAN-ROOT SINK
 |
@@ -4117,7 +4117,7 @@ PLAN-ROOT SINK
    partitions=1/1 files=1 size=12.60MB
    runtime filters: RF000 -> c_customer_sk
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=53.32MB Threads=13
+Max Per-Host Resource Reservation: Memory=49.45MB Threads=13
 Per-Host Resource Estimates: Memory=335MB
 PLAN-ROOT SINK
 |
@@ -4183,7 +4183,7 @@ PLAN-ROOT SINK
    partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_sold_date_sk, RF004 -> store_sales.ss_store_sk, RF006 -> store_sales.ss_hdemo_sk
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=99.14MB Threads=15
+Max Per-Host Resource Reservation: Memory=87.52MB Threads=15
 Per-Host Resource Estimates: Memory=275MB
 PLAN-ROOT SINK
 |
@@ -4340,7 +4340,7 @@ PLAN-ROOT SINK
    partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=54.70MB Threads=10
+Max Per-Host Resource Reservation: Memory=52.76MB Threads=10
 Per-Host Resource Estimates: Memory=285MB
 PLAN-ROOT SINK
 |
@@ -4404,7 +4404,7 @@ PLAN-ROOT SINK
    partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=109.39MB Threads=11
+Max Per-Host Resource Reservation: Memory=105.52MB Threads=11
 Per-Host Resource Estimates: Memory=234MB
 PLAN-ROOT SINK
 |
@@ -5350,7 +5350,7 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=393.21MB Threads=29
-Per-Host Resource Estimates: Memory=1.35GB
+Per-Host Resource Estimates: Memory=1.10GB
 PLAN-ROOT SINK
 |
 54:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5536,7 +5536,7 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=752.42MB Threads=33
-Per-Host Resource Estimates: Memory=1.35GB
+Per-Host Resource Estimates: Memory=1.04GB
 PLAN-ROOT SINK
 |
 54:MERGING-EXCHANGE [UNPARTITIONED]

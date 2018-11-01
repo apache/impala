@@ -1620,7 +1620,7 @@ PLAN-ROOT SINK
    partitions=1/1 files=4 size=288.99MB
    predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=96.94MB Threads=5
+Max Per-Host Resource Reservation: Memory=94.94MB Threads=5
 Per-Host Resource Estimates: Memory=548MB
 PLAN-ROOT SINK
 |
