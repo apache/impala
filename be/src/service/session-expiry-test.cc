@@ -44,14 +44,20 @@ DECLARE_int32(beeswax_port);
 // TODO: Come up with a short-running test that confirms a session will keep itself alive
 // that doesn't depend upon being rescheduled in a timely fashion.
 
+// Object pool containing all objects that must live for the duration of the process.
+// E.g. objects that are singletons and never destroyed in a real daemon (so don't support
+// tear-down logic), but which we create multiple times in unit tests. We leak this pool
+// instead of destroying it to avoid destroying the contained objects.
+static ObjectPool* perm_objects;
+
 TEST(SessionTest, TestExpiry) {
   const int NUM_SESSIONS = 5;
   const int MAX_IDLE_TIMEOUT_MS = 4000;
   FLAGS_idle_session_timeout = 1;
   // Skip validation checks for in-process backend.
   FLAGS_abort_on_config_error = false;
-  scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
-  Statestore* statestore = new Statestore(metrics.get());
+  MetricGroup* metrics = perm_objects->Add(new MetricGroup("statestore"));
+  Statestore* statestore = perm_objects->Add(new Statestore(metrics));
   IGNORE_LEAKING_OBJECT(statestore);
   // Pass in 0 to have the statestore use an ephemeral port for the service.
   ABORT_IF_ERROR(statestore->Init(0));
@@ -111,11 +117,14 @@ TEST(SessionTest, TestExpiry) {
   // work). Sleep to allow the threads closing the session to complete before tearing down
   // the server.
   SleepForMs(1000);
+  statestore->ShutdownForTesting();
 }
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   InitFeSupport();
+  perm_objects = new ObjectPool;
+  IGNORE_LEAKING_OBJECT(perm_objects);
   return RUN_ALL_TESTS();
 }
