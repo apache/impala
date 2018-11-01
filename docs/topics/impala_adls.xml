@@ -35,14 +35,12 @@ under the License.
 
   <conbody>
 
-    <p>
-      <indexterm audience="hidden">ADLS with Impala</indexterm>
-      You can use Impala to query data residing on the Azure Data Lake Store (ADLS) filesystem.
-      This capability allows convenient access to a storage system that is remotely managed,
-      accessible from anywhere, and integrated with various cloud-based services. Impala can
-      query files in any supported file format from ADLS. The ADLS storage location
-      can be for an entire table, or individual partitions in a partitioned table.
-    </p>
+    <p> You can use Impala to query data residing on the Azure Data Lake Store
+      (ADLS) filesystem. This capability allows convenient access to a storage
+      system that is remotely managed, accessible from anywhere, and integrated
+      with various cloud-based services. Impala can query files in any supported
+      file format from ADLS. The ADLS storage location can be for an entire
+      table, or individual partitions in a partitioned table. </p>
 
     <p>
       The default Impala tables use data files stored on HDFS, which are ideal for bulk loads and queries using
@@ -51,6 +49,8 @@ under the License.
       HDFS. In a partitioned table, you can set the <codeph>LOCATION</codeph> attribute for individual partitions
       to put some partitions on HDFS and others on ADLS, typically depending on the age of the data.
     </p>
+    <p>Starting in <keyword keyref="impala31"/>, Impala supports ADLS Gen2
+      filesystem, Azure Blob File System (ABFS).</p>
 
     <p outputclass="toc inpage"/>
 
@@ -70,6 +70,9 @@ under the License.
             <xref href="https://docs.microsoft.com/en-us/azure/data-lake-store/data-lake-store-get-started-portal" scope="external" format="html">Get started with Azure Data Lake Store using the Azure Portal</xref>
           </p>
         </li>
+        <li><xref
+            href="https://docs.microsoft.com/en-us/azure/storage/data-lake-storage/quickstart-create-account"
+            format="html" scope="external">Azure Data Lake Storage Gen2</xref></li>
         <li>
           <p>
             <xref href="https://hadoop.apache.org/docs/current/hadoop-azure-datalake/index.html" scope="external" format="html">Hadoop Azure Data Lake Support</xref>
@@ -82,27 +85,22 @@ under the License.
   <concept id="sql">
     <title>How Impala SQL Statements Work with ADLS</title>
     <conbody>
-      <p>
-        Impala SQL statements work with data on ADLS as follows:
-      </p>
+      <p> Impala SQL statements work with data on ADLS as follows. </p>
       <ul>
-        <li>
-          <p>
-            The <xref href="impala_create_table.xml#create_table"/>
-            or <xref href="impala_alter_table.xml#alter_table"/> statements
-            can specify that a table resides on the ADLS filesystem by
-            encoding an <codeph>adl://</codeph> prefix for the <codeph>LOCATION</codeph>
-            property. <codeph>ALTER TABLE</codeph> can also set the <codeph>LOCATION</codeph>
-            property for an individual partition, so that some data in a table resides on
-            ADLS and other data in the same table resides on HDFS.
-          </p>
-          <p>
-            The full format of the location URI is typically:
-<codeblock>
-adl://<varname>your_account</varname>.azuredatalakestore.net/<varname>rest_of_directory_path</varname>
-</codeblock>
-          </p>
-        </li>
+        <li><p> The <xref href="impala_create_table.xml#create_table"/> or <xref
+              href="impala_alter_table.xml#alter_table"/> statements can specify
+            that a table resides on the ADLS filesystem by specifying an ADLS
+            prefix for the <codeph>LOCATION</codeph> property.<ul>
+              <li><codeph>adl://</codeph> for ADLS Gen1</li>
+              <li><codeph>abfs://</codeph> for ADLS Gen2</li>
+              <li><codeph>abfss://</codeph> for ADLS Gen2 with a secure socket
+                layer connection</li>
+            </ul>
+            <codeph>ALTER TABLE</codeph> can also set the
+              <codeph>LOCATION</codeph> property for an individual partition, so
+            that some data in a table resides on ADLS and other data in the same
+            table resides on HDFS. </p> See <xref href="impala_adls.xml#ddl"/>
+          for usage information.</li>
         <li>
           <p>
             Once a table or partition is designated as residing on ADLS, the <xref href="impala_select.xml#select"/>
@@ -135,10 +133,8 @@ adl://<varname>your_account</varname>.azuredatalakestore.net/<varname>rest_of_di
           </p>
         </li>
       </ul>
-      <p>
-        For usage information about Impala SQL statements with ADLS tables, see <xref href="impala_adls.xml#ddl"/>
-        and <xref href="impala_adls.xml#dml"/>.
-      </p>
+      <p> For usage information about Impala SQL statements with ADLS tables,
+        see <xref href="impala_adls.xml#dml"/>. </p>
     </conbody>
   </concept>
 
@@ -148,30 +144,54 @@ adl://<varname>your_account</varname>.azuredatalakestore.net/<varname>rest_of_di
 
     <conbody>
 
-      <p>
-        To allow Impala to access data in ADLS, specify values for the following configuration settings in your
-        <filepath>core-site.xml</filepath> file:
-      </p>
+      <p> To allow Impala to access data in ADLS, specify values for the
+        following configuration settings in your
+          <filepath>core-site.xml</filepath> file.</p>
+      <p>For ADLS Gen1:</p>
 
-<codeblock><![CDATA[
-<property>
-   <name>dfs.adls.oauth2.access.token.provider.type</name>
-   <value>ClientCredential</value>
-</property>
-<property>
-   <name>dfs.adls.oauth2.client.id</name>
-   <value><varname>your_client_id</varname></value>
-</property>
-<property>
-   <name>dfs.adls.oauth2.credential</name>
-   <value><varname>your_client_secret</varname></value>
-</property>
-<property>
-   <name>dfs.adls.oauth2.refresh.url</name>
-   <value><varname>refresh_URL</varname></value>
-</property>
-]]>
+<codeblock>&lt;property>
+   &lt;name>dfs.adls.oauth2.access.token.provider.type&lt;/name>
+   &lt;value>ClientCredential&lt;/value>
+&lt;/property>
+&lt;property>
+   &lt;name>dfs.adls.oauth2.client.id&lt;/name>
+   &lt;value><varname>your_client_id</varname>&lt;/value>
+&lt;/property>
+&lt;property>
+   &lt;name>dfs.adls.oauth2.credential&lt;/name>
+   &lt;value><varname>your_client_secret</varname>&lt;/value>
+&lt;/property>
+&lt;property>
+   &lt;name>dfs.adls.oauth2.refresh.url&lt;/name>
+   &lt;value>https://login.windows.net/<varname>your_azure_tenant_id</varname>/oauth2/token&lt;/value>
+&lt;/property>
+
 </codeblock>
+      <p>For ADLS Gen2:</p>
+      <codeblock> &lt;property>
+    &lt;name>fs.azure.account.auth.type&lt;/name>
+    &lt;value>OAuth&lt;/value>
+  &lt;/property>
+
+  &lt;property>
+    &lt;name>fs.azure.account.oauth.provider.type&lt;/name>
+    &lt;value>org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider&lt;/value>
+  &lt;/property>
+
+  &lt;property>
+    &lt;name>fs.azure.account.oauth2.client.id&lt;/name>
+    &lt;value><varname>your_client_id</varname>&lt;/value>
+  &lt;/property>
+
+  &lt;property>
+    &lt;name>fs.azure.account.oauth2.client.secret&lt;/name>
+    &lt;value><varname>your_client_secret</varname>&lt;/value>
+  &lt;/property>
+
+  &lt;property>
+    &lt;name>fs.azure.account.oauth2.client.endpoint&lt;/name>
+    &lt;value>https://login.microsoftonline.com/<varname>your_azure_tenant_id</varname>/oauth2/token&lt;/value>
+  &lt;/property></codeblock>
 
       <note>
         <p>
@@ -180,11 +200,10 @@ adl://<varname>your_account</varname>.azuredatalakestore.net/<varname>rest_of_di
         </p>
       </note>
 
-      <p>
-        After specifying the credentials, restart both the Impala and
-        Hive services. (Restarting Hive is required because Impala queries, CREATE TABLE statements, and so on go
-        through the Hive metastore.)
-      </p>
+      <p> After specifying the credentials, restart both the Impala and Hive
+        services. Restarting Hive is required because certain Impala queries,
+        such as <codeph>CREATE TABLE</codeph> statements, go through the Hive
+        metastore.</p>
 
     </conbody>
 
@@ -213,7 +232,8 @@ adl://<varname>your_account</varname>.azuredatalakestore.net/<varname>rest_of_di
     <concept id="dml">
       <title>Using Impala DML Statements for ADLS Data</title>
       <conbody>
-        <p conref="../shared/impala_common.xml#common/adls_dml"/>
+        <p conref="../shared/impala_common.xml#common/adls_dml"
+          conrefend="../shared/impala_common.xml#common/adls_dml_end"/>
       </conbody>
     </concept>
 
@@ -249,12 +269,24 @@ adl://<varname>your_account</varname>.azuredatalakestore.net/<varname>rest_of_di
 
     <conbody>
 
-      <p>
-        Impala reads data for a table or partition from ADLS based on the <codeph>LOCATION</codeph> attribute for the
-        table or partition. Specify the ADLS details in the <codeph>LOCATION</codeph> clause of a <codeph>CREATE
-        TABLE</codeph> or <codeph>ALTER TABLE</codeph> statement. The notation for the <codeph>LOCATION</codeph>
-        clause is <codeph>adl://<varname>store</varname>/<varname>path/to/file</varname></codeph>.
-      </p>
+      <p> Impala reads data for a table or partition from ADLS based on the
+          <codeph>LOCATION</codeph> attribute for the table or partition.
+        Specify the ADLS details in the <codeph>LOCATION</codeph> clause of a
+          <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph>
+        statement. The syntax for the <codeph>LOCATION</codeph> clause is:<ul>
+          <li>For ADLS Gen1,
+                <codeph>adl://<varname>account</varname>.azuredatalakestore.net/<varname>path/file</varname></codeph>
+          </li>
+          <li>For ADLS Gen2,
+                <codeph>abfs://<varname>container</varname>@<varname>account</varname>.dfs.core.windows.net/<varname>path</varname>/<varname>file</varname></codeph></li>
+          <li>For ADLS Gen2 with a secure socket layer connection,
+                <codeph>abfss://<varname>container</varname>@<varname>account</varname>.dfs.core.windows.net/<varname>path</varname>/<varname>file</varname></codeph></li>
+        </ul></p>
+      <p><codeph><varname>container</varname></codeph> denotes the parent
+        location that holds the files and folders, which is the Containers in
+        the Azure Storage Blobs service.</p>
+      <p><codeph><varname>account</varname></codeph> is the name given for your
+        storage account.</p>
 
       <p>
         For a partitioned table, either specify a separate <codeph>LOCATION</codeph> clause for each new partition,
@@ -288,15 +320,12 @@ adl://<varname>your_account</varname>.azuredatalakestore.net/<varname>rest_of_di
                   >   location 'adl://impalademo.azuredatalakestore.net/dir1/dir2/dir3/t1';
 </codeblock>
 
-      <p>
-        For convenience when working with multiple tables with data files stored in ADLS, you can create a database
-        with a <codeph>LOCATION</codeph> attribute pointing to an ADLS path.
-        Specify a URL of the form <codeph>adl://<varname>store</varname>/<varname>root/path/for/database</varname></codeph>
-        for the <codeph>LOCATION</codeph> attribute of the database.
-        Any tables created inside that database
-        automatically create directories underneath the one specified by the database
-        <codeph>LOCATION</codeph> attribute.
-      </p>
+      <p> For convenience when working with multiple tables with data files
+        stored in ADLS, you can create a database with a
+          <codeph>LOCATION</codeph> attribute pointing to an ADLS path. Specify
+        a URL of the form as shown above. Any tables created inside that
+        database automatically create directories underneath the one specified
+        by the database <codeph>LOCATION</codeph> attribute. </p>
 
       <p>
         The following session creates a database and two partitioned tables residing entirely on ADLS, one

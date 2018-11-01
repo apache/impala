@@ -1297,17 +1297,21 @@ drop database temp;
         See <xref href="../topics/impala_s3.xml#s3"/> for details about reading and writing S3 data with Impala.
       </p>
 
-      <p rev="2.9.0 IMPALA-5333" id="adls_dml">
-        In <keyword keyref="impala29_full"/> and higher, the Impala DML statements (<codeph>INSERT</codeph>, <codeph>LOAD DATA</codeph>,
-        and <codeph>CREATE TABLE AS SELECT</codeph>) can write data into a table or partition that resides in the
-        Azure Data Lake Store (ADLS).
-        The syntax of the DML statements is the same as for any other tables, because the ADLS location for tables and
-        partitions is specified by an <codeph>adl://</codeph> prefix in the
-        <codeph>LOCATION</codeph> attribute of
-        <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph> statements.
-        If you bring data into ADLS using the normal ADLS transfer mechanisms instead of Impala DML statements,
-        issue a <codeph>REFRESH</codeph> statement for the table before using Impala to query the ADLS data.
-      </p>
+      <p rev="2.9.0 IMPALA-5333" id="adls_dml"> In <keyword
+          keyref="impala29_full"/> and higher, the Impala DML statements
+          (<codeph>INSERT</codeph>, <codeph>LOAD DATA</codeph>, and
+          <codeph>CREATE TABLE AS SELECT</codeph>) can write data into a table
+        or partition that resides in the Azure Data Lake Store (ADLS). ADLS Gen2
+        is supported in <keyword keyref="impala31"/> and higher.</p>
+      <p rev="2.9.0 IMPALA-5333">In the<codeph>CREATE TABLE</codeph> or
+          <codeph>ALTER TABLE</codeph> statements, specify the ADLS location for
+        tables and partitions with the <codeph>adl://</codeph> prefix for ADLS
+        Gen1 and <codeph>abfs://</codeph> or <codeph>abfss://</codeph> for ADLS
+        Gen2 in the <codeph>LOCATION</codeph> attribute.</p>
+      <p rev="2.9.0 IMPALA-5333" id="adls_dml_end">If you bring data into ADLS
+        using the normal ADLS transfer mechanisms instead of Impala DML
+        statements, issue a <codeph>REFRESH</codeph> statement for the table
+        before using Impala to query the ADLS data. </p>
 
       <p rev="2.6.0 IMPALA-1878" id="s3_dml">
         In <keyword keyref="impala26_full"/> and higher, the Impala DML statements (<codeph>INSERT</codeph>, <codeph>LOAD DATA</codeph>,
@@ -1320,9 +1324,6 @@ drop database temp;
         If you bring data into S3 using the normal S3 transfer mechanisms instead of Impala DML statements,
         issue a <codeph>REFRESH</codeph> statement for the table before using Impala to query the S3 data.
       </p>
-
-        <!-- Formerly part of s3_dml element. Moved out to avoid a circular link in the S3 topic itelf. -->
-        <!-- See <xref href="../topics/impala_s3.xml#s3"/> for details about reading and writing S3 data with Impala. -->
 
       <p rev="2.2.0" id="s3_metadata"> Impala caches metadata for tables where
         the data resides in the Amazon Simple Storage Service (S3), and the
