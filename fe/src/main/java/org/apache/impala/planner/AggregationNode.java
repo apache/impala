@@ -60,6 +60,9 @@ public class AggregationNode extends PlanNode {
   // Conservative minimum size of hash table for low-cardinality aggregations.
   private final static long MIN_HASH_TBL_MEM = 10L * 1024L * 1024L;
 
+  // Default skew factor to account for data skew among fragment instances.
+  private final static double DEFAULT_SKEW_FACTOR = 1.5;
+
   private final MultiAggregateInfo multiAggInfo_;
   private final AggPhase aggPhase_;
 
@@ -474,7 +477,19 @@ public class AggregationNode extends PlanNode {
       // Per-instance cardinality cannot be greater than the total input cardinality.
       long inputCardinality = getChild(0).getCardinality();
       if (inputCardinality != -1) {
-        perInstanceCardinality = Math.min(perInstanceCardinality, inputCardinality);
+        // Calculate the input cardinality distributed across fragment instances.
+        long numInstances = fragment_.getNumInstances(queryOptions.getMt_dop());
+        long perInstanceInputCardinality;
+        if (numInstances > 1) {
+          perInstanceInputCardinality =
+              (long) Math.ceil((inputCardinality / numInstances) * DEFAULT_SKEW_FACTOR);
+        } else {
+          // When numInstances is 1 or unknown(-1), perInstanceInputCardinality is the
+          // same as inputCardinality.
+          perInstanceInputCardinality = inputCardinality;
+        }
+        perInstanceCardinality =
+            Math.min(perInstanceCardinality, perInstanceInputCardinality);
       }
       perInstanceDataBytes = (long)Math.ceil(perInstanceCardinality * avgRowSize_);
       perInstanceMemEstimate = (long)Math.max(perInstanceDataBytes *

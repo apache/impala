@@ -3127,7 +3127,7 @@ PLAN-ROOT SINK
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=123.75MB Threads=12
-Per-Host Resource Estimates: Memory=385MB
+Per-Host Resource Estimates: Memory=376MB
 
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.22MB mem-reservation=0B thread-reservation=1
@@ -3227,7 +3227,7 @@ Per-Host Resources: mem-estimate=109.02MB mem-reservation=43.00MB thread-reserva
 |
 14:AGGREGATE [FINALIZE]
 |  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
-|  mem-estimate=42.58MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=70B cardinality=575772
 |  in pipelines: 14(GETNEXT), 01(OPEN)
 |
@@ -3237,10 +3237,10 @@ Per-Host Resources: mem-estimate=109.02MB mem-reservation=43.00MB thread-reserva
 |  in pipelines: 01(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=64.32MB mem-reservation=39.75MB thread-reservation=1 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=55.74MB mem-reservation=39.75MB thread-reservation=1 runtime-filters-memory=1.00MB
 04:AGGREGATE [STREAMING]
 |  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
-|  mem-estimate=42.58MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=70B cardinality=575772
 |  in pipelines: 01(GETNEXT)
 |
@@ -3290,8 +3290,8 @@ Per-Host Resources: mem-estimate=81.00MB mem-reservation=25.00MB thread-reservat
    tuple-ids=0 row-size=78B cardinality=600122
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=243.75MB Threads=13
-Per-Host Resource Estimates: Memory=724MB
+Max Per-Host Resource Reservation: Memory=209.75MB Threads=13
+Per-Host Resource Estimates: Memory=673MB
 
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.44MB mem-reservation=0B thread-reservation=1
@@ -3407,7 +3407,7 @@ Per-Host Resources: mem-estimate=198.00MB mem-reservation=86.00MB thread-reserva
 |
 14:AGGREGATE [FINALIZE]
 |  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
-|  mem-estimate=42.58MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=2 row-size=70B cardinality=575772
 |  in pipelines: 14(GETNEXT), 01(OPEN)
 |
@@ -3417,10 +3417,10 @@ Per-Host Resources: mem-estimate=198.00MB mem-reservation=86.00MB thread-reserva
 |  in pipelines: 01(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
-Per-Host Resources: mem-estimate=113.87MB mem-reservation=75.75MB thread-reservation=2 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=62.72MB mem-reservation=41.75MB thread-reservation=2 runtime-filters-memory=1.00MB
 04:AGGREGATE [STREAMING]
 |  group by: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
-|  mem-estimate=42.58MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=2 row-size=70B cardinality=575772
 |  in pipelines: 01(GETNEXT)
 |
@@ -3609,7 +3609,7 @@ PLAN-ROOT SINK
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=220.38MB Threads=11
-Per-Host Resource Estimates: Memory=597MB
+Per-Host Resource Estimates: Memory=533MB
 
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=33.72KB mem-reservation=0B thread-reservation=1
@@ -3624,7 +3624,7 @@ PLAN-ROOT SINK
 |  in pipelines: 09(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=73.26MB mem-reservation=34.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=44.30MB mem-reservation=34.00MB thread-reservation=1
 09:TOP-N [LIMIT=100]
 |  order by: o_totalprice DESC, o_orderdate ASC
 |  mem-estimate=9.77KB mem-reservation=0B thread-reservation=0
@@ -3634,7 +3634,7 @@ Per-Host Resources: mem-estimate=73.26MB mem-reservation=34.00MB thread-reservat
 16:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_quantity)
 |  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
-|  mem-estimate=62.96MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=6 row-size=100B cardinality=600122
 |  in pipelines: 16(GETNEXT), 02(OPEN)
 |
@@ -3644,11 +3644,11 @@ Per-Host Resources: mem-estimate=73.26MB mem-reservation=34.00MB thread-reservat
 |  in pipelines: 02(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=184.12MB mem-reservation=116.38MB thread-reservation=1 runtime-filters-memory=3.00MB
+Per-Host Resources: mem-estimate=149.80MB mem-reservation=116.38MB thread-reservation=1 runtime-filters-memory=3.00MB
 08:AGGREGATE [STREAMING]
 |  output: sum(l_quantity)
 |  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
-|  mem-estimate=62.96MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=6 row-size=100B cardinality=600122
 |  in pipelines: 02(GETNEXT)
 |
@@ -3663,7 +3663,7 @@ Per-Host Resources: mem-estimate=184.12MB mem-reservation=116.38MB thread-reserv
 |  |  output: sum:merge(l_quantity)
 |  |  group by: l_orderkey
 |  |  having: sum(l_quantity) > 300
-|  |  mem-estimate=39.36MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=4 row-size=24B cardinality=156344
 |  |  in pipelines: 14(GETNEXT), 03(OPEN)
 |  |
@@ -3760,8 +3760,8 @@ Per-Host Resources: mem-estimate=90.00MB mem-reservation=10.00MB thread-reservat
    tuple-ids=2 row-size=16B cardinality=6001215
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=353.88MB Threads=13
-Per-Host Resource Estimates: Memory=1.03GB
+Max Per-Host Resource Reservation: Memory=268.88MB Threads=13
+Per-Host Resource Estimates: Memory=846MB
 
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=64.19KB mem-reservation=0B thread-reservation=1
@@ -3776,7 +3776,7 @@ PLAN-ROOT SINK
 |  in pipelines: 09(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)] hosts=3 instances=6
-Per-Host Resources: mem-estimate=147.13MB mem-reservation=68.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=55.22MB mem-reservation=34.00MB thread-reservation=2
 09:TOP-N [LIMIT=100]
 |  order by: o_totalprice DESC, o_orderdate ASC
 |  mem-estimate=9.77KB mem-reservation=0B thread-reservation=0
@@ -3786,7 +3786,7 @@ Per-Host Resources: mem-estimate=147.13MB mem-reservation=68.00MB thread-reserva
 16:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_quantity)
 |  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
-|  mem-estimate=62.96MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=6 row-size=100B cardinality=600122
 |  in pipelines: 16(GETNEXT), 02(OPEN)
 |
@@ -3796,11 +3796,11 @@ Per-Host Resources: mem-estimate=147.13MB mem-reservation=68.00MB thread-reserva
 |  in pipelines: 02(GETNEXT)
 |
 F02:PLAN FRAGMENT [HASH(l_orderkey)] hosts=3 instances=6
-Per-Host Resources: mem-estimate=230.96MB mem-reservation=145.88MB thread-reservation=2 runtime-filters-memory=3.00MB
+Per-Host Resources: mem-estimate=115.30MB mem-reservation=94.88MB thread-reservation=2 runtime-filters-memory=3.00MB
 08:AGGREGATE [STREAMING]
 |  output: sum(l_quantity)
 |  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
-|  mem-estimate=62.96MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=6 row-size=100B cardinality=600122
 |  in pipelines: 02(GETNEXT)
 |
@@ -3823,7 +3823,7 @@ Per-Host Resources: mem-estimate=230.96MB mem-reservation=145.88MB thread-reserv
 |  |  output: sum:merge(l_quantity)
 |  |  group by: l_orderkey
 |  |  having: sum(l_quantity) > 300
-|  |  mem-estimate=39.36MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=4 row-size=24B cardinality=156344
 |  |  in pipelines: 14(GETNEXT), 03(OPEN)
 |  |
@@ -3833,11 +3833,11 @@ Per-Host Resources: mem-estimate=230.96MB mem-reservation=145.88MB thread-reserv
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-|  Per-Host Resources: mem-estimate=254.73MB mem-reservation=84.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=251.55MB mem-reservation=84.00MB thread-reservation=2
 |  04:AGGREGATE [STREAMING]
 |  |  output: sum(l_quantity)
 |  |  group by: l_orderkey
-|  |  mem-estimate=39.36MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=37.77MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=4 row-size=24B cardinality=1563438
 |  |  in pipelines: 03(GETNEXT)
 |  |
@@ -5502,7 +5502,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=108.00MB Threads=4
-Per-Host Resource Estimates: Memory=3.32GB
+Per-Host Resource Estimates: Memory=1.70GB
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
@@ -5516,11 +5516,11 @@ PLAN-ROOT SINK
 |  in pipelines: 03(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(tpch_parquet.lineitem.l_orderkey,tpch_parquet.lineitem.l_partkey,tpch_parquet.lineitem.l_suppkey,tpch_parquet.lineitem.l_linenumber,tpch_parquet.lineitem.l_quantity,tpch_parquet.lineitem.l_extendedprice,tpch_parquet.lineitem.l_discount,tpch_parquet.lineitem.l_tax,tpch_parquet.lineitem.l_returnflag,tpch_parquet.lineitem.l_linestatus,tpch_parquet.lineitem.l_shipdate,tpch_parquet.lineitem.l_commitdate,tpch_parquet.lineitem.l_receiptdate,tpch_parquet.lineitem.l_shipinstruct,tpch_parquet.lineitem.l_shipmode,tpch_parquet.lineitem.l_comment)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=1.63GB mem-reservation=34.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=837.94MB mem-reservation=34.00MB thread-reservation=1
 03:AGGREGATE [FINALIZE]
 |  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
 |  limit: 5
-|  mem-estimate=1.62GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=827.16MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1 row-size=263B cardinality=5
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
@@ -5530,10 +5530,10 @@ Per-Host Resources: mem-estimate=1.63GB mem-reservation=34.00MB thread-reservati
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=1.69GB mem-reservation=74.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=907.16MB mem-reservation=74.00MB thread-reservation=2
 01:AGGREGATE [STREAMING]
 |  group by: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
-|  mem-estimate=1.62GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=827.16MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1 row-size=263B cardinality=6001215
 |  in pipelines: 00(GETNEXT)
 |
