@@ -39,12 +39,10 @@ under the License.
 
   <conbody>
 
-    <p>
-      <indexterm audience="hidden">LOAD DATA statement</indexterm>
-      The <codeph>LOAD DATA</codeph> statement streamlines the ETL process for an internal Impala table by moving a
-      data file or all the data files in a directory from an HDFS location into the Impala data directory for that
-      table.
-    </p>
+    <p> The <codeph>LOAD DATA</codeph> statement streamlines the ETL process for
+      an internal Impala table by moving a data file or all the data files in a
+      directory from an HDFS location into the Impala data directory for that
+      table. </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
@@ -240,7 +238,8 @@ Returned 1 row(s) in 0.62s</codeblock>
     <p>See <xref href="../topics/impala_s3.xml#s3"/> for details about reading and writing S3 data with Impala.</p>
 
     <p conref="../shared/impala_common.xml#common/adls_blurb"/>
-    <p conref="../shared/impala_common.xml#common/adls_dml"/>
+    <p conref="../shared/impala_common.xml#common/adls_dml"
+      conrefend="../shared/impala_common.xml#common/adls_dml_end"/>
     <p>See <xref href="../topics/impala_adls.xml#adls"/> for details about reading and writing ADLS data with Impala.</p>
 
     <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
