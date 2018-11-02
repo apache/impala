@@ -76,7 +76,7 @@ Catalog::Catalog() {
   JNIEnv* jni_env = getJNIEnv();
   // Create an instance of the java class JniCatalog
   catalog_class_ = jni_env->FindClass("org/apache/impala/service/JniCatalog");
-  EXIT_IF_EXC(jni_env);
+  ABORT_IF_EXC(jni_env);
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
@@ -87,7 +87,7 @@ Catalog::Catalog() {
   ABORT_IF_ERROR(GetThriftBackendGflags(jni_env, &cfg_bytes));
 
   jobject catalog = jni_env->NewObject(catalog_class_, catalog_ctor_, cfg_bytes);
-  EXIT_IF_EXC(jni_env);
+  CLEAN_EXIT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, catalog, &catalog_));
 }
 

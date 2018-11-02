@@ -59,8 +59,8 @@
 #define THROW_IF_EXC(env, exc_class) \
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
-    if (exc != NULL) { \
-      DCHECK((throwable_to_string_id_) != NULL); \
+    if (exc != nullptr) { \
+      DCHECK((throwable_to_string_id_) != nullptr); \
       jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
           (JniUtil::throwable_to_stack_trace_id()), exc); \
       jboolean is_copy; \
@@ -75,7 +75,7 @@
 #define RETURN_IF_EXC(env) \
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
-    if (exc != NULL) { \
+    if (exc != nullptr) { \
       jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
           (JniUtil::throwable_to_stack_trace_id()), exc); \
       jboolean is_copy; \
@@ -86,10 +86,14 @@
     } \
   } while (false)
 
-#define EXIT_IF_EXC(env) \
+// If there's an exception in 'env', log the backtrace at FATAL level and abort the
+// process. This will generate a core dump if core dumps are enabled, so this should
+// generally only be called for internal errors where the coredump is useful for
+// diagnostics.
+#define ABORT_IF_EXC(env) \
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
-    if (exc != NULL) { \
+    if (exc != nullptr) { \
       jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
           (JniUtil::throwable_to_stack_trace_id()), exc); \
       jboolean is_copy; \
@@ -99,10 +103,25 @@
     } \
   } while (false)
 
+// If there's an exception in 'env', log the backtrace at ERROR level and exit the process
+// cleanly with status 1.
+#define CLEAN_EXIT_IF_EXC(env) \
+  do { \
+    jthrowable exc = (env)->ExceptionOccurred(); \
+    if (exc != nullptr) { \
+      jstring stack = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
+          (JniUtil::throwable_to_stack_trace_id()), exc); \
+      jboolean is_copy; \
+      const char* c_stack = \
+          reinterpret_cast<const char*>((env)->GetStringUTFChars(stack, &is_copy)); \
+      CLEAN_EXIT_WITH_ERROR(c_stack); \
+    } \
+  } while (false)
+
 #define RETURN_ERROR_IF_EXC(env) \
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
-    if (exc != NULL) return JniUtil::GetJniExceptionMsg(env);\
+    if (exc != nullptr) return JniUtil::GetJniExceptionMsg(env);\
   } while (false)
 
 /// C linkage for helper functions in hdfsJniHelper.h
@@ -118,8 +137,8 @@ class Status;
 /// the corresponding objects.
 class JniLocalFrame {
  public:
-  JniLocalFrame(): env_(NULL) {}
-  ~JniLocalFrame() { if (env_ != NULL) env_->PopLocalFrame(NULL); }
+  JniLocalFrame(): env_(nullptr) {}
+  ~JniLocalFrame() { if (env_ != nullptr) env_->PopLocalFrame(nullptr); }
 
   JniLocalFrame(JniLocalFrame&& other) noexcept
     : env_(other.env_) {

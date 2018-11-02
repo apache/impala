@@ -124,7 +124,7 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
   JNIEnv* jni_env = getJNIEnv();
   request_pool_service_class_ =
     jni_env->FindClass("org/apache/impala/util/RequestPoolService");
-  EXIT_IF_EXC(jni_env);
+  ABORT_IF_EXC(jni_env);
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
     ABORT_IF_ERROR(JniUtil::LoadJniMethod(jni_env, request_pool_service_class_,
@@ -133,18 +133,18 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
 
   jstring fair_scheduler_config_path =
       jni_env->NewStringUTF(FLAGS_fair_scheduler_allocation_path.c_str());
-  EXIT_IF_EXC(jni_env);
+  ABORT_IF_EXC(jni_env);
   jstring llama_site_path =
       jni_env->NewStringUTF(FLAGS_llama_site_path.c_str());
-  EXIT_IF_EXC(jni_env);
+  ABORT_IF_EXC(jni_env);
 
   jobject request_pool_service = jni_env->NewObject(request_pool_service_class_, ctor_,
       fair_scheduler_config_path, llama_site_path);
-  EXIT_IF_EXC(jni_env);
+  ABORT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, request_pool_service,
       &request_pool_service_));
   jni_env->CallObjectMethod(request_pool_service_, start_id);
-  EXIT_IF_EXC(jni_env);
+  ABORT_IF_EXC(jni_env);
 }
 
 Status RequestPoolService::ResolveRequestPool(const TQueryCtx& ctx,

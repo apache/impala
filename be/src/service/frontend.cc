@@ -106,7 +106,7 @@ Frontend::Frontend() {
   JNIEnv* jni_env = getJNIEnv();
   // create instance of java class JniFrontend
   fe_class_ = jni_env->FindClass("org/apache/impala/service/JniFrontend");
-  EXIT_IF_EXC(jni_env);
+  ABORT_IF_EXC(jni_env);
 
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
@@ -117,7 +117,7 @@ Frontend::Frontend() {
   ABORT_IF_ERROR(GetThriftBackendGflags(jni_env, &cfg_bytes));
 
   jobject fe = jni_env->NewObject(fe_class_, fe_ctor_, cfg_bytes);
-  EXIT_IF_EXC(jni_env);
+  ABORT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 }
 
