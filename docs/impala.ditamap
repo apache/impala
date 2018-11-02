@@ -173,6 +173,7 @@ under the License.
       <topicref href="topics/impala_set.xml">
         <topicref href="topics/impala_query_options.xml">
           <topicref href="topics/impala_abort_on_error.xml"/>
+          <topicref href="topics/impala_allow_erasure_coded_files.xml"/>
           <topicref href="topics/impala_allow_unsupported_formats.xml"/>
           <topicref href="topics/impala_appx_count_distinct.xml"/>
           <topicref href="topics/impala_batch_size.xml"/>
