@@ -699,7 +699,7 @@ void InitFeSupport(bool disable_codegen) {
   jclass native_backend_cl = env->FindClass("org/apache/impala/service/FeSupport");
   env->RegisterNatives(native_backend_cl, native_methods,
       sizeof(native_methods) / sizeof(native_methods[0]));
-  EXIT_IF_EXC(env);
+  ABORT_IF_EXC(env);
 }
 
 }

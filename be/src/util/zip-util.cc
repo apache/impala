@@ -30,7 +30,7 @@ jmethodID ZipUtil::extract_files_method; // ZipUtil.extractFiles()
 void ZipUtil::InitJvm() {
   JNIEnv* env = getJNIEnv();
   zip_util_class_ = env->FindClass("org/apache/impala/util/ZipUtil");
-  EXIT_IF_EXC(env);
+  ABORT_IF_EXC(env);
   JniMethodDescriptor extract_files_method_desc =
       {"extractFiles", "([B)V", &extract_files_method};
 

@@ -110,7 +110,7 @@ Webserver::UrlCallback MakeCallback(const F& fnc, bool display_log4j_handlers) {
 void InitDynamicLoggingSupport() {
   JNIEnv* env = getJNIEnv();
   log4j_logger_class_ = env->FindClass("org/apache/impala/util/GlogAppender");
-  EXIT_IF_EXC(env);
+  ABORT_IF_EXC(env);
   JniMethodDescriptor get_log_level_method_desc =
       {"getLogLevel", "([B)Ljava/lang/String;", &get_log_level_method};
   JniMethodDescriptor set_log_level_method_desc =
@@ -240,7 +240,7 @@ void InitJvmLoggingSupport() {
   nm.signature = const_cast<char*>("(ILjava/lang/String;Ljava/lang/String;I)V");
   nm.fnPtr = reinterpret_cast<void*>(::Java_org_apache_impala_util_NativeLogger_Log);
   env->RegisterNatives(native_backend_cl, &nm, 1);
-  EXIT_IF_EXC(env);
+  ABORT_IF_EXC(env);
   InitDynamicLoggingSupport();
 }
 
