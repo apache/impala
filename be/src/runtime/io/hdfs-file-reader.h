@@ -57,7 +57,7 @@ private:
   /// 3. The hdfs file is expected to be remote (expected_local_ == false)
   /// In each case, the scan range gets a new ExclusiveHdfsFileHandle at Open(),
   /// owns it exclusively, and destroys it in Close().
-  ExclusiveHdfsFileHandle* exclusive_hdfs_fh_ = nullptr;
+  std::unique_ptr<ExclusiveHdfsFileHandle> exclusive_hdfs_fh_;
 
   /// If true, we expect the reads to be a local read. Note that if this is false,
   /// it does not necessarily mean we expect the read to be remote, and that we never

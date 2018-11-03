@@ -373,6 +373,12 @@ error_codes = (
 
   ("PARQUET_CORRUPT_BOOL_VALUE", 122, "File '$0' is corrupt: error decoding BOOLEAN "
    "value with encoding $1 at offset $2"),
+
+  ("THREAD_POOL_SUBMIT_FAILED", 123,
+   "Failed to submit $0 to thread pool after waiting $1 seconds"),
+
+  ("THREAD_POOL_TASK_TIMED_OUT", 124,
+   "$0 failed to finish before the $1 second timeout"),
 )
 
 import sys

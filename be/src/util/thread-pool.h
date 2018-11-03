@@ -105,6 +105,20 @@ class ThreadPool : public CacheLineAligned {
     return work_queue_.BlockingPut(std::forward<V>(work));
   }
 
+  /// Blocks until the work item is placed on the queue or the timeout expires. The
+  /// ThreadPool must be initialized before calling this method. The same requirements
+  /// about the lifetime of 'work' applies as in Offer() above. If the operation times
+  /// out, the work item can be safely freed.
+  ///
+  /// Returns true if the work item was successfully added to the queue, false otherwise
+  /// (which means the operation timed out or the thread pool has already been shut down).
+  template <typename V>
+  bool Offer(V&& work, int64_t timeout_millis) {
+    DCHECK(initialized_);
+    int64_t timeout_micros = timeout_millis * MICROS_PER_MILLI;
+    return work_queue_.BlockingPutWithTimeout(std::forward<V>(work), timeout_micros);
+  }
+
   /// Shuts the thread pool down, causing the work queue to cease accepting offered work
   /// and the worker threads to terminate once they have processed their current work item.
   /// Returns once the shutdown flag has been set, does not wait for the threads to
@@ -216,6 +230,119 @@ class CallableThreadPool : public ThreadPool<boost::function<void()>> {
  private:
   static void Worker(int thread_id, const boost::function<void()>& f) {
     f();
+  }
+};
+
+/// Parent class for all synchronous work items
+///
+/// Important note for all subclasses:
+/// All fields need to have a lifetime that matches this operation's lifetime.
+/// In particular, caller-provided arguments need to be moved, copied, or need to have a
+/// lifetime independent of the caller. The monitored operation must survive the caller
+/// timing out and potentially deallocating memory.
+class SynchronousWorkItem {
+ public:
+  virtual ~SynchronousWorkItem() {}
+
+  /// Customized implementation for each operation. Subclasses must override this.
+  /// The status is conveyed back to the original caller.
+  virtual Status Execute() {
+    DCHECK(false) << "Execute() must be implemented";
+    return Status("Execute() must be implemented");
+  }
+
+  virtual std::string GetDescription() {
+    DCHECK(false) << "GetDescription() must be implemented";
+    return "";
+  }
+
+ private:
+  friend class SynchronousThreadPool;
+
+  /// This is called by the worker thread and handles the mechanics of notifying
+  /// the caller and conveying status when Execute() completes.
+  void WorkerExecute() {
+    Status status = Execute();
+    DCHECK(!done_promise_.IsSet());
+    discard_result(done_promise_.Set(status));
+  }
+
+  /// Wait for the operation to complete or time out with the specified limit.
+  /// If the operation times out, it returns TErrorCode::THREAD_POOL_TASK_TIMED_OUT.
+  /// Otherwise, it returns the status returned by Execute().
+  Status Wait(int64_t timeout_millis) {
+    bool timed_out;
+    Status status = done_promise_.Get(timeout_millis, &timed_out);
+    if (timed_out) {
+      Status timeout_status = Status(TErrorCode::THREAD_POOL_TASK_TIMED_OUT,
+          GetDescription(), timeout_millis / MILLIS_PER_SEC);
+      LOG(WARNING) << timeout_status.GetDetail();
+      return timeout_status;
+    }
+    return status;
+  }
+
+  // Set to the return status of ExecuteImpl() upon completion
+  Promise<Status> done_promise_;
+};
+
+/// Synchronous thread pool can run any subclass of SynchronousWorkItem
+/// Ownership is shared between the caller side and the worker side:
+/// 1. The caller accesses the operation to wait for its completion (or timeout) and
+///    retrieve any result.
+/// 2. The ThreadPool worker calls Execute() on the operation and needs to maintain
+///    ownership until the operation completes. The blocking queue inside the ThreadPool
+///    also needs to maintain ownership until a thread removes the operation for
+///    processing.
+/// This is an awkward circumstance to have exclusive ownership. The caller can time
+/// out and leave while the worker is processing. When the worker completes and could
+/// release ownership, the caller might still need to retrieve the result or the caller
+/// might be gone. shared_ptr does what we want: the HdfsMonitorOp will survive until
+/// neither thread needs it anymore.
+class SynchronousThreadPool : public ThreadPool<std::shared_ptr<SynchronousWorkItem>> {
+ public:
+  SynchronousThreadPool(const std::string& group, const std::string& thread_prefix,
+      uint32_t num_threads, uint32_t queue_size) :
+    ThreadPool<std::shared_ptr<SynchronousWorkItem>>(group, thread_prefix, num_threads,
+        queue_size, &SynchronousThreadPool::Worker) {}
+
+  /// Run the provided work item and wait up to 'timeout_milliseconds' for the
+  /// operation to complete. If it completes, return the status from the work
+  /// item's Execute() function. Otherwise, return an error status:
+  ///  - THREAD_POOL_TASK_TIMED_OUT if the individual task timed out
+  ///  - THREAD_POOL_SUBMIT_FAILED if all the threads are busy and the task did not
+  ///    even start
+  Status SynchronousOffer(std::shared_ptr<SynchronousWorkItem> work,
+      int64_t timeout_milliseconds) {
+    MonotonicStopWatch offer_timer;
+    offer_timer.Start();
+    bool offer_success = Offer(work, timeout_milliseconds);
+    offer_timer.Stop();
+    if (!offer_success) {
+      // This scenario only happens when all threads are occupied and the queue
+      // is full. This means the system is in a catastrophic state. Log to ERROR.
+      Status failed_to_submit_status =
+        Status(TErrorCode::THREAD_POOL_SUBMIT_FAILED, work->GetDescription(),
+               timeout_milliseconds / MILLIS_PER_SEC);
+      LOG(ERROR) << failed_to_submit_status.GetDetail();
+      return failed_to_submit_status;
+    }
+
+    int64_t offer_time_millis =
+        offer_timer.ElapsedTime() / (NANOS_PER_MICRO * MICROS_PER_MILLI);
+    int64_t timeout_left = timeout_milliseconds - offer_time_millis;
+    if (timeout_left <= 0) {
+      Status timeout_status = Status(TErrorCode::THREAD_POOL_TASK_TIMED_OUT,
+          work->GetDescription(), timeout_milliseconds / MILLIS_PER_SEC);
+      LOG(WARNING) << timeout_status.GetDetail();
+      return timeout_status;
+    }
+    return work->Wait(timeout_left);
+  }
+
+ private:
+  static void Worker(int thread_id, const std::shared_ptr<SynchronousWorkItem>& work) {
+    work->WorkerExecute();
   }
 };
 

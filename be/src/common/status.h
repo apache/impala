@@ -227,6 +227,12 @@ class NODISCARD Status {
         && msg_->error() == TErrorCode::DISK_IO_ERROR;
   }
 
+  bool IsThreadPoolError() const {
+    return msg_ != NULL
+      && (msg_->error() == TErrorCode::THREAD_POOL_SUBMIT_FAILED ||
+          msg_->error() == TErrorCode::THREAD_POOL_TASK_TIMED_OUT);
+  }
+
   /// Returns the error message associated with a non-successful status.
   const ErrorMsg& msg() const {
     DCHECK(msg_ != NULL);

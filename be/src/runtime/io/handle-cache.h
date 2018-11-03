@@ -35,6 +35,8 @@
 namespace impala {
 namespace io {
 
+class HdfsMonitor;
+
 /// This abstract class is a small wrapper around the hdfsFile handle and the file system
 /// instance which is needed to close the file handle. The handle incorporates
 /// the last modified time of the file when it was opened. This is used to distinguish
@@ -47,17 +49,21 @@ class HdfsFileHandle {
   /// Destructor will close the file handle
   ~HdfsFileHandle();
 
+  /// Init opens the file handle
+  Status Init(HdfsMonitor* monitor);
+
   hdfsFile file() const { return hdfs_file_;  }
   int64_t mtime() const { return mtime_; }
-  bool ok() const { return hdfs_file_ != nullptr; }
 
  protected:
-  /// Constructor will open the file
-  HdfsFileHandle(const hdfsFS& fs, const char* fname, int64_t mtime);
+ HdfsFileHandle(const hdfsFS& fs, const std::string* fname, int64_t mtime)
+    : fs_(fs), fname_(fname), mtime_(mtime) {}
 
  private:
   hdfsFS fs_;
-  hdfsFile hdfs_file_;
+  // fname_ has a limited lifetime. It is only valid from construction until Init().
+  const std::string* fname_;
+  hdfsFile hdfs_file_ = nullptr;
   int64_t mtime_;
 };
 
@@ -65,7 +71,7 @@ class HdfsFileHandle {
 /// other purpose.
 class CachedHdfsFileHandle : public HdfsFileHandle {
  public:
-  CachedHdfsFileHandle(const hdfsFS& fs, const char* fname, int64_t mtime);
+  CachedHdfsFileHandle(const hdfsFS& fs, const std::string* fname, int64_t mtime);
   ~CachedHdfsFileHandle();
 };
 
@@ -73,7 +79,7 @@ class CachedHdfsFileHandle : public HdfsFileHandle {
 /// is not appropriate.
 class ExclusiveHdfsFileHandle : public HdfsFileHandle {
  public:
-  ExclusiveHdfsFileHandle(const hdfsFS& fs, const char* fname, int64_t mtime)
+  ExclusiveHdfsFileHandle(const hdfsFS& fs, const std::string* fname, int64_t mtime)
     : HdfsFileHandle(fs, fname, mtime) {}
 };
 
@@ -110,7 +116,7 @@ class FileHandleCache {
   /// up. The cache will age out any file handle that is unused for
   /// `unused_handle_timeout_secs` seconds. Age out is disabled if this is set to zero.
   FileHandleCache(size_t capacity, size_t num_partitions,
-      uint64_t unused_handle_timeout_secs);
+      uint64_t unused_handle_timeout_secs, HdfsMonitor* hdfs_monitor);
 
   /// Destructor is only called for backend tests
   ~FileHandleCache();
@@ -132,8 +138,9 @@ class FileHandleCache {
   ///
   /// This obtains exclusive control over the returned file handle. It must be paired
   /// with a call to ReleaseFileHandle to release exclusive control.
-  CachedHdfsFileHandle* GetFileHandle(const hdfsFS& fs, std::string* fname,
-      int64_t mtime, bool require_new_handle, bool* cache_hit);
+  Status GetFileHandle(const hdfsFS& fs, std::string* fname,
+      int64_t mtime, bool require_new_handle, CachedHdfsFileHandle** handle_out,
+      bool* cache_hit) WARN_UNUSED_RESULT;
 
   /// Release the exclusive hold on the specified file handle (which was obtained
   /// by calling GetFileHandle). The cache may evict a file handle if the cache is
@@ -154,8 +161,8 @@ class FileHandleCache {
   typedef std::list<LruListEntry> LruListType;
 
   struct FileHandleEntry {
-    FileHandleEntry(CachedHdfsFileHandle* fh_in, LruListType& lru_list)
-    : fh(fh_in), lru_entry(lru_list.end()) {}
+    FileHandleEntry(std::unique_ptr<CachedHdfsFileHandle> fh_in, LruListType& lru_list)
+    : fh(std::move(fh_in)), lru_entry(lru_list.end()) {}
     std::unique_ptr<CachedHdfsFileHandle> fh;
 
     /// in_use is true for a file handle checked out via GetFileHandle() that has not
@@ -210,6 +217,9 @@ class FileHandleCache {
   /// the shut_down_promise_ is set.
   std::unique_ptr<Thread> eviction_thread_;
   Promise<bool> shut_down_promise_;
+
+  /// Thread pool used to implement timeouts for HDFS operations
+  HdfsMonitor* hdfs_monitor_;
 };
 }
 }

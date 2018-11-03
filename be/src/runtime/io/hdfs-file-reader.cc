@@ -55,16 +55,12 @@ Status HdfsFileReader::Open(bool use_file_handle_cache) {
   if (use_file_handle_cache && expected_local_) return Status::OK();
   auto io_mgr = scan_range_->io_mgr_;
   // Get a new exclusive file handle.
-  exclusive_hdfs_fh_ = io_mgr->GetExclusiveHdfsFileHandle(hdfs_fs_,
-      scan_range_->file_string(), scan_range_->mtime(), scan_range_->reader_);
-  if (exclusive_hdfs_fh_ == nullptr) {
-    return Status(TErrorCode::DISK_IO_ERROR,
-        GetHdfsErrorMsg("Failed to open HDFS file ", *scan_range_->file_string()));
-  }
+  RETURN_IF_ERROR(io_mgr->GetExclusiveHdfsFileHandle(hdfs_fs_,
+      scan_range_->file_string(), scan_range_->mtime(), scan_range_->reader_,
+      exclusive_hdfs_fh_));
   if (hdfsSeek(hdfs_fs_, exclusive_hdfs_fh_->file(), scan_range_->offset_) != 0) {
     // Destroy the file handle
-    io_mgr->ReleaseExclusiveHdfsFileHandle(exclusive_hdfs_fh_);
-    exclusive_hdfs_fh_ = nullptr;
+    io_mgr->ReleaseExclusiveHdfsFileHandle(std::move(exclusive_hdfs_fh_));
     return Status(TErrorCode::DISK_IO_ERROR,
         Substitute("Error seeking to $0 in file: $1 $2", scan_range_->offset(),
             *scan_range_->file_string(), GetHdfsErrorMsg("")));
@@ -99,13 +95,9 @@ Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
   if (exclusive_hdfs_fh_ != nullptr) {
     hdfs_file = exclusive_hdfs_fh_->file();
   } else {
-    borrowed_hdfs_fh = io_mgr->GetCachedHdfsFileHandle(hdfs_fs_,
+    RETURN_IF_ERROR(io_mgr->GetCachedHdfsFileHandle(hdfs_fs_,
         scan_range_->file_string(),
-        scan_range_->mtime(), request_context);
-    if (borrowed_hdfs_fh == nullptr) {
-      return Status(TErrorCode::DISK_IO_ERROR,
-          GetHdfsErrorMsg("Failed to open HDFS file ", *scan_range_->file_string()));
-    }
+        scan_range_->mtime(), request_context, &borrowed_hdfs_fh));
     hdfs_file = borrowed_hdfs_fh->file();
   }
 
@@ -228,8 +220,7 @@ void HdfsFileReader::Close() {
     }
 
     // Destroy the file handle.
-    scan_range_->io_mgr_->ReleaseExclusiveHdfsFileHandle(exclusive_hdfs_fh_);
-    exclusive_hdfs_fh_ = nullptr;
+    scan_range_->io_mgr_->ReleaseExclusiveHdfsFileHandle(std::move(exclusive_hdfs_fh_));
     ImpaladMetrics::IO_MGR_NUM_OPEN_FILES->Increment(-1L);
   }
 
@@ -287,7 +278,7 @@ void HdfsFileReader::ResetState() {
 string HdfsFileReader::DebugString() const {
   return FileReader::DebugString() + Substitute(
       " exclusive_hdfs_fh=$0 num_remote_bytes=$1",
-      exclusive_hdfs_fh_, num_remote_bytes_);
+      exclusive_hdfs_fh_.get(), num_remote_bytes_);
 }
 
 }

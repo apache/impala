@@ -185,7 +185,8 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
     if (!status.IsCancelled() &&
         !status.IsMemLimitExceeded() &&
         !status.IsInternalError() &&
-        !status.IsDiskIoError()) {
+        !status.IsDiskIoError() &&
+        !status.IsThreadPoolError()) {
       state_->LogError(ErrorMsg(TErrorCode::SEQUENCE_SCANNER_PARSE_ERROR,
           stream_->filename(), stream_->file_offset(),
           (stream_->eof() ? "(EOF)" : "")));

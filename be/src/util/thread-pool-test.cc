@@ -68,6 +68,93 @@ TEST(ThreadPoolTest, BasicTest) {
   EXPECT_EQ(expected_count, count);
 }
 
+class SleepWorkItem : public SynchronousWorkItem {
+public:
+  SleepWorkItem(int64_t timeout_ms, bool* destructor_called)
+    : timeout_ms_(timeout_ms), destructor_called_ptr_(destructor_called) {
+    *destructor_called_ptr_ = false;
+  }
+
+  ~SleepWorkItem() {
+    *destructor_called_ptr_ = true;
+  }
+
+  virtual Status Execute() override {
+    if (timeout_ms_ > 0) SleepForMs(timeout_ms_);
+    message_ = "Done";
+    return Status::OK();
+  }
+  virtual std::string GetDescription() override {
+    return Substitute("Simple task with $0 millisecond timeout", timeout_ms_);
+  }
+
+  std::string GetMessage() { return message_; }
+private:
+  std::string message_ = "Not done";
+  int64_t timeout_ms_;
+  bool* destructor_called_ptr_;
+};
+
+TEST(ThreadPoolTest, SynchronousThreadPoolTest) {
+  // Create a synchronous pool with one thread and a queue size of one.
+  SynchronousThreadPool pool("sync-thread-pool", "worker", 1, 1);
+  ASSERT_OK(pool.Init());
+
+  // Base case: work item takes no time, run it with a timeout of 5 milliseconds
+  unique_ptr<bool> no_sleep_destroyed(new bool);
+  std::shared_ptr<SleepWorkItem> no_sleep(new SleepWorkItem(0, no_sleep_destroyed.get()));
+  ASSERT_OK(pool.SynchronousOffer(no_sleep, 5));
+  ASSERT_EQ(no_sleep->GetMessage(), "Done");
+  // If the SynchronousOffer() completed successfully, the thread pool does not have any
+  // shared_ptr to the work item. The caller is the only holder, so when it calls
+  // reset, the destructor must be called.
+  no_sleep.reset();
+  ASSERT_TRUE(*no_sleep_destroyed);
+
+  // Timeout case #1: Submit one task that takes 100 milliseconds. Offer it with a timeout
+  // of 1 millisecond so that the caller immediately times out.
+  unique_ptr<bool> long_sleep_destroyed(new bool);
+  std::shared_ptr<SleepWorkItem> long_sleep(
+      new SleepWorkItem(100, long_sleep_destroyed.get()));
+  Status timeout_status = pool.SynchronousOffer(long_sleep, 1);
+  ASSERT_EQ(timeout_status.code(), TErrorCode::THREAD_POOL_TASK_TIMED_OUT);
+  // The work item is still running, and even if the caller releases its shared_ptr,
+  // the work item is not destroyed.
+  long_sleep.reset();
+  ASSERT_FALSE(*long_sleep_destroyed);
+
+  // The single thread in the thread pool is still running. Submit another task
+  // that will queue. The task doesn't matter.
+  unique_ptr<bool> queued_task_destroyed(new bool);
+  std::shared_ptr<SleepWorkItem> queued_task(
+      new SleepWorkItem(0, queued_task_destroyed.get()));
+  Status queued_task_status = pool.SynchronousOffer(queued_task, 1);
+  ASSERT_EQ(queued_task_status.code(), TErrorCode::THREAD_POOL_TASK_TIMED_OUT);
+  // The work item is queued, and even if the caller releases its shared_ptr, the work
+  // item is not destroyed.
+  queued_task.reset();
+  ASSERT_FALSE(*queued_task_destroyed);
+
+  // Now, the queue is full. Any new task will fail to submit.
+  unique_ptr<bool> fail_to_submit_destroyed(new bool);
+  std::shared_ptr<SleepWorkItem> fail_to_submit(
+      new SleepWorkItem(0, fail_to_submit_destroyed.get()));
+  Status fail_to_submit_status = pool.SynchronousOffer(fail_to_submit, 1);
+  ASSERT_EQ(fail_to_submit_status.code(), TErrorCode::THREAD_POOL_SUBMIT_FAILED);
+  // When the submit fails, the thread pool does not keep any shared_ptr to the work
+  // item. When the caller releases its shared_ptr, the work item is immediately
+  // destroyed.
+  fail_to_submit.reset();
+  ASSERT_TRUE(*fail_to_submit_destroyed);
+
+  // The tasks will still complete
+  pool.DrainAndShutdown();
+  // The work items that the thread pool had running and in the queue are destroyed
+  // when they complete (even though the caller long since released its shared_ptr).
+  ASSERT_TRUE(*long_sleep_destroyed);
+  ASSERT_TRUE(*queued_task_destroyed);
+}
+
 }
 
 IMPALA_TEST_MAIN();

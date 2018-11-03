@@ -219,7 +219,9 @@ Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
       || message.error() == TErrorCode::CANCELLED_INTERNALLY
       || message.error() == TErrorCode::MEM_LIMIT_EXCEEDED
       || message.error() == TErrorCode::INTERNAL_ERROR
-      || message.error() == TErrorCode::DISK_IO_ERROR) {
+      || message.error() == TErrorCode::DISK_IO_ERROR
+      || message.error() == TErrorCode::THREAD_POOL_SUBMIT_FAILED
+      || message.error() == TErrorCode::THREAD_POOL_TASK_TIMED_OUT) {
     return Status(message);
   }
   // Otherwise, add the error to the error log and continue.

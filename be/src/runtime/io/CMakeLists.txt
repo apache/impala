@@ -31,6 +31,7 @@ add_library(Io
   scan-range.cc
   hdfs-file-reader.cc
   local-file-reader.cc
+  hdfs-monitored-ops.cc
 )
 add_dependencies(Io gen-deps)
 
