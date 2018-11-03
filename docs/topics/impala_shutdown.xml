@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="shutdown">
+
+  <title>SHUTDOWN Statement</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>SHUTDOWN</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>SHUTDOWN</codeph> statement performs a graceful shutdown of Impala Daemon. The
+      Impala daemon will notify other Impala daemons that it is shutting down, wait for a grace
+      period, then shut itself down once no more queries or fragments are executing on that
+      daemon. The <codeph>--shutdown_grace_period_s</codeph> flag determines the duration of the
+      grace period in seconds.
+    </p>
+
+    <p>
+      <b>Syntax:</b>
+    </p>
+
+<codeblock>:SHUTDOWN()
+:SHUTDOWN([<varname>host_name</varname>[:<varname>port_number</varname>] )
+:SHUTDOWN(<varname>deadline</varname>)
+:SHUTDOWN([<varname>host_name</varname>[:<varname>port_number</varname>], <varname>deadline</varname>)</codeblock>
+
+    <p>
+      <b>Usage notes:</b>
+    </p>
+
+    <p>
+      All arguments are optional for <codeph>SHUTDOWN</codeph>.
+    </p>
+
+    <simpletable frame="all" id="simpletable_sly_wrf_rfb">
+
+      <sthead>
+
+        <stentry>Argument</stentry>
+
+        <stentry>Type</stentry>
+
+        <stentry>Default</stentry>
+
+        <stentry>Description</stentry>
+
+      </sthead>
+
+      <strow>
+
+        <stentry><codeph><varname>host_name</varname></codeph>
+
+        </stentry>
+
+        <stentry><codeph>STRING</codeph>
+
+        </stentry>
+
+        <stentry>The current <codeph>impalad</codeph> host</stentry>
+
+        <stentry>
+
+          <p>
+            Address of the backend to be shut down.
+          </p>
+
+        </stentry>
+
+      </strow>
+
+      <strow>
+
+        <stentry><codeph><varname>port_number</varname></codeph>
+
+        </stentry>
+
+        <stentry><codeph>INT</codeph>
+
+        </stentry>
+
+        <stentry><codeph>0</codeph> which is treated the same port as current
+            <codeph>impalad</codeph>
+
+        </stentry>
+
+        <stentry>n/a</stentry>
+
+      </strow>
+
+      <strow>
+
+        <stentry><codeph><varname>deadline</varname></codeph>
+
+        </stentry>
+
+        <stentry><codeph>INT</codeph>
+
+        </stentry>
+
+        <stentry><codeph>The value of the <codeph>--shutdown_deadline_s</codeph>
+            flag, which defaults to 1 hour.</codeph>
+
+        </stentry>
+
+        <stentry>
+
+          <p>
+            <codeph><varname>deadline</varname></codeph> must be a non-negative number,
+            specified in seconds.
+          </p>
+
+          <p>
+            The value, 0, for <varname>deadline</varname> specifies an immediate shutdown.
+          </p>
+
+        </stentry>
+
+      </strow>
+
+    </simpletable>
+
+    <p>
+      Take the following points into consideration when running the <codeph>SHUTDOWN</codeph>
+      statement:
+    </p>
+
+    <ul>
+      <li>
+        A client can shut down the
+        <xref
+          href="impala_components.xml#intro_impalad">coordinator</xref>
+        <codeph>impalad</codeph> that it is connected to via <codeph>:SHUTDOWN()</codeph>.
+      </li>
+
+      <li>
+        A client can remotely shut down another non-coordinator <codeph>impalad</codeph> via
+        <codeph>:SHUTDOWN('<varname>hostname</varname>')</codeph>.
+      </li>
+
+      <li>
+        The shutdown time limit can be overridden to force a quicker or slower shutdown by
+        specifying a deadline. The default deadline is determined by the
+        <codeph>--shutdown_deadline_s</codeph> flag, which defaults to 1 hour.
+      </li>
+
+      <li>
+        <xref href="impala_components.xml#intro_impalad">Executors</xref> can be shut down
+        without disrupting running queries. Short-running queries will finish, and long-running
+        queries will continue until a threshold time limit is reached.
+      </li>
+
+      <li>
+        If queries are submitted to a coordinator after shutdown of that coordinator has
+        started, they will fail.
+      </li>
+
+      <li>
+        Long running queries or other issues, such as stuck fragments, will slow down but not
+        prevent eventual shutdown.
+      </li>
+    </ul>
+
+    <p>
+      <b>Security considerations:</b>
+    </p>
+
+    <p>
+      The <codeph>ALL</codeph> privilege is required on the server.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/cancel_blurb_no"/>
+
+    <p>
+      <b>Examples:</b>
+    </p>
+
+<codeblock>:SHUTDOWN(); -- Shut down the current impalad  with the default deadline.
+:SHUTDOWN('hostname'); --  Shut down impalad running on hostname  with the default deadline.
+:SHUTDOWN(\"hostname:1234\"); -- Shut down impalad running on host at port 1234  with the default deadline.
+:SHUTDOWN(10); - Shut down the current impalad after 10 seconds.
+:SHUTDOWN('hostname', 10); - Shut down impalad running on hostname when all queries running on hostname finish, or after 10 seconds.
+:SHUTDOWN('hostname:11', 10 * 60); -- Shut down impalad running on hostname at port 11 when all queries running on hostname finish, or after 600 seconds.
+:SHUTDOWN(0); -- Perform an immdediate shutdown of the current impalad.</codeblock>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala31"/>
+    </p>
+
+  </conbody>
+
+</concept>

@@ -243,6 +243,7 @@ under the License.
         </topicref>
       </topicref>
       <topicref href="topics/impala_show.xml"/>
+      <topicref href="topics/impala_shutdown.xml"/>
       <topicref href="topics/impala_truncate_table.xml"/>
       <topicref href="topics/impala_update.xml"/>
       <topicref href="topics/impala_upsert.xml"/>
