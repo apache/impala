@@ -401,12 +401,13 @@ bool MathFunctions::DecimalInBaseToDecimal(int64_t src_num, int8_t src_base,
       *result = 0;
       place = 1;
     } else {
-      *result += digit * place;
-      place *= src_base;
+      *result +=
+          ArithmeticUtil::AsUnsigned<std::multiplies>(static_cast<int64_t>(digit), place);
       // Overflow.
       if (UNLIKELY(*result < digit)) {
         return false;
       }
+      place *= src_base;
     }
     temp_num /= 10;
   } while (temp_num > 0);
