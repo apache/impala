@@ -281,14 +281,28 @@ public class TestUtils {
     return createQueryContext(Catalog.DEFAULT_DB, System.getProperty("user.name"));
   }
 
+  public static TQueryCtx createQueryContext(String defaultDb, String user) {
+    TQueryCtx queryCtx = createQueryContext(defaultDb, user, new TQueryOptions());
+    // Disable rewrites by default because some analyzer tests have non-executable
+    // constant exprs (e.g. dummy UDFs) that do not work with constant folding.
+    queryCtx.client_request.query_options.setEnable_expr_rewrites(false);
+    return queryCtx;
+  }
+
+  public static TQueryCtx createQueryContext(TQueryOptions options) {
+    return createQueryContext(Catalog.DEFAULT_DB,
+        System.getProperty("user.name"), options);
+  }
+
   /**
    * Create a TQueryCtx for executing FE tests using the given default DB and user.
    * Expr rewrites are disabled by default and should be enabled by the caller
    * if so desired.
    */
-  public static TQueryCtx createQueryContext(String defaultDb, String user) {
+  public static TQueryCtx createQueryContext(String defaultDb,
+      String user, TQueryOptions options) {
     TQueryCtx queryCtx = new TQueryCtx();
-    queryCtx.setClient_request(new TClientRequest("FeTests", new TQueryOptions()));
+    queryCtx.setClient_request(new TClientRequest("FeTests", options));
     queryCtx.setQuery_id(new TUniqueId());
     queryCtx.setSession(new TSessionState(new TUniqueId(), TSessionType.BEESWAX,
         defaultDb, user, new TNetworkAddress("localhost", 0)));
@@ -300,9 +314,6 @@ public class TestUtils {
     queryCtx.setLocal_time_zone("UTC");
     queryCtx.setStart_unix_millis(System.currentTimeMillis());
     queryCtx.setPid(1000);
-    // Disable rewrites by default because some analyzer tests have non-executable
-    // constant exprs (e.g. dummy UDFs) that do not work with constant folding.
-    queryCtx.client_request.query_options.setEnable_expr_rewrites(false);
     return queryCtx;
   }
 

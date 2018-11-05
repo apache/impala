@@ -17,6 +17,10 @@
 
 package org.apache.impala.analysis;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.common.AnalysisException;
@@ -31,12 +35,12 @@ import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeCountStarRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
-import org.apache.impala.rewrite.RemoveRedundantStringCast;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
-import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
@@ -45,20 +49,95 @@ import com.google.common.collect.Lists;
  */
 public class ExprRewriteRulesTest extends FrontendTestBase {
 
-  /** Wraps an ExprRewriteRule to count how many times it's been applied. */
-  private static class CountingRewriteRuleWrapper implements ExprRewriteRule {
-    int rewrites;
-    ExprRewriteRule wrapped;
+  /**
+   * Specialized form of the Select fixture which analyzes a query without
+   * rewrites. Use this to invoke the rewrite engine within the test itself.
+   * Note: no analysis context is created in this case.
+   */
+  public static class SelectRewriteFixture extends AnalysisSessionFixture.SelectFixture {
+    private Analyzer analyzer_;
 
-    CountingRewriteRuleWrapper(ExprRewriteRule wrapped) {
-      this.wrapped = wrapped;
+    public SelectRewriteFixture(AnalysisSessionFixture analysisFixture) {
+      super(analysisFixture);
     }
 
-    public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
-      Expr ret = wrapped.apply(expr, analyzer);
-      if (expr != ret) rewrites++;
-      return ret;
+    @Override
+    public StatementBase analyze() throws AnalysisException {
+      Preconditions.checkState(analyzer_ == null, "Already analyzed");
+      stmt_ = parse();
+      analysisCtx_ = makeAnalysisContext();
+      analyzer_ = analysisCtx_.createAnalyzer(makeTableCache(stmt_));
+      stmt_.analyze(analyzer_);
+      return stmt_;
     }
+
+    @Override
+    public Analyzer analyzer() {
+      Preconditions.checkState(analyzer_ != null, "Not yet analyzed");
+      return analyzer_;
+    }
+
+    /**
+     * Given an analyzed expression and a set of rules, optionally ensure
+     * that each of the rules fires, then return the rewritten result.
+     */
+    public Expr rewrite(Expr origExpr, List<ExprRewriteRule> rules,
+        boolean requireFire) throws AnalysisException {
+      // Wrap the rules in a (stateful) rule that counts the
+      // number of times each wrapped rule fires.
+      List<ExprRewriteRule> wrappedRules = new ArrayList<>();
+      for (ExprRewriteRule r : rules) {
+        wrappedRules.add(new CountingRewriteRuleWrapper(r));
+      }
+      ExprRewriter rewriter = new ExprRewriter(wrappedRules);
+      Expr rewrittenExpr = rewriter.rewrite(origExpr, analyzer());
+      if (requireFire) {
+        // Asserts that all specified rules fired at least once. This makes sure that
+        // the rules being tested are, in fact, being executed. A common mistake is
+        // to write an expression that's re-written by the constant folder before
+        // getting to the rule that is intended for the test.
+        for (ExprRewriteRule r : wrappedRules) {
+          CountingRewriteRuleWrapper w = (CountingRewriteRuleWrapper) r;
+          assertTrue("Rule " + w.wrapped_.toString() + " didn't fire.",
+            w.rewrites_ > 0);
+        }
+      }
+      assertEquals(requireFire, rewriter.changed());
+      return rewrittenExpr;
+    }
+
+    public Expr verifyExprEquivalence(Expr origExpr, String expectedExprStr,
+        List<ExprRewriteRule> rules) throws AnalysisException {
+      String origSql = origExpr.toSql();
+      boolean expectChange = expectedExprStr != null;
+      Expr rewrittenExpr = rewrite(origExpr, rules, expectChange);
+      String rewrittenSql = rewrittenExpr.toSql();
+      if (expectedExprStr != null) {
+        assertEquals(expectedExprStr, rewrittenSql);
+      } else {
+        assertEquals(origSql, rewrittenSql);
+      }
+      return rewrittenExpr;
+    }
+
+    public Expr verifySelectRewrite(
+        List<ExprRewriteRule> rules, String expectedExprStr)
+        throws AnalysisException {
+      return verifyExprEquivalence(selectExpr(), expectedExprStr, rules);
+    }
+
+    public Expr verifyWhereRewrite(
+        List<ExprRewriteRule> rules, String expectedExprStr)
+        throws AnalysisException {
+      return verifyExprEquivalence(whereExpr(), expectedExprStr, rules);
+    }
+  }
+
+  public static AnalysisSessionFixture session = new AnalysisSessionFixture(frontend_);
+
+  @BeforeClass
+  public static void setup() {
+    session.options().setEnable_expr_rewrites(false);
   }
 
   public Expr RewritesOk(String exprStr, ExprRewriteRule rule, String expectedExprStr)
@@ -66,89 +145,41 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     return RewritesOk("functional.alltypessmall", exprStr, rule, expectedExprStr);
   }
 
-  public Expr RewritesOk(String tableName, String exprStr, ExprRewriteRule rule, String expectedExprStr)
+  public Expr RewritesOk(String tableName, String exprStr, ExprRewriteRule rule,
+      String expectedExprStr)
       throws ImpalaException {
     return RewritesOk(tableName, exprStr, Lists.newArrayList(rule), expectedExprStr);
   }
 
-  public Expr RewritesOk(String exprStr, List<ExprRewriteRule> rules, String expectedExprStr)
+  public Expr RewritesOk(String exprStr, List<ExprRewriteRule> rules,
+      String expectedExprStr)
       throws ImpalaException {
     return RewritesOk("functional.alltypessmall", exprStr, rules, expectedExprStr);
   }
 
   public Expr RewritesOk(String tableName, String exprStr, List<ExprRewriteRule> rules,
       String expectedExprStr) throws ImpalaException {
-    String stmtStr = "select " + exprStr + " from " + tableName;
-    // Analyze without rewrites since that's what we want to test here.
-    SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
-    AnalyzesOkNoRewrite(stmt);
-    Expr origExpr = stmt.getSelectList().getItems().get(0).getExpr();
-    Expr rewrittenExpr =
-        verifyExprEquivalence(origExpr, expectedExprStr, rules, stmt.getAnalyzer());
-    return rewrittenExpr;
+    ExprRewriteRulesTest.SelectRewriteFixture qf =
+        new ExprRewriteRulesTest.SelectRewriteFixture(session);
+    qf.table(tableName);
+    qf.exprSql(exprStr);
+    qf.analyze();
+    return qf.verifySelectRewrite(rules, expectedExprStr);
   }
 
   public Expr RewritesOkWhereExpr(String exprStr, ExprRewriteRule rule, String expectedExprStr)
       throws ImpalaException {
-    return RewritesOkWhereExpr("functional.alltypessmall", exprStr, rule, expectedExprStr);
+    return RewritesOkWhereExpr(exprStr, Lists.newArrayList(rule), expectedExprStr);
   }
 
-  public Expr RewritesOkWhereExpr(String tableName, String exprStr, ExprRewriteRule rule, String expectedExprStr)
-      throws ImpalaException {
-    return RewritesOkWhereExpr(tableName, exprStr, Lists.newArrayList(rule), expectedExprStr);
-  }
-
-  public Expr RewritesOkWhereExpr(String tableName, String exprStr, List<ExprRewriteRule> rules,
+  public Expr RewritesOkWhereExpr(String exprStr, List<ExprRewriteRule> rules,
       String expectedExprStr) throws ImpalaException {
-    String stmtStr = "select count(1)  from " + tableName + " where " + exprStr;
-    // Analyze without rewrites since that's what we want to test here.
-    SelectStmt stmt = (SelectStmt) ParsesOk(stmtStr);
-    AnalyzesOkNoRewrite(stmt);
-    Expr origExpr = stmt.getWhereClause();
-    Expr rewrittenExpr =
-        verifyExprEquivalence(origExpr, expectedExprStr, rules, stmt.getAnalyzer());
-    return rewrittenExpr;
-  }
-
-  private Expr verifyExprEquivalence(Expr origExpr, String expectedExprStr,
-      List<ExprRewriteRule> rules, Analyzer analyzer) throws AnalysisException {
-    String origSql = origExpr.toSql();
-
-    List<ExprRewriteRule> wrappedRules = Lists.newArrayList();
-    for (ExprRewriteRule r : rules) {
-      wrappedRules.add(new CountingRewriteRuleWrapper(r));
-    }
-    ExprRewriter rewriter = new ExprRewriter(wrappedRules);
-
-    Expr rewrittenExpr = rewriter.rewrite(origExpr, analyzer);
-    String rewrittenSql = rewrittenExpr.toSql();
-    boolean expectChange = expectedExprStr != null;
-    if (expectedExprStr != null) {
-      assertEquals(expectedExprStr, rewrittenSql);
-      // Asserts that all specified rules fired at least once. This makes sure that the
-      // rules being tested are, in fact, being executed. A common mistake is to write
-      // an expression that's re-written by the constant folder before getting to the
-      // rule that is intended for the test.
-      for (ExprRewriteRule r : wrappedRules) {
-        CountingRewriteRuleWrapper w = (CountingRewriteRuleWrapper) r;
-        Assert.assertTrue("Rule " + w.wrapped.toString() + " didn't fire.",
-          w.rewrites > 0);
-      }
-    } else {
-      assertEquals(origSql, rewrittenSql);
-    }
-    Assert.assertEquals(expectChange, rewriter.changed());
-    return rewrittenExpr;
-  }
-
-
-  /**
-   * Helper for prettier error messages than what JUnit.Assert provides.
-   */
-  private void assertEquals(String expected, String actual) {
-    if (!actual.equals(expected)) {
-      Assert.fail(String.format("\nActual: %s\nExpected: %s\n", actual, expected));
-    }
+    ExprRewriteRulesTest.SelectRewriteFixture qf =
+        new ExprRewriteRulesTest.SelectRewriteFixture(session);
+    qf.table("functional.alltypessmall");
+    qf.whereSql(exprStr);
+    qf.analyze();
+    return qf.verifyWhereRewrite(rules, expectedExprStr);
   }
 
   @Test

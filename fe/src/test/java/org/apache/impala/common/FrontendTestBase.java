@@ -78,6 +78,7 @@ import com.google.common.collect.Lists;
  * various components, e.g., ParsesOk(), ParserError(), AnalyzesOk(), AnalysisError(),
  * as well as helper functions for creating test-local tables/views and UDF/UDAs.
  */
+// TODO: Revise to leverage AnalysisFixure
 public class FrontendTestBase {
   protected static ImpaladTestCatalog catalog_ = new ImpaladTestCatalog();
   protected static Frontend frontend_ = new Frontend(
