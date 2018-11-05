@@ -150,8 +150,15 @@ public class NumericLiteral extends LiteralExpr {
 
   @Override
   public String toSqlImpl() { return getStringValue(); }
+
   @Override
-  public String getStringValue() { return value_.toString(); }
+  public String getStringValue() {
+    // BigDecimal returns CAST(0, DECIMAL(38, 38))
+    // as 0E-38. We want just 0.
+    return value_.compareTo(BigDecimal.ZERO) == 0
+        ? "0" : value_.toString();
+  }
+
   public double getDoubleValue() { return value_.doubleValue(); }
   public long getLongValue() { return value_.longValue(); }
   public long getIntValue() { return value_.intValue(); }

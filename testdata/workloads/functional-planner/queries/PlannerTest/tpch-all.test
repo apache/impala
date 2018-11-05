@@ -2677,7 +2677,7 @@ Per-Host Resource Estimates: Memory=346MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
+|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
@@ -2696,12 +2696,12 @@ Per-Host Resource Estimates: Memory=364MB
 PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
-|  output: sum:merge(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum:merge(l_extendedprice * (1 - l_discount))
+|  output: sum:merge(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum:merge(l_extendedprice * (1 - l_discount))
 |
 06:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
-|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
+|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_partkey = p_partkey
@@ -2724,12 +2724,12 @@ Per-Host Resource Estimates: Memory=299MB
 PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
-|  output: sum:merge(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum:merge(l_extendedprice * (1 - l_discount))
+|  output: sum:merge(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum:merge(l_extendedprice * (1 - l_discount))
 |
 06:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
-|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
+|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_partkey = p_partkey
@@ -4197,7 +4197,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN HDFS [tpch.customer]
 |  |     partitions=1/1 files=1 size=23.08MB
-|  |     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|  |     predicates: c_acctbal > 0, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |  |
 |  00:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB
@@ -4246,7 +4246,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN HDFS [tpch.customer]
 |  |     partitions=1/1 files=1 size=23.08MB
-|  |     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|  |     predicates: c_acctbal > 0, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |  |
 |  00:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB
@@ -4305,7 +4305,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN HDFS [tpch.customer]
 |  |     partitions=1/1 files=1 size=23.08MB
-|  |     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|  |     predicates: c_acctbal > 0, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |  |
 |  00:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB

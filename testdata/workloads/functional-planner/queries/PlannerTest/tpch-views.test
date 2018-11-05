@@ -935,7 +935,7 @@ where
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: sum(CASE WHEN tpch.part.p_type LIKE 'PROMO%' THEN tpch.lineitem.l_extendedprice * (1 - tpch.lineitem.l_discount) ELSE 0.0 END), sum(tpch.lineitem.l_extendedprice * (1 - tpch.lineitem.l_discount))
+|  output: sum(CASE WHEN tpch.part.p_type LIKE 'PROMO%' THEN tpch.lineitem.l_extendedprice * (1 - tpch.lineitem.l_discount) ELSE 0 END), sum(tpch.lineitem.l_extendedprice * (1 - tpch.lineitem.l_discount))
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: tpch.lineitem.l_partkey = tpch.part.p_partkey
@@ -1507,7 +1507,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN HDFS [tpch.customer]
 |  |     partitions=1/1 files=1 size=23.08MB
-|  |     predicates: tpch.customer.c_acctbal > 0.00, substr(tpch.customer.c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|  |     predicates: tpch.customer.c_acctbal > 0, substr(tpch.customer.c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |  |
 |  00:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB

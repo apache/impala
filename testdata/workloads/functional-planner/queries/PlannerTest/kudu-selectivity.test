@@ -165,7 +165,7 @@ Per-Host Resources: mem-estimate=9.75MB mem-reservation=0B thread-reservation=2
   |
   00:SCAN KUDU [functional_kudu.alltypes]
      predicates: id IN (int_col), bigint_col IN (9999999999999999999), double_col IN (CAST('inf' AS DOUBLE)), float_col IN (CAST('NaN' AS FLOAT)), int_col IN (9999999999), smallint_col IN (99999, 2), tinyint_col IN (1, 999), bool_col IN (1), string_col NOT IN ('bar')
-     kudu predicates: double_col IN (0.0), float_col IN (0.0), bigint_col IN (1, 2), int_col IN (1, 2), smallint_col IN (0, 2), string_col IN ('foo', 'foo       '), tinyint_col IN (1, 2), bool_col IN (TRUE)
+     kudu predicates: double_col IN (0), float_col IN (0), bigint_col IN (1, 2), int_col IN (1, 2), smallint_col IN (0, 2), string_col IN ('foo', 'foo       '), tinyint_col IN (1, 2), bool_col IN (TRUE)
      mem-estimate=9.75MB mem-reservation=0B thread-reservation=1
      tuple-ids=0 row-size=97B cardinality=5
      in pipelines: 00(GETNEXT)

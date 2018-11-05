@@ -895,7 +895,7 @@ Per-Host Resource Estimates: Memory=33MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
+|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
@@ -1447,7 +1447,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN KUDU [tpch_kudu.customer]
 |  |     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
-|  |     kudu predicates: c_acctbal > 0.00
+|  |     kudu predicates: c_acctbal > 0
 |  |
 |  00:SCAN KUDU [tpch_kudu.customer]
 |     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')

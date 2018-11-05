@@ -1683,7 +1683,7 @@ Per-Host Resource Estimates: Memory=402MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
+|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
@@ -1702,12 +1702,12 @@ Per-Host Resource Estimates: Memory=422MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
-|  output: sum:merge(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum:merge(l_extendedprice * (1 - l_discount))
+|  output: sum:merge(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum:merge(l_extendedprice * (1 - l_discount))
 |
 05:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE
-|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
+|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
@@ -2636,8 +2636,8 @@ PLAN-ROOT SINK
 |  |  output: avg(c_acctbal)
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.customer c]
-|     partitions=1/1 files=4 size=288.99MB
-|     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|     partitions=1/1 files=4 size=289.00MB
+|     predicates: c_acctbal > 0, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=288.99MB
@@ -2685,8 +2685,8 @@ PLAN-ROOT SINK
 |  |  output: avg(c_acctbal)
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.customer c]
-|     partitions=1/1 files=4 size=288.99MB
-|     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|     partitions=1/1 files=4 size=289.00MB
+|     predicates: c_acctbal > 0, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=288.99MB
