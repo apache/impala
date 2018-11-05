@@ -380,7 +380,7 @@ public class AnalysisContext {
           && !(stmt_ instanceof AlterViewStmt) && !(stmt_ instanceof ShowCreateTableStmt);
     }
     public boolean requiresExprRewrite() {
-      return isQueryStmt() ||isInsertStmt() || isCreateTableAsSelectStmt()
+      return isQueryStmt() || isInsertStmt() || isCreateTableAsSelectStmt()
           || isUpdateStmt() || isDeleteStmt();
     }
     public TLineageGraph getThriftLineageGraph() {
@@ -458,51 +458,51 @@ public class AnalysisContext {
       new StmtRewriter.SubqueryRewriter().rewrite(analysisResult_);
       reAnalyze = true;
     }
-    if (reAnalyze) {
-      // The rewrites should have no user-visible effect. Remember the original result
-      // types and column labels to restore them after the rewritten stmt has been
-      // reset() and re-analyzed. For a CTAS statement, the types represent column types
-      // of the table that will be created, including the partition columns, if any.
-      List<Type> origResultTypes = Lists.newArrayList();
-      for (Expr e : analysisResult_.stmt_.getResultExprs()) {
-        origResultTypes.add(e.getType());
-      }
-      List<String> origColLabels =
-          Lists.newArrayList(analysisResult_.stmt_.getColLabels());
+    if (!reAnalyze) return;
 
-      // Some expressions, such as function calls with constant arguments, can get
-      // folded into literals. Since literals do not require privilege requests, we
-      // must save the original privileges in order to not lose them during
-      // re-analysis.
-      ImmutableList<PrivilegeRequest> origPrivReqs =
-          analysisResult_.analyzer_.getPrivilegeReqs();
-
-      // Re-analyze the stmt with a new analyzer.
-      analysisResult_.analyzer_ = createAnalyzer(stmtTableCache);
-      analysisResult_.stmt_.reset();
-      try {
-        analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
-      } catch (AnalysisException e) {
-        LOG.error(String.format("Error analyzing the rewritten query.\n" +
-            "Original SQL: %s\nRewritten SQL: %s", analysisResult_.stmt_.toSql(),
-            analysisResult_.stmt_.toSql(true)));
-        throw e;
-      }
-
-      // Restore the original result types and column labels.
-      analysisResult_.stmt_.castResultExprs(origResultTypes);
-      analysisResult_.stmt_.setColLabels(origColLabels);
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Rewritten SQL: " + analysisResult_.stmt_.toSql(true));
-      }
-
-      // Restore privilege requests found during the first pass
-      for (PrivilegeRequest req : origPrivReqs) {
-        analysisResult_.analyzer_.registerPrivReq(req);
-      }
-      if (isExplain) analysisResult_.stmt_.setIsExplain();
-      Preconditions.checkState(!analysisResult_.requiresSubqueryRewrite());
+    // The rewrites should have no user-visible effect. Remember the original result
+    // types and column labels to restore them after the rewritten stmt has been
+    // reset() and re-analyzed. For a CTAS statement, the types represent column types
+    // of the table that will be created, including the partition columns, if any.
+    List<Type> origResultTypes = Lists.newArrayList();
+    for (Expr e : analysisResult_.stmt_.getResultExprs()) {
+      origResultTypes.add(e.getType());
     }
+    List<String> origColLabels =
+        Lists.newArrayList(analysisResult_.stmt_.getColLabels());
+
+    // Some expressions, such as function calls with constant arguments, can get
+    // folded into literals. Since literals do not require privilege requests, we
+    // must save the original privileges in order to not lose them during
+    // re-analysis.
+    ImmutableList<PrivilegeRequest> origPrivReqs =
+        analysisResult_.analyzer_.getPrivilegeReqs();
+
+    // Re-analyze the stmt with a new analyzer.
+    analysisResult_.analyzer_ = createAnalyzer(stmtTableCache);
+    analysisResult_.stmt_.reset();
+    try {
+      analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
+    } catch (AnalysisException e) {
+      LOG.error(String.format("Error analyzing the rewritten query.\n" +
+          "Original SQL: %s\nRewritten SQL: %s", analysisResult_.stmt_.toSql(),
+          analysisResult_.stmt_.toSql(true)));
+      throw e;
+    }
+
+    // Restore the original result types and column labels.
+    analysisResult_.stmt_.castResultExprs(origResultTypes);
+    analysisResult_.stmt_.setColLabels(origColLabels);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Rewritten SQL: " + analysisResult_.stmt_.toSql(true));
+    }
+
+    // Restore privilege requests found during the first pass
+    for (PrivilegeRequest req : origPrivReqs) {
+      analysisResult_.analyzer_.registerPrivReq(req);
+    }
+    if (isExplain) analysisResult_.stmt_.setIsExplain();
+    Preconditions.checkState(!analysisResult_.requiresSubqueryRewrite());
   }
 
   /**
