@@ -68,7 +68,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=185-ec90313c05
+export IMPALA_TOOLCHAIN_BUILD_ID=210-5033cfcc59
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p4
@@ -158,7 +158,7 @@ fi
 : ${CDH_DOWNLOAD_HOST:=native-toolchain.s3.amazonaws.com}
 export CDH_DOWNLOAD_HOST
 export CDH_MAJOR_VERSION=6
-export CDH_BUILD_NUMBER=663310
+export CDH_BUILD_NUMBER=680275
 export IMPALA_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
 export IMPALA_HBASE_VERSION=2.1.0-cdh6.x-SNAPSHOT
 export IMPALA_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
@@ -167,7 +167,7 @@ export IMPALA_PARQUET_VERSION=1.9.0-cdh6.x-SNAPSHOT
 export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
 export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
-export KUDU_JAVA_VERSION=1.8.0-cdh6.x-SNAPSHOT
+export KUDU_JAVA_VERSION=1.9.0-cdh6.x-SNAPSHOT
 
 # When IMPALA_(CDH_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
 # which will be substituted for the CDH platform label in bootstrap_toolchain.py
@@ -596,10 +596,10 @@ fi
 export KUDU_IS_SUPPORTED
 
 if $USE_CDH_KUDU; then
-  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1.8.0-cdh6.x-SNAPSHOT"}
+  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1.9.0-cdh6.x-SNAPSHOT"}
   export IMPALA_KUDU_HOME=${CDH_COMPONENTS_HOME}/kudu-$IMPALA_KUDU_VERSION
 else
-  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"5211897"}
+  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"4ec2598"}
   export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN}/kudu-$IMPALA_KUDU_VERSION
 fi
 
