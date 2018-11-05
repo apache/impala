@@ -443,7 +443,8 @@ class TestKuduOperations(KuduTestSuite):
         or "(type: TINYINT) is not compatible with column 'col1' (type: STRING)" in msg \
         or "has fewer columns than expected." in msg \
         or "Column col1 has unexpected type." in msg \
-        or "Client provided column col1[int64 NULLABLE] not present in tablet" in msg
+        or "Client provided column col1[int64 NULLABLE] not present in tablet" in msg \
+        or "Client provided column col1 INT64 NULLABLE not present in tablet"
 
   def _retry_query(self, cursor, query, expected):
     retries = 0
