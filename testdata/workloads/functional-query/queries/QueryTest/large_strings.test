@@ -129,7 +129,7 @@ select length(repeat(s, 10)) from (
     select l_comment from tpch.lineitem) t1
   ) t2
 ---- CATCH
-String length larger than allowed limit of 1 GB character data
+repeat() result is larger than allowed limit of 1 GB character data
 =====
 ---- QUERY
 select length(lpad(s, 1073741830, '!')) from (
@@ -225,4 +225,9 @@ select cast(fnv_hash(concat(l_comment, 'e')) as string) as h from tpch_parquet.l
 INT,INT
 ---- RESULTS
 611468161,611468161
+=====
+---- QUERY
+select repeat('the quick brown fox', 1024 * 1024 * 100)
+---- CATCH
+repeat() result is larger than allowed limit of 1 GB character data
 =====
