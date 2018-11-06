@@ -193,7 +193,7 @@ public class HdfsPartitionPruner {
       SlotRef slot = bp.getBoundSlot();
       if (slot == null) return false;
       Expr bindingExpr = bp.getSlotBinding(slot.getSlotId());
-      if (bindingExpr == null || !bindingExpr.isLiteral()) return false;
+      if (bindingExpr == null || !Expr.IS_LITERAL.apply(bindingExpr)) return false;
       return true;
     } else if (expr instanceof CompoundPredicate) {
       boolean res = canEvalUsingPartitionMd(expr.getChild(0), analyzer);
@@ -217,7 +217,7 @@ public class HdfsPartitionPruner {
       SlotRef slot = ((InPredicate)expr).getBoundSlot();
       if (slot == null) return false;
       for (int i = 1; i < expr.getChildren().size(); ++i) {
-        if (!(expr.getChild(i).isLiteral())) return false;
+        if (!Expr.IS_LITERAL.apply(expr.getChild(i))) return false;
       }
       return true;
     }
@@ -233,7 +233,7 @@ public class HdfsPartitionPruner {
     Preconditions.checkNotNull(expr);
     Preconditions.checkState(expr instanceof BinaryPredicate);
     boolean isSlotOnLeft = true;
-    if (expr.getChild(0).isLiteral()) isSlotOnLeft = false;
+    if (Expr.IS_LITERAL.apply(expr.getChild(0))) isSlotOnLeft = false;
 
     // Get the operands
     BinaryPredicate bp = (BinaryPredicate)expr;
@@ -241,10 +241,10 @@ public class HdfsPartitionPruner {
     Preconditions.checkNotNull(slot);
     Expr bindingExpr = bp.getSlotBinding(slot.getSlotId());
     Preconditions.checkNotNull(bindingExpr);
-    Preconditions.checkState(bindingExpr.isLiteral());
+    Preconditions.checkState(Expr.IS_LITERAL.apply(bindingExpr));
     LiteralExpr literal = (LiteralExpr)bindingExpr;
     Operator op = bp.getOp();
-    if ((literal instanceof NullLiteral) && (op != Operator.NOT_DISTINCT)
+    if (Expr.IS_NULL_LITERAL.apply(literal) && (op != Operator.NOT_DISTINCT)
         && (op != Operator.DISTINCT_FROM)) {
       return Sets.newHashSet();
     }
@@ -260,7 +260,7 @@ public class HdfsPartitionPruner {
     // Compute the matching partition ids
     if (op == Operator.NOT_DISTINCT) {
       // Case: SlotRef <=> Literal
-      if (literal instanceof NullLiteral) {
+      if (Expr.IS_NULL_LITERAL.apply(literal)) {
         Set<Long> ids = tbl_.getNullPartitionIds(partitionPos);
         if (ids != null) matchingIds.addAll(ids);
         return matchingIds;
@@ -277,7 +277,7 @@ public class HdfsPartitionPruner {
     if (op == Operator.DISTINCT_FROM) {
       // Case: SlotRef IS DISTINCT FROM Literal
       matchingIds.addAll(tbl_.getPartitionIds());
-      if (literal instanceof NullLiteral) {
+      if (Expr.IS_NULL_LITERAL.apply(literal)) {
         Set<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
         matchingIds.removeAll(nullIds);
       } else {

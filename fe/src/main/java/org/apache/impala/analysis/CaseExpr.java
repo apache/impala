@@ -32,7 +32,6 @@ import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -127,8 +126,8 @@ public class CaseExpr extends Expr {
     // Add the key_expr/val_expr pairs
     while (childIdx + 2 <= decodeExpr.getChildren().size()) {
       Expr candidate = decodeExpr.getChild(childIdx++);
-      if (candidate.isLiteral()) {
-        if (candidate.isNullLiteral()) {
+      if (IS_LITERAL.apply(candidate)) {
+        if (IS_NULL_VALUE.apply(candidate)) {
           // An example case is DECODE(foo, NULL, bar), since NULLs are considered
           // equal, this becomes CASE WHEN foo IS NULL THEN bar END.
           children_.add(encodedIsNull.clone());
@@ -402,7 +401,7 @@ public class CaseExpr extends Expr {
       Expr outputExpr = children_.get(i);
 
       if (outputExpr.isConstant()) {
-        if (outputExpr.isLiteral()) {
+        if (IS_LITERAL.apply(outputExpr)) {
           LiteralExpr outputLiteral = (LiteralExpr) outputExpr;
           if (constLiteralSet.add(outputLiteral)) ++numOutputConstants;
         } else {

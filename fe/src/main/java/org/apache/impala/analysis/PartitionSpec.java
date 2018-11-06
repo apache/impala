@@ -88,7 +88,7 @@ public class PartitionSpec extends PartitionSpecBase {
         throw new AnalysisException(String.format(
             "Column '%s' is not a partition column in table: %s",
              pk.getColName(), tableName_));
-      } else if (pk.getValue() instanceof NullLiteral) {
+      } else if (Expr.IS_NULL_LITERAL.apply(pk.getValue())) {
         // No need for further analysis checks of this partition key value.
         continue;
       }

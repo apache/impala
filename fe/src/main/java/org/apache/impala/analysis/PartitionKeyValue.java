@@ -69,7 +69,7 @@ public class PartitionKeyValue {
    */
   public String toPredicateSql() {
     String ident = ToSqlUtils.getIdentSql(colName_);
-    if (literalValue_ instanceof NullLiteral ||
+    if (Expr.IS_NULL_LITERAL.apply(literalValue_) ||
         literalValue_.getStringValue().isEmpty()) {
       return ident + " IS NULL";
     }
@@ -84,7 +84,8 @@ public class PartitionKeyValue {
   public static String getPartitionKeyValueString(LiteralExpr literalValue,
       String nullPartitionKeyValue) {
     Preconditions.checkNotNull(literalValue);
-    if (literalValue instanceof NullLiteral || literalValue.getStringValue().isEmpty()) {
+    if (Expr.IS_NULL_LITERAL.apply(literalValue) ||
+        literalValue.getStringValue().isEmpty()) {
       return nullPartitionKeyValue;
     }
     return literalValue.getStringValue();

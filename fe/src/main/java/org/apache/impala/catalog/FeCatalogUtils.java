@@ -292,7 +292,7 @@ public abstract class FeCatalogUtils {
     for (int i = 0; i < partColSql.size(); ++i) {
       LiteralExpr partVal = part.getPartitionValues().get(i);
       String partValSql = partVal.toSql();
-      if (partVal instanceof NullLiteral || partValSql.isEmpty()) {
+      if (Expr.IS_NULL_LITERAL.apply(partVal) || partValSql.isEmpty()) {
         conjuncts.add(partColSql.get(i) + " IS NULL");
       } else {
         conjuncts.add(partColSql.get(i) + "=" + partValSql);

@@ -182,7 +182,7 @@ public class RangePartition implements ParseNode {
       e.analyze(analyzer);
       literal = LiteralExpr.create(e, analyzer.getQueryCtx());
       Preconditions.checkNotNull(literal);
-      if (literal.isNullLiteral()) {
+      if (Expr.IS_NULL_VALUE.apply(literal)) {
         throw new AnalysisException(String.format("Range partition value %s cannot be " +
             "cast to target TIMESTAMP partitioning column.", value.toSql()));
       }

@@ -67,7 +67,7 @@ public class RemoveRedundantStringCast implements ExprRewriteRule {
         (expr.getChild(0).ignoreImplicitCast() instanceof CastExpr) &&
         expr.getChild(0).ignoreImplicitCast().getType().isStringType() &&
         expr.getChild(1).getType().isStringType() &&
-        expr.getChild(1).isLiteral();
+        Expr.IS_LITERAL.apply(expr.getChild(1));
 
     if (!isPotentiallyRedundantCast) return expr;
     // Ignore the implicit casts added during parsing.
@@ -83,7 +83,7 @@ public class RemoveRedundantStringCast implements ExprRewriteRule {
     // Need to trim() while comparing char(n) types as conversion might add trailing
     // spaces to the 'resultOfReverseCast'.
     if (resultOfReverseCast != null &&
-        !resultOfReverseCast.isNullLiteral() &&
+        !Expr.IS_NULL_VALUE.apply(resultOfReverseCast) &&
         resultOfReverseCast.getStringValue().trim()
             .equals(literalExpr.getStringValue().trim())) {
       return new BinaryPredicate(op, castExprChild,

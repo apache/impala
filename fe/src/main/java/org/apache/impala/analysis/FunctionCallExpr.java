@@ -429,7 +429,7 @@ public class FunctionCallExpr extends Expr {
         // The second argument to these functions is the desired scale, otherwise
         // the default is 0.
         Preconditions.checkState(children_.size() == 2);
-        if (children_.get(1).isNullLiteral()) {
+        if (IS_NULL_VALUE.apply(children_.get(1))) {
           throw new AnalysisException(fnName_.getFunction() +
               "() cannot be called with a NULL second argument.");
         }

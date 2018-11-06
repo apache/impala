@@ -229,7 +229,7 @@ public class FeSupport {
       throws InternalException {
     // Shortcuts to avoid expensive BE evaluation.
     if (pred instanceof BoolLiteral) return ((BoolLiteral) pred).getValue();
-    if (pred instanceof NullLiteral) return false;
+    if (Expr.IS_NULL_LITERAL.apply(pred)) return false;
     Preconditions.checkState(pred.getType().isBoolean());
     TColumnValue val = EvalExprWithoutRow(pred, queryCtx);
     // Return false if pred evaluated to false or NULL. True otherwise.

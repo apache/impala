@@ -32,8 +32,8 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
-import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.Column;
@@ -442,7 +442,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
       List<LiteralExpr> vals = partition.getPartitionValues();
       for (int i = 0; i < getNumClusteringCols(); i++) {
         LiteralExpr val = vals.get(i);
-        if (val instanceof NullLiteral) {
+        if (Expr.IS_NULL_LITERAL.apply(val)) {
           nullParts.get(i).add(partition.getId());
           continue;
         }

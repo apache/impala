@@ -43,8 +43,8 @@ public class NormalizeCountStarRule implements ExprRewriteRule {
     if (origExpr.getParams().isDistinct()) return expr;
     if (origExpr.getParams().exprs().size() != 1) return expr;
     Expr child = origExpr.getChild(0);
-    if (!child.isLiteral()) return expr;
-    if (child.isNullLiteral()) return expr;
+    if (!Expr.IS_LITERAL.apply(child)) return expr;
+    if (Expr.IS_NULL_VALUE.apply(child)) return expr;
     FunctionCallExpr result = new FunctionCallExpr(new FunctionName("count"),
         FunctionParams.createStarParam());
     return result;

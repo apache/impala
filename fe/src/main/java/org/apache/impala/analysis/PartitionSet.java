@@ -152,7 +152,7 @@ public class PartitionSet extends PartitionSpecBase {
         if (bp.getOp() == Operator.EQ) {
           SlotRef leftChild =
               bp.getChild(0) instanceof SlotRef ? ((SlotRef) bp.getChild(0)) : null;
-          NullLiteral nullChild = bp.getChild(1) instanceof NullLiteral ?
+          NullLiteral nullChild = Expr.IS_NULL_LITERAL.apply(bp.getChild(1)) ?
               ((NullLiteral) bp.getChild(1)) : null;
           StringLiteral stringChild = bp.getChild(1) instanceof StringLiteral ?
               ((StringLiteral) bp.getChild(1)) : null;

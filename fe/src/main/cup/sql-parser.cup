@@ -2916,7 +2916,7 @@ sign_chain_expr ::=
     // integrate signs into literals
     // integer literals require analysis to set their type, so the instance check below
     // is not equivalent to e.getType().isNumericType()
-    if (e.isLiteral() && e instanceof NumericLiteral) {
+    if (e instanceof NumericLiteral) {
       ((LiteralExpr)e).swapSign();
       RESULT = e;
     } else {

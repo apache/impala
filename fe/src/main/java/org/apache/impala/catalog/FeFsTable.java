@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
@@ -409,7 +410,7 @@ public interface FeFsTable extends FeTable {
         boolean matchFound = true;
         for (int i = 0; i < targetValues.size(); ++i) {
           String value;
-          if (partitionValues.get(i) instanceof NullLiteral) {
+          if (Expr.IS_NULL_LITERAL.apply(partitionValues.get(i))) {
             value = table.getNullPartitionKeyValue();
           } else {
             value = partitionValues.get(i).getStringValue();

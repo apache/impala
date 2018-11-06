@@ -208,7 +208,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     public boolean apply(Expr arg) {
       return arg instanceof BinaryPredicate
           && ((BinaryPredicate) arg).getOp() == Operator.EQ
-          && (((BinaryPredicate) arg).getChild(1).isLiteral());
+          && IS_LITERAL.apply(((BinaryPredicate) arg).getChild(1));
     }
   };
 
@@ -230,6 +230,65 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
               && !((FunctionCallExpr) arg).getFnName().isBuiltin();
         }
       };
+
+  /**
+   * @return true if the expression is a literal.
+   */
+  public final static com.google.common.base.Predicate<Expr> IS_LITERAL =
+    new com.google.common.base.Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr arg) {
+        return arg instanceof LiteralExpr;
+      }
+    };
+
+  /**
+   * @return true if the expression is a null literal.
+   */
+  public final static com.google.common.base.Predicate<Expr> IS_NULL_LITERAL =
+    new com.google.common.base.Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr arg) {
+        return arg instanceof NullLiteral;
+      }
+    };
+
+  /**
+   * @return true if the expression is a literal value other than NULL.
+   */
+  public final static com.google.common.base.Predicate<Expr> IS_NON_NULL_LITERAL =
+    new com.google.common.base.Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr arg) {
+        return IS_LITERAL.apply(arg) && !IS_NULL_LITERAL.apply(arg);
+      }
+    };
+
+  /**
+   * @return true if the expression is a null literal, or a
+   * cast of a null (as created by the ConstantFoldingRule.)
+   */
+  public final static com.google.common.base.Predicate<Expr> IS_NULL_VALUE =
+    new com.google.common.base.Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr arg) {
+        if (arg instanceof NullLiteral) return true;
+        if (! (arg instanceof CastExpr)) return false;
+        return IS_NULL_VALUE.apply(((CastExpr) arg).getChild(0));
+      }
+    };
+
+  /**
+   * @return true if the expression is a  literal, or a
+   * cast of a null (as created by the ConstantFoldingRule.)
+   */
+  public final static com.google.common.base.Predicate<Expr> IS_LITERAL_VALUE =
+    new com.google.common.base.Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr arg) {
+        return IS_LITERAL.apply(arg) || IS_NULL_VALUE.apply(arg);
+      }
+    };
 
   // id that's unique across the entire query statement and is assigned by
   // Analyzer.registerConjuncts(); only assigned for the top-level terms of a
@@ -638,7 +697,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       // Hack to ensure BE never sees TYPE_NULL. If an expr makes it this far without
       // being cast to a non-NULL type, the type doesn't matter and we can cast it
       // arbitrarily.
-      Preconditions.checkState(this instanceof NullLiteral || this instanceof SlotRef);
+      Preconditions.checkState(IS_NULL_LITERAL.apply(this) ||
+          this instanceof SlotRef);
       return NullLiteral.create(ScalarType.BOOLEAN).treeToThrift();
     }
     TExpr result = new TExpr();
@@ -1106,13 +1166,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
           // Remove constant boolean literal expressions.  N.B. - we may have
           // expressions determined to be constant which can not yet be discarded
           // because they can't be evaluated if expr rewriting is turned off.
-          if (rewritten instanceof NullLiteral ||
-              Expr.IS_FALSE_LITERAL.apply(rewritten)) {
+          if (IS_NULL_LITERAL.apply(rewritten) ||
+              IS_FALSE_LITERAL.apply(rewritten)) {
             conjuncts.clear();
             conjuncts.add(rewritten);
             return false;
           }
-          if (Expr.IS_TRUE_LITERAL.apply(rewritten)) {
+          if (IS_TRUE_LITERAL.apply(rewritten)) {
             pruned++;
             conjuncts.remove(index);
           }
@@ -1183,13 +1243,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * @return true if this is an instance of LiteralExpr
-   */
-  public boolean isLiteral() {
-    return this instanceof LiteralExpr;
-  }
-
-  /**
    * Returns true if this expression should be treated as constant. I.e. if the frontend
    * and backend should assume that two evaluations of the expression within a query will
    * return the same value. Examples of constant expressions include:
@@ -1217,17 +1270,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       if (!expr.isConstant()) return false;
     }
     return true;
-  }
-
-  /**
-   * @return true if this expr is either a null literal or a cast from
-   * a null literal.
-   */
-  public boolean isNullLiteral() {
-    if (this instanceof NullLiteral) return true;
-    if (!(this instanceof CastExpr)) return false;
-    Preconditions.checkState(children_.size() == 1);
-    return children_.get(0).isNullLiteral();
   }
 
   /**
@@ -1404,7 +1446,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static Expr pushNegationToOperands(Expr root) {
     Preconditions.checkNotNull(root);
-    if (Expr.IS_NOT_PREDICATE.apply(root)) {
+    if (IS_NOT_PREDICATE.apply(root)) {
       try {
         // Make sure we call function 'negate' only on classes that support it,
         // otherwise we may recurse infinitely.
