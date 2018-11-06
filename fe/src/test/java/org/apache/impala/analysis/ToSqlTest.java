@@ -73,19 +73,37 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql(query, query);
   }
 
+  private void testToSql(AnalysisContext ctx, String query) {
+    testToSql(ctx, query, query);
+  }
+
   private void testToSql(String query, String expected) {
     testToSql(query, System.getProperty("user.name"), expected);
+  }
+
+  private void testToSql(AnalysisContext ctx, String query, String expected) {
+    testToSql(ctx, query, System.getProperty("user.name"), expected);
   }
 
   private void testToSql(String query, String defaultDb, String expected) {
     testToSql(query, defaultDb, expected, false);
   }
 
+  private void testToSql(AnalysisContext ctx, String query, String defaultDb,
+      String expected) {
+    testToSql(ctx, query, defaultDb, expected, false);
+  }
+
   private void testToSql(String query, String defaultDb, String expected,
       boolean ignoreWhitespace) {
+    testToSql(createAnalysisCtx(defaultDb), query, defaultDb, expected, ignoreWhitespace);
+  }
+
+  private void testToSql(AnalysisContext ctx, String query, String defaultDb,
+      String expected, boolean ignoreWhitespace) {
     String actual = null;
     try {
-      ParseNode node = AnalyzesOk(query, createAnalysisCtx(defaultDb));
+      ParseNode node = AnalyzesOk(query, ctx);
       if (node instanceof QueryStmt) {
         actual = ((QueryStmt)node).getOrigSqlString();
       } else {
@@ -97,7 +115,7 @@ public class ToSqlTest extends FrontendTestBase {
       }
       if (!actual.equals(expected)) {
         String msg = "\n<<< Expected(length:" + expected.length() + "): [" + expected
-          + "]\n>>> Actual(length:" + actual.length() + "): [" + actual + "]\n";
+            + "]\n>>> Actual(length:" + actual.length() + "): [" + actual + "]\n";
         System.err.println(msg);
         fail(msg);
       }
@@ -106,7 +124,7 @@ public class ToSqlTest extends FrontendTestBase {
       fail("Failed to analyze query: " + query + "\n" + e.getMessage());
     }
     // Parse and analyze the resulting SQL to ensure its validity.
-    AnalyzesOk(actual, createAnalysisCtx(defaultDb));
+    AnalyzesOk(actual, ctx);
   }
 
   private void runTestTemplate(String sql, String expectedSql, String[]... testDims) {
@@ -1447,6 +1465,7 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql("REFRESH functional.alltypes");
     testToSql("REFRESH functional.alltypes PARTITION (year=2009, month=1)");
     testToSql("REFRESH FUNCTIONS functional");
+    testToSql(createAnalysisCtx(createAuthorizationConfig()), "REFRESH AUTHORIZATION");
   }
 
   /**

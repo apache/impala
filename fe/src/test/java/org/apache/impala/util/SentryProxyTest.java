@@ -32,6 +32,7 @@ import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
+import org.apache.impala.util.SentryProxy.AuthorizationDelta;
 import org.apache.sentry.api.service.thrift.TSentryPrivilege;
 import org.apache.sentry.api.service.thrift.TSentryRole;
 import org.junit.After;
@@ -516,7 +517,7 @@ public class SentryProxyTest {
   private static CatalogState refreshSentryAuthorization(CatalogServiceCatalog catalog,
       SentryPolicyService sentryService, boolean resetVersions) {
     SentryProxy.refreshSentryAuthorization(catalog, sentryService, USER, resetVersions,
-        false);
+        false, new AuthorizationDelta());
     return new CatalogState(catalog.getCatalogVersion(), getAuthCatalogSize(catalog));
   }
 

@@ -94,8 +94,8 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
         total += 1
     return total
 
-  def _validate_no_user_privileges(self, client, user, invalidate_metadata):
-    if invalidate_metadata: self.execute_query("invalidate metadata")
+  def _validate_no_user_privileges(self, client, user, refresh_authorization):
+    if refresh_authorization: self.execute_query("refresh authorization")
     result = self.user_query(client, "show grant user %s" % user, user=user)
     return TestOwnerPrivileges.count_user_privileges(result) == 0
 
@@ -128,31 +128,31 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
       sentry_log_dir="{0}/test_owner_privileges_with_grant".format(SENTRY_BASE_LOG_DIR))
   def test_owner_privileges_with_grant(self, vector, unique_database):
     """Tests owner privileges with grant on database, table, and view.
-    - invalidate_metadata=True: With Sentry refresh to make sure privileges are really
-                                stored in Sentry.
-    - invalidate_metadata=False: No Sentry refresh to make sure user can use owner
-                                 privileges right away without a Sentry refresh."""
-    for invalidate in [True, False]:
+    - refresh_authorization=True: With Sentry refresh to make sure privileges are really
+                                  stored in Sentry.
+    - refresh_authorization=False: No Sentry refresh to make sure user can use owner
+                                   privileges right away without a Sentry refresh."""
+    for refresh in [True, False]:
       try:
         self._setup_ownership_test()
         self._execute_owner_privilege_tests(TestObject(TestObject.DATABASE,
                                                        "owner_priv_db",
                                                        grant=True),
-                                            invalidate_metadata=invalidate)
+                                            refresh_authorization=refresh)
         self._execute_owner_privilege_tests(TestObject(TestObject.TABLE,
                                                        unique_database +
                                                        ".owner_priv_tbl",
                                                        grant=True),
-                                            invalidate_metadata=invalidate)
+                                            refresh_authorization=refresh)
         self._execute_owner_privilege_tests(TestObject(TestObject.VIEW,
                                                        unique_database +
                                                        ".owner_priv_view",
                                                        grant=True),
-                                            invalidate_metadata=invalidate)
+                                            refresh_authorization=refresh)
       finally:
         self._cleanup_ownership_test()
 
-  def _execute_owner_privilege_tests(self, test_obj, invalidate_metadata):
+  def _execute_owner_privilege_tests(self, test_obj, refresh_authorization):
     """
     Executes all the statements required to validate owner privileges work correctly
     for a specific database, table, or view.
@@ -166,7 +166,7 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
                      test_obj.view_select), user="oo_user1")
     self.validate_privileges(self.oo_user1_impalad_client, "show grant user oo_user1",
                              test_obj, user="oo_user1",
-                             invalidate_metadata=invalidate_metadata)
+                             refresh_authorization=refresh_authorization)
 
     # Ensure grant works.
     self.user_query(self.oo_user1_impalad_client,
@@ -180,11 +180,10 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
     self.user_query(self.oo_user1_impalad_client, "alter %s %s set owner user oo_user2" %
                     (test_obj.obj_type, test_obj.obj_name), user="oo_user1")
     assert self._validate_no_user_privileges(self.oo_user1_impalad_client,
-                                               user="oo_user1",
-                                               invalidate_metadata=invalidate_metadata)
+                                             user="oo_user1",
+                                             refresh_authorization=refresh_authorization)
 
     # Ensure oo_user1 cannot drop database after owner change.
-    # Use a delay to avoid cache consistency issue that could occur after alter.
     self.user_query(self.oo_user1_impalad_client, "drop %s %s" %
                     (test_obj.obj_type, test_obj.obj_name), user="oo_user1",
                     error_msg="does not have privileges to execute 'DROP'")
@@ -192,7 +191,7 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
     # oo_user2 should have privileges for object now.
     self.validate_privileges(self.oo_user2_impalad_client, "show grant user oo_user2",
                              test_obj, user="oo_user2",
-                             invalidate_metadata=invalidate_metadata)
+                             refresh_authorization=refresh_authorization)
 
     # Change the owner to a role and ensure oo_user2 doesn't have privileges.
     # Set the owner back to oo_user1 since for views, oo_user2 doesn't have select
@@ -201,40 +200,37 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
                        (test_obj.obj_type, test_obj.obj_name),
                        query_options={"sync_ddl": 1})
     assert self._validate_no_user_privileges(self.oo_user2_impalad_client,
-                                               user="oo_user2",
-                                               invalidate_metadata=invalidate_metadata)
+                                             user="oo_user2",
+                                             refresh_authorization=refresh_authorization)
     self.user_query(self.oo_user1_impalad_client,
                     "alter %s %s set owner role owner_priv_test_owner_role" %
                     (test_obj.obj_type, test_obj.obj_name), user="oo_user1")
     # Ensure oo_user1 does not have user privileges.
     assert self._validate_no_user_privileges(self.oo_user1_impalad_client,
-                                               user="oo_user1",
-                                               invalidate_metadata=invalidate_metadata)
+                                             user="oo_user1",
+                                             refresh_authorization=refresh_authorization)
 
     # Ensure role has owner privileges.
     self.validate_privileges(self.oo_user1_impalad_client,
                              "show grant role owner_priv_test_owner_role", test_obj,
-                             user="oo_user1", invalidate_metadata=invalidate_metadata)
+                             user="oo_user1", refresh_authorization=refresh_authorization)
 
     # Drop the object and ensure no role privileges.
-    # Use a delay to avoid cache consistency issue that could occur after alter.
     self.user_query(self.oo_user1_impalad_client, "drop %s %s " %
                     (test_obj.obj_type, test_obj.obj_name), user="oo_user1")
     assert self._validate_no_user_privileges(self.oo_user1_impalad_client,
                                              user="oo_user1",
-                                             invalidate_metadata=invalidate_metadata)
+                                             refresh_authorization=refresh_authorization)
 
     # Ensure user privileges are gone after drop.
-    # Use a delay to avoid cache consistency issue that could occur after drop.
     self.user_query(self.oo_user1_impalad_client, "create %s if not exists %s %s %s" %
                     (test_obj.obj_type, test_obj.obj_name, test_obj.table_def,
                      test_obj.view_select), user="oo_user1")
-    # Use a delay to avoid cache consistency issue that could occur after create.
     self.user_query(self.oo_user1_impalad_client, "drop %s %s " %
                     (test_obj.obj_type, test_obj.obj_name), user="oo_user1")
     assert self._validate_no_user_privileges(self.oo_user1_impalad_client,
                                              user="oo_user1",
-                                             invalidate_metadata=invalidate_metadata)
+                                             refresh_authorization=refresh_authorization)
 
   @pytest.mark.execute_serially
   @SentryCacheTestSuite.with_args(
@@ -311,28 +307,28 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
                      .format(SENTRY_BASE_LOG_DIR))
   def test_owner_privileges_without_grant(self, vector, unique_database):
     """Tests owner privileges without grant on database, table, and view.
-    - invalidate_metadata=True: With Sentry refresh to make sure privileges are really
-                                stored in Sentry.
-    - invalidate_metadata=False: No Sentry refresh to make sure user can use owner
-                                 privileges right away without a Sentry refresh."""
-    for invalidate in [True, False]:
+    - refresh_authorization=True: With Sentry refresh to make sure privileges are really
+                                  stored in Sentry.
+    - refresh_authorization=False: No Sentry refresh to make sure user can use owner
+                                   privileges right away without a Sentry refresh."""
+    for refresh in [True, False]:
       try:
         self._setup_ownership_test()
         self._execute_owner_privilege_tests_oo_nogrant(TestObject(TestObject.DATABASE,
                                                                   "owner_priv_db"),
-                                                       invalidate_metadata=invalidate)
+                                                       refresh_authorization=refresh)
         self._execute_owner_privilege_tests_oo_nogrant(TestObject(TestObject.TABLE,
                                                                   unique_database +
                                                                   ".owner_priv_tbl"),
-                                                       invalidate_metadata=invalidate)
+                                                       refresh_authorization=refresh)
         self._execute_owner_privilege_tests_oo_nogrant(TestObject(TestObject.VIEW,
                                                                   unique_database +
                                                                   ".owner_priv_view"),
-                                                       invalidate_metadata=invalidate)
+                                                       refresh_authorization=refresh)
       finally:
         self._cleanup_ownership_test()
 
-  def _execute_owner_privilege_tests_oo_nogrant(self, test_obj, invalidate_metadata):
+  def _execute_owner_privilege_tests_oo_nogrant(self, test_obj, refresh_authorization):
     """
     Executes all the statements required to validate owner privileges work correctly
     for a specific database, table, or view.
@@ -344,7 +340,7 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
                      test_obj.view_select), user="oo_user1")
     self.validate_privileges(self.oo_user1_impalad_client, "show grant user oo_user1",
                              test_obj, user="oo_user1",
-                             invalidate_metadata=invalidate_metadata)
+                             refresh_authorization=refresh_authorization)
 
     # Ensure grant doesn't work.
     self.user_query(self.oo_user1_impalad_client,
@@ -366,7 +362,7 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
                     (test_obj.obj_type, test_obj.obj_name), user="oo_user1")
     assert self._validate_no_user_privileges(self.oo_user1_impalad_client,
                                              user="oo_user1",
-                                             invalidate_metadata=invalidate_metadata)
+                                             refresh_authorization=refresh_authorization)
 
   @pytest.mark.execute_serially
   @SentryCacheTestSuite.with_args(

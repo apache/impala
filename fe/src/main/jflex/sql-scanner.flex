@@ -75,6 +75,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("array", SqlParserSymbols.KW_ARRAY);
     keywordMap.put("as", SqlParserSymbols.KW_AS);
     keywordMap.put("asc", SqlParserSymbols.KW_ASC);
+    keywordMap.put("authorization", SqlParserSymbols.KW_AUTHORIZATION);
     keywordMap.put("avro", SqlParserSymbols.KW_AVRO);
     keywordMap.put("between", SqlParserSymbols.KW_BETWEEN);
     keywordMap.put("bigint", SqlParserSymbols.KW_BIGINT);
@@ -318,13 +319,13 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     // Add SQL:2016 reserved words
     reservedWords.addAll(Arrays.asList(new String[] {
         "abs", "acos", "allocate", "any", "are", "array_agg", "array_max_cardinality",
-        "asensitive", "asin", "asymmetric", "at", "atan", "atomic", "authorization",
-        "avg", "begin", "begin_frame", "begin_partition", "blob", "both", "call",
-        "called", "cardinality", "cascaded", "ceil", "ceiling", "char_length",
-        "character", "character_length", "check", "classifier", "clob", "close",
-        "coalesce", "collate", "collect", "commit", "condition", "connect", "constraint",
-        "contains", "convert", "copy", "corr", "corresponding", "cos", "cosh", "count",
-        "covar_pop", "covar_samp", "cube", "cume_dist", "current_catalog", "current_date",
+        "asensitive", "asin", "asymmetric", "at", "atan", "atomic", "avg", "begin",
+        "begin_frame", "begin_partition", "blob", "both", "call", "called", "cardinality",
+        "cascaded", "ceil", "ceiling", "char_length", "character", "character_length",
+        "check", "classifier", "clob", "close", "coalesce", "collate", "collect",
+        "commit", "condition", "connect", "constraint", "contains", "convert", "copy",
+        "corr", "corresponding", "cos", "cosh", "count", "covar_pop", "covar_samp",
+        "cube", "cume_dist", "current_catalog", "current_date",
         "current_default_transform_group", "current_path", "current_path", "current_role",
         "current_role", "current_row", "current_schema", "current_time",
         "current_timestamp", "current_transform_group_for_type", "current_user", "cursor",

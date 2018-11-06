@@ -55,15 +55,16 @@ class SentryCacheTestSuite(CustomClusterTestSuite):
     return True
 
   def validate_privileges(self, client, query, test_obj, user=None,
-                          invalidate_metadata=False):
-    """Validate privileges. When invalidate_metadata is set to True, this function
-    will call "invalidate metadata" to ensure the privileges get refreshed from Sentry.
+                          refresh_authorization=False):
+    """Validate privileges. When refresh_authorization is set to True, this function
+    will call "refresh authorization" to ensure the privileges get refreshed from Sentry.
     """
     show_user = True if 'show grant user' in query else False
-    if invalidate_metadata: self.execute_query('invalidate metadata')
+    if refresh_authorization: self.execute_query('refresh authorization')
     result = self.execute_query_expect_success(client, query, user=user)
     return SentryCacheTestSuite.check_privileges(result, test_obj,
-                                                 null_create_date=not invalidate_metadata,
+                                                 null_create_date=(not
+                                                                   refresh_authorization),
                                                  show_user=show_user)
 
   def user_query(self, client, query, user=None, error_msg=None):

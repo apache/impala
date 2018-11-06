@@ -441,4 +441,16 @@ public class FrontendTestBase {
     StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
     return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache, fe.getAuthzChecker());
   }
+
+  /**
+   * Creates an authorization config for creating an AnalysisContext with
+   * authorization enabled.
+   */
+  protected AuthorizationConfig createAuthorizationConfig() {
+    AuthorizationConfig authzConfig = AuthorizationConfig.createHadoopGroupAuthConfig(
+        "server1", null, System.getenv("IMPALA_HOME") +
+            "/fe/src/test/resources/sentry-site.xml");
+    authzConfig.validateConfig();
+    return authzConfig;
+  }
 }

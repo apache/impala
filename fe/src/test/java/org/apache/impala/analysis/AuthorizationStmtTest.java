@@ -74,10 +74,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private final Frontend authzFrontend_;
 
   public AuthorizationStmtTest() {
-    AuthorizationConfig authzConfig = AuthorizationConfig.createHadoopGroupAuthConfig(
-        SENTRY_SERVER, null, System.getenv("IMPALA_HOME") +
-        "/fe/src/test/resources/sentry-site.xml");
-    authzConfig.validateConfig();
+    AuthorizationConfig authzConfig = createAuthorizationConfig();
     analysisContext_ = createAnalysisCtx(authzConfig, USER.getName());
     authzCatalog_ = new ImpaladTestCatalog(authzConfig);
     authzFrontend_ = new Frontend(authzConfig, authzCatalog_);
@@ -971,12 +968,15 @@ public class AuthorizationStmtTest extends FrontendTestBase {
 
   @Test
   public void testResetMetadata() throws ImpalaException {
-    // Invalidate metadata on server.
-    authorize("invalidate metadata")
-        .ok(onServer(TPrivilegeLevel.ALL))
-        .ok(onServer(TPrivilegeLevel.OWNER))
-        .ok(onServer(TPrivilegeLevel.REFRESH))
-        .error(refreshError("server"));
+    // Invalidate metadata/refresh authorization on server.
+    for (AuthzTest test: new AuthzTest[]{
+        authorize("invalidate metadata"),
+        authorize("refresh authorization")}) {
+      test.ok(onServer(TPrivilegeLevel.ALL))
+          .ok(onServer(TPrivilegeLevel.OWNER))
+          .ok(onServer(TPrivilegeLevel.REFRESH))
+          .error(refreshError("server"));
+    }
 
     // Invalidate metadata/refresh on a table / view
     for(String name: new String[] {"alltypes", "alltypes_view"}) {

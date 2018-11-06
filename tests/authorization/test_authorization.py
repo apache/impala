@@ -24,6 +24,8 @@ import tempfile
 import json
 import grp
 import re
+import sys
+import subprocess
 import urllib
 
 from time import sleep, time
@@ -500,7 +502,7 @@ class TestAuthorization(CustomClusterTestSuite):
       # Calling INVALIDATE METADATA when Sentry is unavailable should return an error.
       result = self.execute_query_expect_failure(self.client, "invalidate metadata")
       result_str = str(result)
-      assert "MESSAGE: CatalogException: Error updating authorization policy:" \
+      assert "MESSAGE: CatalogException: Error refreshing authorization policy:" \
              in result_str
       assert "CAUSED BY: ImpalaRuntimeException: Error refreshing authorization policy." \
              " Sentry is unavailable. Ensure Sentry is up:" in result_str
@@ -510,3 +512,115 @@ class TestAuthorization(CustomClusterTestSuite):
       self.execute_query_expect_success(self.client, "invalidate metadata")
     finally:
       self.role_cleanup(unique_role)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--server_name=server1 --sentry_config=%s" % SENTRY_CONFIG_FILE,
+      catalogd_args="--sentry_config=%s --sentry_catalog_polling_frequency_s=3600 " %
+                    SENTRY_CONFIG_FILE,
+      impala_log_dir=tempfile.mkdtemp(prefix="test_refresh_authorization_",
+                                      dir=os.getenv("LOG_DIR")))
+  def test_refresh_authorization(self, unique_role):
+    """Tests refresh authorization statement by adding and removing roles and privileges
+       externally. The long Sentry polling is used so that any authorization metadata
+       updated externally does not get polled by Impala in order to test an an explicit
+       call to refresh authorization statement."""
+    group_name = grp.getgrnam(getuser()).gr_name
+    self.role_cleanup(unique_role)
+    for sync_ddl in [1, 0]:
+      query_options = {'sync_ddl': sync_ddl}
+      clients = []
+      if sync_ddl:
+        # When sync_ddl is True, we want to ensure the changes are propagated to all
+        # coordinators.
+        for impalad in self.cluster.impalads:
+          clients.append(impalad.service.create_beeswax_client())
+      else:
+        clients.append(self.client)
+      try:
+        self.client.execute("create role %s" % unique_role)
+        self.client.execute("grant role %s to group `%s`" % (unique_role, group_name))
+        self.client.execute("grant refresh on server to %s" % unique_role)
+
+        self.validate_refresh_authorization_roles(unique_role, query_options, clients)
+        self.validate_refresh_authorization_privileges(unique_role, query_options,
+                                                       clients)
+      finally:
+        self.role_cleanup(unique_role)
+
+  def validate_refresh_authorization_roles(self, unique_role, query_options, clients):
+    """This method tests refresh authorization statement by adding and removing
+       roles externally."""
+    try:
+      # Create two roles inside Impala.
+      self.client.execute("create role %s_internal1" % unique_role)
+      self.client.execute("create role %s_internal2" % unique_role)
+      # Drop an existing role (_internal1) outside Impala.
+      role = "%s_internal1" % unique_role
+      subprocess.check_call(
+        ["/bin/bash", "-c",
+         "%s/bin/sentryShell --conf %s/sentry-site.xml -dr -r %s" %
+         (os.getenv("SENTRY_HOME"), os.getenv("SENTRY_CONF_DIR"), role)],
+        stdout=sys.stdout, stderr=sys.stderr)
+
+      result = self.execute_query_expect_success(self.client, "show roles")
+      assert any(role in x for x in result.data)
+      self.execute_query_expect_success(self.client, "refresh authorization",
+                                        query_options=query_options)
+      for client in clients:
+        result = self.execute_query_expect_success(client, "show roles")
+        assert not any(role in x for x in result.data)
+
+      # Add a new role outside Impala.
+      role = "%s_external" % unique_role
+      subprocess.check_call(
+          ["/bin/bash", "-c",
+           "%s/bin/sentryShell --conf %s/sentry-site.xml -cr -r %s" %
+           (os.getenv("SENTRY_HOME"), os.getenv("SENTRY_CONF_DIR"), role)],
+          stdout=sys.stdout, stderr=sys.stderr)
+
+      result = self.execute_query_expect_success(self.client, "show roles")
+      assert not any(role in x for x in result.data)
+      self.execute_query_expect_success(self.client, "refresh authorization",
+                                        query_options=query_options)
+      for client in clients:
+        result = self.execute_query_expect_success(client, "show roles")
+        assert any(role in x for x in result.data)
+    finally:
+      for suffix in ["internal1", "internal2", "external"]:
+        self.role_cleanup("%s_%s" % (unique_role, suffix))
+
+  def validate_refresh_authorization_privileges(self, unique_role, query_options,
+                                                clients):
+    """This method tests refresh authorization statement by adding and removing
+       privileges externally."""
+    # Grant select privilege outside Impala.
+    subprocess.check_call(
+        ["/bin/bash", "-c",
+         "%s/bin/sentryShell --conf %s/sentry-site.xml -gpr -p "
+         "'server=server1->db=functional->table=alltypes->action=select' -r %s" %
+         (os.getenv("SENTRY_HOME"), os.getenv("SENTRY_CONF_DIR"), unique_role)],
+        stdout=sys.stdout, stderr=sys.stderr)
+
+    # Before refresh authorization, there should only be one refresh privilege.
+    result = self.execute_query_expect_success(self.client, "show grant role %s" %
+                                               unique_role)
+    assert len(result.data) == 1
+    assert any("refresh" in x for x in result.data)
+
+    for client in clients:
+      self.execute_query_expect_failure(client,
+                                        "select * from functional.alltypes limit 1")
+
+    self.execute_query_expect_success(self.client, "refresh authorization",
+                                      query_options=query_options)
+
+    for client in clients:
+      # Ensure select privilege was granted after refresh authorization.
+      result = self.execute_query_expect_success(client, "show grant role %s" %
+                                                 unique_role)
+      assert len(result.data) == 2
+      assert any("select" in x for x in result.data)
+      assert any("refresh" in x for x in result.data)
+      self.execute_query_expect_success(client,
+                                        "select * from functional.alltypes limit 1")

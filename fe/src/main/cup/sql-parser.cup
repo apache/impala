@@ -273,8 +273,8 @@ parser code {:
 // ALL KEYWORDS ALSO NEED TO BE ADDED TO THE word PRODUCTION.
 terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_ANALYTIC, KW_AND, KW_ANTI, KW_API_VERSION,
-  KW_ARRAY, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BLOCKSIZE,
-  KW_BOOLEAN, KW_BY, KW_CACHED, KW_CASCADE, KW_CASE, KW_CAST, KW_CHANGE,
+  KW_ARRAY, KW_AS, KW_ASC, KW_AUTHORIZATION, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY,
+  KW_BLOCKSIZE, KW_BOOLEAN, KW_BY, KW_CACHED, KW_CASCADE, KW_CASE, KW_CAST, KW_CHANGE,
   KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPRESSION,
   KW_COMPUTE, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA, KW_DATABASE, KW_DATABASES,
   KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DEFAULT, KW_DELETE, KW_DELIMITED, KW_DESC,
@@ -714,15 +714,17 @@ overwrite_val ::=
 
 reset_metadata_stmt ::=
   KW_INVALIDATE KW_METADATA
-  {: RESULT = ResetMetadataStmt.createInvalidateStmt(null); :}
+  {: RESULT = ResetMetadataStmt.createInvalidateStmt(); :}
   | KW_INVALIDATE KW_METADATA table_name:table
   {: RESULT = ResetMetadataStmt.createInvalidateStmt(table); :}
   | KW_REFRESH table_name:table
-  {: RESULT = ResetMetadataStmt.createRefreshTableStmt(table, null); :}
+  {: RESULT = ResetMetadataStmt.createRefreshTableStmt(table); :}
   | KW_REFRESH table_name:table partition_spec:partition
-  {: RESULT = ResetMetadataStmt.createRefreshTableStmt(table, partition); :}
+  {: RESULT = ResetMetadataStmt.createRefreshPartitionStmt(table, partition); :}
   | KW_REFRESH KW_FUNCTIONS ident_or_default:db
   {: RESULT = ResetMetadataStmt.createRefreshFunctionsStmt(db); :}
+  | KW_REFRESH KW_AUTHORIZATION
+  {: RESULT = ResetMetadataStmt.createRefreshAuthorizationStmt(); :}
   ;
 
 explain_stmt ::=
@@ -3431,6 +3433,8 @@ word ::=
   | KW_AS:r
   {: RESULT = r.toString(); :}
   | KW_ASC:r
+  {: RESULT = r.toString(); :}
+  | KW_AUTHORIZATION:r
   {: RESULT = r.toString(); :}
   | KW_AVRO:r
   {: RESULT = r.toString(); :}

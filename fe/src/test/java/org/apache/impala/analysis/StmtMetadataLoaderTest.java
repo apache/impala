@@ -193,6 +193,7 @@ public class StmtMetadataLoaderTest {
     testNoLoad("invalidate metadata functional.alltypes");
     testNoLoad("refresh functional.alltypes");
     testNoLoad("refresh functions functional");
+    testNoLoad("refresh authorization");
 
     // This stmt requires the table to be loaded.
     testLoadTables("refresh functional.alltypes partition (year=2009, month=1)", 1, 1,

@@ -1134,6 +1134,22 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Refreshes Sentry authorization metadata. When authorization is not enabled, this
+   * method is a no-op.
+   */
+  public void refreshAuthorization(boolean resetVersions, List<TCatalogObject> added,
+      List<TCatalogObject> removed) throws CatalogException {
+    // Do nothing if authorization is not enabled.
+    if (sentryProxy_ == null) return;
+    try {
+      // Update the authorization policy, waiting for the result to complete.
+      sentryProxy_.refresh(resetVersions, added, removed);
+    } catch (Exception e) {
+      throw new CatalogException("Error refreshing authorization policy: ", e);
+    }
+  }
+
+  /**
    * Resets this catalog instance by clearing all cached table and database metadata.
    * Returns the current catalog version before reset has taken any effect. The
    * requesting impalad will use that version to determine when the
@@ -1143,15 +1159,8 @@ public class CatalogServiceCatalog extends Catalog {
     long currentCatalogVersion = getCatalogVersion();
     LOG.info("Invalidating all metadata. Version: " + currentCatalogVersion);
     // First update the policy metadata.
-    if (sentryProxy_ != null) {
-      // Sentry Service is enabled.
-      try {
-        // Update the authorization policy, waiting for the result to complete.
-        sentryProxy_.refresh(true);
-      } catch (Exception e) {
-        throw new CatalogException("Error updating authorization policy: ", e);
-      }
-    }
+    refreshAuthorization(true, /*catalog objects added*/ new ArrayList<>(),
+        /*catalog objects removed*/ new ArrayList<>());
 
     // Update the HDFS cache pools
     CachePoolReader reader = new CachePoolReader(true);
@@ -1972,8 +1981,9 @@ public class CatalogServiceCatalog extends Catalog {
     // an operation using SYNC_DDL must wait for.
     long maxNumAttempts = 5;
     if (result.isSetUpdated_catalog_objects()) {
-      maxNumAttempts =
-          result.getUpdated_catalog_objects().size() * (MAX_NUM_SKIPPED_TOPIC_UPDATES + 1);
+      maxNumAttempts = Math.max(maxNumAttempts,
+          result.getUpdated_catalog_objects().size() *
+              (MAX_NUM_SKIPPED_TOPIC_UPDATES + 1));
     }
     long numAttempts = 0;
     long begin = System.currentTimeMillis();

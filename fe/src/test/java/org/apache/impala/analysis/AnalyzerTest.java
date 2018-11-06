@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ScalarType;
@@ -32,6 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+
+import static org.junit.Assert.assertEquals;
 
 public class AnalyzerTest extends FrontendTestBase {
   protected final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
@@ -116,7 +119,7 @@ public class AnalyzerTest extends FrontendTestBase {
     tupleDesc.materializeSlots();
     descTbl.computeMemLayout();
 
-    Assert.assertEquals(89.0f, tupleDesc.getAvgSerializedSize(), 0.0);
+    assertEquals(89.0f, tupleDesc.getAvgSerializedSize(), 0.0);
     checkLayoutParams("functional.alltypes.timestamp_col", 16, 0, 80, 0, analyzer);
     checkLayoutParams("functional.alltypes.date_string_col", 12, 16, 80, 1, analyzer);
     checkLayoutParams("functional.alltypes.string_col", 12, 28, 80, 2, analyzer);
@@ -143,8 +146,8 @@ public class AnalyzerTest extends FrontendTestBase {
     TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
     aggDesc.materializeSlots();
     descTbl.computeMemLayout();
-    Assert.assertEquals(16.0f, aggDesc.getAvgSerializedSize(), 0.0);
-    Assert.assertEquals(16, aggDesc.getByteSize());
+    assertEquals(16.0f, aggDesc.getAvgSerializedSize(), 0.0);
+    assertEquals(16, aggDesc.getByteSize());
     checkLayoutParams(aggDesc.getSlots().get(0), 8, 0, 0, -1);
     checkLayoutParams(aggDesc.getSlots().get(1), 8, 8, 0, -1);
   }
@@ -161,8 +164,8 @@ public class AnalyzerTest extends FrontendTestBase {
     TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
     aggDesc.materializeSlots();
     descTbl.computeMemLayout();
-    Assert.assertEquals(16.0f, aggDesc.getAvgSerializedSize(), 0.0);
-    Assert.assertEquals(17, aggDesc.getByteSize());
+    assertEquals(16.0f, aggDesc.getAvgSerializedSize(), 0.0);
+    assertEquals(17, aggDesc.getByteSize());
     checkLayoutParams(aggDesc.getSlots().get(0), 8, 0, 16, 0);
     checkLayoutParams(aggDesc.getSlots().get(1), 8, 8, 0, -1);
   }
@@ -183,7 +186,7 @@ public class AnalyzerTest extends FrontendTestBase {
     slots.get(9).setIsMaterialized(false);
     descTbl.computeMemLayout();
 
-    Assert.assertEquals(64.0f, tupleDesc.getAvgSerializedSize(), 0.0);
+    assertEquals(64.0f, tupleDesc.getAvgSerializedSize(), 0.0);
     // Check non-materialized slots.
     checkLayoutParams("functional.alltypes.id", 0, -1, 0, 0, analyzer);
     checkLayoutParams("functional.alltypes.double_col", 0, -1, 0, 0, analyzer);
@@ -203,10 +206,10 @@ public class AnalyzerTest extends FrontendTestBase {
 
   private void checkLayoutParams(SlotDescriptor d, int byteSize, int byteOffset,
       int nullIndicatorByte, int nullIndicatorBit) {
-    Assert.assertEquals(byteSize, d.getByteSize());
-    Assert.assertEquals(byteOffset, d.getByteOffset());
-    Assert.assertEquals(nullIndicatorByte, d.getNullIndicatorByte());
-    Assert.assertEquals(nullIndicatorBit, d.getNullIndicatorBit());
+    assertEquals(byteSize, d.getByteSize());
+    assertEquals(byteOffset, d.getByteOffset());
+    assertEquals(nullIndicatorByte, d.getNullIndicatorByte());
+    assertEquals(nullIndicatorBit, d.getNullIndicatorBit());
   }
 
   private void checkLayoutParams(String colAlias, int byteSize, int byteOffset,
@@ -219,7 +222,7 @@ public class AnalyzerTest extends FrontendTestBase {
   // Requires query to parse to a SelectStmt.
   protected void checkExprType(String query, Type type) {
     SelectStmt select = (SelectStmt) AnalyzesOk(query);
-    Assert.assertEquals(select.getResultExprs().get(0).getType(), type);
+    assertEquals(select.getResultExprs().get(0).getType(), type);
   }
 
   /**
@@ -319,20 +322,42 @@ public class AnalyzerTest extends FrontendTestBase {
 
   @Test
   public void TestResetMetadata() {
-    AnalyzesOk("invalidate metadata");
-    AnalyzesOk("invalidate metadata functional.alltypessmall");
-    AnalyzesOk("invalidate metadata functional.alltypes_view");
-    AnalyzesOk("invalidate metadata functional.bad_serde");
-    AnalyzesOk("refresh functional.alltypessmall");
-    AnalyzesOk("refresh functional.alltypes_view");
-    AnalyzesOk("refresh functional.bad_serde");
-    AnalyzesOk("refresh functional.alltypessmall partition (year=2009, month=1)");
-    AnalyzesOk("refresh functional.alltypessmall partition (year=2009, month=NULL)");
+    BiConsumer<ParseNode, ResetMetadataStmt.Action> assertAction =
+        (parseNode, action) -> {
+          Preconditions.checkArgument(parseNode instanceof ResetMetadataStmt);
+          assertEquals(action, ((ResetMetadataStmt) parseNode).getAction());
+        };
+
+    assertAction.accept(AnalyzesOk("invalidate metadata"),
+        ResetMetadataStmt.Action.INVALIDATE_METADATA_ALL);
+    assertAction.accept(AnalyzesOk("invalidate metadata functional.alltypessmall"),
+        ResetMetadataStmt.Action.INVALIDATE_METADATA_TABLE);
+    assertAction.accept(AnalyzesOk("invalidate metadata functional.alltypes_view"),
+        ResetMetadataStmt.Action.INVALIDATE_METADATA_TABLE);
+    assertAction.accept(AnalyzesOk("invalidate metadata functional.bad_serde"),
+        ResetMetadataStmt.Action.INVALIDATE_METADATA_TABLE);
+    assertAction.accept(AnalyzesOk("refresh functional.alltypessmall"),
+        ResetMetadataStmt.Action.REFRESH_TABLE);
+    assertAction.accept(AnalyzesOk("refresh functional.alltypes_view"),
+        ResetMetadataStmt.Action.REFRESH_TABLE);
+    assertAction.accept(AnalyzesOk("refresh functional.bad_serde"),
+        ResetMetadataStmt.Action.REFRESH_TABLE);
+    assertAction.accept(AnalyzesOk(
+        "refresh functional.alltypessmall partition (year=2009, month=1)"),
+        ResetMetadataStmt.Action.REFRESH_PARTITION);
+    assertAction.accept(AnalyzesOk(
+        "refresh functional.alltypessmall partition (year=2009, month=NULL)"),
+        ResetMetadataStmt.Action.REFRESH_PARTITION);
+    assertAction.accept(AnalyzesOk(
+        "refresh authorization", createAnalysisCtx(createAuthorizationConfig())),
+        ResetMetadataStmt.Action.REFRESH_AUTHORIZATION);
 
     // invalidate metadata <table name> checks the Hive Metastore for table existence
     // and should not throw an AnalysisError if the table or db does not exist.
-    AnalyzesOk("invalidate metadata functional.unknown_table");
-    AnalyzesOk("invalidate metadata unknown_db.unknown_table");
+    assertAction.accept(AnalyzesOk("invalidate metadata functional.unknown_table"),
+        ResetMetadataStmt.Action.INVALIDATE_METADATA_TABLE);
+    assertAction.accept(AnalyzesOk("invalidate metadata unknown_db.unknown_table"),
+        ResetMetadataStmt.Action.INVALIDATE_METADATA_TABLE);
 
     AnalysisError("refresh functional.unknown_table",
         "Table does not exist: functional.unknown_table");

@@ -216,6 +216,9 @@ struct TResetMetadataRequest {
 
   // True if SYNC_DDL is set in query options
   7: required bool sync_ddl
+
+  // If set, refreshes authorization metadata.
+  8: optional bool authorization
 }
 
 // Response from TResetMetadataRequest

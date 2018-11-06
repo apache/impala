@@ -17,6 +17,7 @@
 
 package org.apache.impala.util;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +36,7 @@ import org.apache.impala.catalog.Role;
 import org.apache.impala.common.Reference;
 import org.apache.impala.common.SentryPolicyReaderException;
 import org.apache.impala.common.SentryUnavailableException;
+import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.log4j.Logger;
 import org.apache.sentry.api.service.thrift.TSentryGroup;
@@ -69,6 +71,28 @@ import org.apache.thrift.transport.TTransportException;
  * synchronize all modifications.
  */
 public class SentryProxy {
+  /**
+   * This class keeps track of catalog objects added and removed.
+   */
+  @VisibleForTesting
+  protected static class AuthorizationDelta {
+    private final List<TCatalogObject> added_;
+    private final List<TCatalogObject> removed_;
+
+    public AuthorizationDelta() {
+      this(new ArrayList<>(), new ArrayList<>());
+    }
+
+    public AuthorizationDelta(List<TCatalogObject> added,
+        List<TCatalogObject> removed) {
+      added_ = added;
+      removed_ = removed;
+    }
+
+    public List<TCatalogObject> getAddedCatalogObjects() { return added_; }
+    public List<TCatalogObject> getRemovedCatalogObjects() { return removed_; }
+  }
+
   private static final Logger LOG = Logger.getLogger(SentryProxy.class);
 
   // Used to periodically poll the Sentry Service and updates the catalog with any
@@ -113,7 +137,7 @@ public class SentryProxy {
     // We configure the PolicyReader to swallow any exception because we do not want to
     // kill the PolicyReader background thread on exception.
     policyReader_.scheduleAtFixedRate(new PolicyReader(/*reset versions*/ false,
-        /*swallow exception*/ true), 0,
+        /*swallow exception*/ true, new AuthorizationDelta()), 0,
         BackendConfig.INSTANCE.getSentryCatalogPollingFrequency(), TimeUnit.SECONDS);
   }
 
@@ -135,16 +159,20 @@ public class SentryProxy {
     private final boolean resetVersions_;
     // A flag to indicate whether or not to swallow any exception thrown.
     private final boolean swallowException_;
+    // Keep track of catalog objects added/removed.
+    private final AuthorizationDelta authzDelta_;
 
-    public PolicyReader(boolean resetVersions, boolean swallowException) {
+    public PolicyReader(boolean resetVersions, boolean swallowException,
+        AuthorizationDelta authzDelta) {
       resetVersions_ = resetVersions;
       swallowException_ = swallowException;
+      authzDelta_ = authzDelta;
     }
 
     public void run() {
       synchronized (SentryProxy.this) {
         refreshSentryAuthorization(catalog_, sentryPolicyService_, processUser_,
-            resetVersions_, swallowException_);
+            resetVersions_, swallowException_, authzDelta_);
       }
     }
   }
@@ -155,15 +183,13 @@ public class SentryProxy {
   @VisibleForTesting
   static void refreshSentryAuthorization(CatalogServiceCatalog catalog,
       SentryPolicyService sentryPolicyService, User processUser, boolean resetVersions,
-      boolean swallowException) {
-    Set<String> rolesToRemove;
-    Set<String> usersToRemove;
+      boolean swallowException, AuthorizationDelta authzDelta) {
     long startTime = System.currentTimeMillis();
     try {
-      rolesToRemove = refreshRolePrivileges(catalog, sentryPolicyService, processUser,
-          resetVersions);
-      usersToRemove = refreshUserPrivileges(catalog, sentryPolicyService, processUser,
-          resetVersions);
+      refreshRolePrivileges(catalog, sentryPolicyService, processUser, resetVersions,
+          authzDelta);
+      refreshUserPrivileges(catalog, sentryPolicyService, processUser, resetVersions,
+          authzDelta);
     } catch (Exception e) {
       LOG.error("Error refreshing Sentry policy: ", e);
       if (swallowException) return;
@@ -181,27 +207,16 @@ public class SentryProxy {
       LOG.debug("Refreshing Sentry policy took " +
           (System.currentTimeMillis() - startTime) + "ms");
     }
-
-    // Remove all the roles, incrementing the catalog version to indicate
-    // a change.
-    for (String roleName: rolesToRemove) {
-      catalog.removeRole(roleName);
-    }
-    // Remove all the users, incrementing the catalog version to indicate
-    // a change.
-    for (String userName: usersToRemove) {
-      catalog.removeUser(userName);
-    }
   }
 
   /**
    * Updates all roles and their associated privileges in the catalog by adding,
    * removing, and replacing the catalog objects to match those in Sentry since
-   * the last sentry sync update. This method returns a list of roles to be removed.
+   * the last sentry sync update.
    */
-  private static Set<String> refreshRolePrivileges(CatalogServiceCatalog catalog,
-      SentryPolicyService sentryPolicyService, User processUser, boolean resetVersions)
-      throws ImpalaException {
+  private static void refreshRolePrivileges(CatalogServiceCatalog catalog,
+      SentryPolicyService sentryPolicyService, User processUser, boolean resetVersions,
+      AuthorizationDelta authzDelta) throws ImpalaException {
     // Assume all roles should be removed. Then query the Policy Service and remove
     // roles from this set that actually exist.
     Set<String> rolesToRemove = catalog.getAuthPolicy().getAllRoleNames();
@@ -230,26 +245,34 @@ public class SentryProxy {
           role.setCatalogVersion(catalog.incrementAndGetCatalogVersion());
         }
       } else {
+        LOG.debug("Adding role: " + sentryRole.getRoleName());
         role = catalog.addRole(sentryRole.getRoleName(), grantGroups);
+        authzDelta.getAddedCatalogObjects().add(role.toTCatalogObject());
       }
       // allRolesPrivileges keys and sentryRole.getName() are used here since they both
       // come from Sentry so they agree in case.
       refreshPrivilegesInCatalog(catalog, resetVersions, sentryRole.getRoleName(), role,
-          allRolesPrivileges);
+          allRolesPrivileges, authzDelta);
     }
-    return rolesToRemove;
+    // Remove all the roles, incrementing the catalog version to indicate
+    // a change.
+    for (String roleName: rolesToRemove) {
+      LOG.debug("Removing role: " + roleName);
+      authzDelta.getRemovedCatalogObjects().add(
+          catalog.removeRole(roleName).toTCatalogObject());
+    }
   }
 
   /**
    * Updates all users and their associated privileges in the catalog by adding,
    * removing, and replacing the catalog objects to match those in Sentry since the
    * last Sentry sync update. Take note that we only store the users with privileges
-   * stored in Sentry and not all available users in the system. This method returns a
-   * list of users to be removed. User privileges do not support grant groups.
+   * stored in Sentry and not all available users in the system. User privileges do not
+   * support grant groups.
    */
-  private static Set<String> refreshUserPrivileges(CatalogServiceCatalog catalog,
-      SentryPolicyService sentryPolicyService, User processUser, boolean resetVersions)
-      throws ImpalaException {
+  private static void refreshUserPrivileges(CatalogServiceCatalog catalog,
+      SentryPolicyService sentryPolicyService, User processUser, boolean resetVersions,
+      AuthorizationDelta authzDelta) throws ImpalaException {
     // Assume all users should be removed. Then query the Policy Service and remove
     // users from this set that actually exist.
     Set<String> usersToRemove = catalog.getAuthPolicy().getAllUserNames();
@@ -268,13 +291,22 @@ public class SentryProxy {
           existingUser);
       if (existingUser.getRef() && resetVersions) {
         user.setCatalogVersion(catalog.incrementAndGetCatalogVersion());
+      } else if (!existingUser.getRef()) {
+        LOG.debug("Adding user: " + user.getName());
+        authzDelta.getAddedCatalogObjects().add(user.toTCatalogObject());
       }
       // allUsersPrivileges keys and userPrivilegesEntry.getKey() are used here since
       // they both come from Sentry so they agree in case.
       refreshPrivilegesInCatalog(catalog, resetVersions, userPrivilegesEntry.getKey(),
-          user, allUsersPrivileges);
+          user, allUsersPrivileges, authzDelta);
     }
-    return usersToRemove;
+    // Remove all the users, incrementing the catalog version to indicate
+    // a change.
+    for (String userName: usersToRemove) {
+      LOG.debug("Removing user: " + userName);
+      authzDelta.getRemovedCatalogObjects().add(
+          catalog.removeUser(userName).toTCatalogObject());
+    }
   }
 
   /**
@@ -285,8 +317,8 @@ public class SentryProxy {
    */
   private static void refreshPrivilegesInCatalog(CatalogServiceCatalog catalog,
       boolean resetVersions, String sentryPrincipalName, Principal principal,
-      Map<String, Set<TSentryPrivilege>> allPrincipalPrivileges)
-      throws CatalogException {
+      Map<String, Set<TSentryPrivilege>> allPrincipalPrivileges,
+      AuthorizationDelta authzDelta) throws CatalogException {
     // Assume all privileges should be removed. Privileges that still exist are
     // deleted from this set and we are left with the set of privileges that need
     // to be removed.
@@ -317,18 +349,28 @@ public class SentryProxy {
         continue;
       }
       if (principal.getPrincipalType() == TPrincipalType.ROLE) {
-        catalog.addRolePrivilege(principal.getName(), thriftPriv);
+        LOG.debug("Adding role privilege: " + privilegeName);
+        authzDelta.getAddedCatalogObjects().add(
+            catalog.addRolePrivilege(principal.getName(), thriftPriv).toTCatalogObject());
       } else {
-        catalog.addUserPrivilege(principal.getName(), thriftPriv);
+        LOG.debug("Adding user privilege: " + privilegeName);
+        authzDelta.getAddedCatalogObjects().add(
+            catalog.addUserPrivilege(principal.getName(), thriftPriv).toTCatalogObject());
       }
     }
 
     // Remove the privileges that no longer exist.
     for (String privilegeName: privilegesToRemove) {
       if (principal.getPrincipalType() == TPrincipalType.ROLE) {
-        catalog.removeRolePrivilege(principal.getName(), privilegeName);
+        LOG.debug("Removing role privilege: " + privilegeName);
+        authzDelta.getRemovedCatalogObjects().add(
+            catalog.removeRolePrivilege(principal.getName(), privilegeName)
+            .toTCatalogObject());
       } else {
-        catalog.removeUserPrivilege(principal.getName(), privilegeName);
+        LOG.debug("Removing user privilege: " + privilegeName);
+        authzDelta.getRemovedCatalogObjects().add(
+            catalog.removeUserPrivilege(principal.getName(), privilegeName)
+            .toTCatalogObject());
       }
     }
   }
@@ -570,12 +612,13 @@ public class SentryProxy {
    * the Catalog with any changes. Throws an ImpalaRuntimeException if there are any
    * errors executing the refresh job.
    */
-  public void refresh(boolean resetVersions) throws ImpalaRuntimeException {
+  public void refresh(boolean resetVersions, List<TCatalogObject> added,
+      List<TCatalogObject> removed) throws ImpalaRuntimeException {
     try {
       // Since this is a synchronous refresh, any exception thrown while running the
       // refresh should be thrown here instead of silently swallowing it.
-      policyReader_.submit(new PolicyReader(resetVersions, /*swallow exception*/ false))
-          .get();
+      policyReader_.submit(new PolicyReader(resetVersions, /*swallow exception*/ false,
+          new AuthorizationDelta(added, removed))).get();
     } catch (Exception e) {
       if (e.getCause() != null && e.getCause() instanceof SentryUnavailableException) {
         throw new ImpalaRuntimeException("Error refreshing authorization policy. " +

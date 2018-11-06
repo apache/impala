@@ -113,21 +113,18 @@ class TestGrantRevoke(SentryCacheTestSuite):
     """Tests grant and revoke for all objects. In these tests, we run tests twice. One
     with just using cache, hence the long sentry poll, and another one by ensuring
     refreshes happen from Sentry."""
-    for invalidate in [True, False]:
+    for refresh in [True, False]:
       for priv in ["all", "select"]:
-        self._execute_with_grant_option_tests(TestObject(TestObject.SERVER), priv,
-                                              invalidate)
-        self._execute_with_grant_option_tests(TestObject(TestObject.DATABASE,
-                                                         "grant_rev_db"), priv,
-                                              invalidate)
-        self._execute_with_grant_option_tests(TestObject(TestObject.TABLE,
-                                                         "grant_rev_db.tbl1"), priv,
-                                              invalidate)
-        self._execute_with_grant_option_tests(TestObject(TestObject.VIEW,
-                                                         "grant_rev_db.tbl1"), priv,
-                                              invalidate)
+        self._execute_with_grant_option_tests(
+            TestObject(TestObject.SERVER), priv, refresh)
+        self._execute_with_grant_option_tests(TestObject(
+            TestObject.DATABASE, "grant_rev_db"), priv, refresh)
+        self._execute_with_grant_option_tests(TestObject(
+            TestObject.TABLE, "grant_rev_db.tbl1"), priv, refresh)
+        self._execute_with_grant_option_tests(
+            TestObject(TestObject.VIEW, "grant_rev_db.tbl1"), priv, refresh)
 
-  def _execute_with_grant_option_tests(self, test_obj, privilege, invalidate_metadata):
+  def _execute_with_grant_option_tests(self, test_obj, privilege, refresh_authorization):
     """
     Executes grant/revoke tests with grant option.
     """
@@ -161,7 +158,7 @@ class TestGrantRevoke(SentryCacheTestSuite):
 
       # Ensure role has privilege.
       self.validate_privileges(self.client, "show grant role grant_revoke_test_role",
-                               test_obj, invalidate_metadata=invalidate_metadata)
+                               test_obj, refresh_authorization=refresh_authorization)
 
       # Try with grant option on existing privilege.
       test_obj.grant = True
@@ -170,7 +167,7 @@ class TestGrantRevoke(SentryCacheTestSuite):
                       % (privilege, test_obj.grant_name, test_obj.obj_name), user="root")
       # Ensure role has updated privilege.
       self.validate_privileges(self.client, "show grant role grant_revoke_test_role",
-                               test_obj, invalidate_metadata=invalidate_metadata)
+                               test_obj, refresh_authorization=refresh_authorization)
 
       # Revoke the grant option
       self.user_query(self.client, "revoke grant option for %s on %s %s from role "
@@ -180,7 +177,7 @@ class TestGrantRevoke(SentryCacheTestSuite):
       # Ensure role has updated privilege.
       test_obj.grant = False
       self.validate_privileges(self.client, "show grant role grant_revoke_test_role",
-                               test_obj, invalidate_metadata=invalidate_metadata)
+                               test_obj, refresh_authorization=refresh_authorization)
 
       # Add the grant option back, then add a regular privilege
       self.user_query(self.client,
@@ -190,7 +187,7 @@ class TestGrantRevoke(SentryCacheTestSuite):
                       (privilege, test_obj.grant_name, test_obj.obj_name), user="root")
       test_obj.grant = True
       self.validate_privileges(self.client, "show grant role grant_revoke_test_role",
-                               test_obj, invalidate_metadata=invalidate_metadata)
+                               test_obj, refresh_authorization=refresh_authorization)
 
       # Revoke the privilege
       self.user_query(self.client, "revoke %s on %s %s from role grant_revoke_test_role" %

@@ -3355,6 +3355,7 @@ public class CatalogOpExecutor {
    * 2) invalidate a specific table, forcing the metadata to be reloaded
    *    on the next access.
    * 3) perform a synchronous incremental refresh of a specific table.
+   * 4) perform a refresh on authorization metadata.
    *
    * For details on the specific commands see comments on their respective
    * methods in CatalogServiceCatalog.java.
@@ -3446,6 +3447,13 @@ public class CatalogOpExecutor {
         resp.getResult().addToUpdated_catalog_objects(addedDb.toTCatalogObject());
       }
       resp.getResult().setVersion(updatedThriftTable.getCatalog_version());
+    } else if (req.isAuthorization()) {
+      List<TCatalogObject> added = new ArrayList<>();
+      List<TCatalogObject> removed = new ArrayList<>();
+      catalog_.refreshAuthorization(false, added, removed);
+      resp.result.setUpdated_catalog_objects(added);
+      resp.result.setRemoved_catalog_objects(removed);
+      resp.result.setVersion(catalog_.getCatalogVersion());
     } else {
       // Invalidate the entire catalog if no table name is provided.
       Preconditions.checkArgument(!req.isIs_refresh());
