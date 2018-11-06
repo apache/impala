@@ -130,6 +130,15 @@ struct ScanRangeMetadata {
 ///     is counted as a disk and each remote disk queue (e.g. HDFS remote reads, S3)
 ///     is counted as a distinct disk.
 ///
+///   ScannerIoWaitTime - total amount of time scanner threads spent waiting for
+///     I/O. This is comparable to ScannerThreadsTotalWallClockTime in the traditional
+///     HDFS scan nodes and the scan node total time for the MT_DOP > 1 scan nodes.
+///     Low values show that each I/O completed before or around the time that the
+///     scanner thread was ready to process the data. High values show that scanner
+///     threads are spending significant time waiting for I/O instead of processing data.
+///     Note that if CPU load is high, this can include time that the thread is runnable
+///     but not scheduled.
+///
 ///   AverageHdfsReadThreadConcurrency - the average number of HDFS read threads
 ///     executing read operations on behalf of this scan. Higher values show that this
 ///     scan is using a larger proportion of the I/O capacity of the system. Lower values
@@ -200,6 +209,9 @@ class HdfsScanNodeBase : public ScanNode {
 
   RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length() {
     return max_compressed_text_file_length_;
+  }
+  RuntimeProfile::Counter* scanner_io_wait_time() const {
+    return scanner_io_wait_time_;
   }
 
   const static int SKIP_COLUMN = -1;
@@ -499,6 +511,9 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Total number of file handle opens where the file handle was not in the cache
   RuntimeProfile::Counter* cached_file_handles_miss_count_ = nullptr;
+
+  /// The amount of time scanner threads spend waiting for I/O.
+  RuntimeProfile::Counter* scanner_io_wait_time_ = nullptr;
 
   /// The number of active hdfs reading threads reading for this node.
   RuntimeProfile::Counter active_hdfs_read_thread_counter_;

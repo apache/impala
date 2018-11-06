@@ -46,13 +46,14 @@ namespace impala {
 
 const string KuduScanNodeBase::KUDU_ROUND_TRIPS = "TotalKuduScanRoundTrips";
 const string KuduScanNodeBase::KUDU_REMOTE_TOKENS = "KuduRemoteScanTokens";
+///   KuduClientTime - total amount of time scanner threads spent in the Kudu
+///   client, either waiting for data from Kudu or processing data.
+const string KuduScanNodeBase::KUDU_CLIENT_TIME = "KuduClientTime";
 
-KuduScanNodeBase::KuduScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs)
-    : ScanNode(pool, tnode, descs),
-      tuple_id_(tnode.kudu_scan_node.tuple_id),
-      client_(nullptr),
-      next_scan_token_idx_(0) {
+KuduScanNodeBase::KuduScanNodeBase(
+    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
+  : ScanNode(pool, tnode, descs),
+    tuple_id_(tnode.kudu_scan_node.tuple_id) {
   DCHECK(KuduIsAvailable());
 }
 
@@ -67,6 +68,7 @@ Status KuduScanNodeBase::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TUnit::UNIT);
   kudu_round_trips_ = ADD_COUNTER(runtime_profile(), KUDU_ROUND_TRIPS, TUnit::UNIT);
   kudu_remote_tokens_ = ADD_COUNTER(runtime_profile(), KUDU_REMOTE_TOKENS, TUnit::UNIT);
+  kudu_client_time_ = ADD_TIMER(runtime_profile(), KUDU_CLIENT_TIME);
 
   DCHECK(state->desc_tbl().GetTupleDescriptor(tuple_id_) != NULL);
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);

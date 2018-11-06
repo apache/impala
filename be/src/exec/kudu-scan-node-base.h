@@ -64,11 +64,11 @@ class KuduScanNodeBase : public ScanNode {
   const TupleId tuple_id_;
 
   /// Descriptor of tuples read from Kudu table.
-  const TupleDescriptor* tuple_desc_;
+  const TupleDescriptor* tuple_desc_ = nullptr;
 
   /// Pointer to the KuduClient, which is stored on the QueryState and shared between
   /// scanners and fragment instances.
-  kudu::client::KuduClient* client_;
+  kudu::client::KuduClient* client_ = nullptr;
 
   /// Kudu table reference. Shared between scanner threads for KuduScanNode.
   kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
@@ -77,14 +77,17 @@ class KuduScanNodeBase : public ScanNode {
   std::vector<std::string> scan_tokens_;
 
   /// The next index in 'scan_tokens_' to be assigned.
-  int next_scan_token_idx_;
+  int next_scan_token_idx_ = 0;
 
-  RuntimeProfile::Counter* kudu_round_trips_;
-  RuntimeProfile::Counter* kudu_remote_tokens_;
+  RuntimeProfile::Counter* kudu_round_trips_ = nullptr;
+  RuntimeProfile::Counter* kudu_remote_tokens_ = nullptr;
+  RuntimeProfile::Counter* kudu_client_time_ = nullptr;
   static const std::string KUDU_ROUND_TRIPS;
   static const std::string KUDU_REMOTE_TOKENS;
+  static const std::string KUDU_CLIENT_TIME;
 
   kudu::client::KuduClient* kudu_client() { return client_; }
   RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
+  RuntimeProfile::Counter* kudu_client_time() const { return kudu_client_time_; }
 };
-}
+} // namespace impala

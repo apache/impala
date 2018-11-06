@@ -236,9 +236,7 @@ Status KrpcDataStreamRecvr::SenderQueue::GetBatch(RowBatch** next_batch) {
                << PrintId(recvr_->fragment_instance_id())
                << " node=" << recvr_->dest_node_id();
       // Don't count time spent waiting on the sender as active time.
-      CANCEL_SAFE_SCOPED_TIMER(recvr_->data_wait_timer_, &is_cancelled_);
-      CANCEL_SAFE_SCOPED_TIMER(recvr_->inactive_timer_, &is_cancelled_);
-      CANCEL_SAFE_SCOPED_TIMER(
+      CANCEL_SAFE_SCOPED_TIMER3(recvr_->data_wait_timer_, recvr_->inactive_timer_,
           received_first_batch_ ? nullptr : recvr_->first_batch_wait_total_timer_,
           &is_cancelled_);
       data_arrival_cv_.wait(l);

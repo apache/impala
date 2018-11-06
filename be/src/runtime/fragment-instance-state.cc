@@ -88,8 +88,8 @@ Status FragmentInstanceState::Exec() {
   {
     // Must go out of scope before Finalize(), otherwise counter will not be
     // updated by time final profile is sent.
-    SCOPED_TIMER(profile()->total_time_counter());
-    SCOPED_TIMER(ADD_TIMER(timings_profile_, EXEC_TIMER_NAME));
+    SCOPED_TIMER2(profile()->total_time_counter(),
+        ADD_TIMER(timings_profile_, EXEC_TIMER_NAME));
     status = ExecInternal();
   }
 
@@ -268,16 +268,16 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
 Status FragmentInstanceState::Open() {
   DCHECK(!opened_promise_.IsSet());
   DCHECK_EQ(current_state_.Load(), FInstanceExecStatePB::WAITING_FOR_PREPARE);
-  SCOPED_TIMER(profile()->total_time_counter());
-  SCOPED_TIMER(ADD_TIMER(timings_profile_, OPEN_TIMER_NAME));
+  SCOPED_TIMER2(profile()->total_time_counter(),
+      ADD_TIMER(timings_profile_, OPEN_TIMER_NAME));
   SCOPED_THREAD_COUNTER_MEASUREMENT(runtime_state_->total_thread_statistics());
 
   if (runtime_state_->ShouldCodegen()) {
     UpdateState(StateEvent::CODEGEN_START);
     RETURN_IF_ERROR(runtime_state_->CreateCodegen());
     {
-      SCOPED_TIMER(runtime_state_->codegen()->ir_generation_timer());
-      SCOPED_TIMER(runtime_state_->codegen()->runtime_profile()->total_time_counter());
+      SCOPED_TIMER2(runtime_state_->codegen()->ir_generation_timer(),
+          runtime_state_->codegen()->runtime_profile()->total_time_counter());
       SCOPED_THREAD_COUNTER_MEASUREMENT(
           runtime_state_->codegen()->llvm_thread_counters());
       exec_tree_->Codegen(runtime_state_);

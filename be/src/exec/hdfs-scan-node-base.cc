@@ -391,6 +391,7 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   max_compressed_text_file_length_ = runtime_profile()->AddHighWaterMarkCounter(
       "MaxCompressedTextFileLength", TUnit::BYTES);
 
+  scanner_io_wait_time_ = ADD_TIMER(runtime_profile(), "ScannerIoWaitTime");
   hdfs_read_thread_concurrency_bucket_ = runtime_profile()->AddBucketingCounters(
       &active_hdfs_read_thread_counter_,
       ExecEnv::GetInstance()->disk_io_mgr()->num_total_disks() + 1);

@@ -115,7 +115,8 @@ void HdfsOrcScanner::ScanRangeInputStream::read(void* buf, uint64_t length,
   unique_ptr<BufferDescriptor> io_buffer;
   Status status;
   {
-    SCOPED_TIMER(scanner_->state_->total_storage_wait_timer());
+    SCOPED_TIMER2(scanner_->state_->total_storage_wait_timer(),
+        scanner_->scan_node_->scanner_io_wait_time());
     bool needs_buffers;
     status =
         scanner_->scan_node_->reader_context()->StartScanRange(range, &needs_buffers);

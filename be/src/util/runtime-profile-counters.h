@@ -54,29 +54,37 @@ namespace impala {
   #define ADD_CHILD_TIMER(profile, name, parent) \
       (profile)->AddCounter(name, TUnit::TIME_NS, parent)
   #define SCOPED_TIMER(c) \
-      ScopedTimer<MonotonicStopWatch> MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c)
+      ScopedTimer<MonotonicStopWatch> MACRO_CONCAT(SCOPED_TIMER_COUNTER, __COUNTER__)(c)
+  #define SCOPED_TIMER2(c1, c2) \
+      ScopedTimer<MonotonicStopWatch> \
+      MACRO_CONCAT(SCOPED_TIMER_COUNTER, __COUNTER__)(c1, c2)
   #define CANCEL_SAFE_SCOPED_TIMER(c, is_cancelled) \
-      ScopedTimer<MonotonicStopWatch> MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c, is_cancelled)
+      CANCEL_SAFE_SCOPED_TIMER3(c1, nullptr, nullptr, is_cancelled);
+  #define CANCEL_SAFE_SCOPED_TIMER3(c1, c2, c3, is_cancelled) \
+      ScopedTimer<MonotonicStopWatch> \
+      MACRO_CONCAT(SCOPED_TIMER_COUNTER, __COUNTER__)(c1, c2, c3, is_cancelled)
   #define COUNTER_ADD(c, v) (c)->Add(v)
   #define COUNTER_SET(c, v) (c)->Set(v)
   #define ADD_THREAD_COUNTERS(profile, prefix) (profile)->AddThreadCounters(prefix)
   #define SCOPED_THREAD_COUNTER_MEASUREMENT(c) \
     ThreadCounterMeasurement \
       MACRO_CONCAT(SCOPED_THREAD_COUNTER_MEASUREMENT, __COUNTER__)(c)
-  #define SCOPED_CONCURRENT_COUNTER(c) \
-    ScopedStopWatch<RuntimeProfile::ConcurrentTimerCounter> \
-      MACRO_CONCAT(SCOPED_CONCURRENT_COUNTER, __COUNTER__)(c)
+  #define SCOPED_CONCURRENT_COUNTER(c)                                    \
+    ScopedStopWatch<RuntimeProfile::ConcurrentTimerCounter> MACRO_CONCAT( \
+      SCOPED_CONCURRENT_COUNTER, __COUNTER__)(c)
 #else
-  #define ADD_COUNTER(profile, name, unit) NULL
-  #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) NULL
-  #define ADD_TIMER(profile, name) NULL
-  #define ADD_SUMMARY_STATS_TIMER(profile, name) NULL
-  #define ADD_CHILD_TIMER(profile, name, parent) NULL
+  #define ADD_COUNTER(profile, name, unit) nullptr
+  #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) nullptr
+  #define ADD_TIMER(profile, name) nullptr
+  #define ADD_SUMMARY_STATS_TIMER(profile, name) nullptr
+  #define ADD_CHILD_TIMER(profile, name, parent) nullptr
   #define SCOPED_TIMER(c)
+  #define SCOPED_TIMER2(c1, c2)
   #define CANCEL_SAFE_SCOPED_TIMER(c)
+  #define CANCEL_SAFE_SCOPED_TIMER3(c1, c2, c3)
   #define COUNTER_ADD(c, v)
   #define COUNTER_SET(c, v)
-  #define ADD_THREAD_COUNTERS(profile, prefix) NULL
+  #define ADD_THREAD_COUNTERS(profile, prefix) nullptr
   #define SCOPED_THREAD_COUNTER_MEASUREMENT(c)
   #define SCOPED_CONCURRENT_COUNTER(c)
 #endif
@@ -398,7 +406,7 @@ class RuntimeProfile::TimeSeriesCounter {
   /// is then read-only (i.e. there is no sample function).
   TimeSeriesCounter(const std::string& name, TUnit::type unit, int period,
       const std::vector<int64_t>& values)
-    : name_(name), unit_(unit), sample_fn_(NULL), samples_(period, values) {
+    : name_(name), unit_(unit), sample_fn_(), samples_(period, values) {
   }
 
   void ToThrift(TTimeSeriesCounter* counter);
@@ -469,6 +477,8 @@ class ScopedEvent {
 };
 
 /// Utility class to update time elapsed when the object goes out of scope.
+/// Supports updating 1-3 counters to avoid the overhead of redundant timer calls.
+///
 /// 'T' must implement the StopWatch "interface" (Start,Stop,ElapsedTime) but
 /// we use templates not to pay for virtual function overhead. In some cases
 /// the runtime profile may be deleted while the counter is still active. In this
@@ -476,13 +486,16 @@ class ScopedEvent {
 /// update the counter when the query is cancelled. The destructor for ScopedTimer
 /// can access both is_cancelled and the counter, so the caller must ensure that it
 /// is safe to access both at the end of the scope in which the timer is used.
-template<class T>
+template <class T>
 class ScopedTimer {
  public:
-  ScopedTimer(RuntimeProfile::Counter* counter, const bool* is_cancelled = NULL) :
-    counter_(counter), is_cancelled_(is_cancelled){
-    if (counter == NULL) return;
-    DCHECK(counter->unit() == TUnit::TIME_NS);
+  ScopedTimer(RuntimeProfile::Counter* c1 = nullptr,
+      RuntimeProfile::Counter* c2 = nullptr,
+      RuntimeProfile::Counter* c3 = nullptr, const bool* is_cancelled = nullptr)
+    : counter1_(c1), counter2_(c2), counter3_(c3), is_cancelled_(is_cancelled) {
+    DCHECK(c1 == nullptr || c1->unit() == TUnit::TIME_NS);
+    DCHECK(c2 == nullptr || c2->unit() == TUnit::TIME_NS);
+    DCHECK(c3 == nullptr || c3->unit() == TUnit::TIME_NS);
     sw_.Start();
   }
 
@@ -490,20 +503,22 @@ class ScopedTimer {
   void Start() { sw_.Start(); }
 
   void UpdateCounter() {
-    if (counter_ != NULL && !IsCancelled()) {
-      counter_->Add(sw_.ElapsedTime());
-    }
+    if (IsCancelled()) return;
+    int64_t elapsed = sw_.ElapsedTime();
+    if (counter1_ != nullptr) counter1_->Add(elapsed);
+    if (counter2_ != nullptr) counter2_->Add(elapsed);
+    if (counter3_ != nullptr) counter3_->Add(elapsed);
   }
 
-  /// Updates the underlying counter for the final time and clears the pointer to it.
+  /// Updates the underlying counters for the final time and clears the pointer to them.
   void ReleaseCounter() {
     UpdateCounter();
-    counter_ = NULL;
+    counter1_ = nullptr;
+    counter2_ = nullptr;
+    counter3_ = nullptr;
   }
 
-  bool IsCancelled() {
-    return is_cancelled_ != NULL && *is_cancelled_;
-  }
+  bool IsCancelled() { return is_cancelled_ != nullptr && *is_cancelled_; }
 
   /// Update counter when object is destroyed
   ~ScopedTimer() {
@@ -517,10 +532,11 @@ class ScopedTimer {
   ScopedTimer& operator=(const ScopedTimer& timer);
 
   T sw_;
-  RuntimeProfile::Counter* counter_;
+  RuntimeProfile::Counter* counter1_;
+  RuntimeProfile::Counter* counter2_;
+  RuntimeProfile::Counter* counter3_;
   const bool* is_cancelled_;
 };
-
 
 #ifdef __APPLE__
 // On OS X rusage via thread is not supported. In addition, the majority of the fields of
@@ -537,7 +553,7 @@ class ThreadCounterMeasurement {
  public:
   ThreadCounterMeasurement(RuntimeProfile::ThreadCounters* counters) :
     stop_(false), counters_(counters) {
-    DCHECK(counters != NULL);
+    DCHECK(counters != nullptr);
     sw_.Start();
     int ret = getrusage(RUSAGE_THREAD, &usage_base_);
     DCHECK_EQ(ret, 0);
