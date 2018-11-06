@@ -152,7 +152,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestBetweenToCompoundRule() throws ImpalaException {
+  public void testBetweenToCompoundRule() throws ImpalaException {
     ExprRewriteRule rule = BetweenToCompoundRule.INSTANCE;
 
     // Basic BETWEEN predicates.
@@ -191,7 +191,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestExtractCommonConjunctsRule() throws ImpalaException {
+  public void testExtractCommonConjunctsRule() throws ImpalaException {
     ExprRewriteRule rule = ExtractCommonConjunctRule.INSTANCE;
 
     // One common conjunct: int_col < 10
@@ -286,7 +286,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
    * testing is done in expr-test.cc.
    */
   @Test
-  public void TestFoldConstantsRule() throws ImpalaException {
+  public void testFoldConstantsRule() throws ImpalaException {
     ExprRewriteRule rule = FoldConstantsRule.INSTANCE;
 
     RewritesOk("1 + 1", rule, "2");
@@ -311,19 +311,26 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("rand()", rule, null);
     RewritesOk("random()", rule, null);
     RewritesOk("uuid()", rule, null);
+
+    RewritesOk("null + 1", rule, "NULL");
+    RewritesOk("(1 + 1) is null", rule, "FALSE");
+    RewritesOk("(null + 1) is null", rule, "TRUE");
   }
 
   @Test
-  public void TestSimplifyConditionalsRule() throws ImpalaException {
+  public void testIf() throws ImpalaException {
     ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
 
-    // IF
     RewritesOk("if(true, id, id+1)", rule, "id");
     RewritesOk("if(false, id, id+1)", rule, "id + 1");
     RewritesOk("if(null, id, id+1)", rule, "id + 1");
     RewritesOk("if(id = 0, true, false)", rule, null);
+  }
 
-    // IFNULL and its aliases
+  @Test
+  public void testIfNull() throws ImpalaException {
+    ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
+
     for (String f : ImmutableList.of("ifnull", "isnull", "nvl")) {
       RewritesOk(f + "(null, id)", rule, "id");
       RewritesOk(f + "(null, null)", rule, "NULL");
@@ -331,24 +338,31 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
 
       RewritesOk(f + "(1, 2)", rule, "1");
       RewritesOk(f + "(0, id)", rule, "0");
-      // non literal constants shouldn't be simplified by the rule
-      RewritesOk(f + "(1 + 1, id)", rule, null);
-      RewritesOk(f + "(NULL + 1, id)", rule, null);
-    }
 
-    // CompoundPredicate
+      // TODO: IMPALA-7769
+      //RewritesOk(f + "(1 + 1, id)", rule, "2");
+      //RewritesOk(f + "(NULL + 1, id)", rule, "id");
+      //RewritesOk(f + "(cast(null as int), id)", rule, "id");
+    }
+  }
+
+  @Test
+  public void testCompoundPredicate() throws ImpalaException {
+    ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
+
     RewritesOk("false || id = 0", rule, "id = 0");
     RewritesOk("true || id = 0", rule, "TRUE");
     RewritesOk("false && id = 0", rule, "FALSE");
     RewritesOk("true && id = 0", rule, "id = 0");
-    // NULL with a non-constant other child doesn't get rewritten.
-    RewritesOk("null && id = 0", rule, null);
-    RewritesOk("null || id = 0", rule, null);
+  }
 
+  @Test
+  public void testCaseWithExpr() throws ImpalaException {
+    ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
     List<ExprRewriteRule> rules = Lists.newArrayList();
     rules.add(FoldConstantsRule.INSTANCE);
     rules.add(rule);
-    // CASE with caseExpr
+
     // Single TRUE case with no preceding non-constant cases.
     RewritesOk("case 1 when 0 then id when 1 then id + 1 when 2 then id + 2 end", rule,
         "id + 1");
@@ -369,8 +383,15 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("case 0 when null then id else 1 end", rule, "1");
     // All non-constant, don't rewrite.
     RewritesOk("case id when 1 then 1 when 2 then 2 else 3 end", rule, null);
+  }
 
-    // CASE without caseExpr
+  @Test
+  public void testCaseWithoutExpr() throws ImpalaException {
+    ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
+    List<ExprRewriteRule> rules = Lists.newArrayList();
+    rules.add(FoldConstantsRule.INSTANCE);
+    rules.add(rule);
+
     // Single TRUE case with no predecing non-constant case.
     RewritesOk("case when FALSE then 0 when TRUE then 1 end", rule, "1");
     // Single TRUE case with preceding non-constant case.
@@ -392,8 +413,18 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
         "CASE WHEN id = 0 THEN 0 ELSE 2 END");
     // All non-constant, don't rewrite.
     RewritesOk("case when id = 0 then 0 when id = 1 then 1 end", rule, null);
+    RewritesOk("case when id = 1 then 10 when false then 20 " +
+        "when true then 30 else 40 end", rule,
+        "CASE WHEN id = 1 THEN 10 ELSE 30 END");
+  }
 
-    // DECODE
+  @Test
+  public void testDecode() throws ImpalaException {
+    ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
+    List<ExprRewriteRule> rules = Lists.newArrayList();
+    rules.add(FoldConstantsRule.INSTANCE);
+    rules.add(rule);
+
     // Single TRUE case with no preceding non-constant case.
     RewritesOk("decode(1, 0, id, 1, id + 1, 2, id + 2)", rules, "id + 1");
     // Single TRUE case with predecing non-constant case.
@@ -414,9 +445,16 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("decode(id, null, 0, 1)", rules, null);
     // All non-constant, don't rewrite.
     RewritesOk("decode(id, 1, 1, 2, 2)", rules, null);
+  }
 
-    // IMPALA-5125: Exprs containing aggregates should not be rewritten if the rewrite
-    // eliminates all aggregates.
+  /**
+   * IMPALA-5125: Exprs containing aggregates should not be rewritten if the rewrite
+   * eliminates all aggregates.
+   */
+  @Test
+  public void testExcludeAggregates() throws ImpalaException {
+    ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
+
     RewritesOk("if(true, 0, sum(id))", rule, null);
     RewritesOk("if(false, max(id), min(id))", rule, "min(id)");
     RewritesOk("true || sum(id) = 0", rule, null);
@@ -424,7 +462,18 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("ifnull(1, max(id))", rule, null);
     RewritesOk("case when true then 0 when false then sum(id) end", rule, null);
     RewritesOk(
-        "case when true then count(id) when false then sum(id) end", rule, "count(id)");
+        "case when true then count(id) when false then sum(id) end",
+        rule, "count(id)");
+    RewritesOk("sum(id) is distinct from null", rule, null);
+    RewritesOk("sum(id) is distinct from sum(id)", rule, null);
+  }
+
+  @Test
+  public void testCoalesce() throws ImpalaException {
+    ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
+    List<ExprRewriteRule> rules = Lists.newArrayList();
+    rules.add(FoldConstantsRule.INSTANCE);
+    rules.add(rule);
 
     // IMPALA-5016: Simplify COALESCE function
     // Test skipping leading nulls.
@@ -453,7 +502,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestNormalizeExprsRule() throws ImpalaException {
+  public void testNormalizeExprsRule() throws ImpalaException {
     ExprRewriteRule rule = NormalizeExprsRule.INSTANCE;
 
     // CompoundPredicate
@@ -466,7 +515,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestNormalizeBinaryPredicatesRule() throws ImpalaException {
+  public void testNormalizeBinaryPredicatesRule() throws ImpalaException {
     ExprRewriteRule rule = NormalizeBinaryPredicatesRule.INSTANCE;
 
     RewritesOk("0 = id", rule, "id = 0");
@@ -488,7 +537,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestEqualityDisjunctsToInRule() throws ImpalaException {
+  public void testEqualityDisjunctsToInRule() throws ImpalaException {
     ExprRewriteRule edToInrule = EqualityDisjunctsToInRule.INSTANCE;
     ExprRewriteRule normalizeRule = NormalizeBinaryPredicatesRule.INSTANCE;
     List<ExprRewriteRule> comboRules = Lists.newArrayList(normalizeRule,
@@ -551,7 +600,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestNormalizeCountStarRule() throws ImpalaException {
+  public void testNormalizeCountStarRule() throws ImpalaException {
     ExprRewriteRule rule = NormalizeCountStarRule.INSTANCE;
 
     RewritesOk("count(1)", rule, "count(*)");
@@ -565,7 +614,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestSimplifyDistinctFromRule() throws ImpalaException {
+  public void testSimplifyDistinctFromRule() throws ImpalaException {
     ExprRewriteRule rule = SimplifyDistinctFromRule.INSTANCE;
 
     // Can be simplified
@@ -588,7 +637,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestRemoveRedundantStringCastRule() throws ImpalaException {
+  public void testRemoveRedundantStringCastRule() throws ImpalaException {
     ExprRewriteRule removeRule = RemoveRedundantStringCast.INSTANCE;
     ExprRewriteRule foldConstantRule = FoldConstantsRule.INSTANCE;
     List<ExprRewriteRule> comboRules = Lists.newArrayList(removeRule, foldConstantRule);
@@ -682,7 +731,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
    * it can be further simplified via SimplifyDistinctFromRule.
    */
   @Test
-  public void TestNullif() throws ImpalaException {
+  public void testNullif() throws ImpalaException {
     List<ExprRewriteRule> rules = Lists.newArrayList(
         SimplifyConditionalsRule.INSTANCE,
         SimplifyDistinctFromRule.INSTANCE);
