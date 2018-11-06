@@ -93,7 +93,21 @@ StringVal StringFunctions::Repeat(
     FunctionContext* context, const StringVal& str, const BigIntVal& n) {
   if (str.is_null || n.is_null) return StringVal::null();
   if (str.len == 0 || n.val <= 0) return StringVal();
-  StringVal result(context, str.len * n.val);
+  if (n.val > StringVal::MAX_LENGTH) {
+    context->SetError("Number of repeats in repeat() call is larger than allowed limit "
+        "of 1 GB character data.");
+    return StringVal::null();
+  }
+  static_assert(numeric_limits<int64_t>::max() / numeric_limits<int>::max()
+      >= StringVal::MAX_LENGTH,
+      "multiplying StringVal::len with positive int fits in int64_t");
+  int64_t out_len = str.len * n.val;
+  if (out_len > StringVal::MAX_LENGTH) {
+    context->SetError(
+        "repeat() result is larger than allowed limit of 1 GB character data.");
+    return StringVal::null();
+  }
+  StringVal result(context, static_cast<int>(out_len));
   if (UNLIKELY(result.is_null)) return StringVal::null();
   uint8_t* ptr = result.ptr;
   for (int64_t i = 0; i < n.val; ++i) {

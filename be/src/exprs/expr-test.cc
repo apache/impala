@@ -611,8 +611,8 @@ class ExprTest : public testing::Test {
     Status status = executor_->Exec(stmt, &result_types);
     status = executor_->FetchResult(&result_row);
     ASSERT_FALSE(status.ok());
-    ASSERT_TRUE(EndsWith(status.msg().msg(), error_string)) << "Actual: "
-        << status.msg().msg() << endl << "Expected: " << error_string;
+    ASSERT_TRUE(EndsWith(status.msg().msg(), error_string)) << "Actual: '"
+        << status.msg().msg() << "'" << endl << "Expected: '" << error_string << "'";
   }
 
   template <typename T> void TestFixedPointComparisons(bool test_boundaries) {
@@ -4082,6 +4082,10 @@ TEST_F(ExprTest, StringFunctions) {
   TestIsNull("repeat(NULL, 6)", TYPE_STRING);
   TestIsNull("repeat('ab', NULL)", TYPE_STRING);
   TestIsNull("repeat(NULL, NULL)", TYPE_STRING);
+  TestErrorString("repeat('x', 1024 * 1024 * 1024 * 10)", "Number of repeats in "
+      "repeat() call is larger than allowed limit of 1 GB character data.\n");
+  TestErrorString("repeat('xx', 1024 * 1024 * 1024)", "repeat() result is larger than "
+      "allowed limit of 1 GB character data.\n");
 
   TestValue("ascii('')", TYPE_INT, 0);
   TestValue("ascii('abcde')", TYPE_INT, 'a');
