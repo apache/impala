@@ -18,6 +18,7 @@
 # under the License.
 
 import os
+from copy import deepcopy
 from subprocess import check_call
 from pytest import skip
 
@@ -75,6 +76,12 @@ class TestNestedTypes(ImpalaTestSuite):
     """Test subplans with various exec nodes inside it."""
     self.run_test_case('QueryTest/nested-types-subplan', vector)
 
+  def test_subplan_single_node(self, vector):
+    """Test subplans with various exec nodes inside it and num_nodes=1."""
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/nested-types-subplan-single-node', new_vector)
+
   def test_with_clause(self, vector):
     """Queries using nested types and with WITH clause."""
     self.run_test_case('QueryTest/nested-types-with-clause', vector)
@@ -93,6 +100,14 @@ class TestNestedTypes(ImpalaTestSuite):
     """Queries over the larger nested TPCH dataset with memory limits tuned for
     a 3-node HDFS minicluster."""
     self.run_test_case('QueryTest/nested-types-tpch-mem-limit', vector)
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_tpch_mem_limit_single_node(self, vector):
+    """Queries over the larger nested TPCH dataset with memory limits tuned for
+    a 3-node HDFS minicluster with num_nodes=1."""
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/nested-types-tpch-mem-limit-single-node', new_vector)
 
   @SkipIfEC.fix_later
   def test_parquet_stats(self, vector):

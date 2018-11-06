@@ -16,6 +16,7 @@
 # under the License.
 
 import pytest
+from copy import deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
@@ -76,6 +77,10 @@ class TestSpillingDebugActionDimensions(ImpalaTestSuite):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip("only run large sorts on exhaustive")
     self.run_test_case('QueryTest/spilling-regression-exhaustive', vector)
+    new_vector = deepcopy(vector)
+    del new_vector.get_value('exec_option')['default_spillable_buffer_size']
+    self.run_test_case(
+        'QueryTest/spilling-regression-exhaustive-no-default-buffer-size', new_vector)
 
 
 @pytest.mark.xfail(pytest.config.option.testing_remote_cluster,

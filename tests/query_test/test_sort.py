@@ -176,7 +176,7 @@ class TestQueryFullSort(ImpalaTestSuite):
     new_vector = deepcopy(vector)
     # Run with num_nodes=1 to make execution more deterministic.
     new_vector.get_value('exec_option')['num_nodes'] = 1
-    self.run_test_case('sort-reservation-usage', new_vector)
+    self.run_test_case('sort-reservation-usage-single-node', new_vector)
 
 class TestRandomSort(ImpalaTestSuite):
   @classmethod

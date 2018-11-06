@@ -465,6 +465,10 @@ class ImpalaTestSuite(BaseTestSuite):
           set_pattern_match = SET_PATTERN.match(query)
           if set_pattern_match != None:
             query_options_changed.append(set_pattern_match.groups()[0])
+            assert set_pattern_match.groups()[0] not in vector.get_value("exec_option"), \
+                "%s cannot be set in  the '.test' file since it is in the test vector. " \
+                "Consider deepcopy()-ing the vector and removing this option in the " \
+                "python test." % set_pattern_match.groups()[0]
           result = self.__execute_query(target_impalad_client, query, user=user)
       except Exception as e:
         if 'CATCH' in test_section:

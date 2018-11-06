@@ -311,13 +311,13 @@ NumRowErrors: 6
 ---- QUERY
 # IMPALA-5871 - test that a cast is correctly added when inserting a string into a Kudu
 # timestamp partition column with distributed exec.
-set exec_single_node_rows_threshold=0;
 insert into allkeytypes values (1,1,1,1,'1','2009-01-01 00:01:00',null,null)
 ---- RESULTS
 : 1
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
+row_regex: .*EXEC_SINGLE_NODE_ROWS_THRESHOLD=0.*
 ====
 ---- QUERY
 # Table with default values

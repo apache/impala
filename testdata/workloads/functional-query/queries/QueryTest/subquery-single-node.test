@@ -1,0 +1,26 @@
+====
+---- QUERY
+# Uncorrelated subquery in binary predicate that returns scalar value at runtime.
+# num_nodes = 1 is set for this file by the python test.
+SELECT count(id) FROM functional.alltypes
+WHERE int_col =
+  (SELECT int_col
+   FROM functional.alltypessmall
+   WHERE id = 1)
+---- RESULTS
+730
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Uncorrelated subquery in arithmetic expr that returns scalar value at runtime.
+SELECT count(id) FROM functional.alltypes
+WHERE int_col =
+  3 * (SELECT int_col
+       FROM functional.alltypessmall
+       WHERE id = 1)
+---- RESULTS
+730
+---- TYPES
+BIGINT
+====

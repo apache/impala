@@ -967,34 +967,6 @@ WHERE int_col =
 BIGINT
 ====
 ---- QUERY
-# Uncorrelated subquery in binary predicate that returns scalar value at runtime
-# executed on a single node.
-set num_nodes=1;
-SELECT count(id) FROM functional.alltypes
-WHERE int_col =
-  (SELECT int_col
-   FROM functional.alltypessmall
-   WHERE id = 1)
----- RESULTS
-730
----- TYPES
-BIGINT
-====
----- QUERY
-# Uncorrelated subquery in arithmetic expr that returns scalar value at runtime
-# executed on a single node.
-set num_nodes=1;
-SELECT count(id) FROM functional.alltypes
-WHERE int_col =
-  3 * (SELECT int_col
-       FROM functional.alltypessmall
-       WHERE id = 1)
----- RESULTS
-730
----- TYPES
-BIGINT
-====
----- QUERY
 # Subquery that returns more than one row
 SELECT a FROM (values(1 a),(2),(3)) v
 WHERE a = (SELECT x FROM (values(1 x),(2),(3)) v)

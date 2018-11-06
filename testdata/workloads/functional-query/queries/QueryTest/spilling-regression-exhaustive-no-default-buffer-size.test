@@ -1,0 +1,31 @@
+====
+---- QUERY
+# Test that we can spill with a buffer size larger than the default I/O size (8mb).
+# buffer_pool_limit is tuned for a 3-node HDFS minicluster.
+set default_spillable_buffer_size=16m;
+set buffer_pool_limit=120m;
+select l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
+from tpch_parquet.lineitem
+order by 1, 2, 3, 4, 5
+offset 6001200
+---- TYPES
+BIGINT,BIGINT,BIGINT,INT,STRING
+---- RESULTS
+5999971,97922,7923,5,'place of the slyly quick pla'
+5999971,132903,2904,4,'ckly above the boldly '
+5999971,144823,4824,2,'e blithely after the carefully pending '
+5999971,161882,6915,6,'luffy theodolites nag boldly bli'
+5999972,102942,473,1,'s maintain carefully among the'
+5999972,133109,8136,2,' the furiously express pearls. furi'
+5999972,152761,2762,3,'sual accounts al'
+5999973,176345,1380,1,'gular excuses. '
+5999974,10463,5466,2,'dolites wake'
+5999974,25360,5361,1,'express dependencies. express, pendi'
+5999975,6452,1453,2,'lar pinto beans aft'
+5999975,7272,2273,1,'tructions. excu'
+5999975,37131,2138,3,', quick deposits. ironic, unusual deposi'
+6000000,32255,2256,1,'carefully '
+6000000,96127,6128,2,'ooze furiously about the pe'
+---- RUNTIME_PROFILE
+row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
+====

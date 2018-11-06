@@ -18,7 +18,7 @@
 # Targeted tests for Impala joins
 #
 import pytest
-from copy import copy
+from copy import deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (
@@ -52,14 +52,15 @@ class TestJoinQueries(ImpalaTestSuite):
       cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
 
   def test_basic_joins(self, vector):
-    new_vector = copy(vector)
+    new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/joins', new_vector)
 
   def test_single_node_joins_with_limits_exhaustive(self, vector):
     if self.exploration_strategy() != 'exhaustive': pytest.skip()
-    new_vector = copy(vector)
+    new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['num_nodes'] = 1
+    del new_vector.get_value('exec_option')['batch_size']  # .test file sets batch_size
     self.run_test_case('QueryTest/single-node-joins-with-limits-exhaustive', new_vector)
 
   @SkipIfS3.hbase
@@ -69,30 +70,30 @@ class TestJoinQueries(ImpalaTestSuite):
   @SkipIf.skip_hbase
   @SkipIfLocal.hbase
   def test_joins_against_hbase(self, vector):
-    new_vector = copy(vector)
+    new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/joins-against-hbase', new_vector)
 
   def test_outer_joins(self, vector):
-    new_vector = copy(vector)
+    new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/outer-joins', new_vector)
 
   def test_single_node_nested_loop_joins(self, vector):
     # Test the execution of nested-loops joins for join types that can only be
     # executed in a single node (right [outer|semi|anti] and full outer joins).
-    new_vector = copy(vector)
+    new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/single-node-nlj', new_vector)
 
   def test_single_node_nested_loop_joins_exhaustive(self, vector):
     if self.exploration_strategy() != 'exhaustive': pytest.skip()
-    new_vector = copy(vector)
+    new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/single-node-nlj-exhaustive', new_vector)
 
   def test_empty_build_joins(self, vector):
-    new_vector = copy(vector)
+    new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/empty-build-joins', new_vector)
 
@@ -122,7 +123,7 @@ class TestTPCHJoinQueries(ImpalaTestSuite):
     super(TestTPCHJoinQueries, cls).teardown_class()
 
   def test_outer_joins(self, vector):
-    new_vector = copy(vector)
+    new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('tpch-outer-joins', new_vector)
 
@@ -167,7 +168,7 @@ class TestSemiJoinQueries(ImpalaTestSuite):
     self.client.execute('insert into %s values(3,NULL,50)' % fq_tbl_name_b);
 
   def test_semi_joins(self, vector, unique_database):
-    new_vector = copy(vector)
+    new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.__load_semi_join_tables(unique_database)
     self.run_test_case('QueryTest/semi-joins', new_vector, unique_database)

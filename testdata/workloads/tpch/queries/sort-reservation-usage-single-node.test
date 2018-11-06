@@ -4,7 +4,7 @@
 # This query and scratch limit are chosen so that the query fails if the first sort
 # does not give up memory to the second sort. Scans the text formatted file so that
 # the scan uses less reservation.
-set num_nodes=1;
+# num_nodes = 1 is set for this file by the python test.
 set scratch_limit=0;
 set buffer_pool_limit=35m;
 set default_spillable_buffer_size=64kb;

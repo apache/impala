@@ -17,9 +17,9 @@
 
 # General Impala query tests
 
-import copy
 import pytest
 import re
+from copy import deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfEC
@@ -108,6 +108,11 @@ class TestQueries(ImpalaTestSuite):
 
   def test_subquery(self, vector):
     self.run_test_case('QueryTest/subquery', vector)
+
+  def test_subquery_single_node(self, vector):
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/subquery-single-node', new_vector)
 
   def test_alias(self, vector):
     self.run_test_case('QueryTest/alias', vector)

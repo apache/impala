@@ -40,8 +40,10 @@ class TestMtDop(ImpalaTestSuite):
     return 'functional-query'
 
   def test_mt_dop(self, vector):
-    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
-    self.run_test_case('QueryTest/mt-dop', vector)
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    del new_vector.get_value('exec_option')['batch_size']  # .test file sets batch_size
+    self.run_test_case('QueryTest/mt-dop', new_vector)
 
   def test_compute_stats(self, vector, unique_database):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')

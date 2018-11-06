@@ -319,10 +319,12 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/parquet', vector)
 
   def test_corrupt_files(self, vector):
-    vector.get_value('exec_option')['abort_on_error'] = 0
-    self.run_test_case('QueryTest/parquet-continue-on-error', vector)
-    vector.get_value('exec_option')['abort_on_error'] = 1
-    self.run_test_case('QueryTest/parquet-abort-on-error', vector)
+    new_vector = deepcopy(vector)
+    del new_vector.get_value('exec_option')['num_nodes']  # .test file sets num_nodes
+    new_vector.get_value('exec_option')['abort_on_error'] = 0
+    self.run_test_case('QueryTest/parquet-continue-on-error', new_vector)
+    new_vector.get_value('exec_option')['abort_on_error'] = 1
+    self.run_test_case('QueryTest/parquet-abort-on-error', new_vector)
 
   def test_timestamp_out_of_range(self, vector, unique_database):
     """IMPALA-4363: Test scanning parquet files with an out of range timestamp.
@@ -748,12 +750,14 @@ class TestParquet(ImpalaTestSuite):
     before we mark the whole scan complete."""
     if vector.get_value('exec_option')['debug_action'] is not None:
       pytest.skip(".test file needs to override debug action")
+    new_vector = deepcopy(vector)
+    del new_vector.get_value('exec_option')['debug_action']
     create_table_and_copy_files(self.client,
         "CREATE TABLE {db}.{tbl} (s STRING) STORED AS PARQUET",
         unique_database, "bad_magic_number", ["testdata/data/bad_magic_number.parquet"])
     # We need the ranges to all be scheduled on the same impalad.
-    vector.get_value('exec_option')['num_nodes'] = 1
-    self.run_test_case("QueryTest/parquet-error-propagation-race", vector,
+    new_vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case("QueryTest/parquet-error-propagation-race", new_vector,
                        unique_database)
 
   def test_int64_timestamps(self, vector, unique_database):
@@ -1071,7 +1075,10 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
         v.get_value('table_format').compression_codec in ['none', 'gzip'])
 
   def test_text_scanner_with_header(self, vector, unique_database):
-    self.run_test_case('QueryTest/hdfs-text-scan-with-header', vector,
+    # Remove to allow .test file to set abort_on_error.
+    new_vector = deepcopy(vector)
+    del new_vector.get_value('exec_option')['abort_on_error']
+    self.run_test_case('QueryTest/hdfs-text-scan-with-header', new_vector,
                        test_file_vars={'$UNIQUE_DB': unique_database})
 
 
