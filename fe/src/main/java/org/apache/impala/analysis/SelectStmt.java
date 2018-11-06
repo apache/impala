@@ -958,7 +958,7 @@ public class SelectStmt extends QueryStmt {
   private Expr rewriteCheckOrdinalResult(ExprRewriter rewriter, Expr expr)
       throws AnalysisException {
     Expr rewrittenExpr = rewriter.rewrite(expr, analyzer_);
-    if (rewrittenExpr.isLiteral() && rewrittenExpr.getType().isIntegerType()) {
+    if (Expr.IS_LITERAL.apply(rewrittenExpr) && rewrittenExpr.getType().isIntegerType()) {
       return expr;
     } else {
       return rewrittenExpr;

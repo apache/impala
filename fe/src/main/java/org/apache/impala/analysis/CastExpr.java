@@ -248,7 +248,7 @@ public class CastExpr extends Expr {
 
     // Ensure child has non-null type (even if it's a null literal). This is required
     // for the UDF interface.
-    if (children_.get(0) instanceof NullLiteral) {
+    if (Expr.IS_NULL_LITERAL.apply(children_.get(0))) {
       NullLiteral nullChild = (NullLiteral)(children_.get(0));
       nullChild.uncheckedCastTo(type_);
     }

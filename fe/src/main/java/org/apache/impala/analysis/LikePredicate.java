@@ -129,7 +129,7 @@ public class LikePredicate extends Predicate {
     Preconditions.checkState(fn_ != null);
     Preconditions.checkState(fn_.getReturnType().isBoolean());
 
-    if (getChild(1).isLiteral() && !getChild(1).isNullLiteral()
+    if (Expr.IS_NON_NULL_LITERAL.apply(getChild(1))
         && (op_ == Operator.RLIKE || op_ == Operator.REGEXP || op_ == Operator.IREGEXP)) {
       // let's make sure the pattern works
       // TODO: this checks that it's a Java-supported regex, but the syntax supported
@@ -147,7 +147,7 @@ public class LikePredicate extends Predicate {
   @Override
   protected float computeEvalCost() {
     if (!hasChildCosts()) return UNKNOWN_COST;
-    if (getChild(1).isLiteral() && !getChild(1).isNullLiteral() &&
+    if (Expr.IS_NON_NULL_LITERAL.apply(getChild(1)) &&
       Pattern.matches("[%_]*[^%_]*[%_]*",
           ((StringLiteral) getChild(1)).getValueWithOriginalEscapes())) {
       // This pattern only has wildcards as leading or trailing character,

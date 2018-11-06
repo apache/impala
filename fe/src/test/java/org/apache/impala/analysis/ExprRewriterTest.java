@@ -45,7 +45,7 @@ public class ExprRewriterTest extends AnalyzerTest {
     @Override
     public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
       if (expr.contains(Subquery.class)) return expr;
-      if (Predicate.IS_TRUE_LITERAL.apply(expr)) return expr;
+      if (Expr.IS_TRUE_LITERAL.apply(expr)) return expr;
       return new BoolLiteral(true);
     }
 
@@ -60,7 +60,7 @@ public class ExprRewriterTest extends AnalyzerTest {
 
     @Override
     public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
-      if (Predicate.IS_TRUE_LITERAL.apply(expr)) return new BoolLiteral(false);
+      if (Expr.IS_TRUE_LITERAL.apply(expr)) return new BoolLiteral(false);
       return expr;
     }
     private TrueToFalseRule() {}

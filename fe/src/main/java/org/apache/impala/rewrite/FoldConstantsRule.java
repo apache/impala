@@ -48,14 +48,14 @@ public class FoldConstantsRule implements ExprRewriteRule {
     // Avoid calling Expr.isConstant() because that would lead to repeated traversals
     // of the Expr tree. Assumes the bottom-up application of this rule. Constant
     // children should have been folded at this point.
-    for (Expr child: expr.getChildren()) if (!child.isLiteral()) return expr;
-    if (expr.isLiteral() || !expr.isConstant()) return expr;
+    for (Expr child: expr.getChildren()) if (!Expr.IS_LITERAL.apply(child)) return expr;
+    if (Expr.IS_LITERAL.apply(expr) || !expr.isConstant()) return expr;
 
     // Do not constant fold cast(null as dataType) because we cannot preserve the
     // cast-to-types and that can lead to query failures, e.g., CTAS
     if (expr instanceof CastExpr) {
       CastExpr castExpr = (CastExpr) expr;
-      if (castExpr.getChild(0) instanceof NullLiteral) {
+      if (Expr.IS_NULL_LITERAL.apply(castExpr.getChild(0))) {
         return expr;
       }
     }

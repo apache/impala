@@ -22,6 +22,7 @@ import static org.junit.Assert.*;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ToSqlUtils;
 import org.apache.impala.catalog.CatalogTest;
 import org.apache.impala.catalog.ColumnStats;
@@ -142,7 +143,7 @@ public class LocalCatalogTest {
     assertEquals(1,  ids.size());
     FeFsPartition partition = FeCatalogUtils.loadPartition(
         t, Iterables.getOnlyElement(ids));
-    assertTrue(partition.getPartitionValue(dayCol).isNullLiteral());
+    assertTrue(Expr.IS_NULL_VALUE.apply(partition.getPartitionValue(dayCol)));
   }
 
   @Test

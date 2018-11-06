@@ -50,6 +50,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.NumericLiteral;
@@ -1047,7 +1048,7 @@ public class HdfsTable extends Table implements FeFsTable {
       ColumnStats stats = getColumns().get(i).getStats();
       LiteralExpr literal = partition.getPartitionValues().get(i);
       // Store partitions with null partition values separately
-      if (literal instanceof NullLiteral) {
+      if (Expr.IS_NULL_LITERAL.apply(literal)) {
         stats.setNumNulls(stats.getNumNulls() + 1);
         if (nullPartitionIds_.get(i).isEmpty()) {
           stats.setNumDistinctValues(stats.getNumDistinctValues() + 1);
@@ -1105,7 +1106,7 @@ public class HdfsTable extends Table implements FeFsTable {
       ColumnStats stats = getColumns().get(i).getStats();
       LiteralExpr literal = partition.getPartitionValues().get(i);
       // Check if this is a null literal.
-      if (literal instanceof NullLiteral) {
+      if (Expr.IS_NULL_LITERAL.apply(literal)) {
         nullPartitionIds_.get(i).remove(partitionId);
         stats.setNumNulls(stats.getNumNulls() - 1);
         if (nullPartitionIds_.get(i).isEmpty()) {

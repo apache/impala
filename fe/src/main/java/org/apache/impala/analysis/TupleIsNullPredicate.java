@@ -173,7 +173,7 @@ public class TupleIsNullPredicate extends Predicate {
       List<Expr> params = fnCallExpr.getParams().exprs();
       if (fnCallExpr.getFnName().getFunction().equals("if") &&
           params.get(0) instanceof TupleIsNullPredicate &&
-          params.get(1) instanceof NullLiteral) {
+          Expr.IS_NULL_LITERAL.apply(params.get(1))) {
         return unwrapExpr(params.get(2));
       }
     }

@@ -1165,7 +1165,7 @@ public class Analyzer {
   public void createAuxEqPredicate(Expr lhs, Expr rhs) {
     // Check the expr type as well as the class because  NullLiteral could have been
     // implicitly cast to a type different than NULL.
-    if (lhs instanceof NullLiteral || rhs instanceof NullLiteral ||
+    if (Expr.IS_NULL_LITERAL.apply(lhs) || Expr.IS_NULL_LITERAL.apply(rhs) ||
         lhs.getType().isNull() || rhs.getType().isNull()) {
       return;
     }

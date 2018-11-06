@@ -92,15 +92,14 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
    */
   private Expr simplifyIfFunctionCallExpr(FunctionCallExpr expr) {
     Preconditions.checkState(expr.getChildren().size() == 3);
-    if (expr.getChild(0) instanceof BoolLiteral) {
-      if (((BoolLiteral) expr.getChild(0)).getValue()) {
-        // IF(TRUE)
-        return expr.getChild(1);
-      } else {
-        // IF(FALSE)
-        return expr.getChild(2);
-      }
-    } else if (expr.getChild(0) instanceof NullLiteral) {
+    Expr head = expr.getChild(0);
+    if (Expr.IS_TRUE_LITERAL.apply(head)) {
+      // IF(TRUE)
+      return expr.getChild(1);
+    } else if (Expr.IS_FALSE_LITERAL.apply(head)) {
+      // IF(FALSE)
+      return expr.getChild(2);
+    } else if (Expr.IS_NULL_LITERAL.apply(head)) {
       // IF(NULL)
       return expr.getChild(2);
     }
@@ -116,8 +115,8 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
   private Expr simplifyIfNullFunctionCallExpr(FunctionCallExpr expr) {
     Preconditions.checkState(expr.getChildren().size() == 2);
     Expr child0 = expr.getChild(0);
-    if (child0 instanceof NullLiteral) return expr.getChild(1);
-    if (child0.isLiteral()) return child0;
+    if (Expr.IS_NULL_LITERAL.apply(child0)) return expr.getChild(1);
+    if (Expr.IS_LITERAL.apply(child0)) return child0;
     return expr;
   }
 
@@ -132,8 +131,8 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
     for (int i = 0; i < numChildren; ++i) {
       Expr childExpr = expr.getChildren().get(i);
       // Skip leading nulls.
-      if (childExpr.isNullLiteral()) continue;
-      if ((i == numChildren - 1) || childExpr.isLiteral()) {
+      if (Expr.IS_NULL_VALUE.apply(childExpr)) continue;
+      if ((i == numChildren - 1) || Expr.IS_LITERAL.apply(childExpr)) {
         result = childExpr;
       } else if (i == 0) {
         result = expr;
@@ -178,7 +177,7 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
     if (!(leftChild instanceof BoolLiteral)) return expr;
 
     if (expr.getOp() == CompoundPredicate.Operator.AND) {
-      if (((BoolLiteral) leftChild).getValue()) {
+      if (Expr.IS_TRUE_LITERAL.apply(leftChild)) {
         // TRUE AND 'expr', so return 'expr'.
         return expr.getChild(1);
       } else {
@@ -186,7 +185,7 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
         return leftChild;
       }
     } else if (expr.getOp() == CompoundPredicate.Operator.OR) {
-      if (((BoolLiteral) leftChild).getValue()) {
+      if (Expr.IS_TRUE_LITERAL.apply(leftChild)) {
         // TRUE OR 'expr', so return TRUE.
         return leftChild;
       } else {
@@ -209,14 +208,14 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
   private Expr simplifyCaseExpr(CaseExpr expr, Analyzer analyzer)
       throws AnalysisException {
     Expr caseExpr = expr.hasCaseExpr() ? expr.getChild(0) : null;
-    if (expr.hasCaseExpr() && !caseExpr.isLiteral()) return expr;
+    if (expr.hasCaseExpr() && !Expr.IS_LITERAL.apply(caseExpr)) return expr;
 
     int numChildren = expr.getChildren().size();
     int loopStart = expr.hasCaseExpr() ? 1 : 0;
     // Check and return early if there's nothing that can be simplified.
     boolean canSimplify = false;
     for (int i = loopStart; i < numChildren - 1; i += 2) {
-      if (expr.getChild(i).isLiteral()) {
+      if (Expr.IS_LITERAL.apply(expr.getChild(i))) {
         canSimplify = true;
         break;
       }
@@ -230,11 +229,11 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
     Expr elseExpr = null;
     for (int i = loopStart; i < numChildren - 1; i += 2) {
       Expr child = expr.getChild(i);
-      if (child instanceof NullLiteral) continue;
+      if (Expr.IS_NULL_LITERAL.apply(child)) continue;
 
       Expr whenExpr;
       if (expr.hasCaseExpr()) {
-        if (child.isLiteral()) {
+        if (Expr.IS_LITERAL.apply(child)) {
           BinaryPredicate pred = new BinaryPredicate(
               BinaryPredicate.Operator.EQ, caseExpr, expr.getChild(i));
           pred.analyze(analyzer);

@@ -513,7 +513,7 @@ public class HdfsScanNode extends ScanNode {
     // Only constant exprs can be evaluated against parquet::Statistics. This includes
     // LiteralExpr, but can also be an expr like "1 + 2".
     if (!constExpr.isConstant()) return;
-    if (constExpr.isNullLiteral()) return;
+    if (Expr.IS_NULL_VALUE.apply(constExpr)) return;
 
     BinaryPredicate.Operator op = binaryPred.getOp();
     if (op == BinaryPredicate.Operator.LT || op == BinaryPredicate.Operator.LE ||
@@ -545,10 +545,10 @@ public class HdfsScanNode extends ScanNode {
       Expr child = children.get(i);
 
       // If any child is not a literal, then nothing can be done
-      if (!child.isLiteral()) return;
+      if (!Expr.IS_LITERAL.apply(child)) return;
       LiteralExpr literalChild = (LiteralExpr) child;
       // If any child is NULL, then there is not a valid min/max. Nothing can be done.
-      if (literalChild instanceof NullLiteral) return;
+      if (Expr.IS_NULL_LITERAL.apply(literalChild)) return;
 
       if (min == null || literalChild.compareTo(min) < 0) min = literalChild;
       if (max == null || literalChild.compareTo(max) > 0) max = literalChild;

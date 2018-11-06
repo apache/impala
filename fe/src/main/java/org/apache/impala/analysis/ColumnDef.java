@@ -269,7 +269,7 @@ public class ColumnDef {
         e.analyze(analyzer);
         defaultValLiteral = LiteralExpr.create(e, analyzer.getQueryCtx());
         Preconditions.checkNotNull(defaultValLiteral);
-        if (defaultValLiteral.isNullLiteral()) {
+        if (Expr.IS_NULL_VALUE.apply(defaultValLiteral)) {
           throw new AnalysisException(String.format("String %s cannot be cast " +
               "to a TIMESTAMP literal.", defaultValue_.toSql()));
         }

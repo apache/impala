@@ -275,9 +275,9 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   // Order NullLiterals based on the SQL ORDER BY default behavior: NULLS LAST.
   @Override
   public int compareTo(LiteralExpr other) {
-    if (this instanceof NullLiteral && other instanceof NullLiteral) return 0;
-    if (this instanceof NullLiteral) return -1;
-    if (other instanceof NullLiteral) return 1;
+    if (Expr.IS_NULL_LITERAL.apply(this) && Expr.IS_NULL_LITERAL.apply(other)) return 0;
+    if (Expr.IS_NULL_LITERAL.apply(this)) return -1;
+    if (Expr.IS_NULL_LITERAL.apply(other)) return 1;
     if (getClass() != other.getClass()) return -1;
     return 0;
   }
