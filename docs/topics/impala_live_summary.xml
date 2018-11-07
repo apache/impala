@@ -36,71 +36,59 @@ under the License.
   </prolog>
 
   <conbody>
-
-    <p rev="2.3.0">
-      <indexterm audience="hidden">LIVE_SUMMARY query option</indexterm>
-      For queries submitted through the <cmdname>impala-shell</cmdname> command,
-      displays the same output as the <codeph>SUMMARY</codeph> command,
-      with the measurements updated in real time as the query progresses.
-      When the query finishes, the final <codeph>SUMMARY</codeph> output remains
-      visible in the <cmdname>impala-shell</cmdname> console output.
-    </p>
-
-    <p>
-    </p>
-
-    <p conref="../shared/impala_common.xml#common/type_boolean"/>
-    <p conref="../shared/impala_common.xml#common/default_false_0"/>
-
+    <p rev="2.3.0"> When the <codeph>LIVE_SUMMARY</codeph> query option is set
+      to <codeph>TRUE</codeph>, Impala displays the same output as the
+        <codeph>SUMMARY</codeph> command for queries submitted through the
+        <cmdname>impala-shell</cmdname> command, with the measurements updated
+      in real time as the query progresses. When the query finishes, the final
+        <codeph>SUMMARY</codeph> output remains visible in the
+        <cmdname>impala-shell</cmdname> console output. </p>
+    <p>Starting in <keyword keyref="impala31"/>, the summary output also
+      includes the queuing status consisting of whether the query was queued and
+      what was the latest queuing reason.</p>
+    <p>the queuing status, whether the query was queued and what was the latest
+      queuing reason.</p>
+    <p><b>Type:</b>
+      <codeph>Boolean</codeph></p>
+    <p><b>Default:</b>
+      <codeph>FALSE (0)</codeph></p>
     <p conref="../shared/impala_common.xml#common/command_line_blurb"/>
-    <p>
-      You can enable this query option within <cmdname>impala-shell</cmdname>
+    <p> You can enable this query option within <cmdname>impala-shell</cmdname>
       by starting the shell with the <codeph>--live_summary</codeph>
-      command-line option.
-      You can still turn this setting off and on again within the shell through the
-      <codeph>SET</codeph> command.
-    </p>
-
+      command-line option. You can still turn this setting off and on again
+      within the shell through the <codeph>SET</codeph> command. </p>
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
-    <p>
-      The live summary output can be useful for evaluating long-running queries,
-      to evaluate which phase of execution takes up the most time, or if some hosts
-      take much longer than others for certain operations, dragging overall performance down.
-      By making the information available in real time, this feature lets you decide what
-      action to take even before you cancel a query that is taking much longer than normal.
-    </p>
-    <p>
-      For example, you might see the HDFS scan phase taking a long time, and therefore revisit
-      performance-related aspects of your schema design such as constructing a partitioned table,
-      switching to the Parquet file format, running the <codeph>COMPUTE STATS</codeph> statement
-      for the table, and so on.
-      Or you might see a wide variation between the average and maximum times for all hosts to
-      perform some phase of the query, and therefore investigate if one particular host
-      needed more memory or was experiencing a network problem.
-    </p>
+    <p> The live summary output can be useful for evaluating long-running
+      queries, to evaluate which phase of execution takes up the most time, or
+      if some hosts take much longer than others for certain operations,
+      dragging overall performance down. By making the information available in
+      real time, this feature lets you decide what action to take even before
+      you cancel a query that is taking much longer than normal. </p>
+    <p> For example, you might see the HDFS scan phase taking a long time, and
+      therefore revisit performance-related aspects of your schema design such
+      as constructing a partitioned table, switching to the Parquet file format,
+      running the <codeph>COMPUTE STATS</codeph> statement for the table, and so
+      on. Or you might see a wide variation between the average and maximum
+      times for all hosts to perform some phase of the query, and therefore
+      investigate if one particular host needed more memory or was experiencing
+      a network problem. </p>
     <p conref="../shared/impala_common.xml#common/live_reporting_details"/>
-    <p>
-      For a simple and concise way of tracking the progress of an interactive query, see
-      <xref href="impala_live_progress.xml#live_progress"/>.
-    </p>
-
+    <p> For a simple and concise way of tracking the progress of an interactive
+      query, see <xref href="impala_live_progress.xml#live_progress"/>. </p>
     <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
-    <p conref="../shared/impala_common.xml#common/impala_shell_progress_reports_compute_stats_caveat"/>
-    <p conref="../shared/impala_common.xml#common/impala_shell_progress_reports_shell_only_caveat"/>
-
+    <p
+      conref="../shared/impala_common.xml#common/impala_shell_progress_reports_compute_stats_caveat"/>
+    <p
+      conref="../shared/impala_common.xml#common/impala_shell_progress_reports_shell_only_caveat"/>
     <p conref="../shared/impala_common.xml#common/added_in_230"/>
-
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
-
-    <p>
-      The following example shows a series of <codeph>LIVE_SUMMARY</codeph> reports that
-      are displayed during the course of a query, showing how the numbers increase to
-      show the progress of different phases of the distributed query. When you do the same
-      in <cmdname>impala-shell</cmdname>, only a single report is displayed at any one time,
-      with each update overwriting the previous numbers.
-    </p>
-
-<codeblock><![CDATA[[localhost:21000] > set live_summary=true;
+    <p> The following example shows a series of <codeph>LIVE_SUMMARY</codeph>
+      reports that are displayed during the course of a query, showing how the
+      numbers increase to show the progress of different phases of the
+      distributed query. When you do the same in
+      <cmdname>impala-shell</cmdname>, only a single report is displayed at any
+      one time, with each update overwriting the previous numbers. </p>
+    <codeblock><![CDATA[[localhost:21000] > set live_summary=true;
 LIVE_SUMMARY set to true
 [localhost:21000] > select count(*) from customer t1 cross join customer t2;
 +---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
@@ -140,9 +128,8 @@ LIVE_SUMMARY set to true
 +---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
 ]]>
 </codeblock>
-
-<!-- Keeping this sample output that illustrates a couple of glitches in the LIVE_SUMMARY display, hidden, to help filing JIRAs. -->
-<codeblock audience="hidden"><![CDATA[[
+    <!-- Keeping this sample output that illustrates a couple of glitches in the LIVE_SUMMARY display, hidden, to help filing JIRAs. -->
+    <codeblock audience="hidden"><![CDATA[[
 +---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
 | Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
 +---------------------+--------+----------+----------+---------+------------+----------+---------------+-----------------------+
@@ -222,8 +209,8 @@ Query: select count(*) from customer t1 cross join customer t2
 | Operator            | #Hosts | Avg Time | Max Time | #Rows   | Est. #Rows | Peak Mem | Est. Peak Mem | Detail                |
 ]]>
 </codeblock>
-
-    <p conref="../shared/impala_common.xml#common/live_progress_live_summary_asciinema"/>
-
+    <p
+      conref="../shared/impala_common.xml#common/live_progress_live_summary_asciinema"
+    />
   </conbody>
 </concept>

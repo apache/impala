@@ -37,19 +37,19 @@ under the License.
 
   <conbody>
 
-    <p rev="2.3.0">
-      <indexterm audience="hidden">LIVE_PROGRESS query option</indexterm>
-      For queries submitted through the <cmdname>impala-shell</cmdname> command,
-      displays an interactive progress bar showing roughly what percentage of
-      processing has been completed. When the query finishes, the progress bar is erased
-      from the <cmdname>impala-shell</cmdname> console output.
-    </p>
-
-    <p>
-    </p>
-
-    <p conref="../shared/impala_common.xml#common/type_boolean"/>
-    <p conref="../shared/impala_common.xml#common/default_false_0"/>
+    <p rev="2.3.0"> When the <codeph>LIVE_PROGRESS</codeph> query option is set
+      to <codeph>TRUE</codeph>, Impala displays an interactive progress bar
+      showing roughly what percentage of processing has been completed for
+      queries submitted through the <cmdname>impala-shell</cmdname> command.
+      When the query finishes, the progress bar is erased from the
+        <cmdname>impala-shell</cmdname> console output. </p>
+    <p>Starting in <keyword keyref="impala31"/>, the summary output also
+      includes the queuing status consisting of whether the query was queued and
+      what was the latest queuing reason.</p>
+    <p><b>Type:</b>
+      <codeph>Boolean</codeph></p>
+    <p><b>Default:</b>
+      <codeph>FALSE (0)</codeph></p>
 
     <p conref="../shared/impala_common.xml#common/command_line_blurb"/>
     <p>
