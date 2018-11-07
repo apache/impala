@@ -32,6 +32,8 @@ import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.Reference;
+import org.apache.impala.common.SentryPolicyReaderException;
+import org.apache.impala.common.SentryUnavailableException;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.log4j.Logger;
 import org.apache.sentry.api.service.thrift.TSentryGroup;
@@ -48,8 +50,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import org.apache.sentry.core.common.exception.SentryUserException;
 import org.apache.sentry.service.common.SentryOwnerPrivilegeType;
 import org.apache.sentry.service.common.ServiceConstants;
+import org.apache.thrift.transport.TTransportException;
 
 /**
  * Thread safe class that acts as a link between the Sentry Service and the Catalog
@@ -105,9 +109,11 @@ public class SentryProxy {
     } else {
       objectOwnershipConfigValue_ = SentryOwnerPrivilegeType.NONE.toString();
     }
-    policyReader_.scheduleAtFixedRate(new PolicyReader(false), 0,
-        BackendConfig.INSTANCE.getSentryCatalogPollingFrequency(),
-        TimeUnit.SECONDS);
+    // We configure the PolicyReader to swallow any exception because we do not want to
+    // kill the PolicyReader background thread on exception.
+    policyReader_.scheduleAtFixedRate(new PolicyReader(/*reset versions*/ false,
+        /*swallow exception*/ true), 0,
+        BackendConfig.INSTANCE.getSentryCatalogPollingFrequency(), TimeUnit.SECONDS);
   }
 
   /**
@@ -125,10 +131,13 @@ public class SentryProxy {
    * atomically.
    */
   private class PolicyReader implements Runnable {
-    private boolean resetVersions_;
+    private final boolean resetVersions_;
+    // A flag to indicate whether or not to swallow any exception thrown.
+    private final boolean swallowException_;
 
-    public PolicyReader(boolean resetVersions) {
+    public PolicyReader(boolean resetVersions, boolean swallowException) {
       resetVersions_ = resetVersions;
+      swallowException_ = swallowException;
     }
 
     public void run() {
@@ -141,7 +150,17 @@ public class SentryProxy {
           usersToRemove = refreshUserPrivileges();
         } catch (Exception e) {
           LOG.error("Error refreshing Sentry policy: ", e);
-          return;
+          if (swallowException_) return;
+          // We need to differentiate between Sentry not available exception and
+          // any other exceptions.
+          if (e.getCause() != null && e.getCause() instanceof SentryUserException) {
+            Throwable sentryException = e.getCause();
+            if (sentryException.getCause() != null &&
+                sentryException.getCause() instanceof TTransportException) {
+              throw new SentryUnavailableException(e);
+            }
+          }
+          throw new SentryPolicyReaderException(e);
         } finally {
           LOG.debug("Refreshing Sentry policy took " +
               (System.currentTimeMillis() - startTime) + "ms");
@@ -527,16 +546,21 @@ public class SentryProxy {
   }
 
   /**
-   * Perfoms a synchronous refresh of all authorization policy metadata and updates
+   * Performs a synchronous refresh of all authorization policy metadata and updates
    * the Catalog with any changes. Throws an ImpalaRuntimeException if there are any
    * errors executing the refresh job.
    */
   public void refresh(boolean resetVersions) throws ImpalaRuntimeException {
     try {
-      policyReader_.submit(new PolicyReader(resetVersions)).get();
+      // Since this is a synchronous refresh, any exception thrown while running the
+      // refresh should be thrown here instead of silently swallowing it.
+      policyReader_.submit(new PolicyReader(resetVersions, /*swallow exception*/ false))
+          .get();
     } catch (Exception e) {
-      // We shouldn't make it here. It means an exception leaked from the
-      // AuthorizationPolicyReader.
+      if (e.getCause() != null && e.getCause() instanceof SentryUnavailableException) {
+        throw new ImpalaRuntimeException("Error refreshing authorization policy. " +
+            "Sentry is unavailable. Ensure Sentry is up: ", e);
+      }
       throw new ImpalaRuntimeException("Error refreshing authorization policy, " +
           "current policy state may be inconsistent. Running 'invalidate metadata' " +
           "may resolve this problem: ", e);
