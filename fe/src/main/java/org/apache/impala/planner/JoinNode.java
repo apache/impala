@@ -365,7 +365,12 @@ public abstract class JoinNode extends PlanNode {
       if (slots.lhsNumRows() > lhsCard) lhsAdjNdv *= lhsCard / slots.lhsNumRows();
       double rhsAdjNdv = slots.rhsNdv();
       if (slots.rhsNumRows() > rhsCard) rhsAdjNdv *= rhsCard / slots.rhsNumRows();
-      long joinCard = Math.round((lhsCard / Math.max(lhsAdjNdv, rhsAdjNdv)) * rhsCard);
+      // A lower limit of 1 on the max Adjusted Ndv ensures we don't estimate
+      // cardinality more than the max possible. This also handles the case of
+      // null columns on both sides having an Ndv of zero (which would change
+      // after IMPALA-7310 is fixed).
+      long joinCard = Math.round((lhsCard / Math.max(1, Math.max(lhsAdjNdv, rhsAdjNdv))) *
+          rhsCard);
       if (result == -1) {
         result = joinCard;
       } else {

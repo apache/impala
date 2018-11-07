@@ -703,4 +703,13 @@ public class PlannerTest extends PlannerTestBase {
     assertEquals(HBaseScanNode.memoryEstimateForFetchingColumns(largeColumnList),
         8 * 1024 * 1024);
   }
+
+  @Test
+  public void testNullColumnJoinCardinality() throws ImpalaException {
+    // IMPALA-7565: Make sure there is no division by zero during cardinality calculation
+    // in a many to many join on null columns (ndv = 0).
+    String query = "select * from functional.nulltable t1 "
+        + "inner join [shuffle] functional.nulltable t2 on t1.d = t2.d";
+    checkCardinality(query, 1, 1);
+  }
 }

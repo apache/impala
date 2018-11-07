@@ -2387,10 +2387,10 @@ PLAN-ROOT SINK
 03:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: t1.d IS DISTINCT FROM t2.d
 |
-|--01:SCAN HDFS [functional.nulltable t2]
+|--00:SCAN HDFS [functional.nulltable t1]
 |     partitions=1/1 files=1 size=18B
 |
-00:SCAN HDFS [functional.nulltable t1]
+01:SCAN HDFS [functional.nulltable t2]
    partitions=1/1 files=1 size=18B
 ====
 # IMPALA-3450: limits on join nodes are reflected in cardinality estimates. The test for
