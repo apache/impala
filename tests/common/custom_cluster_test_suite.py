@@ -164,11 +164,17 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     sentry_env['SENTRY_SERVICE_CONFIG'] = sentry_service_config
     call = subprocess.Popen(
         ['/bin/bash', '-c', os.path.join(IMPALA_HOME,
-        'testdata/bin/run-sentry-service.sh')],
+                                         'testdata/bin/run-sentry-service.sh')],
         env=sentry_env)
     call.wait()
     if call.returncode != 0:
-      raise RuntimeError("unable to start sentry")
+      raise RuntimeError("Unable to start Sentry")
+
+  @classmethod
+  def _stop_sentry_service(cls):
+    subprocess.check_call([os.path.join(os.environ["IMPALA_HOME"],
+                                        "testdata/bin/kill-sentry-service.sh")],
+                          close_fds=True)
 
   @classmethod
   def _start_impala_cluster(cls, options, impala_log_dir=os.getenv('LOG_DIR', "/tmp/"),

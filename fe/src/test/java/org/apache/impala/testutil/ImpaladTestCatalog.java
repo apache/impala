@@ -55,8 +55,9 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
    */
   public ImpaladTestCatalog(AuthorizationConfig authzConfig) {
     super("127.0.0.1");
-    CatalogServiceCatalog catalogServerCatalog =
-        CatalogServiceTestCatalog.createWithAuth(authzConfig.getSentryConfig());
+    CatalogServiceCatalog catalogServerCatalog = authzConfig.isEnabled() ?
+        CatalogServiceTestCatalog.createWithAuth(authzConfig.getSentryConfig()) :
+        CatalogServiceTestCatalog.create();
     // Bootstrap the catalog by adding all dbs, tables, and functions.
     for (FeDb db: catalogServerCatalog.getDbs(PatternMatcher.MATCHER_MATCH_ALL)) {
       // Adding DB should include all tables/fns in that database.

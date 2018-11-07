@@ -478,3 +478,35 @@ class TestAuthorization(CustomClusterTestSuite):
         assert "CatalogException" in obj_dump
     finally:
       self.role_cleanup(unique_role)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server_name=server1 --sentry_config=%s" % SENTRY_CONFIG_FILE,
+    catalogd_args="--sentry_config=%s --sentry_catalog_polling_frequency_s=3600" %
+                  SENTRY_CONFIG_FILE,
+    impala_log_dir=tempfile.mkdtemp(prefix="test_invalidate_metadata_sentry_unavailable_",
+                                    dir=os.getenv("LOG_DIR")))
+  def test_invalidate_metadata_sentry_unavailable(self, unique_role):
+    """IMPALA-7824: Tests that running INVALIDATE METADATA when Sentry is unavailable
+    should not cause Impala to hang."""
+    self.role_cleanup(unique_role)
+    try:
+      group_name = grp.getgrnam(getuser()).gr_name
+      self.client.execute("create role %s" % unique_role)
+      self.client.execute("grant all on server to role %s" % unique_role)
+      self.client.execute("grant role %s to group `%s`" % (unique_role, group_name))
+
+      self._stop_sentry_service()
+      # Calling INVALIDATE METADATA when Sentry is unavailable should return an error.
+      result = self.execute_query_expect_failure(self.client, "invalidate metadata")
+      result_str = str(result)
+      assert "MESSAGE: CatalogException: Error updating authorization policy:" \
+             in result_str
+      assert "CAUSED BY: ImpalaRuntimeException: Error refreshing authorization policy." \
+             " Sentry is unavailable. Ensure Sentry is up:" in result_str
+
+      self._start_sentry_service(SENTRY_CONFIG_FILE)
+      # Calling INVALIDATE METADATA after Sentry is up should not return an error.
+      self.execute_query_expect_success(self.client, "invalidate metadata")
+    finally:
+      self.role_cleanup(unique_role)
