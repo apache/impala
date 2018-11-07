@@ -783,42 +783,15 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
         </metadata>
       </prolog>
       <conbody>
-        <p>
-          To see how admission control works for particular queries, examine
-          the profile output for the query. This information is available
-          through the <codeph>PROFILE</codeph> statement in
-            <cmdname>impala-shell</cmdname> immediately after running a query in
-          the shell, on the <uicontrol>queries</uicontrol> page of the Impala
-          debug web UI, or in the Impala log file (basic information at log
-          level 1, more detailed information at log level 2). The profile output
-          contains details about the admission decision, such as whether the
-          query was queued or not and which resource pool it was assigned to. It
-          also includes the estimated and actual memory usage for the query, so
-          you can fine-tune the configuration for the memory limits of the
-          resource pools.
-        </p>
-        <p>
-          Remember that the limits imposed by admission control are
-            <q>soft</q> limits. The decentralized nature of this mechanism means
-          that each Impala node makes its own decisions about whether to allow
-          queries to run immediately or to queue them. These decisions rely on
-          information passed back and forth between nodes by the statestore
-          service. If a sudden surge in requests causes more queries than
-          anticipated to run concurrently, then throughput could decrease due to
-          queries spilling to disk or contending for resources; or queries could
-          be cancelled if they exceed the <codeph>MEM_LIMIT</codeph> setting
-          while running.
-        </p>
-        <!--
-      <p>
-        If you have trouble getting a query to run because its estimated memory usage is too high, you can override
-        the estimate by setting the <codeph>MEM_LIMIT</codeph> query option in <cmdname>impala-shell</cmdname>,
-        then issuing the query through the shell in the same session. The <codeph>MEM_LIMIT</codeph> value is
-        treated as the estimated amount of memory, overriding the estimate that Impala would generate based on
-        table and column statistics. This value is used only for making admission control decisions, and is not
-        pre-allocated by the query.
-      </p>
--->
+        <p> The limits imposed by admission control are de-centrally managed
+            <q>soft</q> limits. Each Impala coordinator node makes its own
+          decisions about whether to allow queries to run immediately or to
+          queue them. These decisions rely on information passed back and forth
+          between nodes by the StateStore service. If a sudden surge in requests
+          causes more queries than anticipated to run concurrently, then the
+          throughput could decrease due to queries spilling to disk or
+          contending for resources. Or queries could be cancelled if they exceed
+          the <codeph>MEM_LIMIT</codeph> setting while running. </p>
         <p>
           In <cmdname>impala-shell</cmdname>, you can also specify which
           resource pool to direct queries to by setting the
@@ -830,6 +803,33 @@ impala.admission-control.pool-queue-timeout-ms.<varname>queue_name</varname></ph
           with Sentry security. See <xref
             href="impala_authorization.xml#authorization"/> for details.
         </p>
+        <p> To see how admission control works for particular queries, examine
+          the profile output or the summary output for the query. <ul>
+            <li>Profile<p>The information is available through the
+                  <codeph>PROFILE</codeph> statement in
+                  <cmdname>impala-shell</cmdname> immediately after running a
+                query in the shell, on the <uicontrol>queries</uicontrol> page
+                of the Impala debug web UI, or in the Impala log file (basic
+                information at log level 1, more detailed information at log
+                level 2). </p><p>The profile output contains details about the
+                admission decision, such as whether the query was queued or not
+                and which resource pool it was assigned to. It also includes the
+                estimated and actual memory usage for the query, so you can
+                fine-tune the configuration for the memory limits of the
+                resource pools. </p></li>
+            <li>Summary<p>Starting in <keyword keyref="impala31"/>, the
+                information is available in <cmdname>impala-shell</cmdname> when
+                the <codeph>LIVE_PROGRESS</codeph> or
+                  <codeph>LIVE_SUMMARY</codeph> query option is set to
+                  <codeph>TRUE</codeph>.</p><p>You can also start an
+                  <codeph>impala-shell</codeph> session with the
+                  <codeph>--live_progress</codeph> or
+                  <codeph>--live_summary</codeph> flags to monitor all queries
+                in that <codeph>impala-shell</codeph> session.</p><p>The summary
+                output includes the queuing status consisting of whether the
+                query was queued and what was the latest queuing
+              reason.</p></li>
+          </ul></p>
         <p>
           For details about all the Fair Scheduler configuration settings, see
             <xref keyref="FairScheduler">Fair Scheduler Configuration</xref>, in
