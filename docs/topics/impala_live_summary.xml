@@ -46,8 +46,6 @@ under the License.
     <p>Starting in <keyword keyref="impala31"/>, the summary output also
       includes the queuing status consisting of whether the query was queued and
       what was the latest queuing reason.</p>
-    <p>the queuing status, whether the query was queued and what was the latest
-      queuing reason.</p>
     <p><b>Type:</b>
       <codeph>Boolean</codeph></p>
     <p><b>Default:</b>
