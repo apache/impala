@@ -239,6 +239,7 @@ under the License.
           <topicref href="topics/impala_thread_reservation_aggregate_limit.xml"/>
           <topicref href="topics/impala_thread_reservation_limit.xml"/>
           <topicref href="topics/impala_timezone.xml"/>
+          <topicref href="topics/impala_topn_bytes_limit.xml"/>
         </topicref>
       </topicref>
       <topicref href="topics/impala_show.xml"/>
