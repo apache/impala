@@ -171,7 +171,7 @@ public abstract class QueryStmt extends StatementBase {
    * (3) a mix of correlated table refs and table refs rooted at those refs
    *     (the statement is 'self-contained' with respect to correlation)
    */
-  public List<TupleId> getCorrelatedTupleIds(Analyzer analyzer)
+  public List<TupleId> getCorrelatedTupleIds()
       throws AnalysisException {
     // Correlated tuple ids of this stmt.
     List<TupleId> correlatedTupleIds = new ArrayList<>();

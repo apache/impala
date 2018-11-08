@@ -223,9 +223,23 @@ public class SelectStmt extends QueryStmt {
       analyzeSelectClause();
       verifyResultExprs();
       analyzeWhereClause();
-
       createSortInfo(analyzer_);
-      analyzeAggregation();
+
+      // Analyze aggregation-relevant components of the select block (Group By
+      // clause, select list, Order By clause), substitute AVG with SUM/COUNT,
+      // create the AggregationInfo, including the agg output tuple, and transform
+      // all post-agg exprs given AggregationInfo's smap.
+      analyzeHavingClause();
+      if (checkForAggregates()) {
+        verifyAggSemantics();
+        analyzeGroupingExprs();
+        collectAggExprs();
+        rewriteCountDistinct();
+        buildAggregateExprs();
+        buildResultExprs();
+        verifyAggregation();
+      }
+
       createAnalyticInfo();
       if (evaluateOrderBy_) createSortTupleInfo(analyzer_);
 
@@ -243,24 +257,12 @@ public class SelectStmt extends QueryStmt {
       buildColumnLineageGraph();
     }
 
-    private void buildColumnLineageGraph() {
-      ColumnLineageGraph graph = analyzer_.getColumnLineageGraph();
-      if (multiAggInfo_ != null && multiAggInfo_.hasAggregateExprs()) {
-        graph.addDependencyPredicates(multiAggInfo_.getGroupingExprs());
-      }
-      if (sortInfo_ != null && hasLimit()) {
-        // When there is a LIMIT clause in conjunction with an ORDER BY, the
-        // ordering exprs must be added in the column lineage graph.
-        graph.addDependencyPredicates(sortInfo_.getSortExprs());
-      }
-    }
-
     private void analyzeSelectClause() throws AnalysisException {
       // Generate !empty() predicates to filter out empty collections.
       // Skip this step when analyzing a WITH-clause because CollectionTableRefs
       // do not register collection slots in their parent in that context
       // (see CollectionTableRef.analyze()).
-      if (!analyzer_.isWithClause()) registerIsNotEmptyPredicates();
+      if (!analyzer_.hasWithClause()) registerIsNotEmptyPredicates();
 
       // analyze plan hints from select list
       selectList_.analyzePlanHints(analyzer_);
@@ -340,20 +342,19 @@ public class SelectStmt extends QueryStmt {
     }
 
     private void analyzeWhereClause() throws AnalysisException {
-      if (whereClause_ != null) {
-        whereClause_.analyze(analyzer_);
-        if (whereClause_.contains(Expr.isAggregatePredicate())) {
-          throw new AnalysisException(
-              "aggregate function not allowed in WHERE clause");
-        }
-        whereClause_.checkReturnsBool("WHERE clause", false);
-        Expr e = whereClause_.findFirstOf(AnalyticExpr.class);
-        if (e != null) {
-          throw new AnalysisException(
-              "WHERE clause must not contain analytic expressions: " + e.toSql());
-        }
-        analyzer_.registerConjuncts(whereClause_, false);
+      if (whereClause_ == null) return;
+      whereClause_.analyze(analyzer_);
+      if (whereClause_.contains(Expr.isAggregatePredicate())) {
+        throw new AnalysisException(
+            "aggregate function not allowed in WHERE clause");
       }
+      whereClause_.checkReturnsBool("WHERE clause", false);
+      Expr e = whereClause_.findFirstOf(AnalyticExpr.class);
+      if (e != null) {
+        throw new AnalysisException(
+            "WHERE clause must not contain analytic expressions: " + e.toSql());
+      }
+      analyzer_.registerConjuncts(whereClause_, false);
     }
 
     /**
@@ -551,26 +552,6 @@ public class SelectStmt extends QueryStmt {
     }
 
     /**
-     * Analyze aggregation-relevant components of the select block (Group By clause,
-     * select list, Order By clause), substitute AVG with SUM/COUNT, create the
-     * AggregationInfo, including the agg output tuple, and transform all post-agg exprs
-     * given AggregationInfo's smap.
-     */
-    private void analyzeAggregation() throws AnalysisException {
-      analyzeHavingClause();
-      if (!checkForAggregates()) {
-        return;
-      }
-      verifyAggSemantics();
-      analyzeGroupingExprs();
-      collectAggExprs();
-      rewriteCountDistinct();
-      buildAggregateExprs();
-      buildResultExprs();
-      verifyAggregation();
-    }
-
-    /**
      * Analyze the HAVING clause. The HAVING clause is a predicate, not a list
      * (like GROUP BY or ORDER BY) and so cannot contain ordinals.
      *
@@ -660,28 +641,28 @@ public class SelectStmt extends QueryStmt {
     }
 
     private void analyzeGroupingExprs() throws AnalysisException {
-      // analyze grouping exprs
-      groupingExprsCopy_ = new ArrayList<>();
-      if (groupingExprs_ != null) {
-        // make a deep copy here, we don't want to modify the original
-        // exprs during analysis (in case we need to print them later)
-        groupingExprsCopy_ = Expr.cloneList(groupingExprs_);
-        substituteOrdinalsAndAliases(groupingExprsCopy_, "GROUP BY", analyzer_);
+      if (groupingExprs_ == null) {
+        groupingExprsCopy_ = new ArrayList<>();
+        return;
+      }
+      // make a deep copy here, we don't want to modify the original
+      // exprs during analysis (in case we need to print them later)
+      groupingExprsCopy_ = Expr.cloneList(groupingExprs_);
+      substituteOrdinalsAndAliases(groupingExprsCopy_, "GROUP BY", analyzer_);
 
-        for (int i = 0; i < groupingExprsCopy_.size(); ++i) {
-          groupingExprsCopy_.get(i).analyze(analyzer_);
-          if (groupingExprsCopy_.get(i).contains(Expr.isAggregatePredicate())) {
-            // reference the original expr in the error msg
-            throw new AnalysisException(
-                "GROUP BY expression must not contain aggregate functions: "
-                    + groupingExprs_.get(i).toSql());
-          }
-          if (groupingExprsCopy_.get(i).contains(AnalyticExpr.class)) {
-            // reference the original expr in the error msg
-            throw new AnalysisException(
-                "GROUP BY expression must not contain analytic expressions: "
-                    + groupingExprsCopy_.get(i).toSql());
-          }
+      for (int i = 0; i < groupingExprsCopy_.size(); ++i) {
+        groupingExprsCopy_.get(i).analyze(analyzer_);
+        if (groupingExprsCopy_.get(i).contains(Expr.isAggregatePredicate())) {
+          // reference the original expr in the error msg
+          throw new AnalysisException(
+              "GROUP BY expression must not contain aggregate functions: "
+                  + groupingExprs_.get(i).toSql());
+        }
+        if (groupingExprsCopy_.get(i).contains(AnalyticExpr.class)) {
+          // reference the original expr in the error msg
+          throw new AnalysisException(
+              "GROUP BY expression must not contain analytic expressions: "
+                  + groupingExprsCopy_.get(i).toSql());
         }
       }
     }
@@ -703,28 +684,29 @@ public class SelectStmt extends QueryStmt {
 
     private void rewriteCountDistinct() {
       // Optionally rewrite all count(distinct <expr>) into equivalent NDV() calls.
-      if (analyzer_.getQueryCtx().client_request.query_options.appx_count_distinct) {
-        ndvSmap_ = new ExprSubstitutionMap();
-        for (FunctionCallExpr aggExpr: aggExprs_) {
-          if (!aggExpr.isDistinct()
-              || !aggExpr.getFnName().getFunction().equals("count")
-              || aggExpr.getParams().size() != 1) {
-            continue;
-          }
-          FunctionCallExpr ndvFnCall =
-              new FunctionCallExpr("ndv", aggExpr.getParams().exprs());
-          ndvFnCall.analyzeNoThrow(analyzer_);
-          Preconditions.checkState(ndvFnCall.getType().equals(aggExpr.getType()));
-          ndvSmap_.put(aggExpr, ndvFnCall);
+      if (!analyzer_.getQueryCtx().client_request.query_options.appx_count_distinct) {
+        return;
+      }
+      ndvSmap_ = new ExprSubstitutionMap();
+      for (FunctionCallExpr aggExpr: aggExprs_) {
+        if (!aggExpr.isDistinct()
+            || !aggExpr.getFnName().getFunction().equals("count")
+            || aggExpr.getParams().size() != 1) {
+          continue;
         }
-        // Replace all count(distinct <expr>) with NDV(<expr>).
-        List<Expr> substAggExprs = Expr.substituteList(aggExprs_,
-            ndvSmap_, analyzer_, false);
-        aggExprs_.clear();
-        for (Expr aggExpr: substAggExprs) {
-          Preconditions.checkState(aggExpr instanceof FunctionCallExpr);
-          aggExprs_.add((FunctionCallExpr) aggExpr);
-        }
+        FunctionCallExpr ndvFnCall =
+            new FunctionCallExpr("ndv", aggExpr.getParams().exprs());
+        ndvFnCall.analyzeNoThrow(analyzer_);
+        Preconditions.checkState(ndvFnCall.getType().equals(aggExpr.getType()));
+        ndvSmap_.put(aggExpr, ndvFnCall);
+      }
+      // Replace all count(distinct <expr>) with NDV(<expr>).
+      List<Expr> substAggExprs = Expr.substituteList(aggExprs_,
+          ndvSmap_, analyzer_, false);
+      aggExprs_.clear();
+      for (Expr aggExpr: substAggExprs) {
+        Preconditions.checkState(aggExpr instanceof FunctionCallExpr);
+        aggExprs_.add((FunctionCallExpr) aggExpr);
       }
     }
 
@@ -937,6 +919,18 @@ public class SelectStmt extends QueryStmt {
           LOG.trace("post-analytic orderingExprs: " +
               Expr.debugString(sortInfo_.getSortExprs()));
         }
+      }
+    }
+
+    private void buildColumnLineageGraph() {
+      ColumnLineageGraph graph = analyzer_.getColumnLineageGraph();
+      if (multiAggInfo_ != null && multiAggInfo_.hasAggregateExprs()) {
+        graph.addDependencyPredicates(multiAggInfo_.getGroupingExprs());
+      }
+      if (sortInfo_ != null && hasLimit()) {
+        // When there is a LIMIT clause in conjunction with an ORDER BY, the
+        // ordering exprs must be added in the column lineage graph.
+        graph.addDependencyPredicates(sortInfo_.getSortExprs());
       }
     }
   }

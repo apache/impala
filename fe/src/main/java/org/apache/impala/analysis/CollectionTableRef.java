@@ -81,7 +81,7 @@ public class CollectionTableRef extends TableRef {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     desc_ = analyzer.registerTableRef(this);
-    if (isRelative() && !analyzer.isWithClause()) {
+    if (isRelative() && !analyzer.hasWithClause()) {
       SlotDescriptor parentSlotDesc = analyzer.registerSlotRef(resolvedPath_);
       parentSlotDesc.setItemTupleDesc(desc_);
       collectionExpr_ = new SlotRef(parentSlotDesc);

@@ -156,7 +156,7 @@ public class Analyzer {
   private boolean isSubquery_ = false;
 
   // Flag indicating whether this analyzer belongs to a WITH clause view.
-  private boolean isWithClause_ = false;
+  private boolean hasWithClause_ = false;
 
   // If set, when masked privilege requests are registered they will use this error
   // error message.
@@ -183,8 +183,8 @@ public class Analyzer {
   }
   public boolean setHasPlanHints() { return globalState_.hasPlanHints = true; }
   public boolean hasPlanHints() { return globalState_.hasPlanHints; }
-  public void setIsWithClause() { isWithClause_ = true; }
-  public boolean isWithClause() { return isWithClause_; }
+  public void setHasWithClause() { hasWithClause_ = true; }
+  public boolean hasWithClause() { return hasWithClause_; }
 
   // State shared between all objects of an Analyzer tree. We use LinkedHashMap and
   // LinkedHashSet where applicable to preserve the iteration order and make the class
@@ -403,7 +403,7 @@ public class Analyzer {
     authErrorMsg_ = parentAnalyzer.authErrorMsg_;
     maskPrivChecks_ = parentAnalyzer.maskPrivChecks_;
     enablePrivChecks_ = parentAnalyzer.enablePrivChecks_;
-    isWithClause_ = parentAnalyzer.isWithClause_;
+    hasWithClause_ = parentAnalyzer.hasWithClause_;
   }
 
   /**
