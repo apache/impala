@@ -437,14 +437,18 @@ class TestKuduOperations(KuduTestSuite):
     for error in insert_thread.errors:
       msg = str(error)
       # The first two are AnalysisExceptions, the next two come from KuduTableSink::Open()
-      # if the schema has changed since analysis, the last comes from the Kudu server if
+      # if the schema has changed since analysis, the rest come from the Kudu server if
       # the schema changes between KuduTableSink::Open() and when the write ops are sent.
-      assert "has fewer columns (1) than the SELECT / VALUES clause returns (2)" in msg \
-        or "(type: TINYINT) is not compatible with column 'col1' (type: STRING)" in msg \
-        or "has fewer columns than expected." in msg \
-        or "Column col1 has unexpected type." in msg \
-        or "Client provided column col1[int64 NULLABLE] not present in tablet" in msg \
-        or "Client provided column col1 INT64 NULLABLE not present in tablet"
+      possible_errors = [
+        "has fewer columns (1) than the SELECT / VALUES clause returns (2)",
+        "(type: TINYINT) is not compatible with column 'col1' (type: STRING)",
+        "has fewer columns than expected.",
+        "Column col1 has unexpected type.",
+        "Client provided column col1[int64 NULLABLE] not present in tablet",
+        "Client provided column col1 INT64 NULLABLE not present in tablet",
+        "The column 'col1' must have type string NULLABLE found int64 NULLABLE"
+      ]
+      assert any(err in msg for err in possible_errors)
 
   def _retry_query(self, cursor, query, expected):
     retries = 0
