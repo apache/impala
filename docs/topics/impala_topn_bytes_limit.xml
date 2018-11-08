@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="3.1.0" id="topn_bytes_limit">
+
+  <title>TOPN_BYTES_LIMIT Query Option (<keyword keyref="impala31_full"/> or higher only)</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>TOPN_BYTES_LIMIT</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Query Options"/>
+      <data name="Category" value="Querying"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      The <codeph>TOPN_BYTES_LIMIT</codeph> query option places a limit on the amount of
+      estimated memory that Impala can process for <term>top-N</term> queries.
+    </p>
+
+    <p>
+      <term>top-N</term> queries are the queries that include both <codeph>ORDER BY</codeph> and
+      <codeph>LIMIT</codeph> clauses. <term>top-N</term> queries don't spill to disk so they
+      have to keep all rows they process in memory, and those queries can cause out-of-memory
+      issues when running with a large limit and an offset. If the Impala planner estimates that
+      a <term>top-N</term> operator will process more bytes than the
+      <codeph>TOPN_BYTES_LIMIT</codeph> value, it will replace the <term>top-N</term> operator
+      with the <term>sort</term> operator. Switching to the <term>sort</term> operator allows
+      Impala to spill to disk, thus requiring less memory than <term>top-N</term>, but
+      potentially with performance penalties.
+    </p>
+
+    <p>
+      The option has no effect when set to 0 or -1.
+    </p>
+
+    <p>
+      <b>Syntax:</b>
+    </p>
+
+<codeblock>SET TOPN_BYTES_LIMIT=<varname>limit</varname></codeblock>
+
+    <p>
+      <b>Type:</b> Number
+    </p>
+
+    <p>
+      <b>Default:</b> 536870912 (512 MB)
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala31"/>
+    </p>
+
+  </conbody>
+
+</concept>
