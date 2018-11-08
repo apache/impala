@@ -456,7 +456,7 @@ class TestAuthorization(CustomClusterTestSuite):
       self.client.execute("grant select on database functional to role %s" % unique_role)
       for service in [self.cluster.catalogd.service,
                       self.cluster.get_first_impalad().service]:
-        obj_dump = service.get_catalog_object_dump("PRINCIPAL", unique_role)
+        obj_dump = service.get_catalog_object_dump("PRINCIPAL", "%s.ROLE" % unique_role)
         assert "catalog_version" in obj_dump
 
         # Get the privilege associated with that principal ID.
@@ -468,7 +468,7 @@ class TestAuthorization(CustomClusterTestSuite):
         assert "catalog_version" in obj_dump
 
         # Get the principal that does not exist.
-        obj_dump = service.get_catalog_object_dump("PRINCIPAL", "doesnotexist")
+        obj_dump = service.get_catalog_object_dump("PRINCIPAL", "doesnotexist.ROLE")
         assert "CatalogException" in obj_dump
 
         # Get the privilege that does not exist.

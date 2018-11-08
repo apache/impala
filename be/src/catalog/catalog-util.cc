@@ -151,6 +151,8 @@ TCatalogObjectType::type TCatalogObjectTypeFromName(const string& name) {
 
 Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
     const string& object_name, TCatalogObject* catalog_object) {
+  // See Catalog::toCatalogObjectKey in Catalog.java for more information on the
+  // catalog object key format.
   switch (object_type) {
     case TCatalogObjectType::DATABASE:
       catalog_object->__set_type(object_type);
@@ -202,11 +204,31 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       catalog_object->__set_cache_pool(THdfsCachePool());
       catalog_object->cache_pool.__set_pool_name(object_name);
       break;
-    case TCatalogObjectType::PRINCIPAL:
+    case TCatalogObjectType::PRINCIPAL: {
+      // The format is <principal name>.<principal type>
+      vector<string> split;
+      boost::split(split, object_name, [](char c) { return c == '.'; });
+      if (split.size() != 2) {
+        stringstream error_msg;
+        error_msg << "Invalid principal name: " << object_name;
+        return Status(error_msg.str());
+      }
+      string principal_name = split[0];
+      string principal_type = split[1];
       catalog_object->__set_type(object_type);
       catalog_object->__set_principal(TPrincipal());
-      catalog_object->principal.__set_principal_name(object_name);
+      catalog_object->principal.__set_principal_name(principal_name);
+      if (principal_type == "ROLE") {
+        catalog_object->principal.__set_principal_type(TPrincipalType::ROLE);
+      } else if (principal_type == "USER") {
+        catalog_object->principal.__set_principal_type(TPrincipalType::USER);
+      } else {
+        stringstream error_msg;
+        error_msg << "Invalid principal type: " << principal_type;
+        return Status(error_msg.str());
+      }
       break;
+    }
     case TCatalogObjectType::PRIVILEGE: {
       // The format is <privilege name>.<principal ID>.<principal type>
       vector<string> split;
