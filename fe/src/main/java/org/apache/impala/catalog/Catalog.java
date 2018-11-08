@@ -28,6 +28,7 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TFunction;
 import org.apache.impala.thrift.TPartitionKeyValue;
+import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUniqueId;
@@ -545,6 +546,7 @@ public abstract class Catalog {
    * Returns a unique string key of a catalog object.
    */
   public static String toCatalogObjectKey(TCatalogObject catalogObject) {
+    // TODO (IMPALA-7839): Refactor this method to reduce code repetition.
     Preconditions.checkNotNull(catalogObject);
     switch (catalogObject.getType()) {
       case DATABASE:
@@ -558,8 +560,14 @@ public abstract class Catalog {
         return "FUNCTION:" + catalogObject.getFn().getName() + "(" +
             catalogObject.getFn().getSignature() + ")";
       case PRINCIPAL:
-        return "PRINCIPAL:" + catalogObject.getPrincipal().getPrincipal_name()
-            .toLowerCase();
+        // It is important to make the principal object key unique since it is possible
+        // to have the same name for both role and user.
+        String principalName = catalogObject.getPrincipal().getPrincipal_name();
+        if (catalogObject.getPrincipal().getPrincipal_type() == TPrincipalType.ROLE) {
+          principalName = principalName.toLowerCase();
+        }
+        return "PRINCIPAL:" + principalName + "." +
+            catalogObject.getPrincipal().getPrincipal_type().name();
       case PRIVILEGE:
         // The combination of privilege name + principal ID + principal type is
         // guaranteed to be unique.

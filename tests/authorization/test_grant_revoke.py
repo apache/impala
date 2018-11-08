@@ -28,8 +28,9 @@ from tests.common.sentry_cache_test_suite import SentryCacheTestSuite, TestObjec
 from tests.util.calculation_util import get_random_id
 from tests.verifiers.metric_verifier import MetricVerifier
 
-SENTRY_CONFIG_FILE = getenv('IMPALA_HOME') + \
-    '/fe/src/test/resources/sentry-site.xml'
+SENTRY_CONFIG_DIR = "%s/%s" % (getenv("IMPALA_HOME"), "fe/src/test/resources")
+SENTRY_CONFIG_FILE = "%s/sentry-site.xml" % SENTRY_CONFIG_DIR
+SENTRY_CONFIG_FILE_OO = "%s/sentry-site_oo.xml" % SENTRY_CONFIG_DIR
 
 # Sentry long polling frequency to make Sentry refresh not run.
 SENTRY_LONG_POLLING_FREQUENCY_S = 3600
@@ -306,7 +307,7 @@ class TestGrantRevoke(SentryCacheTestSuite):
       impalad_args="--server_name=server1",
       catalogd_args="--sentry_config={0}".format(SENTRY_CONFIG_FILE),
       sentry_config=SENTRY_CONFIG_FILE)
-  def test_invalidate_metadata(self, unique_role):
+  def test_role_name_case_insensitive_invalidate_metadata(self, unique_role):
     """IMPALA-7729: Tests running invalidate metadata with role names that have different
     case sensitivity."""
     for role_name in [unique_role.lower(), unique_role.upper(), unique_role.capitalize()]:
@@ -322,3 +323,48 @@ class TestGrantRevoke(SentryCacheTestSuite):
         assert self.client.wait_for_finished_timeout(handle, timeout=60)
       finally:
         self.client.execute("drop role {0}".format(role_name))
+
+  @pytest.mark.execute_serially
+  @SentryCacheTestSuite.with_args(
+      impalad_args="--server_name=server1 --sentry_config={0} "
+                   "--authorization_policy_provider_class="
+                   "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                   .format(SENTRY_CONFIG_FILE_OO),
+      catalogd_args="--sentry_config={0} "
+                    "--authorization_policy_provider_class="
+                    "org.apache.impala.service.CustomClusterResourceAuthorizationProvider"
+                    .format(SENTRY_CONFIG_FILE_OO),
+      sentry_config=SENTRY_CONFIG_FILE_OO)
+  def test_same_name_for_role_and_user_invalidate_metadata(self, testid_checksum):
+    """IMPALA-7729: Tests running invalidate metadata with for the same name for both
+    user and role should not cause Impala query to hang."""
+    db_prefix = testid_checksum
+    role_name = "foobar"
+    # Use two different clients so that the sessions will use two different user names.
+    foobar_impalad_client = self.create_impala_client()
+    FOOBAR_impalad_client = self.create_impala_client()
+    try:
+      # This will create "foobar" role catalog object.
+      self.client.execute("create role {0}".format(role_name))
+      self.client.execute("grant all on server to {0}".format(role_name))
+      self.client.execute("grant role {0} to group `{1}`".format(
+          role_name, grp.getgrnam(getuser()).gr_name))
+
+      # User names are case sensitive, so "foobar" and "FOOBAR" users should be treated
+      # as two different catalog objects.
+
+      # This will create "foobar" user catalog object.
+      self.user_query(foobar_impalad_client, "create database {0}_db1"
+                      .format(db_prefix, user="foobar"))
+      # This will create "FOOBAR" user catalog object.
+      self.user_query(FOOBAR_impalad_client, "create database {0}_db2"
+                      .format(db_prefix, user="FOOBAR"))
+
+      # Verify that running invalidate metadata won't hang due to having the same name
+      # in both user and role.
+      handle = self.client.execute_async("invalidate metadata")
+      assert self.client.wait_for_finished_timeout(handle, timeout=60)
+    finally:
+      self.client.execute("drop database {0}_db1".format(db_prefix))
+      self.client.execute("drop database {0}_db2".format(db_prefix))
+      self.client.execute("drop role {0}".format(role_name))

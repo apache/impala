@@ -159,8 +159,9 @@ public abstract class Principal extends CatalogObjectImpl {
 
   @Override
   public String getUniqueName() {
-    return this.getPrincipalType() == TPrincipalType.ROLE ? "ROLE:" : "USER:"
-        + getName().toLowerCase();
+    String principalName = getPrincipalType() == TPrincipalType.ROLE ?
+        getName().toLowerCase() : getName();
+    return "PRINCIPAL:" + principalName + "." + getPrincipalType().name();
   }
 
   public TCatalogObject toTCatalogObject() {
