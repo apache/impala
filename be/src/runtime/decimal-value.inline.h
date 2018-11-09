@@ -28,6 +28,7 @@
 #include <sstream>
 
 #include "common/logging.h"
+#include "util/arithmetic-util.h"
 #include "util/bit-util.h"
 #include "util/decimal-util.h"
 #include "util/hash-util.h"
@@ -251,7 +252,9 @@ inline int128_t AddLarge(int128_t x, int x_scale, int128_t y, int y_scale,
   DCHECK(right <= DecimalUtil::GetScaleMultiplier<int128_t>(result_scale));
 
   *overflow |= x_left > DecimalUtil::MAX_UNSCALED_DECIMAL16 - y_left - carry_to_left;
-  left = x_left + y_left + carry_to_left;
+  left = ArithmeticUtil::AsUnsigned<std::plus>(
+      ArithmeticUtil::AsUnsigned<std::plus>(x_left, y_left),
+      static_cast<int128_t>(carry_to_left));
 
   int128_t mult = DecimalUtil::GetScaleMultiplier<int128_t>(result_scale);
   if (UNLIKELY(!*overflow &&
