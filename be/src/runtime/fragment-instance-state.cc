@@ -94,6 +94,10 @@ Status FragmentInstanceState::Exec() {
   }
 
 done:
+  // Don't transition to completion until Close() is called as some new errors may be
+  // logged in RuntimeState:error_log_.
+  Close();
+
   // Must update the fragment instance state first before updating the 'Query State'.
   // Otherwise, there is a race when reading the 'done' flag with GetStatusReport().
   // This may lead to the "final" profile being sent with the 'done' flag as false.
@@ -113,9 +117,6 @@ done:
     // Tell the managing 'QueryState' that we're done with executing.
     query_state_->DoneExecuting();
   }
-  // call this before Close() to make sure the thread token got released
-  Finalize(status);
-  Close();
   return status;
 }
 
@@ -339,6 +340,12 @@ Status FragmentInstanceState::ExecInternal() {
 void FragmentInstanceState::Close() {
   DCHECK(runtime_state_ != nullptr);
 
+  // If we haven't already released this thread token in Prepare(), release
+  // it before calling Close().
+  if (fragment_ctx_.fragment.output_sink.type != TDataSinkType::PLAN_ROOT_SINK) {
+    ReleaseThreadToken();
+  }
+
   // guard against partially-finished Prepare()
   if (sink_ != nullptr) sink_->Close(runtime_state_);
 
@@ -438,13 +445,6 @@ void FragmentInstanceState::UpdateState(const StateEvent event)
   // This method is the only one updating 'current_state_' and is not meant to be thread
   // safe.
   if (next_state != current_state) current_state_.Store(next_state);
-}
-
-void FragmentInstanceState::Finalize(const Status& status) {
-  if (fragment_ctx_.fragment.output_sink.type != TDataSinkType::PLAN_ROOT_SINK) {
-    // if we haven't already release this thread token in Prepare(), release it now
-    ReleaseThreadToken();
-  }
 }
 
 void FragmentInstanceState::ReleaseThreadToken() {

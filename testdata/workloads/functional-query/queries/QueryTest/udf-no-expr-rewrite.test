@@ -22,9 +22,6 @@ select mem_test_leaks(100);
 bigint
 ---- RESULTS
 100
-#---- ERRORS
-#TODO: Fix the non-determinisim below. IMPALA-7829.
-#A fragment instance's last status report may be sent before calling Close() which is
-#where the memory leak is detected. So, we don't always get the following error message.
-#UDF WARNING: Memory leaked via FunctionContext::Allocate(), 100 bytes leaked via FunctionContext::TrackAllocation()
+---- ERRORS
+UDF WARNING: Memory leaked via FunctionContext::Allocate(), 100 bytes leaked via FunctionContext::TrackAllocation()
 ====

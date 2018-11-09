@@ -268,10 +268,6 @@ class FragmentInstanceState {
   /// concurrently.
   void UpdateState(const StateEvent event);
 
-  /// Called when execution is complete to finalize counters. Must be called only once.
-  /// Can handle partially-finished Prepare().
-  void Finalize(const Status& status);
-
   /// Releases the thread token for this fragment executor. Can handle
   /// partially-finished Prepare().
   void ReleaseThreadToken();
