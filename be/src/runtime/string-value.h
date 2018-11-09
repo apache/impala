@@ -33,7 +33,7 @@ namespace impala {
 /// The returned StringValue of all functions that return StringValue
 /// shares its buffer with the parent.
 /// TODO: rename this to be less confusing with impala_udf::StringVal.
-struct StringValue {
+struct __attribute__((__packed__)) StringValue {
   /// The current limitation for a string instance is 1GB character data.
   /// See IMPALA-1619 for more details.
   static const int MAX_LENGTH = (1 << 30);

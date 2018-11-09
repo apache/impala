@@ -39,9 +39,8 @@ public enum PrimitiveType {
   // The timestamp structure is 12 bytes, Aligning to 8 bytes makes it 16.
   TIMESTAMP("TIMESTAMP", 16, TPrimitiveType.TIMESTAMP),
   // 8-byte pointer and 4-byte length indicator (12 bytes total).
-  // Aligning to 8 bytes so 16 total.
-  STRING("STRING", 16, TPrimitiveType.STRING),
-  VARCHAR("VARCHAR", 16, TPrimitiveType.VARCHAR),
+  STRING("STRING", 12, TPrimitiveType.STRING),
+  VARCHAR("VARCHAR", 12, TPrimitiveType.VARCHAR),
 
   // Unsupported scalar type.
   BINARY("BINARY", -1, TPrimitiveType.BINARY),

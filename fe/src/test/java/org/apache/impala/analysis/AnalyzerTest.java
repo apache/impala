@@ -116,20 +116,20 @@ public class AnalyzerTest extends FrontendTestBase {
     tupleDesc.materializeSlots();
     descTbl.computeMemLayout();
 
-    Assert.assertEquals(97.0f, tupleDesc.getAvgSerializedSize(), 0.0);
-    checkLayoutParams("functional.alltypes.date_string_col", 16, 0, 88, 0, analyzer);
-    checkLayoutParams("functional.alltypes.string_col", 16, 16, 88, 1, analyzer);
-    checkLayoutParams("functional.alltypes.timestamp_col", 16, 32, 88, 2, analyzer);
-    checkLayoutParams("functional.alltypes.bigint_col", 8, 48, 88, 3, analyzer);
-    checkLayoutParams("functional.alltypes.double_col", 8, 56, 88, 4, analyzer);
-    checkLayoutParams("functional.alltypes.id", 4, 64, 88, 5, analyzer);
-    checkLayoutParams("functional.alltypes.int_col", 4, 68, 88, 6, analyzer);
-    checkLayoutParams("functional.alltypes.float_col", 4, 72, 88, 7, analyzer);
-    checkLayoutParams("functional.alltypes.year", 4, 76, 89, 0, analyzer);
-    checkLayoutParams("functional.alltypes.month", 4, 80, 89, 1, analyzer);
-    checkLayoutParams("functional.alltypes.smallint_col", 2, 84, 89, 2, analyzer);
-    checkLayoutParams("functional.alltypes.bool_col", 1, 86, 89, 3, analyzer);
-    checkLayoutParams("functional.alltypes.tinyint_col", 1, 87, 89, 4, analyzer);
+    Assert.assertEquals(89.0f, tupleDesc.getAvgSerializedSize(), 0.0);
+    checkLayoutParams("functional.alltypes.timestamp_col", 16, 0, 80, 0, analyzer);
+    checkLayoutParams("functional.alltypes.date_string_col", 12, 16, 80, 1, analyzer);
+    checkLayoutParams("functional.alltypes.string_col", 12, 28, 80, 2, analyzer);
+    checkLayoutParams("functional.alltypes.bigint_col", 8, 40, 80, 3, analyzer);
+    checkLayoutParams("functional.alltypes.double_col", 8, 48, 80, 4, analyzer);
+    checkLayoutParams("functional.alltypes.id", 4, 56, 80, 5, analyzer);
+    checkLayoutParams("functional.alltypes.int_col", 4, 60, 80, 6, analyzer);
+    checkLayoutParams("functional.alltypes.float_col", 4, 64, 80, 7, analyzer);
+    checkLayoutParams("functional.alltypes.year", 4, 68, 81, 0, analyzer);
+    checkLayoutParams("functional.alltypes.month", 4, 72, 81, 1, analyzer);
+    checkLayoutParams("functional.alltypes.smallint_col", 2, 76, 81, 2, analyzer);
+    checkLayoutParams("functional.alltypes.bool_col", 1, 78, 81, 3, analyzer);
+    checkLayoutParams("functional.alltypes.tinyint_col", 1, 79, 81, 4, analyzer);
   }
 
   private void testNonNullable() throws AnalysisException {
@@ -183,22 +183,22 @@ public class AnalyzerTest extends FrontendTestBase {
     slots.get(9).setIsMaterialized(false);
     descTbl.computeMemLayout();
 
-    Assert.assertEquals(68.0f, tupleDesc.getAvgSerializedSize(), 0.0);
+    Assert.assertEquals(64.0f, tupleDesc.getAvgSerializedSize(), 0.0);
     // Check non-materialized slots.
     checkLayoutParams("functional.alltypes.id", 0, -1, 0, 0, analyzer);
     checkLayoutParams("functional.alltypes.double_col", 0, -1, 0, 0, analyzer);
     checkLayoutParams("functional.alltypes.string_col", 0, -1, 0, 0, analyzer);
     // Check materialized slots.
-    checkLayoutParams("functional.alltypes.date_string_col", 16, 0, 60, 0, analyzer);
-    checkLayoutParams("functional.alltypes.timestamp_col", 16, 16, 60, 1, analyzer);
-    checkLayoutParams("functional.alltypes.bigint_col", 8, 32, 60, 2, analyzer);
-    checkLayoutParams("functional.alltypes.int_col", 4, 40, 60, 3, analyzer);
-    checkLayoutParams("functional.alltypes.float_col", 4, 44, 60, 4, analyzer);
-    checkLayoutParams("functional.alltypes.year", 4, 48, 60, 5, analyzer);
-    checkLayoutParams("functional.alltypes.month", 4, 52, 60, 6, analyzer);
-    checkLayoutParams("functional.alltypes.smallint_col", 2, 56, 60, 7, analyzer);
-    checkLayoutParams("functional.alltypes.bool_col", 1, 58, 61, 0, analyzer);
-    checkLayoutParams("functional.alltypes.tinyint_col", 1, 59, 61, 1, analyzer);
+    checkLayoutParams("functional.alltypes.timestamp_col", 16, 0, 56, 0, analyzer);
+    checkLayoutParams("functional.alltypes.date_string_col", 12, 16, 56, 1, analyzer);
+    checkLayoutParams("functional.alltypes.bigint_col", 8, 28, 56, 2, analyzer);
+    checkLayoutParams("functional.alltypes.int_col", 4, 36, 56, 3, analyzer);
+    checkLayoutParams("functional.alltypes.float_col", 4, 40, 56, 4, analyzer);
+    checkLayoutParams("functional.alltypes.year", 4, 44, 56, 5, analyzer);
+    checkLayoutParams("functional.alltypes.month", 4, 48, 56, 6, analyzer);
+    checkLayoutParams("functional.alltypes.smallint_col", 2, 52, 56, 7, analyzer);
+    checkLayoutParams("functional.alltypes.bool_col", 1, 54, 57, 0, analyzer);
+    checkLayoutParams("functional.alltypes.tinyint_col", 1, 55, 57, 1, analyzer);
   }
 
   private void checkLayoutParams(SlotDescriptor d, int byteSize, int byteOffset,

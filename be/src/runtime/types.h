@@ -260,13 +260,13 @@ struct ColumnType {
     switch (type) {
       case TYPE_STRING:
       case TYPE_VARCHAR:
-        return 16;
+        return 12;
       case TYPE_CHAR:
       case TYPE_FIXED_UDA_INTERMEDIATE:
         return len;
       case TYPE_ARRAY:
       case TYPE_MAP:
-        return 16;
+        return 12;
       case TYPE_STRUCT:
         DCHECK(false) << "TYPE_STRUCT slot not possible";
       default:

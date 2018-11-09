@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TSlotDescriptor;
@@ -179,6 +180,15 @@ public class SlotDescriptor {
       }
     }
     return false;
+  }
+
+  /**
+   * Returns true if this slot is of STRING type in a kudu table.
+   */
+  public boolean isKuduStringSlot() {
+    if (getParent() == null) return false;
+    if (!(getParent().getTable() instanceof FeKuduTable)) return false;
+    return getType().isStringType();
   }
 
   /**

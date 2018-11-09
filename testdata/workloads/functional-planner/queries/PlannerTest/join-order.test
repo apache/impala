@@ -543,7 +543,6 @@ PLAN-ROOT SINK
    predicates: l_commitdate < l_receiptdate
    runtime filters: RF000 -> l_orderkey
 ====
-# the largest input is prevented from becoming the leftmost input by the full outer join
 select o_orderpriority, count(*) as order_count
 from tpch.orders
   full outer join tpch.lineitem
@@ -561,13 +560,13 @@ PLAN-ROOT SINK
 |  group by: o_orderpriority
 |
 02:HASH JOIN [FULL OUTER JOIN]
-|  hash predicates: o_orderkey = l_orderkey
+|  hash predicates: l_orderkey = o_orderkey
 |
-|--01:SCAN HDFS [tpch.lineitem]
-|     partitions=1/1 files=1 size=718.94MB
+|--00:SCAN HDFS [tpch.orders]
+|     partitions=1/1 files=1 size=162.56MB
 |
-00:SCAN HDFS [tpch.orders]
-   partitions=1/1 files=1 size=162.56MB
+01:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -601,7 +600,6 @@ PLAN-ROOT SINK
 01:SCAN HDFS [tpch.lineitem]
    partitions=1/1 files=1 size=718.94MB
 ====
-# the largest input is prevented from becoming the leftmost input by the right outer join
 select o_orderpriority, count(*) as order_count
 from tpch.orders
   right outer join tpch.lineitem
@@ -618,16 +616,14 @@ PLAN-ROOT SINK
 |  output: count(*)
 |  group by: o_orderpriority
 |
-02:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: o_orderkey = l_orderkey
-|  runtime filters: RF000 <- l_orderkey
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
 |
-|--01:SCAN HDFS [tpch.lineitem]
-|     partitions=1/1 files=1 size=718.94MB
+|--00:SCAN HDFS [tpch.orders]
+|     partitions=1/1 files=1 size=162.56MB
 |
-00:SCAN HDFS [tpch.orders]
-   partitions=1/1 files=1 size=162.56MB
-   runtime filters: RF000 -> o_orderkey
+01:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |

@@ -742,7 +742,8 @@ llvm::StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
   for (SlotDescriptor* slot: slots()) {
     // Verify that the byte offset in the llvm struct matches the tuple offset
     // computed in the FE.
-    DCHECK_EQ(layout->getElementOffset(slot->llvm_field_idx()), slot->tuple_offset());
+    DCHECK_EQ(layout->getElementOffset(slot->llvm_field_idx()), slot->tuple_offset())
+        << id_;
   }
   return tuple_struct;
 }

@@ -70,9 +70,12 @@ import com.google.common.collect.Lists;
  *
  * Example: select bool_col, int_col, string_col, smallint_col from functional.alltypes
  * Slots:   string_col|int_col|smallint_col|bool_col|null_byte
- * Offsets: 0          16      20           22       23
+ * Offsets: 0          12      16           18       19
  */
 public class TupleDescriptor {
+  // Padding size in bytes for Kudu string slots.
+  private static final int KUDU_STRING_PADDING = 4;
+
   private final TupleId id_;
   private final String debugName_;  // debug-only
   private final ArrayList<SlotDescriptor> slots_ = Lists.newArrayList();
@@ -261,17 +264,24 @@ public class TupleDescriptor {
     for (SlotDescriptor d: slots_) {
       if (!d.isMaterialized()) continue;
       ColumnStats stats = d.getStats();
+      int slotSize = d.getType().getSlotSize();
+
       if (stats.hasAvgSerializedSize()) {
         avgSerializedSize_ += d.getStats().getAvgSerializedSize();
       } else {
         // TODO: for computed slots, try to come up with stats estimates
-        avgSerializedSize_ += d.getType().getSlotSize();
+        avgSerializedSize_ += slotSize;
       }
-      if (!slotsBySize.containsKey(d.getType().getSlotSize())) {
-        slotsBySize.put(d.getType().getSlotSize(), new ArrayList<SlotDescriptor>());
+      // Add padding for a KUDU string slot.
+      if (d.isKuduStringSlot()) {
+        slotSize += KUDU_STRING_PADDING;
+        avgSerializedSize_ += KUDU_STRING_PADDING;
       }
-      totalSlotSize += d.getType().getSlotSize();
-      slotsBySize.get(d.getType().getSlotSize()).add(d);
+      if (!slotsBySize.containsKey(slotSize)) {
+        slotsBySize.put(slotSize, new ArrayList<SlotDescriptor>());
+      }
+      totalSlotSize += slotSize;
+      slotsBySize.get(slotSize).add(d);
       if (d.getIsNullable() || alwaysAddNullBit) ++numNullBits;
     }
     // we shouldn't have anything of size <= 0

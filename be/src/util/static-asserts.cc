@@ -18,6 +18,7 @@
 #include <boost/static_assert.hpp>
 
 #include "common/hdfs.h"
+#include "runtime/collection-value.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf.h"
@@ -28,12 +29,13 @@ namespace impala {
 // at compile time.  If these asserts fail, the compile will fail.
 class UnusedClass {
  private:
-  BOOST_STATIC_ASSERT(sizeof(StringValue) == 16);
+  BOOST_STATIC_ASSERT(sizeof(StringValue) == 12);
   BOOST_STATIC_ASSERT(offsetof(StringValue, len) == 8);
   BOOST_STATIC_ASSERT(sizeof(TimestampValue) == 16);
   BOOST_STATIC_ASSERT(offsetof(TimestampValue, date_) == 8);
   BOOST_STATIC_ASSERT(sizeof(boost::posix_time::time_duration) == 8);
   BOOST_STATIC_ASSERT(sizeof(boost::gregorian::date) == 4);
+  BOOST_STATIC_ASSERT(sizeof(CollectionValue) == 12);
   BOOST_STATIC_ASSERT(sizeof(hdfsFS) == sizeof(void*));
   BOOST_STATIC_ASSERT(sizeof(hdfsFile) == sizeof(void*));
 

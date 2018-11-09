@@ -83,7 +83,11 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
             reinterpret_cast<char*>(slot);
         if (UNLIKELY(str.ptr == NULL)) return false;
         if (need_escape) {
-          UnescapeString(data, str.ptr, &str.len, buffer_len);
+          // Use a temporary variable on the stack to avoid accessing an unaligned
+          // pointer.
+          int str_len = str.len;
+          UnescapeString(data, str.ptr, &str_len, buffer_len);
+          str.len = str_len;
         } else {
           memcpy(str.ptr, data, str.len);
         }

@@ -67,7 +67,7 @@ row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ---- QUERY
 # Aggregation query that will OOM and fail to spill because of IMPALA-3304 without
 # any help from DEBUG_ACTION.
-set mem_limit=100m;
+set mem_limit=80m;
 select l_orderkey, group_concat(l_comment) comments
 from lineitem
 group by l_orderkey

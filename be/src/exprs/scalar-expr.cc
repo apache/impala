@@ -225,8 +225,6 @@ struct MemLayoutData {
   bool variable_length;
   int alignment;
 
-  // TODO: sort by type as well?  Any reason to do this?
-  // TODO: would sorting in reverse order of size be faster due to better packing?
   // TODO: why put var-len at end?
   bool operator<(const MemLayoutData& rhs) const {
     // variable_len go at end
@@ -243,10 +241,6 @@ int ScalarExpr::ComputeResultsLayout(const vector<ScalarExpr*>& exprs,
     return 0;
   }
 
-  // Don't align more than word (8-byte) size. There's no performance gain beyond 8-byte
-  // alignment, and there is a performance gain to keeping the results buffer small. This
-  // is consistent with what compilers do.
-  int MAX_ALIGNMENT = sizeof(int64_t);
 
   vector<MemLayoutData> data;
   data.resize(exprs.size());
@@ -259,33 +253,15 @@ int ScalarExpr::ComputeResultsLayout(const vector<ScalarExpr*>& exprs,
     DCHECK_GT(data[i].byte_size, 0);
     data[i].variable_length = exprs[i]->type().IsVarLenStringType();
 
-    bool fixed_len_char = exprs[i]->type().type == TYPE_CHAR && !data[i].variable_length;
-
-    // Compute the alignment of this value. Values should be self-aligned for optimal
-    // memory access speed, up to the max alignment (e.g., if this value is an int32_t,
-    // its offset in the buffer should be divisible by sizeof(int32_t)).
-    // TODO: is self-alignment really necessary for perf?
-    if (!fixed_len_char) {
-      data[i].alignment = min(data[i].byte_size, MAX_ALIGNMENT);
-    } else {
-      // Fixed-len chars are aligned to a one-byte boundary, as if they were char[],
-      // leaving no padding between them and the previous value.
-      data[i].alignment = 1;
-    }
   }
 
   sort(data.begin(), data.end());
 
-  // Walk the types and store in a packed aligned layout
   int byte_offset = 0;
-
   offsets->resize(exprs.size());
   *var_result_begin = -1;
 
   for (int i = 0; i < data.size(); ++i) {
-    // Increase byte_offset so data[i] is at the right alignment (i.e. add padding between
-    // this value and the previous).
-    byte_offset = BitUtil::RoundUp(byte_offset, data[i].alignment);
 
     (*offsets)[data[i].expr_idx] = byte_offset;
     if (data[i].variable_length && *var_result_begin == -1) {

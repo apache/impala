@@ -7596,7 +7596,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
       exprs.push_back(CreateLiteral(t, "2016-11-09"));
     }
     if (t.IsVarLenStringType()) {
-      ValidateLayout(exprs, 16, 0, expected_offsets);
+      ValidateLayout(exprs, 12, 0, expected_offsets);
     } else {
       ValidateLayout(exprs, t.GetByteSize(), -1, expected_offsets);
     }
@@ -7607,7 +7607,8 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets.clear();
   exprs.clear();
 
-  // Test layout adding a bunch of exprs.  This is designed to trigger padding.
+  // Test layout adding a bunch of exprs.  Previously, this triggered padding.
+  // IMPALA-7367 removed the alignment requirement, hence the values are not padded.
   // The expected result is computed along the way
   exprs.push_back(CreateLiteral(TYPE_BOOLEAN, "0"));
   exprs.push_back(CreateLiteral(TYPE_TINYINT, "0"));
@@ -7615,7 +7616,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets[1].insert(expected_byte_size);
   expected_offsets[1].insert(expected_byte_size + 1);
   expected_offsets[1].insert(expected_byte_size + 2);
-  expected_byte_size += 3 * 1 + 1;  // 1 byte of padding
+  expected_byte_size += 3 * 1;
 
   exprs.push_back(CreateLiteral(TYPE_SMALLINT, "0"));
   expected_offsets[2].insert(expected_byte_size);
@@ -7623,9 +7624,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
 
   exprs.push_back(CreateLiteral(ColumnType::CreateCharType(3), "0"));
   expected_offsets[3].insert(expected_byte_size);
-  expected_byte_size += 3 + 3; // 3 byte of padding
-  ASSERT_EQ(expected_byte_size % 4, 0);
-
+  expected_byte_size += 3;
   exprs.push_back(CreateLiteral(TYPE_INT, "0"));
   exprs.push_back(CreateLiteral(TYPE_FLOAT, "0"));
   exprs.push_back(CreateLiteral(TYPE_FLOAT, "0"));
@@ -7634,8 +7633,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets[4].insert(expected_byte_size + 4);
   expected_offsets[4].insert(expected_byte_size + 8);
   expected_offsets[4].insert(expected_byte_size + 12);
-  expected_byte_size += 4 * 4 + 4;  // 4 bytes of padding
-  ASSERT_EQ(expected_byte_size % 8, 0);
+  expected_byte_size += 4 * 4;
 
   exprs.push_back(CreateLiteral(TYPE_BIGINT, "0"));
   exprs.push_back(CreateLiteral(TYPE_BIGINT, "0"));
@@ -7647,8 +7645,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets[8].insert(expected_byte_size + 16);
   expected_offsets[8].insert(expected_byte_size + 24);
   expected_offsets[8].insert(expected_byte_size + 32);
-  expected_byte_size += 5 * 8;      // No more padding
-  ASSERT_EQ(expected_byte_size % 8, 0);
+  expected_byte_size += 5 * 8;
 
   exprs.push_back(CreateLiteral(TYPE_TIMESTAMP, "2016-11-09"));
   exprs.push_back(CreateLiteral(TYPE_TIMESTAMP, "2016-11-09"));
@@ -7657,17 +7654,15 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets[16].insert(expected_byte_size + 16);
   expected_offsets[16].insert(expected_byte_size + 32);
   expected_byte_size += 3 * 16;
-  ASSERT_EQ(expected_byte_size % 8, 0);
 
   exprs.push_back(CreateLiteral(TYPE_STRING, "0"));
   exprs.push_back(CreateLiteral(TYPE_STRING, "0"));
   exprs.push_back(CreateLiteral(ColumnType::CreateVarcharType(1), "0"));
   expected_offsets[0].insert(expected_byte_size);
-  expected_offsets[0].insert(expected_byte_size + 16);
-  expected_offsets[0].insert(expected_byte_size + 32);
+  expected_offsets[0].insert(expected_byte_size + 12);
+  expected_offsets[0].insert(expected_byte_size + 24);
   expected_var_begin = expected_byte_size;
-  expected_byte_size += 3 * 16;
-  ASSERT_EQ(expected_byte_size % 8, 0);
+  expected_byte_size += 3 * 12;
 
   // Validate computed layout
   ValidateLayout(exprs, expected_byte_size, expected_var_begin, expected_offsets);

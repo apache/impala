@@ -5,7 +5,7 @@ on ss_customer_sk = c_customer_sk
 where c_salutation = 'Mrs.'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=185.50MB mem-reservation=25.50MB thread-reservation=3 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=181.75MB mem-reservation=21.75MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
@@ -13,8 +13,8 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  runtime filters: RF000[bloom] <- c_customer_sk
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=0,1 row-size=355B cardinality=529700
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=319B cardinality=529700
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
@@ -25,7 +25,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100000
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=1 row-size=255B cardinality=16667
+|     tuple-ids=1 row-size=219B cardinality=16667
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -48,7 +48,7 @@ on ss_customer_sk = c_customer_sk
 where c_salutation = 'Mrs.'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=184.50MB mem-reservation=24.50MB thread-reservation=3
+|  Per-Host Resources: mem-estimate=180.75MB mem-reservation=20.75MB thread-reservation=3
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
@@ -56,8 +56,8 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  other predicates: c_salutation = 'Mrs.'
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=0,1N row-size=355B cardinality=2880404
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=0,1N row-size=319B cardinality=2880404
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
@@ -68,7 +68,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100000
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=1 row-size=255B cardinality=16667
+|     tuple-ids=1 row-size=219B cardinality=16667
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -90,7 +90,7 @@ on ss_customer_sk = c_customer_sk
 where c_salutation = 'Mrs.'
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=185.50MB mem-reservation=25.50MB thread-reservation=3 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=181.75MB mem-reservation=21.75MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
@@ -98,8 +98,8 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  runtime filters: RF000[bloom] <- c_customer_sk
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=0N,1 row-size=355B cardinality=529700
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=0N,1 row-size=319B cardinality=529700
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
@@ -110,7 +110,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100000
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=1 row-size=255B cardinality=16667
+|     tuple-ids=1 row-size=219B cardinality=16667
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -223,7 +223,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: b.d_date_sk = a.d_date_sk
 |  runtime filters: RF000[bloom] <- a.d_date_sk
 |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
-|  tuple-ids=1,0 row-size=606B cardinality=36525
+|  tuple-ids=1,0 row-size=510B cardinality=36525
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 |--00:SCAN HDFS [tpcds.date_dim a]
@@ -234,7 +234,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=73049
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=0 row-size=303B cardinality=36525
+|     tuple-ids=0 row-size=255B cardinality=36525
 |     in pipelines: 00(GETNEXT)
 |
 01:SCAN HDFS [tpcds.date_dim b]
@@ -245,7 +245,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=73049
    mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-   tuple-ids=1 row-size=303B cardinality=73049
+   tuple-ids=1 row-size=255B cardinality=73049
    in pipelines: 01(GETNEXT)
 ====
 # Single query with various join types combined.
@@ -364,7 +364,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF000[bloom] <- c_customer_sk / 100
 |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=0,1 row-size=355B cardinality=2880404
+|  tuple-ids=0,1 row-size=319B cardinality=2880404
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
@@ -374,7 +374,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100000
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=1 row-size=255B cardinality=100000
+|     tuple-ids=1 row-size=219B cardinality=100000
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]

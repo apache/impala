@@ -15,34 +15,34 @@ PLAN-ROOT SINK
 |
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=2,1,0 row-size=52B cardinality=1500000
+|  tuple-ids=2,1,0 row-size=44B cardinality=1500000
 |  in pipelines: 00(GETNEXT)
 |
 |--08:NESTED LOOP JOIN [CROSS JOIN]
-|  |  mem-estimate=24B mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2,1,0 row-size=52B cardinality=100
+|  |  mem-estimate=20B mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2,1,0 row-size=44B cardinality=100
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |     parent-subplan=01
 |  |     mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  |     tuple-ids=0 row-size=24B cardinality=1
+|  |     tuple-ids=0 row-size=20B cardinality=1
 |  |     in pipelines: 00(GETNEXT)
 |  |
 |  04:SUBPLAN
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2,1 row-size=28B cardinality=100
+|  |  tuple-ids=2,1 row-size=24B cardinality=100
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  |--07:NESTED LOOP JOIN [CROSS JOIN]
-|  |  |  mem-estimate=24B mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=2,1 row-size=28B cardinality=10
+|  |  |  mem-estimate=20B mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=2,1 row-size=24B cardinality=10
 |  |  |  in pipelines: 00(GETNEXT)
 |  |  |
 |  |  |--05:SINGULAR ROW SRC
 |  |  |     parent-subplan=04
 |  |  |     mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  |  |     tuple-ids=1 row-size=24B cardinality=1
+|  |  |     tuple-ids=1 row-size=20B cardinality=1
 |  |  |     in pipelines: 00(GETNEXT)
 |  |  |
 |  |  06:UNNEST [o.o_lineitems]
@@ -63,7 +63,7 @@ PLAN-ROOT SINK
    predicates on o: !empty(o.o_lineitems), o_orderkey = CAST(4 AS BIGINT)
    predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    stored statistics:
-     table: rows=150000 size=289.00MB
+     table: rows=150000 size=288.96MB
      columns missing stats: c_orders
    extrapolated-rows=disabled max-scan-range-rows=44227
    parquet statistics predicates: c_custkey > CAST(10 AS BIGINT)
@@ -72,7 +72,7 @@ PLAN-ROOT SINK
    parquet dictionary predicates on o: o_orderkey = CAST(4 AS BIGINT)
    parquet dictionary predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    mem-estimate=264.00MB mem-reservation=16.00MB thread-reservation=1
-   tuple-ids=0 row-size=24B cardinality=15000
+   tuple-ids=0 row-size=20B cardinality=15000
    in pipelines: 00(GETNEXT)
 ====
 # Test HBase scan node.
@@ -96,7 +96,7 @@ PLAN-ROOT SINK
      table: rows=10000
      columns: all
    mem-estimate=4.00KB mem-reservation=0B thread-reservation=0
-   tuple-ids=0 row-size=119B cardinality=1
+   tuple-ids=0 row-size=107B cardinality=1
    in pipelines: 00(GETNEXT)
 ====
 # Test datasource scan node.
@@ -115,7 +115,7 @@ PLAN-ROOT SINK
 data source predicates: CAST(tinyint_col AS DOUBLE) < CAST(256 AS DOUBLE), int_col < CAST(2 AS INT)
 predicates: float_col != CAST(0 AS FLOAT)
    mem-estimate=1.00GB mem-reservation=0B thread-reservation=0
-   tuple-ids=0 row-size=116B cardinality=500
+   tuple-ids=0 row-size=112B cardinality=500
    in pipelines: 00(GETNEXT)
 ====
 # Test aggregation.
@@ -354,14 +354,14 @@ PLAN-ROOT SINK
 |  order by: greatest(20, bigint_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3,2 row-size=61B cardinality=7300
+|  tuple-ids=3,2 row-size=53B cardinality=7300
 |  in pipelines: 01(GETNEXT)
 |
 01:SORT
 |  order by: concat('ab', string_col) ASC NULLS FIRST, greatest(20, bigint_col) ASC
 |  materialized: concat('ab', string_col), greatest(20, bigint_col)
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=53B cardinality=7300
+|  tuple-ids=3 row-size=45B cardinality=7300
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -372,7 +372,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=29B cardinality=7300
+   tuple-ids=0 row-size=25B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
 # Test sort node.

@@ -224,9 +224,7 @@ public abstract class Type {
    */
   public int getSlotSize() {
     // 8-byte pointer and 4-byte length indicator (12 bytes total).
-    // Per struct alignment rules, there is an extra 4 bytes of padding to align to 8
-    // bytes so 16 bytes total.
-    if (isCollectionType()) return 16;
+    if (isCollectionType()) return 12;
     throw new IllegalStateException("getSlotSize() not implemented for type " + toSql());
   }
 

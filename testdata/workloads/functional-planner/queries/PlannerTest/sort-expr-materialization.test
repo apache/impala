@@ -10,7 +10,7 @@ PLAN-ROOT SINK
 |  order by: random() ASC
 |  materialized: random()
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=105B cardinality=7300
+|  tuple-ids=1 row-size=97B cardinality=7300
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -21,7 +21,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=97B cardinality=7300
+   tuple-ids=0 row-size=89B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
 # sort on a deterministic expr that exceeds the cost threshold
@@ -36,7 +36,7 @@ PLAN-ROOT SINK
 |  order by: abs(id) + abs(id) ASC
 |  materialized: abs(id) + abs(id)
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=105B cardinality=7300
+|  tuple-ids=1 row-size=97B cardinality=7300
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -47,7 +47,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=97B cardinality=7300
+   tuple-ids=0 row-size=89B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
 # sort on a deterministic expr that doesn't exceed the cost threshold
@@ -61,7 +61,7 @@ PLAN-ROOT SINK
 01:SORT
 |  order by: tinyint_col + 1 ASC
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=97B cardinality=7300
+|  tuple-ids=1 row-size=89B cardinality=7300
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -72,7 +72,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=97B cardinality=7300
+   tuple-ids=0 row-size=89B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
 # sort on multiple exprs, subset is materialized
@@ -88,7 +88,7 @@ PLAN-ROOT SINK
 |  order by: dayofweek(timestamp_col) ASC, TRUE ASC, id + 1 ASC, string_col = date_string_col ASC, id = tinyint_col ASC
 |  materialized: dayofweek(timestamp_col), string_col = date_string_col
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=102B cardinality=7300
+|  tuple-ids=1 row-size=94B cardinality=7300
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -99,7 +99,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=97B cardinality=7300
+   tuple-ids=0 row-size=89B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
 # expensive analytic order by expr gets materialized
@@ -116,14 +116,14 @@ PLAN-ROOT SINK
 |  order by: to_date(timestamp_col) ASC, bool_col IS NULL ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3,2 row-size=41B cardinality=7300
+|  tuple-ids=3,2 row-size=37B cardinality=7300
 |  in pipelines: 01(GETNEXT)
 |
 01:SORT
 |  order by: to_date(timestamp_col) ASC, bool_col IS NULL ASC
 |  materialized: to_date(timestamp_col)
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=3 row-size=37B cardinality=7300
+|  tuple-ids=3 row-size=33B cardinality=7300
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -149,8 +149,8 @@ PLAN-ROOT SINK
 01:TOP-N [LIMIT=10]
 |  order by: string_col LIKE 'a.*b' ASC, id * bigint_col ASC, regexp_replace(string_col, 'a.*b', 'c') ASC
 |  materialized: string_col LIKE 'a.*b', regexp_replace(string_col, 'a.*b', 'c')
-|  mem-estimate=290B mem-reservation=0B thread-reservation=0
-|  tuple-ids=1 row-size=29B cardinality=10
+|  mem-estimate=250B mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=25B cardinality=10
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -161,7 +161,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=29B cardinality=7300
+   tuple-ids=0 row-size=25B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
 # sort on udf, gets materialized
@@ -176,7 +176,7 @@ PLAN-ROOT SINK
 |  order by: default.testfn(double_col) ASC
 |  materialized: default.testfn(double_col)
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=101B cardinality=7300
+|  tuple-ids=1 row-size=93B cardinality=7300
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -187,7 +187,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=97B cardinality=7300
+   tuple-ids=0 row-size=89B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
 # sort expr contains SlotRefs that don't need to be materialized separately
@@ -202,7 +202,7 @@ PLAN-ROOT SINK
 |  order by: concat(date_string_col, string_col) ASC
 |  materialized: concat(date_string_col, string_col)
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=16B cardinality=7300
+|  tuple-ids=1 row-size=12B cardinality=7300
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -213,7 +213,7 @@ PLAN-ROOT SINK
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=310
    mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=1
-   tuple-ids=0 row-size=41B cardinality=7300
+   tuple-ids=0 row-size=33B cardinality=7300
    in pipelines: 00(GETNEXT)
 ====
 # IMPALA-5270: Rand() and udf inside inline view referenced by analytic function.

@@ -27,7 +27,7 @@ namespace impala {
 /// arrays and maps are effectively indistinguishable; a map can be thought of as an array
 /// of key/value structs (and neither of these fields are necessarily materialized in the
 /// item tuples).
-struct CollectionValue {
+struct __attribute__((__packed__)) CollectionValue {
   /// Pointer to buffer containing item tuples.
   uint8_t* ptr;
 
