@@ -28,6 +28,7 @@
 #include "exprs/timezone_db.h"
 #include "kudu/util/int128.h"
 #include "gutil/walltime.h"
+#include "util/arithmetic-util.h"
 
 namespace impala {
 
@@ -70,7 +71,8 @@ inline TimestampValue TimestampValue::UtcFromUnixTimeLimitedRangeNanos(
 
 inline TimestampValue TimestampValue::FromUnixTimeNanos(time_t unix_time, int64_t nanos,
     const Timezone& local_tz) {
-  unix_time += SplitTime<NANOS_PER_SEC>(&nanos);
+  unix_time =
+      ArithmeticUtil::AsUnsigned<std::plus>(unix_time, SplitTime<NANOS_PER_SEC>(&nanos));
   TimestampValue result = FromUnixTime(unix_time, local_tz);
   // 'nanos' is guaranteed to be between [0,NANOS_PER_SEC) at this point, so the
   // next addition cannot change the day or step to a different timezone.
