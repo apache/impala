@@ -58,6 +58,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.JniUtil;
+import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TBuildTestDescriptorTableParams;
 import org.apache.impala.thrift.TCatalogObject;
@@ -163,10 +164,11 @@ public class JniFrontend {
     TQueryCtx queryCtx = new TQueryCtx();
     JniUtil.deserializeThrift(protocolFactory_, queryCtx, thriftQueryContext);
 
-    StringBuilder explainString = new StringBuilder();
-    TExecRequest result = frontend_.createExecRequest(queryCtx, explainString);
-    if (explainString.length() > 0 && LOG.isTraceEnabled()) {
-      LOG.trace(explainString.toString());
+    PlanCtx planCtx = new PlanCtx(queryCtx);
+    TExecRequest result = frontend_.createExecRequest(planCtx);
+    if (LOG.isTraceEnabled()) {
+      String explainStr = planCtx.getExplainString();
+      if (!explainStr.isEmpty()) LOG.trace(explainStr);
     }
 
     // TODO: avoid creating serializer for each query?

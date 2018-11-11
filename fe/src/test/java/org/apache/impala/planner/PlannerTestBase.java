@@ -41,6 +41,7 @@ import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.datagenerator.HBaseTestDataRegionAssignment;
+import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestFileParser;
 import org.apache.impala.testutil.TestFileParser.Section;
 import org.apache.impala.testutil.TestFileParser.TestCase;
@@ -505,11 +506,13 @@ public class PlannerTestBase extends FrontendTestBase {
     boolean sectionExists = expectedPlan != null && !expectedPlan.isEmpty();
     String expectedErrorMsg = getExpectedErrorMessage(expectedPlan);
 
-    StringBuilder explainBuilder = new StringBuilder();
     TExecRequest execRequest = null;
     if (sectionExists) actualOutput.append(section.getHeader() + "\n");
+    String explainStr = "";
     try {
-      execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
+      PlanCtx planCtx = new PlanCtx(queryCtx);
+      execRequest = frontend_.createExecRequest(planCtx);
+      explainStr = planCtx.getExplainString();
     } catch (Exception e) {
       if (!sectionExists) return null;
       handleException(query, expectedErrorMsg, errorLog, actualOutput, e);
@@ -519,9 +522,7 @@ public class PlannerTestBase extends FrontendTestBase {
     // Failed to produce an exec request.
     if (execRequest == null) return null;
 
-    String explainStr = explainBuilder.toString();
-    explainStr = removeExplainHeader(explainBuilder.toString(), testOptions);
-
+    explainStr = removeExplainHeader(explainStr, testOptions);
     actualOutput.append(explainStr);
     LOG.info(section.toString() + ":" + explainStr);
     if (expectedErrorMsg != null) {
@@ -553,13 +554,15 @@ public class PlannerTestBase extends FrontendTestBase {
    * if an error occurred while creating the plan.
    */
   private String getVerboseExplainPlan(TQueryCtx queryCtx) {
-    StringBuilder explainBuilder = new StringBuilder();
+    String explainStr;
     TExecRequest execRequest = null;
     TExplainLevel origExplainLevel =
         queryCtx.client_request.getQuery_options().getExplain_level();
     try {
       queryCtx.client_request.getQuery_options().setExplain_level(TExplainLevel.VERBOSE);
-      execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
+      PlanCtx planCtx = new PlanCtx(queryCtx);
+      execRequest = frontend_.createExecRequest(planCtx);
+      explainStr = planCtx.getExplainString();
     } catch (ImpalaException e) {
       return ExceptionUtils.getStackTrace(e);
     } finally {
@@ -567,7 +570,7 @@ public class PlannerTestBase extends FrontendTestBase {
     }
     Preconditions.checkNotNull(execRequest);
     return removeExplainHeader(
-        explainBuilder.toString(), Collections.<PlannerTestOption>emptySet());
+        explainStr, Collections.<PlannerTestOption>emptySet());
   }
 
   private void checkScanRangeLocations(TestCase testCase, TExecRequest execRequest,
@@ -676,8 +679,8 @@ public class PlannerTestBase extends FrontendTestBase {
     TQueryCtx queryCtx = TestUtils.createQueryContext(Catalog.DEFAULT_DB,
         System.getProperty("user.name"));
     queryCtx.client_request.setStmt(query);
-    StringBuilder explainBuilder = new StringBuilder();
-    TExecRequest execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
+    PlanCtx planCtx = new PlanCtx(queryCtx);
+    TExecRequest execRequest = frontend_.createExecRequest(planCtx);
 
     if (!execRequest.isSetQuery_exec_request()
         || execRequest.query_exec_request == null

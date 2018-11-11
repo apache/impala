@@ -29,6 +29,7 @@ import org.apache.impala.catalog.HBaseColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
@@ -471,10 +472,10 @@ public class PlannerTest extends PlannerTestBase {
     queryCtx.client_request.setStmt(stmt);
     queryCtx.client_request.query_options = defaultQueryOptions();
     if (userMtDop != -1) queryCtx.client_request.query_options.setMt_dop(userMtDop);
-    StringBuilder explainBuilder = new StringBuilder();
     TExecRequest request = null;
     try {
-      request = frontend_.createExecRequest(queryCtx, explainBuilder);
+      PlanCtx planCtx = new PlanCtx(queryCtx);
+      request = frontend_.createExecRequest(planCtx);
     } catch (ImpalaException e) {
       Assert.fail("Failed to create exec request for '" + stmt + "': " + e.getMessage());
     }
@@ -561,14 +562,15 @@ public class PlannerTest extends PlannerTestBase {
     // Setting up a table with computed stats
     queryCtx.client_request.setStmt("compute stats functional.alltypes");
     queryCtx.client_request.query_options = defaultQueryOptions();
-    StringBuilder explainBuilder = new StringBuilder();
-    frontend_.createExecRequest(queryCtx, explainBuilder);
+    PlanCtx planCtx = new PlanCtx(queryCtx);
+    frontend_.createExecRequest(planCtx);
     // Setting up an arbitrary query involving a table with stats.
     queryCtx.client_request.setStmt("select * from functional.alltypes");
     // Setting disable_unsafe_spills = true to verify that it no longer
     // throws a NPE with computed stats (IMPALA-5524)
     queryCtx.client_request.query_options.setDisable_unsafe_spills(true);
-    requestWithDisableSpillOn = frontend_.createExecRequest(queryCtx, explainBuilder);
+    planCtx = new PlanCtx(queryCtx);
+    requestWithDisableSpillOn = frontend_.createExecRequest(planCtx);
     Assert.assertNotNull(requestWithDisableSpillOn);
   }
 
