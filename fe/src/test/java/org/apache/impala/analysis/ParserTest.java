@@ -3841,6 +3841,7 @@ public class ParserTest extends FrontendTestBase {
     }
   }
 
+  @Test
   public void TestAdminFns() {
     // Any combination of whitespace is ok.
     ParsesOk(":foobar()");
