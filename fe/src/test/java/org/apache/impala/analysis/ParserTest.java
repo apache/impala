@@ -3876,4 +3876,34 @@ public class ParserTest extends FrontendTestBase {
     ParserError(": shutdown() :other()");
     ParserError(": shutdown('hostA'); :shutdown('hostB');");
   }
+
+  @Test
+  public void TestIdentifier() {
+    ParsesOk("select * from foo.bar_123");
+    ParsesOk("select * from foo. bar_123");
+    ParsesOk("select * from foo .bar_123");
+    ParsesOk("select * from foo . bar_123");
+
+    ParsesOk("select * from foo.123_bar");
+    ParsesOk("select * from foo. 123_bar");
+    ParsesOk("select * from foo .123_bar");
+    ParsesOk("select * from foo . 123_bar");
+
+    ParsesOk("select * from 123_foo.bar");
+    ParsesOk("select * from 123_foo. bar");
+    ParsesOk("select * from 123_foo .bar");
+    ParsesOk("select * from 123_foo . bar");
+
+    ParsesOk("select * from 123_foo.123_bar");
+    ParsesOk("select * from 123_foo. 123_bar");
+    ParsesOk("select * from 123_foo .123_bar");
+    ParsesOk("select * from 123_foo . 123_bar");
+
+    // We do not allow identifiers that are ambiguous with exponential.
+    ParserError("select * from foo.4e1");
+    ParserError("select * from 4e1.bar");
+
+    ParserError("select * from .123_bar");
+    ParserError("select * from . 123_bar");
+  }
 }

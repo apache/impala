@@ -410,7 +410,10 @@ FLit3 = [0-9]+
 Exponent = [eE] [+-]? [0-9]+
 DecimalLiteral = ({FLit1}|{FLit2}|{FLit3}) {Exponent}?
 
-IdentifierOrKw = [:digit:]*[:jletter:][:jletterdigit:]* | "&&" | "||"
+Identifier = [:digit:]*[:jletter:][:jletterdigit:]*
+// Without \. {Identifier}, a dot followed by an identifier starting with digits will
+// always be lexed to Flit2.
+IdentifierOrKw =  {Identifier} | \. {Identifier} | "&&" | "||"
 QuotedIdentifier = \`(\\.|[^\\\`])*\`
 SingleQuoteStringLiteral = \'(\\.|[^\\\'])*\'
 DoubleQuoteStringLiteral = \"(\\.|[^\\\"])*\"
@@ -502,6 +505,12 @@ EndOfLineComment = "--" !({HintContent}|{ContainsLineTerminator}) {LineTerminato
 
 {IdentifierOrKw} {
   String text = yytext();
+  if (text.startsWith(".")) {
+    // If we see an identifier that starts with a dot, we push back the identifier
+    // minus the dot back into the input stream.
+    yypushback(text.length() - 1);
+    return newToken(SqlParserSymbols.DOT, yytext());
+  }
   Integer kw_id = keywordMap.get(text.toLowerCase());
   if (kw_id != null) {
     return newToken(kw_id, text);
