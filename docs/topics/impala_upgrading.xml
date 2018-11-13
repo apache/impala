@@ -147,6 +147,17 @@ $ ps ax | grep [i]mpalad
   <concept id="concept_a2p_szq_jdb">
 
     <title>Impala Upgrade Considerations</title>
+    <concept id="impala_privileges_30">
+      <title>Grant REFRESH Privilege to Impala Roles with SELECT or INSERT
+        Privilege when Upgrading to <keyword keyref="impala30"/></title>
+      <conbody>
+        <p> To use the fine grained privileges feature in <keyword
+            keyref="impala30"/>, if a role has the <codeph>SELECT</codeph> or
+            <codeph>INSERT</codeph> privilege on an object in Impala before
+          upgrading to <keyword keyref="impala30"/>, grant that role the
+            <codeph>REFRESH</codeph> privilege after the upgrade. </p>
+      </conbody>
+    </concept>
 
     <concept id="IMPALA-3916">
 
