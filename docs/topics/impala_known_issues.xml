@@ -173,8 +173,6 @@ under the License.
 
     <concept id="IMPALA-1792" rev="IMPALA-1792">
 
-<!-- Not part of Alex's spreadsheet -->
-
       <title>ImpalaODBC: Can not get the value in the SQLGetData(m-x th column) after the SQLBindCol(m th column)</title>
 
       <conbody>
@@ -243,28 +241,6 @@ under the License.
       </p>
       </conbody>
     </concept>
-    <concept id="IMPALLA-7298">
-      <title>Kerberos authentication fails with the reverse DNS lookup
-        disabled</title>
-      <conbody>
-        <p> Kerberos authentication does not function correctly if <codeph>rdns
-            = false</codeph> is configured in <codeph>krb5.conf</codeph>. If the
-          flag <codeph>rdns = false</codeph>, when Impala tries to match
-          principals, it will fail because Kerberos receives a SPN (Service
-          Principal Name) with an IP address in it, but Impala expects a
-          principal with a FQDN in it.</p>
-        <p>
-          <b>Bug:</b>
-          <xref keyref="IMPALA-7298">IMPALA-7298</xref></p>
-        <p><b>Affected Versions:</b> Impala 2.12.0 and 3.0</p>
-        <p>
-          <b>Workaround:</b> Set the following flags in
-            <codeph>krb5.conf</codeph>: <ul>
-            <li><codeph>dns_canonicalize_hostname = true</codeph></li>
-            <li><codeph>rdns = true</codeph></li>
-          </ul></p>
-      </conbody>
-    </concept>
 </concept>
 
   <concept id="known_issues_resources">
@@ -279,27 +255,6 @@ under the License.
       </p>
 
     </conbody>
-    <!--AR: The workaround topic does not exist. Not sure if this was ever fully documented upstream.-->
-
-    <concept id="IMPALA-6028" audience="hidden">
-      <title>Handling large rows during upgrade to <keyword
-          keyref="impala210_full"/> or higher</title>
-      <conbody>
-        <p> After an upgrade to <keyword keyref="impala210_full"/> or higher,
-          users who process very large column values (long strings), or have
-          increased the <codeph>--read_size</codeph> configuration setting from
-          its default of 8 MB, might encounter capacity errors for some queries
-          that previously worked. </p>
-        <p>
-          <b>Resolution:</b> After the upgrade, follow the instructions in <xref
-            keyref="convert_read_size"/> to check if your queries are affected
-          by these changes and to modify your configuration settings if so. </p>
-        <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-6028">IMPALA-6028</xref>
-        </p>
-      </conbody>
-    </concept>
 
     <concept id="IMPALA-5605">
 
@@ -518,8 +473,6 @@ explain SELECT 1 FROM alltypestiny a1
 
     </conbody>
 
-<!-- Opened based on internal JIRA. Not part of Alex's spreadsheet AFAIK. -->
-
     <concept id="describe_formatted_avro">
 
       <title>DESCRIBE FORMATTED gives error on Avro table</title>
@@ -564,8 +517,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     <concept id="IMP-175">
 
-<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
-
       <title>Deviation from Hive behavior: Out of range values float/double values are returned as maximum allowed value of type (Hive returns NULL)</title>
 
       <conbody>
@@ -584,8 +535,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </concept>
 
     <concept id="flume_writeformat_text">
-
-<!-- Not part of Alex's spreadsheet. From a non-public JIRA. -->
 
       <title>Configuration needed for Flume to be compatible with Impala</title>
 
@@ -609,8 +558,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </concept>
 
     <concept id="IMPALA-635" rev="IMPALA-635">
-
-<!-- Not part of Alex's spreadsheet -->
 
       <title>Avro Scanner fails to parse some schemas</title>
 
@@ -641,8 +588,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     <concept id="IMPALA-1024" rev="IMPALA-1024">
 
-<!-- Not part of Alex's spreadsheet -->
-
       <title>Impala BE cannot parse Avro schema that contains a trailing semi-colon</title>
 
       <conbody>
@@ -665,8 +610,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </concept>
 
     <concept id="IMPALA-1652" rev="IMPALA-1652">
-
-<!-- To do: Isn't this more a correctness issue? -->
 
       <title>Incorrect results with basic predicate on CHAR typed column</title>
 
@@ -725,10 +668,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
         <p>
-          <b>Resolution:</b>
-        </p>
-
-        <p>
           <b>Workaround:</b> Avoid queries with extremely large expression trees. Setting the
           query option <codeph>disable_codegen=true</codeph> may reduce the impact, at a cost of
           longer query runtime.
@@ -739,8 +678,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </concept>
 
     <concept id="IMPALA-77" rev="IMPALA-77">
-
-<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
 
       <title>Impala does not support running on clusters with federated namespaces</title>
 
@@ -785,8 +722,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     <concept id="IMPALA-2005" rev="IMPALA-2005">
 
-<!-- Not part of Alex's spreadsheet -->
-
       <title>A failed CTAS does not drop the table if the insert fails</title>
 
       <conbody>
@@ -812,8 +747,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     <concept id="IMPALA-1821" rev="IMPALA-1821">
 
-<!-- Not part of Alex's spreadsheet -->
-
       <title>Casting scenarios with invalid/inconsistent results</title>
 
       <conbody>
@@ -836,8 +769,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </concept>
 
     <concept id="IMPALA-941" rev="IMPALA-941">
-
-<!-- Not part of Alex's spreadsheet. Maybe this is interop? -->
 
       <title>Impala Parser issue when using fully qualified table names that start with a number</title>
 
@@ -863,8 +794,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </concept>
 
     <concept id="IMPALA-532" rev="IMPALA-532">
-
-<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
 
       <title>Impala should tolerate bad locale settings</title>
 
@@ -896,8 +825,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </concept>
 
     <concept id="IMP-1203">
-
-<!-- Not part of Alex's spreadsheet. Perhaps it really is a permanent limitation and nobody is tracking it? -->
 
       <title>Log Level 3 Not Recommended for Impala</title>
 
