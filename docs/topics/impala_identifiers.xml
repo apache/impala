@@ -57,9 +57,8 @@ under the License.
 
       <li>
         <p>
-        An identifier must start with an alphabetic character. The remainder can contain any combination of
-        alphanumeric characters and underscores. Quoting the identifier with backticks has no effect on the allowed
-        characters in the name.
+        An identifier must start with an alphanumeric or underscore character. Quoting the identifier with
+        backticks has no effect on the allowed characters in the name.
         </p>
       </li>
 
