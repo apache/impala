@@ -808,13 +808,14 @@ public class CatalogServiceCatalog extends Catalog {
     try {
       long tblVersion = tbl.getCatalogVersion();
       if (tblVersion <= ctx.fromVersion) return;
+      String tableUniqueName = tbl.getUniqueName();
       TopicUpdateLog.Entry topicUpdateEntry =
-          topicUpdateLog_.getOrCreateLogEntry(tbl.getUniqueName());
+          topicUpdateLog_.getOrCreateLogEntry(tableUniqueName);
       if (tblVersion > ctx.toVersion &&
           topicUpdateEntry.getNumSkippedTopicUpdates() < MAX_NUM_SKIPPED_TOPIC_UPDATES) {
         LOG.info("Table " + tbl.getFullName() + " is skipping topic update " +
             ctx.toVersion);
-        topicUpdateLog_.add(tbl.getUniqueName(),
+        topicUpdateLog_.add(tableUniqueName,
             new TopicUpdateLog.Entry(
                 topicUpdateEntry.getNumSkippedTopicUpdates() + 1,
                 topicUpdateEntry.getLastSentVersion(),

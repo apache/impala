@@ -138,8 +138,6 @@ public class Db extends CatalogObjectImpl implements FeDb {
   public String getName() { return thriftDb_.getDb_name(); }
   @Override
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.DATABASE; }
-  @Override
-  public String getUniqueName() { return "DATABASE:" + getName().toLowerCase(); }
 
   /**
    * Adds a table to the table cache.
@@ -434,11 +432,9 @@ public class Db extends CatalogObjectImpl implements FeDb {
     }
   }
 
-  public TCatalogObject toTCatalogObject() {
-    TCatalogObject catalogObj =
-        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
-    catalogObj.setDb(toThrift());
-    return catalogObj;
+  @Override
+  protected void setTCatalogObject(TCatalogObject catalogObject) {
+    catalogObject.setDb(toThrift());
   }
 
   /**

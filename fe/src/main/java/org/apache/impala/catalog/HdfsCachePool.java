@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 
+import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.THdfsCachePool;
 import com.google.common.base.Preconditions;
@@ -55,6 +56,9 @@ public class HdfsCachePool extends CatalogObjectImpl {
 
   @Override
   public String getName() { return cachePool_.getPool_name(); }
+
   @Override
-  public String getUniqueName() { return "HDFS_CACHE_POOL:" + getName().toLowerCase(); }
+  protected void setTCatalogObject(TCatalogObject catalogObject) {
+    catalogObject.setCache_pool(toThrift());
+  }
 }

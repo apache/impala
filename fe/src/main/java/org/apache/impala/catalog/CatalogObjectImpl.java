@@ -19,8 +19,7 @@ package org.apache.impala.catalog;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.impala.common.NotImplementedException;
-import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TCatalogObject;
 
 abstract public class CatalogObjectImpl implements CatalogObject {
   // Current catalog version of this object. Initialized to
@@ -42,6 +41,21 @@ abstract public class CatalogObjectImpl implements CatalogObject {
   public String getName() { return ""; }
 
   @Override
-  public String getUniqueName() { return ""; }
+  public final String getUniqueName() {
+    return Catalog.toCatalogObjectKey(toTCatalogObject());
+  }
+
+  public final TCatalogObject toTCatalogObject() {
+    TCatalogObject catalogObject =
+        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+    setTCatalogObject(catalogObject);
+    return catalogObject;
+  }
+
+  /**
+   * A template method used by {@link CatalogObjectImpl#toTCatalogObject()} for
+   * populating the given catalogObject fields.
+   */
+  protected abstract void setTCatalogObject(TCatalogObject catalogObject);
 }
 

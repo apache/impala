@@ -302,20 +302,13 @@ public class Function extends CatalogObjectImpl {
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.FUNCTION; }
   @Override
   public String getName() { return getFunctionName().toString(); }
-  @Override
-  public String getUniqueName() {
-    return "FUNCTION:" + name_.toString() + "(" + signatureString() + ")";
-  }
 
   // Child classes must override this function.
   public String toSql(boolean ifNotExists) { return ""; }
 
-  public TCatalogObject toTCatalogObject () {
-    TCatalogObject result = new TCatalogObject();
-    result.setType(TCatalogObjectType.FUNCTION);
-    result.setFn(toThrift());
-    result.setCatalog_version(getCatalogVersion());
-    return result;
+  @Override
+  protected void setTCatalogObject(TCatalogObject catalogObject) {
+    catalogObject.setFn(toThrift());
   }
 
   public TFunction toThrift() {

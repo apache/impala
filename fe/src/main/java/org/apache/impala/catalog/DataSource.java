@@ -53,8 +53,6 @@ public class DataSource extends CatalogObjectImpl implements FeDataSource {
 
   @Override
   public String getName() { return dataSrcName_; }
-  @Override
-  public String getUniqueName() { return "DATA_SOURCE:" + dataSrcName_.toLowerCase(); }
   @Override // FeDataSource
   public String getLocation() { return location_; }
   @Override // FeDataSource
@@ -79,10 +77,8 @@ public class DataSource extends CatalogObjectImpl implements FeDataSource {
     return fromThrift(thrift).debugString();
   }
 
-  public TCatalogObject toTCatalogObject() {
-    TCatalogObject catalogObj =
-        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
-    catalogObj.setData_source(toThrift());
-    return catalogObj;
+  @Override
+  protected void setTCatalogObject(TCatalogObject catalogObject) {
+    catalogObject.setData_source(toThrift());
   }
 }

@@ -158,17 +158,8 @@ public abstract class Principal extends CatalogObjectImpl {
   public int getId() { return principal_.getPrincipal_id(); }
 
   @Override
-  public String getUniqueName() {
-    String principalName = getPrincipalType() == TPrincipalType.ROLE ?
-        getName().toLowerCase() : getName();
-    return "PRINCIPAL:" + principalName + "." + getPrincipalType().name();
-  }
-
-  public TCatalogObject toTCatalogObject() {
-    TCatalogObject catalogObject =
-        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+  protected void setTCatalogObject(TCatalogObject catalogObject) {
     catalogObject.setPrincipal(toThrift());
-    return catalogObject;
   }
 
   /**

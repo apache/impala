@@ -143,17 +143,10 @@ public class PrincipalPrivilege extends CatalogObjectImpl {
   public String getName() { return buildPrivilegeName(privilege_); }
   public int getPrincipalId() { return privilege_.getPrincipal_id(); }
   public TPrincipalType getPrincipalType() { return privilege_.getPrincipal_type(); }
-  @Override
-  public String getUniqueName() {
-    return "PRIVILEGE:" + getName().toLowerCase() + "." + Integer.toString(
-        getPrincipalId()) + "." + getPrincipalType().toString();
-  }
 
-  public TCatalogObject toTCatalogObject() {
-    TCatalogObject catalogObject =
-        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+  @Override
+  protected void setTCatalogObject(TCatalogObject catalogObject) {
     catalogObject.setPrivilege(toThrift());
-    return catalogObject;
   }
 
   // The time this principal was created. Used to quickly check if the same privilege

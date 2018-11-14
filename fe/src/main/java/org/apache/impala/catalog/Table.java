@@ -373,13 +373,6 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     return table;
   }
 
-  public TCatalogObject toTCatalogObject() {
-    TCatalogObject catalogObject =
-        new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
-    catalogObject.setTable(toThrift());
-    return catalogObject;
-  }
-
   public TCatalogObject toMinimalTCatalogObject() {
     TCatalogObject catalogObject =
         new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
@@ -387,6 +380,11 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     catalogObject.getTable().setDb_name(getDb().getName());
     catalogObject.getTable().setTbl_name(getName());
     return catalogObject;
+  }
+
+  @Override
+  protected void setTCatalogObject(TCatalogObject catalogObject) {
+    catalogObject.setTable(toThrift());
   }
 
   /**
@@ -453,9 +451,6 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   public TableName getTableName() {
     return new TableName(db_ != null ? db_.getName() : null, name_);
   }
-
-  @Override // CatalogObject
-  public String getUniqueName() { return "TABLE:" + getFullName(); }
 
   @Override // FeTable
   public ArrayList<Column> getColumns() { return colsByPos_; }

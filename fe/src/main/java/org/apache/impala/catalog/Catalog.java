@@ -544,9 +544,15 @@ public abstract class Catalog {
 
   /**
    * Returns a unique string key of a catalog object.
+   *
+   * This method may initially seem counter-intuitive because Catalog::getUniqueName()
+   * uses this method to build a unique name instead of Catalog::getUniqueName()
+   * providing the implementation on how to build a catalog object key. The reason is
+   * building CatalogObject from TCatalogObject in order to call getUniqueName() can
+   * be an expensive operation, especially for constructing a Table catalog object
+   * from TCatalogObject.
    */
   public static String toCatalogObjectKey(TCatalogObject catalogObject) {
-    // TODO (IMPALA-7839): Refactor this method to reduce code repetition.
     Preconditions.checkNotNull(catalogObject);
     switch (catalogObject.getType()) {
       case DATABASE:
