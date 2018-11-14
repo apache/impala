@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 #ifndef IMPALA_UTIL_RUNTIME_PROFILE_COUNTERS_H
 #define IMPALA_UTIL_RUNTIME_PROFILE_COUNTERS_H
 
@@ -33,6 +32,10 @@
 
 namespace impala {
 
+/// This file contains the declarations of various counters that can be used in runtime
+/// profiles. See the class-level comment for RuntimeProfile (runtime-profile.h) for an
+/// overview of what there is. When making changes, please also update that comment.
+
 /// Define macros for updating counters.  The macros make it very easy to disable
 /// all counters at compile time.  Set this to 0 to remove counters.  This is useful
 /// to do to make sure the counters aren't affecting the system.
@@ -45,7 +48,7 @@ namespace impala {
 #if ENABLE_COUNTERS
   #define ADD_COUNTER(profile, name, unit) (profile)->AddCounter(name, unit)
   #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) \
-      (profile)->AddTimeSeriesCounter(name, src_counter)
+      (profile)->AddSamplingTimeSeriesCounter(name, src_counter)
   #define ADD_TIMER(profile, name) (profile)->AddCounter(name, TUnit::TIME_NS)
   #define ADD_SUMMARY_STATS_TIMER(profile, name) \
       (profile)->AddSummaryStatsCounter(name, TUnit::TIME_NS)
@@ -142,7 +145,7 @@ class RuntimeProfile::HighWaterMarkCounter : public RuntimeProfile::Counter {
 /// Do not call Set() and Add().
 class RuntimeProfile::DerivedCounter : public RuntimeProfile::Counter {
  public:
-  DerivedCounter(TUnit::type unit, const DerivedCounterFunction& counter_fn)
+  DerivedCounter(TUnit::type unit, const SampleFunction& counter_fn)
     : Counter(unit),
       counter_fn_(counter_fn) {}
 
@@ -151,7 +154,7 @@ class RuntimeProfile::DerivedCounter : public RuntimeProfile::Counter {
   }
 
  private:
-  DerivedCounterFunction counter_fn_;
+  SampleFunction counter_fn_;
 };
 
 /// An AveragedCounter maintains a set of counters and its value is the
@@ -384,41 +387,125 @@ class RuntimeProfile::EventSequence {
   int64_t offset_ = 0;
 };
 
-typedef StreamingSampler<int64_t, 64> StreamingCounterSampler;
+/// Abstract base for counters to capture a time series of values. Users can add samples
+/// to counters in periodic intervals, and the RuntimeProfile class will retrieve them by
+/// accessing the private interface. Methods are thread-safe where explicitly stated.
 class RuntimeProfile::TimeSeriesCounter {
  public:
-  std::string DebugString() const;
+  // Adds a sample. Thread-safe.
+  void AddSample(int ms_elapsed);
 
-  void AddSample(int ms_elapsed) {
-    int64_t sample = sample_fn_();
-    samples_.AddSample(sample, ms_elapsed);
+  // Returns a pointer do the sample data together with the number of samples and the
+  // sampling period. This method is not thread-safe and must only be used in tests.
+  const int64_t* GetSamplesTest(int* num_samples, int* period) {
+    return GetSamplesLockedForSend(num_samples, period);
   }
+
+  virtual ~TimeSeriesCounter() {}
 
  private:
   friend class RuntimeProfile;
 
-  TimeSeriesCounter(const std::string& name, TUnit::type unit,
-      DerivedCounterFunction fn)
-    : name_(name), unit_(unit), sample_fn_(fn) {
-  }
-
-  /// Construct a time series object from existing sample data. This counter
-  /// is then read-only (i.e. there is no sample function).
-  TimeSeriesCounter(const std::string& name, TUnit::type unit, int period,
-      const std::vector<int64_t>& values)
-    : name_(name), unit_(unit), sample_fn_(), samples_(period, values) {
-  }
-
   void ToThrift(TTimeSeriesCounter* counter);
+
+  /// Adds a sample to the counter. Caller must hold lock_.
+  virtual void AddSampleLocked(int64_t value, int ms_elapsed) = 0;
+
+  /// Returns a pointer to memory containing all samples of the counter. The caller must
+  /// hold lock_. The returned pointer is only valid while the caller holds lock_.
+  virtual const int64_t* GetSamplesLocked(int* num_samples, int* period) const = 0;
+
+  /// Returns a pointer to memory containing all samples of the counter and marks the
+  /// samples as retrieved, so that a subsequent call to Clear() can remove them. The
+  /// caller must hold lock_. The returned pointer is only valid while the caller holds
+  /// lock_.
+  virtual const int64_t* GetSamplesLockedForSend(int* num_samples, int* period);
+
+  /// Sets all internal samples. Thread-safe. Not implemented by all child classes. The
+  /// caller must make sure that this is only called on supported classes.
+  virtual void SetSamples(
+      int period, const std::vector<int64_t>& samples, int64_t start_idx);
+
+  /// Implemented by some child classes to clear internal sample buffers. No-op on other
+  /// child classes.
+  virtual void Clear() {}
+
+ protected:
+  TimeSeriesCounter(const std::string& name, TUnit::type unit,
+      SampleFunction fn = SampleFunction())
+    : name_(name), unit_(unit), sample_fn_(fn) {}
+
+  TUnit::type unit() const { return unit_; }
 
   std::string name_;
   TUnit::type unit_;
-  DerivedCounterFunction sample_fn_;
+  SampleFunction sample_fn_;
+  /// The number of samples that have been retrieved and cleared from this counter.
+  int64_t previous_sample_count_ = 0;
+  mutable SpinLock lock_;
+};
+
+typedef StreamingSampler<int64_t, 64> StreamingCounterSampler;
+class RuntimeProfile::SamplingTimeSeriesCounter
+    : public RuntimeProfile::TimeSeriesCounter {
+ private:
+  friend class RuntimeProfile;
+
+  SamplingTimeSeriesCounter(
+      const std::string& name, TUnit::type unit, SampleFunction fn)
+    : TimeSeriesCounter(name, unit, fn) {}
+
+  virtual void AddSampleLocked(int64_t sample, int ms_elapsed) override;
+  virtual const int64_t* GetSamplesLocked( int* num_samples, int* period) const override;
+
   StreamingCounterSampler samples_;
 };
 
-/// Counter whose value comes from an internal ConcurrentStopWatch to track multiple threads
-/// concurrent running time.
+/// Time series counter that supports piece-wise transmission of its samples.
+///
+/// This time series counter will capture samples into an internal unbounded buffer.
+/// The buffer can be reset to clear out values that have already been transmitted
+/// elsewhere.
+class RuntimeProfile::ChunkedTimeSeriesCounter
+    : public RuntimeProfile::TimeSeriesCounter {
+ public:
+  /// Clears the internal sample buffer and updates the number of samples that the counter
+  /// has seen in total so far.
+  virtual void Clear() override;
+
+ private:
+  friend class RuntimeProfile;
+
+  /// Constructs a time series counter that uses 'fn' to generate new samples. It's size
+  /// is bounded by the expected number of samples per status update times a constant
+  /// factor.
+  ChunkedTimeSeriesCounter(
+      const std::string& name, TUnit::type unit, SampleFunction fn);
+
+  /// Constructs a time series object from existing sample data. This counter is then
+  /// read-only (i.e. there is no sample function). This counter has no maximum size.
+  ChunkedTimeSeriesCounter(const std::string& name, TUnit::type unit, int period,
+      const std::vector<int64_t>& values)
+    : TimeSeriesCounter(name, unit), period_(period), values_(values), max_size_(0) {}
+
+  virtual void AddSampleLocked(int64_t value, int ms_elapsed) override;
+  virtual const int64_t* GetSamplesLocked(int* num_samples, int* period) const override;
+  virtual const int64_t* GetSamplesLockedForSend(int* num_samples, int* period) override;
+
+  virtual void SetSamples(
+      int period, const std::vector<int64_t>& samples, int64_t start_idx) override;
+
+  int period_ = 0;
+  std::vector<int64_t> values_;
+  // The number of values returned through the last call to GetSamplesLockedForSend().
+  int64_t last_get_count_ = 0;
+  // The maximum number of samples that can be stored in this counter. We drop samples at
+  // the front before appending new ones if we would exceed this count.
+  int64_t max_size_;
+};
+
+/// Counter whose value comes from an internal ConcurrentStopWatch to track concurrent
+/// running time for multiple threads.
 class RuntimeProfile::ConcurrentTimerCounter : public Counter {
  public:
   ConcurrentTimerCounter(TUnit::type unit) : Counter(unit) {}

@@ -20,8 +20,9 @@
 
 #include <boost/algorithm/string.hpp>
 #include <cmath>
-#include <sstream>
 #include <iomanip>
+#include <limits>
+#include <sstream>
 
 #include "gen-cpp/RuntimeProfile_types.h"
 #include "util/cpu-info.h"
@@ -132,6 +133,13 @@ class PrettyPrinter {
       case TUnit::DOUBLE_VALUE: {
         double output = *reinterpret_cast<double*>(&value);
         ss << std::setprecision(PRECISION) << output << " ";
+        break;
+      }
+
+      // Printed as integer values
+      case TUnit::BASIS_POINTS: {
+        DCHECK_LE(value, 10000);
+        ss << (value / 100);
         break;
       }
 

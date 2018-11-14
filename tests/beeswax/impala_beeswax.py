@@ -63,6 +63,7 @@ class ImpalaBeeswaxException(Exception):
 class ImpalaBeeswaxResult(object):
   def __init__(self, **kwargs):
     self.query = kwargs.get('query', None)
+    self.query_id = kwargs['query_id']
     self.success = kwargs.get('success', False)
     # Insert returns an int, convert into list to have a uniform data type.
     # TODO: We should revisit this if we have more datatypes to deal with.
@@ -435,7 +436,8 @@ class ImpalaBeeswaxClient(object):
     if query_type == 'use':
       # TODO: "use <database>" does not currently throw an error. Need to update this
       # to handle the error case once that behavior has been changed.
-      return ImpalaBeeswaxResult(query=query_string, success=True, data=[])
+      return ImpalaBeeswaxResult(query=query_string, query_id=query_handle.id,
+                                 success=True, data=[])
 
     # Result fetching for insert is different from other queries.
     exec_result = None
@@ -459,7 +461,8 @@ class ImpalaBeeswaxClient(object):
         break
 
     # The query executed successfully and all the data was fetched.
-    exec_result = ImpalaBeeswaxResult(success=True, data=result_rows, schema=schema)
+    exec_result = ImpalaBeeswaxResult(query_id=handle.id, success=True, data=result_rows,
+                                      schema=schema)
     exec_result.summary = 'Returned %d rows' % (len(result_rows))
     return exec_result
 
@@ -469,7 +472,7 @@ class ImpalaBeeswaxClient(object):
     # The insert was successful
     num_rows = sum(map(int, result.rows_modified.values()))
     data = ["%s: %s" % row for row in result.rows_modified.iteritems()]
-    exec_result = ImpalaBeeswaxResult(success=True, data=data)
+    exec_result = ImpalaBeeswaxResult(query_id=handle.id, success=True, data=data)
     exec_result.summary = "Inserted %d rows" % (num_rows,)
     return exec_result
 

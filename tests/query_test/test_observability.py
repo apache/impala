@@ -56,7 +56,7 @@ class TestObservability(ImpalaTestSuite):
 
   def test_broadcast_num_rows(self):
     """Regression test for IMPALA-3002 - checks that the num_rows for a broadcast node
-    in the exec summaty is correctly set as the max over all instances, not the sum."""
+    in the exec summary is correctly set as the max over all instances, not the sum."""
     query = """select distinct a.int_col, a.string_col from functional.alltypes a
         inner join functional.alltypessmall b on (a.id = b.id)
         where a.year = 2009 and b.month = 2"""
@@ -424,58 +424,94 @@ class TestObservability(ImpalaTestSuite):
     assert counters["TotalBytesSent"] == (counters["TotalScanBytesSent"] +
                                           counters["TotalInnerBytesSent"])
 
+  def test_query_profile_contains_host_resource_usage(self):
+    """Tests that the profile contains a sub-profile with per node resource usage."""
+    result = self.execute_query("select count(*), sleep(1000) from functional.alltypes")
+    profile = result.runtime_profile
+    expected_str = "Per Node Profiles:"
+    assert any(expected_str in line for line in profile.splitlines())
 
-class TestThriftProfile(ImpalaTestSuite):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
+  def test_query_profile_host_cpu_usage_off(self):
+    """Tests that the query profile does not contain CPU metrics by default or when
+    disabled explicitly."""
+    query = "select count(*), sleep(1000) from functional.alltypes"
+    for query_opts in [None, {'resource_trace_ratio': 0.0}]:
+      profile = self.execute_query(query, query_opts).runtime_profile
+      # Assert that no CPU counters exist in the profile
+      for line in profile.splitlines():
+        assert not re.search("HostCpu.*Percentage", line)
 
-  # IMPALA-6399: Run this test serially to avoid a delay over the wait time in fetching
-  # the profile.
-  # This test needs to call self.client.close() to force computation of query end time,
-  # so it has to be in its own suite (IMPALA-6498).
+  def test_query_profile_contains_host_cpu_usage(self):
+    """Tests that the query profile contains various CPU metrics."""
+    query_opts = {'resource_trace_ratio': 1.0}
+    query = "select count(*), sleep(1000) from functional.alltypes"
+    profile = self.execute_query(query, query_opts).runtime_profile
+    # We check for 500ms because a query with 1s duration won't hit the 64 values limit.
+    expected_strs = ["HostCpuIoWaitPercentage (500.000ms):",
+                     "HostCpuSysPercentage (500.000ms):",
+                     "HostCpuUserPercentage (500.000ms):"]
+
+    # Assert that all expected counters exist in the profile.
+    for expected_str in expected_strs:
+      assert any(expected_str in line for line in profile.splitlines()), expected_str
+
+    # Check that there are some values for each counter.
+    for line in profile.splitlines():
+      if not any(key in line for key in expected_strs):
+        continue
+      values = line.split(':')[1].strip().split(',')
+      assert len(values) > 0
+
+  def _find_ts_counters_in_thrift_profile(self, profile, name):
+    """Finds all time series counters in 'profile' with a matching name."""
+    counters = []
+    for node in profile.nodes:
+      for counter in node.time_series_counters or []:
+        if counter.name == name:
+          counters.append(counter)
+    return counters
+
+  def _get_thrift_profile(self, query_id, timeout=MAX_THRIFT_PROFILE_WAIT_TIME_S):
+    """Downloads a thrift profile and asserts that a profile was retrieved within the
+       specified timeout. If you see unexpected timeouts, try running the calling test
+       serially."""
+    thrift_profile = self.impalad_test_service.get_thrift_profile(query_id,
+                                                                  timeout=timeout)
+    assert thrift_profile, "Debug thrift profile for query {0} not available in {1} \
+        seconds".format(query_id, timeout)
+    return thrift_profile
+
+  @pytest.mark.execute_serially
+  def test_thrift_profile_contains_cpu_usage(self):
+    """Tests that the thrift profile contains a time series counter for CPU resource
+       usage."""
+    query_opts = {'resource_trace_ratio': 1.0}
+    result = self.execute_query("select sleep(2000)", query_opts)
+    thrift_profile = self._get_thrift_profile(result.query_id)
+
+    cpu_key = "HostCpuUserPercentage"
+    cpu_counters = self._find_ts_counters_in_thrift_profile(thrift_profile, cpu_key)
+    # The query will run on a single node, we will only find the counter once.
+    assert len(cpu_counters) == 1
+    cpu_counter = cpu_counters[0]
+    assert len(cpu_counter.values) > 0
+
   @pytest.mark.execute_serially
   def test_query_profile_thrift_timestamps(self):
     """Test that the query profile start and end time date-time strings have
     nanosecond precision. Nanosecond precision is expected by management API clients
     that consume Impala debug webpages."""
     query = "select sleep(5)"
-    handle = self.client.execute_async(query)
-    query_id = handle.get_handle().id
-    results = self.client.fetch(query, handle)
-    self.client.close()
+    result = self.execute_query(query)
 
-    start = time()
-    end = start + MAX_THRIFT_PROFILE_WAIT_TIME_S
-    while time() <= end:
-      # Sleep before trying to fetch the profile. This helps to prevent a warning when the
-      # profile is not yet available immediately. It also makes it less likely to
-      # introduce an error below in future changes by forgetting to sleep.
-      sleep(1)
-      tree = self.impalad_test_service.get_thrift_profile(query_id)
-      if not tree:
-        continue
+    tree = self._get_thrift_profile(result.query_id)
+    # tree.nodes[1] corresponds to ClientRequestState::summary_profile_
+    # See be/src/service/client-request-state.[h|cc].
+    start_time = tree.nodes[1].info_strings["Start Time"]
+    end_time = tree.nodes[1].info_strings["End Time"]
+    # Start and End Times are of the form "2017-12-07 22:26:52.167711000"
+    start_time_sub_sec_str = start_time.split('.')[-1]
+    end_time_sub_sec_str = end_time.split('.')[-1]
 
-      # tree.nodes[1] corresponds to ClientRequestState::summary_profile_
-      # See be/src/service/client-request-state.[h|cc].
-      start_time = tree.nodes[1].info_strings["Start Time"]
-      end_time = tree.nodes[1].info_strings["End Time"]
-      # Start and End Times are of the form "2017-12-07 22:26:52.167711000"
-      start_time_sub_sec_str = start_time.split('.')[-1]
-      end_time_sub_sec_str = end_time.split('.')[-1]
-      if len(end_time_sub_sec_str) == 0:
-        elapsed = time() - start
-        logging.info("end_time_sub_sec_str hasn't shown up yet, elapsed=%d", elapsed)
-        continue
-
-      assert len(end_time_sub_sec_str) == 9, end_time
-      assert len(start_time_sub_sec_str) == 9, start_time
-      return True
-
-    # If we're here, we didn't get the final thrift profile from the debug web page.
-    # This could happen due to heavy system load. The test is then inconclusive.
-    # Log a message and fail this run.
-
-    dbg_str = "Debug thrift profile for query {0} not available in {1} seconds".format(
-        query_id, MAX_THRIFT_PROFILE_WAIT_TIME_S)
-    assert False, dbg_str
+    assert len(end_time_sub_sec_str) == 9, end_time
+    assert len(start_time_sub_sec_str) == 9, start_time

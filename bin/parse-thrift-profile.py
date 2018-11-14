@@ -39,14 +39,8 @@
 # 2018-04-13T15:06:34.144000 e44af7f93edb8cd6:1b1f801600000000 TRuntimeProfileTree(nodes=[TRuntimeProf...
 
 
-from thrift.protocol import TCompactProtocol
-from thrift.TSerialization import deserialize
-from RuntimeProfile.ttypes import TRuntimeProfileTree
-
-import base64
-import datetime
+from impala_py_lib import profiles
 import sys
-import zlib
 
 if len(sys.argv) == 1 or sys.argv[1] == "-":
   input_data = sys.stdin
@@ -57,23 +51,5 @@ else:
   sys.exit(1)
 
 for line in input_data:
-  space_separated = line.split(" ")
-  if len(space_separated) == 3:
-    ts = int(space_separated[0])
-    print datetime.datetime.fromtimestamp(ts/1000.0).isoformat(), space_separated[1],
-    base64_encoded = space_separated[2]
-  elif len(space_separated) == 1:
-    base64_encoded = space_separated[0]
-  else:
-    raise Exception("Unexpected line: " + line)
-  possibly_compressed = base64.b64decode(base64_encoded)
-  # Handle both compressed and uncompressed Thrift profiles
-  try:
-    thrift = zlib.decompress(possibly_compressed)
-  except zlib.error:
-    thrift = possibly_compressed
-
-  tree = TRuntimeProfileTree()
-  deserialize(tree, thrift, protocol_factory=TCompactProtocol.TCompactProtocolFactory())
-  tree.validate()
+  tree = profiles.decode_profile_line(line)
   print tree

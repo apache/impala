@@ -58,12 +58,15 @@ Coordinator::BackendState::BackendState(
 }
 
 void Coordinator::BackendState::Init(
-    const BackendExecParams& exec_params,
-    const vector<FragmentStats*>& fragment_stats, ObjectPool* obj_pool) {
+    const BackendExecParams& exec_params, const vector<FragmentStats*>& fragment_stats,
+    RuntimeProfile* host_profile_parent, ObjectPool* obj_pool) {
   backend_exec_params_ = &exec_params;
   host_ = backend_exec_params_->instance_params[0]->host;
   krpc_host_ = backend_exec_params_->instance_params[0]->krpc_host;
   num_remaining_instances_ = backend_exec_params_->instance_params.size();
+
+  host_profile_ = RuntimeProfile::Create(obj_pool, TNetworkAddressToString(host_));
+  host_profile_parent->AddChild(host_profile_);
 
   // populate instance_stats_map_ and install instance
   // profiles as child profiles in fragment_stats' profile
@@ -382,6 +385,11 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
 
   // TODO: keep backend-wide stopwatch?
   return IsDoneLocked(lock);
+}
+
+void Coordinator::BackendState::UpdateHostProfile(
+    const TRuntimeProfileTree& thrift_profile) {
+  host_profile_->Update(thrift_profile);
 }
 
 void Coordinator::BackendState::UpdateExecStats(

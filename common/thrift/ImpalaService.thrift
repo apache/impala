@@ -350,7 +350,12 @@ enum TImpalaQueryOptions {
   // An opaque string, not used by Impala itself, that can be used to identify
   // the client, like a User-Agent in HTTP. Drivers should set this to
   // their version number. May also be used by tests to help identify queries.
-  CLIENT_IDENTIFIER
+  CLIENT_IDENTIFIER,
+
+  // Probability to enable tracing of resource usage consumption on all fragment instance
+  // executors of a query. Must be between 0 and 1 inclusive, 0 means no query will be
+  // traced, 1 means all queries will be traced.
+  RESOURCE_TRACE_RATIO,
 }
 
 // The summary of a DML statement.

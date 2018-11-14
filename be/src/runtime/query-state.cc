@@ -42,6 +42,7 @@
 #include "service/control-service.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
+#include "util/system-state-info.h"
 #include "util/thread.h"
 
 #include "gen-cpp/control_service.pb.h"
@@ -82,7 +83,8 @@ QueryState::QueryState(
     backend_resource_refcnt_(0),
     refcnt_(0),
     is_cancelled_(0),
-    query_spilled_(0) {
+    query_spilled_(0),
+    host_profile_(RuntimeProfile::Create(obj_pool(), "<track resource usage>")) {
   if (query_ctx_.request_pool.empty()) {
     // fix up pool name for tests
     DCHECK(!request_pool.empty());
@@ -130,6 +132,8 @@ QueryState::~QueryState() {
     // therefore be safely destroyed.
     query_mem_tracker_->CloseAndUnregisterFromParent();
   }
+  /// We started periodic counters that track the system resource usage in Init().
+  host_profile_->StopPeriodicCounters();
 }
 
 Status QueryState::Init(const TExecQueryFInstancesParams& exec_rpc_params) {
@@ -138,10 +142,28 @@ Status QueryState::Init(const TExecQueryFInstancesParams& exec_rpc_params) {
   // returns a resource refcount to its caller.
   AcquireBackendResourceRefcount();
 
+  ExecEnv* exec_env = ExecEnv::GetInstance();
+
+  // Initialize resource tracking counters.
+  if (query_ctx().trace_resource_usage) {
+    SystemStateInfo* system_state_info = exec_env->system_state_info();
+    host_profile_->AddChunkedTimeSeriesCounter(
+        "HostCpuUserPercentage", TUnit::BASIS_POINTS, [system_state_info] () {
+        return system_state_info->GetCpuUsageRatios().user;
+        });
+    host_profile_->AddChunkedTimeSeriesCounter(
+        "HostCpuSysPercentage", TUnit::BASIS_POINTS, [system_state_info] () {
+        return system_state_info->GetCpuUsageRatios().system;
+        });
+    host_profile_->AddChunkedTimeSeriesCounter(
+        "HostCpuIoWaitPercentage", TUnit::BASIS_POINTS, [system_state_info] () {
+        return system_state_info->GetCpuUsageRatios().iowait;
+        });
+  }
+
   // Starting a new query creates threads and consumes a non-trivial amount of memory.
   // If we are already starved for memory, fail as early as possible to avoid consuming
   // more resources.
-  ExecEnv* exec_env = ExecEnv::GetInstance();
   MemTracker* process_mem_tracker = exec_env->process_mem_tracker();
   if (process_mem_tracker->LimitExceeded(MemLimit::HARD)) {
     string msg = Substitute(
@@ -202,14 +224,10 @@ Status QueryState::InitBufferPoolState() {
   buffer_reservation_->InitChildTracker(
       NULL, exec_env->buffer_reservation(), query_mem_tracker_, max_reservation);
 
-  // TODO: once there's a mechanism for reporting non-fragment-local profiles,
-  // should make sure to report this profile so it's not going into a black hole.
-  RuntimeProfile* dummy_profile = RuntimeProfile::Create(&obj_pool_, "dummy");
-  // Only create file group if spilling is enabled.
   if (query_options().scratch_limit != 0 && !query_ctx_.disable_spilling) {
     file_group_ = obj_pool_.Add(
         new TmpFileMgr::FileGroup(exec_env->tmp_file_mgr(), exec_env->disk_io_mgr(),
-            dummy_profile, query_id(), query_options().scratch_limit));
+            host_profile_, query_id(), query_options().scratch_limit));
   }
   return Status::OK();
 }
@@ -274,6 +292,12 @@ void QueryState::ConstructReport(bool instances_started,
       TUniqueIdToUniqueIdPB(failed_finstance_id_, report->mutable_fragment_instance_id());
     }
   }
+
+  // Add profile to report
+  host_profile_->ToThrift(&profiles_forest->host_profile);
+  profiles_forest->__isset.host_profile = true;
+  // Free resources in chunked counters in the profile
+  host_profile_->ClearChunkedTimeSeriesCounters();
 
   if (instances_started) {
     for (const auto& entry : fis_map_) {

@@ -26,11 +26,11 @@ namespace posix_time = boost::posix_time;
 using boost::get_system_time;
 using boost::system_time;
 
-namespace impala {
-
 // Period to update rate counters and sampling counters in ms.
 DEFINE_int32(periodic_counter_update_period_ms, 500, "Period to update rate counters and"
     " sampling counters in ms");
+
+namespace impala {
 
 PeriodicCounterUpdater* PeriodicCounterUpdater::instance_ = nullptr;
 
@@ -42,9 +42,14 @@ void PeriodicCounterUpdater::Init() {
       new thread(&PeriodicCounterUpdater::UpdateLoop, instance_));
 }
 
+void PeriodicCounterUpdater::RegisterUpdateFunction(UpdateFn update_fn) {
+  lock_guard<SpinLock> l(instance_->update_fns_lock_);
+  instance_->update_fns_.push_back(update_fn);
+}
+
 void PeriodicCounterUpdater::RegisterPeriodicCounter(
     RuntimeProfile::Counter* src_counter,
-    RuntimeProfile::DerivedCounterFunction sample_fn,
+    RuntimeProfile::SampleFunction sample_fn,
     RuntimeProfile::Counter* dst_counter, PeriodicCounterType type) {
   DCHECK(src_counter == NULL || sample_fn == NULL);
 
@@ -131,6 +136,11 @@ void PeriodicCounterUpdater::UpdateLoop() {
     SleepForMs(FLAGS_periodic_counter_update_period_ms);
     posix_time::time_duration elapsed = get_system_time() - before_time;
     int elapsed_ms = elapsed.total_milliseconds();
+
+    {
+      lock_guard<SpinLock> l(update_fns_lock_);
+      for (UpdateFn& f : update_fns_) f();
+    }
 
     {
       lock_guard<SpinLock> ratelock(instance_->rate_lock_);

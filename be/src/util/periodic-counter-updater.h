@@ -34,7 +34,9 @@ namespace impala {
 /// metric (e.g. memory used) at regular intervals. The samples can be summarized in
 /// a few ways (e.g. averaged, stored as histogram, kept as a time series data, etc).
 /// This class has one thread that will wake up at a regular period and update all
-/// the registered counters.
+/// the registered counters. Optionally, users can register functions to be called before
+/// counters get updated, for example to update global metrics that the counters then
+/// pull from.
 /// Typically, the counter updates should be stopped as early as possible to prevent
 /// future stale samples from polluting the useful values.
 class PeriodicCounterUpdater {
@@ -44,9 +46,15 @@ class PeriodicCounterUpdater {
     SAMPLING_COUNTER,
   };
 
-  // Sets up data structures and starts the counter update thread. Should only be called
-  // once during process startup and must be called before other methods.
+  /// Sets up data structures and starts the counter update thread. Should only be called
+  /// once during process startup and must be called before other methods.
   static void Init();
+
+  typedef std::function<void()> UpdateFn;
+  /// Registers an update function that will be called before individual counters will be
+  /// updated. This can be used to update some global metric once before reading it
+  /// through individual counters.
+  static void RegisterUpdateFunction(UpdateFn update_fn);
 
   /// Registers a periodic counter to be updated by the update thread.
   /// Either sample_fn or dst_counter must be non-NULL.  When the periodic counter
@@ -54,7 +62,7 @@ class PeriodicCounterUpdater {
   /// function to get the value.
   /// dst_counter/sample fn is assumed to be compatible types with src_counter.
   static void RegisterPeriodicCounter(RuntimeProfile::Counter* src_counter,
-      RuntimeProfile::DerivedCounterFunction sample_fn,
+      RuntimeProfile::SampleFunction sample_fn,
       RuntimeProfile::Counter* dst_counter, PeriodicCounterType type);
 
   /// Adds a bucketing counter to be updated at regular intervals.
@@ -82,13 +90,13 @@ class PeriodicCounterUpdater {
  private:
   struct RateCounterInfo {
     RuntimeProfile::Counter* src_counter;
-    RuntimeProfile::DerivedCounterFunction sample_fn;
+    RuntimeProfile::SampleFunction sample_fn;
     int64_t elapsed_ms;
   };
 
   struct SamplingCounterInfo {
     RuntimeProfile::Counter* src_counter; // the counter to be sampled
-    RuntimeProfile::DerivedCounterFunction sample_fn;
+    RuntimeProfile::SampleFunction sample_fn;
     int64_t total_sampled_value; // sum of all sampled values;
     int64_t num_sampled; // number of samples taken
   };
@@ -105,6 +113,12 @@ class PeriodicCounterUpdater {
 
   /// Thread performing asynchronous updates.
   boost::scoped_ptr<boost::thread> update_thread_;
+
+  /// List of functions that will be called before individual counters will be sampled.
+  std::vector<UpdateFn> update_fns_;
+
+  /// Spinlock that protects the list of update functions (and their execution).
+  SpinLock update_fns_lock_;
 
   /// Spinlock that protects the map of rate counters
   SpinLock rate_lock_;

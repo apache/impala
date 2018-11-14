@@ -29,6 +29,9 @@ enum TUnit {
   BYTES_PER_SECOND,
   TIME_NS,
   DOUBLE_VALUE,
+  // 100th of a percent, used to express ratios etc., range from 0 to 10000, pretty
+  // printed as integer percentages from 0 to 100.
+  BASIS_POINTS,
   // No units at all, may not be a numerical quantity
   NONE,
   TIME_MS,

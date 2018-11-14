@@ -672,7 +672,7 @@ KrpcDataStreamRecvr::KrpcDataStreamRecvr(KrpcDataStreamMgr* stream_mgr,
   total_deferred_rpcs_counter_ =
       ADD_COUNTER(enqueue_profile_, "TotalRPCsDeferred", TUnit::UNIT);
   deferred_rpcs_time_series_counter_ =
-      enqueue_profile_->AddTimeSeriesCounter("DeferredQueueSize", TUnit::UNIT,
+      enqueue_profile_->AddSamplingTimeSeriesCounter("DeferredQueueSize", TUnit::UNIT,
       bind<int64_t>(mem_fn(&KrpcDataStreamRecvr::num_deferred_rpcs), this));
   total_has_deferred_rpcs_timer_ =
       ADD_TIMER(enqueue_profile_, "TotalHasDeferredRPCsTime");

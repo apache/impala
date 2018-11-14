@@ -311,6 +311,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   74: optional string client_identifier;
+
+  // See comment in ImpalaService.thrift
+  75: optional double resource_trace_ratio = 0;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
@@ -453,6 +456,10 @@ struct TQueryCtx {
   // stats and key column predicate selectivity. Generally only disabled
   // for testing.
   20: optional bool disable_hbase_row_est = false;
+
+  // Flag to enable tracing of resource usage consumption for all fragment instances of a
+  // query. Set in ImpalaServer::PrepareQueryContext().
+  21: required bool trace_resource_usage = false
 }
 
 // Specification of one output destination of a plan fragment

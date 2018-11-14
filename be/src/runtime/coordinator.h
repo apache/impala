@@ -263,6 +263,11 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Aggregate counters for the entire query. Lives in 'obj_pool_'. Set in Exec().
   RuntimeProfile* query_profile_ = nullptr;
 
+  /// Aggregate counters for backend host resource usage and other per-host information.
+  /// Will contain a child profile for each backend host that participates in the query
+  /// execution. Lives in 'obj_pool_'. Set in Exec().
+  RuntimeProfile* host_profiles_ = nullptr;
+
   /// Total time spent in finalization (typically 0 except for INSERT into hdfs
   /// tables). Set in Exec().
   RuntimeProfile::Counter* finalization_timer_ = nullptr;

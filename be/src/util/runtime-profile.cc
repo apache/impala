@@ -28,6 +28,7 @@
 
 #include "common/object-pool.h"
 #include "gutil/strings/strip.h"
+#include "kudu/util/logging.h"
 #include "rpc/thrift-util.h"
 #include "runtime/mem-tracker.h"
 #include "util/coding-util.h"
@@ -41,6 +42,9 @@
 #include "util/ubsan.h"
 
 #include "common/names.h"
+
+DECLARE_int32(status_report_interval_ms);
+DECLARE_int32(periodic_counter_update_period_ms);
 
 namespace impala {
 
@@ -138,8 +142,10 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
 
   if (node.__isset.time_series_counters) {
     for (const TTimeSeriesCounter& val: node.time_series_counters) {
-      profile->time_series_counter_map_[val.name] =
-          pool->Add(new TimeSeriesCounter(val.name, val.unit, val.period_ms, val.values));
+      // Capture all incoming time series counters with the same type since re-sampling
+      // will have happened on the sender side.
+      profile->time_series_counter_map_[val.name] = pool->Add(
+          new ChunkedTimeSeriesCounter(val.name, val.unit, val.period_ms, val.values));
     }
   }
 
@@ -310,10 +316,13 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
       const TTimeSeriesCounter& c = node.time_series_counters[i];
       TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(c.name);
       if (it == time_series_counter_map_.end()) {
-        time_series_counter_map_[c.name] =
-            pool_->Add(new TimeSeriesCounter(c.name, c.unit, c.period_ms, c.values));
+        // Capture all incoming time series counters with the same type since re-sampling
+        // will have happened on the sender side.
+        time_series_counter_map_[c.name] = pool_->Add(
+            new ChunkedTimeSeriesCounter(c.name, c.unit, c.period_ms, c.values));
       } else {
-        it->second->samples_.SetSamples(c.period_ms, c.values);
+        int64_t start_idx = c.__isset.start_index ? c.start_index : 0;
+        it->second->SetSamples(c.period_ms, c.values, start_idx);
       }
     }
   }
@@ -618,7 +627,7 @@ ADD_COUNTER_IMPL(AddConcurrentTimerCounter, ConcurrentTimerCounter);
 
 RuntimeProfile::DerivedCounter* RuntimeProfile::AddDerivedCounter(
     const string& name, TUnit::type unit,
-    const DerivedCounterFunction& counter_fn, const string& parent_counter_name) {
+    const SampleFunction& counter_fn, const string& parent_counter_name) {
   DCHECK_EQ(is_averaged_profile_, false);
   lock_guard<SpinLock> l(counter_map_lock_);
   if (counter_map_.find(name) != counter_map_.end()) return NULL;
@@ -645,7 +654,7 @@ RuntimeProfile::ThreadCounters* RuntimeProfile::AddThreadCounters(
   return counter;
 }
 
-void RuntimeProfile::AddLocalTimeCounter(const DerivedCounterFunction& counter_fn) {
+void RuntimeProfile::AddLocalTimeCounter(const SampleFunction& counter_fn) {
   DerivedCounter* local_time_counter = pool_->Add(
       new DerivedCounter(TUnit::TIME_NS, counter_fn));
   lock_guard<SpinLock> l(counter_map_lock_);
@@ -768,22 +777,29 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   {
     // Print all time series counters as following:
     //    - <Name> (<period>): <val1>, <val2>, <etc>
-    SpinLock* lock;
-    int num, period;
     lock_guard<SpinLock> l(counter_map_lock_);
     for (const TimeSeriesCounterMap::value_type& v: time_series_counter_map_) {
-      const int64_t* samples = v.second->samples_.GetSamples(&num, &period, &lock);
+      const TimeSeriesCounter* counter = v.second;
+      lock_guard<SpinLock> l(counter->lock_);
+      int num, period;
+      const int64_t* samples = counter->GetSamplesLocked(&num, &period);
       if (num > 0) {
-        stream << prefix << "   - " << v.first << "("
-               << PrettyPrinter::Print(period * 1000000L, TUnit::TIME_NS)
-               << "): ";
-        for (int i = 0; i < num; ++i) {
-          stream << PrettyPrinter::Print(samples[i], v.second->unit_);
-          if (i != num - 1) stream << ", ";
+        // Clamp number of printed values at 64, the maximum number of values in the
+        // SamplingTimeSeriesCounter.
+        int step = 1 + (num - 1) / 64;
+        period *= step;
+        stream << prefix << "   - " << v.first << " ("
+               << PrettyPrinter::Print(period * 1000000L, TUnit::TIME_NS) << "): ";
+        for (int i = 0; i < num; i += step) {
+          stream << PrettyPrinter::Print(samples[i], counter->unit());
+          if (i + step < num) stream << ", ";
+        }
+        if (step > 1) {
+          stream << " (Showing " << ((num + 1) / step) << " of " << num << " values from "
+            "Thrift Profile)";
         }
         stream << endl;
       }
-      lock->unlock();
     }
   }
 
@@ -1068,7 +1084,7 @@ RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
 }
 
 RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
-    const string& name, DerivedCounterFunction fn, TUnit::type dst_unit) {
+    const string& name, SampleFunction fn, TUnit::type dst_unit) {
   lock_guard<SpinLock> l(counter_map_lock_);
   bool created;
   Counter* dst_counter = AddCounterLocked(name, dst_unit, "", &created);
@@ -1095,7 +1111,7 @@ RuntimeProfile::Counter* RuntimeProfile::AddSamplingCounter(
 }
 
 RuntimeProfile::Counter* RuntimeProfile::AddSamplingCounter(
-    const string& name, DerivedCounterFunction sample_fn) {
+    const string& name, SampleFunction sample_fn) {
   lock_guard<SpinLock> l(counter_map_lock_);
   bool created;
   Counter* dst_counter = AddCounterLocked(name, TUnit::DOUBLE_VALUE, "", &created);
@@ -1173,44 +1189,153 @@ RuntimeProfile::SummaryStatsCounter* RuntimeProfile::AddSummaryStatsCounter(
   return counter;
 }
 
-RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddTimeSeriesCounter(
-    const string& name, TUnit::type unit, DerivedCounterFunction fn) {
+RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddSamplingTimeSeriesCounter(
+    const string& name, TUnit::type unit, SampleFunction fn) {
   DCHECK(fn != nullptr);
   lock_guard<SpinLock> l(counter_map_lock_);
   TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(name);
   if (it != time_series_counter_map_.end()) return it->second;
-  TimeSeriesCounter* counter = pool_->Add(new TimeSeriesCounter(name, unit, fn));
+  TimeSeriesCounter* counter = pool_->Add(new SamplingTimeSeriesCounter(name, unit, fn));
   time_series_counter_map_[name] = counter;
   PeriodicCounterUpdater::RegisterTimeSeriesCounter(counter);
   has_active_periodic_counters_ = true;
   return counter;
 }
 
-RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddTimeSeriesCounter(
+RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddSamplingTimeSeriesCounter(
     const string& name, Counter* src_counter) {
   DCHECK(src_counter != NULL);
-  return AddTimeSeriesCounter(name, src_counter->unit(),
+  return AddSamplingTimeSeriesCounter(name, src_counter->unit(),
       bind(&Counter::value, src_counter));
 }
 
-void RuntimeProfile::TimeSeriesCounter::ToThrift(TTimeSeriesCounter* counter) {
-  counter->name = name_;
-  counter->unit = unit_;
-
-  int num, period;
-  SpinLock* lock;
-  const int64_t* samples = samples_.GetSamples(&num, &period, &lock);
-  counter->values.resize(num);
-  Ubsan::MemCpy(counter->values.data(), samples, num * sizeof(int64_t));
-  lock->unlock();
-  counter->period_ms = period;
+void RuntimeProfile::TimeSeriesCounter::AddSample(int ms_elapsed) {
+  lock_guard<SpinLock> l(lock_);
+  int64_t sample = sample_fn_();
+  AddSampleLocked(sample, ms_elapsed);
 }
 
-string RuntimeProfile::TimeSeriesCounter::DebugString() const {
-  stringstream ss;
-  ss << "Counter=" << name_ << endl
-     << samples_.DebugString();
-  return ss.str();
+const int64_t* RuntimeProfile::TimeSeriesCounter::GetSamplesLockedForSend(
+    int* num_samples, int* period) {
+  return GetSamplesLocked(num_samples, period);
+}
+
+void RuntimeProfile::TimeSeriesCounter::SetSamples(
+      int period, const std::vector<int64_t>& samples, int64_t start_idx) {
+  DCHECK(false);
+}
+
+void RuntimeProfile::SamplingTimeSeriesCounter::AddSampleLocked(
+    int64_t sample, int ms_elapsed){
+  samples_.AddSample(sample, ms_elapsed);
+}
+
+const int64_t* RuntimeProfile::SamplingTimeSeriesCounter::GetSamplesLocked(
+    int* num_samples, int* period) const {
+  return samples_.GetSamples(num_samples, period);
+}
+
+RuntimeProfile::ChunkedTimeSeriesCounter::ChunkedTimeSeriesCounter(
+    const string& name, TUnit::type unit, SampleFunction fn)
+  : TimeSeriesCounter(name, unit, fn)
+  , period_(FLAGS_periodic_counter_update_period_ms)
+  , max_size_(10 * FLAGS_status_report_interval_ms / period_) {}
+
+void RuntimeProfile::ChunkedTimeSeriesCounter::Clear() {
+  lock_guard<SpinLock> l(lock_);
+  previous_sample_count_ += last_get_count_;
+  values_.erase(values_.begin(), values_.begin() + last_get_count_);
+  last_get_count_ = 0;
+}
+
+void RuntimeProfile::ChunkedTimeSeriesCounter::AddSampleLocked(
+    int64_t sample, int ms_elapsed) {
+  // We chose inefficiently erasing elements from a vector over using a std::deque because
+  // this should only happen very infrequently and we rely on contiguous storage in
+  // GetSamplesLocked*().
+  if (max_size_ > 0 && values_.size() == max_size_) {
+    KLOG_EVERY_N_SECS(WARNING, 60) << "ChunkedTimeSeriesCounter reached maximum size";
+    values_.erase(values_.begin(), values_.begin() + 1);
+  }
+  DCHECK_LT(values_.size(), max_size_);
+  values_.push_back(sample);
+}
+
+const int64_t* RuntimeProfile::ChunkedTimeSeriesCounter::GetSamplesLocked(
+    int* num_samples, int* period) const {
+  DCHECK(num_samples != nullptr);
+  DCHECK(period != nullptr);
+  *num_samples = values_.size();
+  *period = period_;
+  return values_.data();
+}
+
+const int64_t* RuntimeProfile::ChunkedTimeSeriesCounter::GetSamplesLockedForSend(
+    int* num_samples, int* period) {
+  last_get_count_ = values_.size();
+  return GetSamplesLocked(num_samples, period);
+}
+
+void RuntimeProfile::ChunkedTimeSeriesCounter::SetSamples(
+    int period, const std::vector<int64_t>& samples, int64_t start_idx) {
+  lock_guard<SpinLock> l(lock_);
+  if (start_idx == 0) {
+    // This could be coming from a SamplingTimeSeriesCounter or another
+    // ChunkedTimeSeriesCounter.
+    period_ = period;
+    values_ = samples;
+    return;
+  }
+  // Only ChunkedTimeSeriesCounter will set start_idx > 0.
+  DCHECK_GT(start_idx, 0);
+  DCHECK_EQ(period_, period);
+  if (values_.size() < start_idx) {
+    // Fill up with 0.
+    values_.resize(start_idx);
+  }
+  DCHECK_GE(values_.size(), start_idx);
+  // Skip values we already received.
+  auto start_it = samples.begin() + values_.size() - start_idx;
+  values_.insert(values_.end(), start_it, samples.end());
+}
+
+RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddChunkedTimeSeriesCounter(
+    const string& name, TUnit::type unit, SampleFunction fn) {
+  DCHECK(fn != nullptr);
+  lock_guard<SpinLock> l(counter_map_lock_);
+  TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(name);
+  if (it != time_series_counter_map_.end()) return it->second;
+  TimeSeriesCounter* counter = pool_->Add(new ChunkedTimeSeriesCounter(name, unit, fn));
+  time_series_counter_map_[name] = counter;
+  PeriodicCounterUpdater::RegisterTimeSeriesCounter(counter);
+  has_active_periodic_counters_ = true;
+  return counter;
+}
+
+void RuntimeProfile::ClearChunkedTimeSeriesCounters() {
+  {
+    lock_guard<SpinLock> l(counter_map_lock_);
+    for (auto& it : time_series_counter_map_) it.second->Clear();
+  }
+  {
+    lock_guard<SpinLock> l(children_lock_);
+    for (int i = 0; i < children_.size(); ++i) {
+      children_[i].first->ClearChunkedTimeSeriesCounters();
+    }
+  }
+}
+
+void RuntimeProfile::TimeSeriesCounter::ToThrift(TTimeSeriesCounter* counter) {
+  lock_guard<SpinLock> l(lock_);
+  int num, period;
+  const int64_t* samples = GetSamplesLockedForSend(&num, &period);
+  counter->values.resize(num);
+  Ubsan::MemCpy(counter->values.data(), samples, num * sizeof(int64_t));
+
+  counter->name = name_;
+  counter->unit = unit_;
+  counter->period_ms = period;
+  counter->__set_start_index(previous_sample_count_);
 }
 
 void RuntimeProfile::EventSequence::ToThrift(TEventSequence* seq) {

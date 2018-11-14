@@ -99,6 +99,9 @@ Status Coordinator::Exec() {
   finalization_timer_ = ADD_TIMER(query_profile_, "FinalizationTimer");
   filter_updates_received_ = ADD_COUNTER(query_profile_, "FiltersReceived", TUnit::UNIT);
 
+  host_profiles_ = RuntimeProfile::Create(obj_pool(), "Per Node Profiles");
+  query_profile_->AddChild(host_profiles_);
+
   SCOPED_TIMER(query_profile_->total_time_counter());
 
   // initialize progress updater
@@ -207,7 +210,7 @@ void Coordinator::InitBackendStates() {
   for (const auto& entry: schedule_.per_backend_exec_params()) {
     BackendState* backend_state = obj_pool()->Add(
         new BackendState(*this, backend_idx, filter_mode_));
-    backend_state->Init(entry.second, fragment_stats_, obj_pool());
+    backend_state->Init(entry.second, fragment_stats_, host_profiles_, obj_pool());
     backend_states_[backend_idx++] = backend_state;
   }
 }
@@ -699,6 +702,10 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
   }
   BackendState* backend_state = backend_states_[coord_state_idx];
 
+  if (thrift_profiles.__isset.host_profile) {
+    backend_state->UpdateHostProfile(thrift_profiles.host_profile);
+  }
+
   if (backend_state->ApplyExecStatusReport(request, thrift_profiles, &exec_summary_,
           &progress_, &dml_exec_state_)) {
     // This backend execution has completed.
@@ -816,6 +823,7 @@ void Coordinator::ComputeQuerySummary() {
   COUNTER_SET(ADD_COUNTER(query_profile_, "TotalCpuTime", TUnit::TIME_NS),
       total_utilization.cpu_user_ns + total_utilization.cpu_sys_ns);
 
+  // TODO(IMPALA-8126): Move to host profiles
   query_profile_->AddInfoString("Per Node Peak Memory Usage", mem_info.str());
   query_profile_->AddInfoString("Per Node Bytes Read", bytes_read_info.str());
   query_profile_->AddInfoString("Per Node User Time", cpu_user_info.str());

@@ -65,6 +65,12 @@ struct TTimeSeriesCounter {
 
   // The sampled values.
   4: required list<i64> values
+
+  // The index of the first value in this series (this is equal to the total number of
+  // values contained in previous updates for this counter). Values > 0 mean that this
+  // series contains an interval of a larger series. For values > 0, period_ms should be
+  // ignored, as chunked counters don't resample their values.
+  5: optional i64 start_index
 }
 
 // Thrift version of RuntimeProfile::SummaryStatsCounter.
@@ -133,4 +139,5 @@ struct TRuntimeProfileTree {
 // A list of TRuntimeProfileTree structures.
 struct TRuntimeProfileForest {
   1: required list<TRuntimeProfileTree> profile_trees
+  2: optional TRuntimeProfileTree host_profile
 }

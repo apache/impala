@@ -162,11 +162,11 @@ Status FragmentInstanceState::Prepare() {
   avg_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
       bind<int64_t>(mem_fn(&ThreadResourcePool::num_threads),
           runtime_state_->resource_pool()));
-  mem_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("MemoryUsage",
+  mem_usage_sampled_counter_ = profile()->AddSamplingTimeSeriesCounter("MemoryUsage",
       TUnit::BYTES,
       bind<int64_t>(mem_fn(&MemTracker::consumption),
           runtime_state_->instance_mem_tracker()));
-  thread_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("ThreadUsage",
+  thread_usage_sampled_counter_ = profile()->AddSamplingTimeSeriesCounter("ThreadUsage",
       TUnit::UNIT,
       bind<int64_t>(mem_fn(&ThreadResourcePool::num_threads),
           runtime_state_->resource_pool()));

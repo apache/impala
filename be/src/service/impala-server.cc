@@ -48,6 +48,7 @@
 #include "exec/external-data-source-executor.h"
 #include "exprs/timezone_db.h"
 #include "gen-cpp/CatalogService_constants.h"
+#include "kudu/util/random_util.h"
 #include "rpc/authentication.h"
 #include "rpc/rpc-trace.h"
 #include "rpc/thrift-thread.h"
@@ -107,6 +108,7 @@ using boost::get_system_time;
 using boost::system_time;
 using boost::uuids::random_generator;
 using boost::uuids::uuid;
+using kudu::GetRandomSeed32;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
@@ -261,6 +263,8 @@ const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 
 // Interval between checks for query expiration.
 const int64_t EXPIRATION_CHECK_INTERVAL_MS = 1000L;
+
+ThreadSafeRandom ImpalaServer::rng_(GetRandomSeed32());
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     : exec_env_(exec_env),
@@ -1018,6 +1022,11 @@ void ImpalaServer::PrepareQueryContext(const TNetworkAddress& backend_addr,
   // thread-safe).
   query_ctx->query_id = UuidToQueryId(random_generator()());
   GetThreadDebugInfo()->SetQueryId(query_ctx->query_id);
+
+  const double trace_ratio = query_ctx->client_request.query_options.resource_trace_ratio;
+  if (trace_ratio > 0 && rng_.NextDoubleFraction() < trace_ratio) {
+    query_ctx->__set_trace_resource_usage(true);
+  }
 }
 
 Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,

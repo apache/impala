@@ -161,7 +161,7 @@ class ScopedDisableRedaction {
       &google::LogMessage::SendToLog).stream()
 
 #define KLOG_EVERY_N_SECS(severity, n_secs) \
-  static logging::LogThrottler LOG_THROTTLER;  \
+  static ::kudu::logging::LogThrottler LOG_THROTTLER;  \
   KLOG_EVERY_N_SECS_THROTTLER(severity, n_secs, LOG_THROTTLER, "no-tag")
 
 

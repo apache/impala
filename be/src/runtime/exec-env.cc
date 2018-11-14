@@ -62,8 +62,10 @@
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/parse-util.h"
+#include "util/periodic-counter-updater.h"
 #include "util/pretty-printer.h"
 #include "util/test-info.h"
+#include "util/system-state-info.h"
 #include "util/thread-pool.h"
 #include "util/webserver.h"
 
@@ -268,6 +270,8 @@ Status ExecEnv::Init() {
         FLAGS_buffer_pool_clean_pages_limit));
   }
   InitBufferPool(FLAGS_min_buffer_size, buffer_pool_limit, clean_pages_limit);
+
+  InitSystemStateInfo();
 
   RETURN_IF_ERROR(metrics_->Init(enable_webserver_ ? webserver_.get() : nullptr));
   impalad_client_cache_->InitMetrics(metrics_.get(), "impala-server.backends");
@@ -498,6 +502,13 @@ void ExecEnv::InitMemTracker(int64_t bytes_limit) {
         buffer_pool->ReleaseMemory(min(bytes_to_free, allocated_from_sys - reserved));
     });
   }
+}
+
+void ExecEnv::InitSystemStateInfo() {
+  system_state_info_.reset(new SystemStateInfo());
+  PeriodicCounterUpdater::RegisterUpdateFunction([s = system_state_info_.get()]() {
+    s->CaptureSystemStateSnapshot();
+  });
 }
 
 TNetworkAddress ExecEnv::GetThriftBackendAddress() const {

@@ -29,6 +29,9 @@
 
 #include "common/names.h"
 
+DECLARE_int32(status_report_interval_ms);
+DECLARE_int32(periodic_counter_update_period_ms);
+
 namespace impala {
 
 TEST(CountersTest, Basic) {
@@ -966,6 +969,178 @@ TEST(TimerCounterTest, CountersTestRandom) {
   ValidateLapTime(&tester, MonotonicStopWatch::Now() - lap_time_start);
 }
 
+
+TEST(TimeSeriesCounterTest, TestAddClearRace) {
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+  int i = 0;
+  // Return and increment i
+  auto f = [&i]() { return i++; };
+  RuntimeProfile::TimeSeriesCounter* counter =
+      profile->AddChunkedTimeSeriesCounter("Counter", TUnit::UNIT, f);
+  // Sleep 1 second for some values to accumulate.
+  sleep(1);
+  int num_samples, period;
+  counter->GetSamplesTest(&num_samples, &period);
+  EXPECT_GT(num_samples, 0);
+
+  // Wait for more values to show up
+  sleep(1);
+
+  // Stop the counters. The rest of the test assumes that no new values will be added.
+  profile->StopPeriodicCounters();
+
+  // Clear the counter
+  profile->ClearChunkedTimeSeriesCounters();
+
+  // Check that clearing multiple times doesn't affect valued that have not been
+  // retrieved.
+  profile->ClearChunkedTimeSeriesCounters();
+
+  // Make sure that it still has values in it.
+  counter->GetSamplesTest(&num_samples, &period);
+  EXPECT_GT(num_samples, 0);
+
+  // Clear it again
+  profile->ClearChunkedTimeSeriesCounters();
+
+  // Make sure the values are gone.
+  counter->GetSamplesTest(&num_samples, &period);
+  EXPECT_EQ(num_samples, 0);
 }
+
+/// Stops the periodic counter updater in 'profile' and then clears the samples in
+/// 'counter'.
+void StopAndClearCounter(RuntimeProfile* profile,
+    RuntimeProfile::TimeSeriesCounter* counter) {
+  // There's a race between adding the counter and calling StopPeriodicCounters so we
+  // sleep here to make sure we exercise the code that handles the race.
+  sleep(1);
+  profile->StopPeriodicCounters();
+
+  // Reset the counter state by reading and clearing its samples.
+  int num_samples = 0;
+  int result_period_unused = 0;
+  counter->GetSamplesTest(&num_samples, &result_period_unused);
+  ASSERT_GT(num_samples, 0);
+  profile->ClearChunkedTimeSeriesCounters();
+  // Ensure clean state.
+  counter->GetSamplesTest(&num_samples, &result_period_unused);
+  ASSERT_EQ(num_samples, 0);
+}
+
+/// Tests that ChunkedTimeSeriesCounters are bounded by a maximum size.
+TEST(TimeSeriesCounterTest, TestMaximumSize) {
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+
+  const int test_period = FLAGS_periodic_counter_update_period_ms;
+
+  // Add a counter with a sample function that counts up, starting from 0.
+  int value = 0;
+  auto sample_fn = [&value]() { return value++; };
+  RuntimeProfile::TimeSeriesCounter* counter =
+      profile->AddChunkedTimeSeriesCounter("TestCounter", TUnit::UNIT, sample_fn);
+
+  // Stop counter updates from interfering with the rest of the test.
+  StopAndClearCounter(profile, counter);
+
+  // Reset value after previous values have been retrieved.
+  value = 0;
+
+  int64_t max_size = 10 * FLAGS_status_report_interval_ms / test_period;
+  for (int i = 0; i < 10 + max_size; ++i) counter->AddSample(test_period);
+
+  int num_samples = 0;
+  int result_period = 0;
+  // Retrieve and validate samples.
+  const int64_t* samples = counter->GetSamplesTest(&num_samples, &result_period);
+  ASSERT_EQ(num_samples, max_size);
+  // No resampling happens with ChunkedTimeSeriesCounter.
+  ASSERT_EQ(result_period, test_period);
+
+  // First 10 samples have been truncated
+  ASSERT_EQ(samples[0], 10);
+}
+
+/// Test parameter class that helps to test time series resampling during profile pretty
+/// printing with a varying number of test samples.
+struct TimeSeriesTestParam {
+  TimeSeriesTestParam(int num_samples, vector<const char*> expected)
+    : num_samples(num_samples), expected(expected) {}
+  int num_samples;
+  vector<const char*> expected;
+
+  // Used by gtest to print values of this struct
+  friend std::ostream& operator<<(std::ostream& os, const TimeSeriesTestParam& p) {
+    return os << "num_samples: " << p.num_samples << endl;
+  }
+};
+
+class TimeSeriesCounterResampleTest : public testing::TestWithParam<TimeSeriesTestParam> {
+};
+
+/// Tests that pretty-printing a ChunkedTimeSeriesCounter limits the number or printed
+/// samples to 64 or lower.
+TEST_P(TimeSeriesCounterResampleTest, TestPrettyPrint) {
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+
+  const TimeSeriesTestParam& param = GetParam();
+  const int test_period = FLAGS_periodic_counter_update_period_ms;
+
+  // Add a counter with a sample function that counts up, starting from 0.
+  int value = 0;
+  auto sample_fn = [&value]() { return value++; };
+  // We increase the value of this flag to allow the counter to store enough samples.
+  FLAGS_status_report_interval_ms = 50000;
+  RuntimeProfile::TimeSeriesCounter* counter =
+      profile->AddChunkedTimeSeriesCounter("TestCounter", TUnit::UNIT, sample_fn);
+
+  // Stop counter updates from interfering with the rest of the test.
+  StopAndClearCounter(profile, counter);
+
+  // Reset value after previous values have been retrieved.
+  value = 0;
+  for (int i = 0; i < param.num_samples; ++i) counter->AddSample(test_period);
+
+  int num_samples = 0;
+  int result_period = 0;
+  // Retrieve and validate samples.
+  const int64_t* samples = counter->GetSamplesTest(&num_samples, &result_period);
+  ASSERT_EQ(num_samples, param.num_samples);
+  // No resampling happens with ChunkedTimeSeriesCounter.
+  ASSERT_EQ(result_period, test_period);
+
+  for (int i = 0; i < param.num_samples; ++i) ASSERT_EQ(samples[i], i);
+
+  stringstream pretty;
+  profile->PrettyPrint(&pretty);
+  const string pretty_str = pretty.str();
+
+  for (const char* e : param.expected) EXPECT_STR_CONTAINS(pretty_str, e);
+}
+
+INSTANTIATE_TEST_CASE_P(VariousNumbers, TimeSeriesCounterResampleTest,
+    ::testing::Values(
+    TimeSeriesTestParam(64, {"TestCounter (500.000ms): 0, 1, 2, 3", "61, 62, 63"}),
+
+    TimeSeriesTestParam(65, {"TestCounter (1s000ms): 0, 2, 4, 6,",
+    "60, 62, 64 (Showing 33 of 65 values from Thrift Profile)"}),
+
+    TimeSeriesTestParam(80, {"TestCounter (1s000ms): 0, 2, 4, 6,",
+    "74, 76, 78 (Showing 40 of 80 values from Thrift Profile)"}),
+
+    TimeSeriesTestParam(127, {"TestCounter (1s000ms): 0, 2, 4, 6,",
+    "122, 124, 126 (Showing 64 of 127 values from Thrift Profile)"}),
+
+    TimeSeriesTestParam(128, {"TestCounter (1s000ms): 0, 2, 4, 6,",
+    "122, 124, 126 (Showing 64 of 128 values from Thrift Profile)"}),
+
+    TimeSeriesTestParam(129, {"TestCounter (1s500ms): 0, 3, 6, 9,",
+    "120, 123, 126 (Showing 43 of 129 values from Thrift Profile)"})
+    ));
+
+} // namespace impala
 
 IMPALA_TEST_MAIN();

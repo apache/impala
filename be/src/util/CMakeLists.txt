@@ -79,6 +79,7 @@ add_library(Util
   string-parser.cc
   string-util.cc
   symbols-util.cc
+  system-state-info.cc
   static-asserts.cc
   summary-util.cc
   table-printer.cc
@@ -144,6 +145,7 @@ ADD_BE_LSAN_TEST(runtime-profile-test)
 ADD_BE_LSAN_TEST(string-parser-test)
 ADD_BE_LSAN_TEST(string-util-test)
 ADD_BE_LSAN_TEST(symbols-util-test)
+ADD_BE_LSAN_TEST(system-state-info-test)
 ADD_BE_LSAN_TEST(sys-info-test)
 ADD_BE_LSAN_TEST(thread-pool-test)
 ADD_BE_LSAN_TEST(time-test)

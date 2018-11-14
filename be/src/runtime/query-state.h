@@ -384,6 +384,9 @@ class QueryState {
   /// StartFInstances().
   int64_t fragment_events_start_time_ = 0;
 
+  /// Tracks host resource usage of this backend. Owned by 'obj_pool_', created in c'tor.
+  RuntimeProfile* const host_profile_;
+
   /// Create QueryState w/ a refcnt of 0 and a memory limit of 'mem_limit' bytes applied
   /// to the query mem tracker. The query is associated with the resource pool set in
   /// 'query_ctx.request_pool' or from 'request_pool', if the former is not set (needed

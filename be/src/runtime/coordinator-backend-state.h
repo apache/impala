@@ -61,10 +61,12 @@ class Coordinator::BackendState {
 
   /// Creates InstanceStats for all instance in backend_exec_params in obj_pool
   /// and installs the instance profiles as children of the corresponding FragmentStats'
-  /// root profile.
+  /// root profile. Also creates a child profile below 'host_profile_parent' that contains
+  /// counters for the backend.
   /// Separated from c'tor to simplify future handling of out-of-mem errors.
   void Init(const BackendExecParams& backend_exec_params,
-      const std::vector<FragmentStats*>& fragment_stats, ObjectPool* obj_pool);
+      const std::vector<FragmentStats*>& fragment_stats,
+      RuntimeProfile* host_profile_parent, ObjectPool* obj_pool);
 
   /// Starts query execution at this backend by issuing an ExecQueryFInstances rpc and
   /// notifies on rpc_complete_barrier when the rpc completes. Success/failure is
@@ -86,6 +88,9 @@ class Coordinator::BackendState {
   bool ApplyExecStatusReport(const ReportExecStatusRequestPB& backend_exec_status,
       const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
       ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state);
+
+  /// Merges the incoming 'thrift_profile' into this backend state's host profile.
+  void UpdateHostProfile(const TRuntimeProfileTree& thrift_profile);
 
   /// Update completion_times, rates, and avg_profile for all fragment_stats.
   void UpdateExecStats(const std::vector<FragmentStats*>& fragment_stats);
@@ -243,6 +248,11 @@ class Coordinator::BackendState {
 
   /// indices of fragments executing on this backend, populated in Init()
   std::unordered_set<int> fragments_;
+
+  /// Contains counters for the backend host that are not specific to a particular
+  /// fragment instance, e.g. global CPU utilization and scratch space usage.
+  /// Owned by coordinator object pool provided in the c'tor, created in Update().
+  RuntimeProfile* host_profile_ = nullptr;
 
   /// Thrift address of execution backend.
   TNetworkAddress host_;

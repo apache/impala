@@ -75,13 +75,13 @@ void impala::OverlayQueryOptions(const TQueryOptions& src, const QueryOptionsMas
 // Choose different print function based on the type.
 // TODO: In thrift 0.11.0 operator << is implemented for enums and this indirection can be
 // removed.
-template<typename T, typename std::enable_if_t<std::is_enum<T>::value>* = nullptr>
+template <typename T, typename std::enable_if_t<std::is_enum<T>::value>* = nullptr>
 string PrintQueryOptionValue(const T& option) {
   return PrintThriftEnum(option);
 }
 
-template<typename T, typename std::enable_if_t<std::is_integral<T>::value>* = nullptr>
-string PrintQueryOptionValue(const T& option)  {
+template <typename T, typename std::enable_if_t<std::is_arithmetic<T>::value>* = nullptr>
+string PrintQueryOptionValue(const T& option) {
   return std::to_string(option);
 }
 
@@ -722,6 +722,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
       }
       case TImpalaQueryOptions::CLIENT_IDENTIFIER: {
         query_options->__set_client_identifier(value);
+        break;
+      }
+      case TImpalaQueryOptions::RESOURCE_TRACE_RATIO: {
+        StringParser::ParseResult result;
+        const double val =
+            StringParser::StringToFloat<double>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || val < 0 || val > 1) {
+          return Status(Substitute("Invalid resource trace ratio: '$0'. "
+                                   "Only values from 0 to 1 are allowed.",
+              value));
+        }
+        query_options->__set_resource_trace_ratio(val);
         break;
       }
       default:

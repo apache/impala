@@ -32,6 +32,7 @@
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
+#include "kudu/util/random.h"
 #include "rpc/thrift-server.h"
 #include "common/status.h"
 #include "service/query-options.h"
@@ -47,6 +48,7 @@
 #include "statestore/statestore-subscriber.h"
 
 namespace impala {
+using kudu::ThreadSafeRandom;
 
 class ExecEnv;
 class DataSink;
@@ -913,6 +915,9 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Background thread that does the shutdown.
   [[noreturn]] void ShutdownThread();
+
+  /// Random number generator for use in this class, thread safe.
+  static ThreadSafeRandom rng_;
 
   /// Guards query_log_ and query_log_index_
   boost::mutex query_log_lock_;
