@@ -110,6 +110,12 @@ class TimestampValue {
       const Timezone& local_tz);
 
   /// Return the corresponding timestamp in UTC for the Unix time specified in
+  /// nanoseconds. The range is smaller than in other conversion function, as the
+  /// full [1400 .. 10000) range cannot be represented with an int64.
+  /// Supported range: [1677-09-21 00:12:43.145224192 .. 2262-04-11 23:47:16.854775807]
+  static TimestampValue UtcFromUnixTimeLimitedRangeNanos(int64_t unix_time_nanos);
+
+  /// Return the corresponding timestamp in UTC for the Unix time specified in
   /// microseconds.
   static TimestampValue UtcFromUnixTimeMicros(int64_t unix_time_micros);
 

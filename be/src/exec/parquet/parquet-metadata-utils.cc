@@ -53,7 +53,7 @@ const map<PrimitiveType, set<parquet::Type::type>> SUPPORTED_PHYSICAL_TYPES = {
     {PrimitiveType::TYPE_FLOAT, {parquet::Type::FLOAT}},
     {PrimitiveType::TYPE_DOUBLE, {parquet::Type::INT32, parquet::Type::FLOAT,
         parquet::Type::DOUBLE}},
-    {PrimitiveType::TYPE_TIMESTAMP, {parquet::Type::INT96}},
+    {PrimitiveType::TYPE_TIMESTAMP, {parquet::Type::INT96, parquet::Type::INT64}},
     {PrimitiveType::TYPE_STRING, {parquet::Type::BYTE_ARRAY}},
     {PrimitiveType::TYPE_DATE, {parquet::Type::BYTE_ARRAY}},
     {PrimitiveType::TYPE_DATETIME, {parquet::Type::BYTE_ARRAY}},
@@ -64,32 +64,27 @@ const map<PrimitiveType, set<parquet::Type::type>> SUPPORTED_PHYSICAL_TYPES = {
     {PrimitiveType::TYPE_VARCHAR, {parquet::Type::BYTE_ARRAY}},
 };
 
-/// Physical types that are only supported with specific converted types.
-const map<PrimitiveType, set<pair<parquet::Type::type, parquet::ConvertedType::type>>>
-    SUPPORTED_CONVERTED_TYPES = {
-    {PrimitiveType::TYPE_TIMESTAMP,
-        {{parquet::Type::INT64, parquet::ConvertedType::TIMESTAMP_MICROS},
-         {parquet::Type::INT64, parquet::ConvertedType::TIMESTAMP_MILLIS}}}};
-};
+/// Returns true if 'element' describes a supported Timestamp column.
+bool IsValidTimestampType(const parquet::SchemaElement& element) {
+  ParquetTimestampDecoder::Precision precision; // unused
+  bool needs_conversion; // unused
+  return ParquetTimestampDecoder::GetTimestampInfoFromSchema(
+      element, precision, needs_conversion);
+}
 
 /// Returns true if 'parquet_type' is a supported physical encoding for the Impala
 /// primitive type, false otherwise. Some physical types are accepted only for certain
 /// converted types.
 bool IsSupportedType(PrimitiveType impala_type,
     const parquet::SchemaElement& element) {
+  // Timestamps need special handling, because the supported physical types depend on
+  // the logical type.
+  if (impala_type == PrimitiveType::TYPE_TIMESTAMP) return IsValidTimestampType(element);
   auto encodings = SUPPORTED_PHYSICAL_TYPES.find(impala_type);
   DCHECK(encodings != SUPPORTED_PHYSICAL_TYPES.end());
   parquet::Type::type parquet_type = element.type;
-  if (encodings->second.find(parquet_type) != encodings->second.end()) return true;
-
-  if(!element.__isset.converted_type) return false;
-  parquet::ConvertedType::type converted_type = element.converted_type;
-  auto converted_types = SUPPORTED_CONVERTED_TYPES.find(impala_type);
-  if (converted_types == SUPPORTED_CONVERTED_TYPES.end()) return false;
-  if (converted_types->second.find({parquet_type, converted_type})
-      != converted_types->second.end()) return true;
-
-  return false;
+  return encodings->second.find(parquet_type) != encodings->second.end();
+}
 }
 
 // Needs to be in sync with the order of enum values declared in TParquetArrayResolution.

@@ -62,6 +62,11 @@ inline TimestampValue TimestampValue::FromSubsecondUnixTime(
   return FromUnixTimeNanos(unix_time_whole, nanos, local_tz);
 }
 
+inline TimestampValue TimestampValue::UtcFromUnixTimeLimitedRangeNanos(
+    int64_t unix_time_nanos) {
+  return UtcFromUnixTimeTicks<NANOS_PER_SEC>(unix_time_nanos);
+}
+
 inline TimestampValue TimestampValue::FromUnixTimeNanos(time_t unix_time, int64_t nanos,
     const Timezone& local_tz) {
   unix_time += SplitTime<NANOS_PER_SEC>(&nanos);

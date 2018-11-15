@@ -260,6 +260,12 @@ UTC: 00:45:00, 01:00:00, 01:10:00 =>
 CET: 02:45:00, 02:00:00, 02:10:00
 Columns: rawvalue bigint, rowgroup int, millisutc timsestamp, microsutc timestamp
 
+int64_timestamps_nano.parquet:
+Parquet file generated with Parquet-mr that contains int64 columns with nanosecond
+precision. Tested separately from the micro/millisecond columns because of the different
+valid range.
+Columns: rawvalue bigint, nanoutc timestamp, nanononutc timestamp
+
 out_of_range_timestamp_hive_211.parquet
 Hive-generated file with an out-of-range timestamp. Generated with Hive 2.1.1 using
 the following query:

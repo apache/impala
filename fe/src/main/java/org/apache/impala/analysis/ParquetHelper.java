@@ -29,8 +29,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.ParquetFileReader;
-import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.LogicalTypeAnnotation.*;
 
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.MapType;
@@ -241,13 +242,17 @@ class ParquetHelper {
    * stored as a "OriginalType". The Parquet documentation refers to these as logical
    * types, so we use that terminology here.
    */
-  private static Type convertLogicalParquetType(org.apache.parquet.schema.Type parquetType)
-      throws AnalysisException {
-    OriginalType orig = parquetType.getOriginalType();
-    if (orig == OriginalType.LIST) {
+  private static Type convertLogicalParquetType(
+      org.apache.parquet.schema.Type parquetType) throws AnalysisException {
+    // The Parquet API is responsible for deducing logical type if only converted type
+    // is set.
+    LogicalTypeAnnotation logicalType = parquetType.getLogicalTypeAnnotation();
+
+    if (logicalType instanceof ListLogicalTypeAnnotation) {
       return convertArray(parquetType.asGroupType());
     }
-    if (orig == OriginalType.MAP || orig == OriginalType.MAP_KEY_VALUE) {
+    if (logicalType instanceof MapLogicalTypeAnnotation
+        || logicalType instanceof MapKeyValueTypeAnnotation) {
       // MAP_KEY_VALUE annotation should not be used any more. However, according to the
       // Parquet spec, some existing data incorrectly uses MAP_KEY_VALUE in place of MAP.
       // For backward-compatibility, a group annotated with MAP_KEY_VALUE that is not
@@ -257,7 +262,8 @@ class ParquetHelper {
 
     PrimitiveType prim = parquetType.asPrimitiveType();
     if (prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.BINARY &&
-        (orig == OriginalType.UTF8 || orig == OriginalType.ENUM)) {
+        (logicalType instanceof StringLogicalTypeAnnotation
+            || logicalType instanceof EnumLogicalTypeAnnotation)) {
       // UTF8 is the type annotation Parquet uses for strings
       // ENUM is the type annotation Parquet uses to indicate that
       // the original data type, before conversion to parquet, had been enum.
@@ -269,30 +275,30 @@ class ParquetHelper {
     }
 
     if (prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT64 &&
-        (orig == OriginalType.TIMESTAMP_MILLIS || orig == OriginalType.TIMESTAMP_MICROS)){
-      // IMPALA-7723: nanosecond timestamps are still interpreted as BIGINT - as they have
-      // no converted type, this function will not be reached in their case.
+        logicalType instanceof TimestampLogicalTypeAnnotation) {
       return Type.TIMESTAMP;
     }
 
-    if (prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT32
-        || prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT64) {
+    if ((prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT32
+        || prim.getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT64)
+        && logicalType instanceof IntLogicalTypeAnnotation
+        && ((IntLogicalTypeAnnotation) logicalType).isSigned() == true) {
       // Map signed integer types to an supported Impala column type
-      switch (orig) {
-        case INT_8: return Type.TINYINT;
-        case INT_16: return Type.SMALLINT;
-        case INT_32: return Type.INT;
-        case INT_64: return Type.BIGINT;
+      switch (((IntLogicalTypeAnnotation) logicalType).getBitWidth()) {
+        case 8: return Type.TINYINT;
+        case 16: return Type.SMALLINT;
+        case 32: return Type.INT;
+        case 64: return Type.BIGINT;
       }
     }
 
-    if (orig == OriginalType.DECIMAL) {
-      return ScalarType.createDecimalType(prim.getDecimalMetadata().getPrecision(),
-                                           prim.getDecimalMetadata().getScale());
+    if (logicalType instanceof DecimalLogicalTypeAnnotation) {
+      DecimalLogicalTypeAnnotation decimal = (DecimalLogicalTypeAnnotation) logicalType;
+      return ScalarType.createDecimalType(decimal.getPrecision(), decimal.getScale());
     }
 
     throw new AnalysisException(
-        "Unsupported logical parquet type " + orig + " (primitive type is " +
+        "Unsupported logical parquet type " + logicalType + " (primitive type is " +
             prim.getPrimitiveTypeName().name() + ") for field " +
             parquetType.getName());
   }
@@ -312,7 +318,7 @@ class ParquetHelper {
     //        required int element;
     //      }
     //    }
-    if (field.getOriginalType() != null) {
+    if (field.getLogicalTypeAnnotation() != null) {
       type = convertLogicalParquetType(field);
     } else if (field.isPrimitive()) {
       type = convertPrimitiveParquetType(field);

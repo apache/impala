@@ -291,6 +291,14 @@ void TestFromSubSecondFunctions(int64_t seconds, int64_t millis, const char* exp
           TimestampValue::FromUnixTimeNanos(shifted_seconds, shifted_nanos, tz));
     }
   }
+
+  // Test UtcFromUnixTimeLimitedRangeNanos only for timestamps that fit to its range.
+  int128_t total_nanos = int128_t {seconds} * NANOS_PER_SEC + millis * 1000 * 1000;
+  if (std::numeric_limits<int64_t>::min() >= total_nanos &&
+      std::numeric_limits<int64_t>::max() <= total_nanos) {
+    EXPECT_EQ(from_millis,
+        TimestampValue::UtcFromUnixTimeLimitedRangeNanos((int64_t)total_nanos));
+  }
 }
 
 TEST(TimestampTest, Basic) {
@@ -802,9 +810,8 @@ TEST(TimestampTest, Basic) {
   EXPECT_EQ("2018-01-10 15:30:00",
       TimestampValue::FromUnixTimeNanos(1515600000, -1800000000000, utc_tz).ToString());
 
-  // Test FromUnixTime around the boundary of the values that are converted via boost via
-  // gmtime (IMPALA-5357). Tests 1 second before and after the values supported by the
-  // boost conversion logic.
+  // Test FromUnixTime around the boundary of the values that can be representad with
+  // int64 in nanosecond precision. Tests 1 second before and after these bounds.
   const int64_t MIN_BOOST_CONVERT_UNIX_TIME = -9223372036;
   const int64_t MAX_BOOST_CONVERT_UNIX_TIME = 9223372036;
   EXPECT_EQ("1677-09-21 00:12:43",
@@ -815,6 +822,14 @@ TEST(TimestampTest, Basic) {
       TimestampValue::FromUnixTime(MAX_BOOST_CONVERT_UNIX_TIME, utc_tz).ToString());
   EXPECT_EQ("2262-04-11 23:47:17",
       TimestampValue::FromUnixTime(MAX_BOOST_CONVERT_UNIX_TIME + 1, utc_tz).ToString());
+
+  // Test the exact bounderies of nanoseconds stored as int64.
+  EXPECT_EQ("1677-09-21 00:12:43.145224192",
+      TimestampValue::UtcFromUnixTimeLimitedRangeNanos(
+          std::numeric_limits<int64_t>::min()).ToString());
+  EXPECT_EQ("2262-04-11 23:47:16.854775807",
+      TimestampValue::UtcFromUnixTimeLimitedRangeNanos(
+          std::numeric_limits<int64_t>::max()).ToString());
 
   // Test a leap second in 1998 represented by the UTC time 1998-12-31 23:59:60.
   // Unix time cannot represent the leap second, which repeats 915148800.
@@ -894,6 +909,11 @@ TEST(TimestampTest, SubSecond) {
       TimestampValue::FromUnixTimeNanos(0, 1, tz).ToString());
   EXPECT_EQ("1969-12-31 23:59:59.999999999",
       TimestampValue::FromUnixTimeNanos(0, -1, tz).ToString());
+
+  EXPECT_EQ("1970-01-01 00:00:00.000000001",
+      TimestampValue::UtcFromUnixTimeLimitedRangeNanos(1).ToString());
+  EXPECT_EQ("1969-12-31 23:59:59.999999999",
+      TimestampValue::UtcFromUnixTimeLimitedRangeNanos(-1).ToString());
 }
 
 // Convenience function to create TimestampValues from strings.

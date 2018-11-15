@@ -801,6 +801,9 @@ class TestParquet(ImpalaTestSuite):
     TABLE_NAME = "int64_timestamps_at_dst_changes"
     create_table_from_parquet(self.client, unique_database, TABLE_NAME)
 
+    TABLE_NAME = "int64_timestamps_nano"
+    create_table_from_parquet(self.client, unique_database, TABLE_NAME)
+
     self.run_test_case(
         'QueryTest/parquet-int64-timestamps', vector, unique_database)
 
