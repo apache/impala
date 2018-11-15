@@ -107,8 +107,17 @@ parser.add_option("--hiveserver", dest="hiveserver", default="localhost",
                   help=("Host that has HiveServers2 service running"))
 parser.add_option("--user", dest="user", default=getpass.getuser(),
                   help=("User account under which workload/query will run"))
+parser.add_option("--get_password", dest="get_password", default=False,
+                  action="store_true", help=("Prompt for password for user account"))
+parser.add_option("--use_ssl", dest="use_ssl", action="store_true", default=False,
+                  help=("Whether to use SSL or not"))
 
 options, args = parser.parse_args()
+
+options.password = None
+if options.get_password:
+  options.password = getpass.getpass()
+  options.get_password = None
 
 logging.basicConfig(level=logging.INFO, format='[%(name)s]: %(message)s')
 LOG = logging.getLogger('run-workload')

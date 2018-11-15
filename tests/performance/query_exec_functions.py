@@ -149,13 +149,17 @@ def establish_beeswax_connection(query_config):
     ImpalaBeeswaxClient is the connection suceeds, None otherwise.
   """
   use_kerberos = query_config.use_kerberos
+  user = query_config.user
+  password = query_config.password
+  use_ssl = query_config.use_ssl
   # If the impalad is for the form host, convert it to host:port that the Impala beeswax
   # client accepts.
   if len(query_config.impalad.split(":")) == 1:
     query_config.impalad = "{0}:{1}".format(query_config.impalad, DEFAULT_BEESWAX_PORT)
   client = None
   try:
-    client = ImpalaBeeswaxClient(query_config.impalad, use_kerberos=use_kerberos)
+    client = ImpalaBeeswaxClient(query_config.impalad, use_kerberos=use_kerberos,
+                                 user=user, password=password, use_ssl=use_ssl)
     # Try connect
     client.connect()
     # Set the exec options.
