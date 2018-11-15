@@ -11,32 +11,35 @@ INT
 ====
 ---- QUERY
 # Query should fail due to exceeding scan bytes limit.
+# Added a sleep to make sure it runs long enough to get a non-zero update from the
+# fragment instances on the num of bytes read and cpu time.
 set SCAN_BYTES_LIMIT="100M";
-select count(*) from tpch.lineitem l1,tpch.lineitem l2, tpch.lineitem l3 where
-            l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey and
-            l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment
-            having count(*) = 99
+select sleep(10000) union select count(*) from tpch.lineitem l1,tpch.lineitem l2,
+tpch.lineitem l3 where l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey
+and l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment having count(*) = 99
 ---- CATCH
 row_regex:.*terminated due to scan bytes limit of 100.00 M.*
 ====
 ---- QUERY
 # Query should fail due to CPU time limit.
+# Added a sleep to make sure it runs long enough to get a non-zero update from the
+# fragment instances on the num of bytes read and cpu time.
 set CPU_LIMIT_S=1;
-select count(*) from tpch.lineitem l1,tpch.lineitem l2, tpch.lineitem l3 where
-            l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey and
-            l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment
-            having count(*) = 99
+select sleep(10000) union select count(*) from tpch.lineitem l1,tpch.lineitem l2,
+tpch.lineitem l3 where l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey
+and l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment having count(*) = 99
 ---- CATCH
 row_regex:.*terminated due to CPU limit of 1s000ms.*
 ====
 ---- QUERY
 # Query should fail due to CPU time limit.
+# Added a sleep to make sure it runs long enough to get a non-zero update from the
+# fragment instances on the num of bytes read and cpu time.
 set CPU_LIMIT_S=1;
 set SCAN_BYTES_LIMIT="100G";
-select count(*) from tpch.lineitem l1,tpch.lineitem l2, tpch.lineitem l3 where
-            l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey and
-            l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment
-            having count(*) = 99
+select sleep(10000) union select count(*) from tpch.lineitem l1,tpch.lineitem l2,
+tpch.lineitem l3 where l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey
+and l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment having count(*) = 99
 ---- CATCH
 row_regex:.*terminated due to CPU limit of 1s000ms.*
 ====
