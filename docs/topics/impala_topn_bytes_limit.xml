@@ -42,19 +42,18 @@ under the License.
 
     <p>
       The <codeph>TOPN_BYTES_LIMIT</codeph> query option places a limit on the amount of
-      estimated memory that Impala can process for <term>top-N</term> queries.
+      estimated memory that Impala can process for <i>top-N</i> queries.
     </p>
 
     <p>
-      <term>top-N</term> queries are the queries that include both <codeph>ORDER BY</codeph> and
-      <codeph>LIMIT</codeph> clauses. <term>top-N</term> queries don't spill to disk so they
-      have to keep all rows they process in memory, and those queries can cause out-of-memory
-      issues when running with a large limit and an offset. If the Impala planner estimates that
-      a <term>top-N</term> operator will process more bytes than the
-      <codeph>TOPN_BYTES_LIMIT</codeph> value, it will replace the <term>top-N</term> operator
-      with the <term>sort</term> operator. Switching to the <term>sort</term> operator allows
-      Impala to spill to disk, thus requiring less memory than <term>top-N</term>, but
-      potentially with performance penalties.
+      <i>Top-N</i> queries are the queries that include both <codeph>ORDER BY</codeph> and
+      <codeph>LIMIT</codeph> clauses. <i>Top-N</i> queries don't spill to disk so they have to
+      keep all rows they process in memory, and those queries can cause out-of-memory issues
+      when running with a large limit and an offset. If the Impala planner estimates that a
+      <i>top-N</i> operator will process more bytes than the <codeph>TOPN_BYTES_LIMIT</codeph>
+      value, it will replace the <i>top-N</i> operator with the <i>sort</i> operator. Switching
+      to the <i>sort</i> operator allows Impala to spill to disk, thus requiring less memory
+      than <i>top-N</i>, but potentially with performance penalties.
     </p>
 
     <p>
