@@ -20,8 +20,7 @@ under the License.
 <!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
 <concept id="scan_bytes_limit">
 
-  <title>SCAN_BYTES_LIMIT Query Option (<keyword keyref="impala31"/> or higher
-    only)</title>
+  <title>SCAN_BYTES_LIMIT Query Option (<keyword keyref="impala31"/> or higher only)</title>
 
   <titlealts audience="PDF">
 
@@ -44,8 +43,8 @@ under the License.
   <conbody>
 
     <p>
-      The <codeph>SCAN_BYTES_LIMIT</codeph> query option sets a time limit on the bytes scanned
-      by HDFS and HBase SCAN operations. If a query is still executing when the query’s
+      The <codeph>SCAN_BYTES_LIMIT</codeph> query option sets a limit on the bytes scanned by
+      HDFS and HBase SCAN operations. If a query is still executing when the query’s
       coordinator detects that it has exceeded the limit, the query is terminated with an error.
       The option is intended to prevent runaway queries that scan more data than is intended.
     </p>
@@ -60,7 +59,7 @@ under the License.
       Admission Control and Query Queuing</xref> for information about default query options).
       If a user accidentally omits a partition filter in a <codeph>WHERE</codeph> clause and
       runs a large query that scans a lot of data, the query will be automatically terminated
-      after the time limit expires to free up resources.
+      after it scans more data than the <codeph>SCAN_BYTES_LIMIT</codeph>.
     </p>
 
     <p>
@@ -86,6 +85,10 @@ under the License.
           </li>
         </ul>
       </note>
+    </p>
+
+    <p>
+      Because the checks are done periodically, the query may scan over the limit at times.
     </p>
 
     <p>
