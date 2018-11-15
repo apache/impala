@@ -76,30 +76,40 @@ FailureDetector::PeerState MissedHeartbeatFailureDetector::UpdateHeartbeat(
     const string& peer, bool seen) {
   {
     lock_guard<mutex> l(lock_);
+    int32_t* missed_heartbeat_count = &missed_heartbeat_counts_[peer];
     if (seen) {
-      missed_heartbeat_counts_[peer] = 0;
+      if (*missed_heartbeat_count != 0) {
+        LOG(INFO) << "Heartbeat for '" << peer << "' succeeded after "
+                  << *missed_heartbeat_count << " missed heartbeats. "
+                  << "Resetting missed heartbeat count.";
+        *missed_heartbeat_count = 0;
+      }
       return OK;
     } else {
-      ++missed_heartbeat_counts_[peer];
+      ++(*missed_heartbeat_count);
+      LOG(INFO) << *missed_heartbeat_count << " consecutive heartbeats failed for "
+                << "'" << peer << "'. State is "
+                << PeerStateToString(ComputePeerState(*missed_heartbeat_count));
     }
   }
-
   return GetPeerState(peer);
 }
 
 FailureDetector::PeerState MissedHeartbeatFailureDetector::GetPeerState(
     const string& peer) {
   lock_guard<mutex> l(lock_);
-  map<string, int32_t>::iterator heartbeat_record = missed_heartbeat_counts_.find(peer);
+  auto it = missed_heartbeat_counts_.find(peer);
+  if (it == missed_heartbeat_counts_.end()) return UNKNOWN;
+  return ComputePeerState(it->second);
+}
 
-  if (heartbeat_record == missed_heartbeat_counts_.end()) {
-    return UNKNOWN;
-  } else if (heartbeat_record->second > max_missed_heartbeats_) {
+FailureDetector::PeerState MissedHeartbeatFailureDetector::ComputePeerState(
+    int32_t missed_heatbeat_count) {
+  if (missed_heatbeat_count > max_missed_heartbeats_) {
     return FAILED;
-  } else if (heartbeat_record->second > suspect_missed_heartbeats_) {
+  } else if (missed_heatbeat_count > suspect_missed_heartbeats_) {
     return SUSPECTED;
   }
-
   return OK;
 }
 

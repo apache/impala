@@ -126,6 +126,9 @@ class MissedHeartbeatFailureDetector : public FailureDetector {
   virtual void EvictPeer(const std::string& peer);
 
  private:
+  /// Computes the PeerState from the missed heartbeat count.
+  PeerState ComputePeerState(int32_t missed_heatbeat_count);
+
   /// Protects all members
   boost::mutex lock_;
 

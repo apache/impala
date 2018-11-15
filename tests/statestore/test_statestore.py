@@ -532,6 +532,28 @@ class TestStatestore():
            .wait_for_failure(timeout=60)
        )
 
+  def test_intermittent_hung_heartbeats(self):
+    """Heartbeats that occasionally time out should not cause a failure to be detected."""
+    heartbeat_count = [0]  # Use array to allow mutating from inside callback.
+
+    def heartbeat_cb(sub, args):
+      heartbeat_count[0] += 1
+      # Delay every second heartbeat.
+      if (heartbeat_count[0] % 2 == 1):
+        time.sleep(4)
+      return Subscriber.THeartbeatResponse()
+
+    with StatestoreSubscriber(heartbeat_cb=heartbeat_cb) as sub:
+      topic_name = "test_intermittent_hung_heartbeats"
+      reg = TTopicRegistration(topic_name=topic_name, is_transient=True)
+      (
+        sub.start()
+           .register(topics=[reg])
+           .wait_for_update(topic_name, 30)
+           .kill()
+           .wait_for_failure()
+       )
+
   def test_slow_subscriber(self):
     """Test for IMPALA-6644: This test kills a healthy subscriber and sleeps for a random
     interval between 1 and 9 seconds, this lets the heartbeats fail without removing the
