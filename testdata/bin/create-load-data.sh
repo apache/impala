@@ -98,10 +98,6 @@ do
 done
 
 if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
-  if [[ -z "$REMOTE_LOAD" ]]; then
-    run-step "Loading Hive Builtins" load-hive-builtins.log \
-      ${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
-  fi
   run-step "Generating HBase data" create-hbase.log \
       ${IMPALA_HOME}/testdata/bin/create-hbase.sh
   run-step "Creating /test-warehouse HDFS directory" create-test-warehouse-dir.log \

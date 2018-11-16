@@ -102,13 +102,6 @@ if [ ! -f ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR}/githash.txt ]; then
   exit 1
 fi
 
-
-# Hive builtins are already present on a pre-setup CM managed cluster.
-if [[ -z "$REMOTE_LOAD" ]]; then
-  echo "Loading hive builtins"
-  ${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
-fi
-
 echo "Copying data to ${TARGET_FILESYSTEM}"
 if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   # hive does not yet work well with s3, so we won't need hive builtins.
