@@ -110,7 +110,9 @@ under the License.
       <topicref href="topics/impala_smallint.xml"/>
       <topicref href="topics/impala_string.xml"/>
       <topicref href="topics/impala_struct.xml"/>
-      <topicref href="topics/impala_timestamp.xml"/>
+      <topicref href="topics/impala_timestamp.xml">
+        <topicref href="topics/impala_custom_timezones.xml"/>
+      </topicref>
       <topicref href="topics/impala_tinyint.xml"/>
       <topicref href="topics/impala_varchar.xml"/>
       <topicref href="topics/impala_complex_types.xml"/>
