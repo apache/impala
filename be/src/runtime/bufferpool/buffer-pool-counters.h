@@ -28,6 +28,9 @@ struct BufferPoolClientCounters {
   /// Total amount of time spent inside BufferAllocator::AllocateBuffer().
   RuntimeProfile::Counter* alloc_time;
 
+  /// Total amount of time spent inside the system allocator (subset of 'alloc_time').
+  RuntimeProfile::Counter* sys_alloc_time;
+
   /// Number of buffers allocated via BufferAllocator::AllocateBuffer().
   RuntimeProfile::Counter* cumulative_allocations;
 

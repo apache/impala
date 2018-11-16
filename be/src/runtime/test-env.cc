@@ -62,8 +62,10 @@ Status TestEnv::Init() {
   } else {
     RETURN_IF_ERROR(tmp_file_mgr()->Init(metrics()));
   }
-  exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_,
-      static_cast<int64_t>(0.1 * buffer_pool_capacity_));
+  if (enable_buffer_pool_) {
+    exec_env_->InitBufferPool(buffer_pool_min_buffer_len_, buffer_pool_capacity_,
+        static_cast<int64_t>(0.1 * buffer_pool_capacity_));
+  }
 
   // Initialize RpcMgr and control service.
   IpAddr ip_address;

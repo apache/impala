@@ -72,6 +72,9 @@ class BufferPoolTest : public ::testing::Test {
  public:
   virtual void SetUp() {
     test_env_.reset(new TestEnv);
+    // Don't create global buffer pool in 'test_env_' - we'll create a buffer pool in
+    // each test function.
+    test_env_->DisableBufferPool();
     ASSERT_OK(test_env_->Init());
     RandTestUtil::SeedRng("BUFFER_POOL_TEST_SEED", &rng_);
   }
@@ -122,6 +125,7 @@ class BufferPoolTest : public ::testing::Test {
       created_tmp_dirs_.push_back(dir);
     }
     test_env_.reset(new TestEnv);
+    test_env_->DisableBufferPool();
     test_env_->SetTmpFileMgrArgs(tmp_dirs, false);
     EXPECT_OK(test_env_->Init());
     EXPECT_EQ(num_dirs, test_env_->tmp_file_mgr()->NumActiveTmpDevices());
@@ -465,7 +469,7 @@ TEST_F(BufferPoolTest, BasicRegistration) {
   int64_t total_mem = sum_initial_reservations * num_concurrent_queries;
   global_reservations_.InitRootTracker(NewProfile(), total_mem);
 
-  BufferPool pool(TEST_BUFFER_LEN, total_mem, total_mem);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, total_mem, total_mem);
 
   RegisterQueriesAndClients(&pool, 0, num_concurrent_queries, sum_initial_reservations,
       reservation_limit, &rng_);
@@ -488,7 +492,7 @@ TEST_F(BufferPoolTest, ConcurrentRegistration) {
   int64_t total_mem = num_concurrent_queries * sum_initial_reservations;
   global_reservations_.InitRootTracker(NewProfile(), total_mem);
 
-  BufferPool pool(TEST_BUFFER_LEN, total_mem, total_mem);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, total_mem, total_mem);
   vector<mt19937> thread_rngs = RandTestUtil::CreateThreadLocalRngs(num_threads, &rng_);
   // Launch threads, each with a different set of query IDs.
   thread_group workers;
@@ -512,7 +516,7 @@ TEST_F(BufferPoolTest, PageCreation) {
   int64_t max_page_len = TEST_BUFFER_LEN << (num_pages - 1);
   int64_t total_mem = 2 * 2 * max_page_len;
   global_reservations_.InitRootTracker(NULL, total_mem);
-  BufferPool pool(TEST_BUFFER_LEN, total_mem, total_mem);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, total_mem, total_mem);
   BufferPool::ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
       total_mem, NewProfile(), &client));
@@ -568,7 +572,7 @@ void BufferPoolTest::TestBufferAllocation(bool reserved) {
   // MAX_BUFFER_LEN.
   const int64_t TOTAL_MEM = 2 * MAX_BUFFER_LEN - TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NULL, TOTAL_MEM);
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   BufferPool::ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
       TOTAL_MEM, NewProfile(), &client));
@@ -631,7 +635,7 @@ TEST_F(BufferPoolTest, CleanPageStats) {
   const int MAX_NUM_BUFFERS = 4;
   const int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
 
   ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
@@ -695,7 +699,8 @@ void BufferPoolTest::TestCleanPageLimit(int max_clean_pages, bool randomize_core
   const int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
   const int max_clean_page_bytes = max_clean_pages * TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, max_clean_page_bytes);
+  MetricGroup tmp_metrics("test-metrics");
+  BufferPool pool(&tmp_metrics, TEST_BUFFER_LEN, TOTAL_MEM, max_clean_page_bytes);
 
   ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
@@ -744,7 +749,7 @@ TEST_F(BufferPoolTest, BufferTransfer) {
   const int num_clients = 5;
   int64_t total_mem = num_clients * TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NULL, total_mem);
-  BufferPool pool(TEST_BUFFER_LEN, total_mem, total_mem);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, total_mem, total_mem);
   BufferPool::ClientHandle clients[num_clients];
   BufferPool::BufferHandle handles[num_clients];
   for (int i = 0; i < num_clients; ++i) {
@@ -784,7 +789,7 @@ TEST_F(BufferPoolTest, BufferTransferConcurrent) {
   const int NUM_CLIENTS = 5;
   const int64_t TOTAL_MEM = NUM_CLIENTS * TEST_BUFFER_LEN * 2;
   global_reservations_.InitRootTracker(NULL, TOTAL_MEM);
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
 
   BufferPool::ClientHandle clients[NUM_CLIENTS];
   BufferPool::BufferHandle handles[NUM_CLIENTS];
@@ -854,7 +859,7 @@ TEST_F(BufferPoolTest, Pin) {
   int64_t total_mem = TEST_BUFFER_LEN * 1024;
   // Set up client with enough reservation to pin twice.
   int64_t child_reservation = TEST_BUFFER_LEN * 2;
-  BufferPool pool(TEST_BUFFER_LEN, total_mem, total_mem);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, total_mem, total_mem);
   global_reservations_.InitRootTracker(NULL, total_mem);
   BufferPool::ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
@@ -906,7 +911,7 @@ TEST_F(BufferPoolTest, AsyncPin) {
   const int DATA_SEED = 1234;
   // Set up pool with enough reservation to keep two buffers in memory.
   const int64_t TOTAL_MEM = 2 * TEST_BUFFER_LEN;
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NULL, TOTAL_MEM);
   BufferPool::ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
@@ -976,7 +981,7 @@ TEST_F(BufferPoolTest, AsyncPin) {
 /// Creating a page or pinning without sufficient reservation should DCHECK.
 TEST_F(BufferPoolTest, PinWithoutReservation) {
   int64_t total_mem = TEST_BUFFER_LEN * 1024;
-  BufferPool pool(TEST_BUFFER_LEN, total_mem, total_mem);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, total_mem, total_mem);
   global_reservations_.InitRootTracker(NULL, total_mem);
   BufferPool::ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
@@ -1001,7 +1006,7 @@ TEST_F(BufferPoolTest, ExtractBuffer) {
   int64_t total_mem = TEST_BUFFER_LEN * 1024;
   // Set up client with enough reservation for two buffers/pins.
   int64_t child_reservation = TEST_BUFFER_LEN * 2;
-  BufferPool pool(TEST_BUFFER_LEN, total_mem, total_mem);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, total_mem, total_mem);
   global_reservations_.InitRootTracker(NULL, total_mem);
   BufferPool::ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
@@ -1060,7 +1065,7 @@ TEST_F(BufferPoolTest, ConcurrentPageCreation) {
   int total_mem = num_threads * TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NULL, total_mem);
 
-  BufferPool pool(TEST_BUFFER_LEN, total_mem, total_mem);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, total_mem, total_mem);
   // Share a file group between the threads.
   TmpFileMgr::FileGroup* file_group = NewFileGroup();
 
@@ -1101,7 +1106,8 @@ void BufferPoolTest::CreatePageLoop(BufferPool* pool, TmpFileMgr::FileGroup* fil
 /// Test that DCHECK fires when trying to unpin a page with spilling disabled.
 TEST_F(BufferPoolTest, SpillingDisabledDcheck) {
   global_reservations_.InitRootTracker(NULL, 2 * TEST_BUFFER_LEN);
-  BufferPool pool(TEST_BUFFER_LEN, 2 * TEST_BUFFER_LEN, 2 * TEST_BUFFER_LEN);
+  BufferPool pool(
+      test_env_->metrics(), TEST_BUFFER_LEN, 2 * TEST_BUFFER_LEN, 2 * TEST_BUFFER_LEN);
   BufferPool::PageHandle handle;
 
   BufferPool::ClientHandle client;
@@ -1124,7 +1130,8 @@ TEST_F(BufferPoolTest, SpillingDisabledDcheck) {
 /// Test simple case where pool must evict a page from the same client to fit another.
 TEST_F(BufferPoolTest, EvictPageSameClient) {
   global_reservations_.InitRootTracker(NULL, TEST_BUFFER_LEN);
-  BufferPool pool(TEST_BUFFER_LEN, TEST_BUFFER_LEN, TEST_BUFFER_LEN);
+  BufferPool pool(
+      test_env_->metrics(), TEST_BUFFER_LEN, TEST_BUFFER_LEN, TEST_BUFFER_LEN);
   BufferPool::PageHandle handle1, handle2;
 
   BufferPool::ClientHandle client;
@@ -1150,7 +1157,7 @@ TEST_F(BufferPoolTest, EvictPageSameClient) {
 TEST_F(BufferPoolTest, EvictPageDifferentSizes) {
   const int64_t TOTAL_BYTES = 2 * TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NULL, TOTAL_BYTES);
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_BYTES, TOTAL_BYTES);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_BYTES, TOTAL_BYTES);
   BufferPool::PageHandle handle1, handle2;
 
   BufferPool::ClientHandle client;
@@ -1180,7 +1187,7 @@ TEST_F(BufferPoolTest, EvictPageDifferentClient) {
   const int NUM_CLIENTS = 2;
   const int64_t TOTAL_BYTES = NUM_CLIENTS * TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NULL, TOTAL_BYTES);
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_BYTES, TOTAL_BYTES);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_BYTES, TOTAL_BYTES);
 
   BufferPool::ClientHandle clients[NUM_CLIENTS];
   for (int i = 0; i < NUM_CLIENTS; ++i) {
@@ -1226,7 +1233,7 @@ TEST_F(BufferPoolTest, MultiplyPinnedPageAccounting) {
   const int NUM_BUFFERS = 3;
   const int64_t TOTAL_BYTES = NUM_BUFFERS * TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NULL, TOTAL_BYTES);
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_BYTES, TOTAL_BYTES);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_BYTES, TOTAL_BYTES);
 
   BufferPool::ClientHandle client;
   RuntimeProfile* profile = NewProfile();
@@ -1265,7 +1272,7 @@ const int64_t MEM_RECLAMATION_TOTAL_BYTES =
 // Test that we can reclaim buffers and pages from the same arena and from other arenas.
 TEST_F(BufferPoolTest, MemoryReclamation) {
   global_reservations_.InitRootTracker(NULL, MEM_RECLAMATION_TOTAL_BYTES);
-  BufferPool pool(TEST_BUFFER_LEN, MEM_RECLAMATION_TOTAL_BYTES,
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, MEM_RECLAMATION_TOTAL_BYTES,
       MEM_RECLAMATION_TOTAL_BYTES);
   // Assume that all cores are online. Test various combinations of cores to validate
   // that it can reclaim from any other other core.
@@ -1366,7 +1373,8 @@ void BufferPoolTest::TestEvictionPolicy(int64_t page_size) {
   const int MAX_NUM_BUFFERS = 5;
   int64_t total_mem = MAX_NUM_BUFFERS * page_size;
   global_reservations_.InitRootTracker(NewProfile(), total_mem);
-  BufferPool pool(TEST_BUFFER_LEN, total_mem, total_mem);
+  MetricGroup tmp_metrics("test-metrics");
+  BufferPool pool(&tmp_metrics, TEST_BUFFER_LEN, total_mem, total_mem);
 
   ClientHandle client;
   RuntimeProfile* profile = NewProfile();
@@ -1438,7 +1446,7 @@ TEST_F(BufferPoolTest, DestroyDuringWrite) {
   const int TRIALS = 20;
   const int MAX_NUM_BUFFERS = 5;
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN * MAX_NUM_BUFFERS;
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
   ClientHandle client;
   for (int trial = 0; trial < TRIALS; ++trial) {
@@ -1530,7 +1538,7 @@ TEST_F(BufferPoolTest, QueryTeardownWriteError) {
 void BufferPoolTest::TestWriteError(int write_delay_ms) {
   int MAX_NUM_BUFFERS = 2;
   int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
   ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
@@ -1587,7 +1595,7 @@ TEST_F(BufferPoolTest, WriteErrorWriteDelay) {
 TEST_F(BufferPoolTest, TmpFileAllocateError) {
   const int MAX_NUM_BUFFERS = 2;
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN * MAX_NUM_BUFFERS;
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
   ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
@@ -1627,7 +1635,7 @@ TEST_F(BufferPoolTest, WriteErrorBlacklist) {
   const int PAGES_PER_QUERY = MAX_NUM_PAGES / TOTAL_QUERIES;
   const int64_t TOTAL_MEM = MAX_NUM_PAGES * TEST_BUFFER_LEN;
   const int64_t MEM_PER_QUERY = PAGES_PER_QUERY * TEST_BUFFER_LEN;
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
   vector<FileGroup*> file_groups;
   vector<ClientHandle> clients(TOTAL_QUERIES);
@@ -1740,7 +1748,7 @@ TEST_F(BufferPoolTest, WriteErrorBlacklist) {
 TEST_F(BufferPoolTest, ScratchReadError) {
   // Only allow one buffer in memory.
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN;
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
 
   // Simulate different types of error.
@@ -1812,7 +1820,7 @@ TEST_F(BufferPoolTest, NoDirsAllocationError) {
   vector<string> tmp_dirs = InitMultipleTmpDirs(2);
   int MAX_NUM_BUFFERS = 2;
   int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
   ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
@@ -1844,7 +1852,7 @@ TEST_F(BufferPoolTest, NoTmpDirs) {
   InitMultipleTmpDirs(0);
   const int MAX_NUM_BUFFERS = 3;
   const int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
   ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
@@ -1932,7 +1940,8 @@ void BufferPoolTest::TestRandomInternalSingle(
     int64_t min_buffer_len, bool multiple_pins) {
   const int MAX_NUM_BUFFERS = 200;
   const int64_t TOTAL_MEM = MAX_NUM_BUFFERS * min_buffer_len;
-  BufferPool pool(min_buffer_len, TOTAL_MEM, TOTAL_MEM);
+  MetricGroup tmp_metrics("test-metrics");
+  BufferPool pool(&tmp_metrics, min_buffer_len, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
   MemTracker global_tracker(TOTAL_MEM);
   TestRandomInternalImpl(
@@ -1945,7 +1954,8 @@ void BufferPoolTest::TestRandomInternalMulti(
     int num_threads, int64_t min_buffer_len, bool multiple_pins) {
   const int MAX_NUM_BUFFERS_PER_THREAD = 200;
   const int64_t TOTAL_MEM = num_threads * MAX_NUM_BUFFERS_PER_THREAD * min_buffer_len;
-  BufferPool pool(min_buffer_len, TOTAL_MEM, TOTAL_MEM);
+  MetricGroup tmp_metrics("test-metrics");
+  BufferPool pool(&tmp_metrics, min_buffer_len, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
   MemTracker global_tracker(TOTAL_MEM);
   FileGroup* shared_file_group = NewFileGroup();
@@ -2075,7 +2085,7 @@ void BufferPoolTest::TestRandomInternalImpl(BufferPool* pool, FileGroup* file_gr
 TEST_F(BufferPoolTest, SubReservation) {
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN * 10;
   global_reservations_.InitRootTracker(NULL, TOTAL_MEM);
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   BufferPool::ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
       TOTAL_MEM, NewProfile(), &client));
@@ -2109,7 +2119,7 @@ TEST_F(BufferPoolTest, DecreaseReservation) {
   const int MAX_NUM_BUFFERS = 4;
   const int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
 
   ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NewFileGroup(), &global_reservations_,
@@ -2184,7 +2194,7 @@ TEST_F(BufferPoolTest, ConcurrentBufferOperations) {
   const int MAX_NUM_BUFFERS = 16;
   const int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
-  BufferPool pool(TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   BufferPool::ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", nullptr, &global_reservations_, nullptr,
       TOTAL_MEM, NewProfile(), &client));

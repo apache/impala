@@ -26,6 +26,7 @@
 #include "runtime/bufferpool/buffer-allocator.h"
 #include "util/bit-util.h"
 #include "util/cpu-info.h"
+#include "util/metrics.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
 #include "util/uid-util.h"
@@ -104,10 +105,10 @@ Status BufferPool::PageHandle::GetBuffer(const BufferHandle** buffer) const {
   return Status::OK();
 }
 
-BufferPool::BufferPool(int64_t min_buffer_len, int64_t buffer_bytes_limit,
-      int64_t clean_page_bytes_limit)
+BufferPool::BufferPool(MetricGroup* metrics, int64_t min_buffer_len,
+    int64_t buffer_bytes_limit, int64_t clean_page_bytes_limit)
   : allocator_(new BufferAllocator(
-        this, min_buffer_len, buffer_bytes_limit, clean_page_bytes_limit)),
+        this, metrics, min_buffer_len, buffer_bytes_limit, clean_page_bytes_limit)),
     min_buffer_len_(min_buffer_len) {
   DCHECK_GT(min_buffer_len, 0);
   DCHECK_EQ(min_buffer_len, BitUtil::RoundUpToPowerOfTwo(min_buffer_len));
@@ -395,9 +396,10 @@ BufferPool::Client::Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
     buffers_allocated_bytes_(0) {
   // Set up a child profile with buffer pool info.
   RuntimeProfile* child_profile = profile->CreateChild("Buffer pool", true, true);
-  reservation_.InitChildTracker(child_profile, parent_reservation, mem_tracker,
-      reservation_limit, mem_limit_mode);
+  reservation_.InitChildTracker(
+      child_profile, parent_reservation, mem_tracker, reservation_limit, mem_limit_mode);
   counters_.alloc_time = ADD_TIMER(child_profile, "AllocTime");
+  counters_.sys_alloc_time = ADD_TIMER(child_profile, "SystemAllocTime");
   counters_.cumulative_allocations =
       ADD_COUNTER(child_profile, "CumulativeAllocations", TUnit::UNIT);
   counters_.cumulative_bytes_alloced =

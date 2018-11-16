@@ -421,7 +421,8 @@ void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,
   MallocExtension::instance()->SetNumericProperty(
       "tcmalloc.aggressive_memory_decommit", 1);
 #endif
-  buffer_pool_.reset(new BufferPool(min_buffer_size, capacity, clean_pages_limit));
+  buffer_pool_.reset(
+      new BufferPool(metrics_.get(), min_buffer_size, capacity, clean_pages_limit));
   buffer_reservation_.reset(new ReservationTracker());
   buffer_reservation_->InitRootTracker(nullptr, capacity);
 }

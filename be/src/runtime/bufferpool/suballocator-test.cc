@@ -47,6 +47,7 @@ class SuballocatorTest : public ::testing::Test {
  public:
   virtual void SetUp() override {
     test_env_.reset(new TestEnv);
+    test_env_->DisableBufferPool();
     ASSERT_OK(test_env_->Init());
     RandTestUtil::SeedRng("SUBALLOCATOR_TEST_SEED", &rng_);
     profile_ = RuntimeProfile::Create(&obj_pool_, "test profile");
@@ -71,7 +72,8 @@ class SuballocatorTest : public ::testing::Test {
   /// bytes of buffers of minimum length 'min_buffer_len'.
   void InitPool(int64_t min_buffer_len, int total_mem) {
     global_reservation_.InitRootTracker(nullptr, total_mem);
-    buffer_pool_.reset(new BufferPool(min_buffer_len, total_mem, 0));
+    buffer_pool_.reset(
+        new BufferPool(test_env_->metrics(), min_buffer_len, total_mem, 0));
   }
 
   /// Register a client with 'buffer_pool_'. The client is automatically deregistered

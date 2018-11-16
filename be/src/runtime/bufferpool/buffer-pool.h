@@ -38,6 +38,7 @@
 
 namespace impala {
 
+class MetricGroup;
 class ReservationTracker;
 class RuntimeProfile;
 class SystemAllocator;
@@ -159,9 +160,9 @@ class BufferPool : public CacheLineAligned {
   /// 'buffer_bytes_limit': the maximum physical memory in bytes that can be used by the
   ///     buffer pool. If 'buffer_bytes_limit' is not a multiple of 'min_buffer_len', the
   ///     remainder will not be usable.
-  /// 'clean_page_bytes_limit': the maximum bytes of clean pages that will be retained by the
-  ///     buffer pool.
-  BufferPool(int64_t min_buffer_len, int64_t buffer_bytes_limit,
+  /// 'clean_page_bytes_limit': the maximum bytes of clean pages that will be retained by
+  ///     the buffer pool.
+  BufferPool(MetricGroup* metrics, int64_t min_buffer_len, int64_t buffer_bytes_limit,
       int64_t clean_page_bytes_limit);
   ~BufferPool();
 

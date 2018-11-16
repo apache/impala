@@ -25,12 +25,23 @@
 #include "runtime/bufferpool/system-allocator.h"
 #include "util/bit-util.h"
 #include "util/cpu-info.h"
+#include "util/histogram-metric.h"
+#include "util/metrics.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 
 namespace impala {
+
+// Collect statistics once ALLOC_STAT_SAMPLE_RATE allocations. This allows collecting
+// various useful statistics that would be too expensive to update every allocation.
+// This should be kept as a power-of-two to allow efficient mod calculation.
+static constexpr int64_t ALLOC_STAT_SAMPLE_RATE = 64;
+
+// Maximum buffer size for the purposes of histogram sizing in stats collection. Buffers
+// > 4GB are extremely rare so we don't need to collect precise stats on them.
+static constexpr int64_t STATS_MAX_BUFFER_SIZE = 4L * 1024L * 1024L * 1024L;
 
 /// Decrease 'bytes_remaining' by up to 'max_decrease', down to a minimum of 0.
 /// If 'require_full_decrease' is true, only decrease if we can decrease it
@@ -42,7 +53,8 @@ static int64_t DecreaseBytesRemaining(
 /// particular core. All public methods are thread-safe.
 class BufferPool::FreeBufferArena : public CacheLineAligned {
  public:
-  FreeBufferArena(BufferAllocator* parent);
+  FreeBufferArena(
+      BufferAllocator* parent, MetricGroup* metrics, const std::string& arena_name);
 
   // Destructor should only run in backend tests.
   ~FreeBufferArena();
@@ -103,6 +115,17 @@ class BufferPool::FreeBufferArena : public CacheLineAligned {
   int64_t GetNumCleanPages();
 
   string DebugString();
+
+  IntCounter* system_alloc_time() const { return system_alloc_time_; }
+  IntCounter* local_arena_free_buffer_hits() const {
+    return local_arena_free_buffer_hits_;
+  }
+  IntCounter* direct_alloc_count() const { return direct_alloc_count_; }
+  HistogramMetric* buffer_size_stats() const { return buffer_size_stats_; }
+  IntCounter* numa_arena_free_buffer_hits() const { return numa_arena_free_buffer_hits_; }
+  IntCounter* clean_page_hits() const { return clean_page_hits_; }
+  IntCounter* num_scavenges() const { return num_scavenges_; }
+  IntCounter* num_final_scavenges() const { return num_final_scavenges_; }
 
  private:
   /// The data structures for each power-of-two size of buffers/pages.
@@ -167,6 +190,30 @@ class BufferPool::FreeBufferArena : public CacheLineAligned {
   /// Free buffers and clean pages for each buffer size for this arena.
   /// Indexed by log2(bytes) - log2(min_buffer_len_).
   PerSizeLists buffer_sizes_[LOG_MAX_BUFFER_BYTES + 1];
+
+  // Total time spent in the system allocator.
+  IntCounter* const system_alloc_time_;
+
+  // Counts the number of free buffer hits in the local arena of the current core.
+  IntCounter* const local_arena_free_buffer_hits_;
+
+  // Counts the number the allocator directly allocates a new buffer on the current core.
+  IntCounter* const direct_alloc_count_;
+
+  // Statistics about the buffer sizes allocated from the system allocator.
+  HistogramMetric* const buffer_size_stats_;
+
+  // Counts the number of hits in an arena for the same NUMA node as the current core.
+  IntCounter* const numa_arena_free_buffer_hits_;
+
+  // Counts the number of times a page of the right size was evicted.
+  IntCounter* const clean_page_hits_;
+
+  // Counts the number of times we had to scavenge buffers.
+  IntCounter* const num_scavenges_;
+
+  // Counts the number of times we had to lock all arenas for a final scavenge of buffers.
+  IntCounter* const num_final_scavenges_;
 };
 
 int64_t BufferPool::BufferAllocator::CalcMaxBufferLen(
@@ -178,9 +225,8 @@ int64_t BufferPool::BufferAllocator::CalcMaxBufferLen(
   return max(min_buffer_len, upper_bound); // Can't be < min_buffer_len.
 }
 
-BufferPool::BufferAllocator::BufferAllocator(
-    BufferPool* pool, int64_t min_buffer_len, int64_t system_bytes_limit,
-    int64_t clean_page_bytes_limit)
+BufferPool::BufferAllocator::BufferAllocator(BufferPool* pool, MetricGroup* metrics,
+    int64_t min_buffer_len, int64_t system_bytes_limit, int64_t clean_page_bytes_limit)
   : pool_(pool),
     system_allocator_(new SystemAllocator(min_buffer_len)),
     min_buffer_len_(min_buffer_len),
@@ -200,8 +246,10 @@ BufferPool::BufferAllocator::BufferAllocator(
   DCHECK_LE(max_buffer_len_, MAX_BUFFER_BYTES);
   DCHECK_LE(max_buffer_len_, max(system_bytes_limit_, min_buffer_len_));
 
-  for (unique_ptr<FreeBufferArena>& arena : per_core_arenas_) {
-    arena.reset(new FreeBufferArena(this));
+  MetricGroup* buffer_pool_metrics = metrics->GetOrCreateChildGroup("buffer-pool");
+  for (int i = 0; i < per_core_arenas_.size(); ++i) {
+    per_core_arenas_[i].reset(
+        new FreeBufferArena(this, buffer_pool_metrics, Substitute("arena-$0", i)));
   }
 }
 
@@ -218,13 +266,14 @@ Status BufferPool::BufferAllocator::Allocate(
   COUNTER_ADD(client->impl_->counters().cumulative_bytes_alloced, len);
   COUNTER_ADD(client->impl_->counters().cumulative_allocations, 1);
 
-  RETURN_IF_ERROR(AllocateInternal(len, buffer));
+  RETURN_IF_ERROR(AllocateInternal(client->impl_, len, buffer));
   DCHECK(buffer->is_open());
   buffer->client_ = client;
   return Status::OK();
 }
 
-Status BufferPool::BufferAllocator::AllocateInternal(int64_t len, BufferHandle* buffer) {
+Status BufferPool::BufferAllocator::AllocateInternal(
+    BufferPool::Client* client, int64_t len, BufferHandle* buffer) {
   DCHECK(!buffer->is_open());
   DCHECK_GE(len, min_buffer_len_);
   DCHECK(BitUtil::IsPowerOf2(len)) << len;
@@ -241,11 +290,20 @@ Status BufferPool::BufferAllocator::AllocateInternal(int64_t len, BufferHandle* 
   const int current_core = CpuInfo::GetCurrentCore();
   // Fast path: recycle a buffer of the correct size from this core's arena.
   FreeBufferArena* current_core_arena = per_core_arenas_[current_core].get();
-  if (current_core_arena->PopFreeBuffer(len, buffer)) return Status::OK();
+  if (current_core_arena->PopFreeBuffer(len, buffer)) {
+    current_core_arena->local_arena_free_buffer_hits()->Increment(1);
+    return Status::OK();
+  }
 
   // Fast-ish path: allocate a new buffer if there is room in 'system_bytes_remaining_'.
   int64_t delta = DecreaseBytesRemaining(len, true, &system_bytes_remaining_);
-  if (delta != len) {
+  // Whether to record stats about the system alloc (we don't want to do this every
+  // allocation because of the overhead).
+  bool sample_sys_alloc_stats = false;
+  if (delta == len) {
+    int64_t count = current_core_arena->direct_alloc_count()->Increment(1);
+    sample_sys_alloc_stats = count % ALLOC_STAT_SAMPLE_RATE == 0;
+  } else {
     DCHECK_EQ(0, delta);
     const vector<int>& numa_node_cores = CpuInfo::GetCoresOfSameNumaNode(current_core);
     const int numa_node_core_idx = CpuInfo::GetNumaNodeCoreIdx(current_core);
@@ -259,14 +317,20 @@ Status BufferPool::BufferAllocator::AllocateInternal(int64_t len, BufferHandle* 
       // Each core should start searching from a different point to avoid hot-spots.
       int other_core = numa_node_cores[(numa_node_core_idx + i) % numa_node_cores.size()];
       FreeBufferArena* other_core_arena = per_core_arenas_[other_core].get();
-      if (other_core_arena->PopFreeBuffer(len, buffer)) return Status::OK();
+      if (other_core_arena->PopFreeBuffer(len, buffer)) {
+        current_core_arena->numa_arena_free_buffer_hits()->Increment(1);
+        return Status::OK();
+      }
     }
 
     // Fast-ish path: evict a clean page of the right size from the current NUMA node.
     for (int i = 0; i < numa_node_cores.size(); ++i) {
       int other_core = numa_node_cores[(numa_node_core_idx + i) % numa_node_cores.size()];
       FreeBufferArena* other_core_arena = per_core_arenas_[other_core].get();
-      if (other_core_arena->EvictCleanPage(len, buffer)) return Status::OK();
+      if (other_core_arena->EvictCleanPage(len, buffer)) {
+        current_core_arena->clean_page_hits()->Increment(1);
+        return Status::OK();
+      }
     }
 
     // Slow path: scavenge buffers of different sizes from free buffer lists and clean
@@ -275,8 +339,11 @@ Status BufferPool::BufferAllocator::AllocateInternal(int64_t len, BufferHandle* 
     // TODO: IMPALA-4703: add a stress option where we vary the number of attempts
     // randomly.
     int attempt = 0;
+    int64_t count = current_core_arena->num_scavenges()->Increment(1);
+    sample_sys_alloc_stats = count % ALLOC_STAT_SAMPLE_RATE == 0;
     while (attempt < max_scavenge_attempts_ && delta < len) {
       bool final_attempt = attempt == max_scavenge_attempts_ - 1;
+      if (final_attempt) current_core_arena->num_final_scavenges()->Increment(1);
       delta += ScavengeBuffers(final_attempt, current_core, len - delta);
       ++attempt;
     }
@@ -290,11 +357,17 @@ Status BufferPool::BufferAllocator::AllocateInternal(int64_t len, BufferHandle* 
   }
   // We have headroom to allocate a new buffer at this point.
   DCHECK_EQ(delta, len);
+  MonotonicStopWatch sys_alloc_sw;
+  sys_alloc_sw.Start();
   Status status = system_allocator_->Allocate(len, buffer);
   if (!status.ok()) {
     system_bytes_remaining_.Add(len);
     return status;
   }
+  int64_t sys_alloc_time = sys_alloc_sw.ElapsedTime();
+  if (sample_sys_alloc_stats) current_core_arena->buffer_size_stats()->Update(len);
+  current_core_arena->system_alloc_time()->Increment(sys_alloc_time);
+  client->counters().sys_alloc_time->Add(sys_alloc_time);
   return Status::OK();
 }
 
@@ -464,7 +537,25 @@ string BufferPool::BufferAllocator::DebugString() {
   return ss.str();
 }
 
-BufferPool::FreeBufferArena::FreeBufferArena(BufferAllocator* parent) : parent_(parent) {}
+BufferPool::FreeBufferArena::FreeBufferArena(
+    BufferAllocator* parent, MetricGroup* metrics, const std::string& arena_name)
+  : parent_(parent),
+    system_alloc_time_(
+        metrics->AddCounter("buffer-pool.$0.system-alloc-time", 0, arena_name)),
+    local_arena_free_buffer_hits_(metrics->AddCounter(
+        "buffer-pool.$0.local-arena-free-buffer-hits", 0, arena_name)),
+    direct_alloc_count_(
+        metrics->AddCounter("buffer-pool.$0.direct-alloc-count", 0, arena_name)),
+    buffer_size_stats_(metrics->RegisterMetric(new HistogramMetric(
+        MetricDefs::Get("buffer-pool.$0.allocated-buffer-sizes", arena_name),
+        STATS_MAX_BUFFER_SIZE, 3))),
+    numa_arena_free_buffer_hits_(
+        metrics->AddCounter("buffer-pool.$0.numa-arena-free-buffer-hits", 0, arena_name)),
+    clean_page_hits_(
+        metrics->AddCounter("buffer-pool.$0.clean-page-hits", 0, arena_name)),
+    num_scavenges_(metrics->AddCounter("buffer-pool.$0.num-scavenges", 0, arena_name)),
+    num_final_scavenges_(
+        metrics->AddCounter("buffer-pool.$0.num-final-scavenges", 0, arena_name)) {}
 
 BufferPool::FreeBufferArena::~FreeBufferArena() {
   for (int i = 0; i < NumBufferSizes(); ++i) {

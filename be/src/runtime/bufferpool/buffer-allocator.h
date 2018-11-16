@@ -79,8 +79,8 @@ namespace impala {
 ///
 class BufferPool::BufferAllocator {
  public:
-  BufferAllocator(BufferPool* pool, int64_t min_buffer_len, int64_t system_bytes_limit,
-      int64_t clean_page_bytes_limit);
+  BufferAllocator(BufferPool* pool, MetricGroup* metrics, int64_t min_buffer_len,
+      int64_t system_bytes_limit, int64_t clean_page_bytes_limit);
   ~BufferAllocator();
 
   /// Allocate a buffer with a power-of-two length 'len'. This function may acquire
@@ -169,9 +169,10 @@ class BufferPool::BufferAllocator {
   /// 'min_buffer_len' so that there is at least one valid buffer size.
   static int64_t CalcMaxBufferLen(int64_t min_buffer_len, int64_t system_bytes_limit);
 
-  /// Same as Allocate() but leaves 'buffer->client_' NULL and does not update counters.
-  Status AllocateInternal(
-      int64_t len, BufferPool::BufferHandle* buffer) WARN_UNUSED_RESULT;
+  /// Same as Allocate() but leaves 'buffer->client_' NULL and only updates the
+  /// 'sys_alloc_time' and no other counters.
+  Status AllocateInternal(BufferPool::Client* client, int64_t len,
+      BufferPool::BufferHandle* buffer) WARN_UNUSED_RESULT;
 
   /// Tries to reclaim enough memory from various sources so that the caller can allocate
   /// a buffer of 'target_bytes' from the system allocator. Scavenges buffers from the

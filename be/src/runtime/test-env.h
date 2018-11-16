@@ -41,6 +41,9 @@ class TestEnv {
   void SetTmpFileMgrArgs(
       const std::vector<std::string>& tmp_dirs, bool one_dir_per_device);
 
+  /// Disables creation of a BufferPool instance as part of this TestEnv in Init().
+  void DisableBufferPool() { enable_buffer_pool_ = false; }
+
   /// Set configuration for BufferPool. Only has effect if called before Init().
   /// If not called, a buffer pool with no capacity is created.
   void SetBufferPoolArgs(int64_t min_buffer_len, int64_t capacity);
@@ -78,6 +81,9 @@ class TestEnv {
   bool have_tmp_file_mgr_args_;
   std::vector<std::string> tmp_dirs_;
   bool one_tmp_dir_per_device_;
+
+  /// Whether a buffer pool should be created in Init().
+  bool enable_buffer_pool_ = true;
 
   /// Arguments for BufferPool, used in Init().
   int64_t buffer_pool_min_buffer_len_;

@@ -225,18 +225,18 @@ class AtomicMetric : public ScalarMetric<int64_t, metric_kind_t> {
 
   /// Atomically reads the current value. May be overridden by derived classes.
   /// The default implementation just atomically loads 'value_'. Derived classes
-  /// which derive the return value from mutliple sources other than 'value_'
+  /// which derive the return value from multiple sources other than 'value_'
   /// need to take care of synchronization among sources.
   virtual int64_t GetValue() override { return value_.Load(); }
 
   /// Atomically sets the value.
   void SetValue(const int64_t& value) { value_.Store(value); }
 
-  /// Adds 'delta' to the current value atomically.
-  void Increment(int64_t delta) {
+  /// Adds 'delta' to the current value atomically and returns the new value.
+  int64_t Increment(int64_t delta) {
     DCHECK(metric_kind_t != TMetricKind::COUNTER || delta >= 0)
         << "Can't decrement value of COUNTER metric: " << this->key();
-    value_.Add(delta);
+    return value_.Add(delta);
   }
 
  protected:
@@ -313,7 +313,7 @@ class MetricGroup {
     M* mt = obj_pool_->Add(metric);
 
     boost::lock_guard<SpinLock> l(lock_);
-    DCHECK(metric_map_.find(metric->key_) == metric_map_.end());
+    DCHECK(metric_map_.find(metric->key_) == metric_map_.end()) << metric->key_;
     metric_map_[metric->key_] = mt;
     return mt;
   }

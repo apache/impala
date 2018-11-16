@@ -1327,6 +1327,86 @@
     "key": "buffer-pool.clean-page-bytes"
   },
   {
+    "description": "Total time the buffer pool spent in the system allocator for this arena.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool System Allocation Time.",
+    "units": "TIME_NS",
+    "kind": "COUNTER",
+    "key": "buffer-pool.$0.system-alloc-time"
+  },
+  {
+    "description": "Number of times a free buffer was recycled from this core's arena to fulfil an allocation.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Local Arena Free Buffer Hit Count.",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "buffer-pool.$0.local-arena-free-buffer-hits"
+  },
+  {
+    "description": "Number of times a new buffer was directly allocated from the system allocator to fulfil an allocation.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Direct Allocation Count.",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "buffer-pool.$0.direct-alloc-count"
+  },
+  {
+    "description": "Statistics for buffer sizes allocated from the system. Only a subset of allocations are counted in this metric to reduce overhead.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Allocated Buffer Sizes.",
+    "units": "BYTES",
+    "kind": "HISTOGRAM",
+    "key": "buffer-pool.$0.allocated-buffer-sizes"
+  },
+  {
+    "description": "Number of times that a recycled buffer within the same NUMA node was used to fulfil an allocation.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Numa Free Buffer Hits.",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "buffer-pool.$0.numa-arena-free-buffer-hits"
+  },
+  {
+    "description": "Number of times a clean page was evicted to fulfil an allocation.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Clean Page Hits.",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "buffer-pool.$0.clean-page-hits"
+  },
+  {
+    "description": "Number of times the allocator had to scavenge to fulfil an allocation.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Scavenge Count.",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "buffer-pool.$0.num-scavenges"
+  },
+  {
+    "description": "Number of times the allocator had to lock all arenas and scavenge to fulfil an allocation.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Buffer Pool Final Scavenge Count.",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "buffer-pool.$0.num-final-scavenges"
+  },
+  {
     "description": "Total memory currently used by TCMalloc and buffer pool.",
     "contexts": [
       "STATESTORE",
