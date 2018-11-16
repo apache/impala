@@ -15,15 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exec/hdfs-parquet-table-writer.h"
+#include "exec/parquet/hdfs-parquet-table-writer.h"
 
 #include <boost/unordered_set.hpp>
 
 #include "common/version.h"
 #include "exec/hdfs-table-sink.h"
-#include "exec/parquet-column-stats.inline.h"
-#include "exprs/scalar-expr.h"
+#include "exec/parquet/parquet-column-stats.inline.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
 #include "rpc/thrift-util.h"
 #include "runtime/decimal-value.h"
 #include "runtime/mem-tracker.h"
@@ -38,8 +38,8 @@
 #include "util/debug-util.h"
 #include "util/dict-encoding.h"
 #include "util/hdfs-util.h"
-#include "util/string-util.h"
 #include "util/rle-encoding.h"
+#include "util/string-util.h"
 
 #include <sstream>
 

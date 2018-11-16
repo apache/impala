@@ -16,22 +16,22 @@
 // under the License.
 
 #include "exec/hdfs-table-sink.h"
+#include "exec/exec-node.h"
 #include "exec/hdfs-table-writer.h"
 #include "exec/hdfs-text-table-writer.h"
-#include "exec/hdfs-parquet-table-writer.h"
-#include "exec/exec-node.h"
-#include "gen-cpp/ImpalaInternalService_constants.h"
-#include "util/hdfs-util.h"
-#include "exprs/scalar-expr.h"
+#include "exec/parquet/hdfs-parquet-table-writer.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
+#include "gen-cpp/ImpalaInternalService_constants.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
-#include "util/impalad-metrics.h"
-#include "runtime/mem-tracker.h"
 #include "util/coding-util.h"
+#include "util/hdfs-util.h"
+#include "util/impalad-metrics.h"
 
 #include <limits>
 #include <vector>

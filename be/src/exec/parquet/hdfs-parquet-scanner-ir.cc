@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exec/hdfs-parquet-scanner.h"
+#include "exec/parquet/hdfs-parquet-scanner.h"
 
 #include "exec/filter-context.h"
-#include "exec/parquet-scratch-tuple-batch.h"
+#include "exec/parquet/parquet-scratch-tuple-batch.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/runtime-filter.h"
 #include "runtime/runtime-filter.inline.h"

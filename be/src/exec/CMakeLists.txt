@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+add_subdirectory(parquet)
 
 cmake_minimum_required(VERSION 2.6)
 
@@ -61,9 +62,6 @@ add_library(Exec
   hdfs-plugin-text-scanner.cc
   hdfs-text-scanner.cc
   hdfs-text-table-writer.cc
-  hdfs-parquet-scanner.cc
-  hdfs-parquet-scanner-ir.cc
-  hdfs-parquet-table-writer.cc
   hdfs-orc-scanner.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
@@ -72,9 +70,6 @@ add_library(Exec
   nested-loop-join-node.cc
   non-grouping-aggregator.cc
   non-grouping-aggregator-ir.cc
-  parquet-column-readers.cc
-  parquet-column-stats.cc
-  parquet-metadata-utils.cc
   partial-sort-node.cc
   partitioned-hash-join-builder.cc
   partitioned-hash-join-builder-ir.cc
@@ -87,7 +82,6 @@ add_library(Exec
   kudu-scan-node-mt.cc
   kudu-table-sink.cc
   kudu-util.cc
-  parquet-common.cc
   read-write-util.cc
   scan-node.cc
   scanner-context.cc
@@ -111,9 +105,6 @@ ADD_BE_LSAN_TEST(zigzag-test)
 ADD_BE_LSAN_TEST(hash-table-test)
 ADD_BE_LSAN_TEST(delimited-text-parser-test)
 ADD_BE_LSAN_TEST(read-write-util-test)
-ADD_BE_LSAN_TEST(parquet-plain-test)
-ADD_BE_LSAN_TEST(parquet-version-test)
 ADD_BE_LSAN_TEST(row-batch-list-test)
 ADD_BE_LSAN_TEST(incr-stats-util-test)
 ADD_BE_LSAN_TEST(hdfs-avro-scanner-test)
-ADD_BE_LSAN_TEST(hdfs-parquet-scanner-test)

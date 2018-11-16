@@ -21,9 +21,9 @@
 
 #include "codegen/impala-ir.h"
 #include "exec/hdfs-scanner.h"
-#include "exec/parquet-common.h"
-#include "exec/parquet-scratch-tuple-batch.h"
-#include "exec/parquet-metadata-utils.h"
+#include "exec/parquet/parquet-common.h"
+#include "exec/parquet/parquet-metadata-utils.h"
+#include "exec/parquet/parquet-scratch-tuple-batch.h"
 #include "runtime/scoped-buffer.h"
 #include "util/runtime-profile-counters.h"
 
@@ -346,13 +346,6 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Initializes a ParquetTimestampDecoder depending on writer, timezone, and the schema
   /// of the column.
   ParquetTimestampDecoder CreateTimestampDecoder(const parquet::SchemaElement& element);
-
-  /// The rep and def levels are set to this value to indicate the end of a row group.
-  static const int16_t ROW_GROUP_END = numeric_limits<int16_t>::min();
-  /// Indicates an invalid definition or repetition level.
-  static const int16_t INVALID_LEVEL = -1;
-  /// Indicates an invalid position value.
-  static const int16_t INVALID_POS = -1;
 
   /// Class name in LLVM IR.
   static const char* LLVM_CLASS_NAME;

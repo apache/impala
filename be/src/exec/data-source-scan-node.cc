@@ -20,21 +20,21 @@
 #include <vector>
 #include <gutil/strings/substitute.h>
 
-#include "exec/parquet-common.h"
+#include "exec/parquet/parquet-common.h"
 #include "exec/read-write-util.h"
 #include "exprs/scalar-expr.h"
 #include "gen-cpp/parquet_types.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tuple-row.h"
 #include "util/jni-util.h"
 #include "util/periodic-counter-updater.h"
-#include "util/ubsan.h"
 #include "util/runtime-profile-counters.h"
+#include "util/ubsan.h"
 
 #include "common/names.h"
 

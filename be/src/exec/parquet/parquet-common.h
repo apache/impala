@@ -399,6 +399,14 @@ inline int DecodeDecimalFixedLen(
 
 template <>
 inline int ParquetPlainEncoder::
+Decode<bool, parquet::Type::BOOLEAN>(const uint8_t* buffer,
+    const uint8_t* buffer_end, int fixed_len_size, bool* v) {
+  DCHECK(false) << "Use ParquetBoolDecoder for decoding bools";
+  return -1;
+}
+
+template <>
+inline int ParquetPlainEncoder::
 Decode<Decimal4Value, parquet::Type::FIXED_LEN_BYTE_ARRAY>(const uint8_t* buffer,
     const uint8_t* buffer_end, int fixed_len_size, Decimal4Value* v) {
   return DecodeDecimalFixedLen(buffer, buffer_end, fixed_len_size, v);
@@ -469,11 +477,19 @@ public:
   template <parquet::Type::type PARQUET_TYPE>
   int Decode(const uint8_t* buffer, const uint8_t* buffer_end, TimestampValue* v) const;
 
+  /// Batched version of Decode() that tries to decode 'num_values' values from the memory
+  /// range [buffer, buffer_end) and writes them to 'v' with a stride of 'stride' bytes.
+  /// Returns the number of bytes read from 'buffer' or -1 if there was an error
+  /// decoding, e.g. invalid data or running out of input data before reading
+  /// 'num_values'.
+  template <parquet::Type::type PARQUET_TYPE>
+  int64_t DecodeBatch(const uint8_t* buffer, const uint8_t* buffer_end,
+      int64_t num_values, int64_t stride, TimestampValue* v);
+
   TimestampValue Int64ToTimestampValue(int64_t unix_time) const {
     DCHECK(precision_ == MILLI || precision_ == MICRO);
-    return precision_ == MILLI
-        ? TimestampValue::UtcFromUnixTimeMillis(unix_time)
-        : TimestampValue::UtcFromUnixTimeMicros(unix_time);
+    return precision_ == MILLI ? TimestampValue::UtcFromUnixTimeMillis(unix_time) :
+                                 TimestampValue::UtcFromUnixTimeMicros(unix_time);
   }
 
   void ConvertToLocalTime(TimestampValue* v) const {
@@ -530,6 +546,20 @@ inline int ParquetTimestampDecoder::Decode<parquet::Type::INT96>(
   DCHECK_EQ(precision_, NANO);
   return ParquetPlainEncoder::Decode<TimestampValue, parquet::Type::INT96>(
       buffer, buffer_end, 0, v);
+}
+
+template <parquet::Type::type PARQUET_TYPE>
+inline int64_t ParquetTimestampDecoder::DecodeBatch(const uint8_t* buffer,
+    const uint8_t* buffer_end, int64_t num_values, int64_t stride,
+    TimestampValue* v) {
+  const uint8_t* buffer_pos = buffer;
+  StrideWriter<TimestampValue> out(v, stride);
+  for (int64_t i = 0; i < num_values; ++i) {
+    int encoded_len = Decode<PARQUET_TYPE>(buffer_pos, buffer_end, out.Advance());
+    if (UNLIKELY(encoded_len < 0)) return -1;
+    buffer_pos += encoded_len;
+  }
+  return buffer_pos - buffer;
 }
 }
 #endif

@@ -15,20 +15,20 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exec/parquet-metadata-utils.h"
+#include "exec/parquet/parquet-metadata-utils.h"
 
-#include <string>
-#include <sstream>
-#include <vector>
 #include <strings.h>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "common/status.h"
-#include "exec/parquet-common.h"
-#include "exec/parquet-column-stats.h"
+#include "exec/parquet/parquet-column-stats.h"
+#include "exec/parquet/parquet-common.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 
@@ -373,8 +373,8 @@ string SchemaNode::DebugString(int indent) const {
   return ss.str();
 }
 
-Status ParquetSchemaResolver::CreateSchemaTree(const vector<parquet::SchemaElement>& schema,
-    SchemaNode* node) const {
+Status ParquetSchemaResolver::CreateSchemaTree(
+    const vector<parquet::SchemaElement>& schema, SchemaNode* node) const {
   int idx = 0;
   int col_idx = 0;
   RETURN_IF_ERROR(CreateSchemaTree(schema, 0, 0, 0, &idx, &col_idx, node));
@@ -478,7 +478,8 @@ Status ParquetSchemaResolver::ResolvePath(const SchemaPath& path, SchemaNode** n
 }
 
 Status ParquetSchemaResolver::ResolvePathHelper(ArrayEncoding array_encoding,
-    const SchemaPath& path, SchemaNode** node, bool* pos_field, bool* missing_field) const {
+    const SchemaPath& path, SchemaNode** node, bool* pos_field,
+    bool* missing_field) const {
   DCHECK(schema_.element != NULL)
       << "schema_ must be initialized before calling ResolvePath()";
 
@@ -696,8 +697,8 @@ Status ParquetSchemaResolver::ResolveArray(ArrayEncoding array_encoding,
 // Parquet spec dictates. See
 // https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#maps for
 // more details.
-Status ParquetSchemaResolver::ResolveMap(const SchemaPath& path, int idx, SchemaNode** node,
-    bool* missing_field) const {
+Status ParquetSchemaResolver::ResolveMap(const SchemaPath& path, int idx,
+    SchemaNode** node, bool* missing_field) const {
   if ((*node)->children.size() != 1 || !(*node)->children[0].is_repeated() ||
       (*node)->children[0].children.size() != 2) {
     ErrorMsg msg(TErrorCode::PARQUET_UNRECOGNIZED_SCHEMA, filename_,

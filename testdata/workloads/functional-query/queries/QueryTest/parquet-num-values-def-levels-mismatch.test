@@ -2,5 +2,5 @@
 ---- QUERY
 select * from num_values_def_levels_mismatch
 ---- CATCH
-could not read all def levels for column '_c0'
+Could not read definition level, even though metadata states there are 1 values remaining in data page.
 ====

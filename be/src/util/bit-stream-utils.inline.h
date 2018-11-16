@@ -21,7 +21,7 @@
 #include "util/bit-stream-utils.h"
 
 #include "common/compiler-util.h"
-#include "util/bit-packing.inline.h"
+#include "util/bit-packing.h"
 
 namespace impala {
 

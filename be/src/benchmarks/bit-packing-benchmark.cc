@@ -266,7 +266,7 @@
 
 #include "gutil/strings/substitute.h"
 #include "util/benchmark.h"
-#include "util/bit-packing.inline.h"
+#include "util/bit-packing.h"
 #include "util/bit-stream-utils.inline.h"
 #include "util/cpu-info.h"
 

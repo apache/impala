@@ -31,6 +31,7 @@ add_library(Util
   backend-gflag-util.cc
   benchmark.cc
   bitmap.cc
+  bit-packing.cc
   bit-util.cc
   bloom-filter.cc
   bloom-filter-ir.cc

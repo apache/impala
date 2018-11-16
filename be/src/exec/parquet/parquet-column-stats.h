@@ -21,7 +21,7 @@
 #include <string>
 #include <type_traits>
 
-#include "exec/parquet-common.h"
+#include "exec/parquet/parquet-common.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-buffer.h"
 #include "runtime/timestamp-value.h"

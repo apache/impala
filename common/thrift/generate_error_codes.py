@@ -370,6 +370,9 @@ error_codes = (
   ("PARQUET_TIMESTAMP_INVALID_TIME_OF_DAY", 121,
    "Parquet file '$0' column '$1' contains a timestamp with invalid time of day. "
    "The time of day should be 0 <= and < 24 hour (in nanoseconds)."),
+
+  ("PARQUET_CORRUPT_BOOL_VALUE", 122, "File '$0' is corrupt: error decoding BOOLEAN "
+   "value with encoding $1 at offset $2"),
 )
 
 import sys

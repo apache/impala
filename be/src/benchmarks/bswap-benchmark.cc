@@ -22,13 +22,13 @@
 #include <iostream>
 #include <memory>
 
+#include "exec/parquet/parquet-common.h"
 #include "gutil/strings/substitute.h"
-#include "exec/parquet-common.h"
 #include "runtime/decimal-value.h"
 #include "testutil/mem-util.h"
 #include "util/benchmark.h"
-#include "util/cpu-info.h"
 #include "util/bit-util.h"
+#include "util/cpu-info.h"
 
 #include "common/names.h"
 

@@ -21,7 +21,7 @@
 
 #include "testutil/gtest-util.h"
 #include "testutil/mem-util.h"
-#include "util/bit-packing.inline.h"
+#include "util/bit-packing.h"
 #include "util/bit-stream-utils.inline.h"
 
 #include "common/names.h"

@@ -23,8 +23,9 @@
 #include <math.h>
 
 #include "testutil/gtest-util.h"
-#include "util/rle-encoding.h"
+#include "util/bit-packing.inline.h"
 #include "util/bit-stream-utils.inline.h"
+#include "util/rle-encoding.h"
 
 #include "common/names.h"
 

@@ -18,7 +18,7 @@
 #ifndef IMPALA_EXEC_PARQUET_COLUMN_STATS_INLINE_H
 #define IMPALA_EXEC_PARQUET_COLUMN_STATS_INLINE_H
 
-#include "exec/parquet-common.h"
+#include "exec/parquet/parquet-common.h"
 #include "gen-cpp/parquet_types.h"
 #include "parquet-column-stats.h"
 #include "runtime/string-value.inline.h"

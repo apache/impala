@@ -386,6 +386,7 @@ set (IMPALA_LINK_LIBS
   Catalog
   CodeGen
   Common
+  Parquet
   Exec
   Exprs
   GlobalFlags
@@ -419,6 +420,7 @@ if (BUILD_SHARED_LIBS)
     BufferPool
     Io
     Runtime
+    Parquet
     Exec
     CodeGen
     Exprs
@@ -603,7 +605,6 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-variable")
 add_subdirectory(generated-sources/gen-cpp)
 
 link_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}/build/bufferpool
   ${CMAKE_CURRENT_SOURCE_DIR}/build/catalog
   ${CMAKE_CURRENT_SOURCE_DIR}/build/common
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exec

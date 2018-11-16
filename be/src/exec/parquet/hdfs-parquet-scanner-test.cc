@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exec/hdfs-parquet-scanner.h"
+#include "exec/parquet/hdfs-parquet-scanner.h"
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
 #include "testutil/gtest-util.h"
@@ -108,8 +108,9 @@ TEST_F(HdfsParquetScannerTest, ComputeIdealReservation) {
 
 /// Test that DivideReservationBetweenColumns() returns 'expected_reservations' for
 /// inputs 'col_range_lengths' and 'total_col_reservation'.
-void HdfsParquetScannerTest::TestDivideReservation(const vector<int64_t>& col_range_lengths,
-      int64_t total_col_reservation, const vector<int64_t>& expected_reservations) {
+void HdfsParquetScannerTest::TestDivideReservation(
+    const vector<int64_t>& col_range_lengths, int64_t total_col_reservation,
+    const vector<int64_t>& expected_reservations) {
   vector<pair<int, int64_t>> reservations =
       HdfsParquetScanner::DivideReservationBetweenColumnsHelper(
       MIN_BUFFER_SIZE, MAX_BUFFER_SIZE, col_range_lengths, total_col_reservation);

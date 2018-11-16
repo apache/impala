@@ -35,7 +35,7 @@
 #include <thrift/transport/TBufferTransports.h>
 #pragma clang diagnostic pop
 
-#include "exec/parquet-common.h"
+#include "exec/parquet/parquet-common.h"
 #include "runtime/mem-pool.h"
 #include "util/codec.h"
 #include "util/rle-encoding.h"

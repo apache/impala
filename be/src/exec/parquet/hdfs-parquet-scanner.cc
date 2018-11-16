@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exec/hdfs-parquet-scanner.h"
+#include "exec/parquet/hdfs-parquet-scanner.h"
 
 #include <algorithm>
 #include <queue>
@@ -25,16 +25,18 @@
 
 #include "codegen/codegen-anyval.h"
 #include "exec/hdfs-scan-node.h"
-#include "exec/parquet-column-readers.h"
-#include "exec/parquet-column-stats.h"
+#include "exec/parquet/parquet-collection-column-reader.h"
+#include "exec/parquet/parquet-column-readers.h"
+#include "exec/parquet/parquet-column-stats.h"
 #include "exec/scanner-context.inline.h"
+#include "rpc/thrift-util.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/io/request-context.h"
-#include "runtime/runtime-state.h"
 #include "runtime/runtime-filter.inline.h"
-#include "rpc/thrift-util.h"
+#include "runtime/runtime-state.h"
+#include "util/dict-encoding.h"
 
 #include "common/names.h"
 
@@ -50,10 +52,6 @@ using namespace impala::io;
 // is guaranteed to be true for Impala versions 2.9 or below.
 // THIS RECORDS INFORMATION ABOUT PAST BEHAVIOR. DO NOT CHANGE THIS CONSTANT.
 const int LEGACY_IMPALA_MAX_DICT_ENTRIES = 40000;
-
-const int16_t HdfsParquetScanner::ROW_GROUP_END;
-const int16_t HdfsParquetScanner::INVALID_LEVEL;
-const int16_t HdfsParquetScanner::INVALID_POS;
 
 const char* HdfsParquetScanner::LLVM_CLASS_NAME = "class.impala::HdfsParquetScanner";
 
@@ -303,7 +301,8 @@ static bool CheckRowGroupOverlapsSplit(const parquet::RowGroup& row_group,
       (split_start <= row_group_start && split_end >= row_group_end);
 }
 
-int HdfsParquetScanner::CountScalarColumns(const vector<ParquetColumnReader*>& column_readers) {
+int HdfsParquetScanner::CountScalarColumns(
+    const vector<ParquetColumnReader*>& column_readers) {
   DCHECK(!column_readers.empty() || scan_node_->optimize_parquet_count_star());
   int num_columns = 0;
   stack<ParquetColumnReader*> readers;
@@ -1387,7 +1386,8 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
     // column reader that we will use to count the number of tuples we should output. We
     // will not read any values from this reader.
     ParquetColumnReader* reader;
-    RETURN_IF_ERROR(CreateCountingReader(tuple_desc.tuple_path(), schema_resolver, &reader));
+    RETURN_IF_ERROR(CreateCountingReader(
+        tuple_desc.tuple_path(), schema_resolver, &reader));
     column_readers->push_back(reader);
   }
 
@@ -1562,7 +1562,8 @@ vector<pair<int, int64_t>> HdfsParquetScanner::DivideReservationBetweenColumnsHe
   // buffers to large columns first to maximize the size of I/Os that we do while reading
   // this row group.
   sort(tmp_reservations.begin(), tmp_reservations.end(),
-      [&col_range_lengths](const pair<int, int64_t>& left, const pair<int, int64_t>& right) {
+      [&col_range_lengths](
+          const pair<int, int64_t>& left, const pair<int, int64_t>& right) {
         int64_t left_len = col_range_lengths[left.first];
         int64_t right_len = col_range_lengths[right.first];
         return left_len != right_len ? left_len > right_len : left.first < right.first;
@@ -1600,7 +1601,8 @@ vector<pair<int, int64_t>> HdfsParquetScanner::DivideReservationBetweenColumnsHe
       } else if (bytes_left_in_range > 0 &&
           reservation_to_distribute >= min_buffer_size) {
         // Choose a buffer size that will fit the rest of the bytes left in the range.
-        bytes_to_add = max(min_buffer_size, BitUtil::RoundUpToPowerOfTwo(bytes_left_in_range));
+        bytes_to_add =
+            max(min_buffer_size, BitUtil::RoundUpToPowerOfTwo(bytes_left_in_range));
         // But don't add more reservation than is available.
         bytes_to_add =
             min(bytes_to_add, BitUtil::RoundDownToPowerOfTwo(reservation_to_distribute));
@@ -1626,7 +1628,8 @@ Status HdfsParquetScanner::InitDictionaries(
 }
 
 Status HdfsParquetScanner::ValidateEndOfRowGroup(
-    const vector<ParquetColumnReader*>& column_readers, int row_group_idx, int64_t rows_read) {
+    const vector<ParquetColumnReader*>& column_readers, int row_group_idx,
+    int64_t rows_read) {
   DCHECK(!column_readers.empty());
   DCHECK(parse_status_.ok()) << "Don't overwrite parse_status_"
       << parse_status_.GetDetail();

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exec/parquet-common.h"
+#include "exec/parquet/parquet-common.h"
 
 namespace impala {
 

@@ -15,8 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_BIT_PACKING_INLINE_H
-#define IMPALA_UTIL_BIT_PACKING_INLINE_H
+// This contains all the template implementations for functions defined in bit-packing.h.
+// This should be included by files that want to instantiate those templates directly.
+// Including this file is not generally necessary - instead the templates should be
+// instantiated in bit-packing.cc so that compile times stay manageable.
+
+#pragma once
 
 #include "util/bit-packing.h"
 
@@ -345,6 +349,4 @@ const uint8_t* BitPacking::UnpackAndDecodeUpTo31Values(const uint8_t* __restrict
   return in + BYTES_TO_READ;
 #pragma pop_macro("DECODE_VALUES_CASE")
 }
-}
-
-#endif
+} // namespace impala

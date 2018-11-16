@@ -15,14 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_BIT_PACKING_H
-#define IMPALA_UTIL_BIT_PACKING_H
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <utility>
 
 namespace impala {
-
-#include <cstdint>
-
-#include <utility>
 
 /// Utilities for manipulating bit-packed values. Bit-packing is a technique for
 /// compressing integer values that do not use the full range of the integer type.
@@ -131,5 +130,3 @@ class BitPacking {
   static int64_t NumValuesToUnpack(int bit_width, int64_t in_bytes, int64_t num_values);
 };
 }
-
-#endif

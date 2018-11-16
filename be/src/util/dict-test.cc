@@ -25,6 +25,7 @@
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "testutil/gtest-util.h"
+#include "util/bit-packing.inline.h"
 #include "util/dict-encoding.h"
 
 #include "common/names.h"

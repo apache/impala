@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <iostream>
 #include <limits.h>
-#include "exec/parquet-common.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <iostream>
+#include "exec/parquet/parquet-common.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"

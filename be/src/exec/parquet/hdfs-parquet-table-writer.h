@@ -26,7 +26,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "exec/hdfs-table-writer.h"
-#include "exec/parquet-common.h"
+#include "exec/parquet/parquet-common.h"
 #include "runtime/descriptors.h"
 #include "util/compress.h"
 

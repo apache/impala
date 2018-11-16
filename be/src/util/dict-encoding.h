@@ -23,7 +23,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "common/compiler-util.h"
-#include "exec/parquet-common.h"
+#include "exec/parquet/parquet-common.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"

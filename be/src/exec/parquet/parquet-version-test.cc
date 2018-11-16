@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <iostream>
 #include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <iostream>
 
-#include "exec/parquet-metadata-utils.h"
+#include "exec/parquet/parquet-metadata-utils.h"
 #include "testutil/gtest-util.h"
 
 #include "common/names.h"
