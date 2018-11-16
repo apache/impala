@@ -42,8 +42,12 @@ under the License.
   <conbody>
 
     <p>
-      A data type used in <codeph>CREATE TABLE</codeph> and <codeph>ALTER TABLE</codeph>
-      statements, representing a point in time.
+      The <codeph>TIMESTAMP</codeph> data type holds a value that represents a point in time.
+    </p>
+
+    <p>
+      Internally, the resolution of the time portion of a <codeph>TIMESTAMP</codeph> value is in
+      nanoseconds.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
@@ -52,12 +56,26 @@ under the License.
       In the column definition of a <codeph>CREATE TABLE</codeph> statement:
     </p>
 
-<codeblock><varname>column_name</varname> TIMESTAMP</codeblock>
+<codeblock><varname>column_name</varname> TIMESTAMP
+
+<varname>timestamp</varname> [+ | -] INTERVAL <varname>interval</varname>
+DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <varname>time_unit</varname>)</codeblock>
 
     <p>
-      <b>Range:</b> Allowed date values range from 1400-01-01 to 9999-12-31; this range is
-      different from the Hive <codeph>TIMESTAMP</codeph> type. Internally, the resolution of the
-      time portion of a <codeph>TIMESTAMP</codeph> value is in nanoseconds.
+      <b>Range:</b> 1400-01-01 to 9999-12-31
+    </p>
+
+    <p>
+      Out of range <codeph>TIMESTAMP</codeph> values are converted to NULL.
+    </p>
+
+    <p>
+      The range of Impala <codeph>TIMESTAMP</codeph> is different from the Hive
+      <codeph>TIMESTAMP</codeph> type. Refer to
+      <xref
+        href="https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types#LanguageManualTypes-timestamp"
+        format="html" scope="external">Hive
+      documentation</xref> for detail.
     </p>
 
     <p>
@@ -66,315 +84,154 @@ under the License.
 
     <p>
       You can perform date arithmetic by adding or subtracting a specified number of time units,
-      using the <codeph>INTERVAL</codeph> keyword and the <codeph>+</codeph> and
-      <codeph>-</codeph> operators or <codeph>date_add()</codeph> and
-      <codeph>date_sub()</codeph> functions. You can specify units as <codeph>YEAR[S]</codeph>,
-      <codeph>MONTH[S]</codeph>, <codeph>WEEK[S]</codeph>, <codeph>DAY[S]</codeph>,
-      <codeph>HOUR[S]</codeph>, <codeph>MINUTE[S]</codeph>, <codeph>SECOND[S]</codeph>,
-      <codeph>MILLISECOND[S]</codeph>, <codeph>MICROSECOND[S]</codeph>, and
-      <codeph>NANOSECOND[S]</codeph>. You can only specify one time unit in each interval
-      expression, for example <codeph>INTERVAL 3 DAYS</codeph> or <codeph>INTERVAL 25
-      HOURS</codeph>, but you can produce any granularity by adding together successive
-      <codeph>INTERVAL</codeph> values, such as <codeph><varname>timestamp_value</varname> +
-      INTERVAL 3 WEEKS - INTERVAL 1 DAY + INTERVAL 10 MICROSECONDS</codeph>.
+      using the <codeph>INTERVAL</codeph> keyword and the <codeph>+</codeph> operator, the
+      <codeph>-</codeph> operator, <codeph>date_add()</codeph> or <codeph>date_sub()</codeph>.
     </p>
 
     <p>
-      For example:
+      The following units are supported for <codeph><i>time_unit</i></codeph> in the
+      <codeph>INTERVAL</codeph> clause:
+      <ul>
+        <li>
+          <codeph>YEAR[S]</codeph>
+        </li>
+
+        <li>
+          <codeph>MONTH[S]</codeph>
+        </li>
+
+        <li>
+          <codeph>WEEK[S]</codeph>
+        </li>
+
+        <li>
+          <codeph>DAY[S]</codeph>
+        </li>
+
+        <li>
+          <codeph>HOUR[S]</codeph>
+        </li>
+
+        <li>
+          <codeph>MINUTE[S]</codeph>
+        </li>
+
+        <li>
+          <codeph>SECOND[S]</codeph>
+        </li>
+
+        <li>
+          <codeph>MILLISECOND[S]</codeph>
+        </li>
+
+        <li>
+          <codeph>MICROSECOND[S]</codeph>
+        </li>
+
+        <li>
+          <codeph>NANOSECOND[S]</codeph>
+        </li>
+      </ul>
     </p>
 
-<codeblock>select now() + interval 1 day;
-select date_sub(now(), interval 5 minutes);
-insert into auction_details
-  select auction_id, auction_start_time, auction_start_time + interval 2 days + interval 12 hours
-  from new_auctions;</codeblock>
+    <p>
+      You can only specify one time unit in each interval expression, for example
+      <codeph>INTERVAL 3 DAYS</codeph> or <codeph>INTERVAL 25 HOURS</codeph>, but you can
+      produce any granularity by adding together successive <codeph>INTERVAL</codeph> values,
+      such as <codeph><varname>timestamp_value</varname> + INTERVAL 3 WEEKS - INTERVAL 1 DAY +
+      INTERVAL 10 MICROSECONDS</codeph>.
+    </p>
+
+    <p conref="../shared/impala_common.xml#common/internals_16_bytes"/>
 
     <p>
       <b>Time zones:</b>
     </p>
 
     <p>
-      By default, Impala does not store timestamps using the local timezone, to avoid undesired
-      results from unexpected time zone issues. Timestamps are stored and interpreted relative
-      to UTC, both when written to or read from data files, or when converted to or from Unix
-      time values through functions such as <codeph>from_unixtime()</codeph> or
-      <codeph>unix_timestamp()</codeph>. To convert such a <codeph>TIMESTAMP</codeph> value to
-      one that represents the date and time in a specific time zone, convert the original value
-      with the <codeph>from_utc_timestamp()</codeph> function.
+      By default, Impala stores and interprets <codeph>TIMESTAMP</codeph> values in UTC time
+      zone when writing to data files, reading from data files, or converting to and from system
+      time values through functions.
     </p>
 
     <p>
-      Because Impala does not assume that <codeph>TIMESTAMP</codeph> values are in any
-      particular time zone, you must be conscious of the time zone aspects of data that you
-      query, insert, or convert.
+      When you set the <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> startup
+      flag to <codeph>TRUE</codeph>, Impala treats the <codeph>TIMESTAMP</codeph> values
+      specified in the local time zone. The local time zone is determined in the following order
+      with the <codeph>TIMESTAMP</codeph> query option takes the highest precedence:
+      <ol>
+        <li>
+          The <codeph>TIMESTAMP</codeph> query option
+        </li>
+
+        <li>
+          <codeph>$TZ</codeph> environment variable
+        </li>
+
+        <li>
+          System time zone where the impalad coordinator runs
+        </li>
+      </ol>
     </p>
+
+    <p> The <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph>
+      setting can be used to fix discrepancy in <codeph>INTERVAL</codeph>
+      operations. For example, a <codeph>TIMESTAMP + INTERVAL
+          <varname>n-hours</varname></codeph> can be affected by Daylight Saving
+      Time, which Impala does not consider by default as these operations are
+      applied as if the timestamp was in UTC. You can use the
+        <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting
+      to fix the issue. </p>
+    <p>See <xref href="impala_custom_timezones.xml#custom_timezone"/> for
+      configuring to use custom time zone database and aliases.</p>
 
     <p>
-      For consistency with Unix system calls, the <codeph>TIMESTAMP</codeph> returned by the
-      <codeph>now()</codeph> function represents the local time in the system time zone, rather
-      than in UTC. To store values relative to the current time in a portable way, convert any
-      <codeph>now()</codeph> return values using the <codeph>to_utc_timestamp()</codeph>
-      function first. For example, the following example shows that the current time in
-      California (where this Impala cluster is located) is shortly after 2 PM. If that value was
-      written to a data file, and shipped off to a distant server to be analyzed alongside other
-      data from far-flung locations, the dates and times would not match up precisely because of
-      time zone differences. Therefore, the <codeph>to_utc_timestamp()</codeph> function
-      converts it using a common reference point, the UTC time zone (descended from the old
-      Greenwich Mean Time standard). The <codeph>'PDT'</codeph> argument indicates that the
-      original value is from the Pacific time zone with Daylight Saving Time in effect. When
-      servers in all geographic locations run the same transformation on any local date and time
-      values (with the appropriate time zone argument), the stored data uses a consistent
-      representation. Impala queries can use functions such as <codeph>EXTRACT()</codeph>,
-      <codeph>MIN()</codeph>, <codeph>AVG()</codeph>, and so on to do time-series analysis on
-      those timestamps.
-    </p>
-
-<codeblock>[localhost:21000] > select now();
-+-------------------------------+
-| now()                         |
-+-------------------------------+
-| 2015-04-09 14:07:46.580465000 |
-+-------------------------------+
-[localhost:21000] > select to_utc_timestamp(now(), 'PDT');
-+--------------------------------+
-| to_utc_timestamp(now(), 'pdt') |
-+--------------------------------+
-| 2015-04-09 21:08:07.664547000  |
-+--------------------------------+
-</codeblock>
-
-    <p>
-      The converse function, <codeph>from_utc_timestamp()</codeph>, lets you take stored
-      <codeph>TIMESTAMP</codeph> data or calculated results and convert back to local date and
-      time for processing on the application side. The following example shows how you might
-      represent some future date (such as the ending date and time of an auction) in UTC, and
-      then convert back to local time when convenient for reporting or other processing. The
-      final query in the example tests whether this arbitrary UTC date and time has passed yet,
-      by converting it back to the local time zone and comparing it against the current date and
-      time.
-    </p>
-
-<codeblock>[localhost:21000] > select to_utc_timestamp(now() + interval 2 weeks, 'PDT');
-+---------------------------------------------------+
-| to_utc_timestamp(now() + interval 2 weeks, 'pdt') |
-+---------------------------------------------------+
-| 2015-04-23 21:08:34.152923000                     |
-+---------------------------------------------------+
-[localhost:21000] > select from_utc_timestamp('2015-04-23 21:08:34.152923000','PDT');
-+------------------------------------------------------------+
-| from_utc_timestamp('2015-04-23 21:08:34.152923000', 'pdt') |
-+------------------------------------------------------------+
-| 2015-04-23 14:08:34.152923000                              |
-+------------------------------------------------------------+
-[localhost:21000] > select from_utc_timestamp('2015-04-23 21:08:34.152923000','PDT') &lt; now();
-+--------------------------------------------------------------------+
-| from_utc_timestamp('2015-04-23 21:08:34.152923000', 'pdt') &lt; now() |
-+--------------------------------------------------------------------+
-| false                                                              |
-+--------------------------------------------------------------------+
-</codeblock>
-
-    <p rev="2.2.0">
-      If you have data files written by Hive, those <codeph>TIMESTAMP</codeph> values represent
-      the local timezone of the host where the data was written, potentially leading to
-      inconsistent results when processed by Impala. To avoid compatibility problems or having
-      to code workarounds, you can specify one or both of these <cmdname>impalad</cmdname>
-      startup flags: <codeph>--use_local_tz_for_unix_timestamp_conversions=true</codeph>
-      <codeph>-convert_legacy_hive_parquet_utc_timestamps=true</codeph>. Although
-      <codeph>-convert_legacy_hive_parquet_utc_timestamps</codeph> is turned off by default to
-      avoid performance overhead, where practical turn it on when processing
-      <codeph>TIMESTAMP</codeph> columns in Parquet files written by Hive, to avoid unexpected
-      behavior.
-    </p>
-
-    <p rev="2.2.0">
-      The <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting affects
-      conversions from <codeph>TIMESTAMP</codeph> to <codeph>BIGINT</codeph>, or from
-      <codeph>BIGINT</codeph> to <codeph>TIMESTAMP</codeph>. By default, Impala treats all
-      <codeph>TIMESTAMP</codeph> values as UTC, to simplify analysis of time-series data from
-      different geographic regions. When you enable the
-      <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting, these operations
-      treat the input values as if they are in the local tie zone of the host doing the
-      processing. See <xref
-        href="impala_datetime_functions.xml#datetime_functions"/>
-      for the list of functions affected by the
+      See <xref href="impala_datetime_functions.xml#datetime_functions">Impala Date and Time
+      Functions</xref> for the list of functions affected by the
       <codeph>--use_local_tz_for_unix_timestamp_conversions</codeph> setting.
     </p>
 
     <p>
-      The following sequence of examples shows how the interpretation of
-      <codeph>TIMESTAMP</codeph> values in Parquet tables is affected by the setting of the
-      <codeph>-convert_legacy_hive_parquet_utc_timestamps</codeph> setting.
+      <b>Time zone handling between Impala and Hive:</b>
     </p>
-
-    <p>
-      Regardless of the <codeph>-convert_legacy_hive_parquet_utc_timestamps</codeph> setting,
-      <codeph>TIMESTAMP</codeph> columns in text tables can be written and read interchangeably
-      by Impala and Hive:
-    </p>
-
-<codeblock>Impala DDL and queries for text table:
-
-[localhost:21000] > create table t1 (x timestamp);
-[localhost:21000] > insert into t1 values (now()), (now() + interval 1 day);
-[localhost:21000] > select x from t1;
-+-------------------------------+
-| x                             |
-+-------------------------------+
-| 2015-04-07 15:43:02.892403000 |
-| 2015-04-08 15:43:02.892403000 |
-+-------------------------------+
-[localhost:21000] > select to_utc_timestamp(x, 'PDT') from t1;
-+-------------------------------+
-| to_utc_timestamp(x, 'pdt')    |
-+-------------------------------+
-| 2015-04-07 22:43:02.892403000 |
-| 2015-04-08 22:43:02.892403000 |
-+-------------------------------+
-
-Hive query for text table:
-
-hive> select * from t1;
-OK
-2015-04-07 15:43:02.892403
-2015-04-08 15:43:02.892403
-Time taken: 1.245 seconds, Fetched: 2 row(s)
-</codeblock>
-
-    <p>
-      When the table uses Parquet format, Impala expects any time zone adjustment to be applied
-      prior to writing, while <codeph>TIMESTAMP</codeph> values written by Hive are adjusted to
-      be in the UTC time zone. When Hive queries Parquet data files that it wrote, it adjusts
-      the <codeph>TIMESTAMP</codeph> values back to the local time zone, while Impala does no
-      conversion. Hive does no time zone conversion when it queries Impala-written Parquet
-      files.
-    </p>
-
-<codeblock>Impala DDL and queries for Parquet table:
-
-[localhost:21000] > create table p1 stored as parquet as select x from t1;
-+-------------------+
-| summary           |
-+-------------------+
-| Inserted 2 row(s) |
-+-------------------+
-[localhost:21000] > select x from p1;
-+-------------------------------+
-| x                             |
-+-------------------------------+
-| 2015-04-07 15:43:02.892403000 |
-| 2015-04-08 15:43:02.892403000 |
-+-------------------------------+
-
-Hive DDL and queries for Parquet table:
-
-hive> create table h1 (x timestamp) stored as parquet;
-OK
-hive> insert into h1 select * from p1;
-...
-OK
-Time taken: 35.573 seconds
-hive> select x from p1;
-OK
-2015-04-07 15:43:02.892403
-2015-04-08 15:43:02.892403
-Time taken: 0.324 seconds, Fetched: 2 row(s)
-hive> select x from h1;
-OK
-2015-04-07 15:43:02.892403
-2015-04-08 15:43:02.892403
-Time taken: 0.197 seconds, Fetched: 2 row(s)
-</codeblock>
-
-    <p>
-      The discrepancy arises when Impala queries the Hive-created Parquet table. The underlying
-      values in the <codeph>TIMESTAMP</codeph> column are different from the ones written by
-      Impala, even though they were copied from one table to another by an <codeph>INSERT ...
-      SELECT</codeph> statement in Hive. Hive did an implicit conversion from the local time
-      zone to UTC as it wrote the values to Parquet.
-    </p>
-
-<codeblock>Impala query for TIMESTAMP values from Impala-written and Hive-written data:
-
-[localhost:21000] > select * from p1;
-+-------------------------------+
-| x                             |
-+-------------------------------+
-| 2015-04-07 15:43:02.892403000 |
-| 2015-04-08 15:43:02.892403000 |
-+-------------------------------+
-Fetched 2 row(s) in 0.29s
-[localhost:21000] > select * from h1;
-+-------------------------------+
-| x                             |
-+-------------------------------+
-| 2015-04-07 22:43:02.892403000 |
-| 2015-04-08 22:43:02.892403000 |
-+-------------------------------+
-Fetched 2 row(s) in 0.41s
-
-Underlying integer values for Impala-written and Hive-written data:
-
-[localhost:21000] > select cast(x as bigint) from p1;
-+-------------------+
-| cast(x as bigint) |
-+-------------------+
-| 1428421382        |
-| 1428507782        |
-+-------------------+
-Fetched 2 row(s) in 0.38s
-[localhost:21000] > select cast(x as bigint) from h1;
-+-------------------+
-| cast(x as bigint) |
-+-------------------+
-| 1428446582        |
-| 1428532982        |
-+-------------------+
-Fetched 2 row(s) in 0.20s
-</codeblock>
-
-    <p>
-      When the <codeph>-convert_legacy_hive_parquet_utc_timestamps</codeph> setting is enabled,
-      Impala recognizes the Parquet data files written by Hive, and applies the same
-      UTC-to-local-timezone conversion logic during the query as Hive uses, making the contents
-      of the Impala-written <codeph>P1</codeph> table and the Hive-written <codeph>H1</codeph>
-      table appear identical, whether represented as <codeph>TIMESTAMP</codeph> values or the
-      underlying <codeph>BIGINT</codeph> integers:
-    </p>
-
-<codeblock>[localhost:21000] > select x from p1;
-+-------------------------------+
-| x                             |
-+-------------------------------+
-| 2015-04-07 15:43:02.892403000 |
-| 2015-04-08 15:43:02.892403000 |
-+-------------------------------+
-Fetched 2 row(s) in 0.37s
-[localhost:21000] > select x from h1;
-+-------------------------------+
-| x                             |
-+-------------------------------+
-| 2015-04-07 15:43:02.892403000 |
-| 2015-04-08 15:43:02.892403000 |
-+-------------------------------+
-Fetched 2 row(s) in 0.19s
-[localhost:21000] > select cast(x as bigint) from p1;
-+-------------------+
-| cast(x as bigint) |
-+-------------------+
-| 1428446582        |
-| 1428532982        |
-+-------------------+
-Fetched 2 row(s) in 0.29s
-[localhost:21000] > select cast(x as bigint) from h1;
-+-------------------+
-| cast(x as bigint) |
-+-------------------+
-| 1428446582        |
-| 1428532982        |
-+-------------------+
-Fetched 2 row(s) in 0.22s
-</codeblock>
+    <p>Interoperability between Hive and Impala is different depending on the
+      file format.</p>
+    <ul>
+      <li><i>Text</i><p> For text tables, <codeph>TIMESTAMP</codeph> values can
+          be written and read interchangeably by Impala and Hive as Hive reads
+          and writes <codeph>TIMESTAMP</codeph> values without converting with
+          respect to time zones. </p></li>
+      <li><i>Parquet</i><p> When Hive writes to Parquet data files, the
+            <codeph>TIMESTAMP</codeph> values are normalized to UTC from the
+          local time zone of the host where the data was written. On the other
+          hand, Impala does not make any time zone adjustment when it writes or
+          reads <codeph>TIMESTAMP</codeph> values to Parquet files. This
+          difference in time zone handling can cause potentially inconsistent
+          results when Impala processes <codeph>TIMESTAMP</codeph> values in the
+          Parquet files written by Hive. </p><p> To avoid incompatibility
+          problems or having to code workarounds, you can specify one or both of
+          these impalad startup flags: <ul>
+            <li>
+              <codeph>--use_local_tz_for_unix_timestamp_conversions=true</codeph>
+            </li>
+            <li>
+              <codeph>--convert_legacy_hive_parquet_utc_timestamps=true</codeph>
+            </li>
+          </ul>
+        </p><p> When the
+            <codeph>-convert_legacy_hive_parquet_utc_timestamps</codeph> setting
+          is enabled, Impala recognizes the Parquet data files written by Hive,
+          and applies the same UTC-to-local-timezone conversion logic during the
+          query as Hive does. </p><p>In <keyword keyref="impala30"/> and lower,
+          this option had severe impact on multi-threaded performance. The new
+          time zone implementation in <keyword keyref="impala31"/> eliminated
+          most of the performance overhead and made Impala scale well to
+          multiple threads. Although
+            <codeph>-convert_legacy_hive_parquet_utc_timestamps</codeph> is
+          turned off by default for this performance reason, where practical
+          turn it on when processing <codeph>TIMESTAMP</codeph> columns in
+          Parquet files written by Hive, to avoid unexpected behavior. </p></li>
+    </ul>
 
     <p>
       <b>Conversions:</b>
@@ -422,9 +279,14 @@ ERROR: AnalysisException: Type 'TIMESTAMP' is not supported as partition-column 
 
     <p conref="../shared/impala_common.xml#common/null_bad_timestamp_cast"/>
 
-    <p conref="../shared/impala_common.xml#common/partitioning_worrisome"/>
-
     <p conref="../shared/impala_common.xml#common/hbase_ok"/>
+
+    <p>
+      <b>Parquet consideration:</b> int96 encoded Parquet timestamps are supported in Impala.
+      int64 timestamps will be supported in a future release.
+    </p>
+
+    <p/>
 
     <p conref="../shared/impala_common.xml#common/parquet_ok"/>
 
@@ -432,15 +294,15 @@ ERROR: AnalysisException: Type 'TIMESTAMP' is not supported as partition-column 
 
 <!--    <p conref="../shared/impala_common.xml#common/compatibility_blurb"/> -->
 
-    <p conref="../shared/impala_common.xml#common/internals_16_bytes"/>
-
-    <p conref="../shared/impala_common.xml#common/added_forever"/>
-
     <p conref="../shared/impala_common.xml#common/column_stats_constant"/>
 
     <p conref="../shared/impala_common.xml#common/sqoop_blurb"/>
 
     <p conref="../shared/impala_common.xml#common/sqoop_timestamp_caveat"/>
+
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+
+    <p conref="../shared/impala_common.xml#common/kudu_timestamp_details"/>
 
     <p conref="../shared/impala_common.xml#common/restrictions_blurb"/>
 
@@ -452,10 +314,6 @@ ERROR: AnalysisException: Type 'TIMESTAMP' is not supported as partition-column 
     </p>
 
     <p conref="../shared/impala_common.xml#common/avro_no_timestamp"/>
-
-    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
-
-    <p conref="../shared/impala_common.xml#common/kudu_timestamp_details"/>
 
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
@@ -523,6 +381,8 @@ select s, t, b from timestamp_t order by t;
 | 2017-05-31 15:35:33.033082501 | 2017-05-31 15:35:33.033083000 | 1496244933 |
 +-------------------------------+-------------------------------+------------+
 </codeblock>
+
+    <p conref="../shared/impala_common.xml#common/added_forever"/>
 
     <p conref="../shared/impala_common.xml#common/related_info"/>
 

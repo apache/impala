@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="custom_timezone">
+
+  <title>Customizing Time Zones</title>
+
+  <titlealts audience="PDF">
+
+    <navtitle>Customizing Time Zones</navtitle>
+
+  </titlealts>
+
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="Impala Data Types"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Data Analysts"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Dates and Times"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+
+    <p>
+      Starting in <keyword keyref="impala31">Impala 3.1</keyword>, you can customize the time
+      zone definitions used in Impala.
+      <ul>
+        <li>
+          <p>
+            By default, Impala uses the OS’s time zone database located in
+            <codeph>/usr/share/zoneinfo</codeph>. This directory contains the IANA timezone
+            database in a compiled binary format. The contents of the <codeph>zoneinfo</codeph>
+            directory is controlled by the OS’s package manager.
+          </p>
+        </li>
+
+        <li>
+          <p >
+            New startup flags have been introduced:
+          </p>
+          <ul>
+            <li >
+              <codeph>--hdfs_zone_info_zip</codeph>: This flag allows Impala administrators to
+              specify a custom timezone database. The flag should be set to a shared (not
+              necessarily HDFS) path that points to a zip archive of a custom IANA timezone
+              database. The timezone database is expected to be in a compiled binary format. If
+              the startup flag is set, Impala will use the specified timezone database instead
+              of the default <codeph>/usr/share/zoneinfo </codeph>database. The timezone db
+              upgrade process is described in detail below.
+            </li>
+
+            <li >
+              <p >
+                <codeph>--hdfs_zone_alias_conf</codeph>: This flag allows Impala administrators
+                to specify definitions for custom timezone aliases. The flag should be set to a
+                shared (not necessarily HDFS) path that specifies a config file containing
+                custom timezone alias definitions. This config file can be used as a workaround
+                for users who want to keep using their legacy timezone names. Configuring custom
+                aliases is described in detail below.
+              </p>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </p>
+
+    <p>
+      <b>Upgrading custom IANA time zone database:</b>
+      <ol>
+        <li >
+          Download latest IANA time zone database distribution:
+<codeblock>git clone https://github.com/eggert/tz</codeblock>
+          <p >
+            Alternatively, download a specific tzdb version from:
+<codeblock> https://www.iana.org/time-zones/repository</codeblock>
+          </p>
+        </li>
+
+        <li >
+          Build timezone tools:
+<codeblock>cd tz
+make TOPDIR=tzdata install</codeblock>
+        </li>
+
+        <li >
+          Generate the compiled binary time zone database:
+<codeblock>./zic -d ./tzdata/etc/zoneinfo africa antarctica asia australasia backward backzone etcetera europe factory northamerica pacificnew southamerica systemv</codeblock>
+        </li>
+
+        <li >
+          Create zip archive:
+<codeblock>pushd ./tzdata/etc
+zip -r zoneinfo.zip zoneinfo
+popd</codeblock>
+        </li>
+
+        <li >
+          Copy the time zone database to HDFS:
+<codeblock>hdfs dfs -mkdir -p /tzdb/latest
+hdfs dfs -copyFromLocal ./tzdata/etc/zoneinfo.zip /tzdb/latest</codeblock>
+        </li>
+
+        <li >
+          Set the <codeph>--hdfs_zone_info_zip</codeph> startup flag to
+          <codeph>/tzdb/latest/zoneinfo.zip</codeph> as an <codeph>impalad </codeph>safety
+          valve.
+        </li>
+
+        <li >
+          Perform a full restart of Impala service.
+        </li>
+      </ol>
+    </p>
+
+    <p>
+      <b>Configuring custom time zone aliases:</b>
+    </p>
+
+    <p>
+      <ol>
+        <li >
+          Create a <codeph>tzalias.conf</codeph> config file that contains time zone alias
+          definitions formatted as <codeph><i>ALIAS</i></codeph><codeph> =
+          </codeph><codeph><i>DEFINITION</i></codeph>. For example:
+<codeblock>#
+# Define aliases for existing timezone names:
+#
+Universal Coordinated Time = UTC
+Mideast/Riyadh89 = Asia/Riyadh
+PDT = America/Los_Angeles
+#
+# Define aliases as UTC offsets in seconds:
+#
+GMT-01:00 = 3600
+GMT+01:00 = -3600</codeblock>
+        </li>
+
+        <li >
+          Copy the config file to HDFS:
+<codeblock>hdfs dfs -mkdir -p /tzdb
+hdfs dfs -copyFromLocal tzalias.conf /tzdb</codeblock>
+        </li>
+
+        <li >
+          Set the <codeph>--hdfs_zone_alias_conf</codeph> startup flag to
+          <codeph>/tzdb/tzalias.conf</codeph> as an <codeph>impalad </codeph>safety valve.
+        </li>
+
+        <li >
+          Perform a full restart of Impala service.
+        </li>
+      </ol>
+    </p>
+
+    <p>
+      <b>Added in:</b> <keyword keyref="impala31"/>
+    </p>
+
+  </conbody>
+
+</concept>
