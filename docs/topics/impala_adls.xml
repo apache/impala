@@ -35,12 +35,14 @@ under the License.
 
   <conbody>
 
-    <p> You can use Impala to query data residing on the Azure Data Lake Store
+    <p>
+      You can use Impala to query data residing on the Azure Data Lake Store
       (ADLS) filesystem. This capability allows convenient access to a storage
       system that is remotely managed, accessible from anywhere, and integrated
       with various cloud-based services. Impala can query files in any supported
       file format from ADLS. The ADLS storage location can be for an entire
-      table, or individual partitions in a partitioned table. </p>
+      table or individual partitions in a partitioned table.
+    </p>
 
     <p>
       The default Impala tables use data files stored on HDFS, which are ideal for bulk loads and queries using
@@ -89,14 +91,12 @@ under the License.
       <ul>
         <li><p> The <xref href="impala_create_table.xml#create_table"/> or <xref
               href="impala_alter_table.xml#alter_table"/> statements can specify
-            that a table resides on the ADLS filesystem by specifying an ADLS
-            prefix for the <codeph>LOCATION</codeph> property.<ul>
-              <li><codeph>adl://</codeph> for ADLS Gen1</li>
-              <li><codeph>abfs://</codeph> for ADLS Gen2</li>
-              <li><codeph>abfss://</codeph> for ADLS Gen2 with a secure socket
-                layer connection</li>
-            </ul>
-            <codeph>ALTER TABLE</codeph> can also set the
+            that a table resides on the ADLS filesystem by using one of the
+            following ADLS prefixes in the <codeph>LOCATION</codeph> property.<ul>
+              <li>For ADLS Gen1: <codeph>adl://</codeph></li>
+              <li>For ADLS Gen2: <codeph>abfs://</codeph> or
+                  <codeph>abfss://</codeph></li>
+            </ul></p><p><codeph>ALTER TABLE</codeph> can also set the
               <codeph>LOCATION</codeph> property for an individual partition, so
             that some data in a table resides on ADLS and other data in the same
             table resides on HDFS. </p> See <xref href="impala_adls.xml#ddl"/>
@@ -269,24 +269,44 @@ under the License.
 
     <conbody>
 
-      <p> Impala reads data for a table or partition from ADLS based on the
+      <p>
+        Impala reads data for a table or partition from ADLS based on the
           <codeph>LOCATION</codeph> attribute for the table or partition.
         Specify the ADLS details in the <codeph>LOCATION</codeph> clause of a
           <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph>
-        statement. The syntax for the <codeph>LOCATION</codeph> clause is:<ul>
-          <li>For ADLS Gen1,
-                <codeph>adl://<varname>account</varname>.azuredatalakestore.net/<varname>path/file</varname></codeph>
+        statement. The syntax for the <codeph>LOCATION</codeph> clause is:
+        <ul>
+          <li>
+            For ADLS Gen1:
+<codeblock>adl://<varname>account</varname>.azuredatalakestore.net/<varname>path/file</varname></codeblock></li>
+          <li>
+            For ADLS Gen2:
+<codeblock>abfs://<varname>container</varname>@<varname>account</varname>.dfs.core.windows.net/<varname>path</varname>/<varname>file</varname></codeblock>
+            <p>
+              or
+            </p>
+<codeblock>abfss://<varname>container</varname>@<varname>account</varname>.dfs.core.windows.net/<varname>path</varname>/<varname>file</varname></codeblock>
           </li>
-          <li>For ADLS Gen2,
-                <codeph>abfs://<varname>container</varname>@<varname>account</varname>.dfs.core.windows.net/<varname>path</varname>/<varname>file</varname></codeph></li>
-          <li>For ADLS Gen2 with a secure socket layer connection,
-                <codeph>abfss://<varname>container</varname>@<varname>account</varname>.dfs.core.windows.net/<varname>path</varname>/<varname>file</varname></codeph></li>
-        </ul></p>
-      <p><codeph><varname>container</varname></codeph> denotes the parent
+        </ul>
+      </p>
+      <p>
+        <codeph><varname>container</varname></codeph> denotes the parent
         location that holds the files and folders, which is the Containers in
-        the Azure Storage Blobs service.</p>
-      <p><codeph><varname>account</varname></codeph> is the name given for your
-        storage account.</p>
+        the Azure Storage Blobs service.
+      </p>
+      <p>
+        <codeph><varname>account</varname></codeph> is the name given for your
+        storage account.
+      </p>
+      <note>
+        <p> By default, TLS is enabled both with <codeph>abfs://</codeph> and
+            <codeph>abfss://</codeph>. </p>
+        <p>
+          When you set the <codeph>fs.azure.always.use.https=false</codeph>
+          property, TLS is disabled with <codeph>abfs://</codeph>, and TLS is
+          enabled with <codeph>abfss://</codeph>
+        </p>
+      </note>
 
       <p>
         For a partitioned table, either specify a separate <codeph>LOCATION</codeph> clause for each new partition,
