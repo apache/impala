@@ -20,7 +20,6 @@ package org.apache.impala.analysis;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,7 +43,6 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDescribeOutputStyle;
@@ -67,7 +65,7 @@ parser code {:
 
   // list of expected tokens ids from current parsing state
   // for generating syntax error message
-  private final List<Integer> expectedTokenIds_ = new ArrayList<Integer>();
+  private final List<Integer> expectedTokenIds_ = new ArrayList<>();
 
   // Currently used to tell if it's decimal V1 or V2 mode.
   // TODO: remove when V1 code is dropped.
@@ -110,6 +108,7 @@ parser code {:
   }
 
   // override to save error token
+  @Override
   public void syntax_error(java_cup.runtime.Symbol token) {
     errorToken_ = token;
 
@@ -365,10 +364,10 @@ nonterminal SelectList select_list;
 nonterminal SelectListItem select_list_item;
 nonterminal SelectListItem star_expr;
 nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr;
-nonterminal ArrayList<Expr> expr_list;
+nonterminal List<Expr> expr_list;
 nonterminal String alias_clause;
-nonterminal ArrayList<String> ident_list, primary_keys;
-nonterminal ArrayList<String> opt_ident_list, opt_sort_cols;
+nonterminal List<String> ident_list, primary_keys;
+nonterminal List<String> opt_ident_list, opt_sort_cols;
 nonterminal TableName table_name;
 nonterminal ColumnName column_name;
 nonterminal FunctionName function_name;
@@ -376,9 +375,9 @@ nonterminal Expr where_clause;
 nonterminal Expr predicate, bool_test_expr;
 nonterminal Predicate between_predicate, comparison_predicate, compound_predicate,
   in_predicate, like_predicate, exists_predicate;
-nonterminal ArrayList<Expr> group_by_clause, opt_partition_by_clause;
+nonterminal List<Expr> group_by_clause, opt_partition_by_clause;
 nonterminal Expr having_clause;
-nonterminal ArrayList<OrderByElement> order_by_elements, opt_order_by_clause;
+nonterminal List<OrderByElement> order_by_elements, opt_order_by_clause;
 nonterminal OrderByElement order_by_element;
 nonterminal Boolean opt_order_param;
 nonterminal Boolean opt_nulls_order_param;
@@ -393,15 +392,15 @@ nonterminal AnalyticWindow.Boundary window_boundary;
 nonterminal LiteralExpr literal;
 nonterminal NumericLiteral numeric_literal;
 nonterminal CaseExpr case_expr;
-nonterminal ArrayList<CaseWhenClause> case_when_clause_list;
+nonterminal List<CaseWhenClause> case_when_clause_list;
 nonterminal FunctionParams function_params;
-nonterminal ArrayList<String> dotted_path;
+nonterminal List<String> dotted_path;
 nonterminal SlotRef slot_ref;
 nonterminal FromClause from_clause;
-nonterminal ArrayList<TableRef> table_ref_list;
+nonterminal List<TableRef> table_ref_list;
 nonterminal TableSampleClause opt_tablesample;
 nonterminal WithClause opt_with_clause;
-nonterminal ArrayList<View> with_view_def_list;
+nonterminal List<View> with_view_def_list;
 nonterminal View with_view_def;
 nonterminal TableRef table_ref;
 nonterminal Subquery subquery;
@@ -415,7 +414,7 @@ nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt, upsert_stmt;
 nonterminal UpdateStmt update_stmt;
 nonterminal DeleteStmt delete_stmt;
-nonterminal ArrayList<Pair<SlotRef, Expr>> update_set_expr_list;
+nonterminal List<Pair<SlotRef, Expr>> update_set_expr_list;
 nonterminal StatementBase explain_stmt;
 // Optional partition spec
 nonterminal PartitionSpec opt_partition_spec;
@@ -425,9 +424,9 @@ nonterminal PartitionSpec partition_spec;
 nonterminal PartitionSet opt_partition_set;
 // Required partition set
 nonterminal PartitionSet partition_set;
-nonterminal ArrayList<PartitionKeyValue> partition_clause;
-nonterminal ArrayList<PartitionKeyValue> static_partition_key_value_list;
-nonterminal ArrayList<PartitionKeyValue> partition_key_value_list;
+nonterminal List<PartitionKeyValue> partition_clause;
+nonterminal List<PartitionKeyValue> static_partition_key_value_list;
+nonterminal List<PartitionKeyValue> partition_key_value_list;
 nonterminal PartitionKeyValue partition_key_value;
 nonterminal PartitionKeyValue static_partition_key_value;
 nonterminal Qualifier union_op;
@@ -462,13 +461,13 @@ nonterminal List<RangePartition> range_params_list;
 nonterminal RangePartition range_param;
 nonterminal Pair<List<Expr>, Boolean> opt_lower_range_val,
    opt_upper_range_val;
-nonterminal ArrayList<KuduPartitionParam> hash_partition_param_list;
-nonterminal ArrayList<KuduPartitionParam> partition_param_list;
+nonterminal List<KuduPartitionParam> hash_partition_param_list;
+nonterminal List<KuduPartitionParam> partition_param_list;
 nonterminal KuduPartitionParam range_partition_param;
 nonterminal ColumnDef column_def, view_column_def;
-nonterminal ArrayList<ColumnDef> column_def_list, partition_column_defs,
+nonterminal List<ColumnDef> column_def_list, partition_column_defs,
   view_column_def_list, view_column_defs;
-nonterminal ArrayList<StructField> struct_field_def_list;
+nonterminal List<StructField> struct_field_def_list;
 // Options for DDL commands - CREATE/DROP/ALTER
 nonterminal HdfsCachingOp cache_op_val, opt_cache_op_val;
 nonterminal BigDecimal opt_cache_op_replication;
@@ -839,7 +838,7 @@ update_stmt ::=
 update_set_expr_list ::=
   slot_ref:slot EQUAL expr:e
   {:
-    ArrayList<Pair<SlotRef, Expr>> tmp =
+    List<Pair<SlotRef, Expr>> tmp =
         Lists.newArrayList(new Pair<SlotRef, Expr>(slot, e));
     RESULT = tmp;
   :}
@@ -906,7 +905,7 @@ opt_ident_list ::=
   ident_list:ident
   {: RESULT = ident; :}
   | /* empty */
-  {: RESULT = Lists.newArrayList(); :}
+  {: RESULT = new ArrayList<>(); :}
   ;
 
 opt_kw_table ::=
@@ -1442,7 +1441,7 @@ hash_partition_param ::=
   {: RESULT = KuduPartitionParam.createHashParam(cols, numPartitions.intValue()); :}
   | KW_HASH KW_PARTITIONS INTEGER_LITERAL:numPartitions
   {:
-    RESULT = KuduPartitionParam.createHashParam(Lists.<String>newArrayList(),
+    RESULT = KuduPartitionParam.createHashParam(new ArrayList<>(),
         numPartitions.intValue());
   :}
   ;
@@ -1719,7 +1718,7 @@ properties_map ::=
 column_def_list ::=
   column_def:col_def
   {:
-    ArrayList<ColumnDef> list = Lists.newArrayList();
+    List<ColumnDef> list = new ArrayList<>();
     list.add(col_def);
     RESULT = list;
   :}
@@ -1901,7 +1900,7 @@ view_column_defs ::=
 view_column_def_list ::=
   view_column_def:col_def
   {:
-    ArrayList<ColumnDef> list = new ArrayList<ColumnDef>();
+    List<ColumnDef> list = new ArrayList<>();
     list.add(col_def);
     RESULT = list;
   :}
@@ -2025,7 +2024,7 @@ partition_clause ::=
 partition_key_value_list ::=
   partition_key_value:item
   {:
-    ArrayList<PartitionKeyValue> list = new ArrayList<PartitionKeyValue>();
+    List<PartitionKeyValue> list = new ArrayList<>();
     list.add(item);
     RESULT = list;
   :}
@@ -2071,7 +2070,7 @@ opt_partition_spec ::=
 static_partition_key_value_list ::=
   static_partition_key_value:item
   {:
-    ArrayList<PartitionKeyValue> list = new ArrayList<PartitionKeyValue>();
+    List<PartitionKeyValue> list = new ArrayList<>();
     list.add(item);
     RESULT = list;
   :}
@@ -2241,7 +2240,7 @@ with_view_def ::=
 with_view_def_list ::=
   with_view_def:v
   {:
-    ArrayList<View> list = new ArrayList<View>();
+    List<View> list = new ArrayList<>();
     list.add(v);
     RESULT = list;
   :}
@@ -2307,7 +2306,7 @@ union_operand ::=
 union_operand_list ::=
   union_operand:operand
   {:
-    List<UnionOperand> operands = new ArrayList<UnionOperand>();
+    List<UnionOperand> operands = new ArrayList<>();
     operands.add(new UnionOperand(operand, null));
     RESULT = operands;
   :}
@@ -2345,7 +2344,7 @@ values_stmt ::=
 values_operand_list ::=
   LPAREN select_list:selectList RPAREN
   {:
-    List<UnionOperand> operands = new ArrayList<UnionOperand>();
+    List<UnionOperand> operands = new ArrayList<>();
     operands.add(new UnionOperand(
         new SelectStmt(selectList, null, null, null, null, null, null), null));
     RESULT = operands;
@@ -2608,7 +2607,7 @@ from_clause ::=
 table_ref_list ::=
   table_ref:table opt_plan_hints:hints
   {:
-    ArrayList<TableRef> list = new ArrayList<TableRef>();
+    List<TableRef> list = new ArrayList<>();
     table.setTableHints(hints);
     list.add(table);
     RESULT = list;
@@ -2703,7 +2702,7 @@ opt_plan_hints ::=
   plan_hints:hints
   {: RESULT = hints; :}
   | /* empty */
-  {: RESULT = Lists.newArrayList(); :}
+  {: RESULT = new ArrayList<>(); :}
   ;
 
 plan_hints ::=
@@ -2731,7 +2730,7 @@ plan_hint ::=
 plan_hint_list ::=
   plan_hint:hint
   {:
-    ArrayList<PlanHint> hints = Lists.newArrayList(hint);
+    List<PlanHint> hints = Lists.newArrayList(hint);
     RESULT = hints;
   :}
   | plan_hint_list:hints COMMA plan_hint:hint
@@ -2754,7 +2753,7 @@ opt_tablesample ::=
 ident_list ::=
   ident_or_default:ident
   {:
-    ArrayList<String> list = new ArrayList<String>();
+    List<String> list = new ArrayList<>();
     list.add(ident);
     RESULT = list;
   :}
@@ -2768,7 +2767,7 @@ ident_list ::=
 expr_list ::=
   expr:e
   {:
-    ArrayList<Expr> list = new ArrayList<Expr>();
+    List<Expr> list = new ArrayList<>();
     list.add(e);
     RESULT = list;
   :}
@@ -2810,7 +2809,7 @@ opt_order_by_clause ::=
 order_by_elements ::=
   order_by_element:e
   {:
-    ArrayList<OrderByElement> list = new ArrayList<OrderByElement>();
+    List<OrderByElement> list = new ArrayList<>();
     list.add(e);
     RESULT = list;
   :}
@@ -2891,7 +2890,7 @@ case_expr ::=
 case_when_clause_list ::=
   KW_WHEN expr:whenExpr KW_THEN expr:thenExpr
   {:
-    ArrayList<CaseWhenClause> list = new ArrayList<CaseWhenClause>();
+    List<CaseWhenClause> list = new ArrayList<>();
     list.add(new CaseWhenClause(whenExpr, thenExpr));
     RESULT = list;
   :}
@@ -2985,7 +2984,7 @@ function_call_expr ::=
   function_name:fn_name LPAREN RPAREN
   {:
     RESULT = FunctionCallExpr.createExpr(
-        fn_name, new FunctionParams(new ArrayList<Expr>()), parser.getQueryOptions());
+        fn_name, new FunctionParams(new ArrayList<>()), parser.getQueryOptions());
   :}
   | function_name:fn_name LPAREN function_params:params RPAREN
   {: RESULT = FunctionCallExpr.createExpr(fn_name, params, parser.getQueryOptions()); :}
@@ -3112,7 +3111,7 @@ timestamp_arithmetic_expr ::=
       // Report parsing failure on keyword interval.
       parser.parseError("interval", SqlParserSymbols.KW_INTERVAL);
     }
-    ArrayList<String> fnNamePath = functionName.getFnNamePath();
+    List<String> fnNamePath = functionName.getFnNamePath();
     if (fnNamePath.size() > 1) {
       // This production should not accept fully qualified function names
       throw new Exception("interval should not be qualified by database name");
@@ -3318,7 +3317,7 @@ slot_ref ::=
 dotted_path ::=
   ident_or_default:ident
   {:
-    ArrayList<String> list = new ArrayList<String>();
+    List<String> list = new ArrayList<>();
     list.add(ident);
     RESULT = list;
   :}
@@ -3390,7 +3389,7 @@ struct_field_def ::=
 struct_field_def_list ::=
   struct_field_def:field_def
   {:
-    ArrayList<StructField> list = new ArrayList<StructField>();
+    List<StructField> list = new ArrayList<>();
     list.add(field_def);
     RESULT = list;
   :}

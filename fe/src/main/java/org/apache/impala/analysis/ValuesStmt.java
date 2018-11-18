@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
@@ -34,7 +33,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 public class ValuesStmt extends UnionStmt {
 
   public ValuesStmt(List<UnionOperand> operands,
-      ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
+      List<OrderByElement> orderByElements, LimitElement limitElement) {
     super(operands, orderByElements, limitElement);
   }
 

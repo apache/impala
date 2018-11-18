@@ -1031,7 +1031,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return this;
   }
 
-  public static ArrayList<Expr> resetList(ArrayList<Expr> l) {
+  public static List<Expr> resetList(List<Expr> l) {
     for (int i = 0; i < l.size(); ++i) {
       l.set(i, l.get(i).reset());
     }

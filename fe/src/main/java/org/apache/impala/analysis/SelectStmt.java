@@ -53,10 +53,10 @@ public class SelectStmt extends QueryStmt {
   // BEGIN: Members that need to be reset()
 
   protected SelectList selectList_;
-  protected final ArrayList<String> colLabels_; // lower case column labels
+  protected final List<String> colLabels_; // lower case column labels
   protected final FromClause fromClause_;
   protected Expr whereClause_;
-  protected ArrayList<Expr> groupingExprs_;
+  protected List<Expr> groupingExprs_;
   protected Expr havingClause_;  // original having clause
 
   // havingClause with aliases and agg output resolved
@@ -81,8 +81,8 @@ public class SelectStmt extends QueryStmt {
 
   SelectStmt(SelectList selectList,
              FromClause fromClause,
-             Expr wherePredicate, ArrayList<Expr> groupingExprs,
-             Expr havingPredicate, ArrayList<OrderByElement> orderByElements,
+             Expr wherePredicate, List<Expr> groupingExprs,
+             Expr havingPredicate, List<OrderByElement> orderByElements,
              LimitElement limitElement) {
     super(orderByElements, limitElement);
     selectList_ = selectList;
@@ -840,7 +840,7 @@ public class SelectStmt extends QueryStmt {
     private void createAnalyticInfo()
         throws AnalysisException {
       // collect AnalyticExprs from the SELECT and ORDER BY clauses
-      ArrayList<Expr> analyticExprs = Lists.newArrayList();
+      ArrayList<AnalyticExpr> analyticExprs = Lists.newArrayList();
       TreeNode.collect(resultExprs_, AnalyticExpr.class, analyticExprs);
       if (sortInfo_ != null) {
         TreeNode.collect(sortInfo_.getSortExprs(), AnalyticExpr.class,

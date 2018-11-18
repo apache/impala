@@ -38,7 +38,7 @@ public class AnalyticInfo extends AggregateInfoBase {
   // All unique analytic exprs of a select block. Used to populate
   // super.aggregateExprs_ based on AnalyticExpr.getFnCall() for each analytic expr
   // in this list.
-  private final ArrayList<Expr> analyticExprs_;
+  private final ArrayList<AnalyticExpr> analyticExprs_;
 
   // Intersection of the partition exps of all the analytic functions.
   private final List<Expr> commonPartitionExprs_;
@@ -46,7 +46,7 @@ public class AnalyticInfo extends AggregateInfoBase {
   // map from analyticExprs_ to their corresponding analytic tuple slotrefs
   private final ExprSubstitutionMap analyticTupleSmap_;
 
-  private AnalyticInfo(ArrayList<Expr> analyticExprs) {
+  private AnalyticInfo(ArrayList<AnalyticExpr> analyticExprs) {
     super(new ArrayList<Expr>(), new ArrayList<FunctionCallExpr>());
     analyticExprs_ = Expr.cloneList(analyticExprs);
     // Extract the analytic function calls for each analytic expr.
@@ -68,7 +68,7 @@ public class AnalyticInfo extends AggregateInfoBase {
     commonPartitionExprs_ = Expr.cloneList(other.commonPartitionExprs_);
   }
 
-  public ArrayList<Expr> getAnalyticExprs() { return analyticExprs_; }
+  public ArrayList<AnalyticExpr> getAnalyticExprs() { return analyticExprs_; }
   public ExprSubstitutionMap getSmap() { return analyticTupleSmap_; }
   public List<Expr> getCommonPartitionExprs() { return commonPartitionExprs_; }
 
@@ -77,7 +77,7 @@ public class AnalyticInfo extends AggregateInfoBase {
    * smaps.
    */
   static public AnalyticInfo create(
-      ArrayList<Expr> analyticExprs, Analyzer analyzer) {
+      ArrayList<AnalyticExpr> analyticExprs, Analyzer analyzer) {
     Preconditions.checkState(analyticExprs != null && !analyticExprs.isEmpty());
     Expr.removeDuplicates(analyticExprs);
     AnalyticInfo result = new AnalyticInfo(analyticExprs);

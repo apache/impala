@@ -17,13 +17,13 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.impala.catalog.BuiltinsDb;
-import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TFunctionName;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
@@ -33,7 +33,7 @@ import com.google.common.base.Preconditions;
  */
 public class FunctionName {
   // Only set for parsed function names.
-  private final ArrayList<String> fnNamePath_;
+  private final List<String> fnNamePath_;
 
   // Set/validated during analysis.
   private String db_;
@@ -45,7 +45,7 @@ public class FunctionName {
    * C'tor for parsed function names. The function names could be invalid. The validity
    * is checked during analysis.
    */
-  public FunctionName(ArrayList<String> fnNamePath) {
+  public FunctionName(List<String> fnNamePath) {
     fnNamePath_ = fnNamePath;
   }
 
@@ -75,7 +75,7 @@ public class FunctionName {
   public String getFunction() { return fn_; }
   public boolean isFullyQualified() { return db_ != null; }
   public boolean isBuiltin() { return isBuiltin_; }
-  public ArrayList<String> getFnNamePath() { return fnNamePath_; }
+  public List<String> getFnNamePath() { return fnNamePath_; }
 
   @Override
   public String toString() {

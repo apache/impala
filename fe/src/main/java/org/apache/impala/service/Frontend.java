@@ -1049,7 +1049,7 @@ public class Frontend {
   private TPlanExecInfo createPlanExecInfo(PlanFragment planRoot, Planner planner,
       TQueryCtx queryCtx, TQueryExecRequest queryExecRequest) {
     TPlanExecInfo result = new TPlanExecInfo();
-    ArrayList<PlanFragment> fragments = planRoot.getNodesPreOrder();
+    List<PlanFragment> fragments = planRoot.getNodesPreOrder();
 
     // collect ScanNodes
     List<ScanNode> scanNodes = Lists.newArrayList();
@@ -1147,7 +1147,7 @@ public class Frontend {
 
     // create EXPLAIN output after setting everything else
     result.setQuery_ctx(queryCtx);  // needed by getExplainString()
-    ArrayList<PlanFragment> allFragments = planRoots.get(0).getNodesPreOrder();
+    List<PlanFragment> allFragments = planRoots.get(0).getNodesPreOrder();
     explainString.append(planner.getExplainString(allFragments, result));
     result.setQuery_plan(explainString.toString());
 

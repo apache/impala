@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.authorization.PrivilegeRequest;
@@ -53,12 +52,12 @@ public class WithClause implements ParseNode {
   /////////////////////////////////////////
   // BEGIN: Members that need to be reset()
 
-  private final ArrayList<View> views_;
+  private final List<View> views_;
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
-  public WithClause(ArrayList<View> views) {
+  public WithClause(List<View> views) {
     Preconditions.checkNotNull(views);
     Preconditions.checkState(!views.isEmpty());
     views_ = views;

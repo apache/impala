@@ -292,7 +292,7 @@ public class AnalyticPlanner {
     // we materialize those rhs TupleIsNullPredicates, which are then substituted
     // by a SlotRef into the sort's tuple in ancestor nodes (IMPALA-1519).
     if (inputSmap != null) {
-      List<Expr> tupleIsNullPreds = Lists.newArrayList();
+      List<TupleIsNullPredicate> tupleIsNullPreds = Lists.newArrayList();
       for (Expr rhsExpr: inputSmap.getRhs()) {
         // Ignore substitutions that are irrelevant at this plan node and its ancestors.
         if (!rhsExpr.isBoundByTupleIds(input.getTupleIds())) continue;
@@ -591,7 +591,7 @@ public class AnalyticPlanner {
    * Extract a minimal set of WindowGroups from analyticExprs.
    */
   private List<WindowGroup> collectWindowGroups() {
-    List<Expr> analyticExprs = analyticInfo_.getAnalyticExprs();
+    List<AnalyticExpr> analyticExprs = analyticInfo_.getAnalyticExprs();
     List<WindowGroup> groups = Lists.newArrayList();
     for (int i = 0; i < analyticExprs.size(); ++i) {
       AnalyticExpr analyticExpr = (AnalyticExpr) analyticExprs.get(i);

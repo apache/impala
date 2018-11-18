@@ -538,7 +538,7 @@ public class HdfsScanNode extends ScanNode {
     if (slotRef.getDesc().isArrayPosRef()) return;
     if (inPred.isNotIn()) return;
 
-    ArrayList<Expr> children = inPred.getChildren();
+    List<Expr> children = inPred.getChildren();
     LiteralExpr min = null;
     LiteralExpr max = null;
     for (int i = 1; i < children.size(); ++i) {

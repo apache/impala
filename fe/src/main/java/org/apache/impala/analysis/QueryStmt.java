@@ -49,7 +49,7 @@ public abstract class QueryStmt extends StatementBase {
 
   protected WithClause withClause_;
 
-  protected ArrayList<OrderByElement> orderByElements_;
+  protected List<OrderByElement> orderByElements_;
   protected LimitElement limitElement_;
 
   // For a select statment:
@@ -98,7 +98,7 @@ public abstract class QueryStmt extends StatementBase {
   // returns a single row.
   protected boolean isRuntimeScalar_ = false;
 
-  QueryStmt(ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
+  QueryStmt(List<OrderByElement> orderByElements, LimitElement limitElement) {
     orderByElements_ = orderByElements;
     sortInfo_ = null;
     limitElement_ = limitElement == null ? new LimitElement(null, null) : limitElement;

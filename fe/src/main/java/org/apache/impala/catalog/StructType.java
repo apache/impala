@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -36,9 +37,9 @@ import com.google.common.collect.Maps;
  */
 public class StructType extends Type {
   private final HashMap<String, StructField> fieldMap_ = Maps.newHashMap();
-  private final ArrayList<StructField> fields_;
+  private final List<StructField> fields_;
 
-  public StructType(ArrayList<StructField> fields) {
+  public StructType(List<StructField> fields) {
     Preconditions.checkNotNull(fields);
     fields_ = fields;
     for (int i = 0; i < fields_.size(); ++i) {
@@ -74,7 +75,7 @@ public class StructType extends Type {
     fieldMap_.put(field.getName().toLowerCase(), field);
   }
 
-  public ArrayList<StructField> getFields() { return fields_; }
+  public List<StructField> getFields() { return fields_; }
 
   public StructField getField(String fieldName) {
     return fieldMap_.get(fieldName.toLowerCase());

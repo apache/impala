@@ -246,7 +246,7 @@ public class Planner {
    * Uses a default level of EXTENDED, unless overriden by the
    * 'explain_level' query option.
    */
-  public String getExplainString(ArrayList<PlanFragment> fragments,
+  public String getExplainString(List<PlanFragment> fragments,
       TQueryExecRequest request) {
     // use EXTENDED by default for all non-explain statements
     TExplainLevel explainLevel = TExplainLevel.EXTENDED;
@@ -262,7 +262,7 @@ public class Planner {
    * explicit explain level.
    * Includes the estimated resource requirements from the request if set.
    */
-  public String getExplainString(ArrayList<PlanFragment> fragments,
+  public String getExplainString(List<PlanFragment> fragments,
       TQueryExecRequest request, TExplainLevel explainLevel) {
     StringBuilder str = new StringBuilder();
     boolean hasHeader = false;

@@ -17,13 +17,11 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.StructType;
@@ -54,7 +52,7 @@ public class DescribeTableStmt extends StatementBase {
   private final TDescribeOutputStyle outputStyle_;
 
   /// "."-separated path from the describe statement.
-  private final ArrayList<String> rawPath_;
+  private final List<String> rawPath_;
 
   /// The resolved path to describe, set after analysis.
   private Path path_;
@@ -66,7 +64,7 @@ public class DescribeTableStmt extends StatementBase {
   /// Only set when describing a path to a nested collection.
   private StructType resultStruct_;
 
-  public DescribeTableStmt(ArrayList<String> rawPath, TDescribeOutputStyle outputStyle) {
+  public DescribeTableStmt(List<String> rawPath, TDescribeOutputStyle outputStyle) {
     Preconditions.checkNotNull(rawPath);
     Preconditions.checkArgument(!rawPath.isEmpty());
     rawPath_ = rawPath;

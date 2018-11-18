@@ -162,7 +162,7 @@ public class UnionStmt extends QueryStmt {
   /////////////////////////////////////////
 
   public UnionStmt(List<UnionOperand> operands,
-      ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
+      List<OrderByElement> orderByElements, LimitElement limitElement) {
     super(orderByElements, limitElement);
     Preconditions.checkNotNull(operands);
     Preconditions.checkState(operands.size() > 0);
