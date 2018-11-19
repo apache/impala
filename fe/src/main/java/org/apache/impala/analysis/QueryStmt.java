@@ -317,32 +317,6 @@ public abstract class QueryStmt extends StatementBase {
   }
 
   /**
-   * Substitutes an ordinal or an alias. An ordinal is an integer NumericLiteral
-   * that refers to a select-list expression by ordinal. An alias is a SlotRef
-   * that matches the alias of a select-list expression (tracked by 'aliasMap_').
-   * We should substitute by ordinal or alias but not both to avoid an incorrect
-   * double substitution.
-   * Returns clone() of 'expr' if it is not an ordinal, nor an alias.
-   * The returned expr is analyzed regardless of whether substitution was performed.
-   */
-  protected Expr substituteOrdinalOrAlias(Expr expr, String errorPrefix,
-      Analyzer analyzer) throws AnalysisException {
-    Expr substituteExpr = trySubstituteOrdinal(expr, errorPrefix, analyzer);
-    if (substituteExpr != null) return substituteExpr;
-    if (ambiguousAliasList_.contains(expr)) {
-      throw new AnalysisException("Column '" + expr.toSql() +
-          "' in " + errorPrefix + " clause is ambiguous");
-    }
-    if (expr instanceof SlotRef) {
-      substituteExpr = expr.trySubstitute(aliasSmap_, analyzer, false);
-    } else {
-      expr.analyze(analyzer);
-      substituteExpr = expr;
-    }
-    return substituteExpr;
-  }
-
-  /**
    * Substitutes top-level ordinals and aliases. Does not substitute ordinals and
    * aliases in subexpressions.
    * Modifies the 'exprs' list in-place.
@@ -352,35 +326,79 @@ public abstract class QueryStmt extends StatementBase {
   protected void substituteOrdinalsAndAliases(List<Expr> exprs, String errorPrefix,
       Analyzer analyzer) throws AnalysisException {
     for (int i = 0; i < exprs.size(); ++i) {
-      exprs.set(i, substituteOrdinalOrAlias(exprs.get(i), errorPrefix, analyzer));
+      exprs.set(i, resolveReferenceExpr(exprs.get(i), errorPrefix,
+          analyzer, true));
     }
   }
 
-  // Attempt to replace an expression of form "<number>" with the corresponding
-  // select list items.  Return null if not an ordinal expression.
-  private Expr trySubstituteOrdinal(Expr expr, String errorPrefix,
-      Analyzer analyzer) throws AnalysisException {
-    if (!(expr instanceof NumericLiteral)) return null;
-    expr.analyze(analyzer);
-    if (!expr.getType().isIntegerType()) return null;
-    long pos = ((NumericLiteral) expr).getLongValue();
-    if (pos < 1) {
-      throw new AnalysisException(
-          errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
-    }
-    if (pos > resultExprs_.size()) {
-      throw new AnalysisException(
-          errorPrefix + ": ordinal exceeds number of items in select list: "
-          + expr.toSql());
+  /**
+   * Substitutes an ordinal or an alias. An ordinal is an integer NumericLiteral
+   * that refers to a select-list expression by ordinal. An alias is a SlotRef
+   * that matches the alias of a select-list expression (tracked by 'aliasMap_').
+   * We should substitute by ordinal or alias but not both to avoid an incorrect
+   * double substitution.
+   *
+   * Logic is a bit tricky. The SlotRef, if it exists, cannot be resolved until we
+   * check for an alias. (Resolving the SlotRef may find a column, or trigger an
+   * error, which is not what we want.)
+   *
+   * After the alias check, then we can resolve (analyze) the expression.Then, if
+   * the expression is an ordinal, replace it. Else, the expression is "ordinary"
+   * and can be rewritten by the caller.
+   *
+   * @param expr the expression on which to perform substitution
+   * @param allowOrdinal whether the context of the expression allows ordinals.
+   * lists (ORDER BY, GROUP BY) allow ordinals, expressions (HAVING) do not.
+   * (In the 3.x series, for backward compatibility, HAVING continues to allow
+   * ordinals, but the goal is to remove this non-standard support in the future)
+   * @return the rewritten or substituted expression, with analysis completed
+   */
+  protected Expr resolveReferenceExpr(Expr expr,
+      String errorPrefix, Analyzer analyzer, boolean allowOrdinal)
+          throws AnalysisException {
+    // Check for a SlotRef (representing an alias) before analysis. Since
+    // the slot does not reference a real column, the analysis will fail.
+    // TODO: Seems an odd state of affairs. Consider revisiting by putting
+    // alias in a namespace that can be resolved more easily.
+    if (expr instanceof SlotRef) {
+      if (ambiguousAliasList_.contains(expr)) {
+        // Reference to an ambiguous alias
+        // SELECT foo AS a, bar AS a ORDER BY a
+        throw new AnalysisException(errorPrefix +
+            ": ambiguous alias: '" + expr.toSql() + "'");
+      }
+      // Look the name up in the alias substitution map
+      // Returns a clone of the expression if not found
+      return expr.trySubstitute(aliasSmap_, analyzer_, false);
     }
 
-    // Create copy to protect against accidentally shared state.
-    return resultExprs_.get((int) pos - 1).clone();
+    // Ordinal reference?
+    // Only want values that started as numeric literals
+    boolean wasNumber = expr instanceof NumericLiteral;
+    expr.analyze(analyzer);
+    if (allowOrdinal && wasNumber && Expr.IS_INT_LITERAL.apply(expr)) {
+      long pos = ((NumericLiteral) expr).getLongValue();
+      if (pos < 1) {
+        throw new AnalysisException(
+              errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
+      }
+      if (pos > resultExprs_.size()) {
+        throw new AnalysisException(
+              errorPrefix + ": ordinal exceeds the number of items in the SELECT list: " +
+                  expr.toSql());
+      }
+
+      // Create copy to protect against accidentally shared state.
+      return resultExprs_.get((int) pos - 1).clone();
+    }
+
+    // Ordinary expression..
+    return expr;
   }
 
   /**
    * Returns the materialized tuple ids of the output of this stmt.
-   * Used in case this stmt is part of an @InlineViewRef,
+   * Used in case this stmt is part of an InlineViewRef,
    * since we need to know the materialized tupls ids of a TableRef.
    * This call must be idempotent because it may be called more than once for Union stmt.
    * TODO: The name of this function has become outdated due to analytics

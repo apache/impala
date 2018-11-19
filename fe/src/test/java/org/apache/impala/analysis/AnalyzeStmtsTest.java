@@ -980,100 +980,161 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestAliasesAndOrdinals() throws AnalysisException {
-    AnalysisError("select * from functional.alltypes group by 1",
-        "cannot combine '*' in select list with grouping or aggregation");
-    AnalysisError("select * from functional.alltypes order by 14",
-        "ORDER BY: ordinal exceeds number of items in select list: 14");
-    AnalyzesOk("select t.* from functional.alltypes t order by 1");
-    AnalyzesOk("select t2.* from functional.alltypes t1, " +
-        "functional.alltypes t2 order by 1");
-    AnalyzesOk("select * from (select max(id) from functional.testtbl) t1 order by 1");
-    AnalysisError("select * from (select max(id) from functional.testtbl) t1 order by 2",
-        "ORDER BY: ordinal exceeds number of items in select list: 2");
-
-    // IMPALA-5191: In GROUP BY, HAVING, ORDER BY, aliases and ordinals must only be
+  public void TestGroupByAliases() throws AnalysisException {
+    // IMPALA-5191: GROUP BY, aliases must only be
     // substituted at the top level
-    // Ambiguous alias in HAVING
-    AnalysisError("select not bool_col m, min(smallint_col) m, max(bigint_col) m "
-        + "from functional.alltypes group by bool_col having m",
-        "Column 'm' in HAVING clause is ambiguous");
-    // GROUP BY, ORDER BY, HAVING contains top-level SlotRef or ordinal
     AnalyzesOk("select int_col / 2 as x from functional.alltypes group by x");
-    AnalyzesOk("select int_col / 2 as x from functional.alltypes order by x");
-    AnalyzesOk("select not bool_col as nb from functional.alltypes having nb");
-    AnalyzesOk("select int_col / 2 as x from functional.alltypes group by 1");
-    AnalyzesOk("select int_col / 2 as x from functional.alltypes order by 1");
-    AnalyzesOk("select not bool_col as nb from functional.alltypes having 1");
-    // GROUP BY, ORDER BY, HAVING contains alias in subexpression
+    // GROUP BY contains alias in subexpression
     AnalysisError(
         "select int_col / 2 as x from functional.alltypes group by x / 2",
         "Could not resolve column/field reference: 'x'");
-    AnalysisError(
-        "select int_col / 2 as x from functional.alltypes order by -x",
-        "Could not resolve column/field reference: 'x'");
-    AnalysisError(
-        "select int_col / 2 as x from functional.alltypes having x > 0",
-        "Could not resolve column/field reference: 'x'");
-    // Alias or ordinal referring to aggregation output in GROUP BY, ORDER BY, HAVING
+    // Alias referring to aggregation output in GROUP BY
     AnalysisError("select count(*) a from functional.alltypes group by a",
         "GROUP BY expression must not contain aggregate functions: a");
-    AnalyzesOk("select count(*) a from functional.alltypes order by a");
-    AnalysisError("select count(*) a from functional.alltypes having a",
-        "HAVING clause 'count(*)' requires return type 'BOOLEAN'. " +
-        "Actual type is 'BIGINT'.");
-    AnalysisError("select count(*) from functional.alltypes group by 1",
-        "GROUP BY expression must not contain aggregate functions: 1");
-    AnalyzesOk("select count(*) from functional.alltypes order by 1");
-    AnalysisError("select count(*) from functional.alltypes having 1",
-        "HAVING clause 'count(*)' requires return type 'BOOLEAN'. " +
-        "Actual type is 'BIGINT'.");
-    // Alias or ordinal referring to predicate in GROUP BY, ORDER BY, HAVING
+    // Alias referring to predicate in GROUP BY
     AnalysisError("select count(*) > 10 a from functional.alltypes group by a",
         "GROUP BY expression must not contain aggregate functions: a");
-    AnalyzesOk("select count(*) > 10 a from functional.alltypes order by a");
-    AnalyzesOk("select count(*) > 10 a from functional.alltypes having a");
-    AnalysisError("select count(*) > 10 from functional.alltypes group by 1",
-        "GROUP BY expression must not contain aggregate functions: 1");
-    AnalyzesOk("select count(*) > 10 from functional.alltypes order by 1");
-    AnalyzesOk("select count(*) > 10 from functional.alltypes having 1");
-    // Alias or ordinal referring to analytic output in GROUP BY, ORDER BY, HAVING
+    // Alias referring to analytic output in GROUP BY
     AnalysisError("select sum(id) over(order by id) a " +
         "from functional.alltypes group by a",
         "GROUP BY expression must not contain analytic expressions: " +
         "sum(id) OVER (ORDER BY id ASC)");
-    AnalyzesOk("select sum(id) over(order by id) a from functional.alltypes order by a");
-    AnalysisError("select sum(id) over(order by id) a from functional.alltypes having a",
-        "HAVING clause must not contain analytic expressions: " +
-        "sum(id) OVER (ORDER BY id ASC)");
-    AnalysisError("select sum(id) over(order by id) " +
-        "from functional.alltypes group by 1",
-        "GROUP BY expression must not contain analytic expressions: " +
-        "sum(id) OVER (ORDER BY id ASC)");
-    AnalyzesOk("select sum(id) over(order by id) from functional.alltypes order by 1");
-    AnalysisError("select sum(id) over(order by id) from functional.alltypes having 1",
-        "HAVING clause must not contain analytic expressions: " +
-        "sum(id) OVER (ORDER BY id ASC)");
+    // Alias referring to analytic output in GROUP BY
     AnalyzesOk("with w_test as (select '1' as `one`, 2 as two, '3' as three) " +
         "select `one` as `one`, substring(cast(two as string), 1, 1) as two, " +
         "three as three, count(1) as cnt " +
         "from w_test " +
         "group by `one`, substring(cast(two as string), 1, 1), three");
+  }
+
+  @Test
+  public void TestGroupByOrdinals() throws AnalysisException {
+    AnalysisError("select * from functional.alltypes group by 1",
+        "cannot combine '*' in select list with grouping or aggregation");
+    // IMPALA-5191: ORDER BY, ordinals must only be
+    // substituted at the top level
+    AnalyzesOk("select int_col / 2 as x from functional.alltypes group by 1");
+    // Ordinal referring to aggregation output in GROUP BY
+    AnalysisError("select count(*) from functional.alltypes group by 1",
+        "GROUP BY expression must not contain aggregate functions: 1");
+    // Ordinal referring to predicate in GROUP BY
+    AnalysisError("select count(*) > 10 from functional.alltypes group by 1",
+        "GROUP BY expression must not contain aggregate functions: 1");
+    // Ordinal referring to analytic output in GROUP BY
+    AnalysisError("select sum(id) over(order by id) " +
+        "from functional.alltypes group by 1",
+        "GROUP BY expression must not contain analytic expressions: " +
+        "sum(id) OVER (ORDER BY id ASC)");
     // Constant exprs should not be interpreted as ordinals
     AnalyzesOk("select int_col, count(*) from functional.alltypes group by 1, 1 * 2");
-    AnalyzesOk("select int_col, bigint_col from functional.alltypes order by 1 + 4");
-    AnalysisError("select int_col, bool_col, count(*) from functional.alltypes " +
-        "group by 1, 2 having 1 + 1",
-        "HAVING clause '1 + 1' requires return type 'BOOLEAN'. " +
-        "Actual type is 'SMALLINT'.");
     AnalyzesOk("select int_col, count(*) from functional.alltypes group by 1, " +
         "if(true, 2, int_col)");
+  }
+
+  @Test
+  public void TestOrderByAliases() throws AnalysisException {
+    // IMPALA-5191: ORDER BY, aliases must only be
+    // substituted at the top level
+    AnalyzesOk("select int_col / 2 as x from functional.alltypes order by x");
+    // ORDER BY contains alias in subexpression
+    AnalysisError(
+        "select int_col / 2 as x from functional.alltypes order by -x",
+        "Could not resolve column/field reference: 'x'");
+    // Alias referring to aggregation output in ORDER BY
+    AnalyzesOk("select count(*) a from functional.alltypes order by a");
+    // Alias referring to predicate in ORDER BY
+    AnalyzesOk("select count(*) > 10 a from functional.alltypes order by a");
+    // Alias referring to analytic output in ORDER BY
+    AnalyzesOk("select sum(id) over(order by id) a from functional.alltypes order by a");
+  }
+
+  @Test
+  public void TestOrderByOrdinals() throws AnalysisException {
+    AnalysisError("select * from functional.alltypes order by 14",
+        "ORDER BY: ordinal exceeds the number of items in the SELECT list: 14");
+    AnalyzesOk("select t.* from functional.alltypes t order by 1");
+    AnalyzesOk("select t2.* from functional.alltypes t1, " +
+        "functional.alltypes t2 order by 1");
+    AnalyzesOk("select * from (select max(id) from functional.testtbl) t1 order by 1");
+    AnalysisError("select * from (select max(id) from functional.testtbl) t1 order by 2",
+        "ORDER BY: ordinal exceeds the number of items in the SELECT list: 2");
+    // IMPALA-5191: ORDER BY, ordinals must only be
+    // substituted at the top level
+    AnalyzesOk("select int_col / 2 as x from functional.alltypes order by 1");
+    // Ordinal referring to aggregation output in ORDER BY
+    AnalyzesOk("select count(*) from functional.alltypes order by 1");
+    // Ordinal referring to predicate in ORDER BY
+    AnalyzesOk("select count(*) > 10 from functional.alltypes order by 1");
+    // Ordinal referring to analytic output in ORDER BY
+    AnalyzesOk("select sum(id) over(order by id) from functional.alltypes order by 1");
+    // Constant exprs should not be interpreted as ordinals
+    AnalyzesOk("select int_col, bigint_col from functional.alltypes order by 1 + 4");
     AnalyzesOk("select int_col, bigint_col from functional.alltypes order by " +
         "if(true, 7, int_col)");
-    AnalysisError("select int_col, bool_col, count(*) from functional.alltypes " +
-        "group by 1, 2 having if(TRUE, 2, int_col)",
-        "HAVING clause 'if(TRUE, 2, int_col)' requires return type 'BOOLEAN'. " +
-        "Actual type is 'INT'.");
+  }
+
+  @Test
+  public void TestHavingAliases() throws AnalysisException {
+    // Ambiguous alias in HAVING
+    AnalysisError("select not bool_col m, min(smallint_col) m, max(bigint_col) m "
+        + "from functional.alltypes group by bool_col having m",
+        "HAVING: ambiguous alias: 'm'");
+    // IMPALA-5191: HAVING, aliases must only be
+    // substituted at the top level
+    AnalyzesOk("select not bool_col as nb from functional.alltypes having nb");
+    // HAVING contains alias in subexpression
+    AnalysisError(
+        "select int_col / 2 as x from functional.alltypes having x > 0",
+        "Could not resolve column/field reference: 'x'");
+    // Alias referring to aggregation output in HAVING
+    AnalysisError("select count(*) a from functional.alltypes having a",
+        "HAVING clause 'count(*)' requires return type 'BOOLEAN'. " +
+        "Actual type is 'BIGINT'.");
+    // Alias referring to predicate in HAVING
+    AnalyzesOk("select count(*) > 10 a from functional.alltypes having a");
+    // Alias referring to analytic output in HAVING
+    AnalysisError("select sum(id) over(order by id) a from functional.alltypes having a",
+        "HAVING clause must not contain analytic expressions: " +
+        "sum(id) OVER (ORDER BY id ASC)");
+  }
+
+  // IMPALA-7844: Ordinals not supported in HAVING since
+  // HAVING is an expression, not a list like GROUP BY or ORDER BY.
+  // Verify that an integer is treated as a constant, not an ordinal.
+  @Test
+  public void TestHavingIntegers() throws AnalysisException {
+    if (SelectStmt.ALLOW_ORDINALS_IN_HAVING) {
+      // Legacy 3.x functionality
+      AnalyzesOk("select not bool_col as nb from functional.alltypes having 1");
+      AnalysisError("select count(*) from functional.alltypes having 1",
+          "HAVING clause 'count(*)' requires return type 'BOOLEAN'. " +
+          "Actual type is 'BIGINT'.");
+      AnalyzesOk("select count(*) > 10 from functional.alltypes having 1");
+      AnalysisError("select sum(id) over(order by id) from functional.alltypes having 1",
+          "HAVING clause must not contain analytic expressions: " +
+          "sum(id) OVER (ORDER BY id ASC)");
+      AnalysisError("select sum(id) over(order by id) from functional.alltypes having -1",
+          "HAVING: ordinal must be >= 1: -1");
+    } else {
+      // Forward-looking, post 3.x functionality
+      // IMPALA-7844: Ordinals not supported in HAVING since
+      // HAVING is an expression, not a list like GROUP BY or ORDER BY.
+      AnalysisError("select not bool_col as nb from functional.alltypes having 1",
+          "HAVING clause '1' requires return type 'BOOLEAN'. " +
+          "Actual type is 'TINYINT'.");
+      AnalysisError("select not bool_col as nb from functional.alltypes having -1",
+          "HAVING clause '1' requires return type 'BOOLEAN'. " +
+          "Actual type is 'TINYINT'.");
+      // Constant exprs should not be interpreted as ordinals
+      AnalysisError("select int_col, bool_col, count(*) from functional.alltypes " +
+          "group by 1, 2 having 1 + 1",
+          "HAVING clause '1 + 1' requires return type 'BOOLEAN'. " +
+          "Actual type is 'SMALLINT'.");
+      AnalysisError("select int_col, bool_col, count(*) from functional.alltypes " +
+          "group by 1, 2 having if(TRUE, 2, int_col)",
+          "HAVING clause 'if(TRUE, 2, int_col)' requires return type 'BOOLEAN'. " +
+          "Actual type is 'INT'.");
+    }
   }
 
   @Test
@@ -1168,7 +1229,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
             "(missing from GROUP BY clause?)");
     AnalysisError("select * from " +
         "(select zip, count(*) from functional.testtbl group by 3) x",
-        "GROUP BY: ordinal exceeds number of items in select list");
+        "GROUP BY: ordinal exceeds the number of items in the SELECT list");
     AnalysisError("select * from " +
         "(select * from functional.alltypes group by 1) x",
         "cannot combine '*' in select list with grouping or aggregation");
@@ -2392,7 +2453,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select zip, count(*) from functional.testtbl group by 1");
     AnalyzesOk("select count(*), zip from functional.testtbl group by 2");
     AnalysisError("select zip, count(*) from functional.testtbl group by 3",
-        "GROUP BY: ordinal exceeds number of items in select list: 3");
+        "GROUP BY: ordinal exceeds the number of items in the SELECT list: 3");
     AnalysisError("select * from functional.alltypes group by 1",
         "cannot combine '*' in select list with grouping or aggregation");
     // picks up select item alias
@@ -2405,9 +2466,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes group by a, b");
     // ambiguous alias
     AnalysisError("select zip a, id a, count(*) from functional.testtbl group by a",
-        "Column 'a' in GROUP BY clause is ambiguous");
+        "GROUP BY: ambiguous alias: 'a'");
     AnalysisError("select zip id, id, count(*) from functional.testtbl group by id",
-        "Column 'id' in GROUP BY clause is ambiguous");
+        "GROUP BY: ambiguous alias: 'id'");
 
     // can't group by aggregate
     AnalysisError("select zip, count(*) from functional.testtbl group by count(*)",
@@ -2464,7 +2525,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select zip, id from functional.testtbl order by 0",
         "ORDER BY: ordinal must be >= 1");
     AnalysisError("select zip, id from functional.testtbl order by 3",
-        "ORDER BY: ordinal exceeds number of items in select list: 3");
+        "ORDER BY: ordinal exceeds the number of items in the SELECT list: 3");
     AnalyzesOk("select * from functional.alltypes order by 1");
     // picks up select item alias
     AnalyzesOk("select zip z, id C, id D from functional.testtbl order by z, C, d");
@@ -2500,10 +2561,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // ambiguous alias causes error
     AnalysisError("select string_col a, int_col a from " +
         "functional.alltypessmall order by a limit 1",
-        "Column 'a' in ORDER BY clause is ambiguous");
+        "ORDER BY: ambiguous alias: 'a'");
     AnalysisError("select string_col a, int_col A from " +
         "functional.alltypessmall order by a limit 1",
-        "Column 'a' in ORDER BY clause is ambiguous");
+        "ORDER BY: ambiguous alias: 'a'");
 
     // Test if an ignored order by produces the expected warning.
     AnalyzesOk("select * from (select * from functional.alltypes order by int_col) A",
@@ -2666,12 +2727,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Invalid ordinal in order by.
     AnalysisError("(select int_col from functional.alltypes) " +
         "union (select int_col from functional.alltypessmall) order by 2",
-        "ORDER BY: ordinal exceeds number of items in select list: 2");
+        "ORDER BY: ordinal exceeds the number of items in the SELECT list: 2");
     // Ambiguous order by.
     AnalysisError("(select int_col a, string_col a from functional.alltypes) " +
         "union (select int_col a, string_col a " +
         "from functional.alltypessmall) order by a",
-        "Column 'a' in ORDER BY clause is ambiguous");
+        "ORDER BY: ambiguous alias: 'a'");
     // Ambiguous alias in the second union operand should work.
     AnalyzesOk("(select int_col a, string_col b from functional.alltypes) " +
         "union (select int_col a, string_col a " +
@@ -2680,7 +2741,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // (the corresponding in exprs in the other operand are different)
     AnalysisError("select int_col a, int_col a from functional.alltypes " +
         "union all (select 1, bigint_col from functional.alltypessmall) order by a",
-        "Column 'a' in ORDER BY clause is ambiguous");
+        "ORDER BY: ambiguous alias: 'a'");
 
     // Column labels are inherited from first select block.
     // Order by references an invalid column

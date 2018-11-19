@@ -49,6 +49,39 @@ import com.google.common.collect.Lists;
 public class SelectStmt extends QueryStmt {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
 
+  /**
+   * Impala 3.x and earlier provide non-standard support for a single ordinal
+   * in the HAVING clause:
+   *
+   * SELECT region, count(*), count(*) > 10 FROM sales
+   * HAVING 3
+   *
+   * Most other SQL dialects do not allow ordinals in expressions (such as
+   * HAVING), only in lists (GROUP BY, ORDER BY). The standard way to express
+   * the above is:
+   *
+   * SELECT region, count(*) FROM sales
+   * HAVING count(*) > 10
+   *
+   * Or, better (not currently supported by IMPALA):
+   *
+   * SELECT region, count(*) c FROM SALES
+   * HAVING c > 10
+   *
+   * We intend to disable this non-standard feature in the next major
+   * release. For now, we leave the feature/bug enabled, controlled by
+   * the following constant.
+   *
+   * In that same release, we will enable the third example above.
+   * At present, all that is supported is the odd:
+   *
+   * SELECT region, count(*), count(*) > 10 p FROM sales
+   * HAVING p
+   *
+   * See IMPALA-7844.
+   */
+  public static final boolean ALLOW_ORDINALS_IN_HAVING = true;
+
   /////////////////////////////////////////
   // BEGIN: Members that need to be reset()
 
@@ -537,25 +570,37 @@ public class SelectStmt extends QueryStmt {
       verifyAggregation();
     }
 
+    /**
+     * Analyze the HAVING clause. The HAVING clause is a predicate, not a list
+     * (like GROUP BY or ORDER BY) and so cannot contain ordinals.
+     *
+     * At present, Impala's alias substitution logic only works for top-level
+     * expressions in a list. Since HAVING is a predicate, alias substitution
+     * does not work (the top-level predicate in HAVING is a Boolean expression.)
+     *
+     * TODO: Modify alias substitution to work like column resolution so that aliases
+     * can appear anywhere in the expression. Then, enable alias substitution in HAVING.
+     */
     private void analyzeHavingClause() throws AnalysisException {
       // Analyze the HAVING clause first so we can check if it contains aggregates.
       // We need to analyze/register it even if we are not computing aggregates.
-      if (havingClause_ != null) {
-        // can't contain subqueries
-        if (havingClause_.contains(Predicates.instanceOf(Subquery.class))) {
-          throw new AnalysisException(
-              "Subqueries are not supported in the HAVING clause.");
-        }
-        havingPred_ = substituteOrdinalOrAlias(havingClause_, "HAVING", analyzer_);
-        // can't contain analytic exprs
-        Expr analyticExpr = havingPred_.findFirstOf(AnalyticExpr.class);
-        if (analyticExpr != null) {
-          throw new AnalysisException(
-              "HAVING clause must not contain analytic expressions: "
-                 + analyticExpr.toSql());
-        }
-        havingPred_.checkReturnsBool("HAVING clause", true);
+      if (havingClause_ == null) return;
+      // can't contain subqueries
+      if (havingClause_.contains(Predicates.instanceOf(Subquery.class))) {
+        throw new AnalysisException(
+            "Subqueries are not supported in the HAVING clause.");
       }
+      // Resolve (top-level) aliases and analyzes
+      havingPred_ = resolveReferenceExpr(havingClause_, "HAVING", analyzer_,
+          ALLOW_ORDINALS_IN_HAVING);
+      // can't contain analytic exprs
+      Expr analyticExpr = havingPred_.findFirstOf(AnalyticExpr.class);
+      if (analyticExpr != null) {
+        throw new AnalysisException(
+            "HAVING clause must not contain analytic expressions: "
+               + analyticExpr.toSql());
+      }
+      havingPred_.checkReturnsBool("HAVING clause", true);
     }
 
     private boolean checkForAggregates() throws AnalysisException {

@@ -293,6 +293,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       }
     };
 
+  public final static com.google.common.base.Predicate<Expr> IS_INT_LITERAL =
+    new com.google.common.base.Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr arg) {
+        return IS_LITERAL.apply(arg) && arg.getType().isIntegerType();
+      }
+    };
+
   // id that's unique across the entire query statement and is assigned by
   // Analyzer.registerConjuncts(); only assigned for the top-level terms of a
   // conjunction, and therefore null for most Exprs
