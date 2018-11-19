@@ -20,13 +20,10 @@
 #include <sstream>
 #include <boost/scoped_ptr.hpp>
 
-#include "exprs/scalar-expr-evaluator.h"
 #include "rpc/thrift-util.h"
 #include "runtime/raw-value.h"
-#include "runtime/row-batch.h"
 #include "runtime/types.h"
 #include "service/hs2-util.h"
-#include "util/bit-util.h"
 
 #include "common/names.h"
 
@@ -54,19 +51,18 @@ class AsciiQueryResultSet : public QueryResultSet {
 
   virtual ~AsciiQueryResultSet() {}
 
-  /// Evaluate 'expr_evals' over rows in 'batch', convert to ASCII using "\t" as column
+  /// Convert one row's expr values stored in 'col_values' to ASCII using "\t" as column
   /// delimiter and store it in this result set.
   /// TODO: Handle complex types.
-  virtual Status AddRows(const vector<ScalarExprEvaluator*>& expr_evals, RowBatch* batch,
-      int start_idx, int num_rows) override;
+  virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales);
 
   /// Convert TResultRow to ASCII using "\t" as column delimiter and store it in this
   /// result set.
-  virtual Status AddOneRow(const TResultRow& row) override;
+  virtual Status AddOneRow(const TResultRow& row);
 
-  virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) override;
-  virtual int64_t ByteSize(int start_idx, int num_rows) override;
-  virtual size_t size() override { return result_set_->size(); }
+  virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows);
+  virtual int64_t ByteSize(int start_idx, int num_rows);
+  virtual size_t size() { return result_set_->size(); }
 
  private:
   /// Metadata of the result set
@@ -84,20 +80,18 @@ class HS2ColumnarResultSet : public QueryResultSet {
 
   virtual ~HS2ColumnarResultSet() {}
 
-  /// Evaluate 'expr_evals' over rows in 'batch' and convert to the HS2 columnar
-  /// representation.
-  virtual Status AddRows(const vector<ScalarExprEvaluator*>& expr_evals, RowBatch* batch,
-      int start_idx, int num_rows) override;
+  /// Add a row of expr values
+  virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales);
 
   /// Add a row from a TResultRow
-  virtual Status AddOneRow(const TResultRow& row) override;
+  virtual Status AddOneRow(const TResultRow& row);
 
   /// Copy all columns starting at 'start_idx' and proceeding for a maximum of 'num_rows'
   /// from 'other' into this result set
-  virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) override;
+  virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows);
 
-  virtual int64_t ByteSize(int start_idx, int num_rows) override;
-  virtual size_t size() override { return num_rows_; }
+  virtual int64_t ByteSize(int start_idx, int num_rows);
+  virtual size_t size() { return num_rows_; }
 
  private:
   /// Metadata of the result set
@@ -125,17 +119,15 @@ class HS2RowOrientedResultSet : public QueryResultSet {
 
   virtual ~HS2RowOrientedResultSet() {}
 
-  /// Evaluate 'expr_evals' over rows in 'batch' and convert to the HS2 row-oriented
-  /// representation of TRows stored in a TRowSet.
-  virtual Status AddRows(const vector<ScalarExprEvaluator*>& expr_evals, RowBatch* batch,
-      int start_idx, int num_rows) override;
+  /// Convert expr values to HS2 TRow and store it in a TRowSet.
+  virtual Status AddOneRow(const vector<void*>& col_values, const vector<int>& scales);
 
   /// Convert TResultRow to HS2 TRow and store it in a TRowSet
-  virtual Status AddOneRow(const TResultRow& row) override;
+  virtual Status AddOneRow(const TResultRow& row);
 
-  virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) override;
-  virtual int64_t ByteSize(int start_idx, int num_rows) override;
-  virtual size_t size() override { return result_set_->rows.size(); }
+  virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows);
+  virtual int64_t ByteSize(int start_idx, int num_rows);
+  virtual size_t size() { return result_set_->rows.size(); }
 
  private:
   /// Metadata of the result set
@@ -166,34 +158,20 @@ QueryResultSet* QueryResultSet::CreateHS2ResultSet(
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_evals,
-    RowBatch* batch, int start_idx, int num_rows) {
-  DCHECK_GE(batch->num_rows(), start_idx + num_rows);
-  int num_col = expr_evals.size();
+Status AsciiQueryResultSet::AddOneRow(
+    const vector<void*>& col_values, const vector<int>& scales) {
+  int num_col = col_values.size();
   DCHECK_EQ(num_col, metadata_.columns.size());
-  vector<int> scales;
-  scales.reserve(num_col);
-  for (ScalarExprEvaluator* expr_eval : expr_evals) {
-    scales.push_back(expr_eval->output_scale());
-  }
-  // Round up to power-of-two to avoid accidentally quadratic behaviour from repeated
-  // small increases in size.
-  result_set_->reserve(
-      BitUtil::RoundUpToPowerOfTwo(result_set_->size() + num_rows - start_idx));
   stringstream out_stream;
   out_stream.precision(ASCII_PRECISION);
-  FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
-    for (int i = 0; i < num_col; ++i) {
-      // ODBC-187 - ODBC can only take "\t" as the delimiter
-      out_stream << (i > 0 ? "\t" : "");
-      DCHECK_EQ(1, metadata_.columns[i].columnType.types.size());
-      RawValue::PrintValue(expr_evals[i]->GetValue(it.Get()),
-          ColumnType::FromThrift(metadata_.columns[i].columnType), scales[i],
-          &out_stream);
-    }
-    result_set_->push_back(out_stream.str());
-    out_stream.str("");
+  for (int i = 0; i < num_col; ++i) {
+    // ODBC-187 - ODBC can only take "\t" as the delimiter
+    out_stream << (i > 0 ? "\t" : "");
+    DCHECK_EQ(1, metadata_.columns[i].columnType.types.size());
+    RawValue::PrintValue(col_values[i],
+        ColumnType::FromThrift(metadata_.columns[i].columnType), scales[i], &out_stream);
   }
+  result_set_->push_back(out_stream.str());
   return Status::OK();
 }
 
@@ -285,18 +263,16 @@ HS2ColumnarResultSet::HS2ColumnarResultSet(
   InitColumns();
 }
 
-Status HS2ColumnarResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_evals,
-    RowBatch* batch, int start_idx, int num_rows) {
-  DCHECK_GE(batch->num_rows(), start_idx + num_rows);
-  int num_col = expr_evals.size();
+// Add a row of expr values
+Status HS2ColumnarResultSet::AddOneRow(
+    const vector<void*>& col_values, const vector<int>& scales) {
+  int num_col = col_values.size();
   DCHECK_EQ(num_col, metadata_.columns.size());
   for (int i = 0; i < num_col; ++i) {
-    const TColumnType& type = metadata_.columns[i].columnType;
-    ScalarExprEvaluator* expr_eval = expr_evals[i];
-    ExprValuesToHS2TColumn(expr_eval, type, batch, start_idx, num_rows, num_rows_,
+    ExprValueToHS2TColumn(col_values[i], metadata_.columns[i].columnType, num_rows_,
         &(result_set_->columns[i]));
   }
-  num_rows_ += num_rows;
+  ++num_rows_;
   return Status::OK();
 }
 
@@ -451,21 +427,16 @@ HS2RowOrientedResultSet::HS2RowOrientedResultSet(
   }
 }
 
-Status HS2RowOrientedResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_evals,
-    RowBatch* batch, int start_idx, int num_rows) {
-  DCHECK_GE(batch->num_rows(), start_idx + num_rows);
-  int num_col = expr_evals.size();
+Status HS2RowOrientedResultSet::AddOneRow(
+    const vector<void*>& col_values, const vector<int>& scales) {
+  int num_col = col_values.size();
   DCHECK_EQ(num_col, metadata_.columns.size());
-  result_set_->rows.reserve(
-      BitUtil::RoundUpToPowerOfTwo(result_set_->rows.size() + num_rows - start_idx));
-  FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
-    result_set_->rows.push_back(TRow());
-    TRow& trow = result_set_->rows.back();
-    trow.colVals.resize(num_col);
-    for (int i = 0; i < num_col; ++i) {
-      ExprValueToHS2TColumnValue(expr_evals[i]->GetValue(it.Get()),
-          metadata_.columns[i].columnType, &(trow.colVals[i]));
-    }
+  result_set_->rows.push_back(TRow());
+  TRow& trow = result_set_->rows.back();
+  trow.colVals.resize(num_col);
+  for (int i = 0; i < num_col; ++i) {
+    ExprValueToHS2TColumnValue(
+        col_values[i], metadata_.columns[i].columnType, &(trow.colVals[i]));
   }
   return Status::OK();
 }
