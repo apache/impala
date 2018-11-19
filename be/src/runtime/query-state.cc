@@ -245,7 +245,10 @@ void QueryState::UpdateBackendExecState() {
     }
   }
   // Send one last report if the query has reached the terminal state.
-  if (IsTerminalState()) ReportExecStatus();
+  if (IsTerminalState()) {
+    VLOG_QUERY << "UpdateBackendExecState(): last report for " << PrintId(query_id());
+    ReportExecStatus();
+  }
 }
 
 FragmentInstanceState* QueryState::GetFInstanceState(const TUniqueId& instance_id) {
