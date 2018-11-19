@@ -930,7 +930,9 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
 
     deadline_ms = UnixMillis() + FLAGS_statestore_heartbeat_frequency_ms;
   } else {
-    bool update_skipped;
+    // Initialize to false so that we don't consider the update skipped when
+    // SendTopicUpdate() fails.
+    bool update_skipped = false;
     status = SendTopicUpdate(subscriber.get(), update_kind, &update_skipped);
     if (status.code() == TErrorCode::RPC_RECV_TIMEOUT) {
       // Add details to status to make it more useful, while preserving the stack
