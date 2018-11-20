@@ -282,6 +282,11 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   Status SerializeToArchiveString(std::string* out) const WARN_UNUSED_RESULT;
   Status SerializeToArchiveString(std::stringstream* out) const WARN_UNUSED_RESULT;
 
+  /// Deserializes a string into a TRuntimeProfileTree. 'archive_str' is expected to have
+  /// been serialized by SerializeToArchiveString().
+  static Status DeserializeFromArchiveString(
+      const std::string& archive_str, TRuntimeProfileTree* out);
+
   /// Divides all counters by n
   void Divide(int n);
 

@@ -560,15 +560,24 @@ Status ClientRequestState::ExecDdlRequest() {
   if (ddl_type() == TDdlType::COMPUTE_STATS) {
     TComputeStatsParams& compute_stats_params =
         exec_request_.catalog_op_request.ddl_params.compute_stats_params;
+    RuntimeProfile* child_profile =
+        RuntimeProfile::Create(&profile_pool_, "Child Queries");
+    profile_->AddChild(child_profile);
     // Add child queries for computing table and column stats.
     vector<ChildQuery> child_queries;
     if (compute_stats_params.__isset.tbl_stats_query) {
-      child_queries.push_back(
-          ChildQuery(compute_stats_params.tbl_stats_query, this, parent_server_));
+      RuntimeProfile* profile =
+          RuntimeProfile::Create(&profile_pool_, "Table Stats Query");
+      child_profile->AddChild(profile);
+      child_queries.emplace_back(compute_stats_params.tbl_stats_query, this,
+          parent_server_, profile, &profile_pool_);
     }
     if (compute_stats_params.__isset.col_stats_query) {
-      child_queries.push_back(
-          ChildQuery(compute_stats_params.col_stats_query, this, parent_server_));
+      RuntimeProfile* profile =
+          RuntimeProfile::Create(&profile_pool_, "Column Stats Query");
+      child_profile->AddChild(profile);
+      child_queries.emplace_back(compute_stats_params.col_stats_query, this,
+          parent_server_, profile, &profile_pool_);
     }
 
     if (child_queries.size() > 0) {

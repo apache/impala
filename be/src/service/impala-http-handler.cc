@@ -214,7 +214,8 @@ void ImpalaHttpHandler::QueryProfileHandler(const Webserver::ArgumentMap& args,
   }
 
   stringstream ss;
-  Status status = server_->GetRuntimeProfileStr(unique_id, "", false, &ss);
+  Status status = server_->GetRuntimeProfileOutput(
+      unique_id, "", TRuntimeProfileFormat::STRING, &ss, nullptr);
   if (!status.ok()) {
     Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
@@ -235,7 +236,8 @@ void ImpalaHttpHandler::QueryProfileEncodedHandler(const Webserver::ArgumentMap&
   if (!status.ok()) {
     ss << status.GetDetail();
   } else {
-    Status status = server_->GetRuntimeProfileStr(unique_id, "", true, &ss);
+    Status status = server_->GetRuntimeProfileOutput(
+        unique_id, "", TRuntimeProfileFormat::BASE64, &ss, nullptr);
     if (!status.ok()) {
       ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }

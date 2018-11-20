@@ -296,6 +296,21 @@ class TestObservability(ImpalaTestSuite):
           "Didn't find event '" + regex + "' for query '" + query + \
           "' in profile: \n" + runtime_profile
 
+  def test_compute_stats_profile(self, unique_database):
+    """Test that the profile for a 'compute stats' query contains three unique query ids:
+    one for the parent 'compute stats' query and one each for the two child queries."""
+    table_name = "%s.test_compute_stats_profile" % unique_database
+    self.execute_query(
+        "create table %s as select * from functional.alltypestiny" % table_name)
+    results = self.execute_query("compute stats %s" % table_name)
+    # Search for all query ids (max length 33) in the profile.
+    matches = re.findall("Query \(id=.{,33}\)", results.runtime_profile)
+    query_ids = []
+    for query_id in matches:
+      if query_id not in query_ids:
+        query_ids.append(query_id)
+    assert len(query_ids) == 3, results.runtime_profile
+
 class TestThriftProfile(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

@@ -896,9 +896,18 @@ void ImpalaServer::GetRuntimeProfile(TGetRuntimeProfileResp& return_val,
       request.operationHandle.operationId, &query_id, &secret), SQLSTATE_GENERAL_ERROR);
 
   stringstream ss;
-  HS2_RETURN_IF_ERROR(return_val, GetRuntimeProfileStr(query_id,
-      GetEffectiveUser(*session), false, &ss), SQLSTATE_GENERAL_ERROR);
-  return_val.__set_profile(ss.str());
+  TRuntimeProfileTree thrift_profile;
+  HS2_RETURN_IF_ERROR(return_val,
+      GetRuntimeProfileOutput(
+          query_id, GetEffectiveUser(*session), request.format, &ss, &thrift_profile),
+      SQLSTATE_GENERAL_ERROR);
+  if (request.format == TRuntimeProfileFormat::THRIFT) {
+    return_val.__set_thrift_profile(thrift_profile);
+  } else {
+    DCHECK(request.format == TRuntimeProfileFormat::STRING
+        || request.format == TRuntimeProfileFormat::BASE64);
+    return_val.__set_profile(ss.str());
+  }
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 

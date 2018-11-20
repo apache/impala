@@ -379,7 +379,8 @@ void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& 
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_RPC << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
-  Status status = GetRuntimeProfileStr(query_id, GetEffectiveUser(*session), false, &ss);
+  Status status = GetRuntimeProfileOutput(
+      query_id, GetEffectiveUser(*session), TRuntimeProfileFormat::STRING, &ss, nullptr);
   if (!status.ok()) {
     ss << "GetRuntimeProfile error: " << status.GetDetail();
     RaiseBeeswaxException(ss.str(), SQLSTATE_GENERAL_ERROR);

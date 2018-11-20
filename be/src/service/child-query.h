@@ -50,10 +50,12 @@ class ImpalaServer;
 class ChildQuery {
  public:
   ChildQuery(const std::string& query, ClientRequestState* parent_request_state,
-      ImpalaServer* parent_server)
+      ImpalaServer* parent_server, RuntimeProfile* profile, ObjectPool* profile_pool)
     : query_(query),
       parent_request_state_(parent_request_state),
       parent_server_(parent_server),
+      profile_(profile),
+      profile_pool_(profile_pool),
       is_running_(false),
       is_cancelled_(false) {
     DCHECK(!query_.empty());
@@ -67,6 +69,8 @@ class ChildQuery {
     : query_(other.query_),
       parent_request_state_(other.parent_request_state_),
       parent_server_(other.parent_server_),
+      profile_(other.profile_),
+      profile_pool_(other.profile_pool_),
       is_running_(other.is_running_),
       is_cancelled_(other.is_cancelled_) {}
 
@@ -123,6 +127,10 @@ class ChildQuery {
 
   /// Parent Impala server used for executing this child query. Not owned.
   ImpalaServer* parent_server_;
+
+  /// The profile for the query is retrieved after Close() and added as a child.
+  RuntimeProfile* profile_;
+  ObjectPool* profile_pool_;
 
   /// Result metadata and result rows of query.
   apache::hive::service::cli::thrift::TGetResultSetMetadataResp meta_resp_;

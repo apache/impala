@@ -21,6 +21,19 @@ namespace java org.apache.impala.thrift
 include "ExecStats.thrift"
 include "Metrics.thrift"
 
+// Represents the different formats a runtime profile can be represented in.
+enum TRuntimeProfileFormat {
+  // Pretty printed.
+  STRING,
+
+  // The thrift profile, serialized, compressed, and encoded. Used for the query log.
+  // See RuntimeProfile::SerializeToArchiveString.
+  BASE64,
+
+  // TRuntimeProfileTree.
+  THRIFT
+}
+
 // Counter data
 struct TCounter {
   1: required string name

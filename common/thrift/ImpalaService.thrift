@@ -23,6 +23,7 @@ include "Status.thrift"
 include "Types.thrift"
 include "beeswax.thrift"
 include "TCLIService.thrift"
+include "RuntimeProfile.thrift"
 
 // ImpalaService accepts query execution options through beeswax.Query.configuration in
 // key:value form. For example, the list of strings could be:
@@ -438,12 +439,19 @@ struct TGetRuntimeProfileReq {
   1: optional TCLIService.TOperationHandle operationHandle
 
   2: optional TCLIService.TSessionHandle sessionHandle
+
+  3: optional RuntimeProfile.TRuntimeProfileFormat format =
+      RuntimeProfile.TRuntimeProfileFormat.STRING
 }
 
 struct TGetRuntimeProfileResp {
   1: required TCLIService.TStatus status
 
+  // Will be set on success if TGetRuntimeProfileReq.format was STRING or BASE64.
   2: optional string profile
+
+  // Will be set on success if TGetRuntimeProfileReq.format was THRIFT.
+  3: optional RuntimeProfile.TRuntimeProfileTree thrift_profile
 }
 
 service ImpalaHiveServer2Service extends TCLIService.TCLIService {

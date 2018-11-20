@@ -29,6 +29,7 @@
 #include "common/object-pool.h"
 #include "gutil/strings/strip.h"
 #include "rpc/thrift-util.h"
+#include "runtime/mem-tracker.h"
 #include "util/coding-util.h"
 #include "util/compress.h"
 #include "util/container-util.h"
@@ -857,6 +858,45 @@ Status RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   return Status::OK();;
 }
 
+Status RuntimeProfile::DeserializeFromArchiveString(
+    const std::string& archive_str, TRuntimeProfileTree* out) {
+  int64_t decoded_max;
+  if (!Base64DecodeBufLen(archive_str.c_str(), archive_str.size(), &decoded_max)) {
+    return Status("Error in DeserializeFromArchiveString: Base64DecodeBufLen failed.");
+  }
+
+  vector<uint8_t> decoded_buffer;
+  decoded_buffer.resize(decoded_max);
+  int64_t decoded_len;
+  if (!Base64Decode(archive_str.c_str(), archive_str.size(), decoded_max,
+          reinterpret_cast<char*>(decoded_buffer.data()), &decoded_len)) {
+    return Status("Error in DeserializeFromArchiveString: Base64Decode failed.");
+  }
+  decoded_buffer.resize(decoded_len);
+
+  scoped_ptr<Codec> decompressor;
+  MemTracker mem_tracker;
+  MemPool mem_pool(&mem_tracker);
+  const auto close_mem_tracker = MakeScopeExitTrigger([&mem_pool, &mem_tracker]() {
+    mem_pool.FreeAll();
+    mem_tracker.Close();
+  });
+  RETURN_IF_ERROR(Codec::CreateDecompressor(
+      &mem_pool, false, THdfsCompression::DEFAULT, &decompressor));
+  const auto close_decompressor =
+      MakeScopeExitTrigger([&decompressor]() { decompressor->Close(); });
+
+  int64_t result_len;
+  uint8_t* decompressed_buffer;
+  RETURN_IF_ERROR(decompressor->ProcessBlock(
+      false, decoded_len, decoded_buffer.data(), &result_len, &decompressed_buffer));
+
+  uint32_t deserialized_len = static_cast<uint32_t>(result_len);
+  RETURN_IF_ERROR(
+      DeserializeThriftMsg(decompressed_buffer, &deserialized_len, true, out));
+  return Status::OK();
+}
+
 void RuntimeProfile::SetTExecSummary(const TExecSummary& summary) {
   lock_guard<SpinLock> l(t_exec_summary_lock_);
   t_exec_summary_ = summary;
@@ -956,6 +996,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
 
 void RuntimeProfile::ExecSummaryToThrift(TRuntimeProfileTree* tree) const {
   GetExecSummary(&tree->exec_summary);
+  tree->__isset.exec_summary = true;
 }
 
 void RuntimeProfile::GetExecSummary(TExecSummary* t_exec_summary) const {

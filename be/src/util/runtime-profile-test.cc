@@ -70,7 +70,7 @@ TEST(CountersTest, Basic) {
   exec_summary.__set_status(status);
   profile_a->SetTExecSummary(exec_summary);
 
-  // Serialize/deserialize
+  // Serialize/deserialize to thrift
   profile_a->ToThrift(&thrift_profile);
   RuntimeProfile* from_thrift = RuntimeProfile::CreateFromThrift(&pool, thrift_profile);
   counter_merged = from_thrift->GetCounter("A");
@@ -78,6 +78,20 @@ TEST(CountersTest, Basic) {
   EXPECT_TRUE(from_thrift->GetCounter("Not there") ==  NULL);
   TExecSummary exec_summary_result;
   from_thrift->GetExecSummary(&exec_summary_result);
+  EXPECT_EQ(exec_summary_result.status, status);
+
+  // Seralize/deserialize to archive string
+  string archive_str;
+  EXPECT_OK(profile_a->SerializeToArchiveString(&archive_str));
+  TRuntimeProfileTree deserialized_thrift_profile;
+  EXPECT_OK(RuntimeProfile::DeserializeFromArchiveString(
+      archive_str, &deserialized_thrift_profile));
+  RuntimeProfile* deserialized_profile =
+      RuntimeProfile::CreateFromThrift(&pool, deserialized_thrift_profile);
+  counter_merged = deserialized_profile->GetCounter("A");
+  EXPECT_EQ(counter_merged->value(), 1);
+  EXPECT_TRUE(deserialized_profile->GetCounter("Not there") == nullptr);
+  deserialized_profile->GetExecSummary(&exec_summary_result);
   EXPECT_EQ(exec_summary_result.status, status);
 
   // Averaged

@@ -687,8 +687,9 @@ Status ImpalaServer::InitProfileLogging() {
   return Status::OK();
 }
 
-Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
-    const string& user, bool base64_encoded, stringstream* output) {
+Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
+    const string& user, TRuntimeProfileFormat::type format, stringstream* output,
+    TRuntimeProfileTree* thrift_output) {
   DCHECK(output != nullptr);
   // Search for the query id in the active query map
   {
@@ -701,9 +702,12 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
       lock_guard<mutex> l(*request_state->lock());
       RETURN_IF_ERROR(CheckProfileAccess(user, request_state->effective_user(),
           request_state->user_has_profile_access()));
-      if (base64_encoded) {
+      if (format == TRuntimeProfileFormat::BASE64) {
         RETURN_IF_ERROR(request_state->profile()->SerializeToArchiveString(output));
+      } else if (format == TRuntimeProfileFormat::THRIFT) {
+        request_state->profile()->ToThrift(thrift_output);
       } else {
+        DCHECK(format == TRuntimeProfileFormat::STRING);
         request_state->profile()->PrettyPrint(output);
       }
       return Status::OK();
@@ -722,9 +726,13 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
     }
     RETURN_IF_ERROR(CheckProfileAccess(user, query_record->second->effective_user,
         query_record->second->user_has_profile_access));
-    if (base64_encoded) {
+    if (format == TRuntimeProfileFormat::BASE64) {
       (*output) << query_record->second->encoded_profile_str;
+    } else if (format == TRuntimeProfileFormat::THRIFT) {
+      RETURN_IF_ERROR(RuntimeProfile::DeserializeFromArchiveString(
+          query_record->second->encoded_profile_str, thrift_output));
     } else {
+      DCHECK(format == TRuntimeProfileFormat::STRING);
       (*output) << query_record->second->profile_str;
     }
   }

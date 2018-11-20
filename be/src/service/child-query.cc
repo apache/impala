@@ -67,6 +67,16 @@ Status ChildQuery::ExecAndFetch() {
   }
   RETURN_IF_ERROR(Status(exec_stmt_resp.status));
 
+  TUniqueId query_id;
+  TUniqueId secret_unused;
+  // Add the query id to the profile, in case we exit with an error before we get the
+  // full profile below. If we get an error here, just ignore it and continue.
+  if (ImpalaServer::THandleIdentifierToTUniqueId(
+          hs2_handle_.operationId, &query_id, &secret_unused)
+          .ok()) {
+    profile_->set_name(Substitute("$0 (id=$1)", profile_->name(), PrintId(query_id)));
+  }
+
   TGetResultSetMetadataReq meta_req;
   meta_req.operationHandle = exec_stmt_resp.operationHandle;
   RETURN_IF_ERROR(IsCancelled());
@@ -94,6 +104,20 @@ Status ChildQuery::ExecAndFetch() {
     is_running_ = false;
   }
   RETURN_IF_ERROR(IsCancelled());
+
+  // Get the runtime profile and add it to 'profile_'.
+  TGetRuntimeProfileResp get_profile_resp;
+  TGetRuntimeProfileReq get_profile_req;
+  get_profile_req.operationHandle = exec_stmt_resp.operationHandle;
+  get_profile_req.format = TRuntimeProfileFormat::THRIFT;
+  ImpalaServer::TUniqueIdToTHandleIdentifier(
+      session_id, session_id, &get_profile_req.sessionHandle.sessionId);
+  parent_server_->GetRuntimeProfile(get_profile_resp, get_profile_req);
+  if (Status(get_profile_resp.status).ok()) {
+    RuntimeProfile* runtime_profile =
+        RuntimeProfile::CreateFromThrift(profile_pool_, get_profile_resp.thrift_profile);
+    if (runtime_profile != nullptr) profile_->AddChild(runtime_profile);
+  }
 
   // Don't overwrite error from fetch. A failed fetch unregisters the query and we want to
   // preserve the original error status (e.g., CANCELLED).

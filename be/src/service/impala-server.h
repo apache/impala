@@ -617,14 +617,15 @@ class ImpalaServer : public ImpalaServiceIf,
   /// match is found there, the query log is searched. Returns OK if the profile was
   /// found, otherwise a Status object with an error message will be returned. The
   /// output stream will not be modified on error.
-  /// If base64_encoded, outputs the base64 encoded profile output, otherwise the human
-  /// readable string.
+  /// On success, if 'format' is BASE64 or STRING then 'output' will be set, or if
+  /// 'format' is THRIFT then 'thrift_output' will be set.
   /// If the user asking for this profile is the same user that runs the query
   /// and that user has access to the runtime profile, the profile is written to
   /// the output. Otherwise, nothing is written to output and an error code is
   /// returned to indicate an authorization error.
-  Status GetRuntimeProfileStr(const TUniqueId& query_id, const std::string& user,
-      bool base64_encoded, std::stringstream* output) WARN_UNUSED_RESULT;
+  Status GetRuntimeProfileOutput(const TUniqueId& query_id, const std::string& user,
+      TRuntimeProfileFormat::type format, std::stringstream* output,
+      TRuntimeProfileTree* thrift_output) WARN_UNUSED_RESULT;
 
   /// Returns the exec summary for this query if the user asking for the exec
   /// summary is the same user that run the query and that user has access to the full
