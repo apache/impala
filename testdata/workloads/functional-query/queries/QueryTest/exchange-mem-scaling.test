@@ -4,7 +4,7 @@
 # it hits the memory limit in the exchange node when allocating receiver-side
 # buffers. It's also possible but less likely that this will hit a memory limit
 # in the scan nodes.
-set mem_limit=200m;
+set mem_limit=170m;
 set num_scanner_threads=1;
 select *
 from tpch_parquet.lineitem l1
