@@ -52,9 +52,9 @@ using namespace strings;
 
 namespace impala {
 
-HdfsTableSink::HdfsTableSink(const RowDescriptor* row_desc, const TDataSink& tsink,
-    RuntimeState* state)
-  : DataSink(row_desc, "HdfsTableSink", state),
+HdfsTableSink::HdfsTableSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
+    const TDataSink& tsink, RuntimeState* state)
+  : DataSink(sink_id, row_desc, "HdfsTableSink", state),
     table_desc_(nullptr),
     prototype_partition_(nullptr),
     table_id_(tsink.table_sink.target_table_id),

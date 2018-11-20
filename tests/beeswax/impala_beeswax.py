@@ -282,11 +282,14 @@ class ImpalaBeeswaxClient(object):
       row["num_hosts"] = len(node.exec_stats)
       row["avg_time"] = avg_time
 
+    is_sink = node.node_id == -1
     # If the node is a broadcast-receiving exchange node, the cardinality of rows produced
     # is the max over all instances (which should all have received the same number of
     # rows). Otherwise, the cardinality is the sum over all instances which process
     # disjoint partitions.
-    if node.is_broadcast:
+    if is_sink:
+      cardinality = -1
+    elif node.is_broadcast:
       cardinality = max_stats.cardinality
     else:
       cardinality = agg_stats.cardinality

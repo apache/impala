@@ -58,20 +58,28 @@ public class KuduTableSink extends TableSink {
   }
 
   @Override
+  protected String getLabel() {
+    return "KUDU WRITER";
+  }
+
+  @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
     // TODO: add a memory estimate
     resourceProfile_ = ResourceProfile.noReservation(0);
   }
 
   @Override
-  protected TDataSink toThrift() {
-    TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
+  protected void toThriftImpl(TDataSink tsink) {
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.KUDU, sinkOp_.toThrift());
     TKuduTableSink tKuduSink = new TKuduTableSink();
     tKuduSink.setReferenced_columns(targetColIdxs_);
     tTableSink.setKudu_table_sink(tKuduSink);
-    result.table_sink = tTableSink;
-    return result;
+    tsink.table_sink = tTableSink;
+  }
+
+  @Override
+  protected TDataSinkType getSinkType() {
+    return TDataSinkType.TABLE_SINK;
   }
 }

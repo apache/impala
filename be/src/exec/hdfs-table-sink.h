@@ -127,8 +127,8 @@ struct OutputPartition {
 /// This is consistent with Hive's behavior.
 class HdfsTableSink : public DataSink {
  public:
-  HdfsTableSink(const RowDescriptor* row_desc, const TDataSink& tsink,
-      RuntimeState* state);
+  HdfsTableSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
+      const TDataSink& tsink, RuntimeState* state);
 
   /// Prepares output_exprs and partition_key_exprs, and connects to HDFS.
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);

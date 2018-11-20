@@ -74,10 +74,6 @@ namespace impala {
 
 const string ExecNode::ROW_THROUGHPUT_COUNTER = "RowsReturnedRate";
 
-int ExecNode::GetNodeIdFromProfile(RuntimeProfile* p) {
-  return p->metadata();
-}
-
 ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : id_(tnode.node_id),
     type_(tnode.node_type),
@@ -86,14 +82,14 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     resource_profile_(tnode.resource_profile),
     limit_(tnode.limit),
     num_rows_returned_(0),
-    runtime_profile_(RuntimeProfile::Create(pool_,
-        Substitute("$0 (id=$1)", PrintThriftEnum(tnode.node_type), id_))),
+    runtime_profile_(RuntimeProfile::Create(
+        pool_, Substitute("$0 (id=$1)", PrintThriftEnum(tnode.node_type), id_))),
     rows_returned_counter_(NULL),
     rows_returned_rate_(NULL),
     containing_subplan_(NULL),
     disable_codegen_(tnode.disable_codegen),
     is_closed_(false) {
-  runtime_profile_->set_metadata(id_);
+  runtime_profile_->SetPlanNodeId(id_);
   debug_options_.phase = TExecNodePhase::INVALID;
 }
 

@@ -62,7 +62,7 @@ class ScalarExprEvaluator;
 /// and consumer. See IMPALA-4268.
 class PlanRootSink : public DataSink {
  public:
-  PlanRootSink(const RowDescriptor* row_desc, RuntimeState* state);
+  PlanRootSink(TDataSinkId sink_id, const RowDescriptor* row_desc, RuntimeState* state);
 
   /// Sends a new batch. Ownership of 'batch' remains with the sender. Blocks until the
   /// consumer has consumed 'batch' by calling GetNext().

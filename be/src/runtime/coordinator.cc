@@ -223,9 +223,34 @@ void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
       int root_node_idx = thrift_exec_summary.nodes.size();
 
       const TPlan& plan = fragment.plan;
+      const TDataSink& output_sink = fragment.output_sink;
       int num_instances =
           schedule.GetFragmentExecParams(fragment.idx).instance_exec_params.size();
-      for (const TPlanNode& node: plan.nodes) {
+
+      // Add the data sink at the root of the fragment.
+      data_sink_id_to_idx_map[fragment.idx] = thrift_exec_summary.nodes.size();
+      thrift_exec_summary.nodes.emplace_back();
+      // Note that some clients like impala-shell depend on many of these fields being
+      // set, even if they are optional in the thrift.
+      TPlanNodeExecSummary& node_summary = thrift_exec_summary.nodes.back();
+      node_summary.__set_node_id(-1);
+      node_summary.__set_fragment_idx(fragment.idx);
+      node_summary.__set_label(output_sink.label);
+      node_summary.__set_label_detail("");
+      node_summary.__set_num_children(1);
+      DCHECK(output_sink.__isset.estimated_stats);
+      node_summary.__set_estimated_stats(output_sink.estimated_stats);
+      node_summary.exec_stats.resize(num_instances);
+
+      // We don't track rows returned from sinks, but some clients like impala-shell
+      // expect it to be set in the thrift struct. Set it to -1 for compatibility
+      // with those tools.
+      node_summary.estimated_stats.__set_cardinality(-1);
+      for (TExecStats& instance_stats : node_summary.exec_stats) {
+        instance_stats.__set_cardinality(-1);
+      }
+
+      for (const TPlanNode& node : plan.nodes) {
         node_id_to_idx_map[node.node_id] = thrift_exec_summary.nodes.size();
         thrift_exec_summary.nodes.emplace_back();
         TPlanNodeExecSummary& node_summary = thrift_exec_summary.nodes.back();
@@ -234,9 +259,8 @@ void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
         node_summary.__set_label(node.label);
         node_summary.__set_label_detail(node.label_detail);
         node_summary.__set_num_children(node.num_children);
-        if (node.__isset.estimated_stats) {
-          node_summary.__set_estimated_stats(node.estimated_stats);
-        }
+        DCHECK(node.__isset.estimated_stats);
+        node_summary.__set_estimated_stats(node.estimated_stats);
         node_summary.exec_stats.resize(num_instances);
       }
 

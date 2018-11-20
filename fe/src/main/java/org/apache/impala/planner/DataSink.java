@@ -18,6 +18,8 @@
 package org.apache.impala.planner;
 
 import org.apache.impala.thrift.TDataSink;
+import org.apache.impala.thrift.TDataSinkType;
+import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryOptions;
 
@@ -58,7 +60,33 @@ public abstract class DataSink {
   abstract protected void appendSinkExplainString(String prefix, String detailPrefix,
       TQueryOptions queryOptions, TExplainLevel explainLevel, StringBuilder output);
 
-  protected abstract TDataSink toThrift();
+  /**
+   * Return a short human-readable name to describe the sink in the exec summary.
+   */
+  abstract protected String getLabel();
+
+  /**
+   * Construct a thrift representation of the sink.
+   */
+  protected final TDataSink toThrift() {
+    TDataSink tsink = new TDataSink(getSinkType());
+    tsink.setLabel(fragment_.getId() + ":" + getLabel());
+    TExecStats estimatedStats = new TExecStats();
+    estimatedStats.setMemory_used(resourceProfile_.getMemEstimateBytes());
+    tsink.setEstimated_stats(estimatedStats);
+    toThriftImpl(tsink);
+    return tsink;
+  }
+
+  /**
+   * Add subclass-specific information to the sink.
+   */
+  abstract protected void toThriftImpl(TDataSink tsink);
+
+  /**
+   * Get the sink type of the subclass.
+   */
+  abstract protected TDataSinkType getSinkType();
 
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
   public PlanFragment getFragment() { return fragment_; }

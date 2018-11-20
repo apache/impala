@@ -43,16 +43,25 @@ public class HBaseTableSink extends TableSink {
   }
 
   @Override
+  protected String getLabel() {
+    return "HBASE WRITER";
+  }
+
+  @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
     resourceProfile_ = ResourceProfile.noReservation(0);
   }
 
   @Override
-  protected TDataSink toThrift() {
-    TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
+  protected void toThriftImpl(TDataSink tsink) {
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.HBASE, sinkOp_.toThrift());
-    result.table_sink = tTableSink;
-    return result;
+    tsink.table_sink = tTableSink;
   }
+
+  @Override
+  protected TDataSinkType getSinkType() {
+    return TDataSinkType.TABLE_SINK;
+  }
+
 }

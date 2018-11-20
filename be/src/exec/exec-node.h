@@ -219,9 +219,6 @@ class ExecNode {
   /// check to see if codegen was enabled for the enclosing fragment.
   bool IsNodeCodegenDisabled() const;
 
-  /// Extract node id from p->name().
-  static int GetNodeIdFromProfile(RuntimeProfile* p);
-
   /// Returns true if this node is inside the right-hand side plan tree of a SubplanNode.
   /// Valid to call in or after Prepare().
   bool IsInSubplan() const { return containing_subplan_ != NULL; }

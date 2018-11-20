@@ -60,7 +60,7 @@ class KrpcDataStreamSender : public DataSink {
   /// per-channel's accumulating row batch before it will be sent.
   /// NOTE: supported partition types are UNPARTITIONED (broadcast), HASH_PARTITIONED,
   /// and RANDOM.
-  KrpcDataStreamSender(int sender_id, const RowDescriptor* row_desc,
+  KrpcDataStreamSender(TDataSinkId sink_id, int sender_id, const RowDescriptor* row_desc,
       const TDataStreamSink& tsink,
       const std::vector<TPlanFragmentDestination>& destinations,
       int per_channel_buffer_size, RuntimeState* state);

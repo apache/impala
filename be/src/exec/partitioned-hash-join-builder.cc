@@ -55,7 +55,7 @@ PhjBuilder::PhjBuilder(int join_node_id, TJoinOp::type join_op,
     const RowDescriptor* probe_row_desc, const RowDescriptor* build_row_desc,
     RuntimeState* state, BufferPool::ClientHandle* buffer_pool_client,
     int64_t spillable_buffer_size, int64_t max_row_buffer_size)
-  : DataSink(build_row_desc,
+  : DataSink(-1, build_row_desc,
         Substitute("Hash Join Builder (join_node_id=$0)", join_node_id), state),
     runtime_state_(state),
     join_node_id_(join_node_id),

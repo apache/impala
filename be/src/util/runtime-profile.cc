@@ -63,11 +63,10 @@ RuntimeProfile* RuntimeProfile::Create(ObjectPool* pool, const string& name,
   return pool->Add(new RuntimeProfile(pool, name, is_averaged_profile));
 }
 
-RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
-    bool is_averaged_profile)
+RuntimeProfile::RuntimeProfile(
+    ObjectPool* pool, const string& name, bool is_averaged_profile)
   : pool_(pool),
     name_(name),
-    metadata_(-1),
     is_averaged_profile_(is_averaged_profile),
     counter_total_time_(TUnit::TIME_NS),
     inactive_timer_(TUnit::TIME_NS),
@@ -123,11 +122,11 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
 
   const TRuntimeProfileNode& node = nodes[*idx];
   RuntimeProfile* profile = Create(pool, node.name);
-  profile->metadata_ = node.metadata;
+  profile->metadata_ = node.node_metadata;
   for (int i = 0; i < node.counters.size(); ++i) {
     const TCounter& counter = node.counters[i];
     profile->counter_map_[counter.name] =
-      pool->Add(new Counter(counter.unit, counter.value));
+        pool->Add(new Counter(counter.unit, counter.value));
   }
 
   if (node.__isset.event_sequences) {
@@ -373,7 +372,7 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
         }
       } else {
         child = Create(pool_, tchild.name);
-        child->metadata_ = tchild.metadata;
+        child->metadata_ = tchild.node_metadata;
         child_map_[tchild.name] = child;
         insert_pos = children_.insert(insert_pos, make_pair(child, tchild.indent));
         ++insert_pos;
@@ -913,7 +912,10 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   nodes->push_back(TRuntimeProfileNode());
   TRuntimeProfileNode& node = (*nodes)[index];
   node.name = name_;
-  node.metadata = metadata_;
+  // Set the required metadata field to the plan node ID for compatibility with any tools
+  // that rely on the plan node id being set there.
+  node.metadata = metadata_.__isset.plan_node_id ? metadata_.plan_node_id : -1;
+  node.__set_node_metadata(metadata_);
   node.indent = true;
 
   CounterMap counter_map;
@@ -1004,11 +1006,19 @@ void RuntimeProfile::GetExecSummary(TExecSummary* t_exec_summary) const {
   *t_exec_summary = t_exec_summary_;
 }
 
+void RuntimeProfile::SetPlanNodeId(int node_id) {
+  DCHECK(!metadata_.__isset.data_sink_id) << "Don't set conflicting metadata";
+  metadata_.__set_plan_node_id(node_id);
+}
+
+void RuntimeProfile::SetDataSinkId(int sink_id) {
+  DCHECK(!metadata_.__isset.plan_node_id) << "Don't set conflicting metadata";
+  metadata_.__set_data_sink_id(sink_id);
+}
+
 int64_t RuntimeProfile::UnitsPerSecond(
-    const RuntimeProfile::Counter* total_counter,
-    const RuntimeProfile::Counter* timer) {
-  DCHECK(total_counter->unit() == TUnit::BYTES ||
-         total_counter->unit() == TUnit::UNIT);
+    const RuntimeProfile::Counter* total_counter, const RuntimeProfile::Counter* timer) {
+  DCHECK(total_counter->unit() == TUnit::BYTES || total_counter->unit() == TUnit::UNIT);
   DCHECK(timer->unit() == TUnit::TIME_NS);
 
   if (timer->value() == 0) return 0;

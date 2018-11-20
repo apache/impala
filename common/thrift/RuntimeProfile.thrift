@@ -20,6 +20,7 @@ namespace java org.apache.impala.thrift
 
 include "ExecStats.thrift"
 include "Metrics.thrift"
+include "Types.thrift"
 
 // Represents the different formats a runtime profile can be represented in.
 enum TRuntimeProfileFormat {
@@ -76,13 +77,23 @@ struct TSummaryStatsCounter {
   6: required i64 max_value
 }
 
+// Metadata to help identify what entity the profile node corresponds to.
+union TRuntimeProfileNodeMetadata {
+  // Set if this node corresponds to a plan node.
+  1: Types.TPlanNodeId plan_node_id
+
+  // Set if this node corresponds to a data sink.
+  2: Types.TDataSinkId data_sink_id
+}
+
 // A single runtime profile
 struct TRuntimeProfileNode {
   1: required string name
   2: required i32 num_children
   3: required list<TCounter> counters
-  // TODO: should we make metadata a serializable struct?  We only use it to
-  // store the node id right now so this is sufficient.
+
+  // Legacy field. May contain the node ID for plan nodes.
+  // Replaced by node_metadata, which contains richer metadata.
   4: required i64 metadata
 
   // indicates whether the child will be printed with extra indentation;
@@ -107,6 +118,9 @@ struct TRuntimeProfileNode {
 
   // List of summary stats counters
   11: optional list<TSummaryStatsCounter> summary_stats_counters
+
+  // Metadata about the entity that this node refers to.
+  12: optional TRuntimeProfileNodeMetadata node_metadata
 }
 
 // A flattened tree of runtime profiles, obtained by an

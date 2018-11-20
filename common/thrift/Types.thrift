@@ -21,6 +21,7 @@ namespace java org.apache.impala.thrift
 typedef i64 TTimestamp
 typedef i32 TFragmentIdx
 typedef i32 TPlanNodeId
+typedef i32 TDataSinkId
 typedef i32 TTupleId
 typedef i32 TSlotId
 typedef i32 TTableId

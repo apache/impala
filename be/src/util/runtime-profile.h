@@ -305,12 +305,18 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// (because it doesn't re-file child profiles)
   void set_name(const std::string& name) { name_ = name; }
 
-  int64_t metadata() const { return metadata_; }
-  void set_metadata(int64_t md) { metadata_ = md; }
+  const TRuntimeProfileNodeMetadata& metadata() const { return metadata_; }
+
+  /// Called if this corresponds to a plan node. Sets metadata so that later code that
+  /// analyzes the profile can identify this as the plan node's profile.
+  void SetPlanNodeId(int node_id);
+
+  /// Called if this corresponds to a data sink. Sets metadata so that later code that
+  /// analyzes the profile can identify this as the data sink's profile.
+  void SetDataSinkId(int sink_id);
 
   /// Derived counter function: return measured throughput as input_value/second.
-  static int64_t UnitsPerSecond(
-      const Counter* total_counter, const Counter* timer);
+  static int64_t UnitsPerSecond(const Counter* total_counter, const Counter* timer);
 
   /// Derived counter function: return aggregated value
   static int64_t CounterSum(const std::vector<Counter*>* counters);
@@ -387,8 +393,8 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Name for this runtime profile.
   std::string name_;
 
-  /// user-supplied, uninterpreted metadata.
-  int64_t metadata_;
+  /// Detailed metadata that identifies the plan node, sink, etc.
+  TRuntimeProfileNodeMetadata metadata_;
 
   /// True if this profile is an average derived from other profiles.
   /// All counters in this profile must be of unit AveragedCounter.

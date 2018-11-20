@@ -54,7 +54,11 @@ class TInsertStats;
 /// Close() is called to release any resources before destroying the sink.
 class DataSink {
  public:
-  DataSink(const RowDescriptor* row_desc, const string& name, RuntimeState* state);
+  /// If this is the sink at the root of a fragment, 'sink_id' must be a unique ID for
+  /// the sink for use in runtime profiles and other purposes. Otherwise this is a join
+  /// build sink owned by an ExecNode and 'sink_id' must be -1.
+  DataSink(TDataSinkId sink_id, const RowDescriptor* row_desc, const string& name,
+      RuntimeState* state);
   virtual ~DataSink();
 
   /// Setup. Call before Send(), Open(), or Close() during the prepare phase of the query

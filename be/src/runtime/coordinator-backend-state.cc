@@ -475,17 +475,13 @@ Coordinator::BackendState::InstanceStats::InstanceStats(
 void Coordinator::BackendState::InstanceStats::InitCounters() {
   vector<RuntimeProfile*> children;
   profile_->GetAllChildren(&children);
-  for (RuntimeProfile* p: children) {
-    PlanNodeId id = ExecNode::GetNodeIdFromProfile(p);
+  for (RuntimeProfile* p : children) {
     // This profile is not for an exec node.
-    if (id == g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) continue;
-
-    RuntimeProfile::Counter* c =
-        p->GetCounter(ScanNode::SCAN_RANGES_COMPLETE_COUNTER);
+    if (!p->metadata().__isset.plan_node_id) continue;
+    RuntimeProfile::Counter* c = p->GetCounter(ScanNode::SCAN_RANGES_COMPLETE_COUNTER);
     if (c != nullptr) scan_ranges_complete_counters_.push_back(c);
 
-    RuntimeProfile::Counter* bytes_read =
-        p->GetCounter(ScanNode::BYTES_READ_COUNTER);
+    RuntimeProfile::Counter* bytes_read = p->GetCounter(ScanNode::BYTES_READ_COUNTER);
     if (bytes_read != nullptr) bytes_read_counters_.push_back(bytes_read);
   }
 }
@@ -512,30 +508,34 @@ void Coordinator::BackendState::InstanceStats::Update(
   vector<RuntimeProfile*> children;
   profile_->GetAllChildren(&children);
   TExecSummary& thrift_exec_summary = exec_summary->thrift_exec_summary;
-  for (RuntimeProfile* child: children) {
-    int node_id = ExecNode::GetNodeIdFromProfile(child);
-    if (node_id == -1) continue;
+  for (RuntimeProfile* child : children) {
+    bool is_plan_node = child->metadata().__isset.plan_node_id;
+    bool is_data_sink = child->metadata().__isset.data_sink_id;
+    // Plan Nodes and data sinks get an entry in the summary.
+    if (!is_plan_node && !is_data_sink) continue;
 
-    // TODO: create plan_node_id_to_summary_map_
-    TPlanNodeExecSummary& node_exec_summary =
-        thrift_exec_summary.nodes[exec_summary->node_id_to_idx_map[node_id]];
+    int exec_summary_idx;
+    if (is_plan_node) {
+      exec_summary_idx = exec_summary->node_id_to_idx_map[child->metadata().plan_node_id];
+    } else {
+      exec_summary_idx =
+          exec_summary->data_sink_id_to_idx_map[child->metadata().data_sink_id];
+    }
+    TPlanNodeExecSummary& exec_summary = thrift_exec_summary.nodes[exec_summary_idx];
     int per_fragment_instance_idx = exec_params_.per_fragment_instance_idx;
-    DCHECK_LT(per_fragment_instance_idx, node_exec_summary.exec_stats.size())
-        << " node_id=" << node_id << " instance_id="
-        << PrintId(exec_params_.instance_id)
+    DCHECK_LT(per_fragment_instance_idx, exec_summary.exec_stats.size())
+        << " name=" << child->name()
+        << " instance_id=" << PrintId(exec_params_.instance_id)
         << " fragment_idx=" << exec_params_.fragment().idx;
-    TExecStats& instance_stats =
-        node_exec_summary.exec_stats[per_fragment_instance_idx];
+    TExecStats& instance_stats = exec_summary.exec_stats[per_fragment_instance_idx];
 
     RuntimeProfile::Counter* rows_counter = child->GetCounter("RowsReturned");
     RuntimeProfile::Counter* mem_counter = child->GetCounter("PeakMemoryUsage");
-    if (rows_counter != nullptr) {
-      instance_stats.__set_cardinality(rows_counter->value());
-    }
+    if (rows_counter != nullptr) instance_stats.__set_cardinality(rows_counter->value());
     if (mem_counter != nullptr) instance_stats.__set_memory_used(mem_counter->value());
     instance_stats.__set_latency_ns(child->local_time());
     // TODO: track interesting per-node metrics
-    node_exec_summary.__isset.exec_stats = true;
+    exec_summary.__isset.exec_stats = true;
   }
 
   // determine newly-completed scan ranges and update scan_range_progress

@@ -32,8 +32,9 @@ using boost::mutex;
 
 namespace impala {
 
-PlanRootSink::PlanRootSink(const RowDescriptor* row_desc, RuntimeState* state)
-  : DataSink(row_desc, "PLAN_ROOT_SINK", state) {}
+PlanRootSink::PlanRootSink(
+    TDataSinkId sink_id, const RowDescriptor* row_desc, RuntimeState* state)
+  : DataSink(sink_id, row_desc, "PLAN_ROOT_SINK", state) {}
 
 namespace {
 
@@ -61,9 +62,10 @@ void ValidateCollectionSlots(const RowDescriptor& row_desc, RowBatch* batch) {
   }
 #endif
 }
-}
+} // namespace
 
 Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
+  SCOPED_TIMER(profile()->total_time_counter());
   ValidateCollectionSlots(*row_desc_, batch);
   int current_batch_row = 0;
 
@@ -74,7 +76,10 @@ Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
     unique_lock<mutex> l(lock_);
     // Wait until the consumer gives us a result set to fill in, or the fragment
     // instance has been cancelled.
-    while (results_ == nullptr && !state->is_cancelled()) sender_cv_.Wait(l);
+    while (results_ == nullptr && !state->is_cancelled()) {
+      SCOPED_TIMER(profile_->inactive_timer());
+      sender_cv_.Wait(l);
+    }
     RETURN_IF_CANCELLED(state);
 
     // Otherwise the consumer is ready. Fill out the rows.
@@ -94,6 +99,7 @@ Status PlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
 }
 
 Status PlanRootSink::FlushFinal(RuntimeState* state) {
+  SCOPED_TIMER(profile()->total_time_counter());
   unique_lock<mutex> l(lock_);
   sender_state_ = SenderState::EOS;
   consumer_cv_.NotifyAll();
@@ -101,6 +107,7 @@ Status PlanRootSink::FlushFinal(RuntimeState* state) {
 }
 
 void PlanRootSink::Close(RuntimeState* state) {
+  SCOPED_TIMER(profile()->total_time_counter());
   unique_lock<mutex> l(lock_);
   // FlushFinal() won't have been called when the fragment instance encounters an error
   // before sending all rows.

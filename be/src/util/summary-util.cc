@@ -76,10 +76,15 @@ void PrintExecSummary(const TExecSummary& exec_summary, int indent_level,
   row.push_back(lexical_cast<string>(node.exec_stats.size())); // Num instances
   row.push_back(PrettyPrinter::Print(avg_time, TUnit::TIME_NS));
   row.push_back(PrettyPrinter::Print(max_stats.latency_ns, TUnit::TIME_NS));
-  row.push_back(PrettyPrinter::Print(
-      node.is_broadcast ? max_stats.cardinality : agg_stats.cardinality,
-      TUnit::UNIT));
-  row.push_back(PrettyPrinter::Print(est_stats.cardinality, TUnit::UNIT));
+  if (node.node_id == -1) {
+    // Cardinality stats are not valid for sinks.
+    row.push_back("");
+    row.push_back("");
+  } else {
+    row.push_back(PrettyPrinter::Print(
+        node.is_broadcast ? max_stats.cardinality : agg_stats.cardinality, TUnit::UNIT));
+    row.push_back(PrettyPrinter::Print(est_stats.cardinality, TUnit::UNIT));
+  }
   row.push_back(PrettyPrinter::Print(max_stats.memory_used, TUnit::BYTES));
   row.push_back(PrettyPrinter::Print(est_stats.memory_used, TUnit::BYTES));
   // Node "details" may contain exprs which should be redacted.

@@ -535,7 +535,7 @@ class DataStreamTest : public testing::Test {
     TExpr output_exprs;
     output_exprs.nodes.push_back(expr_node);
 
-    sender.reset(new KrpcDataStreamSender(
+    sender.reset(new KrpcDataStreamSender(-1,
         sender_num, row_desc_, sink.stream_sink, dest_, channel_buffer_size, &state));
     EXPECT_OK(static_cast<KrpcDataStreamSender*>(
         sender.get())->Init(vector<TExpr>({output_exprs}), sink, &state));

@@ -59,15 +59,18 @@ public class JoinBuildSink extends DataSink {
   public JoinTableId getJoinTableId() { return joinTableId_; }
 
   @Override
-  protected TDataSink toThrift() {
-    TDataSink result = new TDataSink(TDataSinkType.JOIN_BUILD_SINK);
+  protected void toThriftImpl(TDataSink tsink) {
     TJoinBuildSink tBuildSink = new TJoinBuildSink();
     tBuildSink.setJoin_table_id(joinTableId_.asInt());
     for (Expr buildExpr: buildExprs_) {
       tBuildSink.addToBuild_exprs(buildExpr.treeToThrift());
     }
-    result.setJoin_build_sink(tBuildSink);
-    return result;
+    tsink.setJoin_build_sink(tBuildSink);
+  }
+
+  @Override
+  protected TDataSinkType getSinkType() {
+    return TDataSinkType.JOIN_BUILD_SINK;
   }
 
   @Override
@@ -84,6 +87,11 @@ public class JoinBuildSink extends DataSink {
             .append(Expr.toSql(buildExprs_, DEFAULT) + "\n");
       }
     }
+  }
+
+  @Override
+  protected String getLabel() {
+    return "JOIN BUILD";
   }
 
   @Override

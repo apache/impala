@@ -50,17 +50,25 @@ public class DataStreamSink extends DataSink {
   }
 
   @Override
+  protected String getLabel() {
+    return "EXCHANGE SENDER";
+  }
+
+  @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
     resourceProfile_ = ResourceProfile.noReservation(0);
   }
 
   @Override
-  protected TDataSink toThrift() {
-    TDataSink result = new TDataSink(TDataSinkType.DATA_STREAM_SINK);
+  protected void toThriftImpl(TDataSink tsink) {
     TDataStreamSink tStreamSink =
         new TDataStreamSink(exchNode_.getId().asInt(), outputPartition_.toThrift());
-    result.setStream_sink(tStreamSink);
-    return result;
+    tsink.setStream_sink(tStreamSink);
+  }
+
+  @Override
+  protected TDataSinkType getSinkType() {
+    return TDataSinkType.DATA_STREAM_SINK;
   }
 
   public DataPartition getOutputPartition() { return outputPartition_; }

@@ -48,9 +48,15 @@ namespace impala {
 // Empty string
 const char* const DataSink::ROOT_PARTITION_KEY = "";
 
-DataSink::DataSink(const RowDescriptor* row_desc, const string& name, RuntimeState* state)
+DataSink::DataSink(TDataSinkId sink_id, const RowDescriptor* row_desc, const string& name,
+    RuntimeState* state)
   : closed_(false), row_desc_(row_desc), name_(name) {
   profile_ = RuntimeProfile::Create(state->obj_pool(), name);
+  if (sink_id != -1) {
+    // There is one sink per fragment so we can use the fragment index as a unique
+    // identifier.
+    profile_->SetDataSinkId(sink_id);
+  }
 }
 
 DataSink::~DataSink() {
@@ -63,27 +69,31 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
   const TDataSink& thrift_sink = fragment_ctx.fragment.output_sink;
   const vector<TExpr>& thrift_output_exprs = fragment_ctx.fragment.output_exprs;
   ObjectPool* pool = state->obj_pool();
+  // We have one fragment per sink, so we can use the fragment index as the sink ID.
+  TDataSinkId sink_id = fragment_ctx.fragment.idx;
   switch (thrift_sink.type) {
     case TDataSinkType::DATA_STREAM_SINK:
       if (!thrift_sink.__isset.stream_sink) return Status("Missing data stream sink.");
-
       // TODO: figure out good buffer size based on size of output row
-      *sink = pool->Add(new KrpcDataStreamSender(fragment_instance_ctx.sender_id,
-          row_desc, thrift_sink.stream_sink, fragment_ctx.destinations,
-          FLAGS_data_stream_sender_buffer_size, state));
+      *sink = pool->Add(new KrpcDataStreamSender(sink_id,
+          fragment_instance_ctx.sender_id, row_desc, thrift_sink.stream_sink,
+          fragment_ctx.destinations, FLAGS_data_stream_sender_buffer_size, state));
       break;
     case TDataSinkType::TABLE_SINK:
       if (!thrift_sink.__isset.table_sink) return Status("Missing table sink.");
       switch (thrift_sink.table_sink.type) {
         case TTableSinkType::HDFS:
-          *sink = pool->Add(new HdfsTableSink(row_desc, thrift_sink, state));
+          *sink =
+              pool->Add(new HdfsTableSink(sink_id, row_desc, thrift_sink, state));
           break;
         case TTableSinkType::HBASE:
-          *sink = pool->Add(new HBaseTableSink(row_desc, thrift_sink, state));
+          *sink =
+              pool->Add(new HBaseTableSink(sink_id, row_desc, thrift_sink, state));
           break;
         case TTableSinkType::KUDU:
           RETURN_IF_ERROR(CheckKuduAvailability());
-          *sink = pool->Add(new KuduTableSink(row_desc, thrift_sink, state));
+          *sink =
+              pool->Add(new KuduTableSink(sink_id, row_desc, thrift_sink, state));
           break;
         default:
           stringstream error_msg;
@@ -96,8 +106,10 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
       }
       break;
     case TDataSinkType::PLAN_ROOT_SINK:
-      *sink = pool->Add(new PlanRootSink(row_desc, state));
+      *sink = pool->Add(new PlanRootSink(sink_id, row_desc, state));
       break;
+    case TDataSinkType::JOIN_BUILD_SINK:
+      // IMPALA-4224 - join build sink not supported in backend execution.
     default:
       stringstream error_msg;
       map<int, const char*>::const_iterator i =

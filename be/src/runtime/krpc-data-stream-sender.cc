@@ -582,10 +582,11 @@ void KrpcDataStreamSender::Channel::Teardown(RuntimeState* state) {
   batch_.reset();
 }
 
-KrpcDataStreamSender::KrpcDataStreamSender(int sender_id, const RowDescriptor* row_desc,
-    const TDataStreamSink& sink, const vector<TPlanFragmentDestination>& destinations,
-    int per_channel_buffer_size, RuntimeState* state)
-  : DataSink(row_desc,
+KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
+    const RowDescriptor* row_desc, const TDataStreamSink& sink,
+    const vector<TPlanFragmentDestination>& destinations, int per_channel_buffer_size,
+    RuntimeState* state)
+  : DataSink(sink_id, row_desc,
         Substitute("KrpcDataStreamSender (dst_id=$0)", sink.dest_node_id), state),
     sender_id_(sender_id),
     partition_type_(sink.output_partition.type),

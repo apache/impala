@@ -35,12 +35,21 @@ public class PlanRootSink extends DataSink {
   }
 
   @Override
+  protected String getLabel() {
+    return "ROOT";
+  }
+
+  @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
     // TODO: add a memory estimate
     resourceProfile_ = ResourceProfile.noReservation(0);
   }
 
-  protected TDataSink toThrift() {
-    return new TDataSink(TDataSinkType.PLAN_ROOT_SINK);
+  protected void toThriftImpl(TDataSink tsink) {
+  }
+
+  @Override
+  protected TDataSinkType getSinkType() {
+    return TDataSinkType.PLAN_ROOT_SINK;
   }
 }

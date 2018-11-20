@@ -203,12 +203,13 @@ class ImpalaClient(object):
     hosts = 0
     if node.exec_stats is not None:
       hosts = len(node.exec_stats)
+    is_sink = node.node_id == -1
     row = [ label_prefix + node.label,
             hosts,
             prettyprint_time(avg_time),
             prettyprint_time(max_stats.latency_ns),
-            prettyprint_units(cardinality),
-            prettyprint_units(est_stats.cardinality),
+            "" if is_sink else prettyprint_units(cardinality),
+            "" if is_sink else prettyprint_units(est_stats.cardinality),
             prettyprint_bytes(max_stats.memory_used),
             prettyprint_bytes(est_stats.memory_used),
             node.label_detail ]

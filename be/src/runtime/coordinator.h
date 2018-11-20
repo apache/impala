@@ -281,6 +281,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
     /// A mapping of plan node ids to index into thrift_exec_summary.nodes
     boost::unordered_map<TPlanNodeId, int> node_id_to_idx_map;
 
+    /// A mapping of fragment data sink ids to index into thrift_exec_summary.nodes
+    boost::unordered_map<TPlanNodeId, int> data_sink_id_to_idx_map;
+
     void Init(const QuerySchedule& query_schedule);
   };
 

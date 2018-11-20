@@ -40,10 +40,11 @@ class TestObservability(ImpalaTestSuite):
     query = """select tinyint_col, count(*) from functional.alltypes
         group by tinyint_col order by tinyint_col limit 5"""
     result = self.execute_query(query)
-    assert result.exec_summary[0]['operator'] == '05:MERGING-EXCHANGE'
-    assert result.exec_summary[0]['num_rows'] == 5
-    assert result.exec_summary[0]['est_num_rows'] == 5
-    assert result.exec_summary[0]['peak_mem'] > 0
+    exchange = result.exec_summary[1]
+    assert exchange['operator'] == '05:MERGING-EXCHANGE'
+    assert exchange['num_rows'] == 5
+    assert exchange['est_num_rows'] == 5
+    assert exchange['peak_mem'] > 0
 
     for line in result.runtime_profile.split('\n'):
       # The first 'RowsProduced' we find is for the coordinator fragment.
@@ -58,10 +59,11 @@ class TestObservability(ImpalaTestSuite):
         inner join functional.alltypessmall b on (a.id = b.id)
         where a.year = 2009 and b.month = 2"""
     result = self.execute_query(query)
-    assert result.exec_summary[5]['operator'] == '04:EXCHANGE'
-    assert result.exec_summary[5]['num_rows'] == 25
-    assert result.exec_summary[5]['est_num_rows'] == 25
-    assert result.exec_summary[5]['peak_mem'] > 0
+    exchange = result.exec_summary[8]
+    assert exchange['operator'] == '04:EXCHANGE'
+    assert exchange['num_rows'] == 25
+    assert exchange['est_num_rows'] == 25
+    assert exchange['peak_mem'] > 0
 
   def test_report_time(self):
     """ Regression test for IMPALA-6741 - checks that last reporting time exists in
@@ -115,6 +117,45 @@ class TestObservability(ImpalaTestSuite):
     scan_idx = len(result.exec_summary) - 1
     assert result.exec_summary[scan_idx]['operator'] == '00:SCAN HBASE'
     assert result.exec_summary[scan_idx]['detail'] == 'functional_hbase.alltypestiny'
+
+  def test_sink_summary(self, unique_database):
+    """IMPALA-1048: Checks that the exec summary contains sinks."""
+    # SELECT query.
+    query = "select count(*) from functional.alltypes"
+    result = self.execute_query(query)
+    # Sanity-check the root sink.
+    root_sink = result.exec_summary[0]
+    assert root_sink['operator'] == 'F01:ROOT'
+    assert root_sink['max_time'] >= 0
+    assert root_sink['num_rows'] == -1
+    assert root_sink['est_num_rows'] == -1
+    assert root_sink['peak_mem'] >= 0
+    assert root_sink['est_peak_mem'] >= 0
+    # Sanity-check the exchange sink.
+    found_exchange_sender = False
+    for row in result.exec_summary[1:]:
+      if 'EXCHANGE SENDER' not in row['operator']:
+        continue
+      found_exchange_sender = True
+      assert re.match("F[0-9]+:EXCHANGE SENDER", row['operator'])
+      assert row['max_time'] >= 0
+      assert row['num_rows'] == -1
+      assert row['est_num_rows'] == -1
+      assert row['peak_mem'] >= 0
+      assert row['est_peak_mem'] >= 0
+    assert found_exchange_sender, result
+
+    # INSERT query.
+    query = "create table {0}.tmp as select count(*) from functional.alltypes".format(
+        unique_database)
+    result = self.execute_query(query)
+    # Sanity-check the HDFS writer sink.
+    assert result.exec_summary[0]['operator'] == 'F01:HDFS WRITER'
+    assert result.exec_summary[0]['max_time'] >= 0
+    assert result.exec_summary[0]['num_rows'] == -1
+    assert result.exec_summary[0]['est_num_rows'] == -1
+    assert result.exec_summary[0]['peak_mem'] >= 0
+    assert result.exec_summary[0]['est_peak_mem'] >= 0
 
   def test_query_states(self):
     """Tests that the query profile shows expected query states."""

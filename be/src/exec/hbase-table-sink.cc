@@ -31,9 +31,9 @@
 
 namespace impala {
 
-HBaseTableSink::HBaseTableSink(const RowDescriptor* row_desc, const TDataSink& tsink,
-    RuntimeState* state)
-  : DataSink(row_desc, "HBaseTableSink", state),
+HBaseTableSink::HBaseTableSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
+    const TDataSink& tsink, RuntimeState* state)
+  : DataSink(sink_id, row_desc, "HBaseTableSink", state),
     table_id_(tsink.table_sink.target_table_id),
     table_desc_(NULL),
     hbase_table_writer_(NULL) {

@@ -174,8 +174,12 @@ public class HdfsTableSink extends TableSink {
   }
 
   @Override
-  protected TDataSink toThrift() {
-    TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
+  protected String getLabel() {
+    return "HDFS WRITER";
+  }
+
+  @Override
+  protected void toThriftImpl(TDataSink tsink) {
     THdfsTableSink hdfsTableSink = new THdfsTableSink(
         Expr.treesToThrift(partitionKeyExprs_), overwrite_, inputIsClustered_);
     FeFsTable table = (FeFsTable) targetTable_;
@@ -190,7 +194,11 @@ public class HdfsTableSink extends TableSink {
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.hdfs_table_sink = hdfsTableSink;
-    result.table_sink = tTableSink;
-    return result;
+    tsink.table_sink = tTableSink;
+  }
+
+  @Override
+  protected TDataSinkType getSinkType() {
+    return TDataSinkType.TABLE_SINK;
   }
 }
