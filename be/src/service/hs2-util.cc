@@ -128,8 +128,9 @@ void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
 // Helper to reserve space in hs2Vals->values and hs2Vals->nulls for the values that the
 // different implementations of ExprValuesToHS2TColumn will write.
 template <typename T>
-void ReserveSpace(int start_idx, int num_rows, uint32_t output_row_idx, T* hs2Vals) {
-  int64_t num_output_rows = output_row_idx + num_rows - start_idx;
+void ReserveSpace(int num_rows, uint32_t output_row_idx, T* hs2Vals) {
+  DCHECK_GE(num_rows, 0);
+  int64_t num_output_rows = output_row_idx + num_rows;
   int64_t num_null_bytes = BitUtil::RoundUpNumBytes(num_output_rows);
   // Round up reserve() arguments to power-of-two to avoid accidentally quadratic
   // behaviour from repeated small increases in size.
@@ -141,7 +142,7 @@ void ReserveSpace(int start_idx, int num_rows, uint32_t output_row_idx, T* hs2Va
 static void BoolExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
     int start_idx, int num_rows, uint32_t output_row_idx,
     apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->boolVal);
+  ReserveSpace(num_rows, output_row_idx, &column->boolVal);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
     BooleanVal val = expr_eval->GetBooleanVal(it.Get());
     column->boolVal.values.push_back(val.val);
@@ -154,7 +155,7 @@ static void BoolExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch*
 static void TinyIntExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
     int start_idx, int num_rows, uint32_t output_row_idx,
     apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->byteVal);
+  ReserveSpace(num_rows, output_row_idx, &column->byteVal);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
     TinyIntVal val = expr_eval->GetTinyIntVal(it.Get());
     column->byteVal.values.push_back(val.val);
@@ -167,7 +168,7 @@ static void TinyIntExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBat
 static void SmallIntExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     RowBatch* batch, int start_idx, int num_rows, uint32_t output_row_idx,
     apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->i16Val);
+  ReserveSpace(num_rows, output_row_idx, &column->i16Val);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
     SmallIntVal val = expr_eval->GetSmallIntVal(it.Get());
     column->i16Val.values.push_back(val.val);
@@ -180,8 +181,9 @@ static void SmallIntExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
 static void IntExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
     int start_idx, int num_rows, uint32_t output_row_idx,
     apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->i32Val);
+  ReserveSpace(num_rows, output_row_idx, &column->i32Val);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
+    DCHECK_EQ(output_row_idx, column->i32Val.values.size());
     IntVal val = expr_eval->GetIntVal(it.Get());
     column->i32Val.values.push_back(val.val);
     SetNullBit(output_row_idx, val.is_null, &column->i32Val.nulls);
@@ -193,7 +195,7 @@ static void IntExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* 
 static void BigIntExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
     int start_idx, int num_rows, uint32_t output_row_idx,
     apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->i64Val);
+  ReserveSpace(num_rows, output_row_idx, &column->i64Val);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
     BigIntVal val = expr_eval->GetBigIntVal(it.Get());
     column->i64Val.values.push_back(val.val);
@@ -206,7 +208,7 @@ static void BigIntExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatc
 static void FloatExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
     int start_idx, int num_rows, uint32_t output_row_idx,
     apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->doubleVal);
+  ReserveSpace(num_rows, output_row_idx, &column->doubleVal);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
     FloatVal val = expr_eval->GetFloatVal(it.Get());
     column->doubleVal.values.push_back(val.val);
@@ -219,7 +221,7 @@ static void FloatExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch
 static void DoubleExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
     int start_idx, int num_rows, uint32_t output_row_idx,
     apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->doubleVal);
+  ReserveSpace(num_rows, output_row_idx, &column->doubleVal);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
     DoubleVal val = expr_eval->GetDoubleVal(it.Get());
     column->doubleVal.values.push_back(val.val);
@@ -232,7 +234,7 @@ static void DoubleExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatc
 static void TimestampExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     RowBatch* batch, int start_idx, int num_rows, uint32_t output_row_idx,
     apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->stringVal);
+  ReserveSpace(num_rows, output_row_idx, &column->stringVal);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
     TimestampVal val = expr_eval->GetTimestampVal(it.Get());
     column->stringVal.values.emplace_back();
@@ -250,7 +252,7 @@ static void TimestampExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
 static void StringExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
     int start_idx, int num_rows, uint32_t output_row_idx,
     apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->stringVal);
+  ReserveSpace(num_rows, output_row_idx, &column->stringVal);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
     StringVal val = expr_eval->GetStringVal(it.Get());
     if (val.is_null) {
@@ -267,7 +269,7 @@ static void StringExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatc
 static void CharExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
     uint32_t output_row_idx, apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->stringVal);
+  ReserveSpace(num_rows, output_row_idx, &column->stringVal);
   ColumnType char_type = ColumnType::CreateCharType(type.types[0].scalar_type.len);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
     StringVal val = expr_eval->GetStringVal(it.Get());
@@ -285,7 +287,7 @@ static void CharExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
 static void DecimalExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
     uint32_t output_row_idx, apache::hive::service::cli::thrift::TColumn* column) {
-  ReserveSpace(start_idx, num_rows, output_row_idx, &column->stringVal);
+  ReserveSpace(num_rows, output_row_idx, &column->stringVal);
   FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
     DecimalVal val = expr_eval->GetDecimalVal(it.Get());
     const ColumnType& decimalType = ColumnType::FromThrift(type);
