@@ -17,20 +17,16 @@
 
 package org.apache.impala.authorization;
 
-import com.google.common.base.Preconditions;
-
-import org.apache.impala.catalog.AuthorizationPolicy;
-
 import org.apache.commons.lang.reflect.ConstructorUtils;
-import org.apache.sentry.core.common.Model;
-import org.apache.sentry.core.model.db.HivePrivilegeModel;
-import org.apache.sentry.policy.common.PolicyEngine;
+import org.apache.impala.catalog.AuthorizationPolicy;
 import org.apache.sentry.policy.engine.common.CommonPolicyEngine;
 import org.apache.sentry.provider.cache.SimpleCacheProviderBackend;
 import org.apache.sentry.provider.common.ProviderBackend;
 import org.apache.sentry.provider.common.ProviderBackendContext;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 import org.apache.sentry.provider.file.SimpleFileProviderBackend;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Wrapper to facilitate differences in Sentry APIs across Sentry versions.

@@ -23,7 +23,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.apache.impala.thrift.TCatalogObject;
-import org.apache.impala.thrift.TTable;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 

@@ -24,7 +24,6 @@ import java.util.Set;
 
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.common.InternalException;
@@ -47,7 +46,6 @@ import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TSymbolLookupParams;
 import org.apache.impala.thrift.TSymbolLookupResult;
 import org.apache.impala.thrift.TTable;
-import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.NativeLibUtil;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;

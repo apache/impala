@@ -25,7 +25,6 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.util.CompressionUtil;
 import org.apache.impala.util.MetaStoreUtil;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.codec.binary.Base64;

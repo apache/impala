@@ -41,7 +41,6 @@ import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocolFactory;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Strings;
 
 import org.apache.impala.thrift.TGetJvmMemoryMetricsResponse;
 import org.apache.impala.thrift.TGetJvmThreadsInfoRequest;

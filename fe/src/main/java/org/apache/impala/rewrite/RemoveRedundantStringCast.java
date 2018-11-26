@@ -23,7 +23,6 @@ import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.TypeDef;
-import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 
 /**

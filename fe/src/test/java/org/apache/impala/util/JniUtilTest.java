@@ -17,21 +17,13 @@
 
 package org.apache.impala.util;
 
-import static org.junit.Assert.*;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Preconditions;
-import org.apache.impala.thrift.TGetJMXJsonResponse;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.JniUtil;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.protocol.TProtocolFactory;
 import org.apache.impala.thrift.TCacheJarParams;
-
-import java.io.IOException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.junit.Test;
 
 /**
  * Unit tests for JniUtil functions.

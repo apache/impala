@@ -27,7 +27,6 @@ import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.ImpaladCatalog;
-import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.Table;

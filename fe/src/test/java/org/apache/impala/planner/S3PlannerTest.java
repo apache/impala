@@ -21,8 +21,6 @@ import static org.junit.Assume.assumeTrue;
 
 import java.net.URI;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.junit.Assert;
 import org.junit.Before;

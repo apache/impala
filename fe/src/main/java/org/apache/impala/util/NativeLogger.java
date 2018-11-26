@@ -17,9 +17,6 @@
 
 package org.apache.impala.util;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Class that manages loading and calling the native logging library to forward
  * log4j log messages to be logged by glog.

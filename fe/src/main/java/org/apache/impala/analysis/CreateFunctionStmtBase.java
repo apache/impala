@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.AuthorizeableFn;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
-import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;

@@ -20,7 +20,6 @@ package org.apache.impala.analysis;
 import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;

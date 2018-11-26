@@ -17,8 +17,6 @@
 
 package org.apache.impala.catalog;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 import org.apache.impala.common.Pair;
