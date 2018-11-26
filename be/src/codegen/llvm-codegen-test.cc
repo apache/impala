@@ -373,10 +373,10 @@ TEST_F(LlvmCodeGenTest, StringValue) {
   EXPECT_EQ(1, str_val.len);
   EXPECT_EQ(static_cast<void*>(str_val.ptr), static_cast<const void*>(str.c_str()));
 
-  // Validate padding bytes are unchanged
+  // After IMPALA-7367 removed the padding from the StringValue struct, validate the
+  // length byte alone.
   int32_t* bytes = reinterpret_cast<int32_t*>(&str_val);
   EXPECT_EQ(1, bytes[2]);   // str_val.len
-  EXPECT_EQ(0, bytes[3]);   // padding
   codegen->Close();
 }
 
