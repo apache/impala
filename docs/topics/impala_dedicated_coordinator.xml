@@ -165,13 +165,13 @@ under the License.
 
       <li >
         <p>
-          Provides a better concurrency by avoiding coordinator bottleneck.
+          Provides better concurrency by avoiding coordinator bottleneck.
         </p>
       </li>
 
       <li>
         <p>
-          Eliminates the query over admission by using one dedicated coordinator.
+          Eliminates query over-admission.
         </p>
       </li>
 
@@ -185,7 +185,7 @@ under the License.
       <li >
         <p>
           Improves reliability and performance for highly concurrent workloads by reducing
-          workload stress on coordinators. Dedicated coordinators require 50% or less
+          workload stress on coordinators. Dedicated coordinators require 50% or fewer
           connections and threads.
         </p>
       </li>
@@ -228,7 +228,7 @@ under the License.
       <p>
         To maintain a healthy state and optimal performance, it is recommended that you keep the
         peak utilization of all resources used by Impala, including CPU, the number of threads,
-        the number of connections, RPCs, under 80%.
+        the number of connections, and RPCs, under 80%.
       </p>
 
       <p >
@@ -337,9 +337,9 @@ under the License.
               On a large cluster with 50+ nodes, the number of network connections from a
               coordinator to executors can grow quickly as query complexity increases. The
               growth is much greater on coordinators than executors. Add a few more coordinators
-              if workload are complex, i.e. (an average number of fragments * number of Impalad)
-              > 500, but with the low memory/CPU usage to share the load. Watch IMPALA-4603 and
-              IMPALA-7213 to track the progress on fixing this issue.
+              if workloads are complex, i.e. (an average number of fragments * number of
+              Impalad) > 500, but with the low memory/CPU usage to share the load. Watch
+              IMPALA-4603 and IMPALA-7213 to track the progress on fixing this issue.
             </li>
 
             <li >
@@ -352,7 +352,7 @@ under the License.
             <li>
               The front-end connection requirement is not a factor in determining the number of
               dedicated coordinators. Consider setting up a connection pool at the client side
-              instead of adding coordinators. For a short term solution, you could increase the
+              instead of adding coordinators. For a short-term solution, you could increase the
               value of <codeph>fe_service_threads</codeph> on coordinators to allow more client
               connections.
             </li>
@@ -591,33 +591,35 @@ under the License.
 
         <li >
           <p>
-            <b>(Dedicated) Executors: </b>They should be collocated with DataNodes as usual.
-            The number of hosts with this setting typically increases as the cluster grows
-            larger and handles more table partitions, data files, and concurrent queries.
+            <b>(Dedicated) Executors: </b>They should be collocated with DataNodes as usual. The
+            number of hosts with this setting typically increases as the cluster grows larger
+            and handles more table partitions, data files, and concurrent queries.
           </p>
         </li>
       </ul>
 
-      <p> To configuring dedicated coordinators/executors, you specify one of
-        the following startup flags for the <cmdname>impalad</cmdname> daemon on
-        each host: <ul>
+      <p>
+        To configuring dedicated coordinators/executors, you specify one of the following
+        startup flags for the <cmdname>impalad</cmdname> daemon on each host:
+        <ul>
           <li>
             <p>
-              <codeph>is_executor=false</codeph> for each host that does not act
-              as an executor for Impala queries. These hosts act exclusively as
-              query coordinators. This setting typically applies to a relatively
-              small number of hosts, because the most common topology is to have
-              nearly all DataNodes doing work for query execution. </p>
+              <codeph>is_executor=false</codeph> for each host that does not act as an executor
+              for Impala queries. These hosts act exclusively as query coordinators. This
+              setting typically applies to a relatively small number of hosts, because the most
+              common topology is to have nearly all DataNodes doing work for query execution.
+            </p>
           </li>
+
           <li>
             <p>
-              <codeph>is_coordinator=false</codeph> for each host that does not
-              act as a coordinator for Impala queries. These hosts act
-              exclusively as executors. The number of hosts with this setting
-              typically increases as the cluster grows larger and handles more
-              table partitions, data files, and concurrent queries. As the
-              overhead for query coordination increases, it becomes more
-              important to centralize that work on dedicated hosts. </p>
+              <codeph>is_coordinator=false</codeph> for each host that does not act as a
+              coordinator for Impala queries. These hosts act exclusively as executors. The
+              number of hosts with this setting typically increases as the cluster grows larger
+              and handles more table partitions, data files, and concurrent queries. As the
+              overhead for query coordination increases, it becomes more important to centralize
+              that work on dedicated hosts.
+            </p>
           </li>
         </ul>
       </p>
