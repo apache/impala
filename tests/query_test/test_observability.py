@@ -157,11 +157,9 @@ class TestObservability(ImpalaTestSuite):
         with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
         select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
         join (select * from l LIMIT 2000000) b on a.l_orderkey = -b.l_orderkey;""")
-    # There are 3 scan nodes and each appears in the profile n+1 times (for n fragment
-    # instances + the averaged fragment). n depends on how data is loaded and scheduler's
-    # decision.
-    n = results.runtime_profile.count("HDFS_SCAN_NODE")
-    assert n > 0 and n % 3 == 0
+    # There are 3 scan nodes and each appears in the profile 4 times (for 3 fragment
+    # instances + the averaged fragment).
+    assert results.runtime_profile.count("HDFS_SCAN_NODE") == 12
     # There are 3 exchange nodes and each appears in the profile 2 times (for 1 fragment
     # instance + the averaged fragment).
     assert results.runtime_profile.count("EXCHANGE_NODE") == 6
