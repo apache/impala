@@ -55,8 +55,8 @@ class TestAutomaticCatalogInvalidation(CustomClusterTestSuite):
     cursor.fetchall()
     # The table is cached after usage.
     assert self.metadata_cache_string in self._get_catalog_object()
-    # Wait 2 * table TTL for the invalidation to take effect.
-    max_wait_time = time.time() + self.timeout * 2
+    # Wait 5 * table TTL for the invalidation to take effect.
+    max_wait_time = time.time() + self.timeout * 5
     while True:
       time.sleep(1)
       # The table is eventually evicted.
