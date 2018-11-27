@@ -59,7 +59,7 @@ public class TimestampArithmeticExpr extends Expr {
     }
   }
 
-  private static Map<String, TimeUnit> TIME_UNITS_MAP = new HashMap<String, TimeUnit>();
+  private static Map<String, TimeUnit> TIME_UNITS_MAP = new HashMap<>();
   static {
     for (TimeUnit timeUnit : TimeUnit.values()) {
       TIME_UNITS_MAP.put(timeUnit.toString(), timeUnit);

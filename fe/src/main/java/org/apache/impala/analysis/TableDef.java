@@ -17,12 +17,15 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
@@ -39,10 +42,6 @@ import org.apache.impala.util.MetaStoreUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-
-import org.apache.hadoop.fs.permission.FsAction;
 
 /**
  * Represents the table parameters in a CREATE TABLE statement. These parameters
@@ -65,11 +64,11 @@ class TableDef {
   private final TableName tableName_;
 
   // List of column definitions
-  private final List<ColumnDef> columnDefs_ = Lists.newArrayList();
+  private final List<ColumnDef> columnDefs_ = new ArrayList<>();
 
   // Names of primary key columns. Populated by the parser. An empty value doesn't
   // mean no primary keys were specified as the columnDefs_ could contain primary keys.
-  private final List<String> primaryKeyColNames_ = Lists.newArrayList();
+  private final List<String> primaryKeyColNames_ = new ArrayList<>();
 
   // If true, the table's data will be preserved if dropped.
   private final boolean isExternal_;
@@ -84,7 +83,7 @@ class TableDef {
   // BEGIN: Members that need to be reset()
 
   // Authoritative list of primary key column definitions populated during analysis.
-  private final List<ColumnDef> primaryKeyColDefs_ = Lists.newArrayList();
+  private final List<ColumnDef> primaryKeyColDefs_ = new ArrayList<>();
 
   // True if analyze() has been called.
   private boolean isAnalyzed_ = false;
@@ -142,8 +141,7 @@ class TableDef {
 
     public Options(String comment) {
       this(ImmutableList.<String>of(), comment, RowFormat.DEFAULT_ROW_FORMAT,
-          Maps.<String, String>newHashMap(), THdfsFileFormat.TEXT, null, null,
-          Maps.<String, String>newHashMap());
+          new HashMap<>(), THdfsFileFormat.TEXT, null, null, new HashMap<>());
     }
   }
 
@@ -237,7 +235,7 @@ class TableDef {
    * names are unique.
    */
   private void analyzeColumnDefs(Analyzer analyzer) throws AnalysisException {
-    Set<String> colNames = Sets.newHashSet();
+    Set<String> colNames = new HashSet<>();
     for (ColumnDef colDef: columnDefs_) {
       colDef.analyze(analyzer);
       if (!colNames.add(colDef.getColName().toLowerCase())) {
@@ -324,7 +322,7 @@ class TableDef {
       List<String> tableCols, List<String> partitionCols)
       throws AnalysisException {
     // The index of each sort column in the list of table columns.
-    LinkedHashSet<Integer> colIdxs = new LinkedHashSet<Integer>();
+    Set<Integer> colIdxs = new LinkedHashSet<>();
 
     int numColumns = 0;
     for (String sortColName: sortCols) {

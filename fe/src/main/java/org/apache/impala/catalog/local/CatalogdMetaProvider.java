@@ -19,6 +19,7 @@ package org.apache.impala.catalog.local;
 
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -703,7 +704,7 @@ public class CatalogdMetaProvider implements MetaProvider {
         req, "returned %d partitions instead of expected %d",
         resp.table_info.partitions.size(), ids.size());
 
-    Map<PartitionRef, PartitionMetadata> ret = Maps.newHashMap();
+    Map<PartitionRef, PartitionMetadata> ret = new HashMap<>();
     for (int i = 0; i < ids.size(); i++) {
       PartitionRef partRef = partRefs.get(i);
       TPartialPartitionInfo part = resp.table_info.partitions.get(i);

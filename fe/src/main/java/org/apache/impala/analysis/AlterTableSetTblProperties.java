@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -53,10 +52,10 @@ import com.google.common.collect.Lists;
 */
 public class AlterTableSetTblProperties extends AlterTableSetStmt {
   private final TTablePropertyType targetProperty_;
-  private final HashMap<String, String> tblProperties_;
+  private final Map<String, String> tblProperties_;
 
   public AlterTableSetTblProperties(TableName tableName, PartitionSet partitionSet,
-      TTablePropertyType targetProperty, HashMap<String, String> tblProperties) {
+      TTablePropertyType targetProperty, Map<String, String> tblProperties) {
     super(tableName, partitionSet);
     Preconditions.checkNotNull(tblProperties);
     Preconditions.checkNotNull(targetProperty);
@@ -65,7 +64,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     CreateTableStmt.unescapeProperties(tblProperties_);
   }
 
-  public HashMap<String, String> getTblProperties() { return tblProperties_; }
+  public Map<String, String> getTblProperties() { return tblProperties_; }
 
   @Override
   public TAlterTableParams toThrift() {

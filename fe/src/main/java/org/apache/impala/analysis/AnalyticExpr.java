@@ -98,7 +98,7 @@ public class AnalyticExpr extends Expr {
       List<OrderByElement> orderByElements, AnalyticWindow window) {
     Preconditions.checkNotNull(fnCall);
     fnCall_ = fnCall;
-    partitionExprs_ = partitionExprs != null ? partitionExprs : new ArrayList<Expr>();
+    partitionExprs_ = partitionExprs != null ? partitionExprs : new ArrayList<>();
     if (orderByElements != null) orderByElements_.addAll(orderByElements);
     window_ = window;
     setChildren();
@@ -351,7 +351,7 @@ public class AnalyticExpr extends Expr {
    */
   private static AnalyticExpr create(String fnName,
       AnalyticExpr referenceExpr, boolean copyOrderBy, boolean reverseOrderBy) {
-    FunctionCallExpr fnExpr = new FunctionCallExpr(fnName, new ArrayList<Expr>());
+    FunctionCallExpr fnExpr = new FunctionCallExpr(fnName, new ArrayList<>());
     fnExpr.setIsAnalyticFnCall(true);
     List<OrderByElement> orderByElements = null;
     if (copyOrderBy) {

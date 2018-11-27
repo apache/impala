@@ -35,7 +35,6 @@ import org.apache.impala.thrift.TTupleDescriptor;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * A collection of slots that are organized in a CPU-friendly memory layout. A slot is
@@ -78,7 +77,7 @@ public class TupleDescriptor {
 
   private final TupleId id_;
   private final String debugName_;  // debug-only
-  private final ArrayList<SlotDescriptor> slots_ = Lists.newArrayList();
+  private final List<SlotDescriptor> slots_ = new ArrayList<>();
 
   // Resolved path to the collection corresponding to this tuple descriptor, if any,
   // Only set for materialized tuples.
@@ -117,10 +116,10 @@ public class TupleDescriptor {
   }
 
   public TupleId getId() { return id_; }
-  public ArrayList<SlotDescriptor> getSlots() { return slots_; }
+  public List<SlotDescriptor> getSlots() { return slots_; }
 
-  public ArrayList<SlotDescriptor> getMaterializedSlots() {
-    ArrayList<SlotDescriptor> result = Lists.newArrayList();
+  public List<SlotDescriptor> getMaterializedSlots() {
+    List<SlotDescriptor> result = new ArrayList<>();
     for (SlotDescriptor slot: slots_) {
       if (slot.isMaterialized()) result.add(slot);
     }
@@ -131,10 +130,11 @@ public class TupleDescriptor {
    * Returns all materialized slots ordered by their offset. Valid to call after the
    * mem layout has been computed.
    */
-  public ArrayList<SlotDescriptor> getSlotsOrderedByOffset() {
+  public List<SlotDescriptor> getSlotsOrderedByOffset() {
     Preconditions.checkState(hasMemLayout_);
-    ArrayList<SlotDescriptor> result = getMaterializedSlots();
+    List<SlotDescriptor> result = getMaterializedSlots();
     Collections.sort(result, new Comparator<SlotDescriptor> () {
+      @Override
       public int compare(SlotDescriptor a, SlotDescriptor b) {
         return Integer.compare(a.getByteOffset(), b.getByteOffset());
       }
@@ -192,7 +192,7 @@ public class TupleDescriptor {
 
   public String debugString() {
     String tblStr = (getTable() == null ? "null" : getTable().getFullName());
-    List<String> slotStrings = Lists.newArrayList();
+    List<String> slotStrings = new ArrayList<>();
     for (SlotDescriptor slot : slots_) {
       slotStrings.add(slot.debugString());
     }
@@ -255,8 +255,7 @@ public class TupleDescriptor {
     avgSerializedSize_ = 0;
 
     // maps from slot size to slot descriptors with that size
-    Map<Integer, List<SlotDescriptor>> slotsBySize =
-        new HashMap<Integer, List<SlotDescriptor>>();
+    Map<Integer, List<SlotDescriptor>> slotsBySize = new HashMap<>();
 
     // populate slotsBySize
     int numNullBits = 0;
@@ -278,7 +277,7 @@ public class TupleDescriptor {
         avgSerializedSize_ += KUDU_STRING_PADDING;
       }
       if (!slotsBySize.containsKey(slotSize)) {
-        slotsBySize.put(slotSize, new ArrayList<SlotDescriptor>());
+        slotsBySize.put(slotSize, new ArrayList<>());
       }
       totalSlotSize += slotSize;
       slotsBySize.get(slotSize).add(d);
@@ -297,7 +296,7 @@ public class TupleDescriptor {
     // is 0, next is 1, etc.
     int slotIdx = 0;
     // sort slots in descending order of size
-    List<Integer> sortedSizes = new ArrayList<Integer>(slotsBySize.keySet());
+    List<Integer> sortedSizes = new ArrayList<>(slotsBySize.keySet());
     Collections.sort(sortedSizes, Collections.reverseOrder());
     for (int slotSize: sortedSizes) {
       if (slotsBySize.get(slotSize).isEmpty()) continue;
@@ -362,7 +361,7 @@ public class TupleDescriptor {
    * Returns a list of slot ids that correspond to partition columns.
    */
   public List<SlotId> getPartitionSlots() {
-    List<SlotId> partitionSlots = Lists.newArrayList();
+    List<SlotId> partitionSlots = new ArrayList<>();
     for (SlotDescriptor slotDesc: getSlots()) {
       if (slotDesc.getColumn() == null) continue;
       if (slotDesc.getColumn().getPosition() < getTable().getNumClusteringCols()) {

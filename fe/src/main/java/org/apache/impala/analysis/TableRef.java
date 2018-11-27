@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -32,7 +33,6 @@ import org.apache.impala.thrift.TReplicaPreference;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
@@ -545,7 +545,7 @@ public class TableRef extends StmtNode {
         throw new AnalysisException(
             "Subquery is not allowed in ON clause: " + toSql());
       }
-      Set<TupleId> onClauseTupleIds = Sets.newHashSet();
+      Set<TupleId> onClauseTupleIds = new HashSet<>();
       List<Expr> conjuncts = onClause_.getConjuncts();
       // Outer join clause conjuncts are registered for this particular table ref
       // (ie, can only be evaluated by the plan node that implements this join).

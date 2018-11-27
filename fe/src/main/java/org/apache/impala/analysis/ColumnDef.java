@@ -370,6 +370,7 @@ public class ColumnDef {
 
   public static List<FieldSchema> toFieldSchemas(List<ColumnDef> colDefs) {
     return Lists.transform(colDefs, new Function<ColumnDef, FieldSchema>() {
+      @Override
       public FieldSchema apply(ColumnDef colDef) {
         Preconditions.checkNotNull(colDef.getType());
         return new FieldSchema(colDef.getColName(), colDef.getType().toSql(),
@@ -392,7 +393,7 @@ public class ColumnDef {
    * is the same as the iteration order of 'colDefs'.
    */
   static Map<String, ColumnDef> mapByColumnNames(Collection<ColumnDef> colDefs) {
-    Map<String, ColumnDef> colDefsByColName = new LinkedHashMap<String, ColumnDef>();
+    Map<String, ColumnDef> colDefsByColName = new LinkedHashMap<>();
     for (ColumnDef colDef: colDefs) {
       ColumnDef def = colDefsByColName.put(colDef.getColName(), colDef);
       Preconditions.checkState(def == null);

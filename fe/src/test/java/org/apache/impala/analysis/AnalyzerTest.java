@@ -17,8 +17,8 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.impala.catalog.Function;
@@ -177,7 +177,7 @@ public class AnalyzerTest extends FrontendTestBase {
     TupleDescriptor tupleDesc = descTbl.getTupleDesc(new TupleId(0));
     tupleDesc.materializeSlots();
     // Mark slots 0 (id), 7 (double_col), 9 (string_col) as non-materialized.
-    ArrayList<SlotDescriptor> slots = tupleDesc.getSlots();
+    List<SlotDescriptor> slots = tupleDesc.getSlots();
     slots.get(0).setIsMaterialized(false);
     slots.get(7).setIsMaterialized(false);
     slots.get(9).setIsMaterialized(false);

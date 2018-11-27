@@ -368,7 +368,7 @@ public class ComputeStatsStmt extends StatementBase {
     }
 
     if (columnWhitelist_ != null) {
-      validatedColumnWhitelist_ = Sets.newHashSet();
+      validatedColumnWhitelist_ = new HashSet<>();
       for (String colName : columnWhitelist_) {
         Column col = table_.getColumn(colName);
         if (col == null) {
@@ -485,7 +485,7 @@ public class ComputeStatsStmt extends StatementBase {
         }
         // Create a hash set out of partitionSet_ for O(1) lookups.
         // TODO(todd) avoid loading all partitions.
-        HashSet<Long> targetPartitions =
+        Set<Long> targetPartitions =
             Sets.newHashSetWithExpectedSize(partitionSet_.getPartitions().size());
         for (FeFsPartition p: partitionSet_.getPartitions()) {
           targetPartitions.add(p.getId());

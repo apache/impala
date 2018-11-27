@@ -17,6 +17,8 @@
 
 package org.apache.impala.analysis;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,8 +36,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 /**
  * Loads all table and view metadata relevant for a single SQL statement and returns the
@@ -54,8 +54,8 @@ public class StmtMetadataLoader {
   private final EventSequence timeline_;
 
   // Results of the loading process. See StmtTableCache.
-  private final Set<String> dbs_ = Sets.newHashSet();
-  private final Map<TableName, FeTable> loadedTbls_ = Maps.newHashMap();
+  private final Set<String> dbs_ = new HashSet<>();
+  private final Map<TableName, FeTable> loadedTbls_ = new HashMap<>();
 
   // Metrics for the metadata load.
   // Number of prioritizedLoad() RPCs issued to the catalogd.
@@ -153,7 +153,7 @@ public class StmtMetadataLoader {
     long startTimeMs = System.currentTimeMillis();
 
     // All tables for which we have requested a prioritized load.
-    Set<TableName> requestedTbls = Sets.newHashSet();
+    Set<TableName> requestedTbls = new HashSet<>();
 
     // Loading a fixed set of tables happens in two steps:
     // 1) Issue a loading request RPC to the catalogd.
@@ -241,8 +241,8 @@ public class StmtMetadataLoader {
    * added to 'loadedTbls_'.
    */
   private Set<TableName> getMissingTables(FeCatalog catalog, Set<TableName> tbls) {
-    Set<TableName> missingTbls = Sets.newHashSet();
-    Set<TableName> viewTbls = Sets.newHashSet();
+    Set<TableName> missingTbls = new HashSet<>();
+    Set<TableName> viewTbls = new HashSet<>();
     for (TableName tblName: tbls) {
       if (loadedTbls_.containsKey(tblName)) continue;
       FeDb db = catalog.getDb(tblName.getDb());
@@ -274,7 +274,7 @@ public class StmtMetadataLoader {
     Preconditions.checkNotNull(stmt);
     List<TableRef> tblRefs = Lists.newArrayList();
     stmt.collectTableRefs(tblRefs);
-    Set<TableName> tableNames = Sets.newHashSet();
+    Set<TableName> tableNames = new HashSet<>();
     for (TableRef ref: tblRefs) {
       tableNames.addAll(Path.getCandidateTables(ref.getPath(), sessionDb_));
     }

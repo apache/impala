@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -28,18 +29,18 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 // Wrapper class around argument types and if it has varArgs
 public class FunctionArgs extends StmtNode {
-  private final ArrayList<TypeDef> argTypeDefs_;
+  private final List<TypeDef> argTypeDefs_;
   private boolean hasVarArgs_;
 
   // Result of analysis.
-  private ArrayList<Type> argTypes_;
+  private List<Type> argTypes_;
 
   public FunctionArgs() {
-    argTypeDefs_ = Lists.newArrayList();
+    argTypeDefs_ = new ArrayList<>();
     hasVarArgs_ = false;
   }
 
-  public FunctionArgs(ArrayList<TypeDef> argTypeDefs, boolean varArgs) {
+  public FunctionArgs(List<TypeDef> argTypeDefs, boolean varArgs) {
     argTypeDefs_ = argTypeDefs;
     hasVarArgs_ = varArgs;
     if (varArgs) Preconditions.checkState(argTypeDefs.size() > 0);
@@ -52,7 +53,7 @@ public class FunctionArgs extends StmtNode {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    ArrayList<Type> argTypes = Lists.newArrayListWithCapacity(argTypeDefs_.size());
+    List<Type> argTypes = Lists.newArrayListWithCapacity(argTypeDefs_.size());
     for (TypeDef typeDef: argTypeDefs_) {
       typeDef.analyze(analyzer);
       argTypes.add(typeDef.getType());
@@ -60,8 +61,8 @@ public class FunctionArgs extends StmtNode {
     argTypes_ = argTypes;
   }
 
-  public ArrayList<TypeDef> getArgTypeDefs() { return argTypeDefs_; }
-  public ArrayList<Type> getArgTypes() { return argTypes_; }
+  public List<TypeDef> getArgTypeDefs() { return argTypeDefs_; }
+  public List<Type> getArgTypes() { return argTypes_; }
   public boolean hasVarArgs() { return hasVarArgs_; }
 
   @Override

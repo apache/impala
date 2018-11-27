@@ -18,8 +18,8 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeView;
@@ -61,7 +61,7 @@ public class InlineViewRef extends TableRef {
   protected Analyzer inlineViewAnalyzer_;
 
   // list of tuple ids materialized by queryStmt
-  protected final ArrayList<TupleId> materializedTupleIds_ = Lists.newArrayList();
+  protected final List<TupleId> materializedTupleIds_ = new ArrayList<>();
 
   // Map inline view's output slots to the corresponding resultExpr of queryStmt.
   protected final ExprSubstitutionMap smap_;
@@ -246,8 +246,8 @@ public class InlineViewRef extends TableRef {
       throws AnalysisException {
     int numColLabels = getColLabels().size();
     Preconditions.checkState(numColLabels > 0);
-    HashSet<String> uniqueColAliases = Sets.newHashSetWithExpectedSize(numColLabels);
-    ArrayList<StructField> fields = Lists.newArrayListWithCapacity(numColLabels);
+    Set<String> uniqueColAliases = Sets.newHashSetWithExpectedSize(numColLabels);
+    List<StructField> fields = Lists.newArrayListWithCapacity(numColLabels);
     for (int i = 0; i < numColLabels; ++i) {
       // inline view select statement has been analyzed. Col label should be filled.
       Expr selectItemExpr = queryStmt_.getResultExprs().get(i);

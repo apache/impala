@@ -94,7 +94,7 @@ public class SelectStmt extends QueryStmt {
     whereClause_ = wherePredicate;
     groupingExprs_ = groupingExprs;
     havingClause_ = havingPredicate;
-    colLabels_ = Lists.newArrayList();
+    colLabels_ = new ArrayList<>();
     havingPred_ = null;
     multiAggInfo_ = null;
     sortInfo_ = null;
@@ -174,7 +174,7 @@ public class SelectStmt extends QueryStmt {
   private class SelectAnalyzer {
 
     private final Analyzer analyzer_;
-    private ArrayList<Expr> groupingExprsCopy_;
+    private List<Expr> groupingExprsCopy_;
     private List<FunctionCallExpr> aggExprs_;
     private ExprSubstitutionMap ndvSmap_;
     private ExprSubstitutionMap countAllMap_;
@@ -616,7 +616,7 @@ public class SelectStmt extends QueryStmt {
 
     private void analyzeGroupingExprs() throws AnalysisException {
       // analyze grouping exprs
-      groupingExprsCopy_ = Lists.newArrayList();
+      groupingExprsCopy_ = new ArrayList<>();
       if (groupingExprs_ != null) {
         // make a deep copy here, we don't want to modify the original
         // exprs during analysis (in case we need to print them later)
@@ -644,7 +644,7 @@ public class SelectStmt extends QueryStmt {
     private void collectAggExprs() {
       // Collect the aggregate expressions from the SELECT, HAVING and ORDER BY clauses
       // of this statement.
-      aggExprs_ = Lists.newArrayList();
+      aggExprs_ = new ArrayList<>();
       TreeNode.collect(resultExprs_, Expr.isAggregatePredicate(), aggExprs_);
       if (havingPred_ != null) {
         havingPred_.collect(Expr.isAggregatePredicate(), aggExprs_);
@@ -803,6 +803,7 @@ public class SelectStmt extends QueryStmt {
 
       com.google.common.base.Predicate<FunctionCallExpr> isNotDistinctPred =
           new com.google.common.base.Predicate<FunctionCallExpr>() {
+            @Override
             public boolean apply(FunctionCallExpr expr) {
               return !expr.isDistinct();
             }
@@ -814,6 +815,7 @@ public class SelectStmt extends QueryStmt {
 
       com.google.common.base.Predicate<FunctionCallExpr> isCountPred =
           new com.google.common.base.Predicate<FunctionCallExpr>() {
+            @Override
             public boolean apply(FunctionCallExpr expr) {
               return expr.getFnName().getFunction().equals("count");
             }
@@ -823,7 +825,7 @@ public class SelectStmt extends QueryStmt {
           Iterables.filter(aggExprs_, Predicates.and(isCountPred, isNotDistinctPred));
       for (FunctionCallExpr countAllAgg: countAllAggs) {
         // Replace COUNT(ALL) with zeroifnull(COUNT(ALL))
-        ArrayList<Expr> zeroIfNullParam = Lists.newArrayList(countAllAgg.clone());
+        List<Expr> zeroIfNullParam = Lists.newArrayList(countAllAgg.clone());
         FunctionCallExpr zeroIfNull =
             new FunctionCallExpr("zeroifnull", zeroIfNullParam);
         zeroIfNull.analyze(analyzer_);
@@ -840,7 +842,7 @@ public class SelectStmt extends QueryStmt {
     private void createAnalyticInfo()
         throws AnalysisException {
       // collect AnalyticExprs from the SELECT and ORDER BY clauses
-      ArrayList<AnalyticExpr> analyticExprs = Lists.newArrayList();
+      List<AnalyticExpr> analyticExprs = new ArrayList<>();
       TreeNode.collect(resultExprs_, AnalyticExpr.class, analyticExprs);
       if (sortInfo_ != null) {
         TreeNode.collect(sortInfo_.getSortExprs(), AnalyticExpr.class,
@@ -860,7 +862,7 @@ public class SelectStmt extends QueryStmt {
       }
       if (rewriteSmap.size() > 0) {
         // Substitute the exprs with their rewritten versions.
-        ArrayList<Expr> updatedAnalyticExprs =
+        List<Expr> updatedAnalyticExprs =
             Expr.substituteList(analyticExprs, rewriteSmap, analyzer_, false);
         // This is to get rid the original exprs which have been rewritten.
         analyticExprs.clear();
@@ -904,7 +906,7 @@ public class SelectStmt extends QueryStmt {
     // Such predicates will be marked twice and that is ok.
     List<Expr> unassigned =
         analyzer.getUnassignedConjuncts(getTableRefIds(), true);
-    List<Expr> unassignedJoinConjuncts = Lists.newArrayList();
+    List<Expr> unassignedJoinConjuncts = new ArrayList<>();
     for (Expr e: unassigned) {
       if (analyzer.evalAfterJoin(e)) unassignedJoinConjuncts.add(e);
     }
@@ -925,7 +927,7 @@ public class SelectStmt extends QueryStmt {
       // to account for propagated predicates because if an analytic expr is only
       // referenced by a propagated predicate, then it's better to not materialize the
       // analytic expr at all.
-      ArrayList<TupleId> tids = Lists.newArrayList();
+      List<TupleId> tids = new ArrayList<>();
       getMaterializedTupleIds(tids); // includes the analytic tuple
       List<Expr> conjuncts = analyzer.getUnassignedConjuncts(tids, false);
       materializeSlots(analyzer, conjuncts);
@@ -942,7 +944,7 @@ public class SelectStmt extends QueryStmt {
   }
 
   public List<TupleId> getTableRefIds() {
-    List<TupleId> result = Lists.newArrayList();
+    List<TupleId> result = new ArrayList<>();
     for (TableRef ref: fromClause_) {
       result.add(ref.getId());
     }
@@ -973,7 +975,7 @@ public class SelectStmt extends QueryStmt {
     if (whereClause_ != null) {
       whereClause_ = rewriter.rewrite(whereClause_, analyzer_);
       // Also rewrite exprs in the statements of subqueries.
-      List<Subquery> subqueryExprs = Lists.newArrayList();
+      List<Subquery> subqueryExprs = new ArrayList<>();
       whereClause_.collect(Subquery.class, subqueryExprs);
       for (Subquery s: subqueryExprs) s.getStatement().rewriteExprs(rewriter);
     }
@@ -1064,7 +1066,7 @@ public class SelectStmt extends QueryStmt {
    * ids also include the logical analytic output tuple.
    */
   @Override
-  public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
+  public void getMaterializedTupleIds(List<TupleId> tupleIdList) {
     if (evaluateOrderBy_) {
       tupleIdList.add(sortInfo_.getSortTupleDescriptor().getId());
     } else if (multiAggInfo_ != null) {
@@ -1115,7 +1117,7 @@ public class SelectStmt extends QueryStmt {
     }
     if (!fromClauseOnly && whereClause_ != null) {
       // Collect TableRefs in WHERE-clause subqueries.
-      List<Subquery> subqueries = Lists.newArrayList();
+      List<Subquery> subqueries = new ArrayList<>();
       whereClause_.collect(Subquery.class, subqueries);
       for (Subquery sq: subqueries) {
         sq.getStatement().collectTableRefs(tblRefs, fromClauseOnly);

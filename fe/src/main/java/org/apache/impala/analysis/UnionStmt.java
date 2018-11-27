@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -255,7 +254,7 @@ public class UnionStmt extends QueryStmt {
     // Create distinctAggInfo, if necessary.
     if (!distinctOperands_.isEmpty()) {
       // Aggregate produces exactly the same tuple as the original union stmt.
-      ArrayList<Expr> groupingExprs = Expr.cloneList(resultExprs_);
+      List<Expr> groupingExprs = Expr.cloneList(resultExprs_);
       try {
         distinctAggInfo_ = MultiAggregateInfo.createDistinct(
             groupingExprs, analyzer.getTupleDesc(tupleId_), analyzer);
@@ -532,7 +531,7 @@ public class UnionStmt extends QueryStmt {
   }
 
   @Override
-  public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
+  public void getMaterializedTupleIds(List<TupleId> tupleIdList) {
     // Return the sort tuple if there is an evaluated order by.
     if (evaluateOrderBy_) {
       tupleIdList.add(sortInfo_.getSortTupleDescriptor().getId());

@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.catalog.ArrayType;
@@ -452,8 +451,8 @@ public class Path {
   /**
    * Returns a raw path from a known root alias and field name.
    */
-  public static ArrayList<String> createRawPath(String rootAlias, String fieldName) {
-    ArrayList<String> result = Lists.newArrayList(rootAlias.split("\\."));
+  public static List<String> createRawPath(String rootAlias, String fieldName) {
+    List<String> result = Lists.newArrayList(rootAlias.split("\\."));
     result.add(fieldName);
     return result;
   }

@@ -73,7 +73,7 @@ public class ScalarFunction extends Function {
    * Creates a builtin scalar function. This is a helper that wraps a few steps
    * into one call.
    */
-  public static ScalarFunction createBuiltin(String name, ArrayList<Type> argTypes,
+  public static ScalarFunction createBuiltin(String name, List<Type> argTypes,
       boolean hasVarArgs, Type retType, String symbol,
       String prepareFnSymbol, String closeFnSymbol, boolean userVisible) {
     Preconditions.checkNotNull(symbol);

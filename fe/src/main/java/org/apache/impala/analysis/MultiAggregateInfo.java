@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -33,7 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 
 /**
  * Encapsulates all the information needed to compute the aggregate functions of a single
@@ -184,7 +184,7 @@ public class MultiAggregateInfo {
     groupingExprs_ = Expr.cloneList(other.groupingExprs_);
     aggExprs_ = Expr.cloneList(other.aggExprs_);
     if (other.aggInfos_ != null) {
-      aggInfos_ = Lists.newArrayList();
+      aggInfos_ = new ArrayList<>();
       for (AggregateInfo aggInfo : other.aggInfos_) aggInfos_.add(aggInfo.clone());
     }
     if (other.transposeAggInfo_ != null) {
@@ -215,9 +215,9 @@ public class MultiAggregateInfo {
     // into a separate list.
     // List of all DISTINCT expr lists and the grouped agg exprs.
     // distinctExprs[i] corresponds to groupedDistinctAggExprs[i]
-    List<List<Expr>> distinctExprs = Lists.newArrayList();
-    List<List<FunctionCallExpr>> groupedDistinctAggExprs = Lists.newArrayList();
-    List<FunctionCallExpr> nonDistinctAggExprs = Lists.newArrayList();
+    List<List<Expr>> distinctExprs = new ArrayList<>();
+    List<List<FunctionCallExpr>> groupedDistinctAggExprs = new ArrayList<>();
+    List<FunctionCallExpr> nonDistinctAggExprs = new ArrayList<>();
     for (FunctionCallExpr aggExpr : aggExprs_) {
       if (aggExpr.isDistinct()) {
         List<Expr> children = AggregateFunction.getCanonicalDistinctAggChildren(aggExpr);
@@ -225,7 +225,7 @@ public class MultiAggregateInfo {
         List<FunctionCallExpr> groupAggFns;
         if (groupIdx == -1) {
           distinctExprs.add(children);
-          groupAggFns = Lists.newArrayList();
+          groupAggFns = new ArrayList<>();
           groupedDistinctAggExprs.add(groupAggFns);
         } else {
           groupAggFns = groupedDistinctAggExprs.get(groupIdx);
@@ -238,7 +238,7 @@ public class MultiAggregateInfo {
     Preconditions.checkState(distinctExprs.size() == groupedDistinctAggExprs.size());
 
     // Populate aggregation classes.
-    aggClasses_ = Lists.newArrayList();
+    aggClasses_ = new ArrayList<>();
     boolean hasNonDistinctAggExprs = !nonDistinctAggExprs.isEmpty();
 
     if (groupedDistinctAggExprs.size() == 0) {
@@ -346,9 +346,9 @@ public class MultiAggregateInfo {
    */
   private AggregateInfo createTransposeAggInfo(List<Expr> groupingExprs,
       List<AggregateInfo> aggInfos, Analyzer analyzer) throws AnalysisException {
-    List<TupleId> aggTids = Lists.newArrayList();
+    List<TupleId> aggTids = new ArrayList<>();
     for (AggregateInfo aggInfo : aggInfos) aggTids.add(aggInfo.getResultTupleId());
-    ArrayList<FunctionCallExpr> transAggExprs = Lists.newArrayList();
+    List<FunctionCallExpr> transAggExprs = new ArrayList<>();
     for (AggregateInfo aggInfo : aggInfos) {
       TupleDescriptor aggTuple = aggInfo.getResultTupleDesc();
       int numGroupingExprs = groupingExprs.size();
@@ -378,11 +378,11 @@ public class MultiAggregateInfo {
    */
   private List<Expr> getTransposeGroupingExprs(
       List<Expr> groupingExprs, List<AggregateInfo> aggInfos, Analyzer analyzer) {
-    List<TupleId> resultTids = Lists.newArrayList();
+    List<TupleId> resultTids = new ArrayList<>();
     for (AggregateInfo aggInfo : aggInfos) resultTids.add(aggInfo.getResultTupleId());
-    List<Expr> result = Lists.newArrayList();
+    List<Expr> result = new ArrayList<>();
     for (int i = 0; i < groupingExprs.size(); ++i) {
-      List<CaseWhenClause> caseWhenClauses = Lists.newArrayList();
+      List<CaseWhenClause> caseWhenClauses = new ArrayList<>();
       for (AggregateInfo aggInfo : aggInfos) {
         TupleDescriptor tupleDesc = aggInfo.getResultTupleDesc();
         Expr whenExpr = NumericLiteral.create(tupleDesc.getId().asInt());
@@ -442,7 +442,7 @@ public class MultiAggregateInfo {
                || !materializedAggInfos_.get(1).isDistinctAgg())) {
       // There are two remaining aggregation classes: one distinct and one non-distinct,
       // Coalesce them into a single aggregation class.
-      ArrayList<FunctionCallExpr> newAggExprs = Lists.newArrayList();
+      List<FunctionCallExpr> newAggExprs = new ArrayList<>();
       for (Integer classIdx : materializedClassIdxs) {
         List<FunctionCallExpr> aggClass = aggClasses_.get(classIdx);
         AggregateInfo aggInfo = aggInfos_.get(classIdx);
@@ -515,8 +515,8 @@ public class MultiAggregateInfo {
       AggregateInfo transposeAggInfo, AggregateInfo simplifiedAggInfo) {
     TupleDescriptor transTupleDesc = transposeAggInfo.getResultTupleDesc();
     TupleDescriptor matAggClassTupleDesc = simplifiedAggInfo.getResultTupleDesc();
-    List<Expr> lhsExprs = Lists.newArrayList();
-    List<Expr> rhsExprs = Lists.newArrayList();
+    List<Expr> lhsExprs = new ArrayList<>();
+    List<Expr> rhsExprs = new ArrayList<>();
     int numGroupingExprs = groupingExprs.size();
     for (int i = 0; i < numGroupingExprs; ++i) {
       lhsExprs.add(new SlotRef(transTupleDesc.getSlots().get(i)));
@@ -548,7 +548,7 @@ public class MultiAggregateInfo {
    */
   public List<AggregateInfo> getMaterializedAggInfos(AggPhase aggPhase) {
     Preconditions.checkNotNull(materializedAggInfos_);
-    List<AggregateInfo> result = Lists.newArrayList();
+    List<AggregateInfo> result = new ArrayList<>();
     switch (aggPhase) {
       case FIRST: {
         result.addAll(materializedAggInfos_);
@@ -581,7 +581,7 @@ public class MultiAggregateInfo {
   }
 
   private List<AggregateInfo> getMergeAggInfos(List<AggregateInfo> aggInfos) {
-    List<AggregateInfo> result = Lists.newArrayList();
+    List<AggregateInfo> result = new ArrayList<>();
     for (AggregateInfo aggInfo : aggInfos) {
       if (!aggInfo.isMerge()) {
         result.add(Preconditions.checkNotNull(aggInfo.getMergeAggInfo()));
@@ -622,7 +622,7 @@ public class MultiAggregateInfo {
    * If 'markAssigned' is true the returned conjuncts are marked as assigned.
    */
   public List<Expr> collectConjuncts(Analyzer analyzer, boolean markAssigned) {
-    List<Expr> result = Lists.newArrayList();
+    List<Expr> result = new ArrayList<>();
     TupleId tid = getResultTupleId();
     TupleDescriptor tupleDesc = analyzer.getTupleDesc(tid);
     // Ignore predicates bound by a grouping slot produced by a SlotRef grouping expr.
@@ -632,7 +632,7 @@ public class MultiAggregateInfo {
     // conjuncts bound by those grouping slots in createEquivConjuncts() (IMPALA-2089).
     // Those conjuncts cannot be redundant because our equivalence classes do not
     // capture dependencies with non-SlotRef exprs.
-    Set<SlotId> groupBySids = Sets.newHashSet();
+    Set<SlotId> groupBySids = new HashSet<>();
     for (int i = 0; i < groupingExprs_.size(); ++i) {
       if (groupingExprs_.get(i).unwrapSlotRef(true) == null) continue;
       groupBySids.add(tupleDesc.getSlots().get(i).getId());

@@ -17,11 +17,12 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.FeTable;
@@ -35,7 +36,6 @@ import org.apache.impala.thrift.TDescriptorTable;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 /**
  * Repository for tuple (and slot) descriptors.
@@ -43,17 +43,17 @@ import com.google.common.collect.Maps;
  * them unique ids.
  */
 public class DescriptorTable {
-  private final HashMap<TupleId, TupleDescriptor> tupleDescs_ = Maps.newHashMap();
-  private final HashMap<SlotId, SlotDescriptor> slotDescs_ = Maps.newHashMap();
+  private final Map<TupleId, TupleDescriptor> tupleDescs_ = new HashMap<>();
+  private final Map<SlotId, SlotDescriptor> slotDescs_ = new HashMap<>();
   private final IdGenerator<TupleId> tupleIdGenerator_ = TupleId.createGenerator();
   private final IdGenerator<SlotId> slotIdGenerator_ = SlotId.createGenerator();
   // The target table of a table sink, may be null.
   // Table id 0 is reserved for it. Set in QueryStmt.analyze() that produces a table sink,
   // e.g. InsertStmt.analyze(), ModifyStmt.analyze().
   private FeTable targetTable_;
-  // For each table, the set of partitions that are referenced by at least one scan range.
-  private final HashMap<FeTable, HashSet<Long>> referencedPartitionsPerTable_ =
-      Maps.newHashMap();
+  // For each table, the set of partitions that are referenced by at least one
+  // scan range.
+  private final Map<FeTable, Set<Long>> referencedPartitionsPerTable_ = new HashMap<>();
   // 0 is reserved for table sinks
   public static final int TABLE_SINK_ID = 0;
   // Table id counter for a single query.
@@ -110,10 +110,10 @@ public class DescriptorTable {
    * Find the set of referenced partitions for the given table.  Allocates a set if
    * none has been allocated for the table yet.
    */
-  private HashSet<Long> getReferencedPartitions(FeTable table) {
-    HashSet<Long> refPartitions = referencedPartitionsPerTable_.get(table);
+  private Set<Long> getReferencedPartitions(FeTable table) {
+    Set<Long> refPartitions = referencedPartitionsPerTable_.get(table);
     if (refPartitions == null) {
-      refPartitions = new HashSet<Long>();
+      refPartitions = new HashSet<>();
       referencedPartitionsPerTable_.put(table, refPartitions);
     }
     return refPartitions;
@@ -152,9 +152,9 @@ public class DescriptorTable {
   public TDescriptorTable toThrift() {
     TDescriptorTable result = new TDescriptorTable();
     // Maps from base table to its table id used in the backend.
-    HashMap<FeTable, Integer> tableIdMap = Maps.newHashMap();
+    Map<FeTable, Integer> tableIdMap = new HashMap<>();
     // Used to check table level consistency
-    HashMap<TableName, FeTable> referencedTables = Maps.newHashMap();
+    Map<TableName, FeTable> referencedTables = new HashMap<>();
 
     if (targetTable_ != null) {
       tableIdMap.put(targetTable_, TABLE_SINK_ID);
@@ -189,7 +189,7 @@ public class DescriptorTable {
       }
     }
     for (FeTable tbl: tableIdMap.keySet()) {
-      HashSet<Long> referencedPartitions = null; // null means include all partitions.
+      Set<Long> referencedPartitions = null; // null means include all partitions.
       // We don't know which partitions are needed for INSERT, so do not prune partitions.
       if (tbl != targetTable_) referencedPartitions = getReferencedPartitions(tbl);
       result.addToTableDescriptors(
@@ -215,7 +215,7 @@ public class DescriptorTable {
       List<List<TColumnType>> slotTypes) {
     DescriptorTable descTbl = new DescriptorTable();
     for (List<TColumnType> ttupleSlots: slotTypes) {
-      ArrayList<StructField> fields = Lists.newArrayListWithCapacity(ttupleSlots.size());
+      List<StructField> fields = Lists.newArrayListWithCapacity(ttupleSlots.size());
       for (TColumnType ttype: ttupleSlots) {
         fields.add(new StructField("testField", Type.fromThrift(ttype)));
       }
@@ -248,7 +248,7 @@ public class DescriptorTable {
       if (itemType.isStructType()) {
         itemStruct = (StructType) itemType;
       } else {
-        ArrayList<StructField> itemFields = Lists.newArrayListWithCapacity(1);
+        List<StructField> itemFields = Lists.newArrayListWithCapacity(1);
         itemFields.add(new StructField("item", itemType));
         itemStruct = new StructType(itemFields);
       }

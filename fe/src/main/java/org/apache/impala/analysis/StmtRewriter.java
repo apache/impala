@@ -254,7 +254,7 @@ public class StmtRewriter {
               new IsNullPredicate(wrapperResult, false),
               new BinaryPredicate(BinaryPredicate.Operator.EQ, wrapperResult, lhs)));
 
-      List<TableRef> fromList = Lists.newArrayList();
+      List<TableRef> fromList = new ArrayList<>();
       fromList.add(wrapperView);
       SelectStmt rewriteQuery = new SelectStmt(
           new SelectList(Lists.newArrayList(new SelectListItem(wrapperResult, null))),
@@ -310,7 +310,7 @@ public class StmtRewriter {
       // to the stmt's table refs later. Explicitly set the inline view's column labels
       // to eliminate any chance that column aliases from the parent query could reference
       // select items from the inline view after the rewrite.
-      List<String> colLabels = Lists.newArrayList();
+      List<String> colLabels = new ArrayList<>();
       for (int i = 0; i < subqueryStmt.getColLabels().size(); ++i) {
         colLabels.add(subqueryStmt.getColumnAliasGenerator().getNextAlias());
       }
@@ -336,8 +336,8 @@ public class StmtRewriter {
           || (expr instanceof ExistsPredicate
                  && !subqueryStmt.getSelectList().isDistinct()
                  && subqueryStmt.hasMultiAggInfo());
-      List<Expr> lhsExprs = Lists.newArrayList();
-      List<Expr> rhsExprs = Lists.newArrayList();
+      List<Expr> lhsExprs = new ArrayList<>();
+      List<Expr> rhsExprs = new ArrayList<>();
       for (Expr conjunct : onClauseConjuncts) {
         updateInlineView(inlineView, conjunct, stmt.getTableRefIds(), lhsExprs, rhsExprs,
             updateGroupBy);
@@ -438,11 +438,11 @@ public class StmtRewriter {
         if (!(conjunct instanceof BinaryPredicate)) continue;
         BinaryPredicate.Operator operator = ((BinaryPredicate) conjunct).getOp();
         if (!operator.isEquivalence()) continue;
-        List<TupleId> lhsTupleIds = Lists.newArrayList();
+        List<TupleId> lhsTupleIds = new ArrayList<>();
         conjunct.getChild(0).getIds(lhsTupleIds, null);
         // Allows for constants to be a join predicate.
         if (lhsTupleIds.isEmpty() && !conjunct.getChild(0).isConstant()) continue;
-        List<TupleId> rhsTupleIds = Lists.newArrayList();
+        List<TupleId> rhsTupleIds = new ArrayList<>();
         conjunct.getChild(1).getIds(rhsTupleIds, null);
         if (rhsTupleIds.isEmpty()) continue;
         // Check if columns from the outer query block (stmt) appear in both sides
@@ -491,7 +491,7 @@ public class StmtRewriter {
         // conjunct with a conjunct that uses the null-matching eq operator.
         if (expr instanceof InPredicate) {
           joinOp = JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN;
-          List<TupleId> tIds = Lists.newArrayList();
+          List<TupleId> tIds = new ArrayList<>();
           joinConjunct.getIds(tIds, null);
 
           if (tIds.size() <= 1 || !tIds.contains(inlineView.getDesc().getId())) {
@@ -526,7 +526,7 @@ public class StmtRewriter {
      */
     private static void replaceUnqualifiedStarItems(SelectStmt stmt, int tableIdx) {
       Preconditions.checkState(tableIdx < stmt.fromClause_.size());
-      ArrayList<SelectListItem> newItems = Lists.newArrayList();
+      List<SelectListItem> newItems = new ArrayList<>();
       for (int i = 0; i < stmt.selectList_.getItems().size(); ++i) {
         SelectListItem item = stmt.selectList_.getItems().get(i);
         if (!item.isStar() || item.getRawPath() != null) {
@@ -567,10 +567,10 @@ public class StmtRewriter {
      * <p>
      * TODO Handle correlated predicates in a HAVING clause.
      */
-    private static ArrayList<Expr> extractCorrelatedPredicates(SelectStmt subqueryStmt)
+    private static List<Expr> extractCorrelatedPredicates(SelectStmt subqueryStmt)
         throws AnalysisException {
       List<TupleId> subqueryTupleIds = subqueryStmt.getTableRefIds();
-      ArrayList<Expr> correlatedPredicates = Lists.newArrayList();
+      List<Expr> correlatedPredicates = new ArrayList<>();
 
       if (subqueryStmt.hasWhereClause()) {
         if (!canExtractCorrelatedPredicates(subqueryStmt.getWhereClause(),
@@ -592,7 +592,7 @@ public class StmtRewriter {
       for (TableRef tableRef : subqueryStmt.getTableRefs()) {
         if (tableRef.getOnClause() == null) continue;
 
-        ArrayList<Expr> onClauseCorrelatedPreds = Lists.newArrayList();
+        List<Expr> onClauseCorrelatedPreds = new ArrayList<>();
         Expr newOnClause =
             extractCorrelatedPredicates(tableRef.getOnClause(), subqueryTupleIds,
                 onClauseCorrelatedPreds);
@@ -619,7 +619,7 @@ public class StmtRewriter {
      * and the extracted correlated predicates are added to 'matches'.
      */
     private static Expr extractCorrelatedPredicates(Expr root, List<TupleId> tupleIds,
-        ArrayList<Expr> matches) {
+        List<Expr> matches) {
       if (isCorrelatedPredicate(root, tupleIds)) {
         matches.add(root);
         return new BoolLiteral(true);
@@ -712,7 +712,7 @@ public class StmtRewriter {
             new com.google.common.base.Predicate<Expr>() {
               @Override
               public boolean apply(Expr arg) {
-                List<TupleId> tids = Lists.newArrayList();
+                List<TupleId> tids = new ArrayList<>();
                 arg.getIds(tids, null);
                 return !Collections.disjoint(tids, subqueryTblIds);
               }
@@ -743,15 +743,15 @@ public class StmtRewriter {
         boolean updateGroupBy) throws AnalysisException {
       SelectStmt stmt = (SelectStmt) inlineView.getViewStmt();
       List<TupleId> subqueryTblIds = stmt.getTableRefIds();
-      ArrayList<Expr> groupByExprs = null;
-      if (updateGroupBy) groupByExprs = Lists.newArrayList();
+      List<Expr> groupByExprs = null;
+      if (updateGroupBy) groupByExprs = new ArrayList<>();
 
       List<SelectListItem> items = stmt.selectList_.getItems();
       // Collect all the SlotRefs from 'expr' and identify those that are bound by
       // subquery tuple ids.
-      ArrayList<Expr> slotRefs = Lists.newArrayList();
+      List<Expr> slotRefs = new ArrayList<>();
       expr.collectAll(Predicates.instanceOf(SlotRef.class), slotRefs);
-      List<Expr> exprsBoundBySubqueryTids = Lists.newArrayList();
+      List<Expr> exprsBoundBySubqueryTids = new ArrayList<>();
       for (Expr slotRef : slotRefs) {
         if (slotRef.isBoundByTupleIds(subqueryTblIds)) {
           exprsBoundBySubqueryTids.add(slotRef);
@@ -904,7 +904,7 @@ public class StmtRewriter {
               "correlated subquery's select list: " + subquery.toSql());
         }
 
-        List<Expr> aggFns = Lists.newArrayList();
+        List<Expr> aggFns = new ArrayList<>();
         item.getExpr().collectAll(Expr.NON_NULL_EMPTY_AGG, aggFns);
         // TODO Generalize this by making the aggregate functions aware of the
         // literal expr that they return on empty input, e.g. max returns a
@@ -915,7 +915,7 @@ public class StmtRewriter {
           zeroIfNull.analyze(analyzer);
           subquerySubstitute = zeroIfNull;
         } else if (((FunctionCallExpr) aggFns.get(0)).getReturnType().isStringType()) {
-          List<Expr> params = Lists.newArrayList();
+          List<Expr> params = new ArrayList<>();
           params.add(slotRef);
           params.add(new StringLiteral(""));
           FunctionCallExpr ifnull = new FunctionCallExpr("ifnull", params);
@@ -1009,12 +1009,12 @@ public class StmtRewriter {
     private void rewriteWhereClauseSubqueries(SelectStmt stmt, Analyzer analyzer)
         throws AnalysisException {
       int numTableRefs = stmt.fromClause_.size();
-      ArrayList<Expr> exprsWithSubqueries = Lists.newArrayList();
+      List<Expr> exprsWithSubqueries = new ArrayList<>();
       ExprSubstitutionMap smap = new ExprSubstitutionMap();
       // Check if all the conjuncts in the WHERE clause that contain subqueries
       // can currently be rewritten as a join.
       for (Expr conjunct : stmt.whereClause_.getConjuncts()) {
-        List<Subquery> subqueries = Lists.newArrayList();
+        List<Subquery> subqueries = new ArrayList<>();
         conjunct.collectAll(Predicates.instanceOf(Subquery.class), subqueries);
         if (subqueries.size() == 0) continue;
         if (subqueries.size() > 1) {

@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.impala.catalog.ArrayType;
@@ -30,7 +31,6 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 
 import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
@@ -126,7 +126,7 @@ public class TypeDef extends StmtNode {
   private void analyzeStructType(StructType structType, Analyzer analyzer)
       throws AnalysisException {
     // Check for duplicate field names.
-    Set<String> fieldNames = Sets.newHashSet();
+    Set<String> fieldNames = new HashSet<>();
     for (StructField f: structType.getFields()) {
       analyze(f.getType(), analyzer);
       if (!fieldNames.add(f.getName().toLowerCase())) {

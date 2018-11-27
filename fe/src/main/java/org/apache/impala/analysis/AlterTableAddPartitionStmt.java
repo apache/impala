@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Joiner;
-import com.google.common.collect.Sets;
 
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
@@ -28,6 +27,7 @@ import org.apache.impala.thrift.TAlterTableAddPartitionParams;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -85,7 +85,7 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
       throw new AnalysisException("ALTER TABLE ADD PARTITION is not supported for " +
           "Kudu tables: " + table.getTableName());
     }
-    Set<String> partitionSpecs = Sets.newHashSet();
+    Set<String> partitionSpecs = new HashSet<>();
     for (PartitionDef p: partitions_) {
       p.analyze(analyzer);
 

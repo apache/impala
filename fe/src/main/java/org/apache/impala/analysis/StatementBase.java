@@ -71,6 +71,7 @@ public abstract class StatementBase extends StmtNode {
    * It is up to the analysis() implementation to ensure the maximum number of missing
    * tables/views get collected in the Analyzer before failing analyze().
    */
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed()) return;
     if (isExplain_) analyzer.setIsExplain();

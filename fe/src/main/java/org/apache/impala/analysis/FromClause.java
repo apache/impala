@@ -35,7 +35,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  */
 public class FromClause extends StmtNode implements Iterable<TableRef> {
 
-  private final ArrayList<TableRef> tableRefs_;
+  private final List<TableRef> tableRefs_;
 
   private boolean analyzed_ = false;
 
@@ -47,7 +47,7 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
     }
   }
 
-  public FromClause() { tableRefs_ = Lists.newArrayList(); }
+  public FromClause() { tableRefs_ = new ArrayList<>(); }
   public List<TableRef> getTableRefs() { return tableRefs_; }
 
   @Override
@@ -88,7 +88,7 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
 
   @Override
   public FromClause clone() {
-    ArrayList<TableRef> clone = Lists.newArrayList();
+    List<TableRef> clone = new ArrayList<>();
     for (TableRef tblRef: tableRefs_) clone.add(tblRef.clone());
     return new FromClause(clone);
   }

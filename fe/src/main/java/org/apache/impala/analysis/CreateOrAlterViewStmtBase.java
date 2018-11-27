@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -28,7 +29,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import com.google.common.base.Joiner;
 
 /**
@@ -131,7 +131,7 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
 
     // Check that the column definitions have valid names, and that there are no
     // duplicate column names.
-    Set<String> distinctColNames = Sets.newHashSet();
+    Set<String> distinctColNames = new HashSet<>();
     for (ColumnDef colDesc: finalColDefs_) {
       colDesc.analyze(null);
       if (!distinctColNames.add(colDesc.getColName().toLowerCase())) {

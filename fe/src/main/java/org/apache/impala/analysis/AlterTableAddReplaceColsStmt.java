@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -32,7 +33,6 @@ import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Represents an ALTER TABLE ADD|REPLACE COLUMNS (colDef1, colDef2, ...) statement.
@@ -87,7 +87,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     }
 
     // Build a set of the partition keys for the table.
-    Set<String> existingPartitionKeys = Sets.newHashSet();
+    Set<String> existingPartitionKeys = new HashSet<>();
     for (FieldSchema fs: t.getMetaStoreTable().getPartitionKeys()) {
       existingPartitionKeys.add(fs.getName().toLowerCase());
     }
@@ -95,7 +95,7 @@ public class AlterTableAddReplaceColsStmt extends AlterTableStmt {
     // Make sure the new columns don't already exist in the table, that the names
     // are all valid and unique, and that none of the columns conflict with
     // partition columns.
-    Set<String> colNames = Sets.newHashSet();
+    Set<String> colNames = new HashSet<>();
     for (ColumnDef c: columnDefs_) {
       c.analyze(analyzer);
       String colName = c.getColName().toLowerCase();

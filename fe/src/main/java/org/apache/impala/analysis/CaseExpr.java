@@ -17,8 +17,8 @@
 
 package org.apache.impala.analysis;
 
-import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function.CompareMode;
@@ -391,7 +391,7 @@ public class CaseExpr extends Expr {
     boolean allOutputsKnown = true;
     int numOutputConstants = 0;
     long maxOutputNonConstNdv = -1;
-    HashSet<LiteralExpr> constLiteralSet = Sets.newHashSetWithExpectedSize(children_.size());
+    Set<LiteralExpr> constLiteralSet = Sets.newHashSetWithExpectedSize(children_.size());
 
     for (int i = loopStart; i < children_.size(); ++i) {
       // The children follow this ordering:

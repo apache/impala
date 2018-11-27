@@ -17,9 +17,8 @@
 
 package org.apache.impala.analysis;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.AuthorizeableFn;
@@ -57,7 +56,7 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
   protected final FunctionArgs args_;
   protected final TypeDef retTypeDef_;
   protected final HdfsUri location_;
-  protected final HashMap<CreateFunctionStmtBase.OptArg, String> optArgs_;
+  protected final Map<CreateFunctionStmtBase.OptArg, String> optArgs_;
   protected final boolean ifNotExists_;
 
   // Result of analysis.
@@ -71,7 +70,7 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
 
   protected CreateFunctionStmtBase(FunctionName fnName, FunctionArgs args,
       TypeDef retTypeDef, HdfsUri location, boolean ifNotExists,
-      HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
+      Map<CreateFunctionStmtBase.OptArg, String> optArgs) {
     // The return and arg types must either be both null or non-null.
     Preconditions.checkState(!(args == null ^ retTypeDef == null));
     fnName_ = fnName;
@@ -191,5 +190,5 @@ public abstract class CreateFunctionStmtBase extends StatementBase {
    * Creates a concrete function.
    */
   protected abstract Function createFunction(FunctionName fnName,
-      ArrayList<Type> argTypes, Type retType, boolean hasVarArgs);
+      List<Type> argTypes, Type retType, boolean hasVarArgs);
 }

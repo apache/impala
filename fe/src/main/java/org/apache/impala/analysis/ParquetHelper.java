@@ -20,11 +20,11 @@ package org.apache.impala.analysis;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
@@ -183,7 +183,7 @@ class ParquetHelper {
    */
   private static StructType convertStruct(org.apache.parquet.schema.GroupType outerGroup)
       throws AnalysisException {
-    ArrayList<StructField> structFields = new ArrayList<StructField>();
+    List<StructField> structFields = new ArrayList<>();
     for (org.apache.parquet.schema.Type field: outerGroup.getFields()) {
       StructField f = new StructField(field.getName(), convertParquetType(field));
       structFields.add(f);
@@ -338,13 +338,13 @@ class ParquetHelper {
       throws AnalysisException {
     org.apache.parquet.schema.MessageType parquetSchema = loadParquetSchema(location.getPath());
     List<org.apache.parquet.schema.Type> fields = parquetSchema.getFields();
-    List<ColumnDef> schema = new ArrayList<ColumnDef>();
+    List<ColumnDef> schema = new ArrayList<>();
 
     for (org.apache.parquet.schema.Type field: fields) {
       Type type = convertParquetType(field);
       Preconditions.checkNotNull(type);
       String colName = field.getName();
-      Map<ColumnDef.Option, Object> option = Maps.newHashMap();
+      Map<ColumnDef.Option, Object> option = new HashMap<>();
       option.put(ColumnDef.Option.COMMENT, "Inferred from Parquet file.");
       schema.add(new ColumnDef(colName, new TypeDef(type), option));
     }

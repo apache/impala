@@ -81,7 +81,7 @@ public class DropFunctionStmt extends StatementBase {
       desc_ = new Function(fnName_, fnArgs_.getArgTypes(), Type.INVALID,
           fnArgs_.hasVarArgs());
     } else {
-      desc_ = new Function(fnName_, new ArrayList<Type>(), Type.INVALID,
+      desc_ = new Function(fnName_, new ArrayList<>(), Type.INVALID,
           false);
     }
 

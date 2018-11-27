@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -34,7 +35,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Represents a set of partitions resulting from evaluating a list of partition conjuncts
@@ -109,7 +109,7 @@ public class PartitionSet extends PartitionSpecBase {
   private void addIfExists(
       Analyzer analyzer, FeTable table, List<Expr> conjuncts) {
     boolean add = false;
-    Set<String> partColNames = Sets.newHashSet();
+    Set<String> partColNames = new HashSet<>();
     Reference<SlotRef> slotRef = new Reference<>();
     for (Expr e : conjuncts) {
       if (e instanceof BinaryPredicate) {

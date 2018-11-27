@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -31,7 +32,6 @@ import org.apache.impala.thrift.TTablePropertyType;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 
 /**
 * Represents an ALTER TABLE SORT BY (c1, c2, ...) statement.
@@ -55,7 +55,7 @@ public class AlterTableSortByStmt extends AlterTableStmt {
    TAlterTableSetTblPropertiesParams tblPropertyParams =
        new TAlterTableSetTblPropertiesParams();
    tblPropertyParams.setTarget(TTablePropertyType.TBL_PROPERTY);
-   Map<String, String> properties = Maps.newHashMap();
+   Map<String, String> properties = new HashMap<>();
    properties.put(TBL_PROP_SORT_COLUMNS, Joiner.on(",").join(columns_));
    tblPropertyParams.setProperties(properties);
    params.setSet_tbl_properties_params(tblPropertyParams);

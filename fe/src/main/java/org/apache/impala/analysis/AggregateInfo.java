@@ -136,7 +136,7 @@ public class AggregateInfo extends AggregateInfoBase {
     AggregateInfo result = new AggregateInfo(groupingExprs, aggExprs, AggPhase.FIRST);
 
     // collect agg exprs with DISTINCT clause
-    ArrayList<FunctionCallExpr> distinctAggExprs = Lists.newArrayList();
+    List<FunctionCallExpr> distinctAggExprs = new ArrayList<>();
     if (aggExprs != null) {
       for (FunctionCallExpr aggExpr: aggExprs) {
         if (aggExpr.isDistinct()) distinctAggExprs.add(aggExpr);
@@ -251,7 +251,7 @@ public class AggregateInfo extends AggregateInfoBase {
   }
 
   public List<FunctionCallExpr> getMaterializedAggregateExprs() {
-    List<FunctionCallExpr> result = Lists.newArrayList();
+    List<FunctionCallExpr> result = new ArrayList<>();
     for (Integer i: materializedSlots_) {
       result.add(aggregateExprs_.get(i));
     }
@@ -320,14 +320,14 @@ public class AggregateInfo extends AggregateInfoBase {
     Preconditions.checkState(mergeAggInfo_ == null);
     TupleDescriptor inputDesc = intermediateTupleDesc_;
     // construct grouping exprs
-    ArrayList<Expr> groupingExprs = Lists.newArrayList();
+    ArrayList<Expr> groupingExprs = new ArrayList<>();
     for (int i = 0; i < getGroupingExprs().size(); ++i) {
       SlotRef slotRef = new SlotRef(inputDesc.getSlots().get(i));
       groupingExprs.add(slotRef);
     }
 
     // construct agg exprs
-    ArrayList<FunctionCallExpr> aggExprs = Lists.newArrayList();
+    ArrayList<FunctionCallExpr> aggExprs = new ArrayList<>();
     for (int i = 0; i < getAggregateExprs().size(); ++i) {
       FunctionCallExpr inputExpr = getAggregateExprs().get(i);
       Preconditions.checkState(inputExpr.isAggregateFunction());
@@ -358,14 +358,14 @@ public class AggregateInfo extends AggregateInfoBase {
    * Returns a SlotRef to the last slot if there is only one slot in range.
    */
   private Expr createCountDistinctAggExprParam(int firstIdx, int lastIdx,
-      ArrayList<SlotDescriptor> slots) {
+      List<SlotDescriptor> slots) {
     if (firstIdx > lastIdx) return null;
 
     Expr elseExpr = new SlotRef(slots.get(lastIdx));
     if (firstIdx == lastIdx) return elseExpr;
 
     for (int i = lastIdx - 1; i >= firstIdx; --i) {
-      ArrayList<Expr> ifArgs = Lists.newArrayList();
+      List<Expr> ifArgs = new ArrayList<>();
       SlotRef slotRef = new SlotRef(slots.get(i));
       // Build expr: IF(IsNull(slotRef), NULL, elseExpr)
       Expr isNullPred = new IsNullPredicate(slotRef, false);
@@ -401,7 +401,7 @@ public class AggregateInfo extends AggregateInfoBase {
 
     // construct agg exprs for original DISTINCT aggregate functions
     // (these aren't part of aggExprs_)
-    ArrayList<FunctionCallExpr> secondPhaseAggExprs = Lists.newArrayList();
+    List<FunctionCallExpr> secondPhaseAggExprs = new ArrayList<>();
     for (FunctionCallExpr inputExpr: distinctAggExprs) {
       Preconditions.checkState(inputExpr.isAggregateFunction());
       FunctionCallExpr aggExpr = null;
@@ -419,7 +419,7 @@ public class AggregateInfo extends AggregateInfoBase {
         aggExpr = new FunctionCallExpr("count", Lists.newArrayList(ifExpr));
       } else if (inputExpr.getFnName().getFunction().equals("group_concat")) {
         // Syntax: GROUP_CONCAT([DISTINCT] expression [, separator])
-        ArrayList<Expr> exprList = Lists.newArrayList();
+        List<Expr> exprList = new ArrayList<>();
         // Add "expression" parameter. Need to get it from the inputDesc's slots so the
         // tuple reference is correct.
         exprList.add(new SlotRef(inputDesc.getSlots().get(origGroupingExprs.size())));
@@ -457,7 +457,7 @@ public class AggregateInfo extends AggregateInfoBase {
       Preconditions.checkState(aggExpr.isAggregateFunction());
     }
 
-    ArrayList<Expr> substGroupingExprs =
+    List<Expr> substGroupingExprs =
         Expr.substituteList(origGroupingExprs, intermediateTupleSmap_, analyzer, false);
     secondPhaseDistinctAggInfo_ =
         new AggregateInfo(substGroupingExprs, secondPhaseAggExprs, AggPhase.SECOND);
@@ -475,7 +475,7 @@ public class AggregateInfo extends AggregateInfoBase {
       AggregateInfo inputAggInfo, List<FunctionCallExpr> distinctAggExprs) {
     outputTupleSmap_.clear();
     int slotIdx = 0;
-    ArrayList<SlotDescriptor> slotDescs = outputTupleDesc_.getSlots();
+    List<SlotDescriptor> slotDescs = outputTupleDesc_.getSlots();
 
     int numDistinctParams = distinctAggExprs.get(0).getChildren().size();
     // If we are counting distinct params of group_concat, we cannot include the custom
@@ -580,7 +580,7 @@ public class AggregateInfo extends AggregateInfoBase {
     // collect input exprs: grouping exprs plus aggregate exprs that need to be
     // materialized
     materializedSlots_.clear();
-    List<Expr> exprs = Lists.newArrayList();
+    List<Expr> exprs = new ArrayList<>();
     exprs.addAll(groupingExprs_);
     for (int i = 0; i < aggregateExprs_.size(); ++i) {
       SlotDescriptor slotDesc =
@@ -643,7 +643,7 @@ public class AggregateInfo extends AggregateInfoBase {
    * with the input exprs.
    */
   public void checkConsistency() {
-    ArrayList<SlotDescriptor> slots = outputTupleDesc_.getSlots();
+    List<SlotDescriptor> slots = outputTupleDesc_.getSlots();
 
     // Check materialized slots.
     int numMaterializedSlots = 0;

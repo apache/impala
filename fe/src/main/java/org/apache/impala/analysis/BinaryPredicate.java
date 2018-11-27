@@ -177,7 +177,7 @@ public class BinaryPredicate extends Predicate {
     }
     Preconditions.checkState(fn_.getReturnType().isBoolean());
 
-    ArrayList<Expr> subqueries = Lists.newArrayList();
+    List<Expr> subqueries = new ArrayList<>();
     collectAll(Predicates.instanceOf(Subquery.class), subqueries);
     if (subqueries.size() > 1) {
       // TODO Remove that restriction when we add support for independent subquery
@@ -190,7 +190,7 @@ public class BinaryPredicate extends Predicate {
           "supported in binary predicates: " + toSql());
     }
 
-    List<InPredicate> inPredicates = Lists.newArrayList();
+    List<InPredicate> inPredicates = new ArrayList<>();
     collect(InPredicate.class, inPredicates);
     for (InPredicate inPredicate: inPredicates) {
       if (inPredicate.contains(Subquery.class)) {

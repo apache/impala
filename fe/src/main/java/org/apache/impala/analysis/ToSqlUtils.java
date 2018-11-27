@@ -20,7 +20,7 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -94,7 +94,7 @@ public class ToSqlUtils {
     List<KuduPartitionParam> partitionParams = stmt.getKuduPartitionParams();
     Preconditions.checkNotNull(partitionParams);
     if (partitionParams.isEmpty()) return null;
-    List<String> paramStrings = Lists.newArrayList();
+    List<String> paramStrings = new ArrayList<>();
     for (KuduPartitionParam p : partitionParams) {
       paramStrings.add(p.toSql());
     }
@@ -140,7 +140,7 @@ public class ToSqlUtils {
   }
 
   public static List<String> getIdentSqlList(List<String> identList) {
-    List<String> identSqlList = Lists.newArrayList();
+    List<String> identSqlList = new ArrayList<>();
     for (String ident: identList) {
       identSqlList.add(getIdentSql(ident));
     }
@@ -161,17 +161,17 @@ public class ToSqlUtils {
    * statement.
    */
   public static String getCreateTableSql(CreateTableStmt stmt) {
-    ArrayList<String> colsSql = Lists.newArrayList();
+    List<String> colsSql = new ArrayList<>();
     for (ColumnDef col: stmt.getColumnDefs()) {
       colsSql.add(col.toString());
     }
-    ArrayList<String> partitionColsSql = Lists.newArrayList();
+    List<String> partitionColsSql = new ArrayList<>();
     for (ColumnDef col: stmt.getPartitionColumnDefs()) {
       partitionColsSql.add(col.toString());
     }
-    LinkedHashMap<String, String> properties = Maps.newLinkedHashMap(
+    Map<String, String> properties = Maps.newLinkedHashMap(
         stmt.getTblProperties());
-    LinkedHashMap<String, String> generatedProperties = Maps.newLinkedHashMap(
+    Map<String, String> generatedProperties = Maps.newLinkedHashMap(
         stmt.getGeneratedKuduProperties());
     removeHiddenTableProperties(properties, generatedProperties);
     properties.putAll(generatedProperties);
@@ -197,14 +197,14 @@ public class ToSqlUtils {
     CreateTableStmt innerStmt = stmt.getCreateStmt();
     // Only add partition column labels to output. Table columns must not be specified as
     // they are deduced from the select statement.
-    ArrayList<String> partitionColsSql = Lists.newArrayList();
+    List<String> partitionColsSql = new ArrayList<>();
     for (ColumnDef col: innerStmt.getPartitionColumnDefs()) {
       partitionColsSql.add(col.getColName());
     }
     // Use a LinkedHashMap to preserve the ordering of the table properties.
-    LinkedHashMap<String, String> properties =
+    Map<String, String> properties =
         Maps.newLinkedHashMap(innerStmt.getTblProperties());
-    LinkedHashMap<String, String> generatedProperties = Maps.newLinkedHashMap(
+    Map<String, String> generatedProperties = Maps.newLinkedHashMap(
         stmt.getCreateStmt().getGeneratedKuduProperties());
     removeHiddenTableProperties(properties, generatedProperties);
     properties.putAll(generatedProperties);
@@ -229,7 +229,7 @@ public class ToSqlUtils {
     if (table instanceof FeView) return getCreateViewSql((FeView)table);
     org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
     // Use a LinkedHashMap to preserve the ordering of the table properties.
-    LinkedHashMap<String, String> properties = Maps.newLinkedHashMap(msTable.getParameters());
+    Map<String, String> properties = Maps.newLinkedHashMap(msTable.getParameters());
     if (properties.containsKey(Table.TBL_PROP_LAST_DDL_TIME)) {
       properties.remove(Table.TBL_PROP_LAST_DDL_TIME);
     }
@@ -237,9 +237,9 @@ public class ToSqlUtils {
         msTable.getTableType().equals(TableType.EXTERNAL_TABLE.toString());
     List<String> sortColsSql = getSortColumns(properties);
     String comment = properties.get("comment");
-    removeHiddenTableProperties(properties, Maps.<String, String>newHashMap());
-    ArrayList<String> colsSql = Lists.newArrayList();
-    ArrayList<String> partitionColsSql = Lists.newArrayList();
+    removeHiddenTableProperties(properties, new HashMap<>());
+    List<String> colsSql = new ArrayList<>();
+    List<String> partitionColsSql = new ArrayList<>();
     boolean isHbaseTable = table instanceof FeHBaseTable;
     for (int i = 0; i < table.getColumns().size(); i++) {
       if (!isHbaseTable && i < table.getNumClusteringCols()) {
@@ -255,7 +255,7 @@ public class ToSqlUtils {
     Map<String, String> serdeParameters = msTable.getSd().getSerdeInfo().getParameters();
 
     String storageHandlerClassName = table.getStorageHandlerClassName();
-    List<String> primaryKeySql = Lists.newArrayList();
+    List<String> primaryKeySql = new ArrayList<>();
     String kuduPartitionByParams = null;
     if (table instanceof FeKuduTable) {
       FeKuduTable kuduTable = (FeKuduTable) table;
@@ -277,7 +277,7 @@ public class ToSqlUtils {
       if (!isExternal) {
         primaryKeySql.addAll(kuduTable.getPrimaryKeyColumnNames());
 
-        List<String> paramsSql = Lists.newArrayList();
+        List<String> paramsSql = new ArrayList<>();
         for (KuduPartitionParam param: kuduTable.getPartitionBy()) {
           paramsSql.add(param.toSql());
         }
@@ -451,11 +451,12 @@ public class ToSqlUtils {
     // Sort entries on the key to ensure output is deterministic for tests (IMPALA-5757).
     List<Entry<String, String>> mapEntries = Lists.newArrayList(propertyMap.entrySet());
     Collections.sort(mapEntries, new Comparator<Entry<String, String>>() {
+      @Override
       public int compare(Entry<String, String> o1, Entry<String, String> o2) {
         return ObjectUtils.compare(o1.getKey(), o2.getKey());
       } });
 
-    List<String> properties = Lists.newArrayList();
+    List<String> properties = new ArrayList<>();
     for (Map.Entry<String, String> entry: mapEntries) {
       properties.add(String.format("'%s'='%s'", entry.getKey(),
           // Properties may contain characters that need to be escaped.

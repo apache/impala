@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -31,7 +32,6 @@ import org.apache.impala.planner.PlanRootSink;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 /**
  * Abstract base class for any statement that returns results
@@ -57,11 +57,11 @@ public abstract class QueryStmt extends StatementBase {
   // aliases substituted, agg output substituted)
   // For a union statement:
   // list of slotrefs into the tuple materialized by the union.
-  protected ArrayList<Expr> resultExprs_ = Lists.newArrayList();
+  protected List<Expr> resultExprs_ = new ArrayList<>();
 
   // For a select statment: select list exprs resolved to base tbl refs
   // For a union statement: same as resultExprs
-  protected ArrayList<Expr> baseTblResultExprs_ = Lists.newArrayList();
+  protected List<Expr> baseTblResultExprs_ = new ArrayList<>();
 
   /**
    * Map of expression substitutions for replacing aliases
@@ -75,7 +75,7 @@ public abstract class QueryStmt extends StatementBase {
    *   select int_col a, string_col a from alltypessmall;
    * Both columns are using the same alias "a".
    */
-  protected final ArrayList<Expr> ambiguousAliasList_;
+  protected final List<Expr> ambiguousAliasList_;
 
   protected SortInfo sortInfo_;
 
@@ -103,7 +103,7 @@ public abstract class QueryStmt extends StatementBase {
     sortInfo_ = null;
     limitElement_ = limitElement == null ? new LimitElement(null, null) : limitElement;
     aliasSmap_ = new ExprSubstitutionMap();
-    ambiguousAliasList_ = Lists.newArrayList();
+    ambiguousAliasList_ = new ArrayList<>();
   }
 
   /**
@@ -173,15 +173,15 @@ public abstract class QueryStmt extends StatementBase {
   public List<TupleId> getCorrelatedTupleIds(Analyzer analyzer)
       throws AnalysisException {
     // Correlated tuple ids of this stmt.
-    List<TupleId> correlatedTupleIds = Lists.newArrayList();
+    List<TupleId> correlatedTupleIds = new ArrayList<>();
     // First correlated and absolute table refs. Used for error detection/reporting.
     // We pick the first ones for simplicity. Choosing arbitrary ones is equally valid.
     TableRef correlatedRef = null;
     TableRef absoluteRef = null;
     // Materialized tuple ids of the table refs checked so far.
-    Set<TupleId> tblRefIds = Sets.newHashSet();
+    Set<TupleId> tblRefIds = new HashSet<>();
 
-    List<TableRef> tblRefs = Lists.newArrayList();
+    List<TableRef> tblRefs = new ArrayList<>();
     collectTableRefs(tblRefs, true);
     for (TableRef tblRef: tblRefs) {
       if (absoluteRef == null && !tblRef.isRelative()) absoluteRef = tblRef;
@@ -231,9 +231,9 @@ public abstract class QueryStmt extends StatementBase {
       return;
     }
 
-    ArrayList<Expr> orderingExprs = Lists.newArrayList();
-    ArrayList<Boolean> isAscOrder = Lists.newArrayList();
-    ArrayList<Boolean> nullsFirstParams = Lists.newArrayList();
+    List<Expr> orderingExprs = new ArrayList<>();
+    List<Boolean> isAscOrder = new ArrayList<>();
+    List<Boolean> nullsFirstParams = new ArrayList<>();
 
     // extract exprs
     for (OrderByElement orderByElement: orderByElements_) {
@@ -386,7 +386,7 @@ public abstract class QueryStmt extends StatementBase {
    * TODO: The name of this function has become outdated due to analytics
    * producing logical (non-materialized) tuples. Re-think and clean up.
    */
-  public abstract void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList);
+  public abstract void getMaterializedTupleIds(List<TupleId> tupleIdList);
 
   @Override
   public List<Expr> getResultExprs() { return resultExprs_; }
@@ -406,7 +406,7 @@ public abstract class QueryStmt extends StatementBase {
   public long getOffset() { return limitElement_.getOffset(); }
   public SortInfo getSortInfo() { return sortInfo_; }
   public boolean evaluateOrderBy() { return evaluateOrderBy_; }
-  public ArrayList<Expr> getBaseTblResultExprs() { return baseTblResultExprs_; }
+  public List<Expr> getBaseTblResultExprs() { return baseTblResultExprs_; }
   public void setLimit(long limit) throws AnalysisException {
     Preconditions.checkState(limit >= 0);
     long newLimit = hasLimit() ? Math.min(limit, getLimit()) : limit;
@@ -429,7 +429,7 @@ public abstract class QueryStmt extends StatementBase {
    * Mark slots referenced in exprs as materialized.
    */
   protected void materializeSlots(Analyzer analyzer, List<Expr> exprs) {
-    List<SlotId> slotIds = Lists.newArrayList();
+    List<SlotId> slotIds = new ArrayList<>();
     for (Expr e: exprs) {
       e.getIds(null, slotIds);
     }
@@ -448,9 +448,9 @@ public abstract class QueryStmt extends StatementBase {
     return new PlanRootSink();
   }
 
-  public ArrayList<OrderByElement> cloneOrderByElements() {
+  public List<OrderByElement> cloneOrderByElements() {
     if (orderByElements_ == null) return null;
-    ArrayList<OrderByElement> result =
+    List<OrderByElement> result =
         Lists.newArrayListWithCapacity(orderByElements_.size());
     for (OrderByElement o: orderByElements_) result.add(o.clone());
     return result;

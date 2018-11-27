@@ -648,7 +648,7 @@ public class HdfsScanNode extends ScanNode {
       // generating new predicates.
       List<Expr> collectionConjuncts =
           analyzer.getUnassignedConjuncts(Lists.newArrayList(itemTid));
-      ArrayList<Expr> bindingPredicates = analyzer.getBoundPredicates(itemTid);
+      List<Expr> bindingPredicates = analyzer.getBoundPredicates(itemTid);
       for (Expr boundPred: bindingPredicates) {
         if (!collectionConjuncts.contains(boundPred)) collectionConjuncts.add(boundPred);
       }

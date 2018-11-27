@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.impala.catalog.Column;
@@ -31,7 +32,6 @@ import org.apache.impala.thrift.TAlterTableType;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Maps;
 
 /**
  * Represents DDL statements that alter column properties:
@@ -62,7 +62,7 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
    */
   public static AlterTableAlterColStmt createDropDefaultStmt(
       TableName tableName, String colName) {
-    Map<ColumnDef.Option, Object> option = Maps.newHashMap();
+    Map<ColumnDef.Option, Object> option = new HashMap<>();
     option.put(ColumnDef.Option.DEFAULT, new NullLiteral());
     return new AlterTableAlterColStmt(
         tableName, colName, new ColumnDef(colName, null, option), true);

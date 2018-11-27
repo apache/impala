@@ -19,13 +19,13 @@ package org.apache.impala.analysis;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Sets;
 import org.apache.impala.catalog.Principal;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TShowGrantPrincipalParams;
 
+import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -73,7 +73,7 @@ public class ShowGrantPrincipalStmt extends AuthorizationStmt {
           // Create a user object here because it's possible the user does not exist in
           // Sentry, but still exists according to the OS, or Hadoop, or other custom
           // group mapping provider.
-          principal_ = Principal.newInstance(name_, principalType_, Sets.newHashSet());
+          principal_ = Principal.newInstance(name_, principalType_, new HashSet<>());
           break;
         default:
           throw new AnalysisException(String.format("Unexpected TPrincipalType: %s",

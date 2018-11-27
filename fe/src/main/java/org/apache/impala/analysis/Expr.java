@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -50,7 +51,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
 import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
@@ -100,6 +100,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // returns true if an Expr is a non-analytic aggregate.
   private final static com.google.common.base.Predicate<Expr> isAggregatePredicate_ =
       new com.google.common.base.Predicate<Expr>() {
+        @Override
         public boolean apply(Expr arg) {
           return arg instanceof FunctionCallExpr &&
               ((FunctionCallExpr)arg).isAggregateFunction();
@@ -889,7 +890,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Return the intersection of l1 and l2.
    */
   public static <C extends Expr> List<C> intersect(List<C> l1, List<C> l2) {
-    List<C> result = new ArrayList<C>();
+    List<C> result = new ArrayList<>();
     for (C element: l1) {
       if (l2.contains(element)) result.add(element);
     }
@@ -967,18 +968,18 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
   }
 
-  public static ArrayList<Expr> trySubstituteList(Iterable<? extends Expr> exprs,
+  public static List<Expr> trySubstituteList(Iterable<? extends Expr> exprs,
       ExprSubstitutionMap smap, Analyzer analyzer, boolean preserveRootTypes)
           throws AnalysisException {
     if (exprs == null) return null;
-    ArrayList<Expr> result = new ArrayList<Expr>();
+    List<Expr> result = new ArrayList<>();
     for (Expr e: exprs) {
       result.add(e.trySubstitute(smap, analyzer, preserveRootTypes));
     }
     return result;
   }
 
-  public static ArrayList<Expr> substituteList(Iterable<? extends Expr> exprs,
+  public static List<Expr> substituteList(Iterable<? extends Expr> exprs,
       ExprSubstitutionMap smap, Analyzer analyzer, boolean preserveRootTypes) {
     try {
       return trySubstituteList(exprs, smap, analyzer, preserveRootTypes);
@@ -1056,9 +1057,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Create a deep copy of 'l'. The elements of the returned list are of the same
    * type as the input list.
    */
-  public static <C extends Expr> ArrayList<C> cloneList(List<C> l) {
+  public static <C extends Expr> List<C> cloneList(List<C> l) {
     Preconditions.checkNotNull(l);
-    ArrayList<C> result = new ArrayList<C>(l.size());
+    List<C> result = new ArrayList<>(l.size());
     for (Expr element: l) {
       result.add((C) element.clone());
     }
@@ -1237,8 +1238,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   public void getIds(List<TupleId> tupleIds, List<SlotId> slotIds) {
-    Set<TupleId> tupleIdSet = Sets.newHashSet();
-    Set<SlotId> slotIdSet = Sets.newHashSet();
+    Set<TupleId> tupleIdSet = new HashSet<>();
+    Set<SlotId> slotIdSet = new HashSet<>();
     getIdsHelper(tupleIdSet, slotIdSet);
     if (tupleIds != null) tupleIds.addAll(tupleIdSet);
     if (slotIds != null) slotIds.addAll(slotIdSet);

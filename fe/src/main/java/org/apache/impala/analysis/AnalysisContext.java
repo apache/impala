@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +51,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.ImmutableList;
 
 import static org.apache.impala.analysis.ToSqlOptions.REWRITTEN;
@@ -524,10 +524,9 @@ public class AnalysisContext {
       // Map of table name to a list of privilege requests associated with that table.
       // These include both table-level and column-level privilege requests. We use a
       // LinkedHashMap to preserve the order in which requests are inserted.
-      LinkedHashMap<String, List<PrivilegeRequest>> tablePrivReqs =
-          Maps.newLinkedHashMap();
+      Map<String, List<PrivilegeRequest>> tablePrivReqs = new LinkedHashMap<>();
       // Privilege requests that are not column or table-level.
-      List<PrivilegeRequest> otherPrivReqs = Lists.newArrayList();
+      List<PrivilegeRequest> otherPrivReqs = new ArrayList<>();
       // Group the registered privilege requests based on the table they reference.
       for (PrivilegeRequest privReq: analyzer.getPrivilegeReqs()) {
         String tableName = privReq.getAuthorizeable().getFullTableName();
@@ -536,7 +535,7 @@ public class AnalysisContext {
         } else {
           List<PrivilegeRequest> requests = tablePrivReqs.get(tableName);
           if (requests == null) {
-            requests = Lists.newArrayList();
+            requests = new ArrayList<>();
             tablePrivReqs.put(tableName, requests);
           }
           // The table-level SELECT must be the first table-level request, and it
