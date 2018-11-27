@@ -248,6 +248,9 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Returns event sequence with the provided name if it exists, otherwise NULL.
   EventSequence* GetEventSequence(const std::string& name) const;
 
+  /// Updates 'value' of info string with 'key'. No-op if the key doesn't exist.
+  void UpdateInfoString(const std::string& key, std::string value);
+
   /// Returns a pointer to the info string value for 'key'.  Returns NULL if
   /// the key does not exist.
   const std::string* GetInfoString(const std::string& key) const;

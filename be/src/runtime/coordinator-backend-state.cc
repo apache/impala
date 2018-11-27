@@ -43,6 +43,9 @@ using namespace impala;
 using namespace rapidjson;
 namespace accumulators = boost::accumulators;
 
+const char* Coordinator::BackendState::InstanceStats::LAST_REPORT_TIME_DESC =
+    "Last report received time";
+
 Coordinator::BackendState::BackendState(
     const Coordinator& coord, int state_idx, TRuntimeFilterMode::type filter_mode)
   : coord_(coord),
@@ -456,6 +459,7 @@ Coordinator::BackendState::InstanceStats::InstanceStats(
   const string& profile_name = Substitute("Instance $0 (host=$1)",
       PrintId(exec_params.instance_id), TNetworkAddressToString(exec_params.host));
   profile_ = RuntimeProfile::Create(obj_pool, profile_name);
+  profile_->AddInfoString(LAST_REPORT_TIME_DESC, ToStringFromUnixMillis(UnixMillis()));
   fragment_stats->root_profile()->AddChild(profile_);
 
   // add total split size to fragment_stats->bytes_assigned()
@@ -490,10 +494,12 @@ void Coordinator::BackendState::InstanceStats::Update(
     const FragmentInstanceExecStatusPB& exec_status,
     const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary,
     ProgressUpdater* scan_range_progress) {
-  last_report_time_ms_ = MonotonicMillis();
+  last_report_time_ms_ = UnixMillis();
   DCHECK_GT(exec_status.report_seq_no(), last_report_seq_no_);
   last_report_seq_no_ = exec_status.report_seq_no();
   if (exec_status.done()) stopwatch_.Stop();
+  profile_->UpdateInfoString(LAST_REPORT_TIME_DESC,
+      ToStringFromUnixMillis(last_report_time_ms_));
   profile_->Update(thrift_profile);
   if (!profile_created_) {
     profile_created_ = true;
@@ -562,7 +568,9 @@ void Coordinator::BackendState::InstanceStats::ToJson(Value* value, Document* do
 
   value->AddMember("first_status_update_received", last_report_time_ms_ > 0,
       document->GetAllocator());
-  value->AddMember("time_since_last_heard_from", MonotonicMillis() - last_report_time_ms_,
+  int64_t elapsed_time_ms =
+      std::max(static_cast<int64_t>(0), UnixMillis() - last_report_time_ms_);
+  value->AddMember("time_since_last_heard_from", elapsed_time_ms,
       document->GetAllocator());
 }
 

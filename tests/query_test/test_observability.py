@@ -15,14 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from datetime import datetime
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.util.filesystem_utils import IS_EC
+from time import sleep, time
 import logging
 import pytest
 import re
-import time
+
+MAX_THRIFT_PROFILE_WAIT_TIME_S = 300
 
 class TestObservability(ImpalaTestSuite):
   @classmethod
@@ -59,6 +62,31 @@ class TestObservability(ImpalaTestSuite):
     assert result.exec_summary[5]['num_rows'] == 25
     assert result.exec_summary[5]['est_num_rows'] == 25
     assert result.exec_summary[5]['peak_mem'] > 0
+
+  def test_report_time(self):
+    """ Regression test for IMPALA-6741 - checks that last reporting time exists in
+    profiles of fragment instances."""
+    query = """select count(distinct a.int_col) from functional.alltypes a
+        inner join functional.alltypessmall b on (a.id = b.id + cast(sleep(15) as INT))"""
+    handle = self.client.execute_async(query)
+    query_id = handle.get_handle().id
+
+    num_validated = 0
+    tree = self.impalad_test_service.get_thrift_profile(query_id,
+        MAX_THRIFT_PROFILE_WAIT_TIME_S)
+    while self.client.get_state(handle) != self.client.QUERY_STATES['FINISHED']:
+      assert tree, num_validated
+      for node in tree.nodes:
+        if node.name.startswith('Instance '):
+          info_strings_key = 'Last report received time'
+          assert info_strings_key in node.info_strings
+          report_time_str = node.info_strings[info_strings_key].split(".")[0]
+          # Try converting the string to make sure it's in the expected format
+          assert datetime.strptime(report_time_str, '%Y-%m-%d %H:%M:%S')
+          num_validated += 1
+      tree = self.impalad_test_service.get_thrift_profile(query_id)
+    assert num_validated > 0
+    self.client.close_query(handle)
 
   @SkipIfS3.hbase
   @SkipIfLocal.hbase
@@ -275,14 +303,13 @@ class TestThriftProfile(ImpalaTestSuite):
     results = self.client.fetch(query, handle)
     self.client.close()
 
-    MAX_WAIT = 300
-    start = time.time()
-    end = start + MAX_WAIT
-    while time.time() <= end:
+    start = time()
+    end = start + MAX_THRIFT_PROFILE_WAIT_TIME_S
+    while time() <= end:
       # Sleep before trying to fetch the profile. This helps to prevent a warning when the
       # profile is not yet available immediately. It also makes it less likely to
       # introduce an error below in future changes by forgetting to sleep.
-      time.sleep(1)
+      sleep(1)
       tree = self.impalad_test_service.get_thrift_profile(query_id)
       if not tree:
         continue
@@ -295,7 +322,7 @@ class TestThriftProfile(ImpalaTestSuite):
       start_time_sub_sec_str = start_time.split('.')[-1]
       end_time_sub_sec_str = end_time.split('.')[-1]
       if len(end_time_sub_sec_str) == 0:
-        elapsed = time.time() - start
+        elapsed = time() - start
         logging.info("end_time_sub_sec_str hasn't shown up yet, elapsed=%d", elapsed)
         continue
 
@@ -308,5 +335,5 @@ class TestThriftProfile(ImpalaTestSuite):
     # Log a message and fail this run.
 
     dbg_str = "Debug thrift profile for query {0} not available in {1} seconds".format(
-      query_id, MAX_WAIT)
+        query_id, MAX_THRIFT_PROFILE_WAIT_TIME_S)
     assert False, dbg_str

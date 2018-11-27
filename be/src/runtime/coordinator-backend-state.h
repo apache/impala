@@ -172,7 +172,15 @@ class Coordinator::BackendState {
     /// query lifetime
     const FInstanceExecParams& exec_params_;
 
-    /// Set in Update(). Uses MonotonicMillis().
+    /// Unix time in milliseconds of the last status report update for this fragment
+    /// instance. Set in Update(). Uses UnixMillis() instead of MonotonicMillis() as
+    /// the last update time in the profile is wall clock time.
+    ///
+    /// This is also used for computing the elapsed time (presented in the debug webpage)
+    /// since the last status report update. While UnixMillis() may be prone to time
+    /// change due to clock adjustment (e.g. NTP), it's assumed that time change is not
+    /// frequent enough to seriously affect the output. Moreover, the inconsistency only
+    /// persists for the duration of one status report update (5 seconds by default).
     int64_t last_report_time_ms_ = 0;
 
     /// The sequence number of the last report.
@@ -203,6 +211,9 @@ class Coordinator::BackendState {
 
     /// Collection of BYTES_READ_COUNTERs of all scan nodes in this fragment instance.
     std::vector<RuntimeProfile::Counter*> bytes_read_counters_;
+
+    /// Descriptor string for the last query status report time in the profile.
+    static const char* LAST_REPORT_TIME_DESC;
 
     /// The current state of this fragment instance's execution. This gets serialized in
     /// ToJson() and is displayed in the debug webpages.

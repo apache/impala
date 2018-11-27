@@ -559,6 +559,12 @@ void RuntimeProfile::AddInfoStringInternal(const string& key, string value,
   }
 }
 
+void RuntimeProfile::UpdateInfoString(const string& key, string value) {
+  lock_guard<SpinLock> l(info_strings_lock_);
+  InfoStrings::iterator it = info_strings_.find(key);
+  if (it != info_strings_.end()) it->second = std::move(value);
+}
+
 const string* RuntimeProfile::GetInfoString(const string& key) const {
   lock_guard<SpinLock> l(info_strings_lock_);
   InfoStrings::const_iterator it = info_strings_.find(key);
