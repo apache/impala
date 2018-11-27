@@ -744,8 +744,8 @@ Per-Host Resource Estimates: Memory=244MB
 Analyzed query: SELECT 
 -- +straight_join
 l_orderkey, o_orderstatus, count(*) FROM tpch_parquet.lineitem INNER JOIN
-tpch_parquet.orders ON o_orderkey = l_orderkey GROUP BY CAST(1 AS INVALID_TYPE),
-CAST(2 AS INVALID_TYPE) HAVING count(*) = CAST(1 AS BIGINT)
+tpch_parquet.orders ON o_orderkey = l_orderkey GROUP BY l_orderkey,
+o_orderstatus HAVING count(*) = CAST(1 AS BIGINT)
 
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.10MB mem-reservation=0B thread-reservation=1
@@ -829,8 +829,8 @@ Per-Host Resource Estimates: Memory=400MB
 Analyzed query: SELECT 
 -- +straight_join
 l_orderkey, o_orderstatus, count(*) FROM tpch_parquet.lineitem INNER JOIN
-tpch_parquet.orders ON o_orderkey = l_orderkey GROUP BY CAST(1 AS INVALID_TYPE),
-CAST(2 AS INVALID_TYPE) HAVING count(*) = CAST(1 AS BIGINT)
+tpch_parquet.orders ON o_orderkey = l_orderkey GROUP BY l_orderkey,
+o_orderstatus HAVING count(*) = CAST(1 AS BIGINT)
 
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.19MB mem-reservation=0B thread-reservation=1
