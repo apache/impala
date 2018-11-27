@@ -55,8 +55,8 @@ under the License.
         </li>
 
         <li>
-          <p >
-            New startup flags have been introduced:
+          <p>
+            Use the following start-up flags to customize the time zone definitions.
           </p>
           <ul>
             <li >
