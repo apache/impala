@@ -107,7 +107,6 @@ class TestClientSsl(CustomClusterTestSuite):
     result = p.get_result()
 
     print result.stderr
-    assert result.rc == 0
     assert "Query Status: Cancelled" in result.stdout
     assert impalad.wait_for_num_in_flight_queries(0)
 

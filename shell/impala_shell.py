@@ -523,7 +523,7 @@ class ImpalaShell(object, cmd.Cmd):
   def _signal_handler(self, signal, frame):
     """Handles query cancellation on a Ctrl+C event"""
     if self.last_query_handle is None or self.query_handle_closed:
-      return
+      raise KeyboardInterrupt()
     # Create a new connection to the impalad and cancel the query.
     for cancel_try in xrange(ImpalaShell.CANCELLATION_TRIES):
       try:
@@ -1733,7 +1733,7 @@ if __name__ == "__main__":
       try:
         shell.cmdloop(intro)
       except KeyboardInterrupt:
-        intro = '\n'
+        print_to_stderr('^C')
       # A last measure against any exceptions thrown by an rpc
       # not caught in the shell
       except socket.error, (code, e):

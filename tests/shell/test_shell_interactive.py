@@ -180,6 +180,12 @@ class TestImpalaShellInteractive(object):
     assert "Cancelled" not in result.stderr
     assert impalad.wait_for_num_in_flight_queries(0)
 
+    p = ImpalaShell()
+    sleep(3)
+    os.kill(p.pid(), signal.SIGINT)
+    result = p.get_result()
+    assert "^C" in result.stderr
+
   def test_unicode_input(self):
     "Test queries containing non-ascii input"
     # test a unicode query spanning multiple lines
