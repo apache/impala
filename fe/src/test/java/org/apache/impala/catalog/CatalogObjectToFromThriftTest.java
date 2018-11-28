@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.SqlCastException;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
@@ -224,14 +225,15 @@ public class CatalogObjectToFromThriftTest {
     Assert.assertNotNull(part);;
     // Create a dummy partition with an invalid decimal type.
     try {
-      HdfsPartition dummyPart = new HdfsPartition(hdfsTable, part.toHmsPartition(),
-        Lists.newArrayList(LiteralExpr.create("1.1", ScalarType.createDecimalType(1, 0)),
-            LiteralExpr.create("1.1", ScalarType.createDecimalType(1, 0))),
+      new HdfsPartition(hdfsTable, part.toHmsPartition(),
+        Lists.newArrayList(LiteralExpr.create("11.1", ScalarType.createDecimalType(1, 0)),
+            LiteralExpr.create("11.1", ScalarType.createDecimalType(1, 0))),
         null, Lists.<HdfsPartition.FileDescriptor>newArrayList(),
         TAccessLevel.READ_WRITE);
       fail("Expected metadata to be malformed.");
-    } catch (AnalysisException e) {
-      Assert.assertTrue(e.getMessage().contains("invalid DECIMAL(1,0) value: 1.1"));
+    } catch (SqlCastException e) {
+      Assert.assertTrue(e.getMessage().contains(
+          "Value 11.1 cannot be cast to type DECIMAL(1,0)"));
     }
   }
 

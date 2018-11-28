@@ -34,20 +34,40 @@ public class Parser {
     }
   }
 
-  public static StatementBase parse(String query) throws ParseException {
+  /**
+   * Parse the statement using default options. Used for testing and for
+   * parsing internally-generated statements. See the full version for details.
+   */
+  public static StatementBase parse(String query) throws AnalysisException {
     return parse(query, new TQueryOptions());
   }
 
+  /**
+   * Run the parser with the given input and options, returning an
+   * abstract syntax tree (AST) for the statement, ready for semantic analysis.
+   *
+   * @param query the query: a valid SQL statement
+   * @param options query options
+   * @return the AST for the statement
+   * @throws AnalysisException for errors which are of two kinds:
+   * {@link ParseException} for syntactic errors, or the generic
+   * AnalysisException for semantic errors (such as overflow of a
+   * numeric literal)
+   */
   public static StatementBase parse(String query, TQueryOptions options)
-      throws ParseException {
+      throws AnalysisException {
     SqlScanner input = new SqlScanner(new StringReader(query));
     SqlParser parser = new SqlParser(input);
     parser.setQueryOptions(options);
     try {
       return (StatementBase) parser.parse().value;
+    } catch (AnalysisException e) {
+      // Pass along any analysis exceptions as they are. Since AnalysisException
+      // is a kind of Exception, we have to special-case it here
+      throw e;
     } catch (Exception e) {
       // Annoyingly, the parser uses a generic Exception to report
-      // errors. Translate it to something more helpful.
+      // syntax errors. Translate it to something more helpful.
       throw new ParseException(parser.getErrorMsg(query), e);
     }
   }

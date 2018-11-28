@@ -19,13 +19,16 @@ package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.SqlCastException;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
@@ -530,6 +533,56 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     // IMPALA-7419: coalesce that gets simplified and contains an aggregate
     RewritesOk("coalesce(null, min(distinct tinyint_col), 42)", rule,
         "coalesce(min(tinyint_col), 42)");
+  }
+
+  /**
+   * Special case in which a numeric literal is explicitly cast to an
+   * incompatible type. In this case, no constant folding should be done.
+   * Runtime relies on the fact that a DECIMAL numeric overflow in V1
+   * resulted in a NULL.
+   */
+  @Test
+  public void TestCoalesceDecimal() throws ImpalaException {
+    String query =
+        "SELECT coalesce(1.8, CAST(0 AS DECIMAL(38,38))) AS c " +
+        " FROM functional.alltypestiny";
+    // Try both with and without rewrites
+    for (int i = 0; i < 2; i++) {
+      boolean rewrite = i == 1;
+
+      // Analyze the expression with the rewrite option and
+      // with Decimal V2 disabled.
+      AnalysisContext ctx = createAnalysisCtx();
+      ctx.getQueryOptions().setEnable_expr_rewrites(rewrite);
+      ctx.getQueryOptions().setDecimal_v2(false);
+      SelectStmt stmt = (SelectStmt) AnalyzesOk(query, ctx);
+
+      // Select list expr takes widest type
+      Expr expr = stmt.getSelectList().getItems().get(0).getExpr();
+      assertTrue(expr instanceof FunctionCallExpr);
+      assertEquals(ScalarType.createDecimalType(38,38), expr.getType());
+
+      // First arg to coalesce should be an implicit cast
+      Expr arg = expr.getChild(0);
+      assertTrue(arg instanceof CastExpr);
+      assertEquals(ScalarType.createDecimalType(38,38), arg.getType());
+
+      // Input to the cast is the numeric literal with its original type
+      Expr num = arg.getChild(0);
+      assertTrue(num instanceof NumericLiteral);
+      assertEquals(ScalarType.createDecimalType(2,1), num.getType());
+    }
+
+    // In V2, the query fails with a cast exception
+    try {
+      AnalysisContext ctx = createAnalysisCtx();
+      ctx.getQueryOptions().setEnable_expr_rewrites(true);
+      ctx.getQueryOptions().setDecimal_v2(true);
+      parseAndAnalyze(query, ctx);
+      fail();
+    } catch (SqlCastException e) {
+      // Expected
+    }
   }
 
   @Test

@@ -103,9 +103,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testNumericLiteral("-" + Double.toString(Double.MAX_VALUE), Type.DOUBLE);
 
     AnalysisError(String.format("select %s1", Double.toString(Double.MAX_VALUE)),
-      "Numeric literal '1.7976931348623157E+3081' exceeds maximum range of doubles.");
+      "Numeric literal '1.7976931348623157E+3081' exceeds maximum range of DOUBLE.");
     AnalysisError(String.format("select %s1", Double.toString(Double.MIN_VALUE)),
-      "Numeric literal '4.9E-3241' underflows minimum resolution of doubles.");
+      "Numeric literal '4.9E-3241' underflows minimum resolution of DOUBLE.");
 
     // Test edge cases near the upper limits of decimal precision - 38 digits.
     // Integer literal.
@@ -2700,6 +2700,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     }
     AnalyzesOk(exprStr.toString());
     exprStr.append(repeatSuffix);
+    exprStr.append(repeatSuffix);
     AnalysisError(exprStr.toString(),
         String.format("Exceeded the maximum depth of an expression tree (%s).",
         Expr.EXPR_DEPTH_LIMIT));
@@ -2722,7 +2723,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select " + getNestedFuncExpr(openFunc, baseArg, closeFunc,
         Expr.EXPR_DEPTH_LIMIT - 1));
     AnalysisError("select " + getNestedFuncExpr(openFunc, baseArg, closeFunc,
-        Expr.EXPR_DEPTH_LIMIT),
+        Expr.EXPR_DEPTH_LIMIT + 1),
         String.format("Exceeded the maximum depth of an expression tree (%s).",
         Expr.EXPR_DEPTH_LIMIT));
     // Test 10x the safe depth.

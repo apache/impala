@@ -25,7 +25,6 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.impala.analysis.Parser.ParseException;
 import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
@@ -69,7 +68,7 @@ public class ParserTest extends FrontendTestBase {
     StatementBase result = null; // Save this object to make debugging easier
     try {
       result = Parser.parse(stmt);
-    } catch (ParseException e) {
+    } catch (AnalysisException e) {
       if (expectedErrorString != null) {
         String errorString = e.getMessage();
         StringBuilder message = new StringBuilder();
@@ -1062,8 +1061,8 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk(String.format("select -%s", Double.toString(Double.MAX_VALUE)));
 
     // Test overflow and underflow
-    ParsesOk(String.format("select %s1", Double.toString(Double.MIN_VALUE)));
-    ParsesOk(String.format("select %s1", Double.toString(Double.MAX_VALUE)));
+    ParserError(String.format("select %s1", Double.toString(Double.MIN_VALUE)));
+    ParserError(String.format("select %s1", Double.toString(Double.MAX_VALUE)));
   }
 
   @Test

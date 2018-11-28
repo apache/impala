@@ -26,6 +26,7 @@ import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.SqlCastException;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.PlanRootSink;
 
@@ -425,11 +426,12 @@ public abstract class QueryStmt extends StatementBase {
   public SortInfo getSortInfo() { return sortInfo_; }
   public boolean evaluateOrderBy() { return evaluateOrderBy_; }
   public List<Expr> getBaseTblResultExprs() { return baseTblResultExprs_; }
-  public void setLimit(long limit) throws AnalysisException {
+
+  public void setLimit(long limit) throws SqlCastException {
     Preconditions.checkState(limit >= 0);
     long newLimit = hasLimit() ? Math.min(limit, getLimit()) : limit;
-    limitElement_ = new LimitElement(new NumericLiteral(Long.toString(newLimit),
-        Type.BIGINT), limitElement_.getOffsetExpr());
+    limitElement_ = new LimitElement(NumericLiteral.create(newLimit, Type.BIGINT),
+        limitElement_.getOffsetExpr());
   }
 
   /**

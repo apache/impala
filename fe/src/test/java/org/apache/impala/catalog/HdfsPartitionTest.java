@@ -20,7 +20,6 @@ package org.apache.impala.catalog;
 import static org.apache.impala.catalog.HdfsPartition.comparePartitionKeyValues;
 import static org.junit.Assert.*;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -60,18 +59,18 @@ public class HdfsPartitionTest {
   public HdfsPartitionTest() {
     valuesNull_.add(NullLiteral.create(Type.BIGINT));
 
-    valuesDecimal_.add(new NumericLiteral(BigDecimal.valueOf(1)));
-    valuesDecimal1_.add(new NumericLiteral(BigDecimal.valueOf(3)));
-    valuesDecimal2_.add(new NumericLiteral(BigDecimal.valueOf(5)));
+    valuesDecimal_.add(NumericLiteral.create(1));
+    valuesDecimal1_.add(NumericLiteral.create(3));
+    valuesDecimal2_.add(NumericLiteral.create(5));
 
-    valuesMixed_.add(new NumericLiteral(BigDecimal.valueOf(3)));
+    valuesMixed_.add(NumericLiteral.create(3));
     valuesMixed_.add(NullLiteral.create(Type.BIGINT));
 
-    valuesMixed1_.add(new NumericLiteral(BigDecimal.valueOf(1)));
+    valuesMixed1_.add(NumericLiteral.create(1));
     valuesMixed1_.add(NullLiteral.create(Type.STRING));
     valuesMixed1_.add(new BoolLiteral(true));
 
-    valuesMixed2_.add(new NumericLiteral(BigDecimal.valueOf(1)));
+    valuesMixed2_.add(NumericLiteral.create(1));
     valuesMixed2_.add(new StringLiteral("Large"));
     valuesMixed2_.add(new BoolLiteral(false));
   }
@@ -98,7 +97,7 @@ public class HdfsPartitionTest {
     }
 
     List<LiteralExpr> valuesTest = Lists.newArrayList();
-    valuesTest.add(new NumericLiteral(BigDecimal.valueOf(3)));
+    valuesTest.add(NumericLiteral.create(3));
     verifyAntiSymmetric(valuesDecimal1_, valuesTest, valuesNull_);
     valuesTest.add(NullLiteral.create(Type.BIGINT));
     verifyAntiSymmetric(valuesMixed_, valuesTest, valuesDecimal_);

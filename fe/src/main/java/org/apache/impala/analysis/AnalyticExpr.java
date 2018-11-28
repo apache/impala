@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
@@ -263,8 +262,8 @@ public class AnalyticExpr extends Expr {
     Preconditions.checkState(
         AnalyticExpr.isPercentRankFn(analyticExpr.getFnCall().getFn()));
 
-    NumericLiteral zero = new NumericLiteral(BigInteger.valueOf(0), ScalarType.BIGINT);
-    NumericLiteral one = new NumericLiteral(BigInteger.valueOf(1), ScalarType.BIGINT);
+    NumericLiteral zero = NumericLiteral.create(0, ScalarType.BIGINT);
+    NumericLiteral one = NumericLiteral.create(1, ScalarType.BIGINT);
     AnalyticExpr countExpr = create("count", analyticExpr, false, false);
     AnalyticExpr rankExpr = create("rank", analyticExpr, true, false);
 
@@ -297,7 +296,7 @@ public class AnalyticExpr extends Expr {
         AnalyticExpr.isCumeDistFn(analyticExpr.getFnCall().getFn()));
     AnalyticExpr rankExpr = create("rank", analyticExpr, true, true);
     AnalyticExpr countExpr = create("count", analyticExpr, false, false);
-    NumericLiteral one = new NumericLiteral(BigInteger.valueOf(1), ScalarType.BIGINT);
+    NumericLiteral one = NumericLiteral.create(1, ScalarType.BIGINT);
     ArithmeticExpr arithmeticRewrite =
         new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE,
           new ArithmeticExpr(ArithmeticExpr.Operator.ADD,
@@ -329,7 +328,7 @@ public class AnalyticExpr extends Expr {
     ifParams.add(bucketExpr);
     ifParams.add(countExpr);
 
-    NumericLiteral one = new NumericLiteral(BigInteger.valueOf(1), ScalarType.BIGINT);
+    NumericLiteral one = NumericLiteral.create(1, ScalarType.BIGINT);
     ArithmeticExpr minMultiplyRowMinusOne =
         new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY,
           new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, rowNumExpr, one),
@@ -616,7 +615,7 @@ public class AnalyticExpr extends Expr {
         newExprParams = Lists.newArrayListWithExpectedSize(3);
         newExprParams.addAll(getFnCall().getChildren());
         // Default offset is 1.
-        newExprParams.add(new NumericLiteral(BigDecimal.valueOf(1)));
+        newExprParams.add(NumericLiteral.create(1));
         // Default default value is NULL.
         newExprParams.add(new NullLiteral());
       } else if (getFnCall().getChildren().size() == 2) {
@@ -666,13 +665,13 @@ public class AnalyticExpr extends Expr {
         if (window_.getRightBoundary().getType() == BoundaryType.PRECEDING) {
           // The number of rows preceding for the end bound determines the number of
           // rows at the beginning of each partition that should have a NULL value.
-          paramExprs.add(new NumericLiteral(window_.getRightBoundary().getOffsetValue(),
-              Type.BIGINT));
+          paramExprs.add(NumericLiteral.create(
+              window_.getRightBoundary().getOffsetValue(), Type.BIGINT));
         } else {
           // -1 indicates that no NULL values are inserted even though we set the end
           // bound to the start bound (which is PRECEDING) below; this is different from
           // the default behavior of windows with an end bound PRECEDING.
-          paramExprs.add(new NumericLiteral(BigInteger.valueOf(-1), Type.BIGINT));
+          paramExprs.add(NumericLiteral.create(-1, Type.BIGINT));
         }
 
         window_ = new AnalyticWindow(window_.getType(),
@@ -770,7 +769,7 @@ public class AnalyticExpr extends Expr {
     Preconditions.checkState(isOffsetFn(getFnCall().getFn()));
     if (offsetFnCall.getChild(1) != null) return offsetFnCall.getChild(1);
     // The default offset is 1.
-    return new NumericLiteral(BigDecimal.valueOf(1));
+    return NumericLiteral.create(1);
   }
 
   /**

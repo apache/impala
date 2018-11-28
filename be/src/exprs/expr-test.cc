@@ -9054,7 +9054,7 @@ int main(int argc, char** argv) {
   executor_->ClearExecOptions();
   executor_->PushExecOption("ENABLE_EXPR_REWRITES=0");
   executor_->PushExecOption("DISABLE_CODEGEN=1");
-  cout << "Running without codegen" << endl;
+  cout << "Running without codegen and without expr rewrites" << endl;
   ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;
 
@@ -9065,7 +9065,7 @@ int main(int argc, char** argv) {
   executor_->PushExecOption("DISABLE_CODEGEN=0");
   executor_->PushExecOption("EXEC_SINGLE_NODE_ROWS_THRESHOLD=0");
   executor_->PushExecOption("DISABLE_CODEGEN_ROWS_THRESHOLD=0");
-  cout << endl << "Running with codegen" << endl;
+  cout << endl << "Running with codegen and without expr rewrites" << endl;
   ret = RUN_ALL_TESTS();
   if (ret != 0) return ret;
 
@@ -9075,6 +9075,6 @@ int main(int argc, char** argv) {
   executor_->ClearExecOptions();
   executor_->PushExecOption("ENABLE_EXPR_REWRITES=1");
   executor_->PushExecOption("DISABLE_CODEGEN=1");
-  cout << endl << "Running without codegen and expr rewrites" << endl;
+  cout << endl << "Running without codegen and with expr rewrites" << endl;
   return RUN_ALL_TESTS();
 }

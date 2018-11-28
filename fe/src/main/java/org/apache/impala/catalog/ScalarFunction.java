@@ -290,6 +290,9 @@ public class ScalarFunction extends Function {
   }
 
   @Override
+  public String toString() { return toSql(false); }
+
+  @Override
   public TFunction toThrift() {
     TFunction fn = super.toThrift();
     fn.setScalar_fn(new TScalarFunction());

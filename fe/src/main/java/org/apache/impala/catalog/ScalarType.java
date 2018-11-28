@@ -526,4 +526,12 @@ public class ScalarType extends Type {
       boolean strict, boolean strictDecimal) {
     return getAssignmentCompatibleType(t1, t2, strict, strictDecimal).matchesType(t2);
   }
+
+  /**
+   * @return true if dest = source is valid (if source is at least as
+   * wide as dest.)
+   */
+  public static boolean isAssignable(ScalarType dest, ScalarType source) {
+    return isImplicitlyCastable(source, dest, false, false);
+  }
 }

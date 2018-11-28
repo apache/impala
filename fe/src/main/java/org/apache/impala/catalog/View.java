@@ -17,26 +17,21 @@
 
 package org.apache.impala.catalog;
 
-import java.io.StringReader;
 import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-
-import org.apache.impala.analysis.ParseNode;
 import org.apache.impala.analysis.Parser;
-import org.apache.impala.analysis.Parser.ParseException;
 import org.apache.impala.analysis.QueryStmt;
-import org.apache.impala.analysis.SqlParser;
-import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.analysis.StatementBase;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TCatalogObjectType;
-import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTableType;
+
 import com.google.common.collect.Lists;
 
 /**
@@ -143,7 +138,7 @@ public class View extends Table implements FeView {
     StatementBase node;
     try {
       node = Parser.parse(inlineViewDef);
-    } catch (ParseException e) {
+    } catch (AnalysisException e) {
       // Do not pass e as the exception cause because it might reveal the existence
       // of tables that the user triggering this load may not have privileges on.
       throw new TableLoadingException(

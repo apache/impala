@@ -35,6 +35,7 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.SqlCastException;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.service.FeSupport;
@@ -523,7 +524,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     Type resolvedWildcardType = getResolvedWildCardType(strictDecimal);
     if (resolvedWildcardType != null) {
       if (resolvedWildcardType.isNull()) {
-        throw new AnalysisException(String.format(
+        throw new SqlCastException(String.format(
             "Cannot resolve DECIMAL precision and scale from NULL type in %s function.",
             fn_.getFunctionName().getFunction()));
       }
@@ -534,7 +535,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
           Type childType = children_.get(j).type_;
           argTypes.append(childType.toSql());
         }
-        throw new AnalysisException(String.format(
+        throw new SqlCastException(String.format(
             "Cannot resolve DECIMAL types of the %s(%s) function arguments. You need " +
             "to wrap the arguments in a CAST.", fn_.getFunctionName().getFunction(),
             argTypes.toString()));
@@ -1343,8 +1344,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     if (!targetType.isDecimal()) {
       // requested cast must be to assignment-compatible type
       // (which implies no loss of precision)
-      Preconditions.checkArgument(targetType.equals(type),
+      if (!targetType.equals(type)) {
+        throw new SqlCastException(
           "targetType=" + targetType + " type=" + type);
+      }
     }
     return uncheckedCastTo(targetType);
   }
@@ -1380,7 +1383,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     Expr newChild = child.castTo(targetType);
     setChild(childIndex, newChild);
   }
-
 
   /**
    * Convert child to to targetType, possibly by inserting an implicit cast, or by

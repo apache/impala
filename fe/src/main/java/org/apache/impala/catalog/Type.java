@@ -17,21 +17,17 @@
 
 package org.apache.impala.catalog;
 
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.analysis.CreateTableStmt;
 import org.apache.impala.analysis.Parser;
-import org.apache.impala.analysis.Parser.ParseException;
-import org.apache.impala.analysis.SqlParser;
-import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.TypeDef;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TPrimitiveType;
-import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TScalarType;
 import org.apache.impala.thrift.TStructField;
 import org.apache.impala.thrift.TTypeNode;
@@ -276,7 +272,7 @@ public abstract class Type {
         // Should never get here.
         throw new IllegalStateException("Invalid create table stmt.");
       }
-    } catch (ParseException e) {
+    } catch (AnalysisException e) {
       return null;
     }
     TypeDef typeDef = createTableStmt.getColumnDefs().get(0).getTypeDef();

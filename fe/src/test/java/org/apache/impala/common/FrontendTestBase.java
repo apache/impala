@@ -20,7 +20,6 @@ package org.apache.impala.common;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,10 +34,7 @@ import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.ParseNode;
 import org.apache.impala.analysis.Parser;
-import org.apache.impala.analysis.Parser.ParseException;
 import org.apache.impala.analysis.QueryStmt;
-import org.apache.impala.analysis.SqlParser;
-import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
@@ -280,7 +276,7 @@ public class FrontendTestBase {
       StatementBase node = Parser.parse(stmt);
       assertNotNull(node);
       return node;
-    } catch (ParseException e) {
+    } catch (AnalysisException e) {
       fail("\nParser error:\n" + e.getMessage());
       throw new IllegalStateException(); // Keep compiler happy
     }
