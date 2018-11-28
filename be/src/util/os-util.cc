@@ -93,11 +93,17 @@ Status impala::GetThreadStats(int64_t tid, ThreadStats* stats) {
   return Status::OK();
 }
 
-bool impala::RunShellProcess(const string& cmd, string* msg, bool do_trim) {
+bool impala::RunShellProcess(const string& cmd, string* msg, bool do_trim,
+    const std::set<std::string>& unset_environment) {
   DCHECK(msg != NULL);
-  FILE* fp = popen(cmd.c_str(), "r");
+  string unset_cmd = "";
+  for (const auto& env: unset_environment) {
+    unset_cmd += "unset " + env + "; ";
+  }
+  string new_cmd = Substitute("$0$1", unset_cmd, cmd);
+  FILE* fp = popen(new_cmd.c_str(), "r");
   if (fp == NULL) {
-    *msg = Substitute("Failed to execute shell cmd: '$0', error was: $1", cmd,
+    *msg = Substitute("Failed to execute shell cmd: '$0', error was: $1", new_cmd,
         GetStrErrMsg());
     return false;
   }

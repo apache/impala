@@ -258,7 +258,8 @@ Status Webserver::Start() {
       const string& password_cmd = FLAGS_webserver_private_key_password_cmd;
       if (!password_cmd.empty()) {
         if (!RunShellProcess(password_cmd, &key_password, true)) {
-          return Status(TErrorCode::SSL_PASSWORD_CMD_FAILED, password_cmd, key_password);
+          return Status(TErrorCode::SSL_PASSWORD_CMD_FAILED, password_cmd, key_password,
+              {"JAVA_TOOL_OPTIONS"});
         }
         options.push_back("ssl_private_key_password");
         options.push_back(key_password.c_str());

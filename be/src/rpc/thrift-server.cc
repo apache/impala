@@ -457,7 +457,7 @@ Status ThriftServer::EnableSsl(SSLProtocol version, const string& certificate,
   version_ = version;
 
   if (!pem_password_cmd.empty()) {
-    if (!RunShellProcess(pem_password_cmd, &key_password_, true)) {
+    if (!RunShellProcess(pem_password_cmd, &key_password_, true, {"JAVA_TOOL_OPTIONS"})) {
       return Status(TErrorCode::SSL_PASSWORD_CMD_FAILED, pem_password_cmd, key_password_);
     } else {
       LOG(INFO) << "Command '" << pem_password_cmd << "' executed successfully, "

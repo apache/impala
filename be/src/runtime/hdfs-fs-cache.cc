@@ -48,14 +48,16 @@ Status HdfsFsCache::Init() {
   HdfsFsCache::instance_.reset(new HdfsFsCache());
 
   if (!FLAGS_s3a_access_key_cmd.empty() && !FLAGS_s3a_secret_key_cmd.empty()) {
-    if (!RunShellProcess(FLAGS_s3a_access_key_cmd, &s3a_access_key_, true)) {
+    if (!RunShellProcess(FLAGS_s3a_access_key_cmd, &s3a_access_key_, true,
+        {"JAVA_TOOL_OPTIONS"})) {
       return Status(Substitute("Could not run command '$0' to retrieve S3 Access Key. "
           "Impala will not be able to access S3.", FLAGS_s3a_access_key_cmd));
     }
     LOG(INFO) << "S3 Access Key retrieval command '" << FLAGS_s3a_access_key_cmd
               << "' executed successfully.";
 
-    if (!RunShellProcess(FLAGS_s3a_secret_key_cmd, &s3a_secret_key_, true)) {
+    if (!RunShellProcess(FLAGS_s3a_secret_key_cmd, &s3a_secret_key_, true,
+        {"JAVA_TOOL_OPTIONS"})) {
       return Status(Substitute("Could not run command '$0' to retrieve S3 Access Key. "
           "Impala will not be able to access S3.", FLAGS_s3a_secret_key_cmd));
     }

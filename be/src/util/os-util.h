@@ -47,7 +47,10 @@ Status GetThreadStats(int64_t tid, ThreadStats* stats);
 /// OS error string, if any, and the first 1k of output if there was any error, or just
 /// the first 1k of output otherwise.
 /// If do_trim is 'true', all trailing whitespace is removed from the output.
-bool RunShellProcess(const std::string& cmd, std::string* msg, bool do_trim=false);
+/// unset_environment is used to unset a set of environment variables prior to running
+/// the cmd.
+bool RunShellProcess(const std::string& cmd, std::string* msg, bool do_trim=false,
+    const std::set<std::string>& unset_environment=std::set<std::string>());
 
 }
 #endif
