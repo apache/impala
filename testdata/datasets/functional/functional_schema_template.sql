@@ -1770,6 +1770,164 @@ SELECT d1, d2, d3, d4, d5, d6
 FROM {db_name}.{table_name};
 ====
 ---- DATASET
+-- Reasonably large table with decimal values.  This is used for
+-- testing min-max filters with decimal types on kudu tables
+functional
+---- BASE_TABLE_NAME
+decimal_rtf_tbl
+---- COLUMNS
+d5_0   DECIMAL(5, 0)
+d5_1   DECIMAL(5, 1)
+d5_3   DECIMAL(5, 3)
+d5_5   DECIMAL(5, 5)
+d9_0   DECIMAL(9, 0)
+d9_1   DECIMAL(9, 1)
+d9_5   DECIMAL(9, 5)
+d9_9   DECIMAL(9, 9)
+d14_0  DECIMAL(14, 0)
+d14_1  DECIMAL(14, 1)
+d14_7  DECIMAL(14, 7)
+d14_14 DECIMAL(14, 14)
+d18_0  DECIMAL(18, 0)
+d18_1  DECIMAL(18, 1)
+d18_9  DECIMAL(18, 9)
+d18_18 DECIMAL(18, 18)
+d28_0  DECIMAL(28, 0)
+d28_1  DECIMAL(28, 1)
+d28_14 DECIMAL(28, 14)
+d28_28 DECIMAL(28, 28)
+d38_0  DECIMAL(38, 0)
+d38_1  DECIMAL(38, 1)
+d38_19 DECIMAL(38, 19)
+d38_38 DECIMAL(38, 38)
+---- PARTITION_COLUMNS
+dpc    DECIMAL(9, 0)
+---- ALTER
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(dpc=1);
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/decimal_rtf_tbl.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(dpc=1);
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(dpc)
+select * from functional.{table_name};
+---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE TABLE {db_name}{db_suffix}.{table_name} (
+  d5_0   DECIMAL(5, 0),
+  d5_1   DECIMAL(5, 1),
+  d5_3   DECIMAL(5, 3),
+  d5_5   DECIMAL(5, 5),
+  d9_0   DECIMAL(9, 0),
+  d9_1   DECIMAL(9, 1),
+  d9_5   DECIMAL(9, 5),
+  d9_9   DECIMAL(9, 9),
+  d14_0  DECIMAL(14, 0),
+  d14_1  DECIMAL(14, 1),
+  d14_7  DECIMAL(14, 7),
+  d14_14 DECIMAL(14, 14),
+  d18_0  DECIMAL(18, 0),
+  d18_1  DECIMAL(18, 1),
+  d18_9  DECIMAL(18, 9),
+  d18_18 DECIMAL(18, 18),
+  d28_0  DECIMAL(28, 0),
+  d28_1  DECIMAL(28, 1),
+  d28_14 DECIMAL(28, 14),
+  d28_28 DECIMAL(28, 28),
+  d38_0  DECIMAL(38, 0),
+  d38_1  DECIMAL(38, 1),
+  d38_19 DECIMAL(38, 19),
+  d38_38 DECIMAL(38, 38),
+  PRIMARY KEY (d5_0, d5_1, d5_3, d5_5, d9_0, d9_1, d9_5, d9_9, d14_0, d14_1, d14_7, d14_14, d18_0, d18_1, d18_9, d18_18, d28_0, d28_1, d28_14, d28_28, d38_0, d38_1, d38_19, d38_38)
+)
+PARTITION BY HASH PARTITIONS 10
+STORED AS KUDU;
+---- DEPENDENT_LOAD_KUDU
+INSERT into TABLE {db_name}{db_suffix}.{table_name}
+SELECT d5_0, d5_1, d5_3, d5_5, d9_0, d9_1, d9_5, d9_9, d14_0, d14_1, d14_7, d14_14, d18_0, d18_1, d18_9, d18_18, d28_0, d28_1, d28_14, d28_28, d38_0, d38_1, d38_19, d38_38
+FROM {db_name}.{table_name};
+====
+---- DATASET
+-- Small table with decimal values.  This is used for
+-- testing min-max filters with decimal types on kudu tables
+functional
+---- BASE_TABLE_NAME
+decimal_rtf_tiny_tbl
+---- COLUMNS
+d5_0   DECIMAL(5, 0)
+d5_1   DECIMAL(5, 1)
+d5_3   DECIMAL(5, 3)
+d5_5   DECIMAL(5, 5)
+d9_0   DECIMAL(9, 0)
+d9_1   DECIMAL(9, 1)
+d9_5   DECIMAL(9, 5)
+d9_9   DECIMAL(9, 9)
+d14_0  DECIMAL(14, 0)
+d14_1  DECIMAL(14, 1)
+d14_7  DECIMAL(14, 7)
+d14_14 DECIMAL(14, 14)
+d18_0  DECIMAL(18, 0)
+d18_1  DECIMAL(18, 1)
+d18_9  DECIMAL(18, 9)
+d18_18 DECIMAL(18, 18)
+d28_0  DECIMAL(28, 0)
+d28_1  DECIMAL(28, 1)
+d28_14 DECIMAL(28, 14)
+d28_28 DECIMAL(28, 28)
+d38_0  DECIMAL(38, 0)
+d38_1  DECIMAL(38, 1)
+d38_19 DECIMAL(38, 19)
+d38_38 DECIMAL(38, 38)
+---- PARTITION_COLUMNS
+dpc    DECIMAL(9, 0)
+---- ALTER
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION(dpc=1);
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/decimal_rtf_tiny_tbl.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(dpc=1);
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition(dpc)
+select * from functional.{table_name};
+---- CREATE_KUDU
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE TABLE {db_name}{db_suffix}.{table_name} (
+  d5_0   DECIMAL(5, 0),
+  d5_1   DECIMAL(5, 1),
+  d5_3   DECIMAL(5, 3),
+  d5_5   DECIMAL(5, 5),
+  d9_0   DECIMAL(9, 0),
+  d9_1   DECIMAL(9, 1),
+  d9_5   DECIMAL(9, 5),
+  d9_9   DECIMAL(9, 9),
+  d14_0  DECIMAL(14, 0),
+  d14_1  DECIMAL(14, 1),
+  d14_7  DECIMAL(14, 7),
+  d14_14 DECIMAL(14, 14),
+  d18_0  DECIMAL(18, 0),
+  d18_1  DECIMAL(18, 1),
+  d18_9  DECIMAL(18, 9),
+  d18_18 DECIMAL(18, 18),
+  d28_0  DECIMAL(28, 0),
+  d28_1  DECIMAL(28, 1),
+  d28_14 DECIMAL(28, 14),
+  d28_28 DECIMAL(28, 28),
+  d38_0  DECIMAL(38, 0),
+  d38_1  DECIMAL(38, 1),
+  d38_19 DECIMAL(38, 19),
+  d38_38 DECIMAL(38, 38),
+  PRIMARY KEY (d5_0, d5_1, d5_3, d5_5, d9_0, d9_1, d9_5, d9_9, d14_0, d14_1, d14_7, d14_14, d18_0, d18_1, d18_9, d18_18, d28_0, d28_1, d28_14, d28_28, d38_0, d38_1, d38_19, d38_38)
+)
+PARTITION BY HASH PARTITIONS 10
+STORED AS KUDU;
+---- DEPENDENT_LOAD_KUDU
+INSERT into TABLE {db_name}{db_suffix}.{table_name}
+SELECT d5_0, d5_1, d5_3, d5_5, d9_0, d9_1, d9_5, d9_9, d14_0, d14_1, d14_7, d14_14, d18_0, d18_1, d18_9, d18_18, d28_0, d28_1, d28_14, d28_28, d38_0, d38_1, d38_19, d38_38
+FROM {db_name}.{table_name};
+====
+---- DATASET
 functional
 ---- BASE_TABLE_NAME
 decimal_tiny

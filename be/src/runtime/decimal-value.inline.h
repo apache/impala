@@ -60,6 +60,13 @@ inline DecimalValue<T> DecimalValue<T>::FromDouble(int precision, int scale, dou
   return DecimalValue(static_cast<T>(d));
 }
 
+template <typename T>
+inline DecimalValue<T> DecimalValue<T>::FromTColumnValue(const TColumnValue& tvalue) {
+  T value = 0;
+  memcpy(&value, tvalue.decimal_val.c_str(), tvalue.decimal_val.length());
+  return DecimalValue<T>(value);
+}
+
 template<typename T>
 inline DecimalValue<T> DecimalValue<T>::FromInt(int precision, int scale, int64_t d,
     bool* overflow) {

@@ -18,6 +18,8 @@
 #include "testutil/gtest-util.h"
 #include "util/min-max-filter.h"
 
+#include "runtime/decimal-value.h"
+#include "runtime/decimal-value.inline.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
@@ -54,7 +56,7 @@ TEST(MinMaxFilterTest, TestBoolMinMaxFilter) {
   TMinMaxFilter tFilter2;
   tFilter2.min.__set_bool_val(false);
   tFilter2.max.__set_bool_val(false);
-  MinMaxFilter::Or(tFilter1, &tFilter2);
+  MinMaxFilter::Or(tFilter1, &tFilter2, ColumnType(PrimitiveType::TYPE_BOOLEAN));
   EXPECT_FALSE(tFilter2.min.bool_val);
   EXPECT_TRUE(tFilter2.max.bool_val);
 
@@ -123,7 +125,7 @@ TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   TMinMaxFilter tFilter2;
   tFilter2.min.__set_int_val(2);
   tFilter2.max.__set_int_val(7);
-  MinMaxFilter::Or(tFilter1, &tFilter2);
+  MinMaxFilter::Or(tFilter1, &tFilter2, int_type);
   EXPECT_EQ(tFilter2.min.int_val, 2);
   EXPECT_EQ(tFilter2.max.int_val, 8);
 
@@ -285,7 +287,7 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   TMinMaxFilter tFilter2;
   tFilter2.min.__set_string_val("b");
   tFilter2.max.__set_string_val("e");
-  MinMaxFilter::Or(tFilter1, &tFilter2);
+  MinMaxFilter::Or(tFilter1, &tFilter2, string_type);
   EXPECT_EQ(tFilter2.min.string_val, "a");
   EXPECT_EQ(tFilter2.max.string_val, "e");
 
@@ -356,13 +358,152 @@ TEST(MinMaxFilterTest, TestTimestampMinMaxFilter) {
   TMinMaxFilter tFilter2;
   t1.ToTColumnValue(&tFilter2.min);
   t3.ToTColumnValue(&tFilter2.max);
-  MinMaxFilter::Or(tFilter1, &tFilter2);
+  MinMaxFilter::Or(tFilter1, &tFilter2, timestamp_type);
   EXPECT_EQ(TimestampValue::FromTColumnValue(tFilter2.min), t2);
   EXPECT_EQ(TimestampValue::FromTColumnValue(tFilter2.max), t3);
 
   filter->Close();
   empty_filter->Close();
   filter2->Close();
+}
+
+#define DECIMAL_CHECK(SIZE)                                                     \
+  do {                                                                          \
+    EXPECT_EQ(*reinterpret_cast<Decimal##SIZE##Value*>(filter->GetMin()), min); \
+    EXPECT_EQ(*reinterpret_cast<Decimal##SIZE##Value*>(filter->GetMax()), max); \
+    EXPECT_FALSE(filter->AlwaysFalse());                                        \
+    EXPECT_FALSE(filter->AlwaysTrue());                                         \
+  } while (false)
+
+void CheckDecimalVals(
+    MinMaxFilter* filter, const Decimal4Value& min, const Decimal4Value& max) {
+  DECIMAL_CHECK(4);
+}
+
+void CheckDecimalVals(
+    MinMaxFilter* filter, const Decimal8Value& min, const Decimal8Value& max) {
+  DECIMAL_CHECK(8);
+}
+
+void CheckDecimalVals(
+    MinMaxFilter* filter, const Decimal16Value& min, const Decimal16Value& max) {
+  DECIMAL_CHECK(16);
+}
+
+void CheckDecimalEmptyFilter(MinMaxFilter* filter, const ColumnType& column_type,
+    TMinMaxFilter* tFilter, ObjectPool* obj_pool, MemTracker* mem_tracker) {
+  EXPECT_TRUE(filter->AlwaysFalse());
+  EXPECT_FALSE(filter->AlwaysTrue());
+  filter->ToThrift(tFilter);
+  EXPECT_TRUE(tFilter->always_false);
+  EXPECT_FALSE(tFilter->always_true);
+  EXPECT_FALSE(tFilter->min.__isset.decimal_val);
+  EXPECT_FALSE(tFilter->max.__isset.decimal_val);
+  MinMaxFilter* empty_filter =
+      MinMaxFilter::Create(*tFilter, column_type, obj_pool, mem_tracker);
+  EXPECT_TRUE(empty_filter->AlwaysFalse());
+  EXPECT_FALSE(empty_filter->AlwaysTrue());
+  empty_filter->Close();
+}
+
+// values are such that VALUE3 < VALUE1 < VALUE2
+// The insert order is VALUE1, VALUE2, VALUE3
+// 1. After VALUE1 insert: both min and max are VALUE1
+// 2. After VALUE2 insert: min=VALUE1; max=VALUE2
+// 3. After VALUE3 insert: min=VALUE3; max=VALUE2
+#define DECIMAL_INSERT_AND_CHECK(SIZE, PRECISION, SCALE, VALUE1, VALUE2, VALUE3)     \
+  do {                                                                               \
+    d1##SIZE =                                                                       \
+        Decimal##SIZE##Value::FromDouble(PRECISION, SCALE, VALUE1, true, &overflow); \
+    filter##SIZE->Insert(&d1##SIZE);                                                 \
+    CheckDecimalVals(filter##SIZE, d1##SIZE, d1##SIZE);                              \
+    d2##SIZE =                                                                       \
+        Decimal##SIZE##Value::FromDouble(PRECISION, SCALE, VALUE2, true, &overflow); \
+    filter##SIZE->Insert(&d2##SIZE);                                                 \
+    CheckDecimalVals(filter##SIZE, d1##SIZE, d2##SIZE);                              \
+    d3##SIZE =                                                                       \
+        Decimal##SIZE##Value::FromDouble(PRECISION, SCALE, VALUE3, true, &overflow); \
+    filter##SIZE->Insert(&d3##SIZE);                                                 \
+    CheckDecimalVals(filter##SIZE, d3##SIZE, d2##SIZE);                              \
+  } while (false)
+
+#define DECIMAL_CHECK_THRIFT(SIZE)                                                  \
+  do {                                                                              \
+    filter##SIZE->ToThrift(&tFilter##SIZE);                                         \
+    EXPECT_FALSE(tFilter##SIZE.always_false);                                       \
+    EXPECT_FALSE(tFilter##SIZE.always_true);                                        \
+    EXPECT_EQ(Decimal##SIZE##Value::FromTColumnValue(tFilter##SIZE.min), d3##SIZE); \
+    EXPECT_EQ(Decimal##SIZE##Value::FromTColumnValue(tFilter##SIZE.max), d2##SIZE); \
+    MinMaxFilter* filter##SIZE##2 = MinMaxFilter::Create(                           \
+        tFilter##SIZE, decimal##SIZE##_type, &obj_pool, &mem_tracker);              \
+    CheckDecimalVals(filter##SIZE##2, d3##SIZE, d2##SIZE);                          \
+    filter##SIZE##2->Close();                                                       \
+  } while (false)
+
+#define DECIMAL_CHECK_OR(SIZE)                                                       \
+  do {                                                                               \
+    TMinMaxFilter tFilter1##SIZE;                                                    \
+    d3##SIZE.ToTColumnValue(&tFilter1##SIZE.min);                                    \
+    d2##SIZE.ToTColumnValue(&tFilter1##SIZE.max);                                    \
+    TMinMaxFilter tFilter2##SIZE;                                                    \
+    d1##SIZE.ToTColumnValue(&tFilter2##SIZE.min);                                    \
+    d1##SIZE.ToTColumnValue(&tFilter2##SIZE.max);                                    \
+    MinMaxFilter::Or(tFilter1##SIZE, &tFilter2##SIZE, decimal##SIZE##_type);         \
+    EXPECT_EQ(Decimal##SIZE##Value::FromTColumnValue(tFilter2##SIZE.min), d3##SIZE); \
+    EXPECT_EQ(Decimal##SIZE##Value::FromTColumnValue(tFilter2##SIZE.max), d2##SIZE); \
+  } while (false)
+
+// Tests that a DecimalMinMaxFilter returns the expected min/max after having values
+// inserted into it, and that MinMaxFilter::Or works for decimal values.
+TEST(MinMaxFilterTest, TestDecimalMinMaxFilter) {
+  ObjectPool obj_pool;
+  MemTracker mem_tracker;
+  bool overflow = false;
+
+  // Create types
+  ColumnType decimal4_type = ColumnType::CreateDecimalType(9, 5);
+  ColumnType decimal8_type = ColumnType::CreateDecimalType(18, 9);
+  ColumnType decimal16_type = ColumnType::CreateDecimalType(38, 19);
+
+  // Decimal Values
+  Decimal4Value d14, d24, d34;
+  Decimal8Value d18, d28, d38;
+  Decimal16Value d116, d216, d316;
+
+  // Create filters
+  MinMaxFilter* filter4 = MinMaxFilter::Create(decimal4_type, &obj_pool, &mem_tracker);
+  MinMaxFilter* filter8 = MinMaxFilter::Create(decimal8_type, &obj_pool, &mem_tracker);
+  MinMaxFilter* filter16 = MinMaxFilter::Create(decimal16_type, &obj_pool, &mem_tracker);
+
+  // Create thrift minmax filters
+  TMinMaxFilter tFilter4, tFilter8, tFilter16;
+
+  // Test the behavior of an empty filter.
+  CheckDecimalEmptyFilter(filter4, decimal4_type, &tFilter4, &obj_pool, &mem_tracker);
+  CheckDecimalEmptyFilter(filter8, decimal8_type, &tFilter8, &obj_pool, &mem_tracker);
+  CheckDecimalEmptyFilter(filter16, decimal16_type, &tFilter16, &obj_pool, &mem_tracker);
+
+  // Insert and check
+  DECIMAL_INSERT_AND_CHECK(4, 9, 5, 2345.67891, 3456.78912, 1234.56789);
+  DECIMAL_INSERT_AND_CHECK(
+      8, 18, 9, 234567891.234567891, 345678912.345678912, 123456789.123456789);
+  DECIMAL_INSERT_AND_CHECK(16, 38, 19, 2345678912345678912.2345678912345678912,
+      3456789123456789123.3456789123456789123, 1234567891234567891.1234567891234567891);
+
+  // Thrift check
+  DECIMAL_CHECK_THRIFT(4);
+  DECIMAL_CHECK_THRIFT(8);
+  DECIMAL_CHECK_THRIFT(16);
+
+  // Check the behavior of Or.
+  DECIMAL_CHECK_OR(4);
+  DECIMAL_CHECK_OR(8);
+  DECIMAL_CHECK_OR(16);
+
+  // Close all filters
+  filter4->Close();
+  filter8->Close();
+  filter16->Close();
 }
 
 int main(int argc, char** argv) {

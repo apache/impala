@@ -555,7 +555,8 @@ def compute_aggregation(function, field, runtime_profile):
 
   return result
 
-def verify_runtime_profile(expected, actual):
+
+def verify_runtime_profile(expected, actual, update_section=False):
   """
   Check that lines matching all of the expected runtime profile entries are present
   in the actual text runtime profile. The check passes if, for each of the expected
@@ -595,14 +596,21 @@ def verify_runtime_profile(expected, actual):
       "\nEXPECTED LINES:\n%s\n\nACTUAL PROFILE:\n%s" % ('\n'.join(unmatched_lines),
         actual))
 
+  updated_aggregations = []
   # Compute the aggregations and check against values
   for i in xrange(len(expected_aggregations)):
     if (expected_aggregations[i] is None): continue
     function, field, expected_value = expected_aggregations[i]
     actual_value = compute_aggregation(function, field, actual)
-    assert actual_value == expected_value, ("Aggregation of %s over %s did not match "
-        "expected results.\nEXPECTED VALUE:\n%d\n\nACTUAL VALUE:\n%d"
-        "\n\nPROFILE:\n%s\n" % (function, field, expected_value, actual_value, actual))
+    if update_section:
+      updated_aggregations.append("aggregation(%s, %s): %d"
+                                  % (function, field, actual_value))
+    else:
+        assert actual_value == expected_value, ("Aggregation of %s over %s did not match "
+            "expected results.\nEXPECTED VALUE:\n%d\n\nACTUAL VALUE:\n%d"
+            "\n\nPROFILE:\n%s\n"
+            % (function, field, expected_value, actual_value, actual))
+  return updated_aggregations
 
 def get_node_exec_options(profile_string, exec_node_id):
   """ Return a list with all of the ExecOption strings for the given exec node id. """

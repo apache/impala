@@ -20,6 +20,7 @@
 
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "impala-ir/impala-ir-functions.h"
+#include "runtime/decimal-value.h"
 #include "runtime/string-buffer.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
@@ -87,7 +88,8 @@ class MinMaxFilter {
       ObjectPool* pool, MemTracker* mem_tracker);
 
   /// Computes the logical OR of 'in' with 'out' and stores the result in 'out'.
-  static void Or(const TMinMaxFilter& in, TMinMaxFilter* out);
+  static void Or(
+      const TMinMaxFilter& in, TMinMaxFilter* out, const ColumnType& columnType);
 
   /// Copies the contents of 'in' into 'out'.
   static void Copy(const TMinMaxFilter& in, TMinMaxFilter* out);
@@ -96,7 +98,7 @@ class MinMaxFilter {
   static std::string GetLlvmClassName(PrimitiveType type);
 
   /// Returns the IRFunction::Type for Insert() for the given type.
-  static IRFunction::Type GetInsertIRFunctionType(PrimitiveType type);
+  static IRFunction::Type GetInsertIRFunctionType(ColumnType col_type);
 };
 
 #define NUMERIC_MIN_MAX_FILTER(NAME, TYPE)                                    \
@@ -232,6 +234,89 @@ class TimestampMinMaxFilter : public MinMaxFilter {
   /// True if no rows have been inserted.
   bool always_false_;
 };
+
+#define DECIMAL_SIZE_4BYTE 4
+#define DECIMAL_SIZE_8BYTE 8
+#define DECIMAL_SIZE_16BYTE 16
+
+// body of GetMin and GetMax defined below
+#pragma push_macro("GET_MINMAX")
+#define GET_MINMAX(MIN_OR_MAX)                              \
+  do {                                                      \
+    switch (size_) {                                        \
+      case DECIMAL_SIZE_4BYTE:                              \
+        return &(MIN_OR_MAX##4_);                           \
+        break;                                              \
+      case DECIMAL_SIZE_8BYTE:                              \
+        return &(MIN_OR_MAX##8_);                           \
+        break;                                              \
+      case DECIMAL_SIZE_16BYTE:                             \
+        return &(MIN_OR_MAX##16_);                          \
+        break;                                              \
+      default:                                              \
+        DCHECK(false) << "Unknown decimal size: " << size_; \
+    }                                                       \
+  } while (false)
+
+// Decimal data can be stored using 4 bytes, 8 bytes or 16 bytes.  The filter
+// is for a particular column, and the size needed is fixed based on the
+// column specification.  So, a union is used to store the min and max value.
+// The precision comes in as input.  Based on the precision the size is found and
+// the respective variable will be used to store the value.  The code is
+// macro-ized to handle different sized decimals.
+class DecimalMinMaxFilter : public MinMaxFilter {
+ public:
+  DecimalMinMaxFilter(int precision)
+    : size_(ColumnType::GetDecimalByteSize(precision)), always_false_(true) {}
+
+  DecimalMinMaxFilter(const TMinMaxFilter& thrift, int precision);
+  virtual ~DecimalMinMaxFilter() {}
+
+  virtual void* GetMin() override {
+    GET_MINMAX(min);
+    return nullptr;
+  }
+
+  virtual void* GetMax() override {
+    GET_MINMAX(max);
+    return nullptr;
+  }
+
+  virtual void Insert(void* val) override;
+  virtual PrimitiveType type() override;
+  virtual bool AlwaysTrue() const override { return false; }
+  virtual bool AlwaysFalse() const override { return always_false_; }
+  virtual void ToThrift(TMinMaxFilter* thrift) const override;
+  virtual std::string DebugString() const override;
+
+  static void Or(const TMinMaxFilter& in, TMinMaxFilter* out, int precision);
+  static void Copy(const TMinMaxFilter& in, TMinMaxFilter* out);
+
+  void Insert4(void* val);
+  void Insert8(void* val);
+  void Insert16(void* val);
+
+  /// Struct name in LLVM IR.
+  static const char* LLVM_CLASS_NAME;
+
+ private:
+  const int size_;
+  union {
+    Decimal16Value min16_;
+    Decimal8Value min8_;
+    Decimal4Value min4_;
+  };
+
+  union {
+    Decimal16Value max16_;
+    Decimal8Value max8_;
+    Decimal4Value max4_;
+  };
+
+  /// True if no rows have been inserted.
+  bool always_false_;
+};
+#pragma pop_macro("GET_MINMAX")
 }
 
 #endif

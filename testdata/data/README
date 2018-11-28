@@ -287,3 +287,14 @@ select id,
   end timestamp_col
 from functional.alltypes
 sort by id
+
+decimal_rtf_tbl.txt
+This was generated using formulas in Google Sheets.  The goal was to create various
+decimal values that covers the 3 storage formats with various precision and scale.
+This is a reasonably large table that is used for testing min-max filters
+with decimal types on Kudu.
+
+decimal_rtf_tiny_tbl.txt
+Small table with specific decimal values picked from decimal_rtf_tbl.txt so that
+min-max filter based pruning can be tested with decimal types on Kudu.
+

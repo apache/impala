@@ -983,7 +983,8 @@ void Coordinator::FilterState::ApplyUpdate(const TUpdateFilterParams& params,
     } else if (min_max_filter_.always_false) {
       MinMaxFilter::Copy(params.min_max_filter, &min_max_filter_);
     } else {
-      MinMaxFilter::Or(params.min_max_filter, &min_max_filter_);
+      MinMaxFilter::Or(params.min_max_filter, &min_max_filter_,
+          ColumnType::FromThrift(desc_.src_expr.nodes[0].type));
     }
   }
 

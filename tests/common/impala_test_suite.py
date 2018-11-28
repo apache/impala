@@ -504,14 +504,20 @@ class ImpalaTestSuite(BaseTestSuite):
         test_section['RESULTS'] = test_section['RESULTS'] \
             .replace(NAMENODE, '$NAMENODE') \
             .replace('$IMPALA_HOME', IMPALA_HOME)
+      rt_profile_info = None
       if 'RUNTIME_PROFILE_%s' % table_format_info.file_format in test_section:
         # If this table format has a RUNTIME_PROFILE section specifically for it, evaluate
         # that section and ignore any general RUNTIME_PROFILE sections.
-        verify_runtime_profile(
-            test_section['RUNTIME_PROFILE_%s' % table_format_info.file_format],
-            result.runtime_profile)
+        rt_profile_info = 'RUNTIME_PROFILE_%s' % table_format_info.file_format
       elif 'RUNTIME_PROFILE' in test_section:
-        verify_runtime_profile(test_section['RUNTIME_PROFILE'], result.runtime_profile)
+        rt_profile_info = 'RUNTIME_PROFILE'
+
+      if rt_profile_info is not None:
+        rt_profile = verify_runtime_profile(test_section[rt_profile_info],
+                               result.runtime_profile,
+                               update_section=pytest.config.option.update_results)
+        if pytest.config.option.update_results:
+          test_section[rt_profile_info] = "".join(rt_profile)
 
       if 'DML_RESULTS' in test_section:
         assert 'ERRORS' not in test_section

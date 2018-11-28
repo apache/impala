@@ -73,4 +73,34 @@ void TimestampMinMaxFilter::Insert(void* val) {
   }
 }
 
+#define INSERT_DECIMAL_MINMAX(SIZE)                         \
+  do {                                                      \
+    if (val == nullptr) return;                             \
+    const Decimal##SIZE##Value* value##SIZE##_ =            \
+        reinterpret_cast<const Decimal##SIZE##Value*>(val); \
+    if (always_false_) {                                    \
+      min##SIZE##_ = *value##SIZE##_;                       \
+      max##SIZE##_ = *value##SIZE##_;                       \
+      always_false_ = false;                                \
+    } else {                                                \
+      if (*value##SIZE##_ < min##SIZE##_) {                 \
+        min##SIZE##_ = *value##SIZE##_;                     \
+      } else if (*value##SIZE##_ > max##SIZE##_) {          \
+        max##SIZE##_ = *value##SIZE##_;                     \
+      }                                                     \
+    }                                                       \
+  } while (false)
+
+void DecimalMinMaxFilter::Insert4(void* val) {
+  INSERT_DECIMAL_MINMAX(4);
+}
+
+void DecimalMinMaxFilter::Insert8(void* val) {
+  INSERT_DECIMAL_MINMAX(8);
+}
+
+void DecimalMinMaxFilter::Insert16(void* val) {
+  INSERT_DECIMAL_MINMAX(16);
+}
+
 } // namespace impala

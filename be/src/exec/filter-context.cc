@@ -403,7 +403,7 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
     DCHECK(ctx->filter->is_min_max_filter());
     // The function for inserting into the min-max filter.
     llvm::Function* min_max_insert_fn = codegen->GetFunction(
-        MinMaxFilter::GetInsertIRFunctionType(filter_expr->type().type), false);
+        MinMaxFilter::GetInsertIRFunctionType(filter_expr->type()), false);
     DCHECK(min_max_insert_fn != nullptr);
 
     llvm::Value* insert_filter_args[] = {local_filter_arg, val_ptr_phi};
