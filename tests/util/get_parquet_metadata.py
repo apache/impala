@@ -21,6 +21,7 @@ import struct
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from parquet.ttypes import ColumnIndex, FileMetaData, OffsetIndex, PageHeader, Type
+from subprocess import check_call
 from thrift.protocol import TCompactProtocol
 from thrift.transport import TTransport
 
@@ -168,3 +169,19 @@ def get_parquet_metadata(filename):
 
     # Return deserialized FileMetaData object
     return read_serialized_object(FileMetaData, f, metadata_pos, metadata_len)
+
+
+def get_parquet_metadata_from_hdfs_folder(hdfs_path, tmp_dir):
+  """Returns a list with the FileMetaData of every file in 'hdfs_path' and its
+  subdirectories. The hdfs folder is copied into 'tmp_dir' before processing.
+  """
+  check_call(['hdfs', 'dfs', '-get', hdfs_path, tmp_dir])
+  result = []
+  for root, subdirs, files in os.walk(tmp_dir):
+    for f in files:
+      if not f.endswith('parq'):
+        continue
+      parquet_file = os.path.join(root, str(f))
+      file_meta_data = get_parquet_metadata(parquet_file)
+      result.append(file_meta_data)
+  return result

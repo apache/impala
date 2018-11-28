@@ -26,6 +26,7 @@
 namespace impala {
 
 class RuntimeState;
+class TQueryOptions;
 
 class ParquetMetadataUtils {
  public:
@@ -55,6 +56,11 @@ class ParquetMetadataUtils {
   static Status ValidateColumn(const char* filename,
       const parquet::SchemaElement& schema_element, const SlotDescriptor* slot_desc,
       RuntimeState* state);
+
+  /// Sets type related fields in a SchemaElement based on the column's internal type
+  /// and query options.
+  static void FillSchemaElement(const ColumnType& col_type,
+      const TQueryOptions& query_options, parquet::SchemaElement* col_schema);
 };
 
 struct ParquetFileVersion {

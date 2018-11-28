@@ -23,17 +23,18 @@ from collections import namedtuple
 from datetime import datetime
 from decimal import Decimal
 from subprocess import check_call
-from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder
+from parquet.ttypes import ColumnOrder, SortingColumn, TypeDefinedOrder, ConvertedType
 
 from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIfEC, SkipIfIsilon, SkipIfLocal, SkipIfS3, SkipIfABFS, \
-    SkipIfADLS
+from tests.common.skip import (SkipIfEC, SkipIfIsilon, SkipIfLocal, SkipIfS3, SkipIfABFS,
+    SkipIfADLS)
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path
-from tests.util.get_parquet_metadata import get_parquet_metadata, decode_stats_value
+from tests.util.get_parquet_metadata import (decode_stats_value,
+    get_parquet_metadata_from_hdfs_folder)
 
 PARQUET_CODECS = ['none', 'snappy', 'gzip']
 
@@ -246,14 +247,11 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     self.execute_query(query)
 
     # Download hdfs files and extract rowgroup metadata
+    file_metadata_list = get_parquet_metadata_from_hdfs_folder(hdfs_path, tmpdir.strpath)
     row_groups = []
-    check_call(['hdfs', 'dfs', '-get', hdfs_path, tmpdir.strpath])
 
-    for root, subdirs, files in os.walk(tmpdir.strpath):
-      for f in files:
-        parquet_file = os.path.join(root, str(f))
-        file_meta_data = get_parquet_metadata(parquet_file)
-        row_groups.extend(file_meta_data.row_groups)
+    for file_metadata in file_metadata_list:
+      row_groups.extend(file_metadata.row_groups)
 
     # Verify that the files have the sorted_columns set
     expected = [SortingColumn(4, False, False), SortingColumn(0, False, False)]
@@ -279,21 +277,18 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     self.execute_query(query)
 
     # Download hdfs files and verify column orders
-    check_call(['hdfs', 'dfs', '-get', hdfs_path, tmpdir.strpath])
+    file_metadata_list = get_parquet_metadata_from_hdfs_folder(hdfs_path, tmpdir.strpath)
 
     expected_col_orders = [ColumnOrder(TYPE_ORDER=TypeDefinedOrder())] * 11
 
-    for root, subdirs, files in os.walk(tmpdir.strpath):
-      for f in files:
-        parquet_file = os.path.join(root, str(f))
-        file_meta_data = get_parquet_metadata(parquet_file)
-        assert file_meta_data.column_orders == expected_col_orders
+    for file_metadata in file_metadata_list:
+      assert file_metadata.column_orders == expected_col_orders
 
-  def test_read_write_logical_types(self, vector, unique_database, tmpdir):
+  def test_read_write_integer_logical_types(self, vector, unique_database, tmpdir):
     """IMPALA-5052: Read and write signed integer parquet logical types
     This test creates a src_tbl like a parquet file. The parquet file was generated
     to have columns with different signed integer logical types. The test verifies
-    that parquet file written by the hdfs parquet table writer using the genererated
+    that parquet file written by the hdfs parquet table writer using the generated
     file has the same column type metadata as the generated one."""
     hdfs_path = (os.environ['DEFAULT_FS'] + "/test-warehouse/{0}.db/"
                  "signed_integer_logical_types.parquet").format(unique_database)
@@ -358,6 +353,115 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
             % dst_tbl)
     assert result_src.data == result_dst.data
 
+  def _ctas_and_get_metadata(self, vector, unique_database, tmp_dir, source_table):
+    """CTAS 'source_table' into a Parquet table and returns its Parquet metadata."""
+    table_name = "test_hdfs_parquet_table_writer"
+    qualified_table_name = "{0}.{1}".format(unique_database, table_name)
+    hdfs_path = get_fs_path('/test-warehouse/{0}.db/{1}/'.format(unique_database,
+                                                                 table_name))
+
+    # Setting num_nodes = 1 ensures that the query is executed on the coordinator,
+    # resulting in a single parquet file being written.
+    query = ("create table {0} stored as parquet as select * from {1}").format(
+      qualified_table_name, source_table)
+    vector.get_value('exec_option')['num_nodes'] = 1
+    self.execute_query_expect_success(self.client, query,
+                                      vector.get_value('exec_option'))
+
+    file_metadata_list = get_parquet_metadata_from_hdfs_folder(hdfs_path, tmp_dir)
+    assert len(file_metadata_list) == 1
+    assert file_metadata_list[0] is not None
+    return file_metadata_list[0]
+
+  @staticmethod
+  def _get_schema(schemas, column_name):
+    """Searches 'schemas' for a schema with name 'column_name'. Asserts if non is found.
+    """
+    for schema in schemas:
+      if schema.name == column_name:
+        return schema
+    assert False, "schema element %s not found" % column_name
+
+  @staticmethod
+  def _check_only_one_member_var_is_set(obj, var_name):
+    """Checks that 'var_name' is the only member of 'obj' that is not None. Useful to
+    check Thrift unions."""
+    keys = [k for k, v in vars(obj).iteritems() if v is not None]
+    assert keys == [var_name]
+
+  def _check_no_logical_type(self, schemas, column_name):
+    """Checks that the schema with name 'column_name' has no logical or converted type."""
+    schema = self._get_schema(schemas, column_name)
+    assert schema.converted_type is None
+    assert schema.logicalType is None
+
+  def _check_int_logical_type(self, schemas, column_name, bit_width):
+    """Checks that the schema with name 'column_name' has logical and converted type that
+    describe a signed integer with 'bit_width' bits."""
+    schema = self._get_schema(schemas, column_name)
+    bit_width_to_converted_type_map = {
+        8: ConvertedType.INT_8,
+        16: ConvertedType.INT_16,
+        32: ConvertedType.INT_32,
+        64: ConvertedType.INT_64
+    }
+    assert schema.converted_type == bit_width_to_converted_type_map[bit_width]
+    assert schema.logicalType is not None
+    self._check_only_one_member_var_is_set(schema.logicalType, "INTEGER")
+    assert schema.logicalType.INTEGER is not None
+    assert schema.logicalType.INTEGER.bitWidth == bit_width
+    assert schema.logicalType.INTEGER.isSigned
+
+  def _check_decimal_logical_type(self, schemas, column_name, precision, scale):
+    """Checks that the schema with name 'column_name' has logical and converted type that
+    describe a decimal with given 'precision' and 'scale'."""
+    schema = self._get_schema(schemas, column_name)
+    assert schema.converted_type == ConvertedType.DECIMAL
+    assert schema.precision == precision
+    assert schema.scale == scale
+    assert schema.logicalType is not None
+    self._check_only_one_member_var_is_set(schema.logicalType, "DECIMAL")
+    assert schema.logicalType.DECIMAL.precision == precision
+    assert schema.logicalType.DECIMAL.scale == scale
+
+  def test_logical_types(self, vector, unique_database, tmpdir):
+    """Tests that the Parquet writers set logical type and converted type correctly
+    for all types except DECIMAL"""
+    source = "functional.alltypestiny"
+    file_metadata = \
+        self._ctas_and_get_metadata(vector, unique_database, tmpdir.strpath, source)
+    schemas = file_metadata.schema
+
+    self._check_int_logical_type(schemas, "tinyint_col", 8)
+    self._check_int_logical_type(schemas, "smallint_col", 16)
+    self._check_int_logical_type(schemas, "int_col", 32)
+    self._check_int_logical_type(schemas, "bigint_col", 64)
+
+    self._check_no_logical_type(schemas, "bool_col")
+    self._check_no_logical_type(schemas, "float_col")
+    self._check_no_logical_type(schemas, "double_col")
+
+    # By default STRING has no logical type, see IMPALA-5982.
+    self._check_no_logical_type(schemas, "string_col")
+
+    # Currently TIMESTAMP is written as INT96 and has no logical type.
+    # This test will break once INT64 becomes the default Parquet type for TIMESTAMP
+    # columns in the future (IMPALA-5049).
+    self._check_no_logical_type(schemas, "timestamp_col")
+
+  def test_decimal_logical_types(self, vector, unique_database, tmpdir):
+    """Tests that the Parquet writers set logical type and converted type correctly
+       for DECIMAL type."""
+    source = "functional.decimal_tiny"
+    file_metadata = \
+        self._ctas_and_get_metadata(vector, unique_database, tmpdir.strpath, source)
+    schemas = file_metadata.schema
+
+    self._check_decimal_logical_type(schemas, "c1", 10, 4)
+    self._check_decimal_logical_type(schemas, "c2", 15, 5)
+    self._check_decimal_logical_type(schemas, "c3", 1, 1)
+
+
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 @SkipIfS3.hive
@@ -399,14 +503,14 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     assert len(decoded) == len(schemas)
     return decoded
 
-  def _get_row_group_stats_from_file(self, parquet_file):
-    """Returns a list of statistics for each row group in file 'parquet_file'. The result
-    is a two-dimensional list, containing stats by row group and column."""
-    file_meta_data = get_parquet_metadata(parquet_file)
+  def _get_row_group_stats_from_file_metadata(self, file_metadata):
+    """Returns a list of statistics for each row group in Parquet file metadata
+    'file_metadata'. The result is a two-dimensional list, containing stats by
+    row group and column."""
     # We only support flat schemas, the additional element is the root element.
-    schemas = file_meta_data.schema[1:]
+    schemas = file_metadata.schema[1:]
     file_stats = []
-    for row_group in file_meta_data.row_groups:
+    for row_group in file_metadata.row_groups:
       num_columns = len(row_group.columns)
       assert num_columns == len(schemas)
       column_stats = [c.meta_data.statistics for c in row_group.columns]
@@ -421,12 +525,9 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     two-dimensional list, containing stats by row group and column."""
     row_group_stats = []
 
-    check_call(['hdfs', 'dfs', '-get', hdfs_path, tmp_dir])
-
-    for root, subdirs, files in os.walk(tmp_dir):
-      for f in files:
-        parquet_file = os.path.join(root, str(f))
-        row_group_stats.extend(self._get_row_group_stats_from_file(parquet_file))
+    file_metadata_list = get_parquet_metadata_from_hdfs_folder(hdfs_path, tmp_dir)
+    for file_metadata in file_metadata_list:
+      row_group_stats.extend(self._get_row_group_stats_from_file_metadata(file_metadata))
 
     return row_group_stats
 
@@ -509,12 +610,12 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
     """
     # Expected values for functional.decimal_tbl
     expected_min_max_values = [
-      ColumnStats('d1', 1234, 132842, 0),
-      ColumnStats('d2', 111, 2222, 0),
-      ColumnStats('d3', Decimal('1.23456789'), Decimal('12345.6789'), 0),
-      ColumnStats('d4', Decimal('0.123456789'), Decimal('0.123456789'), 0),
-      ColumnStats('d5', Decimal('0.1'), Decimal('12345.789'), 0),
-      ColumnStats('d6', 1, 1, 0)
+        ColumnStats('d1', 1234, 132842, 0),
+        ColumnStats('d2', 111, 2222, 0),
+        ColumnStats('d3', Decimal('1.23456789'), Decimal('12345.6789'), 0),
+        ColumnStats('d4', Decimal('0.123456789'), Decimal('0.123456789'), 0),
+        ColumnStats('d5', Decimal('0.1'), Decimal('12345.789'), 0),
+        ColumnStats('d6', 1, 1, 0)
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,
@@ -670,11 +771,11 @@ class TestHdfsParquetTableStatsWriter(ImpalaTestSuite):
 
     # Expected values for tpch_parquet.customer
     expected_min_max_values = [
-      ColumnStats('id', '8600000US00601', '8600000US999XX', 0),
-      ColumnStats('zip', '00601', '999XX', 0),
-      ColumnStats('description1', '\"00601 5-Digit ZCTA', '\"999XX 5-Digit ZCTA', 0),
-      ColumnStats('description2', ' 006 3-Digit ZCTA\"', ' 999 3-Digit ZCTA\"', 0),
-      ColumnStats('income', 0, 189570, 29),
+        ColumnStats('id', '8600000US00601', '8600000US999XX', 0),
+        ColumnStats('zip', '00601', '999XX', 0),
+        ColumnStats('description1', '\"00601 5-Digit ZCTA', '\"999XX 5-Digit ZCTA', 0),
+        ColumnStats('description2', ' 006 3-Digit ZCTA\"', ' 999 3-Digit ZCTA\"', 0),
+        ColumnStats('income', 0, 189570, 29),
     ]
 
     self._ctas_table_and_verify_stats(vector, unique_database, tmpdir.strpath,

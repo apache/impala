@@ -85,7 +85,58 @@ bool IsSupportedType(PrimitiveType impala_type,
   parquet::Type::type parquet_type = element.type;
   return encodings->second.find(parquet_type) != encodings->second.end();
 }
+
+/// Returns true if encoding 'e' is supported by Impala, false otherwise.
+static bool IsEncodingSupported(parquet::Encoding::type e) {
+  switch (e) {
+    case parquet::Encoding::PLAIN:
+    case parquet::Encoding::PLAIN_DICTIONARY:
+    case parquet::Encoding::BIT_PACKED:
+    case parquet::Encoding::RLE:
+      return true;
+    default:
+      return false;
+  }
 }
+
+/// Sets logical and converted types in 'col_schema' to signed 'bitwidth' bit integer.
+void SetIntLogicalType(int bitwidth, parquet::SchemaElement* col_schema) {
+  parquet::IntType int_type;
+  int_type.__set_bitWidth(bitwidth);
+  int_type.__set_isSigned(true);
+  parquet::LogicalType logical_type;
+  logical_type.__set_INTEGER(int_type);
+  col_schema->__set_logicalType(logical_type);
+}
+
+/// Sets logical and converted types in 'col_schema' to UTF8.
+void SetUtf8ConvertedAndLogicalType(parquet::SchemaElement* col_schema) {
+  col_schema->__set_converted_type(parquet::ConvertedType::UTF8);
+  parquet::LogicalType logical_type;
+  logical_type.__set_STRING(parquet::StringType());
+  col_schema->__set_logicalType(logical_type);
+}
+
+/// Sets logical and converted types in 'col_schema' to DECIMAL.
+/// Precision and scale are set according to 'col_type'.
+void SetDecimalConvertedAndLogicalType(
+    const ColumnType& col_type, parquet::SchemaElement* col_schema) {
+  DCHECK_EQ(col_type.type, TYPE_DECIMAL);
+
+  col_schema->__set_type_length(ParquetPlainEncoder::DecimalSize(col_type));
+  col_schema->__set_scale(col_type.scale);
+  col_schema->__set_precision(col_type.precision);
+  col_schema->__set_converted_type(parquet::ConvertedType::DECIMAL);
+
+  parquet::DecimalType decimal_type;
+  decimal_type.__set_scale(col_type.scale);
+  decimal_type.__set_precision(col_type.precision);
+  parquet::LogicalType logical_type;
+  logical_type.__set_DECIMAL(decimal_type);
+  col_schema->__set_logicalType(logical_type);
+}
+
+} // anonymous namespace
 
 // Needs to be in sync with the order of enum values declared in TParquetArrayResolution.
 const std::vector<ParquetSchemaResolver::ArrayEncoding>
@@ -143,18 +194,6 @@ Status ParquetMetadataUtils::ValidateOffsetInFile(const string& filename, int co
         file_length));
   }
   return Status::OK();;
-}
-
-static bool IsEncodingSupported(parquet::Encoding::type e) {
-  switch (e) {
-    case parquet::Encoding::PLAIN:
-    case parquet::Encoding::PLAIN_DICTIONARY:
-    case parquet::Encoding::BIT_PACKED:
-    case parquet::Encoding::RLE:
-      return true;
-    default:
-      return false;
-  }
 }
 
 Status ParquetMetadataUtils::ValidateRowGroupColumn(
@@ -273,6 +312,55 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
     RETURN_IF_ERROR(state->LogOrReturnError(msg));
   }
   return Status::OK();
+}
+
+void ParquetMetadataUtils::FillSchemaElement(const ColumnType& col_type,
+    const TQueryOptions& query_options, parquet::SchemaElement* col_schema) {
+  col_schema->__set_type(ConvertInternalToParquetType(col_type.type));
+  col_schema->__set_repetition_type(parquet::FieldRepetitionType::OPTIONAL);
+
+  switch (col_type.type) {
+    case TYPE_DECIMAL:
+      SetDecimalConvertedAndLogicalType(col_type, col_schema);
+      break;
+    case TYPE_VARCHAR:
+    case TYPE_CHAR:
+      SetUtf8ConvertedAndLogicalType(col_schema);
+      break;
+    case TYPE_STRING:
+      // By default STRING has no logical type, see IMPALA-5982.
+      // VARCHAR and CHAR are always set to UTF8.
+      if (query_options.parquet_annotate_strings_utf8) {
+        SetUtf8ConvertedAndLogicalType(col_schema);
+      }
+      break;
+    case TYPE_TINYINT:
+      col_schema->__set_converted_type(parquet::ConvertedType::INT_8);
+      SetIntLogicalType(8, col_schema);
+      break;
+    case TYPE_SMALLINT:
+      col_schema->__set_converted_type(parquet::ConvertedType::INT_16);
+      SetIntLogicalType(16, col_schema);
+      break;
+    case TYPE_INT:
+      col_schema->__set_converted_type(parquet::ConvertedType::INT_32);
+      SetIntLogicalType(32, col_schema);
+      break;
+    case TYPE_BIGINT:
+      col_schema->__set_converted_type(parquet::ConvertedType::INT_64);
+      SetIntLogicalType(64, col_schema);
+      break;
+    case TYPE_TIMESTAMP:
+    case TYPE_BOOLEAN:
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+      // boolean/float/double/INT96 encoded timestamp have no logical or converted types.
+      // INT64 encoded timestamp will have logical and converted types (IMPALA-5051).
+      break;
+    default:
+      DCHECK(false);
+      break;
+  }
 }
 
 ParquetFileVersion::ParquetFileVersion(const string& created_by) {

@@ -22,6 +22,7 @@
 #include "common/version.h"
 #include "exec/hdfs-table-sink.h"
 #include "exec/parquet/parquet-column-stats.inline.h"
+#include "exec/parquet/parquet-metadata-utils.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "rpc/thrift-util.h"
@@ -969,35 +970,11 @@ Status HdfsParquetTableWriter::CreateSchema() {
   file_metadata_.schema[0].name = "schema";
 
   for (int i = 0; i < columns_.size(); ++i) {
-    parquet::SchemaElement& node = file_metadata_.schema[i + 1];
-    const ColumnType& type = output_expr_evals_[i]->root().type();
-    node.name = table_desc_->col_descs()[i + num_clustering_cols].name();
-    node.__set_type(ConvertInternalToParquetType(type.type));
-    node.__set_repetition_type(parquet::FieldRepetitionType::OPTIONAL);
-    if (type.type == TYPE_DECIMAL) {
-      // This column is type decimal. Update the file metadata to include the
-      // additional fields:
-      //  1) converted_type: indicate this is really a decimal column.
-      //  2) type_length: the number of bytes used per decimal value in the data
-      //  3) precision/scale
-      node.__set_converted_type(parquet::ConvertedType::DECIMAL);
-      node.__set_type_length(
-          ParquetPlainEncoder::DecimalSize(output_expr_evals_[i]->root().type()));
-      node.__set_scale(output_expr_evals_[i]->root().type().scale);
-      node.__set_precision(output_expr_evals_[i]->root().type().precision);
-    } else if (type.type == TYPE_VARCHAR || type.type == TYPE_CHAR ||
-        (type.type == TYPE_STRING &&
-         state_->query_options().parquet_annotate_strings_utf8)) {
-      node.__set_converted_type(parquet::ConvertedType::UTF8);
-    } else if (type.type == TYPE_TINYINT) {
-      node.__set_converted_type(parquet::ConvertedType::INT_8);
-    } else if (type.type == TYPE_SMALLINT) {
-      node.__set_converted_type(parquet::ConvertedType::INT_16);
-    } else if (type.type == TYPE_INT) {
-      node.__set_converted_type(parquet::ConvertedType::INT_32);
-    } else if (type.type == TYPE_BIGINT) {
-      node.__set_converted_type(parquet::ConvertedType::INT_64);
-    }
+    parquet::SchemaElement& col_schema = file_metadata_.schema[i + 1];
+    const ColumnType& col_type = output_expr_evals_[i]->root().type();
+    col_schema.name = table_desc_->col_descs()[i + num_clustering_cols].name();
+    ParquetMetadataUtils::FillSchemaElement(col_type, state_->query_options(),
+                                            &col_schema);
   }
 
   return Status::OK();
