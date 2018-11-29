@@ -3663,34 +3663,32 @@ sudo pip-python install ssl</codeblock>
           you can create dynamic service pools, each with its own settings for the Impala admission control feature.
         </p>
       </note>
+      <!--The below note is not used anywhere. Should remove soon. AR-->
 
-      <note id="max_memory_default_limit_caveat"> If you specify <uicontrol>Max
-          Memory</uicontrol> for an Impala dynamic resource pool, you must also
-        specify the <uicontrol>Default Query Memory Limit</uicontrol>.
-          <uicontrol>Max Memory</uicontrol> relies on the <uicontrol>Default
-          Query Memory Limit</uicontrol> to produce a reliable estimate of
-        overall memory consumption for a query. </note>
-
-      <p id="admission_control_mem_limit_interaction">
-        For example, consider the following scenario:
-        <ul>
-          <li> The cluster is running <cmdname>impalad</cmdname> daemons on five
-            DataNodes. </li>
-          <li> A dynamic resource pool has <uicontrol>Max Memory</uicontrol> set
-            to 100 GB. </li>
-          <li> The <uicontrol>Default Query Memory Limit</uicontrol> for the
-            pool is 10 GB. Therefore, any query running in this pool could use
-            up to 50 GB of memory (default query memory limit * number of Impala
-            nodes). </li>
-          <li> The maximum number of queries that Impala executes concurrently
-            within this dynamic resource pool is two, which is the most that
-            could be accomodated within the 100 GB <uicontrol>Max
-              Memory</uicontrol> cluster-wide limit. </li>
-          <li> There is no memory penalty if queries use less memory than the
-              <uicontrol>Default Query Memory Limit</uicontrol> per-host setting
-            or the <uicontrol>Max Memory</uicontrol> cluster-wide limit. These
-            values are only used to estimate how many queries can be run
-            concurrently within the resource constraints for the pool. </li>
+      <note id="max_memory_default_limit_caveat"> If you specify Max Memory for
+        an Impala dynamic resource pool, you must also specify the Default Query
+        Memory Limit. Max Memory relies on the Default Query Memory Limit to
+        produce a reliable estimate of overall memory consumption for a query. </note>
+      <p id="admission_control_mem_limit_interaction"> For example, consider the
+        following scenario: <ul>
+          <li>The cluster is running <codeph>impalad</codeph> daemons on five
+            hosts.</li>
+          <li>A dynamic resource pool has Max Memory set to 100 GB.</li>
+          <li>The Maximum Query Memory Limit for the pool is 10 GB and Minimum
+            Query Memory Limit is 2 GB. Therefore, any query running in this
+            pool could use up to 50 GB of memory (Maximum Query Memory Limit *
+            number of Impala nodes).</li>
+          <li>Impala will execute varying numbers of queries concurrently
+            because queries may be given memory limits anywhere between 2 GB and
+            10 GB, depending on the estimated memory requirements. For example,
+            Impala may execute up to 10 small queries with 2 GB memory limits or
+            two large queries with 10 GB memory limits because that is what will
+            fit in the 100 GB cluster-wide limit when executing on five
+            hosts.</li>
+          <li>The executing queries may use less memory than the per-host memory
+            limit or the Max Memory cluster-wide limit if they do not need that
+            much memory. In general this is not a problem so long as you are
+            able to execute enough queries concurrently to meet your needs.</li>
         </ul>
       </p>
 
