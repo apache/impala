@@ -40,6 +40,16 @@ echo "Killing running services..."
 mkdir -p ${IMPALA_CLUSTER_LOGS_DIR}
 $IMPALA_HOME/testdata/bin/kill-all.sh &>${IMPALA_CLUSTER_LOGS_DIR}/kill-all.log
 
+# Detect if important configurations are missing and run create-test-configuration.sh
+# if necessary. This is not intended to be a perfect test, but it is enough to
+# detect that bin/clean.sh removed the configurations.
+pushd "${IMPALA_HOME}/fe/src/test/resources/"
+if [ ! -f core-site.xml ] || [ ! -f hbase-site.xml ] || [ ! -f hive-site.xml ]; then
+    echo "Configuration files missing, running bin/create-test-configuration.sh"
+    ${IMPALA_HOME}/bin/create-test-configuration.sh
+fi
+popd
+
 echo "Starting cluster services..."
 $IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER-} 2>&1 | \
     tee ${IMPALA_CLUSTER_LOGS_DIR}/run-mini-dfs.log
