@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import org.apache.impala.common.AnalysisException;
@@ -113,12 +114,7 @@ public class ToSqlTest extends FrontendTestBase {
         // Transform whitespace to single space.
         actual = actual.replace('\n', ' ').replaceAll(" +", " ").trim();
       }
-      if (!actual.equals(expected)) {
-        String msg = "\n<<< Expected(length:" + expected.length() + "): [" + expected
-            + "]\n>>> Actual(length:" + actual.length() + "): [" + actual + "]\n";
-        System.err.println(msg);
-        fail(msg);
-      }
+      assertEquals(expected, actual);
     } catch (Exception e) {
       e.printStackTrace();
       fail("Failed to analyze query: " + query + "\n" + e.getMessage());
@@ -205,13 +201,15 @@ public class ToSqlTest extends FrontendTestBase {
       String fqAlias = "functional." + tbl;
       boolean isCollectionTblRef = isCollectionTableRef(tbl);
       for (String col: columns) {
+        String quotedCol = ToSqlUtils.identSql(col);
         // Test implicit table aliases with unqualified and fully qualified
         // table/view names. Unqualified table/view names should be fully
         // qualified in the generated SQL (IMPALA-962).
         TblsTestToSql(String.format("select %s from $TBL", col), tblName,
-            String.format("SELECT %s FROM %s", col, fqAlias));
+            String.format("SELECT %s FROM %s", quotedCol, fqAlias));
         TblsTestToSql(String.format("select %s.%s from $TBL", uqAlias, col), tblName,
-            String.format("SELECT %s.%s FROM %s", uqAlias, col, fqAlias));
+            String.format("SELECT %s.%s FROM %s", uqAlias, quotedCol,
+            fqAlias));
         // Only references to base tables/views have a fully-qualified implicit alias.
         if (!isCollectionTblRef) {
           TblsTestToSql(String.format("select %s.%s from $TBL", fqAlias, col), tblName,
@@ -220,9 +218,9 @@ public class ToSqlTest extends FrontendTestBase {
 
         // Explicit table alias.
         TblsTestToSql(String.format("select %s from $TBL a", col), tblName,
-            String.format("SELECT %s FROM %s a", col, fqAlias));
+            String.format("SELECT %s FROM %s a", quotedCol, fqAlias));
         TblsTestToSql(String.format("select a.%s from $TBL a", col), tblName,
-            String.format("SELECT a.%s FROM %s a", col, fqAlias));
+            String.format("SELECT a.%s FROM %s a", quotedCol, fqAlias));
       }
     }
 
@@ -252,6 +250,7 @@ public class ToSqlTest extends FrontendTestBase {
     TableName tbl = new TableName("functional", "allcomplextypes");
 
     // Child table uses unqualified implicit alias of parent table.
+    childColumn = ToSqlUtils.identSql(childColumn);
     TblsTestToSql(
         String.format("select %s from $TBL, allcomplextypes.%s",
             childColumn, childTable), tbl,
@@ -443,7 +442,7 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql("alter view functional.complex_view (abc, xyz) as " +
         "select year, month from functional.alltypes_view", "default",
         "ALTER VIEW functional.complex_view(abc, xyz) AS " +
-        "SELECT year, month FROM functional.alltypes_view");
+        "SELECT `year`, `month` FROM functional.alltypes_view");
     testToSql("alter view functional.alltypes_view (cnt) as " +
         "select count(distinct x.int_col) from functional.alltypessmall x " +
         "inner join functional.alltypessmall y on (x.id = y.id) group by x.bigint_col",
@@ -602,8 +601,8 @@ public class ToSqlTest extends FrontendTestBase {
             "select int_col, bool_col, year, month from functional.alltypes",
           String.format(" %snoshuffle%s", prefix, suffix), loc),
           InjectInsertHint("INSERT%s INTO TABLE functional.alltypes(int_col, " +
-            "bool_col) PARTITION (year, month)%s " +
-            "SELECT int_col, bool_col, year, month FROM functional.alltypes",
+            "bool_col) PARTITION (`year`, `month`)%s " +
+            "SELECT int_col, bool_col, `year`, `month` FROM functional.alltypes",
             " \n-- +noshuffle\n", loc));
       testToSql(InjectInsertHint(
             "insert%s into functional.alltypes(int_col, bool_col) " +
@@ -611,8 +610,8 @@ public class ToSqlTest extends FrontendTestBase {
             "select int_col, bool_col, year, month from functional.alltypes",
           String.format(" %sshuffle,clustered%s", prefix, suffix), loc),
           InjectInsertHint("INSERT%s INTO TABLE functional.alltypes(int_col, " +
-            "bool_col) PARTITION (year, month)%s " +
-            "SELECT int_col, bool_col, year, month FROM functional.alltypes",
+            "bool_col) PARTITION (`year`, `month`)%s " +
+            "SELECT int_col, bool_col, `year`, `month` FROM functional.alltypes",
             " \n-- +shuffle,clustered\n", loc));
 
       // Upsert hint.
@@ -835,9 +834,9 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql("values(1, 'a'), (2, 'b') union all values(3, 'c')",
         "VALUES((1, 'a'), (2, 'b')) UNION ALL (VALUES(3, 'c'))");
     testToSql("insert into table functional.alltypessmall " +
-        "partition (year=2009, month=4) " +
+        "partition (`year`=2009, `month`=4) " +
         "values(1, true, 1, 1, 10, 10, 10.0, 10.0, 'a', 'a', cast (0 as timestamp))",
-        "INSERT INTO TABLE functional.alltypessmall PARTITION (year=2009, month=4) " +
+        "INSERT INTO TABLE functional.alltypessmall PARTITION (`year`=2009, `month`=4) " +
         "VALUES(1, TRUE, 1, 1, 10, 10, 10.0, 10.0, 'a', 'a', CAST(0 AS TIMESTAMP))");
     testToSql("upsert into table functional_kudu.testtbl values(1, 'a', 1)",
         "UPSERT INTO TABLE functional_kudu.testtbl VALUES(1, 'a', 1)");
@@ -925,8 +924,8 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql(
         "select key, item from functional.allcomplextypes t, " +
         "(select a1.key, value.item from t.array_map_col a1, a1.value) v",
-        "SELECT key, item FROM functional.allcomplextypes t, " +
-        "(SELECT a1.key, value.item FROM t.array_map_col a1, a1.value) v");
+        "SELECT `key`, item FROM functional.allcomplextypes t, " +
+        "(SELECT a1.`key`, value.item FROM t.array_map_col a1, a1.value) v");
     // Correlated table refs in a union.
     testToSql(
         "select item from functional.allcomplextypes t, " +
@@ -939,7 +938,7 @@ public class ToSqlTest extends FrontendTestBase {
         "(select count(a1.key) c from t.array_map_col a1) v1) " +
         "select * from w",
         "WITH w AS (SELECT c FROM functional.allcomplextypes t, " +
-        "(SELECT count(a1.key) c FROM t.array_map_col a1) v1) " +
+        "(SELECT count(a1.`key`) c FROM t.array_map_col a1) v1) " +
         "SELECT * FROM w");
   }
 
@@ -1077,7 +1076,7 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql("with t1 as (select * from functional.alltypes) " +
             "insert into functional.alltypes partition(year, month) select * from t1",
         "WITH t1 AS (SELECT * FROM functional.alltypes) " +
-        "INSERT INTO TABLE functional.alltypes PARTITION (year, month) " +
+        "INSERT INTO TABLE functional.alltypes PARTITION (`year`, `month`) " +
             "SELECT * FROM t1");
     // WITH clause in upsert stmt.
     testToSql("with t1 as (select * from functional.alltypes) upsert into " +
@@ -1146,7 +1145,7 @@ public class ToSqlTest extends FrontendTestBase {
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes",
         "INSERT INTO TABLE functional.alltypessmall " +
-        "PARTITION (year=2009, month=4) SELECT id, " +
+        "PARTITION (`year`=2009, `month`=4) SELECT id, " +
         "bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, " +
         "double_col, date_string_col, string_col, timestamp_col " +
         "FROM functional.alltypes");
@@ -1157,9 +1156,9 @@ public class ToSqlTest extends FrontendTestBase {
         "float_col, double_col, date_string_col, string_col, timestamp_col, year, " +
         "month from functional.alltypes",
         "INSERT INTO TABLE functional.alltypessmall " +
-        "PARTITION (year, month) SELECT id, bool_col, " +
+        "PARTITION (`year`, `month`) SELECT id, bool_col, " +
         "tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, " +
-        "date_string_col, string_col, timestamp_col, year, month " +
+        "date_string_col, string_col, timestamp_col, `year`, `month` " +
         "FROM functional.alltypes");
     // Partially dynamic partitions.
     testToSql("insert into table functional.alltypessmall " +
@@ -1168,9 +1167,9 @@ public class ToSqlTest extends FrontendTestBase {
         "float_col, double_col, date_string_col, string_col, timestamp_col, month " +
         "from functional.alltypes",
         "INSERT INTO TABLE functional.alltypessmall " +
-        "PARTITION (year=2009, month) SELECT id, " +
+        "PARTITION (`year`=2009, `month`) SELECT id, " +
         "bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, " +
-        "double_col, date_string_col, string_col, timestamp_col, month " +
+        "double_col, date_string_col, string_col, timestamp_col, `month` " +
         "FROM functional.alltypes");
 
     // Permutations
@@ -1182,7 +1181,7 @@ public class ToSqlTest extends FrontendTestBase {
     // Permutations that mention partition column
     testToSql("insert into table functional.alltypes(id, year, month) " +
         " values(1, 1990, 12)",
-        "INSERT INTO TABLE functional.alltypes(id, year, month) " +
+        "INSERT INTO TABLE functional.alltypes(id, `year`, `month`) " +
         "VALUES(1, 1990, 12)");
 
     // Empty permutation with no select statement
@@ -1193,7 +1192,7 @@ public class ToSqlTest extends FrontendTestBase {
     testToSql("insert into table functional.alltypes(id) " +
         " partition (year=2009, month) values(1, 12)",
         "INSERT INTO TABLE functional.alltypes(id) " +
-        "PARTITION (year=2009, month) VALUES(1, 12)");
+        "PARTITION (`year`=2009, `month`) VALUES(1, 12)");
   }
 
   @Test

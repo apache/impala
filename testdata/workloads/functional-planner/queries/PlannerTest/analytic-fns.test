@@ -2170,7 +2170,7 @@ PLAN-ROOT SINK
 |
 02:ANALYTIC
 |  functions: sum(int_col)
-|  partition by: year
+|  partition by: `year`
 |  order by: id ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  row-size=20B cardinality=3.65K
@@ -2205,7 +2205,7 @@ PLAN-ROOT SINK
 |
 08:ANALYTIC
 |  functions: sum(int_col)
-|  partition by: year, tinyint_col
+|  partition by: `year`, tinyint_col
 |  row-size=42B cardinality=3.65K
 |
 07:SORT
@@ -2214,7 +2214,7 @@ PLAN-ROOT SINK
 |
 06:ANALYTIC
 |  functions: last_value(int_col)
-|  partition by: int_col, year
+|  partition by: int_col, `year`
 |  order by: id ASC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |  row-size=34B cardinality=3.65K
@@ -2225,7 +2225,7 @@ PLAN-ROOT SINK
 |
 04:ANALYTIC
 |  functions: avg(int_col)
-|  partition by: tinyint_col, id, year
+|  partition by: tinyint_col, id, `year`
 |  order by: bigint_col ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  row-size=30B cardinality=3.65K
@@ -2236,7 +2236,7 @@ PLAN-ROOT SINK
 |
 02:ANALYTIC
 |  functions: last_value(tinyint_col)
-|  partition by: id, year
+|  partition by: id, `year`
 |  order by: int_col ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
 |  row-size=22B cardinality=3.65K
@@ -2279,7 +2279,7 @@ PLAN-ROOT SINK
 |
 04:ANALYTIC
 |  functions: avg(int_col)
-|  partition by: year
+|  partition by: `year`
 |  order by: bigint_col ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  row-size=33B cardinality=7.30K
@@ -2290,7 +2290,7 @@ PLAN-ROOT SINK
 |
 02:ANALYTIC
 |  functions: sum(int_col)
-|  partition by: year, tinyint_col
+|  partition by: `year`, tinyint_col
 |  order by: bigint_col ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  row-size=25B cardinality=7.30K
@@ -2319,7 +2319,7 @@ PLAN-ROOT SINK
 |
 02:ANALYTIC
 |  functions: sum(id)
-|  partition by: month, tinyint_col
+|  partition by: `month`, tinyint_col
 |  order by: bigint_col ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  row-size=29B cardinality=1

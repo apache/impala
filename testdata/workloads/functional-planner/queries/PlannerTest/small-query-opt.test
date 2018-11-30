@@ -325,7 +325,7 @@ PLAN-ROOT SINK
 |  row-size=5B cardinality=6
 |
 |--05:SCAN HDFS [functional.alltypestiny c]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=5B cardinality=2
 |
@@ -337,12 +337,12 @@ PLAN-ROOT SINK
 |  row-size=5B cardinality=4
 |
 |--02:SCAN HDFS [functional.alltypestiny b]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=5B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny a]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=5B cardinality=2
 ====

@@ -130,7 +130,7 @@ select count(year) from functional_parquet.alltypes
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: count(year)
+|  output: count(`year`)
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
@@ -144,7 +144,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
-|  group by: month, year
+|  group by: `month`, `year`
 |  row-size=16B cardinality=24
 |
 00:SCAN HDFS [functional_parquet.alltypes]
@@ -158,7 +158,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  group by: tinyint_col, year
+|  group by: tinyint_col, `year`
 |  row-size=13B cardinality=unavailable
 |
 00:SCAN HDFS [functional_parquet.alltypes]
@@ -171,7 +171,7 @@ select avg(year), count(*) from functional_parquet.alltypes
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: avg(year), count(*)
+|  output: avg(`year`), count(*)
 |  row-size=16B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
@@ -241,7 +241,7 @@ PLAN-ROOT SINK
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
-|  |  group by: year
+|  |  group by: `year`
 |  |  row-size=12B cardinality=2
 |  |
 |  01:SCAN HDFS [functional_parquet.alltypes]
@@ -283,7 +283,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partition predicates: year < 2010, month > 8
+   partition predicates: `year` < 2010, `month` > 8
    partitions=4/24 files=4 size=31.40KB
    row-size=8B cardinality=unavailable
 ====
@@ -297,7 +297,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partition predicates: year < 2010
+   partition predicates: `year` < 2010
    partitions=12/24 files=12 size=94.74KB
    predicates: tinyint_col > 8
    row-size=1B cardinality=unavailable
@@ -365,7 +365,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=0
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partition predicates: year = -1
+   partition predicates: `year` = -1
    partitions=0/24 files=0 size=0B
    row-size=0B cardinality=0
 ====
@@ -413,11 +413,11 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
-|  group by: year
+|  group by: `year`
 |  row-size=12B cardinality=2
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partition predicates: month = 1
+   partition predicates: `month` = 1
    partitions=2/24 files=2 size=16.06KB
    row-size=12B cardinality=unavailable
 ====

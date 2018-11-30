@@ -17,7 +17,9 @@
 
 package org.apache.impala.util;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.apache.impala.common.PrintUtils;
 import org.junit.Test;
@@ -96,14 +98,14 @@ public class PrintUtilsTest {
         "Analyzed query: SELECT * FROM functional_kudu.alltypestiny\n"
             + "WHERE CAST(bigint_col AS DOUBLE) < CAST(10 AS DOUBLE)");
     // Simple query with a hint retains newlines surrounding hint.
-    assertWrap("SELECT \n"
+    assertWrap("SELECT\n"
             + "-- +straight_join\n"
-            + " * FROM tpch_parquet.orders INNER JOIN \n"
+            + " * FROM tpch_parquet.orders INNER JOIN\n"
             + "-- +shuffle\n"
             + " tpch_parquet.customer ON o_custkey = c_custkey",
-        "SELECT \n"
+        "SELECT\n"
             + "-- +straight_join\n"
-            + "* FROM tpch_parquet.orders INNER JOIN \n"
+            + "* FROM tpch_parquet.orders INNER JOIN\n"
             + "-- +shuffle\n"
             + "tpch_parquet.customer ON o_custkey = c_custkey");
     // test that a long string of blanks prints OK, some may be lost for clarity
@@ -152,7 +154,7 @@ public class PrintUtilsTest {
   }
 
   /**
-   * Assert that there are no blank liones embedded in the wrapped output.
+   * Assert that there are no blank lines embedded in the wrapped output.
    */
   private void assertNoBlankLines(String s) {
     assertFalse("output contains blank line " + s, s.contains("\n\n"));

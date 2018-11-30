@@ -5,7 +5,7 @@ where cast(year as string) = '2019-01-01'
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: CAST(year AS STRING) = '2019-01-01'
+   partition predicates: CAST(`year` AS STRING) = '2019-01-01'
    partitions=0/24 files=0 size=0B
    row-size=89B cardinality=0
 ---- DISTRIBUTEDPLAN
@@ -14,7 +14,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: CAST(year AS STRING) = '2019-01-01'
+   partition predicates: CAST(`year` AS STRING) = '2019-01-01'
    partitions=0/24 files=0 size=0B
    row-size=89B cardinality=0
 ====
@@ -106,7 +106,7 @@ select id, month from functional.alltypes where year = 2009
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009
+   partition predicates: `year` = 2009
    partitions=12/24 files=12 size=238.68KB
    row-size=8B cardinality=3.65K
 ---- SCANRANGELOCATIONS
@@ -129,7 +129,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009
+   partition predicates: `year` = 2009
    partitions=12/24 files=12 size=238.68KB
    row-size=8B cardinality=3.65K
 ====
@@ -139,7 +139,7 @@ select * from functional.alltypes where year = 2009.0
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009.0
+   partition predicates: `year` = 2009.0
    partitions=12/24 files=12 size=238.68KB
    row-size=89B cardinality=3.65K
 ====
@@ -148,7 +148,7 @@ select * from functional.alltypes where 2009 = year
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009
+   partition predicates: `year` = 2009
    partitions=12/24 files=12 size=238.68KB
    row-size=89B cardinality=3.65K
 ====
@@ -157,7 +157,7 @@ select * from functional.alltypes where 2009 <=> year
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year IS NOT DISTINCT FROM 2009
+   partition predicates: `year` IS NOT DISTINCT FROM 2009
    partitions=12/24 files=12 size=238.68KB
    row-size=89B cardinality=3.65K
 ====
@@ -167,7 +167,7 @@ select * from functional.alltypes where !(month > 2)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (month > 2)
+   partition predicates: NOT (`month` > 2)
    partitions=4/24 files=4 size=76.83KB
    row-size=89B cardinality=1.18K
 ====
@@ -177,7 +177,7 @@ select * from functional.alltypes where !(!(month=1))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (NOT (month = 1))
+   partition predicates: NOT (NOT (`month` = 1))
    partitions=2/24 files=2 size=40.32KB
    row-size=89B cardinality=620
 ====
@@ -186,7 +186,7 @@ select * from functional.alltypes where !(!(month<=>1))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (NOT (month IS NOT DISTINCT FROM 1))
+   partition predicates: NOT (NOT (`month` IS NOT DISTINCT FROM 1))
    partitions=2/24 files=2 size=40.32KB
    row-size=89B cardinality=620
 ====
@@ -196,7 +196,7 @@ select * from functional.alltypes where year=2009 and !(month < 6)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, NOT (month < 6)
+   partition predicates: `year` = 2009, NOT (`month` < 6)
    partitions=7/24 files=7 size=140.58KB
    row-size=89B cardinality=2.14K
 ====
@@ -206,7 +206,7 @@ select * from functional.alltypes where !(year < 2009) and !(month < 6)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (year < 2009), NOT (month < 6)
+   partition predicates: NOT (`year` < 2009), NOT (`month` < 6)
    partitions=14/24 files=14 size=281.15KB
    row-size=89B cardinality=4.28K
 ====
@@ -216,7 +216,7 @@ select * from functional.alltypes where !(year = 2009 and month > 6)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (year = 2009 AND month > 6)
+   partition predicates: NOT (`year` = 2009 AND `month` > 6)
    partitions=18/24 files=18 size=357.58KB
    row-size=89B cardinality=5.46K
 ====
@@ -225,7 +225,7 @@ select * from functional.alltypes where !(year <=> 2009 and month > 6)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (year IS NOT DISTINCT FROM 2009 AND month > 6)
+   partition predicates: NOT (`year` IS NOT DISTINCT FROM 2009 AND `month` > 6)
    partitions=18/24 files=18 size=357.58KB
    row-size=89B cardinality=5.46K
 ====
@@ -234,7 +234,7 @@ select * from functional.alltypes where !(year <=> 2009) or !(month > 6)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (year IS NOT DISTINCT FROM 2009) OR NOT (month > 6)
+   partition predicates: NOT (`year` IS NOT DISTINCT FROM 2009) OR NOT (`month` > 6)
    partitions=18/24 files=18 size=357.58KB
    row-size=89B cardinality=5.46K
 ====
@@ -244,7 +244,7 @@ select * from functional.alltypes where !(month = 6 or month = 8)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT month IN (6, 8)
+   partition predicates: NOT `month` IN (6, 8)
    partitions=20/24 files=20 size=398.31KB
    row-size=89B cardinality=6.08K
 ====
@@ -253,7 +253,7 @@ select * from functional.alltypes where !(month <=> 6 or month <=> 8)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (month IS NOT DISTINCT FROM 6 OR month IS NOT DISTINCT FROM 8)
+   partition predicates: NOT (`month` IS NOT DISTINCT FROM 6 OR `month` IS NOT DISTINCT FROM 8)
    partitions=20/24 files=20 size=398.31KB
    row-size=89B cardinality=6.08K
 ====
@@ -263,7 +263,7 @@ select * from functional.alltypes where not (year = 2009 or month is null)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (year = 2009 OR month IS NULL)
+   partition predicates: NOT (`year` = 2009 OR `month` IS NULL)
    partitions=12/24 files=12 size=239.77KB
    row-size=89B cardinality=3.65K
 ====
@@ -273,7 +273,7 @@ select * from functional.alltypes where not (year = 2009 or month <=> null)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (year = 2009 OR month IS NOT DISTINCT FROM NULL)
+   partition predicates: NOT (`year` = 2009 OR `month` IS NOT DISTINCT FROM NULL)
    partitions=12/24 files=12 size=239.77KB
    row-size=89B cardinality=3.65K
 ====
@@ -283,7 +283,7 @@ select * from functional.alltypes where not (not (month is null))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (NOT (month IS NULL))
+   partition predicates: NOT (NOT (`month` IS NULL))
    partitions=0/24 files=0 size=0B
    row-size=89B cardinality=0
 ====
@@ -293,7 +293,7 @@ select * from functional.alltypes where not (not (month <=> null))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (NOT (month IS NOT DISTINCT FROM NULL))
+   partition predicates: NOT (NOT (`month` IS NOT DISTINCT FROM NULL))
    partitions=0/24 files=0 size=0B
    row-size=89B cardinality=0
 ====
@@ -303,7 +303,7 @@ select * from functional.alltypes where not (not (month is null or year = 2009))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (NOT (month IS NULL OR year = 2009))
+   partition predicates: NOT (NOT (`month` IS NULL OR `year` = 2009))
    partitions=12/24 files=12 size=238.68KB
    row-size=89B cardinality=3.65K
 ====
@@ -313,7 +313,7 @@ select * from functional.alltypes where not (not (month <=> null or year = 2009)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: NOT (NOT (month IS NOT DISTINCT FROM NULL OR year = 2009))
+   partition predicates: NOT (NOT (`month` IS NOT DISTINCT FROM NULL OR `year` = 2009))
    partitions=12/24 files=12 size=238.68KB
    row-size=89B cardinality=3.65K
 ====
@@ -323,7 +323,7 @@ select * from functional.alltypes where month=1
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: month = 1
+   partition predicates: `month` = 1
    partitions=2/24 files=2 size=40.32KB
    row-size=89B cardinality=620
 ====
@@ -333,7 +333,7 @@ select * from functional.alltypes where year=2009 and month=1
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/24 files=1 size=19.95KB
    row-size=89B cardinality=310
 ====
@@ -343,7 +343,7 @@ select * from functional.alltypes where year=2009 and month > 6
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 6
+   partition predicates: `year` = 2009, `month` > 6
    partitions=6/24 files=6 size=120.87KB
    row-size=89B cardinality=1.84K
 ====
@@ -352,7 +352,7 @@ select * from functional.alltypes where year=2009 and month < 6
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month < 6
+   partition predicates: `year` = 2009, `month` < 6
    partitions=5/24 files=5 size=98.11KB
    row-size=89B cardinality=1.51K
 ====
@@ -361,7 +361,7 @@ select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month IN (1, 3, 5, 7)
+   partition predicates: `year` = 2009, `month` IN (1, 3, 5, 7)
    partitions=4/24 files=4 size=80.74KB
    row-size=89B cardinality=1.24K
 ====
@@ -370,7 +370,7 @@ select * from functional.alltypes where year<=>2009 and month in (1, 3, 5, 7)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year IS NOT DISTINCT FROM 2009, month IN (1, 3, 5, 7)
+   partition predicates: `year` IS NOT DISTINCT FROM 2009, `month` IN (1, 3, 5, 7)
    partitions=4/24 files=4 size=80.74KB
    row-size=89B cardinality=1.24K
 ====
@@ -381,7 +381,7 @@ where year=2009 and month in (1, 3, 5, 7) and month is not null
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month IN (1, 3, 5, 7), month IS NOT NULL
+   partition predicates: `year` = 2009, `month` IN (1, 3, 5, 7), `month` IS NOT NULL
    partitions=4/24 files=4 size=80.74KB
    row-size=89B cardinality=1.24K
 ====
@@ -392,7 +392,7 @@ where year=2009 and month in (1, 3, 5, 7) and month is null
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month IN (1, 3, 5, 7), month IS NULL
+   partition predicates: `year` = 2009, `month` IN (1, 3, 5, 7), `month` IS NULL
    partitions=0/24 files=0 size=0B
    row-size=89B cardinality=0
 ====
@@ -401,7 +401,7 @@ select * from functional.alltypes where year=2009 and (month in (1, 3, 5) or mon
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month IN (1, 3, 5, 7)
+   partition predicates: `year` = 2009, `month` IN (1, 3, 5, 7)
    partitions=4/24 files=4 size=80.74KB
    row-size=89B cardinality=1.24K
 ====
@@ -411,7 +411,7 @@ select * from functional.alltypes where year<=2009 and month < 6
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year <= 2009, month < 6
+   partition predicates: `year` <= 2009, `month` < 6
    partitions=5/24 files=5 size=98.11KB
    row-size=89B cardinality=1.51K
 ====
@@ -421,7 +421,7 @@ select * from functional.alltypes where month < 9 and month > 6
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: month < 9, month > 6
+   partition predicates: `month` < 9, `month` > 6
    partitions=4/24 files=4 size=81.46KB
    row-size=89B cardinality=1.24K
 ====
@@ -431,7 +431,7 @@ select * from functional.alltypes where year < 2010 and year < 2009 and month > 
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year < 2010, year < 2009, month > 6
+   partition predicates: `year` < 2010, `year` < 2009, `month` > 6
    partitions=0/24 files=0 size=0B
    row-size=89B cardinality=0
 ====
@@ -442,7 +442,7 @@ where year < 2010 and (month > 6 or month = 1 or month in (3, 4))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year < 2010, (month > 6 OR month = 1 OR month IN (3, 4))
+   partition predicates: `year` < 2010, (`month` > 6 OR `month` = 1 OR `month` IN (3, 4))
    partitions=9/24 files=9 size=180.49KB
    row-size=89B cardinality=2.76K
 ====
@@ -453,7 +453,7 @@ where year < 2010 and (month > 6 or month <=> 1 or month in (3, 4))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year < 2010, (month > 6 OR month IS NOT DISTINCT FROM 1 OR month IN (3, 4))
+   partition predicates: `year` < 2010, (`month` > 6 OR `month` IS NOT DISTINCT FROM 1 OR `month` IN (3, 4))
    partitions=9/24 files=9 size=180.49KB
    row-size=89B cardinality=2.76K
 ====
@@ -463,7 +463,7 @@ select * from functional.alltypes where year = 2009 and month between 6 and 8
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month >= 6, month <= 8
+   partition predicates: `year` = 2009, `month` >= 6, `month` <= 8
    partitions=3/24 files=3 size=60.43KB
    row-size=89B cardinality=920
 ====
@@ -473,7 +473,7 @@ select * from functional.alltypes where year <=> 2009 and month between 6 and 8
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year IS NOT DISTINCT FROM 2009, month >= 6, month <= 8
+   partition predicates: `year` IS NOT DISTINCT FROM 2009, `month` >= 6, `month` <= 8
    partitions=3/24 files=3 size=60.43KB
    row-size=89B cardinality=920
 ====
@@ -484,7 +484,7 @@ where year between 2009 and 2009 and month between 6 and 8
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year >= 2009, year <= 2009, month >= 6, month <= 8
+   partition predicates: `year` >= 2009, `year` <= 2009, `month` >= 6, `month` <= 8
    partitions=3/24 files=3 size=60.43KB
    row-size=89B cardinality=920
 ====
@@ -495,7 +495,7 @@ where year = 2009 and (month between 6 and 7 or month between 7 and 8)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, (month >= 6 AND month <= 7 OR month >= 7 AND month <= 8)
+   partition predicates: `year` = 2009, (`month` >= 6 AND `month` <= 7 OR `month` >= 7 AND `month` <= 8)
    partitions=3/24 files=3 size=60.43KB
    row-size=89B cardinality=920
 ---- SCANRANGELOCATIONS
@@ -511,7 +511,7 @@ where year = 2009 and (month between 5+1 and 8-1 or month between 9-2 and 1+7)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, (month >= 6 AND month <= 7 OR month >= 7 AND month <= 8)
+   partition predicates: `year` = 2009, (`month` >= 6 AND `month` <= 7 OR `month` >= 7 AND `month` <= 8)
    partitions=3/24 files=3 size=60.43KB
    row-size=89B cardinality=920
 ---- SCANRANGELOCATIONS
@@ -526,7 +526,7 @@ select * from functional.alltypes where year - 1 = 2009
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year - 1 = 2009
+   partition predicates: `year` - 1 = 2009
    partitions=12/24 files=12 size=239.77KB
    row-size=89B cardinality=3.65K
 ====
@@ -535,7 +535,7 @@ select * from functional.alltypes where year - 1 <=> 2009
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year - 1 IS NOT DISTINCT FROM 2009
+   partition predicates: `year` - 1 IS NOT DISTINCT FROM 2009
    partitions=12/24 files=12 size=239.77KB
    row-size=89B cardinality=3.65K
 ====
@@ -546,7 +546,7 @@ select * from functional.alltypesagg where day is null
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day IS NULL
+   partition predicates: `day` IS NULL
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -556,7 +556,7 @@ select * from functional.alltypesagg where day <=> null
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day IS NOT DISTINCT FROM NULL
+   partition predicates: `day` IS NOT DISTINCT FROM NULL
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -566,7 +566,7 @@ select * from functional.alltypesagg where day is not null
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day IS NOT NULL
+   partition predicates: `day` IS NOT NULL
    partitions=10/11 files=10 size=743.67KB
    row-size=95B cardinality=10.00K
 ====
@@ -576,7 +576,7 @@ select * from functional.alltypesagg where day is distinct from null
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day IS DISTINCT FROM NULL
+   partition predicates: `day` IS DISTINCT FROM NULL
    partitions=10/11 files=10 size=743.67KB
    row-size=95B cardinality=10.00K
 ====
@@ -585,7 +585,7 @@ select * from functional.alltypesagg where day = day
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day = day
+   partition predicates: `day` = `day`
    partitions=10/11 files=10 size=743.67KB
    row-size=95B cardinality=10.00K
 ====
@@ -617,7 +617,7 @@ select * from functional.alltypesagg where day is null and month = 1
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day IS NULL, month = 1
+   partition predicates: `day` IS NULL, `month` = 1
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -627,7 +627,7 @@ select * from functional.alltypesagg where day <=> null and month = 1
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day IS NOT DISTINCT FROM NULL, month = 1
+   partition predicates: `day` IS NOT DISTINCT FROM NULL, `month` = 1
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -637,7 +637,7 @@ select * from functional.alltypesagg where month = 1 and (day is null or day = 1
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: month = 1, (day IS NULL OR day = 10)
+   partition predicates: `month` = 1, (`day` IS NULL OR `day` = 10)
    partitions=2/11 files=2 size=145.53KB
    row-size=95B cardinality=2.00K
 ====
@@ -647,7 +647,7 @@ select * from functional.alltypesagg where month = 1 and (day <=> null or day = 
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: month = 1, (day IS NOT DISTINCT FROM NULL OR day = 10)
+   partition predicates: `month` = 1, (`day` IS NOT DISTINCT FROM NULL OR `day` = 10)
    partitions=2/11 files=2 size=145.53KB
    row-size=95B cardinality=2.00K
 ====
@@ -657,7 +657,7 @@ select * from functional.alltypesagg where month = 1 and (day is null or year = 
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: month = 1, (day IS NULL OR year = 2010)
+   partition predicates: `month` = 1, (`day` IS NULL OR `year` = 2010)
    partitions=11/11 files=11 size=814.73KB
    row-size=95B cardinality=11.00K
 ====
@@ -667,7 +667,7 @@ select * from functional.alltypesagg where month = 1 and (day <=> null or year =
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: month = 1, (day IS NOT DISTINCT FROM NULL OR year = 2010)
+   partition predicates: `month` = 1, (`day` IS NOT DISTINCT FROM NULL OR `year` = 2010)
    partitions=11/11 files=11 size=814.73KB
    row-size=95B cardinality=11.00K
 ====
@@ -678,7 +678,7 @@ where (year = 2010 or month = 1) and (day is not null or day = 10)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: (year = 2010 OR month = 1), (day IS NOT NULL OR day = 10)
+   partition predicates: (`year` = 2010 OR `month` = 1), (`day` IS NOT NULL OR `day` = 10)
    partitions=10/11 files=10 size=743.67KB
    row-size=95B cardinality=10.00K
 ====
@@ -689,7 +689,7 @@ where (year = 2010 or month = 1) and (day is distinct from null or day = 10)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: (year = 2010 OR month = 1), (day IS DISTINCT FROM NULL OR day = 10)
+   partition predicates: (`year` = 2010 OR `month` = 1), (`day` IS DISTINCT FROM NULL OR `day` = 10)
    partitions=10/11 files=10 size=743.67KB
    row-size=95B cardinality=10.00K
 ====
@@ -699,7 +699,7 @@ select * from functional.alltypesagg where day is null or month = 1
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day IS NULL OR month = 1
+   partition predicates: `day` IS NULL OR `month` = 1
    partitions=11/11 files=11 size=814.73KB
    row-size=95B cardinality=11.00K
 ====
@@ -709,7 +709,7 @@ select * from functional.alltypesagg where day <=> null or month = 1
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day IS NOT DISTINCT FROM NULL OR month = 1
+   partition predicates: `day` IS NOT DISTINCT FROM NULL OR `month` = 1
    partitions=11/11 files=11 size=814.73KB
    row-size=95B cardinality=11.00K
 ====
@@ -719,7 +719,7 @@ select * from functional.alltypesagg where day is null or day = 10
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day IS NULL OR day = 10
+   partition predicates: `day` IS NULL OR `day` = 10
    partitions=2/11 files=2 size=145.53KB
    row-size=95B cardinality=2.00K
 ====
@@ -729,7 +729,7 @@ select * from functional.alltypesagg where day <=> null or day = 10
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day IS NOT DISTINCT FROM NULL OR day = 10
+   partition predicates: `day` IS NOT DISTINCT FROM NULL OR `day` = 10
    partitions=2/11 files=2 size=145.53KB
    row-size=95B cardinality=2.00K
 ====
@@ -739,7 +739,7 @@ select * from functional.alltypesagg where day = 10 or (day is null and year = 2
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day = 10 OR (day IS NULL AND year = 2010)
+   partition predicates: `day` = 10 OR (`day` IS NULL AND `year` = 2010)
    partitions=2/11 files=2 size=145.53KB
    row-size=95B cardinality=2.00K
 ====
@@ -749,7 +749,7 @@ select * from functional.alltypesagg where day = 10 or (day <=> null and year = 
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day = 10 OR (day IS NOT DISTINCT FROM NULL AND year = 2010)
+   partition predicates: `day` = 10 OR (`day` IS NOT DISTINCT FROM NULL AND `year` = 2010)
    partitions=2/11 files=2 size=145.53KB
    row-size=95B cardinality=2.00K
 ====
@@ -760,7 +760,7 @@ where (month = 1 and day = 1) or (day is null and year = 2010)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: (month = 1 AND day = 1) OR (day IS NULL AND year = 2010)
+   partition predicates: (`month` = 1 AND `day` = 1) OR (`day` IS NULL AND `year` = 2010)
    partitions=2/11 files=2 size=144.45KB
    row-size=95B cardinality=2.00K
 ====
@@ -771,7 +771,7 @@ where (month = 1 and day = 1) or (day <=> null and year = 2010)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: (month = 1 AND day = 1) OR (day IS NOT DISTINCT FROM NULL AND year = 2010)
+   partition predicates: (`month` = 1 AND `day` = 1) OR (`day` IS NOT DISTINCT FROM NULL AND `year` = 2010)
    partitions=2/11 files=2 size=144.45KB
    row-size=95B cardinality=2.00K
 ====
@@ -781,7 +781,7 @@ select * from functional.alltypesagg where not (day is not null)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (day IS NOT NULL)
+   partition predicates: NOT (`day` IS NOT NULL)
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -791,7 +791,7 @@ select * from functional.alltypesagg where not (day is distinct from null)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (day IS DISTINCT FROM NULL)
+   partition predicates: NOT (`day` IS DISTINCT FROM NULL)
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -801,7 +801,7 @@ select * from functional.alltypesagg where not (not (day is null))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (NOT (day IS NULL))
+   partition predicates: NOT (NOT (`day` IS NULL))
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -811,7 +811,7 @@ select * from functional.alltypesagg where not (not (day <=> null))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (NOT (day IS NOT DISTINCT FROM NULL))
+   partition predicates: NOT (NOT (`day` IS NOT DISTINCT FROM NULL))
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -821,7 +821,7 @@ select * from functional.alltypesagg where not (day is not null and month = 1)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (day IS NOT NULL AND month = 1)
+   partition predicates: NOT (`day` IS NOT NULL AND `month` = 1)
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -831,7 +831,7 @@ select * from functional.alltypesagg where not (day is distinct from null and mo
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (day IS DISTINCT FROM NULL AND month = 1)
+   partition predicates: NOT (`day` IS DISTINCT FROM NULL AND `month` = 1)
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -841,7 +841,7 @@ select * from functional.alltypesagg where not (day is not null or day < 9)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (day IS NOT NULL OR day < 9)
+   partition predicates: NOT (`day` IS NOT NULL OR `day` < 9)
    partitions=0/11 files=0 size=0B
    row-size=95B cardinality=0
 ====
@@ -851,7 +851,7 @@ select * from functional.alltypesagg where not (day is distinct from null or day
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (day IS DISTINCT FROM NULL OR day < 9)
+   partition predicates: NOT (`day` IS DISTINCT FROM NULL OR `day` < 9)
    partitions=0/11 files=0 size=0B
    row-size=95B cardinality=0
 ====
@@ -862,7 +862,7 @@ where not (day is not null and (not (day < 9 and month = 1)))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (day IS NOT NULL AND (NOT (day < 9 AND month = 1)))
+   partition predicates: NOT (`day` IS NOT NULL AND (NOT (`day` < 9 AND `month` = 1)))
    partitions=9/11 files=9 size=665.77KB
    row-size=95B cardinality=9.00K
 ====
@@ -873,7 +873,7 @@ where not (day is distinct from null and (not (day < 9 and month = 1)))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (day IS DISTINCT FROM NULL AND (NOT (day < 9 AND month = 1)))
+   partition predicates: NOT (`day` IS DISTINCT FROM NULL AND (NOT (`day` < 9 AND `month` = 1)))
    partitions=9/11 files=9 size=665.77KB
    row-size=95B cardinality=9.00K
 ====
@@ -884,7 +884,7 @@ where not (day is not null or (day = 1 and (not (month = 1 or year = 2010))))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (day IS NOT NULL OR (day = 1 AND (NOT (month = 1 OR year = 2010))))
+   partition predicates: NOT (`day` IS NOT NULL OR (`day` = 1 AND (NOT (`month` = 1 OR `year` = 2010))))
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -895,7 +895,7 @@ where not (day is distinct from null or (day = 1 and (not (month = 1 or year = 2
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: NOT (day IS DISTINCT FROM NULL OR (day = 1 AND (NOT (month = 1 OR year = 2010))))
+   partition predicates: NOT (`day` IS DISTINCT FROM NULL OR (`day` = 1 AND (NOT (`month` = 1 OR `year` = 2010))))
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -906,7 +906,7 @@ where year + 1 = 2011 and month + 1 <= 3 and day is null
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: year + 1 = 2011, month + 1 <= 3, day IS NULL
+   partition predicates: `year` + 1 = 2011, `month` + 1 <= 3, `day` IS NULL
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -917,7 +917,7 @@ where year + 1 = 2011 and month + 1 <= 3 and day <=> null
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: year + 1 = 2011, month + 1 <= 3, day IS NOT DISTINCT FROM NULL
+   partition predicates: `year` + 1 = 2011, `month` + 1 <= 3, `day` IS NOT DISTINCT FROM NULL
    partitions=1/11 files=1 size=71.05KB
    row-size=95B cardinality=1.00K
 ====
@@ -930,7 +930,7 @@ or not (day not in (10)) or not (day != 8)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day = 5 OR (day >= 1 AND day <= 2) OR (day > 6 AND day < 8) OR day IS NULL OR day IN (4) OR NOT (day IS NOT NULL) OR NOT (day NOT IN (10)) OR NOT (day != 8)
+   partition predicates: `day` = 5 OR (`day` >= 1 AND `day` <= 2) OR (`day` > 6 AND `day` < 8) OR `day` IS NULL OR `day` IN (4) OR NOT (`day` IS NOT NULL) OR NOT (`day` NOT IN (10)) OR NOT (`day` != 8)
    partitions=8/11 files=8 size=591.30KB
    row-size=95B cardinality=8.00K
 ---- SCANRANGELOCATIONS
@@ -953,7 +953,7 @@ or not (day not in (10)) or not (day != 8)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partition predicates: day = 5 OR (day >= 1 AND day <= 2) OR (day > 6 AND day < 8) OR day IS NOT DISTINCT FROM NULL OR day IN (4) OR NOT (day IS DISTINCT FROM NULL) OR NOT (day NOT IN (10)) OR NOT (day != 8)
+   partition predicates: `day` = 5 OR (`day` >= 1 AND `day` <= 2) OR (`day` > 6 AND `day` < 8) OR `day` IS NOT DISTINCT FROM NULL OR `day` IN (4) OR NOT (`day` IS DISTINCT FROM NULL) OR NOT (`day` NOT IN (10)) OR NOT (`day` != 8)
    partitions=8/11 files=8 size=591.30KB
    row-size=95B cardinality=8.00K
 ---- SCANRANGELOCATIONS
@@ -1061,7 +1061,7 @@ select * from functional.alltypesaggmultifiles where day <= 2
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesaggmultifiles]
-   partition predicates: day <= 2
+   partition predicates: `day` <= 2
    partitions=2/11 files=8 size=145.97KB
    row-size=84B cardinality=unavailable
 ====
@@ -1128,7 +1128,7 @@ select * from functional.alltypestiny t1 where t1.year != null or t1.year = null
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypestiny t1]
-   partition predicates: t1.year != NULL OR t1.year = NULL
+   partition predicates: t1.`year` != NULL OR t1.`year` = NULL
    partitions=0/4 files=0 size=0B
    row-size=89B cardinality=0
 ====
@@ -1139,7 +1139,7 @@ where t1.year IS DISTINCT FROM null or t1.year = null
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypestiny t1]
-   partition predicates: t1.year IS DISTINCT FROM NULL OR t1.year = NULL
+   partition predicates: t1.`year` IS DISTINCT FROM NULL OR t1.`year` = NULL
    partitions=4/4 files=4 size=460B
    row-size=89B cardinality=8
 ====
@@ -1150,7 +1150,7 @@ select * from functional.alltypesagg t1 where t1.year + null != t1.day
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partition predicates: t1.day != t1.year + NULL
+   partition predicates: t1.`day` != t1.`year` + NULL
    partitions=0/11 files=0 size=0B
    row-size=95B cardinality=0
 ====
@@ -1161,7 +1161,7 @@ select * from functional.alltypesagg t1 where t1.year + null IS DISTINCT FROM t1
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partition predicates: t1.day IS DISTINCT FROM t1.year + NULL
+   partition predicates: t1.`day` IS DISTINCT FROM t1.`year` + NULL
    partitions=10/11 files=10 size=743.67KB
    row-size=95B cardinality=10.00K
 ====
@@ -1172,7 +1172,7 @@ select * from functional.alltypesagg t1 where day in (10, null)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partition predicates: day IN (10, NULL)
+   partition predicates: `day` IN (10, NULL)
    partitions=1/11 files=1 size=74.48KB
    row-size=95B cardinality=1.00K
 ====
@@ -1183,7 +1183,7 @@ select * from functional.alltypesagg t1 where day not in (10, null)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partition predicates: day NOT IN (10, NULL)
+   partition predicates: `day` NOT IN (10, NULL)
    partitions=0/11 files=0 size=0B
    row-size=95B cardinality=0
 ====
@@ -1194,7 +1194,7 @@ where t1.day = instr("this is a test", "this") or t1.year = year(now()) + 100
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partition predicates: t1.day = 1 OR t1.year = 2119
+   partition predicates: t1.`day` = 1 OR t1.`year` = 2119
    partitions=1/11 files=1 size=73.39KB
    row-size=95B cardinality=1.00K
 ====
@@ -1206,7 +1206,7 @@ where t1.day in (1, cast(2.0 as INT), year(now()) + 100)
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partition predicates: t1.day IN (1, 2, 2119)
+   partition predicates: t1.`day` IN (1, 2, 2119)
    partitions=2/11 files=2 size=147.87KB
    row-size=95B cardinality=2.00K
 ====
@@ -1218,7 +1218,7 @@ where -t1.day in(-1 - 1) or cast(t1.day as string) like '%1%'
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partition predicates: -1 * t1.day IN (-2) OR CAST(t1.day AS STRING) LIKE '%1%'
+   partition predicates: -1 * t1.`day` IN (-2) OR CAST(t1.`day` AS STRING) LIKE '%1%'
    partitions=3/11 files=3 size=222.34KB
    row-size=95B cardinality=3.00K
 ====
@@ -1231,7 +1231,7 @@ where year = (cast(0 as double) / cast(0 as double))
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = (0 / 0), month = (1 / 0)
+   partition predicates: `year` = (0 / 0), `month` = (1 / 0)
    partitions=0/24 files=0 size=0B
    row-size=89B cardinality=0
 ====
@@ -1242,7 +1242,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   predicates: year < rand()
+   predicates: `year` < rand()
    row-size=89B cardinality=730
 ====
 # IMPALA-5180: Test that predicates not touching a partition column are ignored in

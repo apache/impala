@@ -1284,11 +1284,11 @@ PLAN-ROOT SINK
 |  |
 |  07:HASH JOIN [LEFT OUTER JOIN]
 |  |  hash predicates: b.id = a.id
-|  |  other predicates: a.year < 10
+|  |  other predicates: a.`year` < 10
 |  |  row-size=12B cardinality=8
 |  |
 |  |--05:SCAN HDFS [functional.alltypes a]
-|  |     partition predicates: a.year < 10
+|  |     partition predicates: a.`year` < 10
 |  |     partitions=0/24 files=0 size=0B
 |  |     runtime filters: RF004 -> a.id
 |  |     row-size=8B cardinality=0
@@ -1362,11 +1362,11 @@ PLAN-ROOT SINK
 |  |
 |  07:HASH JOIN [FULL OUTER JOIN]
 |  |  hash predicates: b.id = a.id
-|  |  other predicates: a.year < 10
+|  |  other predicates: a.`year` < 10
 |  |  row-size=12B cardinality=8
 |  |
 |  |--05:SCAN HDFS [functional.alltypes a]
-|  |     partition predicates: a.year < 10
+|  |     partition predicates: a.`year` < 10
 |  |     partitions=0/24 files=0 size=0B
 |  |     runtime filters: RF002 -> a.id
 |  |     row-size=8B cardinality=0

@@ -11,12 +11,12 @@ where b.month = 1
 PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: month = b.month
-|  runtime filters: RF000 <- b.month
+|  hash predicates: month = b.`month`
+|  runtime filters: RF000 <- b.`month`
 |  row-size=97B cardinality=1.24K
 |
 |--03:SCAN HDFS [functional.alltypessmall b]
-|     partition predicates: b.month = 1
+|     partition predicates: b.`month` = 1
 |     partitions=1/4 files=1 size=1.57KB
 |     row-size=89B cardinality=25
 |
@@ -41,14 +41,14 @@ PLAN-ROOT SINK
 06:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: month = b.month
-|  runtime filters: RF000 <- b.month
+|  hash predicates: month = b.`month`
+|  runtime filters: RF000 <- b.`month`
 |  row-size=97B cardinality=1.24K
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [functional.alltypessmall b]
-|     partition predicates: b.month = 1
+|     partition predicates: b.`month` = 1
 |     partitions=1/4 files=1 size=1.57KB
 |     row-size=89B cardinality=25
 |
@@ -82,17 +82,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -112,17 +112,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -140,7 +140,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=3
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     limit: 1
 |     row-size=89B cardinality=1
@@ -150,12 +150,12 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=1
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    limit: 1
    row-size=89B cardinality=1
@@ -177,7 +177,7 @@ PLAN-ROOT SINK
 |  |  limit: 1
 |  |
 |  04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     limit: 1
 |     row-size=89B cardinality=1
@@ -191,7 +191,7 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=1
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -199,7 +199,7 @@ PLAN-ROOT SINK
 |  limit: 1
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    limit: 1
    row-size=89B cardinality=1
@@ -222,17 +222,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -262,17 +262,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -293,12 +293,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -317,12 +317,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -347,12 +347,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -381,12 +381,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -416,22 +416,22 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -469,22 +469,22 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -517,22 +517,22 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--06:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 05:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -574,22 +574,22 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--06:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 05:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -622,22 +622,22 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=6
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 06:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -679,22 +679,22 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=6
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 06:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -712,17 +712,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -742,17 +742,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -770,17 +770,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -800,17 +800,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -832,17 +832,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -872,17 +872,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -904,17 +904,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -944,17 +944,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -973,7 +973,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -986,12 +986,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=4
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 02:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1011,7 +1011,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -1030,12 +1030,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=4
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 02:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1062,17 +1062,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1106,17 +1106,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1137,7 +1137,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8
 |
 |--06:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -1150,17 +1150,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1182,7 +1182,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8
 |
 |--06:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -1201,17 +1201,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1240,22 +1240,22 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--05:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1291,22 +1291,22 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--05:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1341,22 +1341,22 @@ PLAN-ROOT SINK
 |  |  |  row-size=89B cardinality=4
 |  |  |
 |  |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |  |     partition predicates: year = 2009, month = 2
+|  |  |     partition predicates: `year` = 2009, `month` = 2
 |  |  |     partitions=1/4 files=1 size=115B
 |  |  |     row-size=89B cardinality=2
 |  |  |
 |  |  03:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  07:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1402,22 +1402,22 @@ PLAN-ROOT SINK
 |  |  |  row-size=89B cardinality=4
 |  |  |
 |  |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |  |     partition predicates: year = 2009, month = 2
+|  |  |     partition predicates: `year` = 2009, `month` = 2
 |  |  |     partitions=1/4 files=1 size=115B
 |  |  |     row-size=89B cardinality=2
 |  |  |
 |  |  03:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  07:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1437,7 +1437,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=5
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -1450,12 +1450,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=4
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 02:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1475,7 +1475,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=5
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -1494,12 +1494,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=4
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 02:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1527,17 +1527,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1571,17 +1571,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1604,17 +1604,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1644,17 +1644,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1677,17 +1677,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1717,17 +1717,17 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1752,22 +1752,22 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1799,22 +1799,22 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1839,22 +1839,22 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1886,22 +1886,22 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -1925,7 +1925,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=5
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -1938,12 +1938,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=4
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 02:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -1973,7 +1973,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=5
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -1992,12 +1992,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=4
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 02:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -2029,17 +2029,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -2083,17 +2083,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -2115,27 +2115,27 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=10
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 3
+|     partition predicates: `year` = 2009, `month` = 3
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -2159,27 +2159,27 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=10
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 3
+|     partition predicates: `year` = 2009, `month` = 3
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -2205,27 +2205,27 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=10
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 3
+|     partition predicates: `year` = 2009, `month` = 3
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -2259,27 +2259,27 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=10
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 3
+|     partition predicates: `year` = 2009, `month` = 3
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -2322,27 +2322,27 @@ PLAN-ROOT SINK
 |  |  |  row-size=89B cardinality=4
 |  |  |
 |  |  |--07:SCAN HDFS [functional.alltypestiny]
-|  |  |     partition predicates: year = 2009, month = 3
+|  |  |     partition predicates: `year` = 2009, `month` = 3
 |  |  |     partitions=1/4 files=1 size=115B
 |  |  |     row-size=89B cardinality=2
 |  |  |
 |  |  06:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -2404,27 +2404,27 @@ PLAN-ROOT SINK
 |  |  |  row-size=89B cardinality=4
 |  |  |
 |  |  |--07:SCAN HDFS [functional.alltypestiny]
-|  |  |     partition predicates: year = 2009, month = 3
+|  |  |     partition predicates: `year` = 2009, `month` = 3
 |  |  |     partitions=1/4 files=1 size=115B
 |  |  |     row-size=89B cardinality=2
 |  |  |
 |  |  06:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  |--04:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -2463,27 +2463,27 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--06:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 3
+|  |     partition predicates: `year` = 2009, `month` = 3
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -2541,27 +2541,27 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--06:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 3
+|  |     partition predicates: `year` = 2009, `month` = 3
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -2609,27 +2609,27 @@ PLAN-ROOT SINK
 |  |  |  row-size=89B cardinality=4
 |  |  |
 |  |  |--06:SCAN HDFS [functional.alltypestiny]
-|  |  |     partition predicates: year = 2009, month = 3
+|  |  |     partition predicates: `year` = 2009, `month` = 3
 |  |  |     partitions=1/4 files=1 size=115B
 |  |  |     row-size=89B cardinality=2
 |  |  |
 |  |  05:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -2642,22 +2642,22 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=2
 |  |
 |  |--14:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 5
+|  |     partition predicates: `year` = 2009, `month` = 5
 |  |     partitions=0/4 files=0 size=0B
 |  |     row-size=89B cardinality=0
 |  |
 |  13:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 4
+|     partition predicates: `year` = 2009, `month` = 4
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--11:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 4
+|     partition predicates: `year` = 2009, `month` = 4
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 10:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 3
+   partition predicates: `year` = 2009, `month` = 3
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -2716,27 +2716,27 @@ PLAN-ROOT SINK
 |  |  |  row-size=89B cardinality=4
 |  |  |
 |  |  |--06:SCAN HDFS [functional.alltypestiny]
-|  |  |     partition predicates: year = 2009, month = 3
+|  |  |     partition predicates: `year` = 2009, `month` = 3
 |  |  |     partitions=1/4 files=1 size=115B
 |  |  |     row-size=89B cardinality=2
 |  |  |
 |  |  05:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -2755,22 +2755,22 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=2
 |  |
 |  |--14:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 5
+|  |     partition predicates: `year` = 2009, `month` = 5
 |  |     partitions=0/4 files=0 size=0B
 |  |     row-size=89B cardinality=0
 |  |
 |  13:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 4
+|     partition predicates: `year` = 2009, `month` = 4
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--11:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 4
+|     partition predicates: `year` = 2009, `month` = 4
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 10:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 3
+   partition predicates: `year` = 2009, `month` = 3
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -2798,17 +2798,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 04:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -2838,17 +2838,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 04:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -2884,17 +2884,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 05:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ---- SCANRANGELOCATIONS
@@ -2944,17 +2944,17 @@ PLAN-ROOT SINK
 |  |  row-size=89B cardinality=4
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny]
-|  |     partition predicates: year = 2009, month = 1
+|  |     partition predicates: `year` = 2009, `month` = 1
 |  |     partitions=1/4 files=1 size=115B
 |  |     row-size=89B cardinality=2
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 05:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=89B cardinality=2
 ====
@@ -2979,7 +2979,7 @@ PLAN-ROOT SINK
 |  |  row-size=13B cardinality=1
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 |     row-size=5B cardinality=1
@@ -2990,7 +2990,7 @@ PLAN-ROOT SINK
 |  row-size=13B cardinality=1
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
    row-size=5B cardinality=1
@@ -3021,7 +3021,7 @@ PLAN-ROOT SINK
 |  |  row-size=13B cardinality=1
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 |     row-size=5B cardinality=1
@@ -3039,7 +3039,7 @@ PLAN-ROOT SINK
 |  row-size=13B cardinality=1
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=115B
    predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
    row-size=5B cardinality=1
@@ -3183,7 +3183,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=4B cardinality=2
 |
@@ -3192,7 +3192,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=4B cardinality=2
 ---- DISTRIBUTEDPLAN
@@ -3221,7 +3221,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=6
 |
 |--03:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=4B cardinality=2
 |
@@ -3236,7 +3236,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=2
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, month = 2
+   partition predicates: `year` = 2009, `month` = 2
    partitions=1/4 files=1 size=115B
    row-size=4B cardinality=2
 ====
@@ -3443,13 +3443,13 @@ PLAN-ROOT SINK
 |  row-size=9B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, functional.alltypestiny.month = 1
+|     partition predicates: `year` = 2009, functional.alltypestiny.month = 1
 |     partitions=1/4 files=1 size=115B
 |     predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 |     row-size=9B cardinality=1
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, functional.alltypestiny.month = 1
+   partition predicates: `year` = 2009, functional.alltypestiny.month = 1
    partitions=1/4 files=1 size=115B
    predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
    row-size=9B cardinality=1
@@ -3463,13 +3463,13 @@ PLAN-ROOT SINK
 |  row-size=9B cardinality=2
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, functional.alltypestiny.month = 1
+|     partition predicates: `year` = 2009, functional.alltypestiny.month = 1
 |     partitions=1/4 files=1 size=115B
 |     predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
 |     row-size=9B cardinality=1
 |
 01:SCAN HDFS [functional.alltypestiny]
-   partition predicates: year = 2009, functional.alltypestiny.month = 1
+   partition predicates: `year` = 2009, functional.alltypestiny.month = 1
    partitions=1/4 files=1 size=115B
    predicates: functional.alltypestiny.int_col < 5, functional.alltypestiny.bool_col = FALSE
    row-size=9B cardinality=1
@@ -3557,7 +3557,7 @@ PLAN-ROOT SINK
 |  |  row-size=16B cardinality=10
 |  |
 |  02:SCAN HDFS [functional.alltypes]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/24 files=1 size=18.12KB
 |     row-size=12B cardinality=280
 |
@@ -3604,7 +3604,7 @@ PLAN-ROOT SINK
 |  |  row-size=16B cardinality=10
 |  |
 |  02:SCAN HDFS [functional.alltypes]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/24 files=1 size=18.12KB
 |     row-size=12B cardinality=280
 |
@@ -3716,7 +3716,7 @@ PLAN-ROOT SINK
 |  |  row-size=16B cardinality=10
 |  |
 |  06:SCAN HDFS [functional.alltypes]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/24 files=1 size=18.12KB
 |     row-size=12B cardinality=280
 |
@@ -3779,7 +3779,7 @@ PLAN-ROOT SINK
 |  |  row-size=16B cardinality=10
 |  |
 |  06:SCAN HDFS [functional.alltypes]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/24 files=1 size=18.12KB
 |     row-size=12B cardinality=280
 |

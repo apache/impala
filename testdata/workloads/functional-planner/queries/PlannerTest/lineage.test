@@ -10,7 +10,7 @@ select * from (
     "queryId":"0:0",
     "hash":"25456c60a2e874a20732f42c7af27553",
     "user":"progers",
-    "timestamp":1546590134,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -64,7 +64,7 @@ order by b.bigint_col limit 10
     "queryId":"0:0",
     "hash":"e0309eeff9811f53c82657d62c1e04eb",
     "user":"progers",
-    "timestamp":1546590134,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -201,7 +201,7 @@ create table lineage_test_tbl as select int_col, tinyint_col from functional.all
     "queryId":"0:0",
     "hash":"407f23b24758ffcb2ac445b9703f5c44",
     "user":"progers",
-    "timestamp":1546590134,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -256,7 +256,7 @@ where a.year = 2009 and b.month = 2
     "queryId":"0:0",
     "hash":"f3101dcb046a7d34d7ee14892a6cc94e",
     "user":"progers",
-    "timestamp":1546590134,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -344,7 +344,7 @@ select * from
     "queryId":"0:0",
     "hash":"9c04c1e9feee35ffacf14bfcd3b363a7",
     "user":"progers",
-    "timestamp":1546590134,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -378,7 +378,7 @@ create table lineage_test_tblm as select * from functional_hbase.alltypes limit 
     "queryId":"0:0",
     "hash":"a294f36bddf2adb329eac3055a76b2b5",
     "user":"progers",
-    "timestamp":1546590134,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -643,7 +643,7 @@ functional_hbase.alltypes
     "queryId":"0:0",
     "hash":"b923425ce9cc2d53d36523ec83971e67",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -828,7 +828,7 @@ from functional.alltypes
     "queryId":"0:0",
     "hash":"b7b9474fc6b97f104bd031209438ee0e",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -1007,7 +1007,7 @@ where year=2009 and month=05
     "queryId":"0:0",
     "hash":"2ed3a6c784e1c0c7fcef226d71375180",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -1238,7 +1238,7 @@ where year=2009 and month>10
     "queryId":"0:0",
     "hash":"39ac95ce0632ef1ee8b474be644971f3",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -1481,7 +1481,7 @@ having min(id) > 10
     "queryId":"0:0",
     "hash":"e6969c2cc67e9d6f3f985ddc6431f915",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -1768,7 +1768,7 @@ group by int_col, tinyint_col
     "queryId":"0:0",
     "hash":"83c78528e6f5325c56a3f3521b08a78d",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -1815,7 +1815,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
     "queryId":"0:0",
     "hash":"4f1ecaaed571d2ed9f09f091f399c311",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -1873,7 +1873,7 @@ order by a.tinyint_col, a.int_col
     "queryId":"0:0",
     "hash":"b6e26c00b2ef17f0592ebadb0ecc21f6",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -1984,7 +1984,7 @@ order by 2, 3, 4
     "queryId":"0:0",
     "hash":"6bf993cea0d1ab9e613674ef178916c9",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -2116,7 +2116,7 @@ order by 2, 3, 4
     "queryId":"0:0",
     "hash":"811403c86e86fe630dea7bd0a6c89273",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867921,
     "edges":[
         {
             "sources":[
@@ -2250,7 +2250,7 @@ where b.month = 1
     "queryId":"0:0",
     "hash":"e3000cd5edf2a02e1f5407810f3cc09a",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -2358,7 +2358,7 @@ where month = 1
     "queryId":"0:0",
     "hash":"3f1ecf7239e205342aee4979e7cb4877",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -2460,7 +2460,7 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
     "queryId":"0:0",
     "hash":"4edf165aed5982ede63f7c91074f4b44",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -2637,7 +2637,7 @@ from
     "queryId":"0:0",
     "hash":"8b4d1ab11721d9ebdf26666d4195eb18",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -2731,7 +2731,7 @@ limit 0
     "queryId":"0:0",
     "hash":"50d3b4f249f038b0711ea75c17640fc9",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -2795,7 +2795,7 @@ select int_col, string_col from functional.view_view
     "queryId":"0:0",
     "hash":"9073496459077de1332e5017977dedf5",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -2848,7 +2848,7 @@ where t.id < 10
     "queryId":"0:0",
     "hash":"8ba7998033f90e1e358f4fdc7ea4251b",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -2894,7 +2894,7 @@ where id in
     "queryId":"0:0",
     "hash":"e8ad1371d2a13e1ee9ec45689b62cdc9",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -2994,7 +2994,7 @@ and tinyint_col < 10
     "queryId":"0:0",
     "hash":"a7500c022d29c583c31b287868a848bf",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -3045,7 +3045,7 @@ and a.bigint_col > 10
     "queryId":"0:0",
     "hash":"5e6227f323793ea4441e2a3119af2f09",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -3126,7 +3126,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
     "queryId":"0:0",
     "hash":"a7ab58d90540f28a8dfd69703632ad7a",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -3180,7 +3180,7 @@ select id, int_col, string_col, year, month from t1
     "queryId":"0:0",
     "hash":"0bc5b3e66cc72387f74893b1f1934946",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -3399,7 +3399,7 @@ from
     "queryId":"0:0",
     "hash":"aa95e5e6f39fc80bb3c318a2515dc77d",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -3472,7 +3472,7 @@ create view test_view_lineage as select id from functional.alltypestiny
     "queryId":"0:0",
     "hash":"ff6b1ecb265afe4f03355a07238cfe37",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -3522,7 +3522,7 @@ limit 0
     "queryId":"0:0",
     "hash":"b96adf892b897da1e562c5be98724fb5",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -3599,7 +3599,7 @@ create view test_view_lineage (a1, a2, a3, a4, a5, a6, a7) as
     "queryId":"0:0",
     "hash":"ffbe643df8f26e92907fb45de1aeda36",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -3782,7 +3782,7 @@ create view test_view_lineage as
     "queryId":"0:0",
     "hash":"d4b9e2d63548088f911816b2ae29d7c2",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -3919,7 +3919,7 @@ alter view functional.alltypes_view as select id from functional.alltypestiny
     "queryId":"0:0",
     "hash":"8c9367afc562a4c04d2d40e1276646c2",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -3960,7 +3960,7 @@ select * from (
     "queryId":"0:0",
     "hash":"4fb3ceddbf596097335af607d528f5a7",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -4028,7 +4028,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
     "queryId":"0:0",
     "hash":"8c0c64f8a4c08b82ad343ab439101957",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -4134,7 +4134,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
     "queryId":"0:0",
     "hash":"1b0db371b32e90d33629ed7779332cf7",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -4319,7 +4319,7 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
     "queryId":"0:0",
     "hash":"4affc0d1e384475d1ff2fc2e19643064",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -4457,7 +4457,7 @@ where not exists (select 1 from functional.alltypes a where v.id = a.id)
     "queryId":"0:0",
     "hash":"e79b8abc8a682d9e0f6b2c30a6c885f3",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -4501,7 +4501,7 @@ where k.int_col < 10
     "queryId":"0:0",
     "hash":"7b7c92d488186d869bb6b78c97666f41",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -4556,7 +4556,7 @@ functional.alltypes a where a.id < 100
     "queryId":"0:0",
     "hash":"87a59bac56c6ad27f7af6e71af46d552",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -4640,7 +4640,7 @@ functional.alltypes where id < 10
     "queryId":"0:0",
     "hash":"0bccfdbf4118e6d5a3d94062ecb5130a",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -4704,7 +4704,7 @@ functional.alltypes where id < 10
     "queryId":"0:0",
     "hash":"f4c1e7b016e75012f7268f2f42ae5630",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[
@@ -4770,7 +4770,7 @@ from functional.alltypestiny
     "queryId":"0:0",
     "hash":"de98b09af6b6ab0f0678c5fc0c4369b4",
     "user":"progers",
-    "timestamp":1546590135,
+    "timestamp":1547867922,
     "edges":[
         {
             "sources":[

@@ -6,7 +6,7 @@ where year=2009 and month=05
 UPSERT INTO KUDU [functional_kudu.testtbl]
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 5
+   partition predicates: `year` = 2009, `month` = 5
    partitions=1/24 files=1 size=20.36KB
    row-size=25B cardinality=310
 ---- DISTRIBUTEDPLAN
@@ -19,7 +19,7 @@ UPSERT INTO KUDU [functional_kudu.testtbl]
 01:EXCHANGE [KUDU(KuduPartition(bigint_col))]
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 5
+   partition predicates: `year` = 2009, `month` = 5
    partitions=1/24 files=1 size=20.36KB
    row-size=25B cardinality=310
 ====

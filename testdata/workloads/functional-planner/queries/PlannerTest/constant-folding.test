@@ -408,8 +408,8 @@ insert into functional.alltypes (id, int_col) partition(year,month)
 select id, int_col, cast(1 + 1 + 1 + year as int), cast(month - (1 - 1 - 1) as int)
 from functional.alltypessmall
 ---- PLAN
-Analyzed query: SELECT id, int_col, CAST(CAST(3 AS BIGINT) + CAST(year AS
-BIGINT) AS INT), CAST(CAST(month AS BIGINT) - CAST(-1 AS BIGINT) AS INT) FROM
+Analyzed query: SELECT id, int_col, CAST(CAST(3 AS BIGINT) + CAST(`year` AS
+BIGINT) AS INT), CAST(CAST(`month` AS BIGINT) - CAST(-1 AS BIGINT) AS INT) FROM
 functional.alltypessmall
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=38.00MB mem-reservation=6.01MB thread-reservation=2

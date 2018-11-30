@@ -2836,7 +2836,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         ++numDistinctExprs;
       }
       if (aggExpr.getFnName().toString().equals("ndv")) {
-        assertEquals(rewrittenColName, aggExpr.getChild(0).toSql());
+        assertEquals(ToSqlUtils.getIdentSql(rewrittenColName),
+            aggExpr.getChild(0).toSql());
         ++numNdvExprs;
       }
     }

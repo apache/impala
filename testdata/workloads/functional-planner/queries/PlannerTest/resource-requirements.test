@@ -4124,8 +4124,8 @@ Per-Host Resource Estimates: Memory=16MB
 Codegen disabled by planner
 Analyzed query: SELECT id, bool_col, tinyint_col, smallint_col, int_col,
 bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
-FROM functional.alltypes WHERE year = CAST(2009 AS INT) AND month = CAST(5 AS
-INT)
+FROM functional.alltypes WHERE `year` = CAST(2009 AS INT) AND `month` = CAST(5
+AS INT)
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=16.02MB mem-reservation=32.00KB thread-reservation=2
@@ -4134,7 +4134,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  mem-estimate=24.52KB mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = CAST(2009 AS INT), month = CAST(5 AS INT)
+   partition predicates: `year` = CAST(2009 AS INT), `month` = CAST(5 AS INT)
    partitions=1/24 files=1 size=20.36KB
    stored statistics:
      table: rows=7300 size=478.45KB
@@ -4150,8 +4150,8 @@ Per-Host Resource Estimates: Memory=16MB
 Codegen disabled by planner
 Analyzed query: SELECT id, bool_col, tinyint_col, smallint_col, int_col,
 bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
-FROM functional.alltypes WHERE year = CAST(2009 AS INT) AND month = CAST(5 AS
-INT)
+FROM functional.alltypes WHERE `year` = CAST(2009 AS INT) AND `month` = CAST(5
+AS INT)
 
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=16.02MB mem-reservation=32.00KB thread-reservation=2
@@ -4160,7 +4160,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  mem-estimate=24.52KB mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes, RANDOM]
-   partition predicates: year = CAST(2009 AS INT), month = CAST(5 AS INT)
+   partition predicates: `year` = CAST(2009 AS INT), `month` = CAST(5 AS INT)
    partitions=1/24 files=1 size=20.36KB
    stored statistics:
      table: rows=7300 size=478.45KB
@@ -4176,8 +4176,8 @@ Per-Host Resource Estimates: Memory=32MB
 Codegen disabled by planner
 Analyzed query: SELECT id, bool_col, tinyint_col, smallint_col, int_col,
 bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
-FROM functional.alltypes WHERE year = CAST(2009 AS INT) AND month = CAST(5 AS
-INT)
+FROM functional.alltypes WHERE `year` = CAST(2009 AS INT) AND `month` = CAST(5
+AS INT)
 
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
 |  Per-Host Resources: mem-estimate=32.02MB mem-reservation=64.00KB thread-reservation=2
@@ -4186,7 +4186,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  mem-estimate=12.26KB mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes, RANDOM]
-   partition predicates: year = CAST(2009 AS INT), month = CAST(5 AS INT)
+   partition predicates: `year` = CAST(2009 AS INT), `month` = CAST(5 AS INT)
    partitions=1/24 files=1 size=20.36KB
    stored statistics:
      table: rows=7300 size=478.45KB
@@ -5850,7 +5850,7 @@ INSERT INTO KUDU [functional_kudu.tinyinttable]
    constant-operands=1
    mem-estimate=0B mem-reservation=0B thread-reservation=0
    tuple-ids=0 row-size=1B cardinality=1
-   in pipelines:
+   in pipelines: <none>
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=2.00MB Threads=2
 Per-Host Resource Estimates: Memory=22MB
@@ -5867,12 +5867,12 @@ INSERT INTO KUDU [functional_kudu.tinyinttable]
 |  materialized: KuduPartition(1)
 |  mem-estimate=2.00MB mem-reservation=2.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1 row-size=5B cardinality=1
-|  in pipelines:
+|  in pipelines: <none>
 |
 01:EXCHANGE [KUDU(KuduPartition(1))]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=0 row-size=1B cardinality=1
-|  in pipelines:
+|  in pipelines: <none>
 |
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
@@ -5880,5 +5880,5 @@ Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
    constant-operands=1
    mem-estimate=0B mem-reservation=0B thread-reservation=0
    tuple-ids=0 row-size=1B cardinality=1
-   in pipelines:
+   in pipelines: <none>
 ====

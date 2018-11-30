@@ -582,7 +582,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NOT NULL
-   row-size=84B cardinality=1.73K
+   row-size=84B cardinality=1.72K
 ====
 # HBase scan query with conjunctive predicates one of which is an 'IS NULL'
 select * from functional_hbase.alltypesagg
@@ -591,7 +591,7 @@ where bigint_col is null and day = 1
 PLAN-ROOT SINK
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
-   predicates: bigint_col IS NULL, day = 1
+   predicates: bigint_col IS NULL, `day` = 1
    row-size=84B cardinality=1.73K
 ====
 # HBase scan query with conjunctive predicates one of which is an 'IS NOT NULL'
@@ -602,7 +602,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NOT NULL, bool_col = TRUE
-   row-size=84B cardinality=1.73K
+   row-size=84B cardinality=1.72K
 ---- SCANRANGELOCATIONS
 NODE 0:
   HBASE KEYRANGE 3:7
@@ -615,7 +615,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col IS NOT NULL, bool_col = TRUE
-   row-size=84B cardinality=1.73K
+   row-size=84B cardinality=1.72K
 ====
 # HBase scan query with an aggregation and a single predicate
 select count(*) from functional_hbase.alltypesagg
@@ -658,7 +658,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HBASE [functional_hbase.alltypesagg]
-   predicates: bigint_col = 10, day = 1
+   predicates: `day` = 1, bigint_col = 10
    row-size=12B cardinality=1.73K
 ====
 # IMPALA-1141: Simple joins to make sure cardinality estimates are right.
@@ -688,7 +688,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=120
 |
 |--02:SCAN HBASE [functional_hbase.alltypessmall c]
-|     predicates: c.month = 4
+|     predicates: c.`month` = 4
 |     row-size=12B cardinality=12
 |
 01:SCAN HBASE [functional_hbase.alltypessmall a]

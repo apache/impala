@@ -1725,7 +1725,7 @@ where
 PLAN-ROOT SINK
 |
 03:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: tt1.month = t1.id
+|  hash predicates: tt1.`month` = t1.id
 |  other predicates: t1.id > zeroifnull(count(tt1.smallint_col))
 |  runtime filters: RF000 <- t1.id
 |  row-size=16B cardinality=8
@@ -1736,7 +1736,7 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(tt1.smallint_col)
-|  group by: tt1.month
+|  group by: tt1.`month`
 |  row-size=12B cardinality=4
 |
 01:SCAN HDFS [functional.alltypestiny tt1]
@@ -2414,12 +2414,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=12
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -2455,12 +2455,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=12
 |
 |--05:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
 |--04:SCAN HDFS [functional.alltypestiny]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=115B
 |     row-size=89B cardinality=2
 |
@@ -2971,7 +2971,7 @@ PLAN-ROOT SINK
 |  |
 |  04:AGGREGATE [FINALIZE]
 |  |  output: max(allt.smallint_col)
-|  |  group by: ata.month
+|  |  group by: ata.`month`
 |  |  limit: 2
 |  |  row-size=6B cardinality=1
 |  |
@@ -2985,7 +2985,7 @@ PLAN-ROOT SINK
 |  |     row-size=6B cardinality=7.30K
 |  |
 |  02:SCAN HDFS [functional.alltypesagg ata]
-|     partition predicates: ata.month = 1
+|     partition predicates: ata.`month` = 1
 |     partitions=11/11 files=11 size=814.73KB
 |     runtime filters: RF002 -> ata.id
 |     row-size=8B cardinality=11.00K
@@ -3015,15 +3015,15 @@ PLAN-ROOT SINK
 |  |
 |  10:AGGREGATE [FINALIZE]
 |  |  output: max:merge(allt.smallint_col)
-|  |  group by: ata.month
+|  |  group by: ata.`month`
 |  |  limit: 2
 |  |  row-size=6B cardinality=1
 |  |
-|  09:EXCHANGE [HASH(ata.month)]
+|  09:EXCHANGE [HASH(ata.`month`)]
 |  |
 |  04:AGGREGATE [STREAMING]
 |  |  output: max(allt.smallint_col)
-|  |  group by: ata.month
+|  |  group by: ata.`month`
 |  |  row-size=6B cardinality=1
 |  |
 |  03:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -3040,7 +3040,7 @@ PLAN-ROOT SINK
 |  07:EXCHANGE [HASH(ata.id)]
 |  |
 |  02:SCAN HDFS [functional.alltypesagg ata]
-|     partition predicates: ata.month = 1
+|     partition predicates: ata.`month` = 1
 |     partitions=11/11 files=11 size=814.73KB
 |     runtime filters: RF002 -> ata.id
 |     row-size=8B cardinality=11.00K

@@ -32,12 +32,12 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  row-size=25B cardinality=13
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partition predicates: b.month = 2
+|     partition predicates: b.`month` = 2
 |     partitions=1/4 files=1 size=1.58KB
 |     row-size=4B cardinality=25
 |
 00:SCAN HDFS [functional.alltypes a]
-   partition predicates: a.year = 2009
+   partition predicates: a.`year` = 2009
    partitions=12/24 files=12 size=238.68KB
    runtime filters: RF000 -> a.id
    row-size=21B cardinality=3.65K
@@ -63,12 +63,12 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
-|     partition predicates: b.month = 2
+|     partition predicates: b.`month` = 2
 |     partitions=1/4 files=1 size=1.58KB
 |     row-size=4B cardinality=25
 |
 00:SCAN HDFS [functional.alltypes a]
-   partition predicates: a.year = 2009
+   partition predicates: a.`year` = 2009
    partitions=12/24 files=12 size=238.68KB
    runtime filters: RF000 -> a.id
    row-size=21B cardinality=3.65K

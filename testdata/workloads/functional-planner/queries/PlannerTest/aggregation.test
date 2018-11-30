@@ -911,8 +911,8 @@ where v.a = v.b and v.b = v.c and v.c = v.d and v.a = v.c and v.a = v.d
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  group by: tinyint_col, smallint_col, int_col + int_col, coalesce(bigint_col, year)
-|  having: int_col + int_col = coalesce(bigint_col, year), smallint_col = int_col + int_col
+|  group by: tinyint_col, smallint_col, int_col + int_col, coalesce(bigint_col, `year`)
+|  having: int_col + int_col = coalesce(bigint_col, `year`), smallint_col = int_col + int_col
 |  row-size=19B cardinality=730
 |
 00:SCAN HDFS [functional.alltypes]
@@ -1010,7 +1010,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: group_concat(string_col)
-|  group by: day
+|  group by: `day`
 |  row-size=16B cardinality=11
 |
 02:AGGREGATE
@@ -1023,14 +1023,14 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
-   predicates: day = id % 100
+   predicates: `day` = id % 100
    row-size=23B cardinality=1.10K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: group_concat(string_col)
-|  group by: day
+|  group by: `day`
 |  row-size=16B cardinality=11
 |
 02:AGGREGATE
@@ -1047,7 +1047,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
-   predicates: day = id % 100
+   predicates: `day` = id % 100
    row-size=23B cardinality=1.10K
 ====
 # test group_concat with distinct together with another distinct aggregate function
@@ -1059,11 +1059,11 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(CAST(timestamp_col AS STRING)), group_concat(CAST(timestamp_col AS STRING))
-|  group by: year
+|  group by: `year`
 |  row-size=24B cardinality=1
 |
 01:AGGREGATE
-|  group by: year, CAST(timestamp_col AS STRING)
+|  group by: `year`, CAST(timestamp_col AS STRING)
 |  row-size=20B cardinality=10.21K
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -1076,24 +1076,24 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(CAST(timestamp_col AS STRING)), group_concat:merge(CAST(timestamp_col AS STRING))
-|  group by: year
+|  group by: `year`
 |  row-size=24B cardinality=1
 |
-05:EXCHANGE [HASH(year)]
+05:EXCHANGE [HASH(`year`)]
 |
 02:AGGREGATE [STREAMING]
 |  output: count(CAST(timestamp_col AS STRING)), group_concat(CAST(timestamp_col AS STRING))
-|  group by: year
+|  group by: `year`
 |  row-size=24B cardinality=1
 |
 04:AGGREGATE
-|  group by: year, CAST(timestamp_col AS STRING)
+|  group by: `year`, CAST(timestamp_col AS STRING)
 |  row-size=20B cardinality=10.21K
 |
-03:EXCHANGE [HASH(year,CAST(timestamp_col AS STRING))]
+03:EXCHANGE [HASH(`year`,CAST(timestamp_col AS STRING))]
 |
 01:AGGREGATE [STREAMING]
-|  group by: year, CAST(timestamp_col AS STRING)
+|  group by: `year`, CAST(timestamp_col AS STRING)
 |  row-size=20B cardinality=10.21K
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -1203,12 +1203,12 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(date_string_col), group_concat(date_string_col, '-'), count:merge(*)
-|  group by: month, year
+|  group by: `month`, `year`
 |  row-size=36B cardinality=1
 |
 01:AGGREGATE
 |  output: count(*)
-|  group by: month, year, date_string_col
+|  group by: `month`, `year`, date_string_col
 |  row-size=36B cardinality=10
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -1221,26 +1221,26 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(date_string_col), group_concat:merge(date_string_col, '-'), count:merge(*)
-|  group by: month, year
+|  group by: `month`, `year`
 |  row-size=36B cardinality=1
 |
-05:EXCHANGE [HASH(month,year)]
+05:EXCHANGE [HASH(`month`,`year`)]
 |
 02:AGGREGATE [STREAMING]
 |  output: count(date_string_col), group_concat(date_string_col, '-'), count:merge(*)
-|  group by: month, year
+|  group by: `month`, `year`
 |  row-size=36B cardinality=1
 |
 04:AGGREGATE
 |  output: count:merge(*)
-|  group by: month, year, date_string_col
+|  group by: `month`, `year`, date_string_col
 |  row-size=36B cardinality=10
 |
-03:EXCHANGE [HASH(month,year,date_string_col)]
+03:EXCHANGE [HASH(`month`,`year`,date_string_col)]
 |
 01:AGGREGATE [STREAMING]
 |  output: count(*)
-|  group by: month, year, date_string_col
+|  group by: `month`, `year`, date_string_col
 |  row-size=36B cardinality=10
 |
 00:SCAN HDFS [functional.alltypesagg]

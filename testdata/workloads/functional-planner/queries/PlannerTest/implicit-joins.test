@@ -438,7 +438,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: avg(id)
-|  group by: month
+|  group by: `month`
 |  row-size=12B cardinality=12
 |
 02:SCAN HDFS [functional.alltypes]

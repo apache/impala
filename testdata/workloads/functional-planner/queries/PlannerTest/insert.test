@@ -9,7 +9,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 5
+   partition predicates: `year` = 2009, `month` = 5
    partitions=1/24 files=1 size=20.36KB
    row-size=81B cardinality=310
 ---- SCANRANGELOCATIONS
@@ -20,7 +20,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 5
+   partition predicates: `year` = 2009, `month` = 5
    partitions=1/24 files=1 size=20.36KB
    row-size=81B cardinality=310
 ====
@@ -36,7 +36,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,4
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 5
+   partition predicates: `year` = 2009, `month` = 5
    partitions=1/24 files=1 size=20.36KB
    row-size=81B cardinality=310
 ---- SCANRANGELOCATIONS
@@ -47,7 +47,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,4
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 5
+   partition predicates: `year` = 2009, `month` = 5
    partitions=1/24 files=1 size=20.36KB
    row-size=81B cardinality=310
 ====
@@ -63,7 +63,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(2009,4)
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 5
+   partition predicates: `year` = 2009, `month` = 5
    partitions=1/24 files=1 size=20.36KB
    row-size=81B cardinality=310
 ---- SCANRANGELOCATIONS
@@ -74,7 +74,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=true, PARTITION-KEYS=(2009,4)
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 5
+   partition predicates: `year` = 2009, `month` = 5
    partitions=1/24 files=1 size=20.36KB
    row-size=81B cardinality=310
 ====
@@ -94,7 +94,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |  row-size=89B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=40.07KB
    row-size=89B cardinality=610
 ---- SCANRANGELOCATIONS
@@ -109,10 +109,10 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |  order by: year ASC NULLS LAST, month ASC NULLS LAST
 |  row-size=89B cardinality=610
 |
-01:EXCHANGE [HASH(year,month)]
+01:EXCHANGE [HASH(`year`,`month`)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=40.07KB
    row-size=89B cardinality=610
 ====
@@ -124,11 +124,11 @@ float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from functional.alltypes
 where year=2009 and month>10
 ---- PLAN
-WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(`year`,`month`)]
 |  partitions=24
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=40.07KB
    row-size=89B cardinality=610
 ---- SCANRANGELOCATIONS
@@ -136,13 +136,13 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
 ---- DISTRIBUTEDPLAN
-WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(`year`,`month`)]
 |  partitions=24
 |
-01:EXCHANGE [HASH(year,month)]
+01:EXCHANGE [HASH(`year`,`month`)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=40.07KB
    row-size=89B cardinality=610
 ====
@@ -163,7 +163,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_co
 |  row-size=72B cardinality=unavailable
 |
 00:SCAN HDFS [functional_seq_snap.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=11.34KB
    row-size=72B cardinality=unavailable
 ---- DISTRIBUTEDPLAN
@@ -177,7 +177,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_co
 01:EXCHANGE [HASH(int_col,int_col)]
 |
 00:SCAN HDFS [functional_seq_snap.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=11.34KB
    row-size=72B cardinality=unavailable
 ====
@@ -192,20 +192,20 @@ from functional.alltypes
 where year=2009 and month>10
 group by year, month
 ---- PLAN
-WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(`year`,`month`)]
 |  partitions=24
 |
 02:SORT
-|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  order by: `year` ASC NULLS LAST, `month` ASC NULLS LAST
 |  row-size=80B cardinality=24
 |
 01:AGGREGATE [FINALIZE]
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
-|  group by: year, month
+|  group by: `year`, `month`
 |  row-size=80B cardinality=24
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=40.07KB
    row-size=89B cardinality=610
 ---- SCANRANGELOCATIONS
@@ -213,27 +213,27 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
 ---- DISTRIBUTEDPLAN
-WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(`year`,`month`)]
 |  partitions=24
 |
 04:SORT
-|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  order by: `year` ASC NULLS LAST, `month` ASC NULLS LAST
 |  row-size=80B cardinality=24
 |
 03:AGGREGATE [FINALIZE]
 |  output: min:merge(id), min:merge(bool_col), min:merge(tinyint_col), min:merge(smallint_col), min:merge(int_col), min:merge(bigint_col), min:merge(float_col), min:merge(double_col), min:merge(date_string_col), min:merge(string_col), min:merge(timestamp_col)
-|  group by: year, month
+|  group by: `year`, `month`
 |  row-size=80B cardinality=24
 |
-02:EXCHANGE [HASH(year,month)]
+02:EXCHANGE [HASH(`year`,`month`)]
 |
 01:AGGREGATE [STREAMING]
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
-|  group by: year, month
+|  group by: `year`, `month`
 |  row-size=80B cardinality=24
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=40.07KB
    row-size=89B cardinality=610
 ====
@@ -253,7 +253,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |  row-size=85B cardinality=610
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=40.07KB
    row-size=85B cardinality=610
 ---- SCANRANGELOCATIONS
@@ -268,10 +268,10 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |  order by: month ASC NULLS LAST
 |  row-size=85B cardinality=610
 |
-01:EXCHANGE [HASH(month)]
+01:EXCHANGE [HASH(`month`)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=40.07KB
    row-size=85B cardinality=610
 ====
@@ -286,20 +286,20 @@ from functional.alltypes
 where year=2009 and month>10
 group by month
 ---- PLAN
-WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,month)]
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,`month`)]
 |  partitions=12
 |
 02:SORT
-|  order by: month ASC NULLS LAST
+|  order by: `month` ASC NULLS LAST
 |  row-size=76B cardinality=12
 |
 01:AGGREGATE [FINALIZE]
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
-|  group by: month
+|  group by: `month`
 |  row-size=76B cardinality=12
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=40.07KB
    row-size=85B cardinality=610
 ---- SCANRANGELOCATIONS
@@ -307,27 +307,27 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
 ---- DISTRIBUTEDPLAN
-WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,month)]
+WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,`month`)]
 |  partitions=12
 |
 04:SORT
-|  order by: month ASC NULLS LAST
+|  order by: `month` ASC NULLS LAST
 |  row-size=76B cardinality=12
 |
 03:AGGREGATE [FINALIZE]
 |  output: min:merge(id), min:merge(bool_col), min:merge(tinyint_col), min:merge(smallint_col), min:merge(int_col), min:merge(bigint_col), min:merge(float_col), min:merge(double_col), min:merge(date_string_col), min:merge(string_col), min:merge(timestamp_col)
-|  group by: month
+|  group by: `month`
 |  row-size=76B cardinality=12
 |
-02:EXCHANGE [HASH(month)]
+02:EXCHANGE [HASH(`month`)]
 |
 01:AGGREGATE [STREAMING]
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
-|  group by: month
+|  group by: `month`
 |  row-size=76B cardinality=12
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month > 10
+   partition predicates: `year` = 2009, `month` > 10
    partitions=2/24 files=2 size=40.07KB
    row-size=85B cardinality=610
 ====
@@ -347,7 +347,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,4
 |  row-size=85B cardinality=300
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year > 2009, month = 4
+   partition predicates: `year` > 2009, `month` = 4
    partitions=1/24 files=1 size=19.71KB
    row-size=85B cardinality=300
 ---- SCANRANGELOCATIONS
@@ -362,7 +362,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,4
 |  row-size=85B cardinality=300
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year > 2009, month = 4
+   partition predicates: `year` > 2009, `month` = 4
    partitions=1/24 files=1 size=19.71KB
    row-size=85B cardinality=300
 ====
@@ -376,7 +376,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/24 files=1 size=19.95KB
    limit: 10
    row-size=81B cardinality=10
@@ -391,7 +391,7 @@ WRITE TO HDFS [functional.alltypesnopart, OVERWRITE=false]
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/24 files=1 size=19.95KB
    limit: 10
    row-size=81B cardinality=10
@@ -688,7 +688,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,1)]
 |  order by: year ASC NULLS LAST
 |  row-size=85B cardinality=7.30K
 |
-01:EXCHANGE [HASH(year)]
+01:EXCHANGE [HASH(`year`)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB

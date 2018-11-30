@@ -17,7 +17,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.allcomplextypes.int_map_col]
    partitions=0/0 files=0 size=0B
-   predicates: value < 10, key = 'test'
+   predicates: value < 10, `key` = 'test'
    row-size=16B cardinality=0
 ====
 # Scan of a deeply nested collection.
@@ -32,7 +32,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.allcomplextypes.complex_nested_struct_col.f2.f12]
    partitions=0/0 files=0 size=0B
-   predicates: key = 'test'
+   predicates: `key` = 'test'
    row-size=20B cardinality=0
 ====
 # Join on two nested collections with structs.
@@ -568,7 +568,7 @@ PLAN-ROOT SINK
 |
 |--04:NESTED LOOP JOIN [INNER JOIN]
 |  |  join predicates: b.f1 = a.id
-|  |  predicates: b.f1 < a.year
+|  |  predicates: b.f1 < a.`year`
 |  |  row-size=40B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
@@ -595,7 +595,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=0
 |
 |--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
-|  |  join predicates: b.f1 < a.year, b.f1 = a.id
+|  |  join predicates: b.f1 < a.`year`, b.f1 = a.id
 |  |  row-size=20B cardinality=1
 |  |
 |  |--02:SINGULAR ROW SRC
@@ -622,7 +622,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=0
 |
 |--04:NESTED LOOP JOIN [LEFT SEMI JOIN]
-|  |  join predicates: b.f1 < a.year, b.f1 = a.id
+|  |  join predicates: b.f1 < a.`year`, b.f1 = a.id
 |  |  row-size=20B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
@@ -649,7 +649,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=0
 |
 |--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
-|  |  join predicates: b.f1 < a.year, b.f1 = a.id
+|  |  join predicates: b.f1 < a.`year`, b.f1 = a.id
 |  |  row-size=20B cardinality=1
 |  |
 |  |--02:SINGULAR ROW SRC
@@ -676,7 +676,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=0
 |
 |--04:NESTED LOOP JOIN [LEFT ANTI JOIN]
-|  |  join predicates: b.f1 < a.year, b.f1 = a.id
+|  |  join predicates: b.f1 < a.`year`, b.f1 = a.id
 |  |  row-size=20B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
@@ -703,7 +703,7 @@ PLAN-ROOT SINK
 |  row-size=28B cardinality=0
 |
 |--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
-|  |  join predicates: b.f1 < a.year, b.f1 = a.id
+|  |  join predicates: b.f1 < a.`year`, b.f1 = a.id
 |  |  row-size=28B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
@@ -730,7 +730,7 @@ PLAN-ROOT SINK
 |  row-size=40B cardinality=0
 |
 |--04:NESTED LOOP JOIN [LEFT OUTER JOIN]
-|  |  join predicates: b.f1 < a.year, b.f1 = a.id
+|  |  join predicates: b.f1 < a.`year`, b.f1 = a.id
 |  |  row-size=40B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
@@ -757,7 +757,7 @@ PLAN-ROOT SINK
 |  row-size=40B cardinality=0
 |
 |--04:NESTED LOOP JOIN [FULL OUTER JOIN]
-|  |  join predicates: b.f1 < a.year, b.f1 = a.id
+|  |  join predicates: b.f1 < a.`year`, b.f1 = a.id
 |  |  predicates: a.id < 10, b.f1 % 2 = 0
 |  |  row-size=40B cardinality=11
 |  |
@@ -794,7 +794,7 @@ PLAN-ROOT SINK
 |  |     row-size=0B cardinality=10
 |  |
 |  09:NESTED LOOP JOIN [LEFT OUTER JOIN]
-|  |  join predicates: (a.month < 4 OR d.f1 > 5)
+|  |  join predicates: (a.`month` < 4 OR d.f1 > 5)
 |  |  row-size=76B cardinality=1
 |  |
 |  |--05:UNNEST [a.struct_array_col d]
@@ -808,7 +808,7 @@ PLAN-ROOT SINK
 |  |     row-size=0B cardinality=10
 |  |
 |  07:NESTED LOOP JOIN [INNER JOIN]
-|  |  join predicates: c.value = a.year
+|  |  join predicates: c.value = a.`year`
 |  |  row-size=64B cardinality=10
 |  |
 |  |--02:SINGULAR ROW SRC
@@ -1319,7 +1319,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=0
 |
 |--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
-|  |  join predicates: a.year < b.item, b.item = id
+|  |  join predicates: a.`year` < b.item, b.item = id
 |  |  row-size=20B cardinality=1
 |  |
 |  |--02:SINGULAR ROW SRC
@@ -1374,7 +1374,7 @@ PLAN-ROOT SINK
 |
 |--04:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  |  hash predicates: id = b.item
-|  |  other join predicates: a.year < b.item
+|  |  other join predicates: a.`year` < b.item
 |  |  row-size=20B cardinality=1
 |  |
 |  |--03:UNNEST [a.int_array_col b]
@@ -1837,7 +1837,7 @@ PLAN-ROOT SINK
 |  |  |     row-size=28B cardinality=1
 |  |  |
 |  |  08:UNNEST [c.f12]
-|  |     predicates: coalesce(key, CAST(f21 AS STRING)) = 'test3'
+|  |     predicates: coalesce(`key`, CAST(f21 AS STRING)) = 'test3'
 |  |     row-size=20B cardinality=10
 |  |
 |  05:UNNEST [t.complex_nested_struct_col.f2 c]
@@ -1847,7 +1847,7 @@ PLAN-ROOT SINK
    partitions=0/0 files=0 size=0B
    predicates: t.id < 200, !empty(t.complex_nested_struct_col.f2), !empty(t.int_array_col)
    predicates on a: a.item >= 10, a.item <= 20, a.item % 2 = 0
-   predicates on m: m.key = 'test', m.value != 30
+   predicates on m: m.`key` = 'test', m.value != 30
    predicates on c: c.f11 >= 10, c.f11 <= 20, c.f11 % 2 = 0
    predicates on f12: f12.key = 'test2'
    row-size=48B cardinality=0
@@ -1948,15 +1948,15 @@ PLAN-ROOT SINK
 |  |
 |  06:ANALYTIC
 |  |  functions: count(*)
-|  |  partition by: key
+|  |  partition by: `key`
 |  |  row-size=20B cardinality=10
 |  |
 |  05:SORT
-|  |  order by: key ASC NULLS FIRST
+|  |  order by: `key` ASC NULLS FIRST
 |  |  row-size=12B cardinality=10
 |  |
 |  04:AGGREGATE [FINALIZE]
-|  |  group by: key
+|  |  group by: `key`
 |  |  row-size=12B cardinality=10
 |  |
 |  03:UNNEST [t.int_map_col]

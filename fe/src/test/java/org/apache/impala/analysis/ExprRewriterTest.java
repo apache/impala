@@ -304,9 +304,9 @@ public class ExprRewriterTest extends AnalyzerTest {
         "insert into functional.alltypes(id) partition(year=2009, month=10) " +
         "select 1 + 1",
         "INSERT INTO TABLE functional.alltypes(id) " +
-        "PARTITION (year=2009, month=10) SELECT 1 + 1",
+        "PARTITION (`year`=2009, `month`=10) SELECT 1 + 1",
         "INSERT INTO TABLE functional.alltypes(id) " +
-        "PARTITION (year=2009, month=10) SELECT 2");
+        "PARTITION (`year`=2009, `month`=10) SELECT 2");
 
     if (RuntimeEnv.INSTANCE.isKuduSupported()) {
       // Update.
@@ -386,9 +386,9 @@ public class ExprRewriterTest extends AnalyzerTest {
             + " over(partition by year order by id) as s from functional.alltypes) v "
             + " where year = 2009 and id = 1 and"
             + " int_col < 10 and s = 4",
-        "SELECT * FROM (SELECT id, int_col, year, sum(int_col)"
-            + " OVER (PARTITION BY year ORDER BY id ASC) s FROM functional.alltypes) v"
-            + " WHERE year = CAST(2009 AS INT) AND id = CAST(1 AS INT) AND"
+        "SELECT * FROM (SELECT id, int_col, `year`, sum(int_col)"
+            + " OVER (PARTITION BY `year` ORDER BY id ASC) s FROM functional.alltypes) v"
+            + " WHERE `year` = CAST(2009 AS INT) AND id = CAST(1 AS INT) AND"
             + " int_col < CAST(10 AS INT) AND s = CAST(4 AS BIGINT)");
     assertToSqlWithImplicitCasts(ctx,
         "select * from functional.alltypes where "

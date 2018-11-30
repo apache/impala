@@ -83,7 +83,7 @@ row_regex:.*Max Per-Host Resource Reservation: Memory=.*
 row_regex:.*Per-Host Resource Estimates: Memory=.*
 'Codegen disabled by planner'
 row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes WHERE.*
-'month IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT))'
+'`month` IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT))'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*mem-estimate=.* mem-reservation=.*
@@ -91,7 +91,7 @@ row_regex:.*mem-estimate=.* mem-reservation=.*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
-'   partition predicates: month IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT))'
+'   partition predicates: `month` IN (CAST(1 AS INT), CAST(2 AS INT), CAST(3 AS INT))'
 row_regex:.*partitions=3/12 files=3 size=.*
 '   stored statistics:'
 row_regex:.*table: rows=3650 size=.*
@@ -142,7 +142,7 @@ row_regex:.*Max Per-Host Resource Reservation: Memory=.*
 row_regex:.*Per-Host Resource Estimates: Memory=16MB.*
 'Codegen disabled by planner'
 row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes WHERE.*
-'year = CAST(2010 AS INT)'
+'`year` = CAST(2010 AS INT)'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
@@ -150,7 +150,7 @@ row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
-'   partition predicates: year = CAST(2010 AS INT)'
+'   partition predicates: `year` = CAST(2010 AS INT)'
 row_regex:.*partitions=12/24 files=12 size=.*
 '   stored statistics:'
 row_regex:.*table: rows=3650 size=.*
@@ -172,7 +172,7 @@ row_regex:.*Max Per-Host Resource Reservation: Memory=.*
 row_regex:.*Per-Host Resource Estimates: Memory=16MB.*
 'Codegen disabled by planner'
 row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes WHERE.*
-'year = CAST(2010 AS INT)'
+'`year` = CAST(2010 AS INT)'
 ''
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
@@ -180,7 +180,7 @@ row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN HDFS [$DATABASE.alltypes]'
-'   partition predicates: year = CAST(2010 AS INT)'
+'   partition predicates: `year` = CAST(2010 AS INT)'
 row_regex:.*partitions=12/24 files=12 size=.*
 '   stored statistics:'
 row_regex:.*table: rows=10950 size=.*

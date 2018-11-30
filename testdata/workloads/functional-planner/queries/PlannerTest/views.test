@@ -544,7 +544,7 @@ select * from functional.alltypes_parens
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/24 files=1 size=19.95KB
    predicates: (int_col < 100 OR bool_col = FALSE)
    row-size=89B cardinality=31
@@ -554,7 +554,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/24 files=1 size=19.95KB
    predicates: (int_col < 100 OR bool_col = FALSE)
    row-size=89B cardinality=31

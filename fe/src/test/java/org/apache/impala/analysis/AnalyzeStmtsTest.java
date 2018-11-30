@@ -3814,7 +3814,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "float_col, double_col, date_string_col, tinyint_col, timestamp_col, " +
         "year, string_col from functional.alltypes",
         "Target table 'functional.alltypes' is incompatible with source expressions.\n" +
-        "Expression 'month' (type: INT) is not compatible with column 'string_col'" +
+        "Expression '`month`' (type: INT) is not compatible with column 'string_col'" +
         " (type: STRING)");
 
     // Empty permutation and no query statement

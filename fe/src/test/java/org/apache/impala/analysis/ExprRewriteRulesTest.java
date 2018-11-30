@@ -511,7 +511,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
 
     // IMPALA-5016: Simplify COALESCE function
     // Test skipping leading nulls.
-    RewritesOk("coalesce(null, id, year)", rule, "coalesce(id, year)");
+    RewritesOk("coalesce(null, id, year)", rule, "coalesce(id, `year`)");
     RewritesOk("coalesce(null, 1, id)", rule, "1");
     RewritesOk("coalesce(null, null, id)", rule, "id");
     // If the leading parameter is a non-NULL constant, rewrite to that constant.
@@ -526,10 +526,10 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     // Combine COALESCE rule with FoldConstantsRule.
     RewritesOk("coalesce(1 + 2, id, year)", rules, "3");
     RewritesOk("coalesce(null is null, bool_col)", rules, "TRUE");
-    RewritesOk("coalesce(10 + null, id, year)", rules, "coalesce(id, year)");
+    RewritesOk("coalesce(10 + null, id, year)", rules, "coalesce(id, `year`)");
     // Don't rewrite based on nullability of slots. TODO (IMPALA-5753).
     RewritesOk("coalesce(year, id)", rule, null);
-    RewritesOk("functional_kudu.alltypessmall", "coalesce(id, year)", rule, null);
+    RewritesOk("functional_kudu.alltypessmall", "coalesce(id, `year`)", rule, null);
     // IMPALA-7419: coalesce that gets simplified and contains an aggregate
     RewritesOk("coalesce(null, min(distinct tinyint_col), 42)", rule,
         "coalesce(min(tinyint_col), 42)");

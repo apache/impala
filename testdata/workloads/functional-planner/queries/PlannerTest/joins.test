@@ -160,18 +160,18 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: a.id = b.id, a.int_col = b.int_col
-|  other predicates: a.tinyint_col = 15, a.day >= 6, a.tinyint_col + b.tinyint_col < 15
+|  other predicates: a.tinyint_col = 15, a.`day` >= 6, a.tinyint_col + b.tinyint_col < 15
 |  runtime filters: RF000 <- b.id, RF001 <- b.int_col
 |  row-size=184B cardinality=5
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partition predicates: b.month > 2
+|     partition predicates: b.`month` > 2
 |     partitions=2/4 files=2 size=3.17KB
 |     predicates: b.string_col = '15'
 |     row-size=89B cardinality=5
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partition predicates: a.day >= 6
+   partition predicates: a.`day` >= 6
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.id, RF001 -> a.int_col
@@ -183,14 +183,14 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: a.id = b.id, a.int_col = b.int_col
-|  other predicates: a.tinyint_col = 15, a.day >= 6, a.tinyint_col + b.tinyint_col < 15
+|  other predicates: a.tinyint_col = 15, a.`day` >= 6, a.tinyint_col + b.tinyint_col < 15
 |  runtime filters: RF000 <- b.id, RF001 <- b.int_col
 |  row-size=184B cardinality=5
 |
 |--04:EXCHANGE [HASH(b.id,b.int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
-|     partition predicates: b.month > 2
+|     partition predicates: b.`month` > 2
 |     partitions=2/4 files=2 size=3.17KB
 |     predicates: b.string_col = '15'
 |     row-size=89B cardinality=5
@@ -198,7 +198,7 @@ PLAN-ROOT SINK
 03:EXCHANGE [HASH(a.id,a.int_col)]
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partition predicates: a.day >= 6
+   partition predicates: a.`day` >= 6
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.id, RF001 -> a.int_col
@@ -223,7 +223,7 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: c.id = a.id, c.string_col = b.string_col
-|  other predicates: a.tinyint_col = 15, b.string_col = '15', a.day >= 6, b.month > 2, a.float_col - c.double_col < 0, a.tinyint_col + b.tinyint_col < 15, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
+|  other predicates: a.tinyint_col = 15, b.string_col = '15', a.`day` >= 6, b.`month` > 2, a.float_col - c.double_col < 0, a.tinyint_col + b.tinyint_col < 15, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
 |  row-size=279B cardinality=2.00K
 |
 |--03:HASH JOIN [FULL OUTER JOIN]
@@ -231,19 +231,19 @@ PLAN-ROOT SINK
 |  |  row-size=184B cardinality=561
 |  |
 |  |--01:SCAN HDFS [functional.alltypessmall b]
-|  |     partition predicates: b.month > 2
+|  |     partition predicates: b.`month` > 2
 |  |     partitions=2/4 files=2 size=3.17KB
 |  |     predicates: b.string_col = '15'
 |  |     row-size=89B cardinality=5
 |  |
 |  00:SCAN HDFS [functional.alltypesagg a]
-|     partition predicates: a.day >= 6
+|     partition predicates: a.`day` >= 6
 |     partitions=5/11 files=5 size=372.38KB
 |     predicates: a.tinyint_col = 15
 |     row-size=95B cardinality=556
 |
 02:SCAN HDFS [functional.alltypesaggnonulls c]
-   partition predicates: c.day < 3
+   partition predicates: c.`day` < 3
    partitions=2/10 files=2 size=148.10KB
    row-size=95B cardinality=2.00K
 ---- DISTRIBUTEDPLAN
@@ -253,14 +253,14 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: a.id = c.id, b.string_col = c.string_col
-|  other predicates: a.tinyint_col = 15, b.string_col = '15', a.day >= 6, b.month > 2, a.float_col - c.double_col < 0, a.tinyint_col + b.tinyint_col < 15, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
+|  other predicates: a.tinyint_col = 15, b.string_col = '15', a.`day` >= 6, b.`month` > 2, a.float_col - c.double_col < 0, a.tinyint_col + b.tinyint_col < 15, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
 |  runtime filters: RF000 <- c.id, RF001 <- c.string_col
 |  row-size=279B cardinality=2.00K
 |
 |--08:EXCHANGE [HASH(c.id,c.string_col)]
 |  |
 |  02:SCAN HDFS [functional.alltypesaggnonulls c]
-|     partition predicates: c.day < 3
+|     partition predicates: c.`day` < 3
 |     partitions=2/10 files=2 size=148.10KB
 |     row-size=95B cardinality=2.00K
 |
@@ -273,7 +273,7 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [HASH(b.id,b.int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
-|     partition predicates: b.month > 2
+|     partition predicates: b.`month` > 2
 |     partitions=2/4 files=2 size=3.17KB
 |     predicates: b.string_col = '15'
 |     runtime filters: RF001 -> b.string_col
@@ -282,7 +282,7 @@ PLAN-ROOT SINK
 05:EXCHANGE [HASH(a.id,a.int_col)]
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partition predicates: a.day >= 6
+   partition predicates: a.`day` >= 6
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.id
@@ -412,7 +412,7 @@ PLAN-ROOT SINK
 |     row-size=107B cardinality=1
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partition predicates: a.day >= 6
+   partition predicates: a.`day` >= 6
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.int_col, RF001 -> a.id
@@ -446,7 +446,7 @@ PLAN-ROOT SINK
 |     row-size=107B cardinality=1
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partition predicates: a.day >= 6
+   partition predicates: a.`day` >= 6
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.int_col, RF001 -> a.id
@@ -474,7 +474,7 @@ PLAN-ROOT SINK
 |--01:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partition predicates: a.day >= 6
+   partition predicates: a.`day` >= 6
    partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.int_col, RF001 -> a.id
@@ -506,7 +506,7 @@ limit 5
 PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=5]
-|  order by: count(x.day) ASC
+|  order by: count(x.`day`) ASC
 |  row-size=9B cardinality=1
 |
 09:AGGREGATE [FINALIZE]
@@ -559,7 +559,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 10:TOP-N [LIMIT=5]
-|  order by: count(x.day) ASC
+|  order by: count(x.`day`) ASC
 |  row-size=9B cardinality=1
 |
 09:AGGREGATE [FINALIZE]
@@ -1580,13 +1580,13 @@ PLAN-ROOT SINK
 |  |  row-size=17B cardinality=7
 |  |
 |  |--02:SCAN HDFS [functional.alltypessmall]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=1.58KB
 |  |     predicates: functional.alltypessmall.id < 5
 |  |     row-size=17B cardinality=3
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=1.57KB
 |     predicates: functional.alltypessmall.id < 5
 |     row-size=17B cardinality=3
@@ -1629,13 +1629,13 @@ PLAN-ROOT SINK
 |  |  row-size=17B cardinality=7
 |  |
 |  |--03:SCAN HDFS [functional.alltypessmall]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=1.58KB
 |  |     predicates: functional.alltypessmall.id < 5
 |  |     row-size=17B cardinality=3
 |  |
 |  02:SCAN HDFS [functional.alltypessmall]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=1.57KB
 |     predicates: functional.alltypessmall.id < 5
 |     row-size=17B cardinality=3
@@ -1684,13 +1684,13 @@ PLAN-ROOT SINK
 |  |  row-size=17B cardinality=7
 |  |
 |  |--05:SCAN HDFS [functional.alltypessmall]
-|  |     partition predicates: year = 2009, month = 2
+|  |     partition predicates: `year` = 2009, `month` = 2
 |  |     partitions=1/4 files=1 size=1.58KB
 |  |     predicates: functional.alltypessmall.id < 5
 |  |     row-size=17B cardinality=3
 |  |
 |  04:SCAN HDFS [functional.alltypessmall]
-|     partition predicates: year = 2009, month = 1
+|     partition predicates: `year` = 2009, `month` = 1
 |     partitions=1/4 files=1 size=1.57KB
 |     predicates: functional.alltypessmall.id < 5
 |     row-size=17B cardinality=3
@@ -1702,12 +1702,12 @@ PLAN-ROOT SINK
 |  row-size=17B cardinality=51
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partition predicates: year = 2009, month = 2
+|     partition predicates: `year` = 2009, `month` = 2
 |     partitions=1/4 files=1 size=1.58KB
 |     row-size=17B cardinality=25
 |
 01:SCAN HDFS [functional.alltypessmall]
-   partition predicates: year = 2009, month = 1
+   partition predicates: `year` = 2009, `month` = 1
    partitions=1/4 files=1 size=1.57KB
    row-size=17B cardinality=25
 ====
@@ -2736,7 +2736,7 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: c.id = a.id, c.string_col IS NOT DISTINCT FROM b.string_col
-|  other predicates: a.tinyint_col = 15, b.string_col = '15', a.day >= 6, b.month > 2, a.float_col - c.double_col < 0, a.tinyint_col + b.tinyint_col < 15, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
+|  other predicates: a.tinyint_col = 15, b.string_col = '15', a.`day` >= 6, b.`month` > 2, a.float_col - c.double_col < 0, a.tinyint_col + b.tinyint_col < 15, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
 |  row-size=279B cardinality=2.00K
 |
 |--03:HASH JOIN [FULL OUTER JOIN]
@@ -2744,19 +2744,19 @@ PLAN-ROOT SINK
 |  |  row-size=184B cardinality=561
 |  |
 |  |--01:SCAN HDFS [functional.alltypessmall b]
-|  |     partition predicates: b.month > 2
+|  |     partition predicates: b.`month` > 2
 |  |     partitions=2/4 files=2 size=3.17KB
 |  |     predicates: b.string_col = '15'
 |  |     row-size=89B cardinality=5
 |  |
 |  00:SCAN HDFS [functional.alltypesagg a]
-|     partition predicates: a.day >= 6
+|     partition predicates: a.`day` >= 6
 |     partitions=5/11 files=5 size=372.38KB
 |     predicates: a.tinyint_col = 15
 |     row-size=95B cardinality=556
 |
 02:SCAN HDFS [functional.alltypesaggnonulls c]
-   partition predicates: c.day < 3
+   partition predicates: c.`day` < 3
    partitions=2/10 files=2 size=148.10KB
    row-size=95B cardinality=2.00K
 ====

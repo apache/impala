@@ -72,17 +72,17 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(int_col)
-|  group by: year
+|  group by: `year`
 |  row-size=12B cardinality=2
 |
 04:AGGREGATE
-|  group by: year, int_col
+|  group by: `year`, int_col
 |  row-size=8B cardinality=20
 |
-03:EXCHANGE [HASH(year)]
+03:EXCHANGE [HASH(`year`)]
 |
 01:AGGREGATE [STREAMING]
-|  group by: year, int_col
+|  group by: `year`, int_col
 |  row-size=8B cardinality=20
 |
 00:SCAN HDFS [functional.alltypes]
@@ -100,24 +100,24 @@ PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(int_col)
-|  group by: year
+|  group by: `year`
 |  row-size=12B cardinality=2
 |
-05:EXCHANGE [HASH(year)]
+05:EXCHANGE [HASH(`year`)]
 |
 02:AGGREGATE [STREAMING]
 |  output: count(int_col)
-|  group by: year
+|  group by: `year`
 |  row-size=12B cardinality=2
 |
 04:AGGREGATE
-|  group by: year, int_col
+|  group by: `year`, int_col
 |  row-size=8B cardinality=20
 |
-03:EXCHANGE [HASH(year,int_col)]
+03:EXCHANGE [HASH(`year`,int_col)]
 |
 01:AGGREGATE [STREAMING]
-|  group by: year, int_col
+|  group by: `year`, int_col
 |  row-size=8B cardinality=20
 |
 00:SCAN HDFS [functional.alltypes]
@@ -217,29 +217,29 @@ PLAN-ROOT SINK
 |
 04:AGGREGATE [FINALIZE]
 |  output: count(a.int_col)
-|  group by: a.year
+|  group by: a.`year`
 |  row-size=12B cardinality=2
 |
 03:AGGREGATE
-|  group by: a.year, a.int_col
+|  group by: a.`year`, a.int_col
 |  row-size=8B cardinality=20
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: a.year = b.year
-|  runtime filters: RF000 <- b.year
+|  hash predicates: a.`year` = b.`year`
+|  runtime filters: RF000 <- b.`year`
 |  row-size=12B cardinality=26.64M
 |
-|--06:EXCHANGE [HASH(b.year)]
+|--06:EXCHANGE [HASH(b.`year`)]
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |     row-size=4B cardinality=7.30K
 |
-05:EXCHANGE [HASH(a.year)]
+05:EXCHANGE [HASH(a.`year`)]
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> a.year
+   runtime filters: RF000 -> a.`year`
    row-size=8B cardinality=7.30K
 ====
 select count(distinct a.int_col) from functional.alltypes a inner join [shuffle]
@@ -254,42 +254,42 @@ PLAN-ROOT SINK
 |
 10:AGGREGATE [FINALIZE]
 |  output: count:merge(a.int_col)
-|  group by: a.year
+|  group by: a.`year`
 |  row-size=12B cardinality=2
 |
-09:EXCHANGE [HASH(a.year)]
+09:EXCHANGE [HASH(a.`year`)]
 |
 04:AGGREGATE [STREAMING]
 |  output: count(a.int_col)
-|  group by: a.year
+|  group by: a.`year`
 |  row-size=12B cardinality=2
 |
 08:AGGREGATE
-|  group by: a.year, a.int_col
+|  group by: a.`year`, a.int_col
 |  row-size=8B cardinality=20
 |
-07:EXCHANGE [HASH(a.year,a.int_col)]
+07:EXCHANGE [HASH(a.`year`,a.int_col)]
 |
 03:AGGREGATE [STREAMING]
-|  group by: a.year, a.int_col
+|  group by: a.`year`, a.int_col
 |  row-size=8B cardinality=20
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: a.year = b.year
-|  runtime filters: RF000 <- b.year
+|  hash predicates: a.`year` = b.`year`
+|  runtime filters: RF000 <- b.`year`
 |  row-size=12B cardinality=26.64M
 |
-|--06:EXCHANGE [HASH(b.year)]
+|--06:EXCHANGE [HASH(b.`year`)]
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |     row-size=4B cardinality=7.30K
 |
-05:EXCHANGE [HASH(a.year)]
+05:EXCHANGE [HASH(a.`year`)]
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> a.year
+   runtime filters: RF000 -> a.`year`
    row-size=8B cardinality=7.30K
 ====
 # The input is partitioned by distinct exprs + grouping exprs
@@ -306,36 +306,36 @@ PLAN-ROOT SINK
 |
 08:AGGREGATE [FINALIZE]
 |  output: count:merge(a.int_col)
-|  group by: a.year
+|  group by: a.`year`
 |  row-size=12B cardinality=2
 |
-07:EXCHANGE [HASH(a.year)]
+07:EXCHANGE [HASH(a.`year`)]
 |
 04:AGGREGATE [STREAMING]
 |  output: count(a.int_col)
-|  group by: a.year
+|  group by: a.`year`
 |  row-size=12B cardinality=2
 |
 03:AGGREGATE
-|  group by: a.year, a.int_col
+|  group by: a.`year`, a.int_col
 |  row-size=8B cardinality=20
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: a.int_col = b.int_col, a.year = b.year
-|  runtime filters: RF000 <- b.int_col, RF001 <- b.year
+|  hash predicates: a.`year` = b.`year`, a.int_col = b.int_col
+|  runtime filters: RF000 <- b.`year`, RF001 <- b.int_col
 |  row-size=16B cardinality=5.33M
 |
-|--06:EXCHANGE [HASH(b.int_col,b.year)]
+|--06:EXCHANGE [HASH(b.`year`,b.int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |     row-size=8B cardinality=7.30K
 |
-05:EXCHANGE [HASH(a.int_col,a.year)]
+05:EXCHANGE [HASH(a.`year`,a.int_col)]
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> a.int_col, RF001 -> a.year
+   runtime filters: RF000 -> a.`year`, RF001 -> a.int_col
    row-size=8B cardinality=7.30K
 ====
 select count(distinct a.int_col) from functional.alltypes a inner join [shuffle]
@@ -351,34 +351,34 @@ PLAN-ROOT SINK
 |
 04:AGGREGATE [FINALIZE]
 |  output: count(a.int_col)
-|  group by: a.year
+|  group by: a.`year`
 |  row-size=12B cardinality=2
 |
 08:AGGREGATE
-|  group by: a.year, a.int_col
+|  group by: a.`year`, a.int_col
 |  row-size=8B cardinality=20
 |
-07:EXCHANGE [HASH(a.year)]
+07:EXCHANGE [HASH(a.`year`)]
 |
 03:AGGREGATE [STREAMING]
-|  group by: a.year, a.int_col
+|  group by: a.`year`, a.int_col
 |  row-size=8B cardinality=20
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: a.int_col = b.int_col, a.year = b.year
-|  runtime filters: RF000 <- b.int_col, RF001 <- b.year
+|  hash predicates: a.`year` = b.`year`, a.int_col = b.int_col
+|  runtime filters: RF000 <- b.`year`, RF001 <- b.int_col
 |  row-size=16B cardinality=5.33M
 |
-|--06:EXCHANGE [HASH(b.int_col,b.year)]
+|--06:EXCHANGE [HASH(b.`year`,b.int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
 |     row-size=8B cardinality=7.30K
 |
-05:EXCHANGE [HASH(a.int_col,a.year)]
+05:EXCHANGE [HASH(a.`year`,a.int_col)]
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> a.int_col, RF001 -> a.year
+   runtime filters: RF000 -> a.`year`, RF001 -> a.int_col
    row-size=8B cardinality=7.30K
 ====

@@ -938,13 +938,18 @@ public class InsertStmt extends StatementBase {
     strBuilder.append(" TABLE " + originalTableName_);
     if (columnPermutation_ != null) {
       strBuilder.append("(");
-      strBuilder.append(Joiner.on(", ").join(columnPermutation_));
+      String sep = "";
+      for (String col : columnPermutation_) {
+        strBuilder.append(sep);
+        strBuilder.append(ToSqlUtils.getIdentSql(col));
+        sep = ", ";
+      }
       strBuilder.append(")");
     }
     if (partitionKeyValues_ != null) {
       List<String> values = new ArrayList<>();
       for (PartitionKeyValue pkv: partitionKeyValues_) {
-        values.add(pkv.getColName()
+        values.add(ToSqlUtils.getIdentSql(pkv.getColName())
             + (pkv.getValue() != null ? ("=" + pkv.getValue().toSql(options)) : ""));
       }
       strBuilder.append(" PARTITION (" + Joiner.on(", ").join(values) + ")");

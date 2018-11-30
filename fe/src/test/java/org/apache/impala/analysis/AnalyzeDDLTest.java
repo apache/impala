@@ -156,11 +156,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Arbitrary exprs as partition key values. Non-partition columns should fail.
     AnalysisError("alter table functional.alltypes drop " +
         "partition(year=2050, month=int_col) ",
-        "Partition exprs cannot contain non-partition column(s): month = int_col.");
+        "Partition exprs cannot contain non-partition column(s): `month` = int_col.");
     AnalysisError("alter table functional.alltypes drop " +
         "partition(year=cast(int_col as int), month=12) ",
         "Partition exprs cannot contain non-partition column(s): " +
-        "year = CAST(int_col AS INT).");
+        "`year` = CAST(int_col AS INT).");
 
     // IF NOT EXISTS properly checks for partition existence
     AnalyzesOk("alter table functional.alltypes add " +
@@ -758,8 +758,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional.alltypestiny partition (year=2009,month=1) " +
         "set location '/test-warehouse/new_location'",
         "Target partition is cached, please uncache before changing the location " +
-        "using: ALTER TABLE functional.alltypestiny PARTITION (year = 2009, month = 1) " +
-        "SET UNCACHED");
+        "using: ALTER TABLE functional.alltypestiny " +
+        "PARTITION (`year` = 2009, `month` = 1) SET UNCACHED");
 
     // Table/db/partition do not exist
     AnalysisError("alter table baddb.alltypestiny set cached in 'testPool'",

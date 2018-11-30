@@ -181,6 +181,7 @@ public class PrintUtils {
       String line = split[i];
       String wrappedLine = WordUtils.wrap(line, wrapLength, null, true);
       // we keep any existing newlines in text - these should be commented hints
+      wrappedLine = wrappedLine.replaceAll(" +$", "");
       ret.append(wrappedLine);
       if (i < split.length - 1) ret.append("\n");
     }

@@ -18,16 +18,21 @@
 package org.apache.impala.analysis;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FrontendTestBase;
@@ -37,6 +42,96 @@ import org.junit.Test;
 import com.google.common.collect.Lists;
 
 public class ToSqlUtilsTest extends FrontendTestBase {
+
+  @Test
+  public void testRemoveHiddenProperties() {
+    Map<String,String> props = new HashMap<>();
+    for (String kw : ToSqlUtils.HIDDEN_TABLE_PROPERTIES) {
+      props.put(kw, kw + "-value");
+    }
+    props.put("foo", "foo-value");
+    ToSqlUtils.removeHiddenTableProperties(props);
+    assertEquals(1, props.size());
+    assertEquals("foo-value", props.get("foo"));
+  }
+
+  @Test
+  public void testRemoveHiddenKuduProperties() {
+    Map<String,String> props = new HashMap<>();
+    props.put(KuduTable.KEY_TABLE_NAME, "kudu-value");
+    props.put("foo", "foo-value");
+    ToSqlUtils.removeHiddenKuduTableProperties(props);
+    assertEquals(1, props.size());
+    assertEquals("foo-value", props.get("foo"));
+  }
+
+  @Test
+  public void testGetSortColumns() {
+    Map<String,String> props = new HashMap<>();
+    props.put("foo", "foo-value");
+    // Returns null if no sort cols property
+    assertNull(ToSqlUtils.getSortColumns(props));
+
+    // Degenerate case
+    props.put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS, "");
+    List<String> sortCols = ToSqlUtils.getSortColumns(props);
+    assertTrue(sortCols.isEmpty());
+
+    // One column
+    props.put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS, "col1");
+    sortCols = ToSqlUtils.getSortColumns(props);
+    assertEquals(1, sortCols.size());
+    assertEquals("col1", sortCols.get(0));
+
+    // One column with padding
+    props.put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS, " col1 ");
+    sortCols = ToSqlUtils.getSortColumns(props);
+    assertEquals(1, sortCols.size());
+    assertEquals("col1", sortCols.get(0));
+
+    // One column with spaces in name
+    props.put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS, " col 1 ");
+    sortCols = ToSqlUtils.getSortColumns(props);
+    assertEquals(1, sortCols.size());
+    assertEquals("col 1", sortCols.get(0));
+
+    // Spurious commas
+    props.put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS, ",col1,");
+    sortCols = ToSqlUtils.getSortColumns(props);
+    assertEquals(1, sortCols.size());
+    assertEquals("col1", sortCols.get(0));
+
+    // Spurious commas and spaces
+    props.put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS, " , col1 , ");
+    sortCols = ToSqlUtils.getSortColumns(props);
+    assertEquals(1, sortCols.size());
+    assertEquals("col1", sortCols.get(0));
+
+    // Two columns
+    props.put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS, "col1,col2");
+    sortCols = ToSqlUtils.getSortColumns(props);
+    assertEquals(2, sortCols.size());
+    assertEquals("col1", sortCols.get(0));
+    assertEquals("col2", sortCols.get(1));
+
+    // Two columns with extra commas and spaces
+    props.put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS, " col1 ,, col2 ");
+    sortCols = ToSqlUtils.getSortColumns(props);
+    assertEquals(2, sortCols.size());
+    assertEquals("col1", sortCols.get(0));
+    assertEquals("col2", sortCols.get(1));
+
+    // Three columns
+    props.put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS, "col1,col2,col3");
+    sortCols = ToSqlUtils.getSortColumns(props);
+    assertEquals(3, sortCols.size());
+    assertEquals("col1", sortCols.get(0));
+    assertEquals("col2", sortCols.get(1));
+    assertEquals("col3", sortCols.get(2));
+
+    // Note: this method cannot handle a the pathological case of a
+    // quoted column with a comma in the name: `foo,bar`.
+  }
 
   private FeTable getTable(String dbName, String tableName) {
     FeTable table = catalog_.getOrLoadTable(dbName, tableName);
@@ -48,6 +143,85 @@ public class ToSqlUtilsTest extends FrontendTestBase {
     FeTable table = getTable(dbName, tableName);
     assertTrue(table instanceof FeView);
     return (FeView) table;
+  }
+
+  @Test
+  public void testHiveNeedsQuotes() {
+    // Regular old ident
+    assertFalse(ToSqlUtils.hiveNeedsQuotes("foo"));
+    // Operator
+    assertTrue(ToSqlUtils.hiveNeedsQuotes("+"));
+    // Keyword
+    assertTrue(ToSqlUtils.hiveNeedsQuotes("SELECT"));
+    assertTrue(ToSqlUtils.hiveNeedsQuotes("select"));
+    assertTrue(ToSqlUtils.hiveNeedsQuotes("sElEcT"));
+    // Two idents
+    assertTrue(ToSqlUtils.hiveNeedsQuotes("foo bar"));
+    // Expression
+    assertTrue(ToSqlUtils.hiveNeedsQuotes("a+b"));
+    assertFalse(ToSqlUtils.hiveNeedsQuotes("123ab"));
+    assertTrue(ToSqlUtils.hiveNeedsQuotes("123.a"));
+  }
+
+  @Test
+  public void testImpalaNeedsQuotes() {
+    // Regular old ident
+    assertFalse(ToSqlUtils.impalaNeedsQuotes("foo"));
+    // Keyword
+    assertTrue(ToSqlUtils.impalaNeedsQuotes("SELECT"));
+    assertTrue(ToSqlUtils.impalaNeedsQuotes("select"));
+    assertTrue(ToSqlUtils.impalaNeedsQuotes("sElEcT"));
+    // Special case checks for numbers
+    assertTrue(ToSqlUtils.impalaNeedsQuotes("123"));
+    assertTrue(ToSqlUtils.impalaNeedsQuotes("123a"));
+    assertFalse(ToSqlUtils.impalaNeedsQuotes("a123"));
+
+    // Note: the Impala check can't detect multi-part
+    // symbols "a b" nor operators. Rely on the Hive
+    // version for that.
+  }
+
+  @Test
+  public void testGetIdentSql() {
+    // Hive & Impala keyword
+    assertEquals("`create`", ToSqlUtils.getIdentSql("create"));
+    // Hive-only keyword
+    assertEquals("`month`", ToSqlUtils.getIdentSql("month"));
+    // Impala keyword
+    assertEquals("`kudu`", ToSqlUtils.getIdentSql("kudu"));
+    // Number
+    assertEquals("`123`", ToSqlUtils.getIdentSql("123"));
+    // Starts with number
+    assertEquals("`123a`", ToSqlUtils.getIdentSql("123a"));
+    // Contains spaces
+    assertEquals("`a b`", ToSqlUtils.getIdentSql("a b"));
+    // Operator
+    assertEquals("`+`", ToSqlUtils.getIdentSql("+"));
+    // Simple identifier
+    assertEquals("foo", ToSqlUtils.getIdentSql("foo"));
+    // Comment characters in name
+    assertEquals("`foo#`", ToSqlUtils.getIdentSql("foo#"));
+    assertEquals("`foo#bar`", ToSqlUtils.getIdentSql("foo#bar"));
+    assertEquals("`foo--bar`", ToSqlUtils.getIdentSql("foo--bar"));
+
+    List<String> in = Lists.newArrayList("create", "foo");
+    List<String> out = ToSqlUtils.getIdentSqlList(in);
+    assertEquals(2, out.size());
+    assertEquals("`create`", out.get(0));
+    assertEquals("foo", out.get(1));
+
+    assertEquals("`create`.foo", ToSqlUtils.getPathSql(in));
+  }
+
+  @Test
+  public void tesToIdentSql() {
+    // Normal quoting
+    assertEquals("`create`", ToSqlUtils.identSql("create"));
+    assertEquals("foo", ToSqlUtils.identSql("foo"));
+    // Wildcard is special in test cases
+    assertEquals("*", ToSqlUtils.identSql("*"));
+    // Multi-part names
+    assertEquals("foo.`create`.*", ToSqlUtils.identSql("foo.create.*"));
   }
 
   @Test

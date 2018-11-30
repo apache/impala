@@ -68,7 +68,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = CAST(2009 AS INT)
+   partition predicates: `year` = CAST(2009 AS INT)
    partitions=6/24 files=6 size=119.70KB
    stored statistics:
      table: rows=7300 size=478.45KB
@@ -127,7 +127,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
-   partition predicates: year = CAST(2010 AS INT)
+   partition predicates: `year` = CAST(2010 AS INT)
    partitions=1/24 files=1 size=20.36KB
    stored statistics:
      table: rows=7300 size=478.45KB

@@ -4,7 +4,7 @@ select min(month), max(year), ndv(day) from functional.alltypesagg
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: min(month), max(year), ndv(day)
+|  output: min(`month`), max(`year`), ndv(`day`)
 |  row-size=16B cardinality=1
 |
 00:UNION
@@ -14,7 +14,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: min(month), max(year), ndv(day)
+|  output: min(`month`), max(`year`), ndv(`day`)
 |  row-size=16B cardinality=1
 |
 00:UNION
@@ -27,12 +27,12 @@ select count(distinct year), ndv(day) from functional.alltypesagg
 PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
-|  output: count(year), ndv:merge(day)
+|  output: count(`year`), ndv:merge(`day`)
 |  row-size=16B cardinality=1
 |
 01:AGGREGATE
-|  output: ndv(day)
-|  group by: year
+|  output: ndv(`day`)
+|  group by: `year`
 |  row-size=12B cardinality=1
 |
 00:UNION
@@ -42,12 +42,12 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
-|  output: count(year), ndv:merge(day)
+|  output: count(`year`), ndv:merge(`day`)
 |  row-size=16B cardinality=1
 |
 01:AGGREGATE
-|  output: ndv(day)
-|  group by: year
+|  output: ndv(`day`)
+|  group by: `year`
 |  row-size=12B cardinality=1
 |
 00:UNION
@@ -60,7 +60,7 @@ select min(month), max(day) from functional.alltypesagg where year = 2010 and da
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: min(month), max(day)
+|  output: min(`month`), max(`day`)
 |  row-size=8B cardinality=1
 |
 00:UNION
@@ -75,7 +75,7 @@ select c1, c2 from
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: min(year), max(month)
+|  output: min(`year`), max(`month`)
 |  row-size=8B cardinality=0
 |
 00:UNION
@@ -87,9 +87,9 @@ select ndv(month) from functional.alltypesagg group by year having max(day)=10
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: ndv(month), max(day)
-|  group by: year
-|  having: max(day) = 10
+|  output: ndv(`month`), max(`day`)
+|  group by: `year`
+|  having: max(`day`) = 10
 |  row-size=16B cardinality=0
 |
 00:UNION
@@ -102,7 +102,7 @@ select month from functional.alltypes group by month
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  group by: month
+|  group by: `month`
 |  row-size=4B cardinality=12
 |
 00:UNION
@@ -115,7 +115,7 @@ select distinct month from functional.alltypes where month % 2 = 0
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  group by: month
+|  group by: `month`
 |  row-size=4B cardinality=6
 |
 00:UNION
@@ -130,11 +130,11 @@ where a.year = b.year
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: min(a.month)
+|  output: min(a.`month`)
 |  row-size=4B cardinality=1
 |
 02:HASH JOIN [INNER JOIN]
-|  hash predicates: a.year = b.year
+|  hash predicates: a.`year` = b.`year`
 |  row-size=12B cardinality=24
 |
 |--01:UNION
@@ -148,11 +148,11 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: min(a.month)
+|  output: min(a.`month`)
 |  row-size=4B cardinality=1
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: a.year = b.year
+|  hash predicates: a.`year` = b.`year`
 |  row-size=12B cardinality=24
 |
 |--04:EXCHANGE [UNPARTITIONED]
@@ -175,12 +175,12 @@ on (a.year = b.year)
 PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN]
-|  hash predicates: year = year
-|  runtime filters: RF000 <- year
+|  hash predicates: `year` = `year`
+|  runtime filters: RF000 <- `year`
 |  row-size=16B cardinality=4
 |
 |--01:AGGREGATE [FINALIZE]
-|  |  group by: year
+|  |  group by: `year`
 |  |  row-size=4B cardinality=2
 |  |
 |  00:UNION
@@ -188,8 +188,8 @@ PLAN-ROOT SINK
 |     row-size=4B cardinality=2
 |
 03:AGGREGATE [FINALIZE]
-|  output: count(month)
-|  group by: year
+|  output: count(`month`)
+|  group by: `year`
 |  row-size=12B cardinality=2
 |
 02:SCAN HDFS [functional.alltypes]
@@ -204,7 +204,7 @@ functional.alltypes a, functional.alltypesnopart b
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: min(a.year), ndv(b.timestamp_col)
+|  output: min(a.`year`), ndv(b.timestamp_col)
 |  row-size=12B cardinality=0
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
@@ -227,7 +227,7 @@ select c1, c2 from
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: ndv(a.year + b.year), min(a.month + b.month)
+|  output: ndv(a.`year` + b.`year`), min(a.`month` + b.`month`)
 |  row-size=16B cardinality=1
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
@@ -251,12 +251,12 @@ on (t1.int_col = t3.int_col)
 PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: t1.int_col = min(t2.year)
-|  runtime filters: RF000 <- min(t2.year)
+|  hash predicates: t1.int_col = min(t2.`year`)
+|  runtime filters: RF000 <- min(t2.`year`)
 |  row-size=8B cardinality=8
 |
 |--02:AGGREGATE [FINALIZE]
-|  |  output: min(t2.year)
+|  |  output: min(t2.`year`)
 |  |  row-size=4B cardinality=1
 |  |
 |  01:UNION
@@ -283,7 +283,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=14
 |
 |--04:AGGREGATE [FINALIZE]
-|  |  group by: year
+|  |  group by: `year`
 |  |  row-size=4B cardinality=2
 |  |
 |  03:UNION
@@ -291,7 +291,7 @@ PLAN-ROOT SINK
 |     row-size=4B cardinality=2
 |
 02:AGGREGATE [FINALIZE]
-|  group by: month
+|  group by: `month`
 |  row-size=4B cardinality=12
 |
 01:UNION
@@ -304,7 +304,7 @@ select date_string_col, min(month) from functional.alltypes group by date_string
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: min(month)
+|  output: min(`month`)
 |  group by: date_string_col
 |  row-size=24B cardinality=736
 |
@@ -318,7 +318,7 @@ select count(month) from functional.alltypes
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: count(month)
+|  output: count(`month`)
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]

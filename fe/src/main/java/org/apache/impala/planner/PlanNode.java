@@ -357,7 +357,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
         for (PipelineMembership pipe: pipelines_) {
           pipelines.add(pipe.getExplainString());
         }
-        expBuilder.append(Joiner.on(", ").join(pipelines) + "\n");
+        if (pipelines.isEmpty()) expBuilder.append("<none>");
+        else expBuilder.append(Joiner.on(", ").join(pipelines));
+        expBuilder.append("\n");
       } else {
         expBuilder.append("<not computed>");
       }
