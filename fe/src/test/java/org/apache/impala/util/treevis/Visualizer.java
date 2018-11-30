@@ -22,6 +22,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -29,8 +31,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-
-import org.apache.impala.analysis.Expr;
 
 /**
  * Visualizes a tree structure. Walks the tree, printing most
@@ -56,7 +56,8 @@ public class Visualizer {
     void startObj(String name, Object obj);
     void startArray(String name);
     void field(String name, Object value);
-    void special(String name, String value);
+    void elide(String name, Object value, String reason);
+    void emptyArray(String name);
     void endArray();
     void endObj();
   }
@@ -71,19 +72,23 @@ public class Visualizer {
       String.class,
       Boolean.class,
       Enum.class,
-      AtomicLong.class
+      AtomicLong.class,
+      BigDecimal.class,
+      BigInteger.class
   };
 
-  private TreeVisualizer treeVis;
-  private Set<Class<?>> scalarTypes = new HashSet<>();
-  private Set<Class<?>> ignoreTypes = new HashSet<>();
+  private TreeVisualizer treeVis_;
+  private Set<Class<?>> scalarTypes_ = new HashSet<>();
+  private Set<Class<?>> ignoreTypes_ = new HashSet<>();
+  // Infinite recursion preventer.
   // Since there is no IdentityHashMap. Values ignored.
-  private Map<Object, Object> parents = new IdentityHashMap<>();
+  private Map<Object, Object> parents_ = new IdentityHashMap<>();
+  private int depthLimit_ = Integer.MAX_VALUE;
 
   public Visualizer(TreeVisualizer treeVis) {
-    this.treeVis = treeVis;
+    this.treeVis_ = treeVis;
     for (Class<?> c : STD_SCALARS) {
-      scalarTypes.add(c);
+      scalarTypes_.add(c);
     }
   }
 
@@ -95,7 +100,7 @@ public class Visualizer {
    * @param cls the class to skip
    */
   public void ignore(Class<?> cls) {
-    ignoreTypes.add(cls);
+    ignoreTypes_.add(cls);
   }
 
   /**
@@ -105,7 +110,17 @@ public class Visualizer {
    * @param cls the class to render using toString()
    */
   public void scalar(Class<?> cls) {
-    scalarTypes.add(cls);
+    scalarTypes_.add(cls);
+  }
+
+  /**
+   * Specifies the maximum nesting depth to print.
+   *
+   * @param limit the maximum depth. Objects deeper than
+   * the limit are elided on output.
+   */
+  public void depthLimit(int limit) {
+    depthLimit_ = limit;
   }
 
   /**
@@ -114,16 +129,16 @@ public class Visualizer {
    * @param root the object to visualize
    */
   public void visualize(Object root) {
-    treeVis.startObj("<root>", root);
+    treeVis_.startObj("<root>", root);
     visit(root);
-    treeVis.endObj();
+    treeVis_.endObj();
   }
 
   public void visit(Object obj) {
     Class<?> objClass = obj.getClass();
-    Method visMethod;
+    Method customMethod;
     try {
-      visMethod = objClass.getMethod("visualize", getClass());
+      customMethod = objClass.getMethod("visualize", getClass());
     } catch (NoSuchMethodException e) {
       visualizeObj(obj);
       return;
@@ -131,16 +146,14 @@ public class Visualizer {
       throw new IllegalStateException(e);
     }
     try {
-      visMethod.invoke(obj, this);
-    } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+      customMethod.invoke(obj, this);
+    } catch (IllegalAccessException | IllegalArgumentException |
+             InvocationTargetException e) {
       throw new IllegalStateException(e);
     }
   }
 
   private void visualizeObj(Object obj) {
-    if (obj instanceof Expr) {
-      System.out.print("");
-    }
     Class<?> objClass = obj.getClass();
     visualizeMembers(obj, objClass);
   }
@@ -158,14 +171,14 @@ public class Visualizer {
         Object value = field.get(obj);
         visitValue(name, value);
       } catch (IllegalArgumentException | IllegalAccessException e) {
-        treeVis.special(name, "<unavailable>");
+        treeVis_.elide(name, obj, "Unavailable");
       }
     }
   }
 
   public void visitValue(String name, Object value) {
     if (value == null) {
-      treeVis.field(name, value);
+      treeVis_.field(name, value);
       return;
     }
     Class<?> valueClass = value.getClass();
@@ -173,49 +186,56 @@ public class Visualizer {
       visualizeArray(name, value);
       return;
     }
-    if (scalarTypes.contains(valueClass)) {
-      treeVis.field(name, value);
+    if (scalarTypes_.contains(valueClass)) {
+      treeVis_.field(name, value);
       return;
     }
-    if (ignoreTypes.contains(valueClass)) {
-      treeVis.special(name, "<Skip " + valueClass.getSimpleName() + ">");
+    if (valueClass.isEnum()) {
+      treeVis_.field(name, value);
       return;
     }
-    if (parents.containsKey(value)) {
-      treeVis.special(name, "<Back pointer to " + valueClass.getSimpleName() + ">");
+    if (ignoreTypes_.contains(valueClass)) {
+      treeVis_.elide(name, value, "Skip");
       return;
     }
-    parents.put(value, value);
+    if (parents_.containsKey(value)) {
+      treeVis_.elide(name, value, "Back pointer");
+      return;
+    }
+    if (parents_.size() >= depthLimit_) {
+      treeVis_.elide(name, value, "...");
+      return;
+    }
+    parents_.put(value, value);
     if (value instanceof Collection) {
       visitCollection(name, (Collection<?>) value);
     } else {
-      treeVis.startObj(name, value);
+      treeVis_.startObj(name, value);
       visit(value);
-      treeVis.endObj();
+      treeVis_.endObj();
     }
-    parents.remove(value);
+    parents_.remove(value);
   }
 
   private void visualizeArray(String name, Object value) {
-    // TODO: Specially handle scalar arrays
     int len = Array.getLength(value);
     if (len == 0) {
-      treeVis.special(name, "[]");
+      treeVis_.emptyArray(name);
       return;
     }
-    treeVis.startArray(name);
+    treeVis_.startArray(name);
     for (int i = 0; i < len; i++) {
       visitValue(Integer.toString(i), Array.get(value, i));
     }
-    treeVis.endArray();
+    treeVis_.endArray();
   }
 
   private void visitCollection(String name, Collection<?> col) {
     if (col.isEmpty()) {
-      treeVis.special(name, "[]");
+      treeVis_.elide(name, col, "[]");
       return;
     }
-    treeVis.startArray(name);
+    treeVis_.startArray(name);
     if (col instanceof Map) {
       Map<?, ?> map = (Map<?, ?>) col;
       for (Entry<?, ?> entry : map.entrySet()) {
@@ -227,6 +247,6 @@ public class Visualizer {
         visitValue(Integer.toString(i++), member);
       }
     }
-    treeVis.endArray();
+    treeVis_.endArray();
   }
 }
