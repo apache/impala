@@ -22,8 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.analysis.CreateTableStmt;
+import org.apache.impala.analysis.Parser;
+import org.apache.impala.analysis.Parser.ParseException;
 import org.apache.impala.analysis.SqlParser;
 import org.apache.impala.analysis.SqlScanner;
+import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.TypeDef;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TColumnType;
@@ -261,12 +264,9 @@ public abstract class Type {
     // to get the ColumnType.
     // Pick a table name that can't be used.
     String stmt = String.format("CREATE TABLE $DUMMY ($DUMMY %s)", typeStr);
-    SqlScanner input = new SqlScanner(new StringReader(stmt));
-    SqlParser parser = new SqlParser(input);
-    parser.setQueryOptions(new TQueryOptions());
     CreateTableStmt createTableStmt;
     try {
-      Object o = parser.parse().value;
+      StatementBase o = Parser.parse(stmt);
       if (!(o instanceof CreateTableStmt)) {
         // Should never get here.
         throw new IllegalStateException("Couldn't parse create table stmt.");
@@ -276,7 +276,7 @@ public abstract class Type {
         // Should never get here.
         throw new IllegalStateException("Invalid create table stmt.");
       }
-    } catch (Exception e) {
+    } catch (ParseException e) {
       return null;
     }
     TypeDef typeDef = createTableStmt.getColumnDefs().get(0).getTypeDef();

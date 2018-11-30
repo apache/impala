@@ -70,7 +70,7 @@ class TestImpalaShellInteractive(object):
 
   def _expect_with_cmd(self, proc, cmd, expectations=(), db="default"):
     """Executes a command on the expect process instance and verifies a set of
-    assertions defined by the expections."""
+    assertions defined by the expectations."""
     proc.sendline(cmd + ";")
     proc.expect(":21000] {db}>".format(db=db))
     if not expectations: return
@@ -324,7 +324,7 @@ class TestImpalaShellInteractive(object):
   def test_history_file_option(self, tmp_history_file):
     """
     Setting the 'tmp_history_file' fixture above means that the IMPALA_HISTFILE
-    environment will be overriden. Here we override that environment by passing
+    environment will be overridden. Here we override that environment by passing
     the --history_file command line option, ensuring that the history ends up
     in the appropriate spot.
     """
@@ -725,7 +725,7 @@ class TestImpalaShellInteractive(object):
     query = "with v as (select 1) \nselect foo('\\\\'), ('bar \n;"
     shell.send_cmd(query)
     result = shell.get_result()
-    assert "ERROR: AnalysisException: Unmatched string literal" in result.stderr
+    assert "ERROR: ParseException: Unmatched string literal" in result.stderr
 
   def test_timezone_validation(self):
     """Test that query option TIMEZONE is validated when executing a query.

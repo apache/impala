@@ -37,8 +37,11 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.impala.analysis.CreateTableStmt;
+import org.apache.impala.analysis.Parser;
+import org.apache.impala.analysis.Parser.ParseException;
 import org.apache.impala.analysis.SqlParser;
 import org.apache.impala.analysis.SqlScanner;
+import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.Metrics;
@@ -99,10 +102,7 @@ public class JdbcTest {
   protected void addTestTable(String createTableSql) throws Exception {
     // Parse the stmt to extract the table name. We do this first to ensure
     // that we do not execute arbitrary SQL here and pollute the test setup.
-    SqlScanner input = new SqlScanner(new StringReader(createTableSql));
-    SqlParser parser = new SqlParser(input);
-    parser.setQueryOptions(new TQueryOptions());
-    Object result = parser.parse().value;
+    StatementBase result = Parser.parse(createTableSql);
     if (!(result instanceof CreateTableStmt)) {
       throw new Exception("Given stmt is not a CREATE TABLE stmt: " + createTableSql);
     }

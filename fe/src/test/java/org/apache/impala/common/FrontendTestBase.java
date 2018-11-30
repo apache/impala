@@ -34,6 +34,8 @@ import org.apache.impala.analysis.CreateViewStmt;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.ParseNode;
+import org.apache.impala.analysis.Parser;
+import org.apache.impala.analysis.Parser.ParseException;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SqlParser;
 import org.apache.impala.analysis.SqlScanner;
@@ -270,21 +272,17 @@ public class FrontendTestBase {
   }
 
   /**
-   * Parse 'stmt' and return the root ParseNode.
+   * Parse 'stmt' and return the root StatementBase.
    */
-  public ParseNode ParsesOk(String stmt) {
-    SqlScanner input = new SqlScanner(new StringReader(stmt));
-    SqlParser parser = new SqlParser(input);
-    parser.setQueryOptions(new TQueryOptions());
-    ParseNode node = null;
+  public StatementBase ParsesOk(String stmt) {
     try {
-      node = (ParseNode) parser.parse().value;
-    } catch (Exception e) {
-      e.printStackTrace();
-      fail("\nParser error:\n" + parser.getErrorMsg(stmt));
+      StatementBase node = Parser.parse(stmt);
+      assertNotNull(node);
+      return node;
+    } catch (ParseException e) {
+      fail("\nParser error:\n" + e.getMessage());
+      throw new IllegalStateException(); // Keep compiler happy
     }
-    assertNotNull(node);
-    return node;
   }
 
   /**
@@ -440,7 +438,7 @@ public class FrontendTestBase {
 
   protected AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx, Frontend fe)
       throws ImpalaException {
-    StatementBase parsedStmt = fe.parse(stmt, ctx.getQueryOptions());
+    StatementBase parsedStmt = Parser.parse(stmt, ctx.getQueryOptions());
     StmtMetadataLoader mdLoader =
         new StmtMetadataLoader(fe, ctx.getQueryCtx().session.database, null);
     StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);

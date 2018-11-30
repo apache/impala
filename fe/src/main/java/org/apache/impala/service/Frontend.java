@@ -52,6 +52,8 @@ import org.apache.impala.analysis.DropTableOrViewStmt;
 import org.apache.impala.analysis.GrantRevokePrivStmt;
 import org.apache.impala.analysis.GrantRevokeRoleStmt;
 import org.apache.impala.analysis.InsertStmt;
+import org.apache.impala.analysis.Parser;
+import org.apache.impala.analysis.Parser.ParseException;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.ResetMetadataStmt;
 import org.apache.impala.analysis.ShowFunctionsStmt;
@@ -1204,24 +1206,6 @@ public class Frontend {
     return result;
   }
 
-  @VisibleForTesting
-  public StatementBase parse(String stmt) throws AnalysisException {
-    return parse(stmt, new TQueryOptions());
-  }
-
-  public StatementBase parse(String stmt, TQueryOptions options)
-      throws AnalysisException {
-    SqlScanner input = new SqlScanner(new StringReader(stmt));
-    SqlParser parser = new SqlParser(input);
-    Preconditions.checkArgument(options != null);
-    parser.setQueryOptions(options);
-    try {
-      return (StatementBase) parser.parse().value;
-    } catch (Exception e) {
-      throw new AnalysisException(parser.getErrorMsg(stmt), e);
-    }
-  }
-
   /**
    * Create a TExecRequest for the query and query context provided in the plan
    * context. Fills in the EXPLAIN string and optionally the internal plan tree.
@@ -1285,8 +1269,8 @@ public class Frontend {
       EventSequence timeline) throws ImpalaException {
     TQueryCtx queryCtx = planCtx.getQueryContext();
     // Parse stmt and collect/load metadata to populate a stmt-local table cache
-    StatementBase stmt =
-        parse(queryCtx.client_request.stmt, queryCtx.client_request.query_options);
+    StatementBase stmt = Parser.parse(
+        queryCtx.client_request.stmt, queryCtx.client_request.query_options);
     StmtMetadataLoader metadataLoader =
         new StmtMetadataLoader(this, queryCtx.session.database, timeline);
     StmtTableCache stmtTableCache = metadataLoader.loadTables(stmt);

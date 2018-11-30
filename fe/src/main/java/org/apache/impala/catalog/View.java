@@ -25,9 +25,12 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 import org.apache.impala.analysis.ParseNode;
+import org.apache.impala.analysis.Parser;
+import org.apache.impala.analysis.Parser.ParseException;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SqlParser;
 import org.apache.impala.analysis.SqlScanner;
+import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTable;
@@ -137,13 +140,10 @@ public class View extends Table implements FeView {
 
     // Parse the expanded view definition SQL-string into a QueryStmt and
     // populate a view definition.
-    SqlScanner input = new SqlScanner(new StringReader(inlineViewDef));
-    SqlParser parser = new SqlParser(input);
-    parser.setQueryOptions(new TQueryOptions());
-    ParseNode node = null;
+    StatementBase node;
     try {
-      node = (ParseNode) parser.parse().value;
-    } catch (Exception e) {
+      node = Parser.parse(inlineViewDef);
+    } catch (ParseException e) {
       // Do not pass e as the exception cause because it might reveal the existence
       // of tables that the user triggering this load may not have privileges on.
       throw new TableLoadingException(

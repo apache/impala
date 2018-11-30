@@ -21,16 +21,15 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.StringReader;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.analysis.Parser.ParseException;
 import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.compat.MetastoreShim;
-import org.apache.impala.thrift.TQueryOptions;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
@@ -66,15 +65,13 @@ public class ParserTest extends FrontendTestBase {
    * Asserts if stmt parses fine or the error string doesn't match and it is non-null.
    */
   public void ParserError(String stmt, String expectedErrorString) {
-    SqlScanner input = new SqlScanner(new StringReader(stmt));
-    SqlParser parser = new SqlParser(input);
-    parser.setQueryOptions(new TQueryOptions());
-    Object result = null; // Save this object to make debugging easier
+    @SuppressWarnings("unused")
+    StatementBase result = null; // Save this object to make debugging easier
     try {
-      result = parser.parse().value;
-    } catch (Exception e) {
+      result = Parser.parse(stmt);
+    } catch (ParseException e) {
       if (expectedErrorString != null) {
-        String errorString = parser.getErrorMsg(stmt);
+        String errorString = e.getMessage();
         StringBuilder message = new StringBuilder();
         message.append("Got: ");
         message.append(errorString).append("\nExpected: ").append(expectedErrorString);

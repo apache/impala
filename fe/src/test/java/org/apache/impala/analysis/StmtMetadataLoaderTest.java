@@ -40,7 +40,7 @@ public class StmtMetadataLoaderTest {
       throws ImpalaException {
     ImpaladTestCatalog catalog = new ImpaladTestCatalog();
     Frontend fe = new Frontend(AuthorizationConfig.createAuthDisabledConfig(), catalog);
-    StatementBase stmt = fe.parse(stmtStr);
+    StatementBase stmt = Parser.parse(stmtStr);
     // Catalog is fresh and no tables are cached.
     validateUncached(stmt, fe, expectedNumLoadRequests, expectedNumCatalogUpdates,
         expectedDbs, expectedTables);
@@ -51,7 +51,7 @@ public class StmtMetadataLoaderTest {
   private void testNoLoad(String stmtStr) throws ImpalaException {
     ImpaladTestCatalog catalog = new ImpaladTestCatalog();
     Frontend fe = new Frontend(AuthorizationConfig.createAuthDisabledConfig(), catalog);
-    StatementBase stmt = fe.parse(stmtStr);
+    StatementBase stmt = Parser.parse(stmtStr);
     validateCached(stmt, fe, new String[]{}, new String[]{});
   }
 
