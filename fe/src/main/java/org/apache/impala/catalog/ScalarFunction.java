@@ -49,7 +49,12 @@ public class ScalarFunction extends Function {
   private String prepareFnSymbol_;
   private String closeFnSymbol_;
 
-  public ScalarFunction(FunctionName fnName, ArrayList<Type> argTypes, Type retType,
+  public ScalarFunction(FunctionName fnName, List<Type> argTypes, Type retType,
+      boolean hasVarArgs) {
+    super(fnName, argTypes, retType, hasVarArgs);
+  }
+
+  public ScalarFunction(FunctionName fnName, Type argTypes[], Type retType,
       boolean hasVarArgs) {
     super(fnName, argTypes, retType, hasVarArgs);
   }
@@ -270,10 +275,17 @@ public class ScalarFunction extends Function {
   public String toSql(boolean ifNotExists) {
     StringBuilder sb = new StringBuilder("CREATE FUNCTION ");
     if (ifNotExists) sb.append("IF NOT EXISTS ");
-    sb.append(dbName() + "." + signatureString() + "\n")
-      .append(" RETURNS " + getReturnType() + "\n")
-      .append(" LOCATION '" + getLocation() + "'\n")
-      .append(" SYMBOL='" + getSymbolName() + "'\n");
+    sb.append(dbName()).append(".");
+    if (binaryType_ == TFunctionBinaryType.JAVA) {
+      sb.append(name_.getFunction());
+    } else {
+      sb.append(signatureString()).append("\n");
+      sb.append(" RETURNS " + getReturnType());
+    }
+    if (getLocation() != null)
+      sb.append("\n").append(" LOCATION '" + getLocation()).append("'");
+    if (getSymbolName() != null)
+      sb.append("\n").append(" SYMBOL='" + getSymbolName()).append("'");
     return sb.toString();
   }
 

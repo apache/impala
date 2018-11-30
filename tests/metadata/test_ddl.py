@@ -35,7 +35,7 @@ class TestDdlStatements(TestDdlBase):
   @SkipIfLocal.hdfs_client
   @SkipIfABFS.trash
   def test_drop_table_with_purge(self, unique_database):
-    """This test checks if the table data is permamently deleted in
+    """This test checks if the table data is permanently deleted in
     DROP TABLE <tbl> PURGE queries"""
     self.client.execute("create table {0}.t1(i int)".format(unique_database))
     self.client.execute("create table {0}.t2(i int)".format(unique_database))

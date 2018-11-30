@@ -406,9 +406,10 @@ public class ToSqlUtils {
     Preconditions.checkNotNull(functions);
     StringBuilder sb = new StringBuilder();
     for (Function fn: functions) {
+      if (sb.length() > 0) sb.append(";\n");
       sb.append(fn.toSql(false));
     }
-    return sb.toString();
+    return sb.append("\n").toString();
   }
 
   public static String getCreateViewSql(FeView view) {

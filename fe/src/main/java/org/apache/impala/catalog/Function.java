@@ -85,15 +85,15 @@ public class Function extends CatalogObjectImpl {
   }
 
   // User specified function name e.g. "Add"
-  private FunctionName name_;
+  protected final FunctionName name_;
 
-  private final Type retType_;
+  protected final Type retType_;
   // Array of parameter types.  empty array if this function does not have parameters.
-  private Type[] argTypes_;
+  protected final Type[] argTypes_;
 
   // If true, this function has variable arguments.
   // TODO: we don't currently support varargs with no fixed types. i.e. fn(...)
-  private boolean hasVarArgs_;
+  protected boolean hasVarArgs_;
 
   // If true (default), this function is called directly by the user. For operators,
   // this is false. If false, it also means the function is not visible from
@@ -102,8 +102,8 @@ public class Function extends CatalogObjectImpl {
 
   // Absolute path in HDFS for the binary that contains this function.
   // e.g. /udfs/udfs.jar
-  private HdfsUri location_;
-  private TFunctionBinaryType binaryType_;
+  protected HdfsUri location_;
+  protected TFunctionBinaryType binaryType_;
 
   // Set to true for functions that survive service restarts, including all builtins,
   // native and IR functions, but only Java functions created without a signature.
@@ -128,12 +128,10 @@ public class Function extends CatalogObjectImpl {
 
   public Function(FunctionName name, List<Type> args,
       Type retType, boolean varArgs) {
-    this(name, (Type[])null, retType, varArgs);
-    if (args != null && args.size() > 0) {
-      argTypes_ = args.toArray(new Type[args.size()]);
-    } else {
-      argTypes_ = new Type[0];
-    }
+    this(name,
+        (args != null && args.size() > 0)
+          ? args.toArray(new Type[args.size()]) : new Type[0],
+        retType, varArgs);
   }
 
   /**
@@ -304,7 +302,11 @@ public class Function extends CatalogObjectImpl {
   public String getName() { return getFunctionName().toString(); }
 
   // Child classes must override this function.
-  public String toSql(boolean ifNotExists) { return ""; }
+  // If this class is created directly, it is only as a search key to
+  // find a function and is not, itself, a valid function for SQL geneation.
+  public String toSql(boolean ifNotExists) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
   protected void setTCatalogObject(TCatalogObject catalogObject) {

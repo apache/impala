@@ -17,7 +17,6 @@
 
 package org.apache.impala.catalog;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.impala.analysis.Expr;
@@ -74,7 +73,7 @@ public class AggregateFunction extends Function {
   // empty input in BE).
   private boolean returnsNonNullOnEmpty_;
 
-  public AggregateFunction(FunctionName fnName, ArrayList<Type> argTypes, Type retType,
+  public AggregateFunction(FunctionName fnName, List<Type> argTypes, Type retType,
       boolean hasVarArgs) {
     super(fnName, argTypes, retType, hasVarArgs);
   }
@@ -229,20 +228,20 @@ public class AggregateFunction extends Function {
   public String toSql(boolean ifNotExists) {
     StringBuilder sb = new StringBuilder("CREATE AGGREGATE FUNCTION ");
     if (ifNotExists) sb.append("IF NOT EXISTS ");
-    sb.append(dbName() + "." + signatureString() + "\n")
-      .append(" RETURNS " + getReturnType() + "\n");
-    if (getIntermediateType() != null) {
-      sb.append(" INTERMEDIATE " + getIntermediateType() + "\n");
+    sb.append(dbName()).append(".").append(signatureString())
+      .append("\n RETURNS ").append(getReturnType());
+    if (intermediateType_ != null) {
+      sb.append("\n INTERMEDIATE ").append(intermediateType_);
     }
-    sb.append(" LOCATION '" + getLocation() + "'\n")
-      .append(" UPDATE_FN='" + getUpdateFnSymbol() + "'\n")
-      .append(" INIT_FN='" + getInitFnSymbol() + "'\n")
-      .append(" MERGE_FN='" + getMergeFnSymbol() + "'\n");
-    if (getSerializeFnSymbol() != null) {
-      sb.append(" SERIALIZE_FN='" + getSerializeFnSymbol() + "'\n");
+    sb.append("\n LOCATION '").append(location_)
+      .append("'\n UPDATE_FN='").append(updateFnSymbol_)
+      .append("'\n INIT_FN='").append(initFnSymbol_)
+      .append("'\n MERGE_FN='").append(mergeFnSymbol_).append("'");
+    if (serializeFnSymbol_ != null) {
+      sb.append("\n SERIALIZE_FN='").append(serializeFnSymbol_).append("'");
     }
-    if (getFinalizeFnSymbol() != null) {
-      sb.append(" FINALIZE_FN='" + getFinalizeFnSymbol() + "'\n");
+    if (finalizeFnSymbol_ != null) {
+      sb.append("\n FINALIZE_FN='").append(finalizeFnSymbol_).append("'");
     }
     return sb.toString();
   }

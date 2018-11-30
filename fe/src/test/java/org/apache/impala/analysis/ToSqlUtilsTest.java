@@ -21,10 +21,20 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.ScalarFunction;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.thrift.TFunctionBinaryType;
 import org.junit.Test;
+
+import com.google.common.collect.Lists;
 
 public class ToSqlUtilsTest extends FrontendTestBase {
 
@@ -67,4 +77,165 @@ public class ToSqlUtilsTest extends FrontendTestBase {
     }
   }
 
+  @Test
+  public void testScalarFunctionSql() {
+    {
+      // Can't generate SQL for an unresolved function
+
+      List<Type> args = new ArrayList<>();
+      Function fn = Function.createFunction("mydb", "fn1",
+          args, Type.INT, false, TFunctionBinaryType.JAVA);
+      try {
+        ToSqlUtils.getCreateFunctionSql(Lists.newArrayList(fn));
+      } catch (UnsupportedOperationException e) {
+        // Expected
+      }
+    }
+    {
+      // Java function, leave off location and symbol
+      List<Type> args = new ArrayList<>();
+      Function fn = new ScalarFunction(new FunctionName("mydb", "fn1"),
+          args, Type.INT, false);
+      fn.setBinaryType(TFunctionBinaryType.JAVA);
+      String sql = ToSqlUtils.getCreateFunctionSql(Lists.newArrayList(fn));
+      String expected = "CREATE FUNCTION mydb.fn1\n";
+      assertEquals(expected, sql);
+    }
+    {
+      // Java function, with location and symbol
+      List<Type> args = new ArrayList<>();
+      ScalarFunction fn = new ScalarFunction(new FunctionName("mydb", "fn1"),
+          args, Type.INT, false);
+      fn.setBinaryType(TFunctionBinaryType.JAVA);
+      fn.setLocation(new HdfsUri("hdfs://foo:123/fns/myfunc.jar"));
+      fn.setSymbolName("MyClass");
+      String sql = ToSqlUtils.getCreateFunctionSql(Lists.newArrayList(fn));
+      String expected = "CREATE FUNCTION mydb.fn1\n" +
+          " LOCATION 'hdfs://foo:123/fns/myfunc.jar'\n" +
+          " SYMBOL='MyClass'\n";
+      assertEquals(expected, sql);
+    }
+    {
+      // Java function, with location and symbol
+      List<Type> args = Lists.newArrayList(Type.VARCHAR, Type.BOOLEAN);
+      ScalarFunction fn = new ScalarFunction(new FunctionName("mydb", "fn1"),
+          args, Type.INT, false);
+      fn.setBinaryType(TFunctionBinaryType.JAVA);
+      fn.setLocation(new HdfsUri("hdfs://foo:123/fns/myfunc.jar"));
+      fn.setSymbolName("MyClass");
+      String sql = ToSqlUtils.getCreateFunctionSql(Lists.newArrayList(fn));
+      String expected = "CREATE FUNCTION mydb.fn1\n" +
+          " LOCATION 'hdfs://foo:123/fns/myfunc.jar'\n" +
+          " SYMBOL='MyClass'\n";
+      assertEquals(expected, sql);
+    }
+    {
+      // C++ function, with location and symbol
+      List<Type> args = new ArrayList<>();
+      ScalarFunction fn = new ScalarFunction(new FunctionName("mydb", "fn1"),
+          args, Type.INT, false);
+      fn.setBinaryType(TFunctionBinaryType.NATIVE);
+      fn.setLocation(new HdfsUri("hdfs://foo:123/fns/myfunc.so"));
+      fn.setSymbolName("myClass");
+      String sql = ToSqlUtils.getCreateFunctionSql(Lists.newArrayList(fn));
+      String expected = "CREATE FUNCTION mydb.fn1()\n" +
+          " RETURNS INT\n" +
+          " LOCATION 'hdfs://foo:123/fns/myfunc.so'\n" +
+          " SYMBOL='myClass'\n";
+      assertEquals(expected, sql);
+    }
+    {
+      // C++ function, with location and symbol
+      List<Type> args = Lists.newArrayList(Type.VARCHAR, Type.BOOLEAN);
+      ScalarFunction fn = new ScalarFunction(new FunctionName("mydb", "fn1"),
+          args, Type.INT, false);
+      fn.setBinaryType(TFunctionBinaryType.NATIVE);
+      fn.setLocation(new HdfsUri("hdfs://foo:123/fns/myfunc.so"));
+      fn.setSymbolName("myClass");
+      String sql = ToSqlUtils.getCreateFunctionSql(Lists.newArrayList(fn));
+      String expected = "CREATE FUNCTION mydb.fn1(VARCHAR(*), BOOLEAN)\n" +
+          " RETURNS INT\n" +
+          " LOCATION 'hdfs://foo:123/fns/myfunc.so'\n" +
+          " SYMBOL='myClass'\n";
+      assertEquals(expected, sql);
+    }
+  }
+
+  @Test
+  public void testAggFnSql() {
+    {
+      // C++ aggregate function, with minimum state
+      List<Type> args = Lists.newArrayList(Type.INT, Type.BOOLEAN);
+      AggregateFunction fn = new AggregateFunction(new FunctionName("mydb", "fn1"),
+          args, Type.BIGINT, false);
+      fn.setBinaryType(TFunctionBinaryType.NATIVE);
+      fn.setLocation(new HdfsUri("hdfs://foo:123/fns/myfunc.so"));
+      fn.setUpdateFnSymbol("Update");
+      fn.setInitFnSymbol("Init");
+      fn.setMergeFnSymbol("Merge");
+      String sql = ToSqlUtils.getCreateFunctionSql(Lists.newArrayList(fn));
+      String expected = "CREATE AGGREGATE FUNCTION mydb.fn1(INT, BOOLEAN)\n" +
+          " RETURNS BIGINT\n" +
+          " LOCATION 'hdfs://foo:123/fns/myfunc.so'\n" +
+          " UPDATE_FN='Update'\n" +
+          " INIT_FN='Init'\n" +
+          " MERGE_FN='Merge'\n";
+      assertEquals(expected, sql);
+    }
+    {
+      // C++ aggregate function, with full state
+      List<Type> args = Lists.newArrayList(Type.INT, Type.BOOLEAN);
+      AggregateFunction fn = new AggregateFunction(new FunctionName("mydb", "fn1"),
+          args, Type.BIGINT, false);
+      fn.setBinaryType(TFunctionBinaryType.NATIVE);
+      fn.setLocation(new HdfsUri("hdfs://foo:123/fns/myfunc.so"));
+      fn.setUpdateFnSymbol("Update");
+      fn.setInitFnSymbol("Init");
+      fn.setMergeFnSymbol("Merge");
+      fn.setFinalizeFnSymbol("Finalize");
+      fn.setSerializeFnSymbol("Serialize");
+      fn.setIntermediateType(Type.INT);
+      String sql = ToSqlUtils.getCreateFunctionSql(Lists.newArrayList(fn));
+      String expected = "CREATE AGGREGATE FUNCTION mydb.fn1(INT, BOOLEAN)\n" +
+          " RETURNS BIGINT\n" +
+          " INTERMEDIATE INT\n" +
+          " LOCATION 'hdfs://foo:123/fns/myfunc.so'\n" +
+          " UPDATE_FN='Update'\n" +
+          " INIT_FN='Init'\n" +
+          " MERGE_FN='Merge'\n" +
+          " SERIALIZE_FN='Serialize'\n" +
+          " FINALIZE_FN='Finalize'\n";
+      assertEquals(expected, sql);
+    }
+  }
+
+  @Test
+  public void testCreateFunctionSql() {
+    {
+      // Two functions, one C++, one Java
+      ScalarFunction fn1 = new ScalarFunction(new FunctionName("mydb", "fn1"),
+          new ArrayList<>(), Type.INT, false);
+      fn1.setBinaryType(TFunctionBinaryType.JAVA);
+      fn1.setLocation(new HdfsUri("hdfs://foo:123/fns/myfunc.jar"));
+      fn1.setSymbolName("MyClass");
+
+      List<Type> args = Lists.newArrayList(Type.VARCHAR, Type.BOOLEAN);
+      ScalarFunction fn2 = new ScalarFunction(new FunctionName("mydb", "fn2"),
+          args, Type.INT, false);
+      fn2.setBinaryType(TFunctionBinaryType.NATIVE);
+      fn2.setLocation(new HdfsUri("hdfs://foo:123/fns/myfunc.so"));
+      fn2.setSymbolName("myClass");
+
+      String sql = ToSqlUtils.getCreateFunctionSql(Lists.newArrayList(fn1, fn2));
+      String expected =
+          "CREATE FUNCTION mydb.fn1\n" +
+          " LOCATION 'hdfs://foo:123/fns/myfunc.jar'\n" +
+          " SYMBOL='MyClass';\n"  +
+          "CREATE FUNCTION mydb.fn2(VARCHAR(*), BOOLEAN)\n" +
+          " RETURNS INT\n" +
+          " LOCATION 'hdfs://foo:123/fns/myfunc.so'\n" +
+          " SYMBOL='myClass'\n";
+      assertEquals(expected, sql);
+    }
+  }
 }

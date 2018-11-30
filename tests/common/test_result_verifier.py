@@ -352,7 +352,7 @@ def verify_raw_results(test_section, exec_result, file_format, result_section,
     expected_results = remove_comments(test_section[result_section])
   else:
     assert 'ERRORS' not in test_section, "'ERRORS' section must have accompanying 'RESULTS' section"
-    LOG.info("No results found. Skipping verification");
+    LOG.info("No results found. Skipping verification")
     return
   if 'ERRORS' in test_section:
     expected_errors = split_section_lines(remove_comments(test_section['ERRORS']))

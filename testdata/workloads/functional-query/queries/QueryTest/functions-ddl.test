@@ -95,7 +95,7 @@ show create aggregate function $DATABASE.agg_fn
  UPDATE_FN=''_Z11CountUpdatePN10impala_udf15FunctionContextERKNS_6IntValEPNS_9BigIntValE''
  INIT_FN=''_Z9CountInitPN10impala_udf15FunctionContextEPNS_9BigIntValE''
  MERGE_FN=''_Z10CountMergePN10impala_udf15FunctionContextERKNS_9BigIntValEPS2_''
- FINALIZE_FN=''_Z13CountFinalizePN10impala_udf15FunctionContextERKNS_9BigIntValE''
+ FINALIZE_FN=''_Z13CountFinalizePN10impala_udf15FunctionContextERKNS_9BigIntValE'';
 CREATE AGGREGATE FUNCTION $DATABASE.agg_fn(INT, STRING)
  RETURNS INT
  LOCATION ''$NAMENODE/test-warehouse/libTestUdas.so''
@@ -111,7 +111,6 @@ show create function _impala_builtins.sin
 ---- RESULTS: MULTI_LINE
 ['CREATE FUNCTION _impala_builtins.sin(DOUBLE)
  RETURNS DOUBLE
- LOCATION ''null''
  SYMBOL=''_ZN6impala13MathFunctions3SinEPN10impala_udf15FunctionContextERKNS1_9DoubleValE''
 ']
 ---- TYPES
@@ -127,7 +126,7 @@ show create aggregate function _impala_builtins.avg
  UPDATE_FN=''_ZN6impala18AggregateFunctions9AvgUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE''
  INIT_FN=''_ZN6impala18AggregateFunctions7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE''
  MERGE_FN=''_ZN6impala18AggregateFunctions8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_''
- FINALIZE_FN=''_ZN6impala18AggregateFunctions11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE''
+ FINALIZE_FN=''_ZN6impala18AggregateFunctions11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'';
 CREATE AGGREGATE FUNCTION _impala_builtins.avg(DECIMAL(*,*))
  RETURNS DECIMAL(*,*)
  INTERMEDIATE FIXED_UDA_INTERMEDIATE(24)
@@ -135,7 +134,7 @@ CREATE AGGREGATE FUNCTION _impala_builtins.avg(DECIMAL(*,*))
  UPDATE_FN=''_ZN6impala18AggregateFunctions16DecimalAvgUpdateEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPNS1_9StringValE''
  INIT_FN=''_ZN6impala18AggregateFunctions14DecimalAvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE''
  MERGE_FN=''_ZN6impala18AggregateFunctions15DecimalAvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_''
- FINALIZE_FN=''_ZN6impala18AggregateFunctions18DecimalAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE''
+ FINALIZE_FN=''_ZN6impala18AggregateFunctions18DecimalAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'';
 CREATE AGGREGATE FUNCTION _impala_builtins.avg(DOUBLE)
  RETURNS DOUBLE
  INTERMEDIATE FIXED_UDA_INTERMEDIATE(16)
@@ -143,7 +142,7 @@ CREATE AGGREGATE FUNCTION _impala_builtins.avg(DOUBLE)
  UPDATE_FN=''_ZN6impala18AggregateFunctions9AvgUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE''
  INIT_FN=''_ZN6impala18AggregateFunctions7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE''
  MERGE_FN=''_ZN6impala18AggregateFunctions8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_''
- FINALIZE_FN=''_ZN6impala18AggregateFunctions11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE''
+ FINALIZE_FN=''_ZN6impala18AggregateFunctions11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE'';
 CREATE AGGREGATE FUNCTION _impala_builtins.avg(TIMESTAMP)
  RETURNS TIMESTAMP
  INTERMEDIATE FIXED_UDA_INTERMEDIATE(16)
