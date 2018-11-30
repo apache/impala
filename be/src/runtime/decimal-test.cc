@@ -19,9 +19,11 @@
 #include <stdio.h>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
 #include "runtime/decimal-value.inline.h"
+#include "runtime/raw-value.h"
 #include "runtime/types.h"
 #include "testutil/gtest-util.h"
 #include "util/string-parser.h"
@@ -706,6 +708,24 @@ TEST(DecimalTest, MultiplyScaleOverflow) {
   result = x.Multiply<int128_t>(scale_37, y, scale_1, 38, 38, false, &overflow);
   EXPECT_TRUE(result.value() == 3);
   EXPECT_FALSE(overflow);
+}
+
+// Test that unaligned decimal values are handled correctly.
+TEST(DecimalTest, UnalignedValues) {
+  // Regression test for IMPALA-7473 that triggered a crash in release builds.
+  Decimal16Value aligned(12345);
+  uint8_t* unaligned_mem = reinterpret_cast<uint8_t*>(malloc(sizeof(Decimal16Value) + 9));
+  memcpy(&unaligned_mem[9], &aligned, sizeof(aligned));
+  Decimal16Value* unaligned = reinterpret_cast<Decimal16Value*>(&unaligned_mem[9]);
+  // VerifyToString() worked even prior to the bugfix because GCC happened to generate
+  // code without aligned load instructions.
+  VerifyToString(*unaligned, 28, 2, "123.45");
+  // PrintValue() contained different generated code that wasn't safe for unaligned
+  // values.
+  stringstream ss;
+  RawValue::PrintValue(unaligned, ColumnType::CreateDecimalType(28, 2), 0, &ss);
+  EXPECT_EQ("123.45", ss.str());
+  free(unaligned_mem);
 }
 
 enum Op {

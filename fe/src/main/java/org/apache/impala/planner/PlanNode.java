@@ -341,11 +341,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       expBuilder.append(detailPrefix);
       expBuilder.append("in pipelines: ");
-      List<String> pipelines = Lists.newArrayList();
-      for (PipelineMembership pipe: pipelines_) {
-        pipelines.add(pipe.getExplainString());
+      if (pipelines_ != null) {
+        List<String> pipelines = Lists.newArrayList();
+        for (PipelineMembership pipe: pipelines_) {
+          pipelines.add(pipe.getExplainString());
+        }
+        expBuilder.append(Joiner.on(", ").join(pipelines) + "\n");
+      } else {
+        expBuilder.append("<not computed>");
       }
-      expBuilder.append(Joiner.on(", ").join(pipelines) + "\n");
     }
 
 

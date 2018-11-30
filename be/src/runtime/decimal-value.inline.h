@@ -674,21 +674,25 @@ inline std::string DecimalValue<T>::ToString(const ColumnType& type) const {
 
 template<typename T>
 inline std::string DecimalValue<T>::ToString(int precision, int scale) const {
+  T value;
+  // 'value_' may be unaligned. Use memcpy to avoid emitting instructions that assume
+  // alignment - see IMPALA-7473.
+  memcpy(&value, &value_, sizeof(T));
   // Decimal values are sent to clients as strings so in the interest of
   // speed the string will be created without the using stringstream with the
   // whole/fractional_part().
   int last_char_idx = precision
       + (scale > 0)   // Add a space for decimal place
       + (scale == precision)   // Add a space for leading 0
-      + (value_ < 0);   // Add a space for negative sign
+      + (value < 0);   // Add a space for negative sign
   std::string str = std::string(last_char_idx, '0');
   // Start filling in the values in reverse order by taking the last digit
   // of the value. Use a positive value and worry about the sign later. At this
   // point the last_char_idx points to the string terminator.
-  T remaining_value = value_;
+  T remaining_value = value;
   int first_digit_idx = 0;
-  if (value_ < 0) {
-    remaining_value = -value_;
+  if (value < 0) {
+    remaining_value = -value;
     first_digit_idx = 1;
   }
   if (scale > 0) {
@@ -710,7 +714,7 @@ inline std::string DecimalValue<T>::ToString(int precision, int scale) const {
     }
     // For safety, enforce string length independent of remaining_value.
   } while (last_char_idx > first_digit_idx);
-  if (value_ < 0) str[0] = '-';
+  if (value < 0) str[0] = '-';
   return str;
 }
 
