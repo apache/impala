@@ -143,14 +143,14 @@ under the License.
       <dl>
         <dlentry>
           <dt>Max Memory</dt>
-          <dd>Maximum amount of aggregate memory available across the cluster to
-            all queries executing in this pool. This should be a portion of the
-            aggregate configured memory for Impala daemons, which will be shown
-            in the settings dialog next to this option for convenience. Setting
-            this to a non-zero value enables memory based admission
-              control.<p>Impala determines the expected maximum memory used by
-              all queries in the pool and holds back any further queries that
-              would result in Max Memory being exceeded. </p><p>You set Max
+          <dd>The maximum amount of aggregate memory available across the
+            cluster to all queries executing in this pool. This should be a
+            portion of the aggregate configured memory for Impala daemons, which
+            will be shown in the settings dialog next to this option for
+            convenience. Setting this to a non-zero value enables memory based
+            admission control.<p>Impala determines the expected maximum memory
+              used by all queries in the pool and holds back any further queries
+              that would result in Max Memory being exceeded. </p><p>You set Max
               Memory in <codeph>fair-scheduler.xml</codeph> file with the
                 <codeph>maxResources</codeph> tag. For example:
                 <codeph>&lt;maxResources>2500
@@ -176,11 +176,11 @@ under the License.
           <dd>These two options determine the minimum and maximum per-host
             memory limit that will be chosen by Impala Admission control for
             queries in this resource pool. If set, Impala Admission Control will
-            choose a memory limit between the minimum and maximum value based on
-            the per-host memory estimate for the query. The memory limit chosen
-            determines the amount of memory that Impala Admission control will
-            set aside for this query on each host that the query is running on.
-            The aggregate memory across all of the hosts that the query is
+            choose a memory limit between the minimum and maximum values based
+            on the per-host memory estimate for the query. The memory limit
+            chosen determines the amount of memory that Impala Admission control
+            will set aside for this query on each host that the query is running
+            on. The aggregate memory across all of the hosts that the query is
             running on is counted against the pool’s Max Memory.<p>Minimum Query
               Memory Limit must be less than or equal to Maximum Query Memory
               Limit and Max Memory.</p><p>You set the settings in
