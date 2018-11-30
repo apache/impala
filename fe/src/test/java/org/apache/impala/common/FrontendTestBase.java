@@ -31,6 +31,7 @@ import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.Function;
@@ -286,10 +287,10 @@ public class FrontendTestBase extends AbstractFrontendTest {
    * Creates an authorization config for creating an AnalysisContext with
    * authorization enabled.
    */
-  protected AuthorizationConfig createAuthorizationConfig() {
-    AuthorizationConfig authzConfig = AuthorizationConfig.createHadoopGroupAuthConfig(
-        "server1", null, System.getenv("IMPALA_HOME") +
-            "/fe/src/test/resources/sentry-site.xml");
+  protected SentryAuthorizationConfig createAuthorizationConfig() {
+    SentryAuthorizationConfig authzConfig =
+        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
+            System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
     return authzConfig;
   }
 }

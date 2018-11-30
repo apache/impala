@@ -22,51 +22,39 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 
 /**
- * Represents a privilege request in the context of an Authorizeable object. If no
- * Authorizeable object is provided, it represents a privilege request on the server.
+ * Represents a privilege request in the context of an Authorizable object. If no
+ * Authorizable object is provided, it represents a privilege request on the server.
  * For example, SELECT on table Foo in database Bar.
+ *
+ * Use PrivilegeRequestBuilder to create this instance.
  */
 public class PrivilegeRequest {
-  private final Authorizeable authorizeable_;
+  private final Authorizable authorizable_;
   private final Privilege privilege_;
   private final boolean grantOption_;
 
-  public PrivilegeRequest(Authorizeable authorizeable, Privilege privilege) {
-    this(authorizeable, privilege, false);
-  }
-
-  public PrivilegeRequest(Authorizeable authorizeable, Privilege privilege,
-      boolean grantOption) {
-    Preconditions.checkNotNull(authorizeable);
+  PrivilegeRequest(Authorizable authorizable, Privilege privilege, boolean grantOption) {
+    Preconditions.checkNotNull(authorizable);
     Preconditions.checkNotNull(privilege);
-    authorizeable_ = authorizeable;
+    authorizable_ = authorizable;
     privilege_ = privilege;
     grantOption_ = grantOption;
   }
 
-  public PrivilegeRequest(Privilege privilege) {
-    Preconditions.checkNotNull(privilege);
-    authorizeable_ = null;
-    privilege_ = privilege;
-    grantOption_ = false;
-  }
-
   /*
-   * Name of the Authorizeable. Authorizeable refers to the server if it's null.
+   * Name of the Authorizable.
    */
-  public String getName() {
-    return (authorizeable_ != null) ? authorizeable_.getName() : "server";
-  }
+  public String getName() { return authorizable_.getName(); }
 
   /*
-   * Requested privilege on the Authorizeable.
+   * Requested privilege on the Authorizable.
    */
   public Privilege getPrivilege() { return privilege_; }
 
   /*
-   * Returns Authorizeable object. Null if the request is for server-level permission.
+   * Returns Authorizable object. Null if the request is for server-level permission.
    */
-  public Authorizeable getAuthorizeable() { return authorizeable_; }
+  public Authorizable getAuthorizable() { return authorizable_; }
 
   /**
    * Returns whether the grant option is required or not.
@@ -75,7 +63,7 @@ public class PrivilegeRequest {
 
   @Override
   public int hashCode() {
-    return Objects.hash(authorizeable_, privilege_, grantOption_);
+    return Objects.hash(authorizable_, privilege_, grantOption_);
   }
 
   @Override
@@ -84,7 +72,7 @@ public class PrivilegeRequest {
     if (o == null || getClass() != o.getClass()) return false;
     PrivilegeRequest that = (PrivilegeRequest) o;
     return grantOption_ == that.grantOption_ &&
-        Objects.equals(authorizeable_, that.authorizeable_) &&
+        Objects.equals(authorizable_, that.authorizable_) &&
         privilege_ == that.privilege_;
   }
 }

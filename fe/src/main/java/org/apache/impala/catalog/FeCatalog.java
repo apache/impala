@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TGetPartitionStatsResponse;

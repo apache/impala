@@ -34,7 +34,6 @@ import java.util.Set;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizeableTable;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
@@ -573,7 +572,7 @@ public class Analyzer {
         if (tableRef.requireGrantOption()) {
           builder.grantOption();
         }
-        registerPrivReq(builder.toRequest());
+        registerPrivReq(builder.build());
       }
       PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder()
           .onTable(getDefaultDb(), rawPath.get(0))
@@ -581,7 +580,7 @@ public class Analyzer {
       if (tableRef.requireGrantOption()) {
         builder.grantOption();
       }
-      registerPrivReq(builder.toRequest());
+      registerPrivReq(builder.build());
       throw e;
     } catch (TableLoadingException e) {
       throw new AnalysisException(String.format(
@@ -971,7 +970,7 @@ public class Analyzer {
       if (column != null) {
         registerPrivReq(new PrivilegeRequestBuilder().
             allOf(Privilege.SELECT).onColumn(tupleDesc.getTableName().getDb(),
-            tupleDesc.getTableName().getTbl(), column.getName()).toRequest());
+            tupleDesc.getTableName().getTbl(), column.getName()).build());
       }
     }
   }
@@ -2430,10 +2429,10 @@ public class Analyzer {
     for (Privilege priv : privilege) {
       if (priv == Privilege.ANY || addColumnPrivilege) {
         registerPrivReq(new PrivilegeRequestBuilder()
-            .allOf(priv).onAnyColumn(tableName.getDb(), tableName.getTbl()).toRequest());
+            .allOf(priv).onAnyColumn(tableName.getDb(), tableName.getTbl()).build());
       } else {
         registerPrivReq(new PrivilegeRequestBuilder()
-            .allOf(priv).onTable(tableName.getDb(), tableName.getTbl()).toRequest());
+            .allOf(priv).onTable(tableName.getDb(), tableName.getTbl()).build());
       }
     }
     FeTable table = getTable(tableName.getDb(), tableName.getTbl());
@@ -2515,10 +2514,9 @@ public class Analyzer {
       pb.grantOption();
     }
     if (privilege == Privilege.ANY) {
-      registerPrivReq(
-          pb.any().onAnyColumn(dbName, AuthorizeableTable.ANY_TABLE_NAME).toRequest());
+      registerPrivReq(pb.any().onAnyColumn(dbName).build());
     } else {
-      registerPrivReq(pb.allOf(privilege).onDb(dbName).toRequest());
+      registerPrivReq(pb.allOf(privilege).onDb(dbName).build());
     }
 
     FeDb db = getDb(dbName, throwIfDoesNotExist);
@@ -2550,7 +2548,7 @@ public class Analyzer {
   public boolean dbContainsTable(String dbName, String tableName, Privilege privilege)
       throws AnalysisException {
     registerPrivReq(new PrivilegeRequestBuilder().allOf(privilege)
-        .onTable(dbName,  tableName).toRequest());
+        .onTable(dbName,  tableName).build());
     try {
       FeDb db = getCatalog().getDb(dbName);
       if (db == null) {
@@ -2636,8 +2634,7 @@ public class Analyzer {
   public void registerPrivReq(PrivilegeRequest privReq) {
     if (!enablePrivChecks_) return;
     if (maskPrivChecks_) {
-      globalState_.maskedPrivilegeReqs.add(
-          Pair.<PrivilegeRequest, String>create(privReq, authErrorMsg_));
+      globalState_.maskedPrivilegeReqs.add(Pair.create(privReq, authErrorMsg_));
     } else {
       globalState_.privilegeReqs.add(privReq);
     }
@@ -2678,7 +2675,7 @@ public class Analyzer {
     if (requireGrantOption) {
       builder.grantOption();
     }
-    registerPrivReq(builder.toRequest());
+    registerPrivReq(builder.build());
   }
 
   /**

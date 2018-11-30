@@ -133,7 +133,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
         String authzServer = analyzer.getAuthzConfig().getServerName();
         Preconditions.checkNotNull(authzServer);
         analyzer.registerPrivReq(new PrivilegeRequestBuilder().onServer(
-            authzServer).all().toRequest());
+            authzServer).all().build());
       }
     }
   }

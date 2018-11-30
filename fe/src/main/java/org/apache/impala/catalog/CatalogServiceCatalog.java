@@ -41,7 +41,11 @@ import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
-import org.apache.impala.authorization.SentryConfig;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.authorization.AuthorizationProvider;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryProxy;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
@@ -79,7 +83,6 @@ import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
-import org.apache.impala.util.SentryProxy;
 import org.slf4j.Logger;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -262,9 +265,9 @@ public class CatalogServiceCatalog extends Catalog {
      * @throws ImpalaException
      */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      SentryConfig sentryConfig, TUniqueId catalogServiceId, String kerberosPrincipal,
-      String localLibraryPath, MetaStoreClientPool metaStoreClientPool)
-      throws ImpalaException {
+      AuthorizationConfig authConfig, TUniqueId catalogServiceId,
+      String kerberosPrincipal, String localLibraryPath,
+      MetaStoreClientPool metaStoreClientPool) throws ImpalaException {
     super(metaStoreClientPool);
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
@@ -279,8 +282,10 @@ public class CatalogServiceCatalog extends Catalog {
     } catch (IOException e) {
       LOG.error("Couldn't identify the default FS. Cache Pool reader will be disabled.");
     }
-    if (sentryConfig != null) {
-      sentryProxy_ = new SentryProxy(sentryConfig, this, kerberosPrincipal);
+    if (authConfig != null && authConfig.isEnabled() &&
+        authConfig.getProvider() == AuthorizationProvider.SENTRY) {
+      sentryProxy_ = new SentryProxy((SentryAuthorizationConfig) authConfig, this,
+          kerberosPrincipal);
     } else {
       sentryProxy_ = null;
     }
@@ -325,18 +330,19 @@ public class CatalogServiceCatalog extends Catalog {
     }
   }
 
-    /**
-     * Initializes the Catalog using the default MetastoreClientPool impl.
-     * @param initialHmsCnxnTimeoutSec Time (in seconds) CatalogServiceCatalog will wait
-     * to establish an initial connection to the HMS before giving up.
-     */
-
+  /**
+   * Initializes the Catalog using the default MetastoreClientPool impl.
+   * @param initialHmsCnxnTimeoutSec Time (in seconds) CatalogServiceCatalog will wait
+   *                                 to establish an initial connection to the HMS before
+   *                                 giving up.
+   */
   public CatalogServiceCatalog(boolean loadInBackground, int numLoadingThreads,
-      int initialHmsCnxnTimeoutSec, SentryConfig sentryConfig, TUniqueId catalogServiceId,
-      String kerberosPrincipal, String localLibraryPath) throws ImpalaException {
-    this(loadInBackground, numLoadingThreads, sentryConfig, catalogServiceId,
+      int initialHmsCnxnTimeoutSec, AuthorizationConfig authConfig,
+      TUniqueId catalogServiceId, String kerberosPrincipal, String localLibraryPath)
+      throws ImpalaException {
+    this(loadInBackground, numLoadingThreads, authConfig, catalogServiceId,
         kerberosPrincipal, localLibraryPath, new MetaStoreClientPool(
-        INITIAL_META_STORE_CLIENT_POOL_SIZE, initialHmsCnxnTimeoutSec));
+            INITIAL_META_STORE_CLIENT_POOL_SIZE, initialHmsCnxnTimeoutSec));
   }
 
   // Timeout for acquiring a table lock

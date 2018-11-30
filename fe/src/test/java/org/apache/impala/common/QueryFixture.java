@@ -33,7 +33,7 @@ import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
-import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
@@ -95,7 +95,7 @@ public class QueryFixture {
     protected AnalysisContext makeAnalysisContext() {
       EventSequence timeline = new EventSequence("Frontend Test Timeline");
       return new AnalysisContext(queryCtx_,
-          AuthorizationConfig.createAuthDisabledConfig(), timeline);
+          SentryAuthorizationConfig.createAuthDisabledConfig(), timeline);
     }
 
     /**

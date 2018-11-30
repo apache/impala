@@ -101,7 +101,7 @@ public class AdminFnStmt extends StatementBase {
       String authzServer = analyzer.getAuthzConfig().getServerName();
       Preconditions.checkNotNull(authzServer);
       analyzer.registerPrivReq(
-          new PrivilegeRequestBuilder().onServer(authzServer).all().toRequest());
+          new PrivilegeRequestBuilder().onServer(authzServer).all().build());
     }
 
     // TODO: this parsing and type checking logic is specific to the command, similar to

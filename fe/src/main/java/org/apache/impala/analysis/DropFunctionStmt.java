@@ -19,9 +19,8 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 
-import org.apache.impala.authorization.AuthorizeableFn;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequest;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Type;
@@ -85,8 +84,9 @@ public class DropFunctionStmt extends StatementBase {
           false);
     }
 
-    analyzer.registerPrivReq(new PrivilegeRequest(
-        new AuthorizeableFn(desc_.dbName(), desc_.signatureString()), Privilege.DROP));
+    analyzer.registerPrivReq(new PrivilegeRequestBuilder()
+        .onFunction(desc_.dbName(), desc_.signatureString()).allOf(Privilege.DROP)
+        .build());
 
     FeDb db =  analyzer.getDb(desc_.dbName(), false);
     if (db == null && !ifExists_) {

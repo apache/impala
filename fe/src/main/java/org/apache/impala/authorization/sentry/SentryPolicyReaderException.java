@@ -15,21 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.common;
+package org.apache.impala.authorization.sentry;
 
 /**
- * Thrown when Sentry is not available.
+ * Thrown as a generic exception when processing Sentry policy.
  */
-public class SentryUnavailableException extends RuntimeException {
-  public SentryUnavailableException(String msg, Throwable cause) {
+public class SentryPolicyReaderException extends RuntimeException {
+  public SentryPolicyReaderException(String msg, Throwable cause) {
     super(msg, cause);
   }
 
-  public SentryUnavailableException(String msg) {
+  public SentryPolicyReaderException(String msg) {
     super(msg);
   }
 
-  public SentryUnavailableException(Throwable cause) {
+  public SentryPolicyReaderException(Throwable cause) {
     super(cause);
   }
 }

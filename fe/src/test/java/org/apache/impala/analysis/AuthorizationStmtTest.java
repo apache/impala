@@ -29,10 +29,11 @@ import java.util.Set;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
-import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.User;
-import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.authorization.AuthorizationException;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryPolicyService;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
@@ -53,7 +54,6 @@ import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TTableName;
-import org.apache.impala.util.SentryPolicyService;
 import org.apache.sentry.api.service.thrift.TSentryRole;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -75,7 +75,7 @@ public class AuthorizationStmtTest extends FrontendTestBase {
   private final Frontend authzFrontend_;
 
   public AuthorizationStmtTest() {
-    AuthorizationConfig authzConfig = createAuthorizationConfig();
+    SentryAuthorizationConfig authzConfig = createAuthorizationConfig();
     analysisContext_ = createAnalysisCtx(authzConfig, USER.getName());
     authzCatalog_ = new ImpaladTestCatalog(authzConfig);
     authzFrontend_ = new Frontend(authzConfig, authzCatalog_);

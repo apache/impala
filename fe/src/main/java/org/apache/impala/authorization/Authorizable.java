@@ -19,30 +19,39 @@ package org.apache.impala.authorization;
 
 import java.util.List;
 
-import org.apache.sentry.core.model.db.DBModelAuthorizable;
-
 /*
- * Abstract class representing an authorizeable object (Table, Db, Column, etc).
+ * Abstract class representing an authorizable object (Table, Db, Column, etc).
  */
-public abstract class Authorizeable {
-  /*
-  * Returns the list of the Hive "authorizeable" objects in their hierarchical order.
-  * For example:
-  * [Column] would return Db -> Table -> Column
-  * [Table] would return Db -> Table
-  * [Db] would return [Db]
-  * [URI] would return [URI]
-  */
-  public abstract List<DBModelAuthorizable> getHiveAuthorizeableHierarchy();
+public abstract class Authorizable {
+  public enum Type {
+    SERVER,
+    DB,
+    TABLE,
+    COLUMN,
+    FUNCTION,
+    URI
+  }
 
   // Returns the name of the object.
   public abstract String getName();
 
+  // Returns the type of the authorizable.
+  public abstract Type getType();
+
   // Returns the full table name if applicable, null otherwise.
   public String getFullTableName() { return null; }
 
+  // Returns the table name if applicable, null otherwise.
+  public String getTableName() { return null; }
+
   // Returns the database name if applicable, null otherwise.
   public String getDbName() { return null; }
+
+  // Returns the column name if applicable, null otherwise.
+  public String getColumnName() { return null; }
+
+  // Returns the function name if applicable, null otherwise.
+  public String getFnName() { return null; }
 
   @Override
   public int hashCode() { return getName().hashCode(); }
@@ -51,6 +60,6 @@ public abstract class Authorizeable {
   public boolean equals(Object o) {
     if (o == null) return false;
     if (o.getClass() != this.getClass()) return false;
-    return ((Authorizeable) o).getName().equals(this.getName());
+    return ((Authorizable) o).getName().equals(this.getName());
   }
 }

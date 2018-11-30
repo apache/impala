@@ -15,43 +15,54 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.authorization;
-
-import java.util.List;
-
-import org.apache.sentry.core.model.db.DBModelAuthorizable;
+package org.apache.impala.authorization.sentry;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import org.apache.impala.authorization.Authorizable;
+import org.apache.sentry.core.model.db.AccessConstants;
+import org.apache.sentry.core.model.db.DBModelAuthorizable;
+
+import java.util.List;
 
 /**
- * Class used to authorize access to a column.
+ * Class used to authorize access to a column for Sentry.
  */
-public class AuthorizeableColumn extends Authorizeable {
+public class SentryAuthorizableColumn extends SentryAuthorizable  {
   private final org.apache.sentry.core.model.db.Column column_;
   private final org.apache.sentry.core.model.db.Table table_;
   private final org.apache.sentry.core.model.db.Database database_;
-  public final static String ANY_COLUMN_NAME =
-      org.apache.sentry.core.model.db.AccessConstants.ALL;
 
-  public AuthorizeableColumn(String dbName, String tableName, String columnName) {
-    Preconditions.checkState(!Strings.isNullOrEmpty(dbName));
-    Preconditions.checkState(!Strings.isNullOrEmpty(tableName));
-    Preconditions.checkState(!Strings.isNullOrEmpty(columnName));
+  public SentryAuthorizableColumn(String dbName) {
+    this(dbName, AccessConstants.ALL);
+  }
+
+  public SentryAuthorizableColumn(String dbName, String tableName) {
+    this(dbName, tableName, AccessConstants.ALL);
+  }
+
+  public SentryAuthorizableColumn(String dbName, String tableName, String columnName) {
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(dbName));
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(tableName));
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(columnName));
     column_ = new org.apache.sentry.core.model.db.Column(columnName);
     table_ = new org.apache.sentry.core.model.db.Table(tableName);
     database_ = new org.apache.sentry.core.model.db.Database(dbName);
   }
 
   @Override
-  public List<DBModelAuthorizable> getHiveAuthorizeableHierarchy() {
-    return Lists.newArrayList(database_, table_, column_);
+  public List<Authorizable> getAuthorizableHierarchy() {
+    return Lists.newArrayList(new SentryAuthorizableDb(database_.getName()),
+        new SentryAuthorizableTable(database_.getName(), table_.getName()), this);
   }
 
   @Override
   public String getName() { return database_.getName() + "." + table_.getName() + "."
       + column_.getName(); }
+
+  @Override
+  public Type getType() { return Type.COLUMN; }
 
   @Override
   public String getFullTableName() {
@@ -61,6 +72,12 @@ public class AuthorizeableColumn extends Authorizeable {
   @Override
   public String getDbName() { return database_.getName(); }
 
-  public String getTblName() { return table_.getName(); }
+  @Override
+  public String getTableName() { return table_.getName(); }
+
+  @Override
   public String getColumnName() { return column_.getName(); }
+
+  @Override
+  public DBModelAuthorizable getDBModelAuthorizable() { return column_; }
 }

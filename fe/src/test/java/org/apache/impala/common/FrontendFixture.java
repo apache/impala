@@ -37,6 +37,7 @@ import org.apache.impala.analysis.StatementBase;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
@@ -91,7 +92,7 @@ public class FrontendFixture {
 
   // The actual Impala frontend that backs this fixture.
   protected final Frontend frontend_ = new Frontend(
-      AuthorizationConfig.createAuthDisabledConfig(), catalog_);
+      SentryAuthorizationConfig.createAuthDisabledConfig(), catalog_);
 
   // Test-local list of test databases and tables.
   protected final List<Db> testDbs_ = new ArrayList<>();
@@ -293,7 +294,7 @@ public class FrontendFixture {
         defaultDb, System.getProperty("user.name"));
     EventSequence timeline = new EventSequence("Frontend Test Timeline");
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
-        AuthorizationConfig.createAuthDisabledConfig(), timeline);
+        SentryAuthorizationConfig.createAuthDisabledConfig(), timeline);
     return analysisCtx;
   }
 
@@ -302,7 +303,7 @@ public class FrontendFixture {
     queryCtx.client_request.query_options = queryOptions;
     EventSequence timeline = new EventSequence("Frontend Test Timeline");
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
-        AuthorizationConfig.createAuthDisabledConfig(), timeline);
+        SentryAuthorizationConfig.createAuthDisabledConfig(), timeline);
     return analysisCtx;
   }
 

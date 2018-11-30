@@ -15,35 +15,39 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.authorization;
+package org.apache.impala.authorization.sentry;
+
+import com.google.common.collect.Lists;
+import org.apache.impala.authorization.Authorizable;
+import org.apache.sentry.core.model.db.DBModelAuthorizable;
 
 import java.util.List;
 
-import org.apache.sentry.core.model.db.DBModelAuthorizable;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-
 /**
- * Class used to authorize access at the catalog level. Generally, all Impala
- * services in the cluster will be configured with the same catalog name.
+ * Class used to authorize access at the catalog level for Sentry. Generally, all
+ * Impala services in the cluster will be configured with the same catalog name.
  * What Sentry refers to as a Server maps to our concept of a Catalog, thus
- * the name AuthorizeableServer.
+ * the name AuthorizableServer.
  */
-public class AuthorizeableServer extends Authorizeable {
+public class SentryAuthorizableServer extends SentryAuthorizable {
   private final org.apache.sentry.core.model.db.Server server_;
 
-  public AuthorizeableServer(String serverName) {
-    Preconditions.checkState(!Strings.isNullOrEmpty(serverName));
-    server_ = new org.apache.sentry.core.model.db.Server(serverName);
+  public SentryAuthorizableServer(String serverName) {
+    server_ = new org.apache.sentry.core.model.db.Server(
+        serverName == null ? "server" : serverName);
   }
 
   @Override
-  public List<DBModelAuthorizable> getHiveAuthorizeableHierarchy() {
-    return Lists.newArrayList((DBModelAuthorizable) server_);
+  public List<Authorizable> getAuthorizableHierarchy() {
+    return Lists.newArrayList(this);
   }
 
   @Override
   public String getName() { return server_.getName(); }
+
+  @Override
+  public Type getType() { return Type.SERVER; }
+
+  @Override
+  public DBModelAuthorizable getDBModelAuthorizable() { return server_; }
 }

@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.analysis.TableName;
-import org.apache.impala.catalog.AuthorizationPolicy;
+import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;

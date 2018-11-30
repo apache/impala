@@ -26,13 +26,12 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
+import org.apache.impala.authorization.Authorizable;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizeableColumn;
-import org.apache.impala.authorization.AuthorizeableTable;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
-import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Type;
@@ -536,7 +535,7 @@ public class AnalysisContext {
       List<PrivilegeRequest> otherPrivReqs = new ArrayList<>();
       // Group the registered privilege requests based on the table they reference.
       for (PrivilegeRequest privReq: analyzer.getPrivilegeReqs()) {
-        String tableName = privReq.getAuthorizeable().getFullTableName();
+        String tableName = privReq.getAuthorizable().getFullTableName();
         if (tableName == null) {
           otherPrivReqs.add(privReq);
         } else {
@@ -548,8 +547,8 @@ public class AnalysisContext {
           // The table-level SELECT must be the first table-level request, and it
           // must precede all column-level privilege requests.
           Preconditions.checkState((requests.isEmpty() ||
-              !(privReq.getAuthorizeable() instanceof AuthorizeableColumn)) ||
-              (requests.get(0).getAuthorizeable() instanceof AuthorizeableTable &&
+              !(privReq.getAuthorizable().getType() == Authorizable.Type.COLUMN)) ||
+              (requests.get(0).getAuthorizable().getType() == Authorizable.Type.TABLE &&
               requests.get(0).getPrivilege() == Privilege.SELECT));
           requests.add(privReq);
         }
@@ -568,7 +567,7 @@ public class AnalysisContext {
     } else {
       for (PrivilegeRequest privReq: analyzer.getPrivilegeReqs()) {
         Preconditions.checkState(
-            !(privReq.getAuthorizeable() instanceof AuthorizeableColumn) ||
+            !(privReq.getAuthorizable().getType() == Authorizable.Type.COLUMN) ||
             analysisResult_.isSingleColumnPrivStmt());
         authorizePrivilegeRequest(authzChecker, privReq);
       }
@@ -601,8 +600,8 @@ public class AnalysisContext {
     PrivilegeRequest request) throws AuthorizationException, InternalException {
     Preconditions.checkNotNull(request);
     String dbName = null;
-    if (request.getAuthorizeable() != null) {
-      dbName = request.getAuthorizeable().getDbName();
+    if (request.getAuthorizable() != null) {
+      dbName = request.getAuthorizable().getDbName();
     }
     // If this is a system database, some actions should always be allowed
     // or disabled, regardless of what is in the auth policy.
@@ -628,7 +627,7 @@ public class AnalysisContext {
     boolean hasTableSelectPriv = true;
     boolean hasColumnSelectPriv = false;
     for (PrivilegeRequest request: requests) {
-      if (request.getAuthorizeable() instanceof AuthorizeableTable) {
+      if (request.getAuthorizable().getType() == Authorizable.Type.TABLE) {
         try {
           authorizePrivilegeRequest(authzChecker, request);
         } catch (AuthorizationException e) {
@@ -639,7 +638,7 @@ public class AnalysisContext {
         }
       } else {
         Preconditions.checkState(
-            request.getAuthorizeable() instanceof AuthorizeableColumn);
+            request.getAuthorizable().getType() == Authorizable.Type.COLUMN);
         if (hasTableSelectPriv) continue;
         if (authzChecker.hasAccess(analyzer.getUser(), request)) {
           hasColumnSelectPriv = true;
@@ -649,13 +648,13 @@ public class AnalysisContext {
         throw new AuthorizationException(String.format("User '%s' does not have " +
           "privileges to execute '%s' on: %s", analyzer.getUser().getName(),
           request.getPrivilege().toString(),
-          request.getAuthorizeable().getFullTableName()));
+          request.getAuthorizable().getFullTableName()));
       }
     }
     if (!hasTableSelectPriv && !hasColumnSelectPriv) {
        throw new AuthorizationException(String.format("User '%s' does not have " +
           "privileges to execute 'SELECT' on: %s", analyzer.getUser().getName(),
-          requests.get(0).getAuthorizeable().getFullTableName()));
+          requests.get(0).getAuthorizable().getFullTableName()));
     }
   }
 

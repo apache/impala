@@ -15,40 +15,39 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.authorization;
+package org.apache.impala.authorization.sentry;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
+import org.apache.impala.authorization.Authorizable;
+import org.apache.sentry.core.model.db.AccessURI;
+import org.apache.sentry.core.model.db.DBModelAuthorizable;
 
 import java.util.List;
 
-import com.google.common.base.Strings;
-import org.apache.sentry.core.model.db.DBModelAuthorizable;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-
 /**
- * Class used to authorize access to a Function.
+ * Class used to authorize access to a URI for Sentry.
  */
-public class AuthorizeableFn extends Authorizeable {
-  private final String fnName_;
-  private final org.apache.sentry.core.model.db.Database database_;
+public class SentryAuthorizableUri extends SentryAuthorizable {
+  private final String uriName_;
 
-  public AuthorizeableFn(String dbName, String fnName) {
-    Preconditions.checkState(!Strings.isNullOrEmpty(dbName));
-    Preconditions.checkState(!Strings.isNullOrEmpty(fnName));
-    database_ = new org.apache.sentry.core.model.db.Database(dbName);
-    fnName_ = fnName;
+  public SentryAuthorizableUri(String uriName) {
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(uriName));
+    uriName_ = uriName;
   }
 
   @Override
-  public List<DBModelAuthorizable> getHiveAuthorizeableHierarchy() {
-    return Lists.newArrayList((DBModelAuthorizable) database_);
+  public List<Authorizable> getAuthorizableHierarchy() {
+    return Lists.newArrayList(this);
   }
 
   @Override
-  public String getName() { return database_.getName() + "." + fnName_; }
+  public String getName() { return uriName_; }
 
   @Override
-  public String getDbName() { return database_.getName(); }
+  public Type getType() { return Type.URI; }
 
-  public String getFnName() { return fnName_; };
+  @Override
+  public DBModelAuthorizable getDBModelAuthorizable() { return new AccessURI(uriName_); }
 }

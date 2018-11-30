@@ -44,7 +44,8 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.client.builder.DatabaseBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.PartitionBuilder;
 import org.apache.hadoop.hive.metastore.client.builder.TableBuilder;
-import org.apache.impala.authorization.SentryConfig;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryConfig;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.DatabaseNotFoundException;
@@ -796,10 +797,10 @@ public class MetastoreEventsProcessorTest {
     private String tblName_;
 
     private FakeCatalogServiceCatalogForFlagTests(boolean loadInBackground,
-        int numLoadingThreads, SentryConfig sentryConfig, TUniqueId catalogServiceId,
+        int numLoadingThreads, AuthorizationConfig authConfig, TUniqueId catalogServiceId,
         String kerberosPrincipal, String localLibraryPath,
         MetaStoreClientPool metaStoreClientPool) throws ImpalaException {
-      super(loadInBackground, numLoadingThreads, sentryConfig, catalogServiceId,
+      super(loadInBackground, numLoadingThreads, authConfig, catalogServiceId,
           kerberosPrincipal, localLibraryPath, metaStoreClientPool);
     }
 

@@ -17,8 +17,10 @@
 
 package org.apache.impala.testutil;
 
-import org.apache.impala.authorization.SentryConfig;
-import org.apache.impala.catalog.AuthorizationPolicy;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryConfig;
+import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.common.ImpalaException;
@@ -34,11 +36,10 @@ import java.util.UUID;
  * for testing.
  */
 public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
-
   public CatalogServiceTestCatalog(boolean loadInBackground, int numLoadingThreads,
-      SentryConfig sentryConfig, TUniqueId catalogServiceId,
+      AuthorizationConfig authConfig, TUniqueId catalogServiceId,
       MetaStoreClientPool metaStoreClientPool) throws ImpalaException {
-    super(loadInBackground, numLoadingThreads, sentryConfig, catalogServiceId, null,
+    super(loadInBackground, numLoadingThreads, authConfig, catalogServiceId, null,
         System.getProperty("java.io.tmpdir"), metaStoreClientPool);
 
     // Cache pools are typically loaded asynchronously, but as there is no fixed execution
@@ -49,7 +50,7 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
   }
 
   public static CatalogServiceCatalog create() {
-    return createWithAuth(null);
+    return createWithAuth(new SentryConfig(null));
   }
 
   /**
@@ -60,8 +61,8 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
     FeSupport.loadLibrary();
     CatalogServiceCatalog cs;
     try {
-      cs = new CatalogServiceTestCatalog(false, 16, config, new TUniqueId(), new
-          MetaStoreClientPool(0, 0));
+      cs = new CatalogServiceTestCatalog(false, 16, new SentryAuthorizationConfig(config),
+          new TUniqueId(), new MetaStoreClientPool(0, 0));
       cs.reset();
     } catch (ImpalaException e) {
       throw new IllegalStateException(e.getMessage(), e);

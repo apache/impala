@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.authorization;
+package org.apache.impala.authorization.sentry;
 
 import java.io.File;
 import java.net.MalformedURLException;

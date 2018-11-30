@@ -23,9 +23,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 
-import org.apache.impala.authorization.AuthorizeableUri;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequest;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.util.FsPermissionChecker;
@@ -121,8 +120,8 @@ public class HdfsUri {
     }
 
     if (registerPrivReq) {
-      analyzer.registerPrivReq(new PrivilegeRequest(
-          new AuthorizeableUri(uriPath_.toString()), privilege));
+      analyzer.registerPrivReq(new PrivilegeRequestBuilder()
+          .onUri(uriPath_.toString()).allOf(privilege).build());
     }
   }
 

@@ -21,7 +21,6 @@ import java.util.List;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.impala.authorization.Privilege;
-import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.service.BackendConfig;
@@ -152,7 +151,7 @@ public class ResetMetadataStmt extends StatementBase {
           // Verify the user has privileges to access this table.
           analyzer.registerPrivReq(new PrivilegeRequestBuilder()
               .onTable(dbName, tableName_.getTbl()).allOf(Privilege.REFRESH)
-              .toRequest());
+              .build());
         }
         break;
       case REFRESH_AUTHORIZATION:
@@ -160,14 +159,16 @@ public class ResetMetadataStmt extends StatementBase {
           throw new AnalysisException("Authorization is not enabled. To enable " +
               "authorization restart Impala with the --server_name=<name> flag.");
         }
-        analyzer.registerPrivReq(new PrivilegeRequest(Privilege.REFRESH));
+        analyzer.registerPrivReq(new PrivilegeRequestBuilder()
+            .onServer(analyzer.getServerName()).allOf(Privilege.REFRESH).build());
         break;
       case REFRESH_FUNCTIONS:
         analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-            .onDb(database_).allOf(Privilege.REFRESH).toRequest());
+            .onDb(database_).allOf(Privilege.REFRESH).build());
         break;
       case INVALIDATE_METADATA_ALL:
-        analyzer.registerPrivReq(new PrivilegeRequest(Privilege.REFRESH));
+        analyzer.registerPrivReq(new PrivilegeRequestBuilder()
+            .onServer(analyzer.getServerName()).allOf(Privilege.REFRESH).build());
         if (BackendConfig.INSTANCE.getBackendCfg().use_local_catalog) {
           throw new AnalysisException("Global INVALIDATE METADATA is not supported " +
               "when --use_local_catalog is configured.");

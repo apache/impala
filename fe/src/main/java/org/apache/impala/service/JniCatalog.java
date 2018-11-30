@@ -26,7 +26,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.impala.authorization.SentryConfig;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.sentry.SentryConfig;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
@@ -107,7 +108,7 @@ public class JniCatalog {
         TLogLevel.values()[cfg.non_impala_java_vlog]);
 
     // Check if the Sentry Service is configured. If so, create a configuration object.
-    SentryConfig sentryConfig = null;
+    SentryConfig sentryConfig = new SentryConfig(null);
     if (!Strings.isNullOrEmpty(cfg.sentry_config)) {
       sentryConfig = new SentryConfig(cfg.sentry_config);
       sentryConfig.loadConfig();
@@ -115,8 +116,9 @@ public class JniCatalog {
     LOG.info(JniUtil.getJavaVersion());
 
     catalog_ = new CatalogServiceCatalog(cfg.load_catalog_in_background,
-        cfg.num_metadata_loading_threads, cfg.initial_hms_cnxn_timeout_s, sentryConfig,
-        getServiceId(), cfg.principal, cfg.local_library_path);
+        cfg.num_metadata_loading_threads, cfg.initial_hms_cnxn_timeout_s,
+        new SentryAuthorizationConfig(sentryConfig), getServiceId(), cfg.principal,
+        cfg.local_library_path);
     try {
       catalog_.reset();
     } catch (CatalogException e) {

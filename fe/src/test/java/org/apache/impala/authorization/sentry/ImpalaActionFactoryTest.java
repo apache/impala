@@ -14,10 +14,11 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-package org.apache.impala.authorization;
+package org.apache.impala.authorization.sentry;
 
 import com.google.common.collect.Lists;
-import org.apache.impala.authorization.Privilege.ImpalaAction;
+import org.apache.impala.authorization.sentry.ImpalaAction;
+import org.apache.impala.authorization.sentry.ImpalaActionFactory;
 import org.apache.sentry.core.common.BitFieldAction;
 import org.junit.Test;
 

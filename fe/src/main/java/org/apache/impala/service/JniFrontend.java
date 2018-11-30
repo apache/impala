@@ -44,9 +44,9 @@ import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.ShellBasedUnixGroupsNetgroupMapping;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.ToSqlUtils;
-import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.User;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.Function;
@@ -139,7 +139,7 @@ public class JniFrontend {
 
     // Validate the authorization configuration before initializing the Frontend.
     // If there are any configuration problems Impala startup will fail.
-    AuthorizationConfig authConfig = new AuthorizationConfig(cfg.server_name,
+    SentryAuthorizationConfig authConfig = new SentryAuthorizationConfig(cfg.server_name,
         cfg.authorization_policy_file, cfg.sentry_config,
         cfg.authorization_policy_provider_class);
     if (authConfig.isEnabled()) {

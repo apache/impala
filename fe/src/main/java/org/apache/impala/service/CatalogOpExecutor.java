@@ -1143,7 +1143,7 @@ public class CatalogOpExecutor {
    */
   private void updateOwnerPrivileges(String databaseName, String tableName,
       String serverName, String oldOwner, PrincipalType oldOwnerType, String newOwner,
-      PrincipalType newOwnerType, TDdlExecResponse resp) {
+      PrincipalType newOwnerType, TDdlExecResponse resp) throws ImpalaException {
     if (catalog_.getSentryProxy() == null || !catalog_.getSentryProxy()
         .isObjectOwnershipEnabled()) return;
     Preconditions.checkNotNull(serverName);
@@ -1983,7 +1983,7 @@ public class CatalogOpExecutor {
    * Create a TPrivilege for an owner of a table for use as a filter.
    */
   private TPrivilege createTableOwnerPrivilegeFilter(String databaseName,
-      String tableName, String serverName) {
+      String tableName, String serverName) throws ImpalaException {
     TPrivilege privilege = createDatabaseOwnerPrivilegeFilter(databaseName, serverName);
     privilege.setScope(TPrivilegeScope.TABLE);
     privilege.setTable_name(tableName);
@@ -1994,7 +1994,7 @@ public class CatalogOpExecutor {
    * Create a TPrivilege for an owner of a database for use as a filter.
    */
   private TPrivilege createDatabaseOwnerPrivilegeFilter(String databaseName,
-      String serverName) {
+      String serverName) throws ImpalaException {
     TPrivilege privilege = new TPrivilege();
     privilege.setScope(TPrivilegeScope.DATABASE).setServer_name(serverName)
         .setPrivilege_level(TPrivilegeLevel.OWNER)
@@ -3022,7 +3022,7 @@ public class CatalogOpExecutor {
   }
 
   private void alterTableOrViewSetOwner(Table tbl, TAlterTableOrViewSetOwnerParams params,
-      TDdlExecResponse response) throws ImpalaRuntimeException {
+      TDdlExecResponse response) throws ImpalaException {
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
     String oldOwner = msTbl.getOwner();
     PrincipalType oldOwnerType = msTbl.getOwnerType();
@@ -3443,7 +3443,7 @@ public class CatalogOpExecutor {
   /**
    * Checks if with grant is enabled for object ownership in Sentry.
    */
-  private boolean isObjectOwnershipGrantEnabled() {
+  private boolean isObjectOwnershipGrantEnabled() throws ImpalaException {
     return catalog_.getSentryProxy() == null ? false :
         catalog_.getSentryProxy().isObjectOwnershipGrantEnabled();
   }
@@ -3913,7 +3913,7 @@ public class CatalogOpExecutor {
   }
 
   private void alterDatabase(TAlterDbParams params, TDdlExecResponse response)
-      throws CatalogException, ImpalaRuntimeException {
+      throws ImpalaException {
     switch (params.getAlter_type()) {
       case SET_OWNER:
         alterDatabaseSetOwner(params.getDb(), params.getSet_owner_params(), response);
@@ -3925,7 +3925,7 @@ public class CatalogOpExecutor {
   }
 
   private void alterDatabaseSetOwner(String dbName, TAlterDbSetOwnerParams params,
-      TDdlExecResponse response) throws CatalogException, ImpalaRuntimeException {
+      TDdlExecResponse response) throws ImpalaException {
     Db db = catalog_.getDb(dbName);
     if (db == null) {
       throw new CatalogException("Database: " + dbName + " does not exist.");

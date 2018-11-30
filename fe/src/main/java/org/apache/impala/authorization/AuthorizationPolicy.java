@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.catalog;
+package org.apache.impala.authorization;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +25,13 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.net.ntp.TimeStamp;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogObjectCache;
+import org.apache.impala.catalog.CatalogObjectVersionSet;
+import org.apache.impala.catalog.Principal;
+import org.apache.impala.catalog.PrincipalPrivilege;
+import org.apache.impala.catalog.Role;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.Frontend;
@@ -36,8 +43,6 @@ import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.log4j.Logger;
-import org.apache.sentry.core.common.ActiveRoleSet;
-import org.apache.sentry.provider.cache.PrivilegeCache;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -46,13 +51,12 @@ import com.google.common.collect.Sets;
 /**
  * A thread safe authorization policy cache, consisting of roles, groups that are
  * members of that role, the privileges associated with the role, and users and the
- * privileges associated with the user. The source data this cache is backing is read from
- * the Sentry Policy Service. Writing to the cache will replace any matching items, but
- * will not write back to the Sentry Policy Service.
- * The roleCache_ contains all roles defined in Sentry whereas userCache_ only contains
- * users that have privileges defined in Sentry and does not represent all users in the
- * system. A principal type can have 0 or more privileges and principal types are stored
- * in a map of principal name to principal object. For example:
+ * privileges associated with the user.
+ * The roleCache_ contains all roles defined in authorization provider whereas userCache_
+ * only contains users that have privileges defined in authorization provider and does
+ * not represent all users in the system. A principal type can have 0 or more privileges
+ * and principal types are stored in a map of principal name to principal object.
+ * For example:
  * RoleName -> Role -> [PrincipalPriv1, ..., PrincipalPrivN]
  * UserName -> User -> [PrincipalPriv1, ..., PrincipalPrivN]
  * There is a separate cache for users since we cannot guarantee uniqueness between
@@ -63,12 +67,8 @@ import com.google.common.collect.Sets;
  * "principal ID" rather than embedding the principal name. When a privilege is added to
  * a principal type, we do a lookup to get the principal ID to probe the principalIds_
  * map.
- * Acts as the backing cache for the Sentry cached based provider (which is why
- * PrivilegeCache is implemented).
- * TODO: Instead of calling into Sentry to perform final authorization checks, we
- * should parse/validate the privileges in Impala.
  */
-public class AuthorizationPolicy implements PrivilegeCache {
+public class AuthorizationPolicy {
   private static final Logger LOG = Logger.getLogger(AuthorizationPolicy.class);
 
   // Need to keep separate caches of role names and user names since there is
@@ -77,7 +77,8 @@ public class AuthorizationPolicy implements PrivilegeCache {
   private final CatalogObjectCache<Role> roleCache_ = new CatalogObjectCache<>();
 
   // Cache of user names (case-sensitive) to user objects.
-  private final CatalogObjectCache<User> userCache_ = new CatalogObjectCache<>(false);
+  private final CatalogObjectCache<org.apache.impala.catalog.User> userCache_ =
+      new CatalogObjectCache<>(false);
 
   // Map of principal ID -> user/role name. Used to match privileges to users/roles.
   private final Map<Integer, String> principalIds_ = new HashMap<>();
@@ -114,8 +115,8 @@ public class AuthorizationPolicy implements PrivilegeCache {
       }
     }
     if (principal.getPrincipalType() == TPrincipalType.USER) {
-      Preconditions.checkArgument(principal instanceof User);
-      userCache_.add((User) principal);
+      Preconditions.checkArgument(principal instanceof org.apache.impala.catalog.User);
+      userCache_.add((org.apache.impala.catalog.User) principal);
     } else {
       Preconditions.checkArgument(principal instanceof Role);
       roleCache_.add((Role) principal);
@@ -194,7 +195,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
   /**
    * Returns all users in the policy. Returns an empty list if no users exist.
    */
-  public synchronized List<User> getAllUsers() {
+  public synchronized List<org.apache.impala.catalog.User> getAllUsers() {
     return userCache_.getValues();
   }
 
@@ -231,14 +232,14 @@ public class AuthorizationPolicy implements PrivilegeCache {
   /**
    * Gets a user given a user name. Returns null if no user exist with this name.
    */
-  public synchronized User getUser(String userName) {
+  public synchronized org.apache.impala.catalog.User getUser(String userName) {
     return userCache_.get(userName);
   }
 
   /**
    * Gets a user given a user ID. Returns null if no user exists with this ID.
    */
-  public synchronized User getUser(int userId) {
+  public synchronized org.apache.impala.catalog.User getUser(int userId) {
     String userName = principalIds_.get(userId);
     if (userName == null) return null;
     return userCache_.get(userName);
@@ -359,8 +360,8 @@ public class AuthorizationPolicy implements PrivilegeCache {
    * Removes a user. Returns the removed user or null if no user with
    * this name existed.
    */
-  public synchronized User removeUser(String userName) {
-    User removedUser = userCache_.remove(userName);
+  public synchronized org.apache.impala.catalog.User removeUser(String userName) {
+    org.apache.impala.catalog.User removedUser = userCache_.remove(userName);
     if (removedUser == null) return null;
     // Cleanup user ID.
     principalIds_.remove(removedUser.getId());
@@ -401,66 +402,6 @@ public class AuthorizationPolicy implements PrivilegeCache {
       grantedRoles.remove(roleName.toLowerCase());
     }
     return role;
-  }
-
-  /**
-   * Returns a set of privilege strings in Sentry format.
-   */
-  @Override
-  public synchronized Set<String> listPrivileges(Set<String> groups,
-      ActiveRoleSet roleSet) {
-    Set<String> privileges = new HashSet<>();
-    if (roleSet != ActiveRoleSet.ALL) {
-      throw new UnsupportedOperationException("Impala does not support role subsets.");
-    }
-
-    // Collect all privileges granted to all roles.
-    for (String groupName: groups) {
-      List<Role> grantedRoles = getGrantedRoles(groupName);
-      for (Role role: grantedRoles) {
-        for (PrincipalPrivilege privilege: role.getPrivileges()) {
-          String authorizeable = privilege.getName();
-          if (authorizeable == null) {
-            if (LOG.isTraceEnabled()) {
-              LOG.trace("Ignoring invalid privilege: " + privilege.getName());
-            }
-            continue;
-          }
-          privileges.add(authorizeable);
-        }
-      }
-    }
-    return privileges;
-  }
-
-  /**
-   * Returns a set of privilege strings in Sentry format.
-   */
-  @Override
-  public synchronized Set<String> listPrivileges(Set<String> groups, Set<String> users,
-      ActiveRoleSet roleSet) {
-    Set<String> privileges = listPrivileges(groups, roleSet);
-    for (String userName: users) {
-      User user = getUser(userName);
-      if (user != null) {
-        for (PrincipalPrivilege privilege: user.getPrivileges()) {
-          String authorizeable = privilege.getName();
-          if (authorizeable == null) {
-            if (LOG.isTraceEnabled()) {
-              LOG.trace("Ignoring invalid privilege: " + privilege.getName());
-            }
-            continue;
-          }
-          privileges.add(authorizeable);
-        }
-      }
-    }
-    return privileges;
-  }
-
-  @Override
-  public void close() {
-    // Nothing to do, but required by PrivilegeCache.
   }
 
   /**
@@ -559,7 +500,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
       throw new AnalysisException(String.format("User '%s' does not exist.",
           principalName));
     }
-    User user = getUser(principalName);
+    org.apache.impala.catalog.User user = getUser(principalName);
     if (user != null) {
       createShowUserPrivilegesResultRows(result, user.getPrivileges(), filter,
           principalName, TPrincipalType.USER);

@@ -120,11 +120,11 @@ public class CopyTestCaseStmt extends StatementBase {
       Pair<Set<FeDb>, Set<FeTable>> referencedObjects = getReferencedCatalogObjects();
       for (FeDb db: referencedObjects.first) {
         analyzer.registerPrivReq(new PrivilegeRequestBuilder().onDb(db.getName()).allOf
-            (Privilege.VIEW_METADATA).toRequest());
+            (Privilege.VIEW_METADATA).build());
       }
       for (FeTable table: referencedObjects.second) {
         analyzer.registerPrivReq(new PrivilegeRequestBuilder().onTable(table.getDb()
-            .getName(), table.getName()).allOf(Privilege.VIEW_METADATA).toRequest());
+            .getName(), table.getName()).allOf(Privilege.VIEW_METADATA).build());
       }
     } else {
       hdfsPath_.analyze(analyzer, Privilege.ALL, FsAction.READ, /*registerPrivReq*/ true,

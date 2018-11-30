@@ -100,10 +100,10 @@ public class DescribeTableStmt extends StatementBase {
       // table/database if the user is not authorized.
       if (rawPath_.size() > 1) {
         analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-            .onTable(rawPath_.get(0), rawPath_.get(1)).any().toRequest());
+            .onTable(rawPath_.get(0), rawPath_.get(1)).any().build());
       }
       analyzer.registerPrivReq(new PrivilegeRequestBuilder()
-          .onTable(analyzer.getDefaultDb(), rawPath_.get(0)).any().toRequest());
+          .onTable(analyzer.getDefaultDb(), rawPath_.get(0)).any().build());
       throw ae;
     } catch (TableLoadingException tle) {
       throw new AnalysisException(tle.getMessage(), tle);
@@ -120,7 +120,7 @@ public class DescribeTableStmt extends StatementBase {
 
     analyzer.registerPrivReq(new PrivilegeRequestBuilder()
         .onColumn(path_.getRootTable().getDb().getName(), path_.getRootTable().getName(),
-        path_.getRawPath().get(0)).any().toRequest());
+        path_.getRawPath().get(0)).any().build());
 
     if (path_.destType().isComplexType()) {
       if (outputStyle_ == TDescribeOutputStyle.FORMATTED ||

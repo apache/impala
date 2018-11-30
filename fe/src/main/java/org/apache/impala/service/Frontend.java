@@ -65,12 +65,14 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TruncateStmt;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizeableTable;
+import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.authorization.User;
+import org.apache.impala.authorization.sentry.SentryAuthorizationChecker;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
@@ -253,21 +255,25 @@ public class Frontend {
     authzConfig_ = authorizationConfig;
     catalogManager_ = catalogManager;
 
-    // Load the authorization policy once at startup, initializing
-    // authzChecker_. This ensures that, if the policy fails to load,
-    // we will throw an exception and fail to start.
-    AuthorizationPolicyReader policyReaderTask =
-        new AuthorizationPolicyReader(authzConfig_);
-    policyReaderTask.run();
+    if (authzConfig_.getProvider() == AuthorizationProvider.SENTRY) {
+      SentryAuthorizationConfig sentryAuthzConfig =
+          (SentryAuthorizationConfig) authzConfig_;
+      // Load the authorization policy once at startup, initializing
+      // authzChecker_. This ensures that, if the policy fails to load,
+      // we will throw an exception and fail to start.
+      AuthorizationPolicyReader policyReaderTask =
+          new AuthorizationPolicyReader(sentryAuthzConfig);
+      policyReaderTask.run();
 
-    // If authorization is enabled, reload the policy on a regular basis.
-    if (authzConfig_.isEnabled() && authzConfig_.isFileBasedPolicy()) {
-      // Stagger the reads across nodes
-      Random randomGen = new Random(UUID.randomUUID().hashCode());
-      int delay = AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS + randomGen.nextInt(60);
+      // If authorization is enabled, reload the policy on a regular basis.
+      if (sentryAuthzConfig.isEnabled() && sentryAuthzConfig.isFileBasedPolicy()) {
+        // Stagger the reads across nodes
+        Random randomGen = new Random(UUID.randomUUID().hashCode());
+        int delay = AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS + randomGen.nextInt(60);
 
-      policyReader_.scheduleAtFixedRate(policyReaderTask,
-          delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
+        policyReader_.scheduleAtFixedRate(policyReaderTask,
+            delay, AUTHORIZATION_POLICY_RELOAD_INTERVAL_SECS, TimeUnit.SECONDS);
+      }
     }
     impaladTableUsageTracker_ = ImpaladTableUsageTracker.createFromConfig(
         BackendConfig.INSTANCE);
@@ -277,9 +283,9 @@ public class Frontend {
    * Reads (and caches) an authorization policy from HDFS.
    */
   private class AuthorizationPolicyReader implements Runnable {
-    private final AuthorizationConfig config_;
+    private final SentryAuthorizationConfig config_;
 
-    public AuthorizationPolicyReader(AuthorizationConfig config) {
+    public AuthorizationPolicyReader(SentryAuthorizationConfig config) {
       config_ = config;
     }
 
@@ -287,7 +293,7 @@ public class Frontend {
     public void run() {
       try {
         LOG.info("Reloading authorization policy file from: " + config_.getPolicyFile());
-        authzChecker_.set(new AuthorizationChecker(config_,
+        authzChecker_.set(new SentryAuthorizationChecker(config_,
             getCatalog().getAuthPolicy()));
       } catch (Exception e) {
         LOG.error("Error reloading policy file: ", e);
@@ -309,7 +315,7 @@ public class Frontend {
     if (!req.is_delta) {
       // In the case that it was a non-delta update, the catalog might have reloaded
       // itself, and we need to reset the AuthorizationChecker accordingly.
-      authzChecker_.set(new AuthorizationChecker(
+      authzChecker_.set(new SentryAuthorizationChecker(
           authzConfig_, getCatalog().getAuthPolicy()));
     }
     return resp;
@@ -783,7 +789,7 @@ public class Frontend {
       while (iter.hasNext()) {
         String tblName = iter.next();
         PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
-            .any().onAnyColumn(dbName, tblName).toRequest();
+            .any().onAnyColumn(dbName, tblName).build();
         if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
           iter.remove();
         }
@@ -807,7 +813,7 @@ public class Frontend {
       if (authzConfig_.isEnabled()) {
         PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
             .any().onColumn(table.getTableName().getDb(), table.getTableName().getTbl(),
-            colName).toRequest();
+            colName).build();
         if (!authzChecker_.get().hasAccess(user, privilegeRequest)) continue;
       }
       columns.add(column);
@@ -844,7 +850,7 @@ public class Frontend {
       return true;
     }
     PrivilegeRequest request = new PrivilegeRequestBuilder()
-        .any().onAnyColumn(db.getName(), AuthorizeableTable.ANY_TABLE_NAME).toRequest();
+        .any().onAnyColumn(db.getName()).build();
     return authzChecker_.get().hasAccess(user, request);
   }
 
@@ -1017,7 +1023,7 @@ public class Frontend {
       PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
           .allOf(Privilege.VIEW_METADATA).onTable(table.getDb().getName(),
               table.getName())
-          .toRequest();
+          .build();
       if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
         // Filter out columns that the user is not authorized to see.
         filteredColumns = new ArrayList<Column>();
@@ -1026,7 +1032,7 @@ public class Frontend {
           privilegeRequest = new PrivilegeRequestBuilder()
               .allOf(Privilege.VIEW_METADATA)
               .onColumn(table.getDb().getName(), table.getName(), colName)
-              .toRequest();
+              .build();
           if (authzChecker_.get().hasAccess(user, privilegeRequest)) {
             filteredColumns.add(col);
           }
@@ -1055,7 +1061,7 @@ public class Frontend {
         PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder()
             .allOf(Privilege.VIEW_METADATA)
             .onTable(table.getDb().getName(),table.getName())
-            .toRequest();
+            .build();
         // Only filter if the user doesn't have table access.
         if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
           List<TResultRow> results = new ArrayList<TResultRow>();

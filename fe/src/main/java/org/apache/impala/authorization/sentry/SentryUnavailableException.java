@@ -15,33 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.authorization;
-
-import java.util.List;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+package org.apache.impala.authorization.sentry;
 
 /**
- * Class used to authorize access to a URI.
+ * Thrown when Sentry is not available.
  */
-public class AuthorizeableUri extends Authorizeable {
-  private final String uriName_;
-
-  public AuthorizeableUri(String uriName) {
-    Preconditions.checkNotNull(uriName);
-    uriName_ = uriName;
+public class SentryUnavailableException extends RuntimeException {
+  public SentryUnavailableException(String msg, Throwable cause) {
+    super(msg, cause);
   }
 
-  @Override
-  public List<org.apache.sentry.core.model.db.DBModelAuthorizable>
-      getHiveAuthorizeableHierarchy() {
-    org.apache.sentry.core.model.db.AccessURI accessURI =
-        new org.apache.sentry.core.model.db.AccessURI(uriName_);
-    return Lists.newArrayList(
-        (org.apache.sentry.core.model.db.DBModelAuthorizable) accessURI);
+  public SentryUnavailableException(String msg) {
+    super(msg);
   }
 
-  @Override
-  public String getName() { return uriName_; }
+  public SentryUnavailableException(Throwable cause) {
+    super(cause);
+  }
 }

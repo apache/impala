@@ -34,7 +34,7 @@ ${USER} = all_tpch, all_newdb, all_functional_seq_snap, select_tpcds,\
 auth_to_local_group = test_role
 server_admin = all_server
 
-# The [roles] section defines privileges for objects in the authorizeable hierarchy.
+# The [roles] section defines privileges for objects in the authorizable hierarchy.
 # Each role must start at the server-level and go down. If no "action" is specified, the
 # role will have all permissions at that level. For more information see the Hive Access
 # documentation.

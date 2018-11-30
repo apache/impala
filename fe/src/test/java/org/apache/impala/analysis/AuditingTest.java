@@ -19,8 +19,8 @@ package org.apache.impala.analysis;
 
 import java.util.Set;
 
-import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.common.AnalysisException;
@@ -367,9 +367,10 @@ public class AuditingTest extends FrontendTestBase {
   public void TestAccessEventsOnAuthFailure() throws ImpalaException {
     // The policy file doesn't exist so all operations will result in
     // an AuthorizationError
-    AuthorizationConfig config = AuthorizationConfig.createHadoopGroupAuthConfig(
-        "server1", "/does/not/exist", System.getenv("IMPALA_HOME") +
-        "/fe/src/test/resources/sentry-site.xml");
+    SentryAuthorizationConfig config =
+        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
+            "/does/not/exist", System.getenv("IMPALA_HOME") +
+            "/fe/src/test/resources/sentry-site.xml");
     try (ImpaladCatalog catalog = new ImpaladTestCatalog(config)) {
       Frontend fe = new Frontend(config, catalog);
       AnalysisContext analysisCtx = createAnalysisCtx(config);

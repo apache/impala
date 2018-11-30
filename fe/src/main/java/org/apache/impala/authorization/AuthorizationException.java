@@ -15,8 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.catalog;
+package org.apache.impala.authorization;
 
+import org.apache.impala.catalog.CatalogException;
 
 /**
  * Thrown for authorization errors encountered when accessing Catalog objects.

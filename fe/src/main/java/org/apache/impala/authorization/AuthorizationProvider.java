@@ -15,21 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.common;
+
+package org.apache.impala.authorization;
 
 /**
- * Thrown as a generic exception when processing Sentry policy.
+ * This enum contains the list of authorization providers supported in Impala.
  */
-public class SentryPolicyReaderException extends RuntimeException {
-  public SentryPolicyReaderException(String msg, Throwable cause) {
-    super(msg, cause);
-  }
-
-  public SentryPolicyReaderException(String msg) {
-    super(msg);
-  }
-
-  public SentryPolicyReaderException(Throwable cause) {
-    super(cause);
-  }
+public enum AuthorizationProvider {
+  SENTRY
 }

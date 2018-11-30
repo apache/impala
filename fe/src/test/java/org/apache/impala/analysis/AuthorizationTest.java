@@ -34,9 +34,10 @@ import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizeableTable;
 import org.apache.impala.authorization.User;
-import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationException;
+import org.apache.impala.authorization.sentry.SentryPolicyService;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.common.AnalysisException;
@@ -55,7 +56,7 @@ import org.apache.impala.thrift.TPrivilegeScope;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.util.PatternMatcher;
-import org.apache.impala.util.SentryPolicyService;
+import org.apache.sentry.core.model.db.AccessConstants;
 import org.apache.sentry.provider.common.ResourceAuthorizationProvider;
 import org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider;
 import org.junit.After;
@@ -110,9 +111,11 @@ public class AuthorizationTest extends FrontendTestBase {
    * Test context whose instances are used to parameterize this test.
    */
   private static class TestContext {
-    public final AuthorizationConfig authzConfig;
+    public final SentryAuthorizationConfig authzConfig;
     public final ImpaladTestCatalog catalog;
-    public TestContext(AuthorizationConfig authzConfig, ImpaladTestCatalog catalog) {
+
+    public TestContext(SentryAuthorizationConfig authzConfig,
+        ImpaladTestCatalog catalog) {
       this.authzConfig = authzConfig;
       this.catalog = catalog;
     }
@@ -140,12 +143,12 @@ public class AuthorizationTest extends FrontendTestBase {
   static {
     testCtxs_ = new ArrayList<>();
     // Create and init file based auth config.
-    AuthorizationConfig filePolicyAuthzConfig = createPolicyFileAuthzConfig();
+    SentryAuthorizationConfig filePolicyAuthzConfig = createPolicyFileAuthzConfig();
     ImpaladTestCatalog filePolicyCatalog = new ImpaladTestCatalog(filePolicyAuthzConfig);
     testCtxs_.add(new TestContext(filePolicyAuthzConfig, filePolicyCatalog));
 
     // Create and init sentry service based auth config.
-    AuthorizationConfig sentryServiceAuthzConfig;
+    SentryAuthorizationConfig sentryServiceAuthzConfig;
     try {
       sentryServiceAuthzConfig = createSentryServiceAuthzConfig();
     } catch (ImpalaException e) {
@@ -175,23 +178,24 @@ public class AuthorizationTest extends FrontendTestBase {
     fe_ = new Frontend(ctx_.authzConfig, ctx_.catalog);
   }
 
-  public static AuthorizationConfig createPolicyFileAuthzConfig() {
-    AuthorizationConfig result =
-        AuthorizationConfig.createHadoopGroupAuthConfig("server1", AUTHZ_POLICY_FILE,
-        System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
+  public static SentryAuthorizationConfig createPolicyFileAuthzConfig() {
+    SentryAuthorizationConfig result =
+        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
+            AUTHZ_POLICY_FILE,
+            System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
     return result;
   }
 
-  public static AuthorizationConfig createSentryServiceAuthzConfig()
+  public static SentryAuthorizationConfig createSentryServiceAuthzConfig()
       throws ImpalaException {
-    AuthorizationConfig result =
-        AuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
+    SentryAuthorizationConfig result =
+        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
         System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
     setupSentryService(result);
     return result;
   }
 
-  private static void setupSentryService(AuthorizationConfig authzConfig)
+  private static void setupSentryService(SentryAuthorizationConfig authzConfig)
       throws ImpalaException {
     SentryPolicyService sentryService = new SentryPolicyService(
         authzConfig.getSentryConfig());
@@ -226,7 +230,7 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege = new TPrivilege(TPrivilegeLevel.INSERT, TPrivilegeScope.TABLE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_parquet");
-    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    privilege.setTable_name(AccessConstants.ALL);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // refresh_functional_text_lzo
@@ -237,7 +241,7 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege = new TPrivilege(TPrivilegeLevel.REFRESH, TPrivilegeScope.DATABASE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_text_lzo");
-    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    privilege.setTable_name(AccessConstants.ALL);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // refresh_functional_alltypesagg
@@ -292,7 +296,7 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege = new TPrivilege(TPrivilegeLevel.INSERT, TPrivilegeScope.DATABASE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_text_lzo");
-    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    privilege.setTable_name(AccessConstants.ALL);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // create_functional_text_lzo
@@ -303,7 +307,7 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege = new TPrivilege(TPrivilegeLevel.CREATE, TPrivilegeScope.DATABASE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_text_lzo");
-    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    privilege.setTable_name(AccessConstants.ALL);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // alter_functional_text_lzo
@@ -314,7 +318,7 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege = new TPrivilege(TPrivilegeLevel.ALTER, TPrivilegeScope.DATABASE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_text_lzo");
-    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    privilege.setTable_name(AccessConstants.ALL);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // drop_functional_text_lzo
@@ -325,7 +329,7 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege = new TPrivilege(TPrivilegeLevel.DROP, TPrivilegeScope.DATABASE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_text_lzo");
-    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    privilege.setTable_name(AccessConstants.ALL);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // alter_functional_alltypeserror
@@ -363,19 +367,19 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.URI, false);
     privilege.setServer_name("server1");
     privilege.setUri("hdfs://localhost:20500/test-warehouse/new_table");
-    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    privilege.setTable_name(AccessConstants.ALL);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.URI, false);
     privilege.setServer_name("server1");
     privilege.setUri("hdfs://localhost:20500/test-warehouse/UPPER_CASE");
-    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    privilege.setTable_name(AccessConstants.ALL);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     privilege = new TPrivilege(TPrivilegeLevel.ALL, TPrivilegeScope.URI, false);
     privilege.setServer_name("server1");
     privilege.setUri("hdfs://localhost:20500/test-warehouse/libTestUdfs.so");
-    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    privilege.setTable_name(AccessConstants.ALL);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // all tpch
@@ -400,7 +404,7 @@ public class AuthorizationTest extends FrontendTestBase {
     privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("tpcds");
-    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    privilege.setTable_name(AccessConstants.ALL);
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // select_functional_alltypesagg
@@ -520,8 +524,8 @@ public class AuthorizationTest extends FrontendTestBase {
 
   @Test
   public void TestSentryService() throws ImpalaException {
-    SentryPolicyService sentryService =
-        new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
+    SentryPolicyService sentryService = new SentryPolicyService(
+        ctx_.authzConfig.getSentryConfig());
     String roleName = "testRoleName";
     roleName = roleName.toLowerCase();
 
@@ -838,7 +842,7 @@ public class AuthorizationTest extends FrontendTestBase {
     //       DEFAULT
     //     </value>
     //   </property>
-    AuthorizationConfig authzConfig = new AuthorizationConfig("server1",
+    SentryAuthorizationConfig authzConfig = new SentryAuthorizationConfig("server1",
         AUTHZ_POLICY_FILE, ctx_.authzConfig.getSentryConfig().getConfigFile(),
         LocalGroupResourceAuthorizationProvider.class.getName());
     try (ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
@@ -900,7 +904,7 @@ public class AuthorizationTest extends FrontendTestBase {
   public void TestServerNameAuthorized() throws ImpalaException {
     if (ctx_.authzConfig.isFileBasedPolicy()) {
       // Authorization config that has a different server name from policy file.
-      TestWithIncorrectConfig(AuthorizationConfig.createHadoopGroupAuthConfig(
+      TestWithIncorrectConfig(SentryAuthorizationConfig.createHadoopGroupAuthConfig(
           "differentServerName", AUTHZ_POLICY_FILE,
           ctx_.authzConfig.getSentryConfig().getConfigFile()),
           new User(System.getProperty("user.name")));
@@ -915,8 +919,8 @@ public class AuthorizationTest extends FrontendTestBase {
     // Validate a non-existent policy file.
     // Use a HadoopGroupProvider in this case so the user -> group mappings can still be
     // resolved in the absence of the policy file.
-    TestWithIncorrectConfig(AuthorizationConfig.createHadoopGroupAuthConfig("server1",
-        AUTHZ_POLICY_FILE + "_does_not_exist",
+    TestWithIncorrectConfig(SentryAuthorizationConfig.createHadoopGroupAuthConfig(
+        "server1", AUTHZ_POLICY_FILE + "_does_not_exist",
         ctx_.authzConfig.getSentryConfig().getConfigFile()),
         new User(System.getProperty("user.name")));
   }
@@ -925,12 +929,13 @@ public class AuthorizationTest extends FrontendTestBase {
   public void TestConfigValidation() throws InternalException {
     String sentryConfig = ctx_.authzConfig.getSentryConfig().getConfigFile();
     // Valid configs pass validation.
-    AuthorizationConfig config = AuthorizationConfig.createHadoopGroupAuthConfig(
-        "server1", AUTHZ_POLICY_FILE, sentryConfig);
+    SentryAuthorizationConfig config =
+        SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
+            AUTHZ_POLICY_FILE, sentryConfig);
     Assert.assertTrue(config.isEnabled());
     Assert.assertTrue(config.isFileBasedPolicy());
 
-    config = AuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
+    config = SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null,
         sentryConfig);
     Assert.assertTrue(config.isEnabled());
     Assert.assertTrue(!config.isFileBasedPolicy());
@@ -938,7 +943,7 @@ public class AuthorizationTest extends FrontendTestBase {
     // Invalid configs
     // No sentry configuration file.
     try {
-      config = AuthorizationConfig.createHadoopGroupAuthConfig(
+      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
           "server1", AUTHZ_POLICY_FILE, null);
       Assert.assertTrue(config.isEnabled());
     } catch (Exception e) {
@@ -949,7 +954,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
     // Empty / null server name.
     try {
-      config = AuthorizationConfig.createHadoopGroupAuthConfig(
+      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
           "", AUTHZ_POLICY_FILE, sentryConfig);
       Assert.assertTrue(config.isEnabled());
       fail("Expected configuration to fail.");
@@ -960,8 +965,8 @@ public class AuthorizationTest extends FrontendTestBase {
           e.getMessage());
     }
     try {
-      config = AuthorizationConfig.createHadoopGroupAuthConfig(null, AUTHZ_POLICY_FILE,
-          sentryConfig);
+      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig(null,
+          AUTHZ_POLICY_FILE, sentryConfig);
       Assert.assertTrue(config.isEnabled());
       fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
@@ -973,7 +978,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
     // Sentry config file does not exist.
     try {
-      config = AuthorizationConfig.createHadoopGroupAuthConfig("server1", "",
+      config = SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", "",
           "/path/does/not/exist.xml");
       Assert.assertTrue(config.isEnabled());
       fail("Expected configuration to fail.");
@@ -985,7 +990,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
     // Invalid ResourcePolicyProvider class name.
     try {
-      config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE, sentryConfig,
+      config = new SentryAuthorizationConfig("server1", AUTHZ_POLICY_FILE, sentryConfig,
           "ClassDoesNotExist");
       Assert.assertTrue(config.isEnabled());      fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
@@ -996,7 +1001,7 @@ public class AuthorizationTest extends FrontendTestBase {
 
     // Valid class name, but class is not derived from ResourcePolicyProvider
     try {
-      config = new AuthorizationConfig("server1", AUTHZ_POLICY_FILE, sentryConfig,
+      config = new SentryAuthorizationConfig("server1", AUTHZ_POLICY_FILE, sentryConfig,
           this.getClass().getName());
       Assert.assertTrue(config.isEnabled());      fail("Expected configuration to fail.");
     } catch (IllegalArgumentException e) {
@@ -1007,13 +1012,13 @@ public class AuthorizationTest extends FrontendTestBase {
     }
 
     // Config validations skipped if authorization disabled
-    config = new AuthorizationConfig("", "", "", "");
+    config = new SentryAuthorizationConfig("", "", "", "");
     Assert.assertFalse(config.isEnabled());
-    config = new AuthorizationConfig(null, "", "", null);
+    config = new SentryAuthorizationConfig(null, "", "", null);
     Assert.assertFalse(config.isEnabled());
-    config = new AuthorizationConfig("", null, "", "");
+    config = new SentryAuthorizationConfig("", null, "", "");
     Assert.assertFalse(config.isEnabled());
-    config = new AuthorizationConfig(null, null, null, null);
+    config = new SentryAuthorizationConfig(null, null, null, null);
     Assert.assertFalse(config.isEnabled());
   }
 
@@ -1022,7 +1027,7 @@ public class AuthorizationTest extends FrontendTestBase {
     if (!ctx_.authzConfig.isFileBasedPolicy()) return;
     // Use an authorization configuration that uses the
     // LocalGroupResourceAuthorizationProvider.
-    AuthorizationConfig authzConfig = new AuthorizationConfig("server1",
+    SentryAuthorizationConfig authzConfig = new SentryAuthorizationConfig("server1",
         AUTHZ_POLICY_FILE, ctx_.authzConfig.getSentryConfig().getConfigFile(),
         LocalGroupResourceAuthorizationProvider.class.getName());
     try (ImpaladCatalog catalog = new ImpaladTestCatalog(authzConfig)) {
@@ -1117,9 +1122,5 @@ public class AuthorizationTest extends FrontendTestBase {
   private static TSessionState createSessionState(String defaultDb, User user) {
     return new TSessionState(null, null,
         defaultDb, user.getName(), new TNetworkAddress("", 0));
-  }
-
-  private SentryPolicyService createSentryService() {
-    return new SentryPolicyService(ctx_.authzConfig.getSentryConfig());
   }
 }

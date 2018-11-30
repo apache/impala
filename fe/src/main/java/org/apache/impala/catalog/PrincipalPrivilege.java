@@ -19,6 +19,7 @@ package org.apache.impala.catalog;
 
 import java.util.List;
 
+import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TPrincipalType;

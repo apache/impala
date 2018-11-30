@@ -15,26 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.util;
-
-import java.util.Set;
+package org.apache.impala.authorization.sentry;
 
 import org.apache.sentry.core.common.exception.SentryAccessDeniedException;
 import org.apache.sentry.core.common.exception.SentryAlreadyExistsException;
 import org.apache.sentry.core.common.exception.SentryGroupNotFoundException;
-import org.apache.sentry.api.service.thrift.SentryPolicyServiceClient;
-import org.apache.sentry.api.service.thrift.TSentryRole;
 import org.apache.sentry.core.common.exception.SentryUserException;
+import org.apache.thrift.transport.TTransportException;
 
 /**
- * Wrapper to facilitate differences in Sentry APIs across Sentry versions.
+ * A helper class for Sentry.
  */
 public class SentryUtil {
-  static boolean isSentryAlreadyExists(Exception e) {
+  private SentryUtil() {}
+
+  public static boolean isSentryAlreadyExists(Exception e) {
     return e instanceof SentryAlreadyExistsException;
   }
 
-  static boolean isSentryAccessDenied(Exception e) {
+  public static boolean isSentryAccessDenied(Exception e) {
     return e instanceof SentryAccessDeniedException;
   }
 
@@ -42,8 +41,8 @@ public class SentryUtil {
     return e instanceof SentryGroupNotFoundException;
   }
 
-  static Set<TSentryRole> listRoles(SentryPolicyServiceClient client, String username)
-      throws SentryUserException {
-    return client.listAllRoles(username);
+  public static boolean isSentryUnavailable(Exception e) {
+    return e instanceof SentryUserException &&
+        e.getCause() instanceof TTransportException;
   }
 }

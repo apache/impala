@@ -37,7 +37,8 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
-import org.apache.impala.catalog.AuthorizationPolicy;
+import org.apache.impala.authorization.sentry.SentryAuthorizationPolicy;
+import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogDeltaLog;
 import org.apache.impala.catalog.CatalogException;
@@ -263,7 +264,7 @@ public class CatalogdMetaProvider implements MetaProvider {
    * Cache of authorization policy metadata. Populated from data pushed from the
    * StateStore. Currently this is _not_ "fetch-on-demand".
    */
-  private final AuthorizationPolicy authPolicy_ = new AuthorizationPolicy();
+  private final AuthorizationPolicy authPolicy_ = new SentryAuthorizationPolicy();
 
   public CatalogdMetaProvider(TBackendGflags flags) {
     Preconditions.checkArgument(flags.isSetLocal_catalog_cache_expiration_s());

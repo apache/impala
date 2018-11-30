@@ -14,10 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.impala.authorization;
+
+package org.apache.impala.authorization.sentry;
 
 import com.google.common.base.Preconditions;
-import org.apache.impala.authorization.Privilege.ImpalaAction;
 import org.apache.sentry.core.common.BitFieldAction;
 import org.apache.sentry.core.common.BitFieldActionFactory;
 

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.util;
+package org.apache.impala.authorization.sentry;
 
 import java.util.List;
 import java.util.Map;
@@ -33,9 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.impala.analysis.PrivilegeSpec;
-import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.authorization.User;
-import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TPrivilege;
@@ -399,8 +398,7 @@ public class SentryPolicyService {
   public List<TSentryRole> listAllRoles(User requestingUser) throws ImpalaException {
     SentryServiceClient client = new SentryServiceClient();
     try {
-      return Lists.newArrayList(SentryUtil.listRoles(client.get(),
-            requestingUser.getShortName()));
+      return Lists.newArrayList(client.get().listAllRoles(requestingUser.getShortName()));
     } catch (Exception e) {
       if (SentryUtil.isSentryAccessDenied(e)) {
         throw new AuthorizationException(String.format(ACCESS_DENIED_ERROR_MSG,

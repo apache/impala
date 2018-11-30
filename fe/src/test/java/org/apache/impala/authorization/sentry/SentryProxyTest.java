@@ -15,13 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.util;
+package org.apache.impala.authorization.sentry;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.User;
@@ -32,7 +30,7 @@ import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
-import org.apache.impala.util.SentryProxy.AuthorizationDelta;
+import org.apache.impala.authorization.sentry.SentryProxy.AuthorizationDelta;
 import org.apache.sentry.api.service.thrift.TSentryPrivilege;
 import org.apache.sentry.api.service.thrift.TSentryRole;
 import org.junit.After;
@@ -55,10 +53,10 @@ public class SentryProxyTest {
   private static final org.apache.impala.authorization.User USER =
       new org.apache.impala.authorization.User(System.getProperty("user.name"));
   private final SentryPolicyService sentryService_;
-  private final AuthorizationConfig authzConfig_;
+  private final SentryAuthorizationConfig authzConfig_;
 
   public SentryProxyTest() {
-    authzConfig_ = AuthorizationConfig.createHadoopGroupAuthConfig(
+    authzConfig_ = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
         SENTRY_SERVER, null, System.getenv("IMPALA_HOME") +
             "/fe/src/test/resources/sentry-site.xml");
     sentryService_ = new SentryPolicyService(authzConfig_.getSentryConfig());

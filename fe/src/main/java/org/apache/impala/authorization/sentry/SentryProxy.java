@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package org.apache.impala.util;
+package org.apache.impala.authorization.sentry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,15 +27,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.impala.catalog.AuthorizationException;
+import org.apache.impala.authorization.AuthorizationException;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.common.Reference;
-import org.apache.impala.common.SentryPolicyReaderException;
-import org.apache.impala.common.SentryUnavailableException;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.log4j.Logger;
@@ -43,7 +41,6 @@ import org.apache.sentry.api.service.thrift.TSentryGroup;
 import org.apache.sentry.api.service.thrift.TSentryPrivilege;
 import org.apache.sentry.api.service.thrift.TSentryRole;
 
-import org.apache.impala.authorization.SentryConfig;
 import org.apache.impala.authorization.User;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -114,8 +111,10 @@ public class SentryProxy {
   // The value for the object ownership config.
   private final String objectOwnershipConfigValue_;
 
-  public SentryProxy(SentryConfig sentryConfig, CatalogServiceCatalog catalog,
+  public SentryProxy(SentryAuthorizationConfig authzConfig, CatalogServiceCatalog catalog,
       String kerberosPrincipal) throws ImpalaException {
+    Preconditions.checkNotNull(authzConfig);
+    SentryConfig sentryConfig = authzConfig.getSentryConfig();
     Preconditions.checkNotNull(catalog);
     Preconditions.checkNotNull(sentryConfig);
     catalog_ = catalog;
