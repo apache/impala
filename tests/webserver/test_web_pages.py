@@ -21,8 +21,8 @@ from tests.common.skip import SkipIfBuildType
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 import json
-import requests
 import pytest
+import requests
 
 
 class TestWebPage(ImpalaTestSuite):
@@ -282,14 +282,19 @@ class TestWebPage(ImpalaTestSuite):
     self.get_and_check_status(self.TABLE_METRICS_URL +
       "?name=%s.%s" % (db_name, tbl_name), metric, ports_to_test=self.CATALOG_TEST_PORT)
 
-  def __run_query_and_get_debug_page(self, query, page_url, query_options=None):
+  def __run_query_and_get_debug_page(self, query, page_url, query_options=None,
+                                     expected_state=None):
     """Runs a query to obtain the content of the debug page pointed to by page_url, then
-    cancels the query."""
+    cancels the query. Optionally takes in an expected_state parameter, if specified the
+    method waits for the query to reach the expected state before getting its debug
+    information."""
     if query_options:
       self.client.set_configuration(query_options)
     query_handle = self.client.execute_async(query)
     response_json = ""
     try:
+      if expected_state:
+        self.wait_for_state(query_handle, expected_state, 100)
       responses = self.get_and_check_status(
         page_url + "?query_id=%s&json" % query_handle.get_handle().id,
         ports_to_test=[25000])
@@ -299,48 +304,74 @@ class TestWebPage(ImpalaTestSuite):
       self.client.cancel(query_handle)
     return response_json
 
-  @pytest.mark.skip(reason='IMPALA-7625')
   def test_backend_states(self, unique_database):
-    """Test that /query_backends returns the list of backend states for DML or queries;
-    nothing for DDL statements"""
-    CROSS_JOIN = ("select count(*) from functional.alltypes a "
-                  "CROSS JOIN functional.alltypes b CROSS JOIN functional.alltypes c")
-    for q in [CROSS_JOIN,
-              "CREATE TABLE {0}.foo AS {1}".format(unique_database, CROSS_JOIN),
-              "DESCRIBE functional.alltypes"]:
-      response_json = self.__run_query_and_get_debug_page(q, self.QUERY_BACKENDS_URL)
-
-      if "DESCRIBE" not in q:
-        assert len(response_json['backend_states']) > 0
-      else:
-        assert 'backend_states' not in response_json
-
-  @pytest.mark.skip(reason='IMPALA-7625')
-  def test_backend_instances(self, unique_database):
-    """Test that /query_finstances returns the list of fragment instances for DML or
+    """Test that /query_backends returns the list of backend states for DML or
     queries; nothing for DDL statements"""
-    CROSS_JOIN = ("select count(*) from functional.alltypes a "
-                  "CROSS JOIN functional.alltypes b CROSS JOIN functional.alltypes c")
-    for q in [CROSS_JOIN,
-              "CREATE TABLE {0}.foo AS {1}".format(unique_database, CROSS_JOIN),
-              "DESCRIBE functional.alltypes"]:
-      response_json = self.__run_query_and_get_debug_page(q, self.QUERY_FINSTANCES_URL)
+    sleep_query = "select sleep(10000) from functional.alltypes limit 1"
+    ctas_sleep_query = "create table {0}.foo as {1}".format(unique_database, sleep_query)
+    running_state = self.client.QUERY_STATES['RUNNING']
+    backend_state_properties = ['cpu_user_s', 'rpc_latency', 'num_remaining_instances',
+                                'num_instances', 'peak_per_host_mem_consumption',
+                                'time_since_last_heard_from', 'status', 'host',
+                                'cpu_sys_s', 'done', 'bytes_read']
 
-      if "DESCRIBE" not in q:
-        assert len(response_json['backend_instances']) > 0
-      else:
-        assert 'backend_instances' not in response_json
+    for query in [sleep_query, ctas_sleep_query]:
+      response_json = self.__run_query_and_get_debug_page(query,
+                                                          self.QUERY_BACKENDS_URL,
+                                                          expected_state=running_state)
 
-  @pytest.mark.skip(reason='IMPALA-7625')
+      assert 'backend_states' in response_json
+      backend_states = response_json['backend_states']
+      assert len(backend_states) > 0
+
+      for backend_state in backend_states:
+        for backend_state_property in backend_state_properties:
+          assert backend_state_property in backend_state
+        assert backend_state['status'] == 'OK'
+        assert not backend_state['done']
+
+    response_json = self.__run_query_and_get_debug_page("describe functional.alltypes",
+                                                        self.QUERY_BACKENDS_URL)
+    assert 'backend_states' not in response_json
+
+  def test_backend_instances(self, unique_database, query_options=None):
+    """Test that /query_finstances returns the list of fragment instances for DML or queries;
+    nothing for DDL statements"""
+    sleep_query = "select sleep(10000) from functional.alltypes limit 1"
+    ctas_sleep_query = "create table {0}.foo as {1}".format(unique_database, sleep_query)
+    running_state = self.client.QUERY_STATES['RUNNING']
+    instance_stats_properties = ['fragment_name', 'time_since_last_heard_from',
+                                 'current_state', 'first_status_update_received',
+                                 'instance_id', 'done']
+
+    for query in [sleep_query, ctas_sleep_query]:
+      response_json = self.__run_query_and_get_debug_page(query,
+                                                          self.QUERY_FINSTANCES_URL,
+                                                          expected_state=running_state)
+
+      assert 'backend_instances' in response_json
+      backend_instances = response_json['backend_instances']
+      assert len(backend_instances) > 0
+
+      for backend_instance in backend_instances:
+        assert 'host' in backend_instance
+        assert 'instance_stats' in backend_instance
+
+        instances_stats = backend_instance['instance_stats']
+        assert len(instances_stats) > 0
+        for instance_stats in instances_stats:
+          for instance_stats_property in instance_stats_properties:
+            assert instance_stats_property in instance_stats
+        assert not instance_stats['done']
+
+    response_json = self.__run_query_and_get_debug_page("describe functional.alltypes",
+                                                         self.QUERY_BACKENDS_URL)
+    assert 'backend_instances' not in response_json
+
   def test_backend_instances_mt_dop(self, unique_database):
     """Test that accessing /query_finstances does not crash the backend when running with
     mt_dop."""
-    # vector.get_value('exec_option')['mt_dop'] = 4
-    QUERY = "select * from tpch.lineitem where l_orderkey < 3"
-    QUERY_OPTIONS = dict(mt_dop=4)
-    response_json = self.__run_query_and_get_debug_page(QUERY, self.QUERY_FINSTANCES_URL,
-                                                        QUERY_OPTIONS)
-    assert len(response_json['backend_instances']) > 0
+    self.test_backend_instances(unique_database, query_options=dict(mt_dop=4))
 
   def test_io_mgr_threads(self):
     """Test that IoMgr threads have readable names. This test assumed that all systems we

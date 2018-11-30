@@ -34,6 +34,7 @@ from random import choice
 from subprocess import check_call
 
 from tests.common.base_test_suite import BaseTestSuite
+from tests.common.errors import Timeout
 from tests.common.impala_connection import create_connection
 from tests.common.impala_service import ImpaladService
 from tests.common.test_dimensions import (
@@ -826,3 +827,15 @@ class ImpalaTestSuite(BaseTestSuite):
         if cls.get_workload() == workload_strategy[0]:
           return workload_strategy[1]
     return default_strategy
+
+  def wait_for_state(self, handle, expected_state, timeout):
+    """Waits for the given 'query_handle' to reach the 'expected_state'. If it does not
+    reach the given state within 'timeout' seconds, the method throws an AssertionError.
+    """
+    start_time = time.time()
+    actual_state = self.client.get_state(handle)
+    while actual_state != expected_state and time.time() - start_time < timeout:
+      actual_state = self.client.get_state(handle)
+    if actual_state != expected_state:
+      raise Timeout("query '%s' did not reach expected state '%s', last known state '%s'"
+                    % (handle.get_handle().id, expected_state, actual_state))

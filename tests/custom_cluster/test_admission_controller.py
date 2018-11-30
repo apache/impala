@@ -280,21 +280,12 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       for query in queries:
         handles.append(client.execute_async(query))
       for query, handle in zip(queries, handles):
-        self._wait_for_state(client, handle, client.QUERY_STATES['FINISHED'], timeout_s)
+        self.wait_for_state(handle, client.QUERY_STATES['FINISHED'], timeout_s)
         self.client.fetch(query, handle)
         profiles.append(self.client.get_runtime_profile(handle))
       return profiles
     finally:
       client.close()
-
-  def _wait_for_state(self, client, handle, expected_state, timeout):
-    """Try to fetch 'expected_state' from 'client' within 'timeout' seconds.
-    Fail if unable."""
-    start_time = time()
-    actual_state = client.get_state(handle)
-    while (actual_state != expected_state and time() - start_time < timeout):
-      actual_state = client.get_state(handle)
-    assert expected_state == actual_state
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
