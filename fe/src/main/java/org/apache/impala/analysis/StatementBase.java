@@ -33,7 +33,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 /**
  * Base class for all Impala SQL statements.
  */
-public abstract class StatementBase implements ParseNode {
+public abstract class StatementBase extends StmtNode {
 
   // True if this Stmt is the top level of an explain stmt.
   protected boolean isExplain_ = false;

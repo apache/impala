@@ -387,6 +387,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Throws exception if any errors found.
    * @see ParseNode#analyze(Analyzer)
    */
+  // TODO: Analyze for expressions should return a possibly-rewritten
+  // expression, leaving the StmtNode version to analyze statements
+  // in-place.
   public final void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed()) return;
 
@@ -687,6 +690,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return toSql(DEFAULT);
   }
 
+  /**
+   * Some expression nodes are also statement-like and know about
+   * before/after rewrite expressions.
+   */
   @Override
   public String toSql(ToSqlOptions options) {
     return (printSqlInParens_) ? "(" + toSqlImpl(options) + ")" : toSqlImpl(options);

@@ -17,15 +17,24 @@
 
 package org.apache.impala.analysis;
 
-import org.apache.impala.common.AnalysisException;
-
+/**
+ * Parse nodes divide into two broad categories: statement-like nodes (derived
+ * from {@link StmtNode}) and expression nodes (which derive from @{link Expr}.)
+ *
+ * Statement-like nodes form the structure of a query and mostly retain their
+ * structure during analysis. That is, they are "analyzed in place." By contrast,
+ * expressions are often rewritten so that the final expression out of the analyzer
+ * may be different than the expression received from the parser. As a result, the
+ * analyze interface differs between the two categories.
+ *
+ * Error reporting often wants to emit the user's original SQL expression before
+ * rewrites. Statements hold onto both the original and rewritten expressions.
+ * Expressions, by contrast don't know if they are original or rewritten.
+ *
+ * Operations that affect all statement-like nodes are defined here; those that
+ * affect all expressions are defined in Expr.
+ */
 public interface ParseNode {
-
-  /**
-   * Perform semantic analysis of node and all of its children.
-   * Throws exception if any semantic errors were found.
-   */
-  void analyze(Analyzer analyzer) throws AnalysisException;
 
   /**
    * Returns the SQL string corresponding to this node and its descendants.

@@ -27,7 +27,7 @@ import com.google.common.collect.Lists;
 import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 
 // Wrapper class around argument types and if it has varArgs
-public class FunctionArgs implements ParseNode {
+public class FunctionArgs extends StmtNode {
   private final ArrayList<TypeDef> argTypeDefs_;
   private boolean hasVarArgs_;
 

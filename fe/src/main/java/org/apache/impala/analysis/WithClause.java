@@ -48,7 +48,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  *
  * Views defined within the same WITH-clause may not use the same alias.
  */
-public class WithClause implements ParseNode {
+public class WithClause extends StmtNode {
   /////////////////////////////////////////
   // BEGIN: Members that need to be reset()
 

@@ -64,7 +64,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  * TODO for 2.3: Rename this class to CollectionRef and re-consider the naming and
  * structure of all subclasses.
  */
-public class TableRef implements ParseNode {
+public class TableRef extends StmtNode {
   // Path to a collection type. Not set for inline views.
   protected List<String> rawPath_;
 

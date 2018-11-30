@@ -54,7 +54,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  * where l_bound_type, u_bound_type are boolean values indicating if the associated bounds
  * are inclusive (true) or exclusive (false).
  */
-public class RangePartition implements ParseNode {
+public class RangePartition extends StmtNode {
 
   // Upper and lower bound exprs contain literals of the target column type post-analysis.
   // For TIMESTAMPs those are Kudu UNIXTIME_MICROS, i.e. int64s.

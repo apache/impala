@@ -30,7 +30,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  * Represents the partial SQL statement of specifying whether a table/partition
  * should or should not be marked as cached.
  */
-public class HdfsCachingOp implements ParseNode {
+public class HdfsCachingOp extends StmtNode {
   private final THdfsCachingOp cacheOp_;
   private final BigDecimal parsedReplication_;
 

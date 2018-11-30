@@ -30,7 +30,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  * Base class for PartitionSpec and PartitionSet containing the partition
  * specifications of related DDL operations.
  */
-public abstract class PartitionSpecBase implements ParseNode {
+public abstract class PartitionSpecBase extends StmtNode {
   protected FeFsTable table_;
   protected TableName tableName_;
   protected Boolean partitionShouldExist_;

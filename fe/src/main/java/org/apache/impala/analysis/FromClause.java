@@ -33,7 +33,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  * analyzed independently of the statement using them. To increase the flexibility of
  * the class it implements the Iterable interface.
  */
-public class FromClause implements ParseNode, Iterable<TableRef> {
+public class FromClause extends StmtNode implements Iterable<TableRef> {
 
   private final ArrayList<TableRef> tableRefs_;
 

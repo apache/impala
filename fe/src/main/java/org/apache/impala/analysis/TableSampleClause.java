@@ -32,7 +32,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  * The first number specifies the percent of table bytes to sample.
  * The second number specifies the random seed to use.
  */
-public class TableSampleClause implements ParseNode {
+public class TableSampleClause extends StmtNode {
   // Required percent of bytes to sample.
   private final long percentBytes_;
   // Optional random seed. Null if not specified.

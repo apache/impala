@@ -34,7 +34,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  * Represents a partition definition used in ALTER TABLE ADD PARTITION consisting of
  * partition key-value pairs and an optional location and optional caching options.
  */
-public class PartitionDef implements ParseNode {
+public class PartitionDef extends StmtNode {
   private final PartitionSpec partitionSpec_;
   private final HdfsUri location_;
   private final HdfsCachingOp cacheOp_;

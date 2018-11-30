@@ -37,7 +37,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 /**
  * Represents an anonymous type definition, e.g., used in DDL and CASTs.
  */
-public class TypeDef implements ParseNode {
+public class TypeDef extends StmtNode {
   private boolean isAnalyzed_;
   private final Type parsedType_;
 

@@ -41,7 +41,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  * A privilege spec may correspond to one or more privileges. Currently, a privilege spec
  * can represent multiple privileges only at the COLUMN scope.
  */
-public class PrivilegeSpec implements ParseNode {
+public class PrivilegeSpec extends StmtNode {
   private final TPrivilegeScope scope_;
   private final TPrivilegeLevel privilegeLevel_;
   private final TableName tableName_;

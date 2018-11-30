@@ -23,6 +23,7 @@ import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.Table;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.Frontend;

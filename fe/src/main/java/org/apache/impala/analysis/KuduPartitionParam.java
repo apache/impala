@@ -64,7 +64,7 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  *   )
  *
  */
-public class KuduPartitionParam implements ParseNode {
+public class KuduPartitionParam extends StmtNode {
 
   /**
    * Creates a hash-based KuduPartitionParam.
