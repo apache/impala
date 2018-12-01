@@ -107,6 +107,9 @@ void RawValue::PrintValue(const void* value, const ColumnType& type, int scale,
     case TYPE_CHAR:
       *str = string(reinterpret_cast<const char*>(value), type.len);
       return;
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+      *str = "Intermediate UDA step, no value printed";
+      return;
     default:
       PrintValue(value, type, scale, &out);
   }
@@ -276,7 +279,7 @@ void RawValue::PrintValue(
         default: DCHECK(false) << type;
       }
       break;
-    default: DCHECK(false);
+    default: DCHECK(false) << "Unknown type: " << type;
   }
   stream->precision(old_precision);
   // Undo setting stream to fixed

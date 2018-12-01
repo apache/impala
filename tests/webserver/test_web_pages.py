@@ -237,6 +237,22 @@ class TestWebPage(ImpalaTestSuite):
     bad_loglevel_url = self.SET_GLOG_LOGLEVEL_URL + "?badurl=foo"
     self.get_and_check_status(bad_loglevel_url)
 
+  @pytest.mark.execute_serially
+  def test_uda_with_log_level(self):
+    """IMPALA-7903: Impala crashes when executing an aggregate query with log level set
+    to 3. Running this test serially not to interfere with other tests setting the log
+    level."""
+    # Check that the log_level end points are accessible.
+    self.get_and_check_status(self.SET_GLOG_LOGLEVEL_URL)
+    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL)
+    # Set log level to 3.
+    set_glog_url = (self.SET_GLOG_LOGLEVEL_URL + "?glog=3")
+    self.get_and_check_status(set_glog_url, "v set to 3")
+    # Check that Impala doesn't crash when running a query that aggregates.
+    self.client.execute("select avg(int_col) from functional.alltypessmall")
+    # Reset log level.
+    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, "v set to ")
+
   def test_catalog(self):
     """Tests the /catalog and /catalog_object endpoints."""
     self.get_and_check_status_jvm(self.CATALOG_URL, "functional")
