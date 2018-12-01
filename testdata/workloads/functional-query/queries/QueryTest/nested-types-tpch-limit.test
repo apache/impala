@@ -1,8 +1,5 @@
 ====
 ---- QUERY
-use tpch_nested_parquet
-====
----- QUERY
 # IMPALA-3652: test limit on a hash join in a subplan where resources need to be
 # transfered in Reset()
 select count(*)

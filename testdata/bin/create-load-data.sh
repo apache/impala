@@ -577,8 +577,12 @@ if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   if [[ -n "$CM_HOST" ]]; then
     LOAD_NESTED_ARGS="--cm-host $CM_HOST"
   fi
-  run-step "Loading nested data" load-nested.log \
-    ${IMPALA_HOME}/testdata/bin/load_nested.py ${LOAD_NESTED_ARGS:-}
+  run-step "Loading nested parquet data" load-nested.log \
+    ${IMPALA_HOME}/testdata/bin/load_nested.py \
+    -t tpch_nested_parquet -f parquet/none ${LOAD_NESTED_ARGS:-}
+  run-step "Loading nested orc data" load-nested.log \
+    ${IMPALA_HOME}/testdata/bin/load_nested.py \
+    -t tpch_nested_orc_def -f orc/def ${LOAD_NESTED_ARGS:-}
   run-step "Loading auxiliary workloads" load-aux-workloads.log load-aux-workloads
   run-step "Loading dependent tables" copy-and-load-dependent-tables.log \
       copy-and-load-dependent-tables

@@ -19,8 +19,10 @@
 
 #include <queue>
 
+#include "exec/orc-column-readers.h"
 #include "exec/scanner-context.inline.h"
 #include "exprs/expr.h"
+#include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
 #include "runtime/io/request-context.h"
 #include "runtime/runtime-filter.inline.h"
@@ -170,8 +172,32 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   context_->ReleaseCompletedResources(true);
   RETURN_IF_ERROR(footer_status);
 
-  // Update orc reader options base on the tuple descriptor
-  RETURN_IF_ERROR(SelectColumns(scan_node_->tuple_desc()));
+  schema_resolver_.reset(new OrcSchemaResolver(*scan_node_->hdfs_table(),
+      &reader_->getType(), filename()));
+
+  // Update 'row_reader_options_' based on the tuple descriptor so the ORC lib can skip
+  // columns we don't need.
+  RETURN_IF_ERROR(SelectColumns(*scan_node_->tuple_desc()));
+
+  // Build 'col_id_path_map_' that maps from ORC column ids to their corresponding
+  // SchemaPath in the table. The map is used in the constructors of OrcColumnReaders
+  // where we resolve SchemaPaths of the descriptors.
+  OrcMetadataUtils::BuildSchemaPaths(reader_->getType(),
+      scan_node_->num_partition_keys(), &col_id_path_map_);
+
+  // To create OrcColumnReaders, we need the selected orc schema. It's a subset of the
+  // file schema: a tree of selected orc types and can only be got from an orc::RowReader
+  // (by orc::RowReader::getSelectedType).
+  // Selected nodes are still connected as a tree since if a node is selected, all its
+  // ancestors and children will be selected too.
+  // Here we haven't read stripe data yet so no orc::RowReaders are created. To get the
+  // selected types we create a temp orc::RowReader (but won't read rows from it).
+  unique_ptr<orc::RowReader> tmp_row_reader =
+      reader_->createRowReader(row_reader_options_);
+  const orc::Type* root_type = &tmp_row_reader->getSelectedType();
+  DCHECK_EQ(root_type->getKind(), orc::TypeKind::STRUCT);
+  orc_root_reader_ = this->obj_pool_.Add(
+      new OrcStructReader(root_type, scan_node_->tuple_desc(), this));
 
   // Set top-level template tuple.
   template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];
@@ -191,7 +217,7 @@ void HdfsOrcScanner::Close(RowBatch* row_batch) {
     template_tuple_pool_->FreeAll();
     context_->ReleaseCompletedResources(true);
   }
-  scratch_batch_.reset(nullptr);
+  orc_root_batch_.reset(nullptr);
 
   // Verify all resources (if any) have been transferred.
   DCHECK_EQ(template_tuple_pool_->total_allocated_bytes(), 0);
@@ -254,105 +280,141 @@ inline THdfsCompression::type HdfsOrcScanner::TranslateCompressionKind(
   return THdfsCompression::DEFAULT;
 }
 
-Status HdfsOrcScanner::SelectColumns(const TupleDescriptor* tuple_desc) {
-  list<uint64_t> selected_indices;
-  int num_columns = 0;
-  const orc::Type& root_type = reader_->getType();
-  // TODO validate columns. e.g. scale of decimal type
-  for (SlotDescriptor* slot_desc: tuple_desc->slots()) {
-    // Skip partition columns
-    if (slot_desc->col_pos() < scan_node_->num_partition_keys()) continue;
+bool HdfsOrcScanner::IsPartitionKeySlot(const SlotDescriptor* slot) {
+  return slot->parent() == scan_node_->tuple_desc() &&
+      slot->col_pos() < scan_node_->num_partition_keys();
+}
 
-    const SchemaPath &path = slot_desc->col_path();
-    DCHECK_EQ(path.size(), 1);
-    int col_idx = path[0];
-    // The first index in a path includes the table's partition keys
-    int col_idx_in_file = col_idx - scan_node_->num_partition_keys();
-    if (col_idx_in_file >= root_type.getSubtypeCount()) {
-      // In this case, we are selecting a column that is not in the file.
+bool HdfsOrcScanner::IsMissingField(const SlotDescriptor* slot) {
+  return missing_field_slots_.find(slot) != missing_field_slots_.end();
+}
+
+Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
+    list<const orc::Type*>* selected_nodes, stack<const SlotDescriptor*>* pos_slots) {
+  const orc::Type* node = nullptr;
+  bool pos_field = false;
+  bool missing_field = false;
+  RETURN_IF_ERROR(schema_resolver_->ResolveColumn(tuple_desc.tuple_path(), &node,
+      &pos_field, &missing_field));
+  if (missing_field) {
+    return Status(Substitute("Could not find nested column '$0' in file '$1'.",
+        PrintPath(*scan_node_->hdfs_table(), tuple_desc.tuple_path()), filename()));
+  }
+  if (tuple_desc.byte_size() == 0) {
+    // Don't need to materialize any slots but just generate an empty tuple for each
+    // (collection) row. (E.g. count(*) or 'exists' on results of subquery).
+    // Due to ORC-450 we can't get the number of tuples inside a collection without
+    // reading its items (or subcolumn of its items). So we select the most inner
+    // subcolumn of the collection (get by orc::Type::getMaximumColumnId()). E.g.
+    // if 'node' is array<struct<c1:int,c2:int,c3:int>> and we just need the array
+    // lengths. We still need to read at least one subcolumn otherwise the ORC lib
+    // will skip the whole array column. So we select 'c3' for this case.
+    selected_type_ids_.push_back(node->getMaximumColumnId());
+    VLOG(3) << "Add ORC column " << node->getMaximumColumnId() << " for empty tuple "
+        << PrintPath(*scan_node_->hdfs_table(), tuple_desc.tuple_path());
+    return Status::OK();
+  }
+
+  // Each tuple can have at most one position slot.
+  SlotDescriptor* pos_slot_desc = nullptr;
+  for (SlotDescriptor* slot_desc : tuple_desc.slots()) {
+    // Skip partition columns
+    if (IsPartitionKeySlot(slot_desc)) continue;
+
+    node = nullptr;
+    pos_field = false;
+    missing_field = false;
+    // Reminder: slot_desc->col_path() can be much deeper than tuple_desc.tuple_path()
+    // to reference to a deep subcolumn.
+    RETURN_IF_ERROR(schema_resolver_->ResolveColumn(
+        slot_desc->col_path(), &node, &pos_field, &missing_field));
+
+    if (missing_field) {
+      if (slot_desc->type().IsCollectionType()) {
+        // If the collection column is missing, the whole scan range should return 0 rows
+        // since we're selecting children column(s) of the collection.
+        return Status(Substitute("Could not find nested column '$0' in file '$1'.",
+            PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()), filename()));
+      }
+      // In this case, we are selecting a column/subcolumn that is not in the file.
       // Update the template tuple to put a NULL in this slot.
-      Tuple** template_tuple = &template_tuple_map_[tuple_desc];
+      Tuple** template_tuple = &template_tuple_map_[&tuple_desc];
       if (*template_tuple == nullptr) {
         *template_tuple =
-            Tuple::Create(tuple_desc->byte_size(), template_tuple_pool_.get());
+            Tuple::Create(tuple_desc.byte_size(), template_tuple_pool_.get());
       }
       (*template_tuple)->SetNull(slot_desc->null_indicator_offset());
+      missing_field_slots_.insert(slot_desc);
       continue;
     }
-    selected_indices.push_back(col_idx_in_file);
-    const orc::Type* orc_type = root_type.getSubtype(col_idx_in_file);
-    const ColumnType& col_type = scan_node_->hdfs_table()->col_descs()[col_idx].type();
-    // TODO(IMPALA-6503): Support reading complex types from ORC format files
-    DCHECK(!col_type.IsComplexType()) << "Complex types are not supported yet";
-    RETURN_IF_ERROR(ValidateType(col_type, *orc_type));
-    col_id_slot_map_[orc_type->getColumnId()] = slot_desc;
-    ++num_columns;
+    if (pos_field) {
+      DCHECK(pos_slot_desc == nullptr)
+          << "There should only be one position slot per tuple";
+      pos_slot_desc = slot_desc;
+      pos_slots->push(pos_slot_desc);
+      DCHECK_EQ(node->getKind(), orc::TypeKind::LIST);
+      continue;
+    }
+
+    // 'col_path'(SchemaPath) of the SlotDescriptor won't map to a STRUCT column.
+    // We only deal with collection columns (ARRAY/MAP) and primitive columns here.
+    if (slot_desc->type().IsCollectionType()) {
+      // Recursively resolve nested columns
+      DCHECK(slot_desc->collection_item_descriptor() != nullptr);
+      const TupleDescriptor* item_tuple_desc = slot_desc->collection_item_descriptor();
+      RETURN_IF_ERROR(ResolveColumns(*item_tuple_desc, selected_nodes, pos_slots));
+    } else {
+      VLOG(3) << "Add ORC column " << node->getColumnId() << " for "
+          << PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path());
+      selected_nodes->push_back(node);
+    }
   }
-  COUNTER_SET(num_cols_counter_, static_cast<int64_t>(num_columns));
-  row_reader_options.include(selected_indices);
   return Status::OK();
 }
 
-Status HdfsOrcScanner::ValidateType(const ColumnType& type, const orc::Type& orc_type) {
-  switch (orc_type.getKind()) {
-    case orc::TypeKind::BOOLEAN:
-      if (type.type == TYPE_BOOLEAN) return Status::OK();
-      break;
-    case orc::TypeKind::BYTE:
-      if (type.type == TYPE_TINYINT || type.type == TYPE_SMALLINT
-          || type.type == TYPE_INT || type.type == TYPE_BIGINT)
-        return Status::OK();
-      break;
-    case orc::TypeKind::SHORT:
-      if (type.type == TYPE_SMALLINT || type.type == TYPE_INT
-          || type.type == TYPE_BIGINT)
-        return Status::OK();
-      break;
-    case orc::TypeKind::INT:
-      if (type.type == TYPE_INT || type.type == TYPE_BIGINT) return Status::OK();
-      break;
-    case orc::TypeKind::LONG:
-      if (type.type == TYPE_BIGINT) return Status::OK();
-      break;
-    case orc::TypeKind::FLOAT:
-    case orc::TypeKind::DOUBLE:
-      if (type.type == TYPE_FLOAT || type.type == TYPE_DOUBLE) return Status::OK();
-      break;
-    case orc::TypeKind::STRING:
-    case orc::TypeKind::VARCHAR:
-    case orc::TypeKind::CHAR:
-      if (type.type == TYPE_STRING || type.type == TYPE_VARCHAR
-          || type.type == TYPE_CHAR)
-        return Status::OK();
-      break;
-    case orc::TypeKind::TIMESTAMP:
-      if (type.type == TYPE_TIMESTAMP) return Status::OK();
-      break;
-    case orc::TypeKind::DECIMAL: {
-      if (type.type != TYPE_DECIMAL || type.scale != orc_type.getScale()) break;
-      bool overflow = false;
-      int orc_precision = orc_type.getPrecision();
-      if (orc_precision == 0 || orc_precision > ColumnType::MAX_DECIMAL8_PRECISION) {
-        // For ORC decimals whose precision is larger than 18, its value can't fit into
-        // an int64 (10^19 > 2^63). So we should use int128 (16 bytes) for this case.
-        // The possible byte sizes for Impala decimals are 4, 8, 16.
-        // We mark it as overflow if the target byte size is not 16.
-        overflow = (type.GetByteSize() != 16);
-      } else if (orc_type.getPrecision() > ColumnType::MAX_DECIMAL4_PRECISION) {
-        // For ORC decimals whose precision <= 18 and > 9, int64 and int128 can fit them.
-        // We only mark it as overflow if the target byte size is 4.
-        overflow = (type.GetByteSize() == 4);
-      }
-      if (!overflow) return Status::OK();
-      return Status(Substitute(
-          "It can't be truncated to table column $2 for column $0 in ORC file '$1'",
-          orc_type.toString(), filename(), type.DebugString()));
-    }
-    default: break;
+/// Whether 'selected_type_ids' contains the id of any children of 'node'
+bool HasChildrenSelected(const orc::Type& node,
+    const list<uint64_t>& selected_type_ids) {
+  for (uint64_t id : selected_type_ids) {
+    if (id >= node.getColumnId() && id <= node.getMaximumColumnId()) return true;
   }
-  return Status(Substitute(
-      "Type mismatch: table column $0 is map to column $1 in ORC file '$2'",
-      type.DebugString(), orc_type.toString(), filename()));
+  return false;
+}
+
+Status HdfsOrcScanner::SelectColumns(const TupleDescriptor& tuple_desc) {
+  list<const orc::Type*> selected_nodes;
+  stack<const SlotDescriptor*> pos_slots;
+  // Select columns for all non-position slots.
+  RETURN_IF_ERROR(ResolveColumns(tuple_desc, &selected_nodes, &pos_slots));
+
+  for (auto t : selected_nodes) selected_type_ids_.push_back(t->getColumnId());
+  // Select columns for array positions. Due to ORC-450 we can't materialize array
+  // offsets without materializing its items, so we should still select the item or any
+  // sub column of the item. To be simple, we choose the max column id in the subtree
+  // of the ARRAY node.
+  // We process the deeper position slots first since it may introduce an item column
+  // that can also serve the position slot of upper arrays. E.g. for 'array_col' as
+  // array<struct<c1:int,c2:int,c3:array<int>>>, if both 'array_col.pos' and
+  // 'array_col.item.c3.pos' are needed, we just need to select 'array_col.item.c3.item'
+  // in the ORC lib, then we get offsets(indices) of both the inner and outer arrays.
+  while (!pos_slots.empty()) {
+    const SlotDescriptor* pos_slot_desc = pos_slots.top();
+    pos_slots.pop();
+    const orc::Type* array_node = nullptr;
+    bool pos_field = false;
+    bool missing_field = false;
+    RETURN_IF_ERROR(schema_resolver_->ResolveColumn(pos_slot_desc->col_path(),
+        &array_node, &pos_field, &missing_field));
+    if (HasChildrenSelected(*array_node, selected_type_ids_)) continue;
+    selected_type_ids_.push_back(array_node->getMaximumColumnId());
+    VLOG(3) << "Add ORC column " << array_node->getMaximumColumnId() << " for "
+        << PrintPath(*scan_node_->hdfs_table(), pos_slot_desc->col_path());
+    selected_nodes.push_back(array_node);
+  }
+
+  COUNTER_SET(num_cols_counter_, static_cast<int64_t>(selected_type_ids_.size()));
+  row_reader_options_.includeTypes(selected_type_ids_);
+  return Status::OK();
 }
 
 Status HdfsOrcScanner::ProcessSplit() {
@@ -401,15 +463,23 @@ Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
   tuple_mem_ = nullptr;
   tuple_ = nullptr;
 
-  // Transfer remaining tuples from the scratch batch.
-  if (ScratchBatchNotEmpty()) {
+  // Transfer remaining values in current orc batch. They are left in the previous call
+  // of 'TransferTuples' inside 'AssembleRows'. Since the orc batch has the same capacity
+  // as RowBatch's, the remaining values should be drained by one more round of calling
+  // 'TransferTuples' here.
+  if (!orc_root_reader_->EndOfBatch()) {
     assemble_rows_timer_.Start();
-    RETURN_IF_ERROR(TransferScratchTuples(row_batch));
+    RETURN_IF_ERROR(TransferTuples(orc_root_reader_, row_batch));
     assemble_rows_timer_.Stop();
     if (row_batch->AtCapacity()) return Status::OK();
-    DCHECK_EQ(scratch_batch_tuple_idx_, scratch_batch_->numElements);
+    DCHECK(orc_root_reader_->EndOfBatch());
   }
 
+  // Process next stripe if current stripe is drained. Each stripe will generate several
+  // orc batches. We only advance the stripe after processing the last batch.
+  // 'advance_stripe_' is updated in 'NextStripe', meaning the current stripe we advance
+  // to can be skip. 'end_of_stripe_' marks whether current stripe is drained. It's only
+  // set to true in 'AssembleRows'.
   while (advance_stripe_ || end_of_stripe_) {
     context_->ReleaseCompletedResources(/* done */ true);
     // Commit the rows to flush the row batch from the previous stripe
@@ -442,11 +512,6 @@ Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
     parse_status_ = Status::OK();
   }
   return Status::OK();
-}
-
-inline bool HdfsOrcScanner::ScratchBatchNotEmpty() {
-  return scratch_batch_ != nullptr
-      && scratch_batch_tuple_idx_ < scratch_batch_->numElements;
 }
 
 inline static bool CheckStripeOverlapsSplit(int64_t stripe_start, int64_t stripe_end,
@@ -505,9 +570,9 @@ Status HdfsOrcScanner::NextStripe() {
     // TODO: check if this stripe can be skipped by stats. e.g. IMPALA-6505
 
     COUNTER_ADD(num_stripes_counter_, 1);
-    row_reader_options.range(stripe->getOffset(), stripe_len);
+    row_reader_options_.range(stripe->getOffset(), stripe_len);
     try {
-      row_reader_ = reader_->createRowReader(row_reader_options);
+      row_reader_ = reader_->createRowReader(row_reader_options_);
     } catch (ResourceError& e) {  // errors throw from the orc scanner
       parse_status_ = e.GetStatus();
       return parse_status_;
@@ -531,18 +596,19 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
   bool continue_execution = !scan_node_->ReachedLimit() && !context_->cancelled();
   if (!continue_execution) return Status::CancelledInternal("ORC scanner");
 
-  scratch_batch_tuple_idx_ = 0;
-  scratch_batch_ = row_reader_->createRowBatch(row_batch->capacity());
-  DCHECK_EQ(scratch_batch_->numElements, 0);
+  // We're going to free the previous batch. Clear the reference first.
+  orc_root_reader_->UpdateInputBatch(nullptr);
+
+  orc_root_batch_ = row_reader_->createRowBatch(row_batch->capacity());
+  DCHECK_EQ(orc_root_batch_->numElements, 0);
 
   int64_t num_rows_read = 0;
-  while (continue_execution) {  // one ORC scratch batch (ColumnVectorBatch) in a round
-    if (scratch_batch_tuple_idx_ == scratch_batch_->numElements) {
+  while (continue_execution) {  // one ORC batch (ColumnVectorBatch) in a round
+    if (orc_root_reader_->EndOfBatch()) {
       try {
-        if (!row_reader_->next(*scratch_batch_)) {
-          end_of_stripe_ = true;
-          break; // no more data to process
-        }
+        end_of_stripe_ |= !row_reader_->next(*orc_root_batch_);
+        orc_root_reader_->UpdateInputBatch(orc_root_batch_.get());
+        if (end_of_stripe_) break; // no more data to process
       } catch (ResourceError& e) {
         parse_status_ = e.GetStatus();
         return parse_status_;
@@ -552,32 +618,41 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
         eos_ = true;
         return parse_status_;
       }
-      if (scratch_batch_->numElements == 0) {
+      if (orc_root_batch_->numElements == 0) {
         RETURN_IF_ERROR(CommitRows(0, row_batch));
         end_of_stripe_ = true;
         return Status::OK();
       }
-      num_rows_read += scratch_batch_->numElements;
-      scratch_batch_tuple_idx_ = 0;
+      num_rows_read += orc_root_batch_->numElements;
     }
 
-    RETURN_IF_ERROR(TransferScratchTuples(row_batch));
+    RETURN_IF_ERROR(TransferTuples(orc_root_reader_, row_batch));
     if (row_batch->AtCapacity()) break;
     continue_execution &= !scan_node_->ReachedLimit() && !context_->cancelled();
   }
   stripe_rows_read_ += num_rows_read;
   COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
+  // Merge Scanner-local counter into HdfsScanNode counter and reset.
+  COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
+  coll_items_read_counter_ = 0;
   return Status::OK();
 }
 
-Status HdfsOrcScanner::TransferScratchTuples(RowBatch* dst_batch) {
+Status HdfsOrcScanner::TransferTuples(OrcComplexColumnReader* coll_reader,
+    RowBatch* dst_batch) {
+  if (!coll_reader->MaterializeTuple()) {
+    // Top-level readers that are not materializing tuples will delegate the
+    // materialization to its unique child.
+    DCHECK_EQ(coll_reader->children().size(), 1);
+    OrcColumnReader* child = coll_reader->children()[0];
+    // Only complex type readers can be top-level readers.
+    DCHECK(child->IsComplexColumnReader());
+    return TransferTuples(static_cast<OrcComplexColumnReader*>(child), dst_batch);
+  }
   const TupleDescriptor* tuple_desc = scan_node_->tuple_desc();
 
   ScalarExprEvaluator* const* conjunct_evals = conjunct_evals_->data();
   int num_conjuncts = conjunct_evals_->size();
-
-  const orc::Type* root_type = &row_reader_->getSelectedType();
-  DCHECK_EQ(root_type->getKind(), orc::TypeKind::STRUCT);
 
   DCHECK_LT(dst_batch->num_rows(), dst_batch->capacity());
   if (tuple_ == nullptr) RETURN_IF_ERROR(AllocateTupleMem(dst_batch));
@@ -588,13 +663,10 @@ Status HdfsOrcScanner::TransferScratchTuples(RowBatch* dst_batch) {
   Tuple* tuple = tuple_;  // tuple_ is updated in CommitRows
 
   // TODO(IMPALA-6506): codegen the runtime filter + conjunct evaluation loop
-  // TODO: transfer the scratch_batch_ column-by-column for batch, and then evaluate
-  // the predicates in later loop.
-  while (row_id < capacity && ScratchBatchNotEmpty()) {
-    DCHECK_LT((void*)tuple, (void*)tuple_mem_end_);
+  while (row_id < capacity && !coll_reader->EndOfBatch()) {
+    if (tuple_desc->byte_size() > 0) DCHECK_LT((void*)tuple, (void*)tuple_mem_end_);
     InitTuple(tuple_desc, template_tuple_, tuple);
-    RETURN_IF_ERROR(ReadRow(static_cast<const orc::StructVectorBatch&>(*scratch_batch_),
-        scratch_batch_tuple_idx_++, root_type, tuple, dst_batch));
+    RETURN_IF_ERROR(coll_reader->TransferTuple(tuple, dst_batch->tuple_data_pool()));
     row->SetTuple(scan_node_->tuple_idx(), tuple);
     if (!EvalRuntimeFilters(row)) continue;
     if (ExecNode::EvalConjuncts(conjunct_evals, num_conjuncts, row)) {
@@ -619,150 +691,64 @@ Status HdfsOrcScanner::AllocateTupleMem(RowBatch* row_batch) {
   return Status::OK();
 }
 
-inline Status HdfsOrcScanner::ReadRow(const orc::StructVectorBatch& batch, int row_idx,
-    const orc::Type* orc_type, Tuple* tuple, RowBatch* dst_batch) {
-  for (unsigned int c = 0; c < orc_type->getSubtypeCount(); ++c) {
-    orc::ColumnVectorBatch* col_batch = batch.fields[c];
-    const orc::Type* col_type = orc_type->getSubtype(c);
-    const SlotDescriptor* slot_desc = DCHECK_NOTNULL(
-        col_id_slot_map_[col_type->getColumnId()]);
-    if (col_batch->hasNulls && !col_batch->notNull[row_idx]) {
-      tuple->SetNull(slot_desc->null_indicator_offset());
-      continue;
+Status HdfsOrcScanner::AssembleCollection(
+    const OrcComplexColumnReader& complex_col_reader, int row_idx,
+    CollectionValueBuilder* coll_value_builder) {
+  int total_tuples = complex_col_reader.GetNumTuples(row_idx);
+  if (!complex_col_reader.MaterializeTuple()) {
+    // 'complex_col_reader' maps to a STRUCT or collection column of STRUCTs/collections
+    // and there're no need to materialize current level tuples. Delegate the
+    // materialization to the unique child reader.
+    DCHECK_EQ(complex_col_reader.children().size(), 1);
+    DCHECK(complex_col_reader.children()[0]->IsComplexColumnReader());
+    auto child_reader = reinterpret_cast<OrcComplexColumnReader*>(
+        complex_col_reader.children()[0]);
+    // We should give the child reader the boundary (offset and total tuples) of current
+    // collection
+    int child_batch_offset = complex_col_reader.GetChildBatchOffset(row_idx);
+    for (int i = 0; i < total_tuples; ++i) {
+      RETURN_IF_ERROR(AssembleCollection(*child_reader, child_batch_offset + i,
+          coll_value_builder));
     }
-    void* slot_val_ptr = tuple->GetSlot(slot_desc->tuple_offset());
-    switch (col_type->getKind()) {
-      case orc::TypeKind::BOOLEAN: {
-        int64_t val = static_cast<const orc::LongVectorBatch*>(col_batch)->
-            data.data()[row_idx];
-        *(reinterpret_cast<bool*>(slot_val_ptr)) = (val != 0);
-        break;
-      }
-      case orc::TypeKind::BYTE:
-      case orc::TypeKind::SHORT:
-      case orc::TypeKind::INT:
-      case orc::TypeKind::LONG: {
-        const orc::LongVectorBatch* long_batch =
-            static_cast<const orc::LongVectorBatch*>(col_batch);
-        int64_t val = long_batch->data.data()[row_idx];
-        switch (slot_desc->type().type) {
-          case TYPE_TINYINT:
-            *(reinterpret_cast<int8_t*>(slot_val_ptr)) = val;
-            break;
-          case TYPE_SMALLINT:
-            *(reinterpret_cast<int16_t*>(slot_val_ptr)) = val;
-            break;
-          case TYPE_INT:
-            *(reinterpret_cast<int32_t*>(slot_val_ptr)) = val;
-            break;
-          case TYPE_BIGINT:
-            *(reinterpret_cast<int64_t*>(slot_val_ptr)) = val;
-            break;
-          default:
-            DCHECK(false) << "Illegal translation from impala type "
-                << slot_desc->DebugString() << " to orc INT";
-        }
-        break;
-      }
-      case orc::TypeKind::FLOAT:
-      case orc::TypeKind::DOUBLE: {
-        double val =
-            static_cast<const orc::DoubleVectorBatch*>(col_batch)->data.data()[row_idx];
-        if (slot_desc->type().type == TYPE_FLOAT) {
-          *(reinterpret_cast<float*>(slot_val_ptr)) = val;
-        } else {
-          DCHECK_EQ(slot_desc->type().type, TYPE_DOUBLE);
-          *(reinterpret_cast<double*>(slot_val_ptr)) = val;
-        }
-        break;
-      }
-      case orc::TypeKind::STRING:
-      case orc::TypeKind::VARCHAR:
-      case orc::TypeKind::CHAR: {
-        auto str_batch = static_cast<const orc::StringVectorBatch*>(col_batch);
-        const char* src_ptr = str_batch->data.data()[row_idx];
-        int64_t src_len = str_batch->length.data()[row_idx];
-        int dst_len = slot_desc->type().len;
-        if (slot_desc->type().type == TYPE_CHAR) {
-          int unpadded_len = min(dst_len, static_cast<int>(src_len));
-          char* dst_char = reinterpret_cast<char*>(slot_val_ptr);
-          memcpy(dst_char, src_ptr, unpadded_len);
-          StringValue::PadWithSpaces(dst_char, dst_len, unpadded_len);
-          break;
-        }
-        StringValue* dst = reinterpret_cast<StringValue*>(slot_val_ptr);
-        if (slot_desc->type().type == TYPE_VARCHAR && src_len > dst_len) {
-          dst->len = dst_len;
-        } else {
-          dst->len = src_len;
-        }
-        // Space in the StringVectorBatch is allocated by reader_mem_pool_. It will be
-        // reused at next batch, so we allocate a new space for this string.
-        uint8_t* buffer = dst_batch->tuple_data_pool()->TryAllocate(dst->len);
-        if (buffer == nullptr) {
-          string details = Substitute("Could not allocate string buffer of $0 bytes "
-              "for ORC file '$1'.", dst->len, filename());
-          return scan_node_->mem_tracker()->MemLimitExceeded(
-              state_, details, dst->len);
-        }
-        dst->ptr = reinterpret_cast<char*>(buffer);
-        memcpy(dst->ptr, src_ptr, dst->len);
-        break;
-      }
-      case orc::TypeKind::TIMESTAMP: {
-        const orc::TimestampVectorBatch* ts_batch =
-            static_cast<const orc::TimestampVectorBatch*>(col_batch);
-        int64_t secs = ts_batch->data.data()[row_idx];
-        int64_t nanos = ts_batch->nanoseconds.data()[row_idx];
-        *reinterpret_cast<TimestampValue*>(slot_val_ptr) =
-            TimestampValue::FromUnixTimeNanos(secs, nanos, state_->local_time_zone());
-        break;
-      }
-      case orc::TypeKind::DECIMAL: {
-        // For decimals whose precision is larger than 18, its value can't fit into
-        // an int64 (10^19 > 2^63). So we should use int128 for this case.
-        if (col_type->getPrecision() == 0 || col_type->getPrecision() > 18) {
-          auto int128_batch = static_cast<const orc::Decimal128VectorBatch*>(col_batch);
-          orc::Int128 orc_val = int128_batch->values.data()[row_idx];
-
-          DCHECK_EQ(slot_desc->type().GetByteSize(), 16);
-          int128_t val = orc_val.getHighBits();
-          val <<= 64;
-          val |= orc_val.getLowBits();
-          // Use memcpy to avoid gcc generating unaligned instructions like movaps
-          // for int128_t. They will raise SegmentFault when addresses are not
-          // aligned to 16 bytes.
-          memcpy(slot_val_ptr, &val, sizeof(int128_t));
-        } else {
-          // Reminder: even decimal(1,1) is stored in int64 batch
-          auto int64_batch = static_cast<const orc::Decimal64VectorBatch*>(col_batch);
-          int64_t val = int64_batch->values.data()[row_idx];
-
-          switch (slot_desc->type().GetByteSize()) {
-            case 4:
-              reinterpret_cast<Decimal4Value*>(slot_val_ptr)->value() = val;
-              break;
-            case 8:
-              reinterpret_cast<Decimal8Value*>(slot_val_ptr)->value() = val;
-              break;
-            case 16:
-              reinterpret_cast<Decimal16Value*>(slot_val_ptr)->value() = val;
-              break;
-            default: DCHECK(false) << "invalidate byte size";
-          }
-        }
-        break;
-      }
-      case orc::TypeKind::LIST:
-      case orc::TypeKind::MAP:
-      case orc::TypeKind::STRUCT:
-      case orc::TypeKind::UNION:
-      default:
-        DCHECK(false) << slot_desc->type().DebugString() << " map to ORC column "
-            << col_type->toString();
-    }
+    return Status::OK();
   }
+  DCHECK(complex_col_reader.IsCollectionReader());
+  auto coll_reader = reinterpret_cast<const OrcCollectionReader*>(&complex_col_reader);
+
+  const TupleDescriptor* tuple_desc = &coll_value_builder->tuple_desc();
+  Tuple* template_tuple = template_tuple_map_[tuple_desc];
+  const vector<ScalarExprEvaluator*>& evals =
+      conjunct_evals_map_[tuple_desc->id()];
+
+  int tuple_idx = 0;
+  while (!scan_node_->ReachedLimit() && !context_->cancelled()
+      && tuple_idx < total_tuples) {
+    MemPool* pool;
+    Tuple* tuple;
+    TupleRow* row = nullptr;
+
+    int64_t num_rows;
+    // We're assembling item tuples into an CollectionValue
+    parse_status_ =
+        GetCollectionMemory(coll_value_builder, &pool, &tuple, &row, &num_rows);
+    if (UNLIKELY(!parse_status_.ok())) break;
+    // 'num_rows' can be very high if we're writing to a large CollectionValue. Limit
+    // the number of rows we read at one time so we don't spend too long in the
+    // 'num_rows' loop below before checking for cancellation or limit reached.
+    num_rows = min(
+        num_rows, static_cast<int64_t>(scan_node_->runtime_state()->batch_size()));
+    int num_to_commit = 0;
+    while (num_to_commit < num_rows && tuple_idx < total_tuples) {
+      InitTuple(tuple_desc, template_tuple, tuple);
+      RETURN_IF_ERROR(coll_reader->ReadChildrenValue(row_idx, tuple_idx++, tuple, pool));
+      if (ExecNode::EvalConjuncts(evals.data(), evals.size(), row)) {
+        tuple = next_tuple(tuple_desc->byte_size(), tuple);
+        ++num_to_commit;
+      }
+    }
+    coll_value_builder->CommitTuples(num_to_commit);
+  }
+  coll_items_read_counter_ += tuple_idx;
   return Status::OK();
 }
-
 }

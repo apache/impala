@@ -699,7 +699,12 @@ nested_struct struct<a: int, b: array<int>, c: struct<d: array<array<struct<e: i
 hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/nullable.parq \
 /test-warehouse/complextypestbl_parquet/ && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/nonnullable.parq \
-/test-warehouse/complextypestbl_parquet/
+/test-warehouse/complextypestbl_parquet/ && \
+hadoop fs -mkdir -p /test-warehouse/complextypestbl_orc_def && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/nullable.orc \
+/test-warehouse/complextypestbl_orc_def/ && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/nonnullable.orc \
+/test-warehouse/complextypestbl_orc_def/
 ---- LOAD
 ====
 ---- DATASET

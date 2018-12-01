@@ -1,10 +1,7 @@
 ====
 ---- QUERY
-use tpch_nested_parquet
-====
----- QUERY
 select count(*)
-from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems i
+from customer c, c.c_orders o, o.o_lineitems i
 where c_custkey in (1, 2) and o_orderkey in (4808192, 1374019)
 ---- RESULTS
 7
@@ -13,7 +10,7 @@ bigint
 ====
 ---- QUERY
 select count(*)
-from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems i
+from customer c, c.c_orders o, o.o_lineitems i
 ---- RESULTS
 6001215
 ---- TYPES
@@ -21,7 +18,7 @@ bigint
 ====
 ---- QUERY
 select count(l_linenumber)
-from tpch_nested_parquet.customer.c_orders.o_lineitems i
+from customer.c_orders.o_lineitems i
 ---- RESULTS
 6001215
 ---- TYPES
@@ -29,7 +26,7 @@ bigint
 ====
 ---- QUERY
 select count(*)
-from tpch_nested_parquet.customer.c_orders.o_lineitems i
+from customer.c_orders.o_lineitems i
 ---- RESULTS
 6001215
 ---- TYPES
@@ -61,7 +58,7 @@ order by c_custkey
 bigint,bigint
 ====
 ---- QUERY
-select c_custkey from tpch_nested_parquet.customer c left anti join c.c_orders
+select c_custkey from customer c left anti join c.c_orders
 where c_custkey < 10 order by c_custkey
 ---- RESULTS
 3
@@ -73,7 +70,7 @@ bigint
 ---- QUERY
 # Exercise TOP-N node with array data
 select c_custkey, c_name, o_orderkey, o_orderpriority
-from tpch_nested_parquet.customer c, c.c_orders o
+from customer c, c.c_orders o
 where c_custkey < 100
 order by o_orderpriority, o_orderkey
 limit 10;
@@ -96,8 +93,8 @@ bigint,string,bigint,string
 # In this query no slots of the supplier.s_partssupps array are materialized, so there
 # are NULL tuples once the array is unnested.
 SELECT t2.s_name
-FROM tpch_nested_parquet.customer t1
-INNER JOIN tpch_nested_parquet.supplier t2
+FROM customer t1
+INNER JOIN supplier t2
   ON t2.s_phone = t1.c_phone AND t2.s_acctbal = t1.c_acctbal,
 t2.s_partsupps t3
 WHERE t2.s_suppkey > t2.s_nationkey;
@@ -150,7 +147,7 @@ BIGINT,BIGINT
 # generate many rows. This test stresses the order by and should not crash.
 SELECT o_orderkey, r FROM
   (SELECT o2.o_orderkey, COUNT(o1.pos) OVER (ORDER BY o2.o_orderkey DESC) r
-   FROM tpch_nested_parquet.customer c
+   FROM customer c
    JOIN c.c_orders o1
    JOIN c.c_orders o2 ON (o1.pos = o2.pos)) v
 ORDER BY o_orderkey LIMIT 1
@@ -164,7 +161,7 @@ BIGINT,BIGINT
 # build side of a nested loop join. Reproduces a memory transfer bug triggered by empty
 # row batches in the build side of the join.
 select straight_join c_custkey, cnt1
-from tpch_nested_parquet.customer c,
+from customer c,
   (select count(*) cnt1 from c.c_orders) v
 where cnt1 = 1
 order by c_custkey

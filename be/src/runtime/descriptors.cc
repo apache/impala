@@ -62,6 +62,11 @@ static void DecompressLocation(const impala::THdfsTable& thrift_table,
 
 namespace impala {
 
+const int SchemaPathConstants::ARRAY_ITEM;
+const int SchemaPathConstants::ARRAY_POS;
+const int SchemaPathConstants::MAP_KEY;
+const int SchemaPathConstants::MAP_VALUE;
+
 const int RowDescriptor::INVALID_IDX;
 
 const char* TupleDescriptor::LLVM_CLASS_NAME = "class.impala::TupleDescriptor";

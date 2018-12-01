@@ -19,6 +19,7 @@
 
 import os
 from copy import deepcopy
+import pytest
 from subprocess import check_call
 from pytest import skip
 
@@ -45,7 +46,7 @@ class TestNestedTypes(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestNestedTypes, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'parquet')
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
 
   def test_scanner_basic(self, vector):
     """Queries that do not materialize arrays."""
@@ -74,7 +75,9 @@ class TestNestedTypes(ImpalaTestSuite):
 
   def test_subplan(self, vector):
     """Test subplans with various exec nodes inside it."""
-    self.run_test_case('QueryTest/nested-types-subplan', vector)
+    db_suffix = vector.get_value('table_format').db_suffix()
+    self.run_test_case('QueryTest/nested-types-subplan', vector,
+                       use_db='tpch_nested' + db_suffix)
 
   def test_subplan_single_node(self, vector):
     """Test subplans with various exec nodes inside it and num_nodes=1."""
@@ -84,22 +87,30 @@ class TestNestedTypes(ImpalaTestSuite):
 
   def test_with_clause(self, vector):
     """Queries using nested types and with WITH clause."""
-    self.run_test_case('QueryTest/nested-types-with-clause', vector)
+    db_suffix = vector.get_value('table_format').db_suffix()
+    self.run_test_case('QueryTest/nested-types-with-clause', vector,
+                       use_db='tpch_nested' + db_suffix)
 
   def test_tpch(self, vector):
     """Queries over the larger nested TPCH dataset."""
-    self.run_test_case('QueryTest/nested-types-tpch', vector)
+    db_suffix = vector.get_value('table_format').db_suffix()
+    self.run_test_case('QueryTest/nested-types-tpch', vector,
+                       use_db='tpch_nested' + db_suffix)
 
   def test_tpch_limit(self, vector):
     """Queries over the larger nested TPCH dataset with limits in their subplan."""
     vector.get_value('exec_option')['batch_size'] = 10
-    self.run_test_case('QueryTest/nested-types-tpch-limit', vector)
+    db_suffix = vector.get_value('table_format').db_suffix()
+    self.run_test_case('QueryTest/nested-types-tpch-limit', vector,
+                       use_db='tpch_nested' + db_suffix)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_tpch_mem_limit(self, vector):
     """Queries over the larger nested TPCH dataset with memory limits tuned for
     a 3-node HDFS minicluster."""
-    self.run_test_case('QueryTest/nested-types-tpch-mem-limit', vector)
+    db_suffix = vector.get_value('table_format').db_suffix()
+    self.run_test_case('QueryTest/nested-types-tpch-mem-limit', vector,
+                       use_db='tpch_nested' + db_suffix)
 
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_tpch_mem_limit_single_node(self, vector):
@@ -107,11 +118,16 @@ class TestNestedTypes(ImpalaTestSuite):
     a 3-node HDFS minicluster with num_nodes=1."""
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['num_nodes'] = 1
-    self.run_test_case('QueryTest/nested-types-tpch-mem-limit-single-node', new_vector)
+    db_suffix = vector.get_value('table_format').db_suffix()
+    self.run_test_case('QueryTest/nested-types-tpch-mem-limit-single-node',
+                       new_vector, use_db='tpch_nested' + db_suffix)
 
   @SkipIfEC.fix_later
   def test_parquet_stats(self, vector):
     """Queries that test evaluation of Parquet row group statistics."""
+    if vector.get_value('table_format').file_format == 'orc':
+      pytest.skip('Predicate push down on ORC stripe statistics is not supported' +
+                  '(IMPALA-6505)')
     self.run_test_case('QueryTest/nested-types-parquet-stats', vector)
 
   @SkipIfIsilon.hive
@@ -134,6 +150,9 @@ class TestNestedTypes(ImpalaTestSuite):
     """IMPALA-6370: Test that a partitioned table with nested types can be scanned."""
     table = "complextypes_partitioned"
     db_table = "{0}.{1}".format(unique_database, table)
+    table_format_info = vector.get_value('table_format')  # type: TableFormatInfo
+    file_format = table_format_info.file_format
+    db_suffix = table_format_info.db_suffix()
     self.client.execute("""
         CREATE EXTERNAL TABLE {0} (
           id BIGINT,
@@ -150,12 +169,12 @@ class TestNestedTypes(ImpalaTestSuite):
         PARTITIONED BY (
           part int
         )
-        STORED AS PARQUET""".format(db_table))
+        STORED AS {1}""".format(db_table, file_format))
     # Add multiple partitions pointing to the complextypes_tbl data.
     for partition in [1, 2]:
       self.client.execute("ALTER TABLE {0} ADD PARTITION(part={1}) LOCATION '{2}'".format(
           db_table, partition,
-          self._get_table_location("functional_parquet.complextypestbl", vector)))
+          self._get_table_location("functional%s.complextypestbl" % db_suffix, vector)))
     self.run_test_case('QueryTest/nested-types-basic-partitioned', vector,
         unique_database)
 
@@ -572,6 +591,8 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
 class TestMaxNestingDepth(ImpalaTestSuite):
   # Should be kept in sync with the FE's Type.MAX_NESTING_DEPTH
   MAX_NESTING_DEPTH = 100
+  TABLES = ['struct', 'int_array', 'struct_array', 'int_map', 'struct_map']
+  TEMP_TABLE_SUFFIX = '_parquet'
 
   @classmethod
   def get_workload(self):
@@ -581,15 +602,44 @@ class TestMaxNestingDepth(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestMaxNestingDepth, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
-        v.get_value('table_format').file_format == 'parquet')
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
 
   def test_max_nesting_depth(self, vector, unique_database):
-    """Tests that Impala can scan Parquet files having complex types of
+    """Tests that Impala can scan Parquet and ORC files having complex types of
     the maximum nesting depth."""
+    file_format = vector.get_value('table_format').file_format
+    if file_format == 'parquet':
+      self.__create_parquet_tables(unique_database)
+    elif file_format == 'orc':
+      self.__create_orc_tables(unique_database)
+    self.run_test_case('QueryTest/max-nesting-depth', vector, unique_database)
+
+  def __create_parquet_tables(self, unique_database, as_target=True):
+    """Create Parquet tables from files. If 'as_target' is False, the Parquet tables will
+     be used to create ORC tables, so we add a suffix in the table names."""
     check_call(["hdfs", "dfs", "-copyFromLocal",
       "%s/testdata/max_nesting_depth" % os.environ['IMPALA_HOME'],
       "%s/%s.db/" % (WAREHOUSE, unique_database)], shell=False)
-    self.run_test_case('QueryTest/max-nesting-depth', vector, unique_database)
+    tbl_suffix = '' if as_target else self.TEMP_TABLE_SUFFIX
+    for tbl in self.TABLES:
+      tbl_name = "%s.%s_tbl%s" % (unique_database, tbl, tbl_suffix)
+      tbl_location = "%s/%s.db/max_nesting_depth/%s/" % (WAREHOUSE, unique_database, tbl)
+      create_table = "CREATE EXTERNAL TABLE %s LIKE PARQUET '%s' STORED AS PARQUET" \
+          " location '%s'" % (tbl_name, tbl_location + 'file.parq', tbl_location)
+      self.client.execute(create_table)
+
+  def __create_orc_tables(self, unique_database):
+    # Creating ORC tables from ORC files (IMPALA-8046) has not been supported.
+    # We create the Parquet tables first and then transform them into ORC tables.
+    self.__create_parquet_tables(unique_database, False)
+    for tbl in self.TABLES:
+      tbl_name = "%s.%s_tbl" % (unique_database, tbl)
+      from_tbl_name = tbl_name + self.TEMP_TABLE_SUFFIX
+      create_table = "CREATE TABLE %s LIKE %s STORED AS ORC" % (tbl_name, from_tbl_name)
+      insert_table = "INSERT INTO %s SELECT * FROM %s" % (tbl_name, from_tbl_name)
+      self.run_stmt_in_hive(create_table)
+      self.run_stmt_in_hive(insert_table)
+      self.client.execute("INVALIDATE METADATA %s" % tbl_name)
 
   @SkipIfIsilon.hive
   @SkipIfS3.hive
@@ -602,8 +652,9 @@ class TestMaxNestingDepth(ImpalaTestSuite):
     # Type with a nesting depth of MAX_NESTING_DEPTH + 1
     type_sql = ("array<" * self.MAX_NESTING_DEPTH) + "int" +\
       (">" * self.MAX_NESTING_DEPTH)
-    create_table_sql = "CREATE TABLE %s.above_max_depth (f %s) STORED AS PARQUET" %\
-      (unique_database, type_sql)
+    file_format = vector.get_value('table_format').file_format
+    create_table_sql = "CREATE TABLE %s.above_max_depth (f %s) STORED AS %s" %\
+      (unique_database, type_sql, file_format)
     self.run_stmt_in_hive(create_table_sql)
     self.client.execute("invalidate metadata %s.above_max_depth" % unique_database)
     try:

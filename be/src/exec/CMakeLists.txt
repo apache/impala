@@ -70,6 +70,8 @@ add_library(Exec
   nested-loop-join-node.cc
   non-grouping-aggregator.cc
   non-grouping-aggregator-ir.cc
+  orc-column-readers.cc
+  orc-metadata-utils.cc
   partial-sort-node.cc
   partitioned-hash-join-builder.cc
   partitioned-hash-join-builder-ir.cc

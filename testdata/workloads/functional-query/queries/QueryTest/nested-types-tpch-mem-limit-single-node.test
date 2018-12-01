@@ -1,14 +1,11 @@
 ====
 ---- QUERY
-use tpch_nested_parquet
-====
----- QUERY
 # IMPALA-2376: run scan that constructs large collection and set memory limit low enough
 # to get the below query to consistently fail when allocating a large collection. Set
 # num_nodes to 1 in the python test and mt_dop to 1 here in order to make the query as
 # deterministic as possible. mem_limit is tuned for a 3-node HDFS minicluster.
 set buffer_pool_limit=24m;
-set mem_limit=35m;
+set mem_limit=28m;
 set mt_dop=1;
 select max(cnt1), max(cnt2), max(cnt3), max(cnt4), max(cnt5)
 from customer c,
@@ -18,5 +15,5 @@ from customer c,
 ---- TYPES
 BIGINT
 ---- CATCH
-row_regex: .*Memory limit exceeded: Failed to allocate [0-9]+ bytes for collection 'tpch_nested_parquet.customer.c_orders.item.o_lineitems'.*
+row_regex: .*Memory limit exceeded: Failed to allocate [0-9]+ bytes for collection 'tpch_nested_.*.customer.c_orders.item.o_lineitems'.*
 ====

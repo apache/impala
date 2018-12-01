@@ -1,15 +1,12 @@
 ====
 ---- QUERY
-use tpch_nested_parquet
-====
----- QUERY
 # IMPALA-2473: Scan query with large row size leading to oversized batches.
 # Should not OOM given single scanner thread and sufficient memory limit.
 # mem_limit is tuned for a 3-node HDFS minicluster.
 set num_scanner_threads=1;
 set mem_limit=1g;
 select *
-from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
+from customer c, c.c_orders o, o.o_lineitems
 order by l_partkey desc, l_suppkey desc, l_linenumber desc, c_custkey
 limit 5
 ---- RESULTS
@@ -28,7 +25,7 @@ bigint,string,string,smallint,string,decimal,string,string,bigint,string,decimal
 set num_scanner_threads=1;
 set mem_limit=500m;
 select *
-from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
+from customer c, c.c_orders o, o.o_lineitems
 where c_phone='20-968-632-1388' and l_partkey = 127499
 ---- RESULTS
 53722,'Customer#000053722','p2hQ7009dQSEuRdE31HtjVv9idN2rXBHdTx4JRk',10,'20-968-632-1388',4153.75,'HOUSEHOLD','l foxes are ideas. final deposits boost blithely. carefully bo',10277,'F',101242.81,'1994-04-08','3-MEDIUM','Clerk#000000655',0,'counts sleep around the special',127499,2524,1,12.00,18317.88,0.07,0.07,'A','F','1994-07-27','1994-05-22','1994-08-11','NONE','RAIL',' according to the furiously silent th'

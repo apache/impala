@@ -1,2 +1,3 @@
 # Manually created file.
-file_format:parquet, dataset:tpch_nested, compression_codec: none, compression_type: none
+file_format: parquet, dataset: tpch_nested, compression_codec: none, compression_type: none
+file_format: orc, dataset: tpch_nested, compression_codec: def, compression_type: block

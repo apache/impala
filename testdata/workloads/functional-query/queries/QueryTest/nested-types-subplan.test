@@ -1,8 +1,5 @@
 ====
 ---- QUERY
-use tpch_nested_parquet
-====
----- QUERY
 # Basic subplan with an unnest + join.
 select c_custkey, c_mktsegment, o_orderkey, o_orderdate
 from customer c, c.c_orders o
@@ -255,7 +252,7 @@ bigint,string,bigint,decimal,decimal,string,string
 ---- QUERY
 # Test a left outer join inside a subplan.
 select count(okey), opriority
-from tpch_nested_parquet.customer c,
+from customer c,
   (select ca.o_orderkey okey, ca.o_orderpriority opriority
    from c.c_orders ca left outer join c.c_orders cb
    on ca.o_orderkey = cb.o_orderkey) v
@@ -319,7 +316,7 @@ bigint,string,bigint,string
 ---- QUERY
 # Test a right outer join inside a subplan.
 select count(okey), opriority
-from tpch_nested_parquet.customer c,
+from customer c,
   (select ca.o_orderkey okey, ca.o_orderpriority opriority
    from c.c_orders ca right outer join c.c_orders cb
    on ca.o_orderkey = cb.o_orderkey
@@ -523,7 +520,7 @@ bigint,string,bigint,decimal,string
 ---- QUERY
 # Test uncorrelated NOT IN subquery with a relative table ref.
 select c_custkey, c_mktsegment, o_orderkey, o_totalprice, o_orderdate
-from tpch_nested_parquet.customer c, c.c_orders o
+from customer c, c.c_orders o
 where c_custkey < 10
   and o_orderdate like "1992%"
   and cast(o_orderdate as timestamp) + interval 13 days not in
@@ -597,7 +594,7 @@ bigint, bigint
 ---- QUERY
 # IMPALA-3678: Union in a subplan - passthrough should be disabled.
 select count(c.c_custkey), count(v.tot_price)
-from tpch_nested_parquet.customer c, (
+from customer c, (
   select sum(o_totalprice) tot_price from c.c_orders
   union
   select sum(o_totalprice) tot_price from c.c_orders
@@ -610,7 +607,7 @@ bigint,bigint
 ---- QUERY
 # IMPALA-5363: Reset probe_batch_ after reaching limit.
 # Query with a partitioned hash join inside a subplan
-select count(*) FROM tpch_nested_parquet.customer c, (SELECT ca.o_orderkey okey,
+select count(*) FROM customer c, (SELECT ca.o_orderkey okey,
 ca.o_orderpriority opriority FROM c.c_orders ca, c.c_orders cb
 WHERE ca.o_orderkey = cb.o_orderkey limit 2) v limit 51
 ---- RESULTS
@@ -621,7 +618,7 @@ bigint
 ---- QUERY
 # IMPALA-5363: Reset probe_batch_ after reaching limit.
 # Query with a Nested loop join inside a subplan
-select count(*) FROM tpch_nested_parquet.customer c, (SELECT ca.o_orderkey okey,
+select count(*) FROM customer c, (SELECT ca.o_orderkey okey,
 ca.o_orderpriority opriority FROM c.c_orders ca, c.c_orders cb
 WHERE ca.o_orderkey < cb.o_orderkey limit 2) v limit 51
 ---- RESULTS
@@ -633,7 +630,7 @@ bigint
 # IMPALA-5438: Union with constant exprs in a subplan. The 'c_custkey % 100' was chosen
 # to have all impalads produce results to make sure the constant exprs in the union are
 # evaluated regardless of which fragment instance they are in.
-select c_custkey, order_cnt, union_cnt from tpch_nested_parquet.customer c,
+select c_custkey, order_cnt, union_cnt from customer c,
  (select count(o_orderkey) order_cnt from c.c_orders) v,
  (select count(o_orderkey) union_cnt from (
   select o_orderkey from c.c_orders
@@ -647,7 +644,7 @@ bigint,bigint,bigint
 ---- QUERY
 # IMPALA-2368: Resetting nested subplans works correctly with an analytic sort.
 select count(o_orderkey)
-from tpch_nested_parquet.customer c
+from customer c
 inner join c.c_orders o
 where c_custkey < 10 and c_custkey in
  (select lead(l.l_linenumber) over (partition by l.l_shipdate order by l.l_linenumber)

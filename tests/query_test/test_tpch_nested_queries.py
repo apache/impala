@@ -29,9 +29,9 @@ class TestTpchNestedQuery(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestTpchNestedQuery, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
-    # The nested tpch data is currently only available in parquet.
+    # The nested tpch data is currently only available in parquet and orc.
     cls.ImpalaTestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format in ['parquet'])
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
 
   def test_tpch_q1(self, vector):
     self.run_test_case(self.get_workload() + '-q1', vector)

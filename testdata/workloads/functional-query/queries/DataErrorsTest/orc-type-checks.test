@@ -80,12 +80,12 @@ decimal
 132842
 ====
 ---- QUERY
-select d2 from mismatch_decimals
+select d2 from mismatch_decimals where d6 = 1
 ---- TYPES
 decimal
 ---- RESULTS
 ---- CATCH
-It can't be truncated to table column DECIMAL(8,0) for column decimal(10,0) in ORC file
+Column decimal(10,0) in ORC file '$NAMENODE/test-warehouse/decimal_tbl_orc_def/d6=1/000000_0' can't be truncated to table column DECIMAL(8,0)
 ====
 ---- QUERY
 select d3 from mismatch_decimals

@@ -20,70 +20,57 @@ PLAN-ROOT SINK
    predicates: !empty(t.a)
    row-size=24B cardinality=unavailable
 ====
-# Complex types are not supported on ORC.
+# Scanning an unpartitioned ORC table with complex types plans ok.
 select 1 from functional_orc_def.complextypes_fileformat t, t.a
 ---- PLAN
-NotImplementedException: Scan of table 't' in format 'ORC' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
-====
-select s.f1 from functional_orc_def.complextypes_fileformat t, t.m
----- PLAN
-NotImplementedException: Scan of table 't' in format 'ORC' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
-====
-# Complex types are not supported on ORC, however queries materializing
-# only scalar type columns are allowed.
-select id from functional_orc_def.complextypes_fileformat
----- PLAN
 PLAN-ROOT SINK
 |
-00:SCAN HDFS [functional_orc_def.complextypes_fileformat]
-   partitions=1/1 files=1 size=621B
-   row-size=4B cardinality=unavailable
-====
-# Complex types are not supported on ORC but count(*) and similar
-# queries should work.
-select count(*) from functional_orc_def.complextypes_fileformat
----- PLAN
-PLAN-ROOT SINK
+01:SUBPLAN
+|  row-size=12B cardinality=unavailable
 |
-01:AGGREGATE [FINALIZE]
-|  output: count(*)
-|  row-size=8B cardinality=1
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=12B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=12B cardinality=1
+|  |
+|  03:UNNEST [t.a]
+|     row-size=0B cardinality=10
 |
-00:SCAN HDFS [functional_orc_def.complextypes_fileformat]
+00:SCAN HDFS [functional_orc_def.complextypes_fileformat t]
    partitions=1/1 files=1 size=621B
-   row-size=0B cardinality=unavailable
+   predicates: !empty(t.a)
+   row-size=12B cardinality=unavailable
 ====
 # Complex types are not supported on Avro.
 select s.f1 from functional_avro_snap.complextypes_fileformat t, t.a
 ---- PLAN
 NotImplementedException: Scan of table 't' in format 'AVRO' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 # Complex types are not supported on text files.
 select s.f1 from functional.complextypes_fileformat t, t.a
 ---- PLAN
 NotImplementedException: Scan of table 't' in format 'TEXT' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 # Complex types are not supported on text files, even if no complex-typed
 # columns are selected.
 select 1 from functional.complextypes_fileformat
 ---- PLAN
 NotImplementedException: Scan of table 'functional.complextypes_fileformat' in format 'TEXT' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 # Complex types are not supported on RC files.
 select 1 from functional_rc_snap.complextypes_fileformat t, t.a
 ---- PLAN
 NotImplementedException: Scan of table 't' in format 'RC_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 select s.f1 from functional_rc_snap.complextypes_fileformat t, t.m
 ---- PLAN
 NotImplementedException: Scan of table 't' in format 'RC_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 # Complex types are not supported on RC files, however queries materializing
 # only scalar type columns are allowed.
@@ -113,7 +100,7 @@ PLAN-ROOT SINK
 select s.f1 from functional_seq_snap.complextypes_fileformat t, t.a
 ---- PLAN
 NotImplementedException: Scan of table 't' in format 'SEQUENCE_FILE' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 # Queries referencing only scalar typed columns on sequence files
 # are allowed.
@@ -147,14 +134,14 @@ PLAN-ROOT SINK
 select id from functional_hbase.allcomplextypes t, t.int_array_col
 ---- PLAN
 NotImplementedException: Scan of table 't.int_array_col' is not supported because 't' references a nested field/collection.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 # Scanning an HBase table with complex-types columns fails if a complex-typed
 # column is selected.
 select complex_struct_col.f1 from functional_hbase.allcomplextypes
 ---- PLAN
 NotImplementedException: Scan of table 'functional_hbase.allcomplextypes.complex_struct_col.f1' is not supported because 'functional_hbase.allcomplextypes' references a nested field/collection.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 # The complextypes_multifileformat has five partitions with different file formats:
 # p=1 text
@@ -166,7 +153,7 @@ Complex types are supported for these file formats: PARQUET.
 select 1 from functional.complextypes_multifileformat where p = 1
 ---- PLAN
 NotImplementedException: Scan of partition 'p=1' in format 'TEXT' of table 'functional.complextypes_multifileformat' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 # Scanning a Parquet partition of a multi-format table with complex types plans ok.
 select s.f1 from functional.complextypes_multifileformat t, t.a where p = 2
@@ -195,13 +182,13 @@ PLAN-ROOT SINK
 select s.f1 from functional.complextypes_multifileformat t, t.a where p = 3
 ---- PLAN
 NotImplementedException: Scan of partition 'p=3' in format 'AVRO' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 # Scanning an RC file partition of a multi-format table with complex types fails.
 select id from functional.complextypes_multifileformat t, t.a where p = 4
 ---- PLAN
 NotImplementedException: Scan of partition 'p=4' in format 'RC_FILE' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
+Complex types are supported for these file formats: PARQUET, ORC.
 ====
 # Complex types are not supported on RC files but count(*) and similar
 # queries should work.
@@ -218,24 +205,26 @@ PLAN-ROOT SINK
    partitions=1/5 files=1 size=128B
    row-size=0B cardinality=unavailable
 ====
-# Scanning an ORC file partition of a multi-format table with complex types fails.
+# Scanning an ORC file partition of a multi-format table with complex types plans ok.
 select id from functional.complextypes_multifileformat t, t.a where p = 5
----- PLAN
-NotImplementedException: Scan of partition 'p=5' in format 'ORC' of table 't' is not supported because the table has a column 's' with a complex type 'STRUCT<f1:STRING,f2:INT>'.
-Complex types are supported for these file formats: PARQUET.
-====
-# Complex types are not supported on ORC files but count(*) and similar
-# queries should work.
-select count(*) from functional.complextypes_multifileformat where p = 5
 ---- PLAN
 PLAN-ROOT SINK
 |
-01:AGGREGATE [FINALIZE]
-|  output: count(*)
-|  row-size=8B cardinality=1
+01:SUBPLAN
+|  row-size=16B cardinality=unavailable
 |
-00:SCAN HDFS [functional.complextypes_multifileformat]
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=16B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=16B cardinality=1
+|  |
+|  03:UNNEST [t.a]
+|     row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional.complextypes_multifileformat t]
    partition predicates: p = 5
    partitions=1/5 files=1 size=128B
-   row-size=0B cardinality=unavailable
+   predicates: !empty(t.a)
+   row-size=16B cardinality=unavailable
 ====

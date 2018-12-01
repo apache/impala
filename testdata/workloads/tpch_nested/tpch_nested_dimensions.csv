@@ -1,4 +1,4 @@
-file_format: parquet
+file_format: parquet,orc
 dataset: tpch_nested
 compression_codec: none
 compression_type: none

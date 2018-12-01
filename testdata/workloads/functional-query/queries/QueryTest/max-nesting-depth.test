@@ -1,12 +1,5 @@
 ====
 ---- QUERY
-# Test maximally nested struct.
-create external table $DATABASE.struct_tbl
-like parquet '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct/file.parq'
-stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct/'
-====
----- QUERY
 select f.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
@@ -18,13 +11,6 @@ from $DATABASE.struct_tbl
 42
 ---- TYPES
 int
-====
----- QUERY
-# Test maximally nested array.
-create external table $DATABASE.int_array_tbl
-like parquet '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/int_array/file.parq'
-stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/int_array/'
 ====
 ---- QUERY
 # Test absolute table ref executed with a single scan.
@@ -73,13 +59,6 @@ select * from $DATABASE.int_array_tbl.f t0,
 int
 ====
 ---- QUERY
-# Test maximally nested array of struct.
-create external table $DATABASE.struct_array_tbl
-like parquet '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct_array/file.parq'
-stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct_array/'
-====
----- QUERY
 # Test absolute table ref executed with a single scan.
 select * from $DATABASE.struct_array_tbl.f.
   f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.f0.
@@ -107,13 +86,6 @@ select * from $DATABASE.struct_array_tbl.f t0,
 42
 ---- TYPES
 int
-====
----- QUERY
-# Test maximally nested map.
-create external table $DATABASE.int_map_tbl
-like parquet '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/int_map/file.parq'
-stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/int_map/'
 ====
 ---- QUERY
 # Test absolute table ref executed with a single scan.
@@ -160,13 +132,6 @@ select t98.value from $DATABASE.int_map_tbl.f t0,
 42
 ---- TYPES
 int
-====
----- QUERY
-# Test maximally nested map of struct.
-create external table $DATABASE.struct_map_tbl
-like parquet '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct_map/file.parq'
-stored as parquet
-location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/max_nesting_depth/struct_map/'
 ====
 ---- QUERY
 # Test absolute table ref executed with a single scan.
