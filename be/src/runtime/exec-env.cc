@@ -433,6 +433,11 @@ Status ExecEnv::StartKrpcService() {
   return Status::OK();
 }
 
+void ExecEnv::SetImpalaServer(ImpalaServer* server) {
+  DCHECK(impala_server_ == nullptr) << "ImpalaServer already registered";
+  impala_server_ = server;
+}
+
 void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,
     int64_t clean_pages_limit) {
 #if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)

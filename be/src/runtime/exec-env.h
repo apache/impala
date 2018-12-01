@@ -103,7 +103,9 @@ class ExecEnv {
   Status StartKrpcService() WARN_UNUSED_RESULT;
 
   /// TODO: Should ExecEnv own the ImpalaServer as well?
-  void SetImpalaServer(ImpalaServer* server) { impala_server_ = server; }
+  /// Registers the ImpalaServer 'server' with this ExecEnv instance. May only be called
+  /// once.
+  void SetImpalaServer(ImpalaServer* server);
 
   /// Get the address of the thrift backend service. Only valid to call if
   /// StartServices() was successful.

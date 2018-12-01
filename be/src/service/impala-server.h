@@ -85,6 +85,7 @@ class QuerySchedule;
 ///
 /// Main thread (caller code), after instantiating the server, must call Start().
 /// Start() does the following:
+///    - Registers the ImpalaServer instance with the ExecEnv
 ///    - Start internal services
 ///    - Wait (indefinitely) for local catalog to be initialized from statestore
 ///      (if coordinator)

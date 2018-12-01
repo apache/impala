@@ -311,7 +311,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     }
   }
 
-  status = exec_env->tmp_file_mgr()->Init(exec_env->metrics());
+  status = exec_env_->tmp_file_mgr()->Init(exec_env_->metrics());
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
     if (FLAGS_abort_on_config_error) {
@@ -363,14 +363,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     ERR_load_crypto_strings();
   }
 
-  http_handler_.reset(new ImpalaHttpHandler(this));
-  http_handler_->RegisterHandlers(exec_env->webserver());
-
   // Initialize impalad metrics
   ImpaladMetrics::CreateMetrics(
-      exec_env->metrics()->GetOrCreateChildGroup("impala-server"));
+      exec_env_->metrics()->GetOrCreateChildGroup("impala-server"));
 
-  ABORT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env->metrics()));
+  ABORT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env_->metrics()));
 
   // Register the membership callback if running in a real cluster.
   if (!TestInfo::is_test()) {
@@ -378,7 +375,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
         vector<TTopicDelta>* topic_updates) {
       this->MembershipCallback(state, topic_updates);
     };
-    ABORT_IF_ERROR(exec_env->subscriber()->AddTopic(
+    ABORT_IF_ERROR(exec_env_->subscriber()->AddTopic(
         Statestore::IMPALA_MEMBERSHIP_TOPIC, /* is_transient=*/ true,
         /* populate_min_subscriber_topic_version=*/ false,
         /* filter_prefix=*/"", cb));
@@ -423,7 +420,6 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   is_coordinator_ = FLAGS_is_coordinator;
   is_executor_ = FLAGS_is_executor;
-  exec_env_->SetImpalaServer(this);
 }
 
 Status ImpalaServer::PopulateAuthorizedProxyConfig(
@@ -1066,8 +1062,9 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
   }
   const TUniqueId& query_id = request_state->query_id();
   {
+    DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
     ScopedShardedMapRef<std::shared_ptr<ClientRequestState>> map_ref(query_id,
-        &ExecEnv::GetInstance()->impala_server()->client_request_state_map_);
+        &client_request_state_map_);
     DCHECK(map_ref.get() != nullptr);
 
     auto entry = map_ref->find(query_id);
@@ -1155,8 +1152,9 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
 
   shared_ptr<ClientRequestState> request_state;
   {
+    DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
     ScopedShardedMapRef<std::shared_ptr<ClientRequestState>> map_ref(query_id,
-        &ExecEnv::GetInstance()->impala_server()->client_request_state_map_);
+        &client_request_state_map_);
     DCHECK(map_ref.get() != nullptr);
 
     auto entry = map_ref->find(query_id);
@@ -2217,6 +2215,12 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port,
    int32_t hs2_port) {
   exec_env_->SetImpalaServer(this);
 
+  // We must register the HTTP handlers after registering the ImpalaServer with the
+  // ExecEnv. Otherwise the HTTP handlers will try to resolve the ImpalaServer through the
+  // ExecEnv singleton and will receive a nullptr.
+  http_handler_.reset(new ImpalaHttpHandler(this));
+  http_handler_->RegisterHandlers(exec_env_->webserver());
+
   if (!FLAGS_is_coordinator && !FLAGS_is_executor) {
     return Status("Impala does not have a valid role configured. "
         "Either --is_coordinator or --is_executor must be set to true.");
@@ -2356,8 +2360,9 @@ void ImpalaServer::Join() {
 
 shared_ptr<ClientRequestState> ImpalaServer::GetClientRequestState(
     const TUniqueId& query_id) {
+  DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
   ScopedShardedMapRef<std::shared_ptr<ClientRequestState>> map_ref(query_id,
-      &ExecEnv::GetInstance()->impala_server()->client_request_state_map_);
+      &client_request_state_map_);
   DCHECK(map_ref.get() != nullptr);
 
   auto entry = map_ref->find(query_id);

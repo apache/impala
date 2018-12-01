@@ -86,3 +86,5 @@ class TestQueryConcurrency(CustomClusterTestSuite):
     assert result.startswith("Could not obtain runtime profile")
     client1.close()
     client2.close()
+    q1.join()
+    q2.join()
