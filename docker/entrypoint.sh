@@ -213,6 +213,13 @@ function build_impdev() {
   # and, this is a first build anyway.
   ./buildall.sh -noclean -format -testdata -notests
 
+  # We make one exception to "-notests":
+  # test_insert_parquet.py, which is used in all the end-to-end test
+  # shards, depends on this binary. We build it here once,
+  # instead of building it during the startup of each container running
+  # a subset of E2E tests. Building it here is also a lot faster.
+  make -j$(nproc) --load-average=$(nproc) parquet-reader
+
   # Dump current memory usage to logs, before shutting things down.
   memory_usage
 
@@ -350,11 +357,6 @@ function test_suite() {
   [[ $FE_TEST && $BE_TEST && $EE_TEST && $JDBC_TEST && $CLUSTER_TEST ]]
 
   ret=0
-
-  if [[ ${EE_TEST} = true ]]; then
-    # test_insert_parquet.py depends on this binary
-    make -j$(nproc) --load-average=$(nproc) parquet-reader
-  fi
 
   # Run tests.
   (echo ">>> $1: Starting run-all-test") 2> /dev/null
