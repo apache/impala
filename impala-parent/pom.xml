@@ -49,6 +49,10 @@ under the License.
     <commons-io.version>2.6</commons-io.version>
     <slf4j.version>1.7.25</slf4j.version>
     <junit.version>4.12</junit.version>
+    <jackson-mapper-asl.version>1.8.10-cloudera.1</jackson-mapper-asl.version>
+    <jackson.1.9.version>1.9.13</jackson.1.9.version>
+    <jackson.2.2.version>2.2.3</jackson.2.2.version>
+    <jackson-databind.2.2.version>2.2.3-cloudera.1</jackson-databind.2.2.version>
     <!-- Beware compatibility requirements with Thrift and
          KMS; see IMPALA-4210. -->
     <httpcomponents.core.version>4.2.5</httpcomponents.core.version>
@@ -124,4 +128,33 @@ under the License.
     </pluginRepository>
   </pluginRepositories>
 
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.codehaus.jackson</groupId>
+        <artifactId>jackson-mapper-asl</artifactId>
+        <version>${jackson-mapper-asl.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.jackson</groupId>
+        <artifactId>jackson-core-asl</artifactId>
+        <version>${jackson.1.9.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>${jackson.2.2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson-databind.2.2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${jackson.2.2.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 </project>
