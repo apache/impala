@@ -561,6 +561,7 @@ class TestWithDocker(object):
           # Share timezone between host and container
           "-e", "LOCALTIME_LINK_TARGET=" + localtime_link_target,
           "-v", self.ccache_dir + ":/ccache",
+          "-e", "CCACHE_TEMPDIR=" + "/ccache/" + name,
           "-v", _make_dir_if_not_exist(self.log_dir,
                                        logdir) + ":/logs",
           "-v", base + ":/mnt/base:ro"]
