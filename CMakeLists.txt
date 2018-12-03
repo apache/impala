@@ -112,6 +112,7 @@ set_dep_root(RE2)
 set_dep_root(RAPIDJSON)
 set_dep_root(SNAPPY)
 set_dep_root(THRIFT)
+set(THRIFT11_ROOT $ENV{IMPALA_TOOLCHAIN}/thrift-$ENV{IMPALA_THRIFT11_VERSION})
 set_dep_root(ZLIB)
 set_dep_root(CCTZ)
 
@@ -262,6 +263,12 @@ IMPALA_ADD_THIRDPARTY_LIB(thrift ${THRIFT_INCLUDE_DIR} ${THRIFT_STATIC_LIB} "")
 message(STATUS "Thrift version: ${THRIFT_VERSION}")
 message(STATUS "Thrift contrib dir: ${THRIFT_CONTRIB_DIR}")
 message(STATUS "Thrift compiler: ${THRIFT_COMPILER}")
+
+if (NOT EXISTS ${THRIFT11_ROOT}/bin/thrift)
+  message(FATAL_ERROR "Unable to find Thrift 11 compiler")
+endif(NOT EXISTS ${THRIFT11_ROOT}/bin/thrift)
+
+set(THRIFT11_COMPILER ${THRIFT11_ROOT}/bin/thrift)
 
 # find flatbuffers headers, lib and compiler
 find_package(FlatBuffers REQUIRED)

@@ -16,7 +16,15 @@
 # under the License.
 
 # set the python path for test modules and beeswax
-PYTHONPATH=${IMPALA_HOME}:${IMPALA_HOME}/shell/gen-py:${IMPALA_HOME}/testdata/
+# setting USE_THRIFT11_GEN_PY will add Thrift 11 Python generated code rather than the
+# default Thrift Python code
+PYTHONPATH=${IMPALA_HOME}
+if [ -n "${USE_THRIFT11_GEN_PY:-}" ]; then
+  PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell/build/thrift-11-gen/gen-py
+else
+  PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell/gen-py
+fi
+PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/testdata/
 
 # There should be just a single version of python that created the
 # site-packages directory. We find it by performing shell independent expansion

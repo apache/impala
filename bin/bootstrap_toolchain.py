@@ -466,6 +466,7 @@ if __name__ == "__main__":
       "libunwind", "lz4", "openldap", "openssl", "orc", "protobuf",
       "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib"])
   packages.insert(0, Package("llvm", "5.0.1-asserts-p1"))
+  packages.insert(0, Package("thrift", os.environ.get("IMPALA_THRIFT11_VERSION")))
   bootstrap(toolchain_root, packages)
 
   # Download the CDH components if necessary.
