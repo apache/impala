@@ -148,3 +148,20 @@ class TestRPCTimeout(CustomClusterTestSuite):
   def test_reportexecstatus_profile_fail(self):
     query_options = {'debug_action': 'REPORT_EXEC_STATUS_PROFILE:FAIL@0.8'}
     self.execute_query_verify_metrics(self.TEST_QUERY, query_options, 10)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--backend_client_rpc_timeout_ms=100"
+      " --status_report_interval_ms=1000 --status_report_max_retries=100000")
+  def test_reportexecstatus_retries(self, unique_database):
+    tbl = "%s.kudu_test" % unique_database
+    self.execute_query("create table %s (a int primary key) stored as kudu" % tbl)
+    # Since the sleep time (1000ms) is much longer than the rpc timeout (100ms), all
+    # reports will appear to fail. The query is designed to result in many intermediate
+    # status reports but fewer than the max allowed failures, so the query should succeed.
+    query_options = {'debug_action': 'REPORT_EXEC_STATUS_DELAY:SLEEP@1000'}
+    result = self.execute_query(
+        "insert into %s select 0 from tpch.lineitem limit 100000" % tbl, query_options)
+    assert result.success, str(result)
+    # Ensure that the error log was tracked correctly - all but the first row inserted
+    # should result in a 'key already present' insert error.
+    assert "(1 of 99999 similar)" in result.log, str(result)

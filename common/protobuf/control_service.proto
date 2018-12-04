@@ -109,6 +109,21 @@ enum FInstanceExecStatePB {
   FINISHED = 8;
 }
 
+// Represents any part of the status report that isn't idempotent. If the executor thinks
+// the report failed, we'll retransmit these parts, and this allows us to keep them
+// associated with their original sequence number so that if the coordinator actually did
+// receive the original report it won't reapply them.
+message StatefulStatusPB {
+  // Sequence number prevents out-of-order or duplicated updates from being applied.
+  // 'report_seq_no' will be <= the 'report_seq_no' in the FragmentInstanceExecStatusPB
+  // that contains this StatefulStatusPB.
+  optional int64 report_seq_no = 1;
+
+  // Map of TErrorCode to ErrorLogEntryPB; New errors that have not been reported to
+  // the coordinator by this fragment instance. Not idempotent.
+  map<int32, ErrorLogEntryPB> error_log = 2;
+}
+
 message FragmentInstanceExecStatusPB {
   // Sequence number prevents out-of-order or duplicated updates from being applied.
   optional int64 report_seq_no = 1;
@@ -126,9 +141,9 @@ message FragmentInstanceExecStatusPB {
   // instance. This is sent only when 'done' above is true. Not idempotent.
   optional DmlExecStatusPB dml_exec_status = 5;
 
-  // Map of TErrorCode to ErrorLogEntryPB; New errors that have not been reported to
-  // the coordinator by this fragment instance. Not idempotent.
-  map<int32, ErrorLogEntryPB> error_log = 6;
+  // The non-idempotent parts of the report, and any prior reports that are not known to
+  // have been received by the coordinator.
+  repeated StatefulStatusPB stateful_report = 6;
 }
 
 message ReportExecStatusRequestPB {

@@ -96,6 +96,13 @@ class FragmentInstanceState {
   void GetStatusReport(FragmentInstanceExecStatusPB* instance_status,
       TRuntimeProfileTree* thrift_profile);
 
+  /// After each call to GetStatusReport(), the query state thread should call one of the
+  /// following to indicate if the report rpc was successful. Note that in the case of
+  /// ReportFailed(), the report may have been received by the coordinator even though the
+  /// rpc appeared to fail.
+  void ReportSuccessful(const FragmentInstanceExecStatusPB& instance_status);
+  void ReportFailed(const FragmentInstanceExecStatusPB& instance_status);
+
   /// Returns fragment instance's sink if this is the root fragment instance. Valid after
   /// the Prepare phase. May be nullptr.
   PlanRootSink* root_sink() { return root_sink_; }
@@ -158,6 +165,14 @@ class FragmentInstanceState {
   /// state thread only. Written in GetStatusReport() by the query state thread.
   bool final_report_sent_ = false;
 
+  /// The non-idempotent parts of any reports that were generated but may not have been
+  /// received by the coordinator.
+  std::vector<StatefulStatusPB> prev_stateful_reports_;
+
+  /// True if a report has been generated where 'done' is true, after which the sequence
+  /// number should not be bumped for future reports.
+  bool final_report_generated_ = false;
+
   /// Profile for timings for each stage of the plan fragment instance's lifecycle.
   /// Lives in obj_pool().
   RuntimeProfile* timings_profile_ = nullptr;
@@ -212,7 +227,10 @@ class FragmentInstanceState {
 
   /// Returns the monotonically increasing sequence number.
   /// Called by query state thread only.
-  int64_t AdvanceReportSeqNo() { return ++report_seq_no_; }
+  int64_t AdvanceReportSeqNo() {
+    DCHECK(!final_report_generated_);
+    return ++report_seq_no_;
+  }
 
   /// A counter for the per query, per host peak mem usage. Note that this is not the
   /// max of the peak memory of all fragments running on a host since it needs to take

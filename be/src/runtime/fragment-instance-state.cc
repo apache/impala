@@ -255,7 +255,13 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
   if (per_host_mem_usage_ != nullptr) {
     per_host_mem_usage_->Set(runtime_state()->query_mem_tracker()->peak_consumption());
   }
-  instance_status->set_report_seq_no(AdvanceReportSeqNo());
+  if (final_report_generated_) {
+    // Since execution was already finished, the contents of this report will be identical
+    // to the last report, so don't advance the sequence number.
+    instance_status->set_report_seq_no(report_seq_no_);
+  } else {
+    instance_status->set_report_seq_no(AdvanceReportSeqNo());
+  }
   const TUniqueId& finstance_id = instance_id();
   TUniqueIdToUniqueIdPB(finstance_id, instance_status->mutable_fragment_instance_id());
   const bool done = IsDone();
@@ -267,10 +273,41 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
   if (done) {
     runtime_state()->dml_exec_state()->ToProto(
         instance_status->mutable_dml_exec_status());
-    final_report_sent_ = true;
+    final_report_generated_ = true;
   }
-  // Send new errors to coordinator.
-  runtime_state()->GetUnreportedErrors(instance_status->mutable_error_log());
+  if (prev_stateful_reports_.size() > 0) {
+    // Send errors from previous reports that failed.
+    *instance_status->mutable_stateful_report() =
+        {prev_stateful_reports_.begin(), prev_stateful_reports_.end()};
+  }
+  if (runtime_state()->HasErrors()) {
+    // Add any new errors.
+    StatefulStatusPB* stateful_report = instance_status->add_stateful_report();
+    stateful_report->set_report_seq_no(report_seq_no_);
+    runtime_state()->GetUnreportedErrors(stateful_report->mutable_error_log());
+  }
+}
+
+void FragmentInstanceState::ReportSuccessful(
+    const FragmentInstanceExecStatusPB& instance_exec_status) {
+  prev_stateful_reports_.clear();
+  if (instance_exec_status.done()) final_report_sent_ = true;
+}
+
+void FragmentInstanceState::ReportFailed(
+    const FragmentInstanceExecStatusPB& instance_exec_status) {
+  int num_reports = instance_exec_status.stateful_report_size();
+  if (num_reports > 0 && prev_stateful_reports_.size() != num_reports) {
+    // If a stateful report was generated in GetStatusReport(), copy it to
+    // 'prev_stateful_reports_'. It will be the last one in the list and will have a seq
+    // no that matches the overall report's seq no. There can be at most 1 new stateful
+    // report that has been generated since the last call to ReportSuccessful()/Failed().
+    DCHECK_EQ(prev_stateful_reports_.size() + 1, num_reports);
+    const StatefulStatusPB& stateful_report =
+        instance_exec_status.stateful_report()[num_reports - 1];
+    DCHECK_EQ(stateful_report.report_seq_no(), instance_exec_status.report_seq_no());
+    prev_stateful_reports_.emplace_back(stateful_report);
+  }
 }
 
 Status FragmentInstanceState::Open() {

@@ -319,10 +319,11 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     int instance_idx = GetInstanceIdx(instance_exec_status.fragment_instance_id());
     DCHECK_EQ(instance_stats_map_.count(instance_idx), 1);
     InstanceStats* instance_stats = instance_stats_map_[instance_idx];
+    int64_t last_report_seq_no = instance_stats->last_report_seq_no_;
     DCHECK(instance_stats->exec_params_.instance_id ==
         ProtoToQueryId(instance_exec_status.fragment_instance_id()));
     // Ignore duplicate or out-of-order messages.
-    if (report_seq_no <= instance_stats->last_report_seq_no_) {
+    if (report_seq_no <= last_report_seq_no) {
       VLOG_QUERY << Substitute("Ignoring stale update for query instance $0 with "
           "seq no $1", PrintId(instance_stats->exec_params_.instance_id), report_seq_no);
       continue;
@@ -340,13 +341,19 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       dml_exec_state->Update(instance_exec_status.dml_exec_status());
     }
 
-    // Log messages aggregated by type
-    if (instance_exec_status.error_log_size() > 0) {
-      // Append the log messages from each update with the global state of the query
-      // execution
-      MergeErrorMaps(instance_exec_status.error_log(), &error_log_);
-      VLOG_FILE << "host=" << TNetworkAddressToString(host_) << " error log: " <<
-          PrintErrorMapToString(error_log_);
+    // Handle the non-idempotent parts of the report for any sequence numbers that we
+    // haven't seen yet.
+    if (instance_exec_status.stateful_report_size() > 0) {
+      for (const auto& stateful_report : instance_exec_status.stateful_report()) {
+        DCHECK_LE(stateful_report.report_seq_no(), report_seq_no);
+        if (last_report_seq_no < stateful_report.report_seq_no()) {
+          // Append the log messages from each update with the global state of the query
+          // execution
+          MergeErrorMaps(stateful_report.error_log(), &error_log_);
+          VLOG_FILE << "host=" << TNetworkAddressToString(host_)
+                    << " error log: " << PrintErrorMapToString(error_log_);
+        }
+      }
     }
 
     DCHECK_GT(num_remaining_instances_, 0);

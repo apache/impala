@@ -387,6 +387,9 @@ class QueryState {
   /// Tracks host resource usage of this backend. Owned by 'obj_pool_', created in c'tor.
   RuntimeProfile* const host_profile_;
 
+  /// The number of failed intermediate reports since the last successfully sent report.
+  int64_t num_failed_reports_ = 0;
+
   /// Create QueryState w/ a refcnt of 0 and a memory limit of 'mem_limit' bytes applied
   /// to the query mem tracker. The query is associated with the resource pool set in
   /// 'query_ctx.request_pool' or from 'request_pool', if the former is not set (needed
@@ -413,8 +416,15 @@ class QueryState {
       TRuntimeProfileForest* profiles_forest);
 
   /// Gather statues and profiles of all fragment instances belonging to this query state
-  /// and send it to the coordinator via ReportExecStatus() RPC.
-  void ReportExecStatus();
+  /// and send it to the coordinator via ReportExecStatus() RPC. Returns true if the
+  /// report rpc was successful or if it was unsuccessful and we've reached the maximum
+  /// number of allowed failures and cancelled.
+  bool ReportExecStatus();
+
+  /// Returns the amount of time in ms to wait before sending the next status report,
+  /// calculated as a function of the status report interval with backoff based on the
+  /// number of consecutive failed reports.
+  int64_t GetReportWaitTimeMs() const;
 
   /// Returns true if the overall backend status is already set with an error.
   bool HasErrorStatus() const {

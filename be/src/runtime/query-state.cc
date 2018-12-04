@@ -54,11 +54,13 @@ using kudu::rpc::RpcSidecar;
 
 #include "common/names.h"
 
-DEFINE_int32(status_report_interval_ms, 5000,
-    "interval between profile reports; in milliseconds");
-DEFINE_int32(report_status_retry_interval_ms, 100,
-    "The interval in milliseconds to wait before retrying a failed status report RPC to "
-    "the coordinator.");
+static const int DEFAULT_REPORT_WAIT_TIME_MS = 5000;
+
+DEFINE_int32(status_report_interval_ms, DEFAULT_REPORT_WAIT_TIME_MS,
+    "Interval between profile reports in milliseconds. If set to <= 0, periodic "
+    "reporting is disabled.");
+DEFINE_int32(status_report_max_retries, 3,
+    "Max number of times to retry sending the status report before cancelling");
 DECLARE_int32(backend_client_rpc_timeout_ms);
 DECLARE_int64(rpc_max_message_size);
 
@@ -268,7 +270,7 @@ void QueryState::UpdateBackendExecState() {
   // Send one last report if the query has reached the terminal state.
   if (IsTerminalState()) {
     VLOG_QUERY << "UpdateBackendExecState(): last report for " << PrintId(query_id());
-    ReportExecStatus();
+    while (!ReportExecStatus()) SleepForMs(GetReportWaitTimeMs());
   }
 }
 
@@ -317,7 +319,7 @@ void QueryState::ConstructReport(bool instances_started,
   }
 }
 
-void QueryState::ReportExecStatus() {
+bool QueryState::ReportExecStatus() {
 #ifndef NDEBUG
   if (FLAGS_stress_status_report_delay_ms) {
     LOG(INFO) << "Sleeping " << FLAGS_stress_status_report_delay_ms << "ms before "
@@ -353,52 +355,64 @@ void QueryState::ReportExecStatus() {
         serialize_status.ok() ? "OK" : serialize_status.GetDetail(), profile_len);
   }
 
-  // Try to send the RPC 3 times before failing. Sleep for 100ms between retries.
-  // It's safe to retry the RPC as the coordinator handles duplicate RPC messages.
   Status rpc_status;
   Status result_status;
-  for (int i = 0; i < 3; ++i) {
-    RpcController rpc_controller;
+  RpcController rpc_controller;
 
-    // The profile is a thrift structure serialized to a string and sent as a sidecar.
-    // We keep the runtime profile as Thrift object as Impala client still communicates
-    // with Impala server with Thrift RPC.
-    //
-    // Note that the sidecar is created with faststring so the ownership of the Thrift
-    // profile buffer is transferred to RPC layer and it is freed after the RPC payload
-    // is sent. If serialization of the profile to RPC sidecar fails, we will proceed
-    // without the profile so that the coordinator can still get the status instead of
-    // hitting IMPALA-2990.
-    if (profile_buf != nullptr) {
-      unique_ptr<kudu::faststring> sidecar_buf = make_unique<kudu::faststring>();
-      sidecar_buf->assign_copy(profile_buf, profile_len);
-      unique_ptr<RpcSidecar> sidecar = RpcSidecar::FromFaststring(move(sidecar_buf));
+  // The profile is a thrift structure serialized to a string and sent as a sidecar.
+  // We keep the runtime profile as Thrift object as Impala client still communicates
+  // with Impala server with Thrift RPC.
+  //
+  // Note that the sidecar is created with faststring so the ownership of the Thrift
+  // profile buffer is transferred to RPC layer and it is freed after the RPC payload
+  // is sent. If serialization of the profile to RPC sidecar fails, we will proceed
+  // without the profile so that the coordinator can still get the status instead of
+  // hitting IMPALA-2990.
+  if (profile_buf != nullptr) {
+    unique_ptr<kudu::faststring> sidecar_buf = make_unique<kudu::faststring>();
+    sidecar_buf->assign_copy(profile_buf, profile_len);
+    unique_ptr<RpcSidecar> sidecar = RpcSidecar::FromFaststring(move(sidecar_buf));
 
-      int sidecar_idx;
-      kudu::Status sidecar_status =
-          rpc_controller.AddOutboundSidecar(move(sidecar), &sidecar_idx);
-      if (LIKELY(sidecar_status.ok())) {
-        report.set_thrift_profiles_sidecar_idx(sidecar_idx);
-      } else {
-        LOG(DFATAL) <<
-            FromKuduStatus(sidecar_status, "Failed to add sidecar").GetDetail();
-      }
+    int sidecar_idx;
+    kudu::Status sidecar_status =
+        rpc_controller.AddOutboundSidecar(move(sidecar), &sidecar_idx);
+    if (LIKELY(sidecar_status.ok())) {
+      report.set_thrift_profiles_sidecar_idx(sidecar_idx);
+    } else {
+      LOG(DFATAL) << FromKuduStatus(sidecar_status, "Failed to add sidecar").GetDetail();
     }
-
-    rpc_controller.set_timeout(
-        MonoDelta::FromMilliseconds(FLAGS_backend_client_rpc_timeout_ms));
-    ReportExecStatusResponsePB resp;
-    rpc_status = FromKuduStatus(proxy_->ReportExecStatus(report, &resp, &rpc_controller),
-        "ReportExecStatus() RPC failed");
-    result_status = Status(resp.status());
-    if (rpc_status.ok()) break;
-    //TODO: Consider exponential backoff.
-    if (i < 2) SleepForMs(FLAGS_report_status_retry_interval_ms);
-    LOG(WARNING) <<
-        Substitute("Retrying ReportExecStatus() RPC for query $0", PrintId(query_id()));
   }
 
-  if ((!rpc_status.ok() || !result_status.ok()) && instances_started) {
+  rpc_controller.set_timeout(
+      MonoDelta::FromMilliseconds(FLAGS_backend_client_rpc_timeout_ms));
+  ReportExecStatusResponsePB resp;
+  rpc_status = FromKuduStatus(proxy_->ReportExecStatus(report, &resp, &rpc_controller),
+      "ReportExecStatus() RPC failed");
+  result_status = Status(resp.status());
+  if (rpc_status.ok()) {
+    num_failed_reports_ = 0;
+  } else {
+    ++num_failed_reports_;
+    LOG(WARNING) << Substitute("Failed to send ReportExecStatus() RPC for query $0. "
+                               "Consecutive failed reports = $1",
+        PrintId(query_id()), num_failed_reports_);
+  }
+
+  // Notify the fragment instances of the report's status.
+  for (const FragmentInstanceExecStatusPB& instance_exec_status :
+      report.instance_exec_status()) {
+    const TUniqueId& id = ProtoToQueryId(instance_exec_status.fragment_instance_id());
+    FragmentInstanceState* fis = fis_map_[id];
+    if (rpc_status.ok()) {
+      fis->ReportSuccessful(instance_exec_status);
+    } else {
+      fis->ReportFailed(instance_exec_status);
+    }
+  }
+
+  if (((!rpc_status.ok() && num_failed_reports_ >= FLAGS_status_report_max_retries)
+          || !result_status.ok())
+      && instances_started) {
     // TODO: should we try to keep rpc_status for the final report? (but the final
     // report, following this Cancel(), may not succeed anyway.)
     // TODO: not keeping an error status here means that all instances might
@@ -418,7 +432,15 @@ void QueryState::ReportExecStatus() {
                 << "Returned status: " << result_status.GetDetail();
     }
     Cancel();
+    return true;
   }
+
+  return rpc_status.ok();
+}
+
+int64_t QueryState::GetReportWaitTimeMs() const {
+  return (FLAGS_status_report_interval_ms > 0 ? FLAGS_status_report_interval_ms :
+      DEFAULT_REPORT_WAIT_TIME_MS) * (num_failed_reports_ + 1);
 }
 
 void QueryState::ErrorDuringPrepare(const Status& status, const TUniqueId& finst_id) {
@@ -564,7 +586,7 @@ void QueryState::MonitorFInstances() {
   DCHECK(backend_exec_state_ == BackendExecState::EXECUTING)
       << BackendExecStateToString(backend_exec_state_);
   if (FLAGS_status_report_interval_ms > 0) {
-    while (!WaitForFinishOrTimeout(FLAGS_status_report_interval_ms)) {
+    while (!WaitForFinishOrTimeout(GetReportWaitTimeMs())) {
       ReportExecStatus();
     }
   } else {
