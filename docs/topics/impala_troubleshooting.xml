@@ -93,6 +93,32 @@ under the License.
       </ul>
     </conbody>
   </concept>
+  <concept id="IMPALA-5605">
+    <title>Troubleshooting Crashes Caused by Memory Resource Limit</title>
+    <conbody>
+      <p>Under very high concurrency, Impala could encounter a serious error due
+        to usage of various operating system resources. Errors similar to the
+        following may be caused by operating system resource exhaustion:</p>
+      <codeblock>F0629 08:20:02.956413 29088 llvm-codegen.cc:111] LLVM hit fatal error: Unable to allocate section memory!
+terminate called after throwing an instance of 'boost::exception_detail::clone_impl&lt;boost::exception_detail::error_info_injector&lt;boost::thread_resource_error> >'</codeblock>
+      <p>The KRPC implementation in Impala 2.12 / 3.0 greatly reduces thread
+        counts and the chances of hitting a resource limit.</p>
+      <p>If you still get an error similar to the above in Impala 3.0 and
+        higher, try increasing the <codeph>max_map_count</codeph> OS virtual
+        memory parameter. <codeph>max_map_count</codeph> defines the maximum
+        number of memory map areas that a process can use. Configure each host
+        running an <codeph>impalad</codeph> daemon with the command to increase
+          <codeph>max_map_count</codeph> to 8 GB.</p>
+      <codeblock outputclass="cdoc-input">echo 8000000 > /proc/sys/vm/max_map_count</codeblock>
+      <p>To make the above settings durable, refer to your OS documentation. For
+        example, on RHEL 6.x:<ol>
+          <li>Add the following line to
+            <codeph>/etc/sysctl.conf</codeph>:<codeblock>vm.max_map_count=8000000</codeblock></li>
+          <li>Run the following
+            command:<codeblock outputclass="cdoc-input">sysctl -p</codeblock></li>
+        </ol></p>
+    </conbody>
+  </concept>
 
   <concept id="trouble_io" rev="">
     <title>Troubleshooting I/O Capacity Problems</title>
@@ -439,16 +465,6 @@ hadoop jar $HADOOP_INSTALL/hadoop-*-test.jar TestDFSIO -clean
 ]]>
 </codeblock>
 
-    </conbody>
-  </concept>
-
-  <concept id="webui_snippet" audience="PDF">
-    <title conref="impala_webui.xml#webui/webui_title"/>
-    <conbody>
-      <p conref="impala_webui.xml#webui/webui_intro"/>
-      <p>
-        For full details, see <xref href="impala_webui.xml#webui"/>.
-      </p>
     </conbody>
   </concept>
 
