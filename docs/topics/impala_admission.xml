@@ -143,20 +143,31 @@ under the License.
       <dl>
         <dlentry>
           <dt>Max Memory</dt>
-          <dd>The maximum amount of aggregate memory available across the
-            cluster to all queries executing in this pool. This should be a
-            portion of the aggregate configured memory for Impala daemons, which
-            will be shown in the settings dialog next to this option for
-            convenience. Setting this to a non-zero value enables memory based
-            admission control.<p>Impala determines the expected maximum memory
-              used by all queries in the pool and holds back any further queries
-              that would result in Max Memory being exceeded. </p><p>You set Max
-              Memory in <codeph>fair-scheduler.xml</codeph> file with the
-                <codeph>maxResources</codeph> tag. For example:
-                <codeph>&lt;maxResources>2500
-              mb&lt;/maxResources></codeph></p><p>If you specify Max Memory, you
-              should specify the amount of memory to allocate to each query in
-              this pool. You can do this in two ways:</p><ul>
+          <dd>
+            <p>
+              The maximum amount of aggregate memory available across the
+              cluster to all queries executing in this pool. This should be a
+              portion of the aggregate configured memory for Impala daemons,
+              which will be shown in the settings dialog next to this option for
+              convenience. Setting this to a non-zero value enables memory based
+              admission control.
+            </p>
+            <p>
+              Impala determines the expected maximum memory used by all
+              queries in the pool and holds back any further queries that would
+              result in Max Memory being exceeded.
+            </p>
+            <p>
+              You set Max Memory in <codeph>fair-scheduler.xml</codeph> file
+              with the <codeph>maxResources</codeph> tag. For example:
+                <codeph>&lt;maxResources>2500 mb&lt;/maxResources></codeph>
+            </p>
+            <p>
+              If you specify Max Memory, you should specify the amount of
+              memory to allocate to each query in this pool. You can do this in
+              two ways:
+            </p>
+            <ul>
               <li>By setting Maximum Query Memory Limit and Minimum Query Memory
                 Limit. This is preferred in <keyword keyref="impala31_full"/>
                 and greater and gives Impala flexibility to set aside more
@@ -164,28 +175,43 @@ under the License.
               <li>By setting Default Query Memory Limit to the exact amount of
                 memory that Impala should set aside for queries in that
                 pool.</li>
-            </ul><p>Note that if you do not set any of the above options, or set
-              Default Query Memory Limit to 0, Impala will rely entirely on
+            </ul>
+            <p>
+              Note that in the following cases, Impala will rely entirely on
               memory estimates to determine how much memory to set aside for
               each query. This is not recommended because it can result in
               queries not running or being starved for memory if the estimates
-              are inaccurate.</p></dd>
+              are inaccurate. And it can affect other queries running on the
+              same node.
+              <ul>
+                <li>Max Memory, Maximum Query Memory Limit, and Minimum Query
+                  Memory Limit are not set, and the <codeph>MEM_LIMIT</codeph>
+                  query option is not set for the query.</li>
+                <li>Default Query Memory Limit is set to 0, and the
+                    <codeph>MEM_LIMIT</codeph> query option is not set for the
+                  query.</li>
+              </ul>
+            </p>
+          </dd>
         </dlentry>
         <dlentry>
           <dt>Minimum Query Memory Limit and Maximum Query Memory Limit</dt>
-          <dd>These two options determine the minimum and maximum per-host
-            memory limit that will be chosen by Impala Admission control for
-            queries in this resource pool. If set, Impala Admission Control will
-            choose a memory limit between the minimum and maximum values based
-            on the per-host memory estimate for the query. The memory limit
-            chosen determines the amount of memory that Impala Admission control
-            will set aside for this query on each host that the query is running
-            on. The aggregate memory across all of the hosts that the query is
-            running on is counted against the pool’s Max Memory.<p>Minimum Query
-              Memory Limit must be less than or equal to Maximum Query Memory
-              Limit and Max Memory.</p><p>You set the settings in
-                <codeph>llama-site.xml</codeph>. For
-              example:</p><codeblock>
+          <dd>
+            <p>These two options determine the minimum and maximum per-host
+              memory limit that will be chosen by Impala Admission control for
+              queries in this resource pool. If set, Impala Admission Control
+              will choose a memory limit between the minimum and maximum values
+              based on the per-host memory estimate for the query. The memory
+              limit chosen determines the amount of memory that Impala Admission
+              control will set aside for this query on each host that the query
+              is running on. The aggregate memory across all of the hosts that
+              the query is running on is counted against the pool’s Max
+              Memory.</p>
+            <p>Minimum Query Memory Limit must be less than or equal to Maximum
+              Query Memory Limit and Max Memory.</p>
+            <p>You set the settings in <codeph>llama-site.xml</codeph>. For
+              example:</p>
+            <codeblock>
 &lt;property>
     &lt;name>impala.admission-control.<b>max-query-mem-limit</b>.root.default.regularPool&lt;/name>
     &lt;value>1610612736&lt;/value>&lt;!--1.5GB-->
@@ -193,15 +219,31 @@ under the License.
   &lt;property>
     &lt;name>impala.admission-control.<b>min-query-mem-limit</b>.root.default.regularPool&lt;/name>
     &lt;value>52428800&lt;/value>&lt;!--50MB-->
-  &lt;/property></codeblock><p>A
-              user can override Impala’s choice of memory limit by setting the
-                <codeph>MEM_LIMIT</codeph> query option. If the Clamp MEM_LIMIT
-              Query Option setting is set to <codeph>TRUE</codeph> and the user
-              sets <codeph>MEM_LIMIT</codeph> to a value that is outside of the
-              range specified by these two options, then the effective memory
-              limit will be either the minimum or maximum, depending on whether
-                <codeph>MEM_LIMIT</codeph> is lower than or higher the
-              range.</p></dd>
+  &lt;/property></codeblock>
+            <p>A user can override Impala’s choice of memory limit by setting
+              the <codeph>MEM_LIMIT</codeph> query option. If the Clamp
+              MEM_LIMIT Query Option setting is set to <codeph>TRUE</codeph> and
+              the user sets <codeph>MEM_LIMIT</codeph> to a value that is
+              outside of the range specified by these two options, then the
+              effective memory limit will be either the minimum or maximum,
+              depending on whether <codeph>MEM_LIMIT</codeph> is lower than or
+              higher the range.</p>
+            <p>For example, assume a resource pool with the following parameters
+              set: <ul>
+                <li>Minimum Query Memory Limit = 2GB</li>
+                <li>Maximum Query Memory Limit = 10GB</li>
+              </ul>If a user tries to submit a query with the
+                <codeph>MEM_LIMIT</codeph> query option set to 14 GB, the
+              following would happen:<ul>
+                <li>If Clamp MEM_LIMIT Query Option = true, admission controller
+                  would override <codeph>MEM_LIMIT</codeph> with 10 GB and
+                  attempt admission using that value.</li>
+                <li>If Clamp MEM_LIMIT Query Option = false, the admission
+                  controller will retain the <codeph>MEM_LIMIT</codeph> of 14 GB
+                  set by the user and will attempt admission using the
+                  value.</li>
+              </ul></p>
+          </dd>
         </dlentry>
         <dlentry>
           <dt>Default Query Memory Limit</dt>
@@ -213,8 +255,8 @@ under the License.
             hosts that the query is running on is counted against the pool’s Max
             Memory. This option is deprecated in <keyword keyref="impala31_full"
             /> and higher and is replaced by Maximum Query Memory Limit and
-            Minimum Query Memory Limit. Do not set this field if either Maximum
-            Query Memory Limit or Minimum Query Memory Limit is set.</dd>
+            Minimum Query Memory Limit. Do not set this if either Maximum Query
+            Memory Limit or Minimum Query Memory Limit is set.</dd>
         </dlentry>
       </dl>
       <p
