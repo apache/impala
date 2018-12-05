@@ -24,15 +24,16 @@
 
 #include "gen-cpp/StatestoreService_types.h"
 #include "gen-cpp/Types_types.h"
+#include "scheduling/hash-ring.h"
 #include "util/network-util.h"
 
 namespace impala {
 
-/// Configuration class to store a list of backends per IP address and a mapping from
-/// hostnames to IP addresses.
+/// Configuration class to store a list of backends per IP address, a mapping from
+/// hostnames to IP addresses, and a hash ring containing all backends.
 class BackendConfig {
  public:
-  BackendConfig() {}
+  BackendConfig();
 
   /// Construct from list of backends.
   BackendConfig(const std::vector<TNetworkAddress>& backends);
@@ -62,6 +63,8 @@ class BackendConfig {
   /// be retained beyond the lifetime of this BackendConfig.
   const TBackendDescriptor* LookUpBackendDesc(const TNetworkAddress& host) const;
 
+  const HashRing* GetHashRing() const { return &backend_ip_hash_ring_; }
+
   int NumBackends() const { return backend_map_.size(); }
 
  private:
@@ -74,6 +77,10 @@ class BackendConfig {
   /// backend_map_ changes.
   typedef boost::unordered_map<Hostname, IpAddr> BackendIpAddressMap;
   BackendIpAddressMap backend_ip_map_;
+
+  /// All backends are kept in a hash ring to allow a consistent mapping from filenames
+  /// to backends.
+  HashRing backend_ip_hash_ring_;
 };
 
 }  // end ns impala

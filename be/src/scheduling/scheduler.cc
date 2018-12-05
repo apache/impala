@@ -32,9 +32,12 @@
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/Types_types.h"
 #include "runtime/exec-env.h"
+#include "scheduling/hash-ring.h"
 #include "statestore/statestore-subscriber.h"
+#include "thirdparty/pcg-cpp-0.98/include/pcg_random.hpp"
 #include "util/container-util.h"
 #include "util/flat_buffer.h"
+#include "util/hash-util.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/runtime-profile-counters.h"
@@ -674,7 +677,7 @@ Status Scheduler::ComputeScanRangeAssignment(const BackendConfig& executor_confi
       // Remote reads will always break ties by executor rank.
       bool decide_local_assignment_by_rank = random_replica || cached_replica;
       const IpAddr* executor_ip = nullptr;
-      executor_ip = assignment_ctx.SelectLocalExecutor(
+      executor_ip = assignment_ctx.SelectExecutorFromCandidates(
           executor_candidates, decide_local_assignment_by_rank);
       TBackendDescriptor executor;
       assignment_ctx.SelectExecutorOnHost(*executor_ip, &executor);
@@ -684,9 +687,31 @@ Status Scheduler::ComputeScanRangeAssignment(const BackendConfig& executor_confi
   } // End of for loop over scan ranges.
 
   // Assign remote scans to executors.
+  int num_remote_executor_candidates = query_options.num_remote_executor_candidates;
   for (const TScanRangeLocationList* scan_range_locations : remote_scan_range_locations) {
     DCHECK(!exec_at_coord);
-    const IpAddr* executor_ip = assignment_ctx.SelectRemoteExecutor();
+    const IpAddr* executor_ip;
+    vector<IpAddr> remote_executor_candidates;
+    // Limit the number of remote executor candidates:
+    // 1. When enabled by setting 'num_remote_executor_candidates' > 0
+    // AND
+    // 2. This is an HDFS file split
+    // AND
+    // 3. The number of remote executor candidates is less than the number of backends.
+    // Otherwise, fall back to the normal method of selecting executors for remote
+    // ranges, which allows for execution on any backend.
+    if (scan_range_locations->scan_range.__isset.hdfs_file_split &&
+        num_remote_executor_candidates > 0 &&
+        num_remote_executor_candidates < executor_config.NumBackends()) {
+      assignment_ctx.GetRemoteExecutorCandidates(
+          &scan_range_locations->scan_range.hdfs_file_split,
+          num_remote_executor_candidates, &remote_executor_candidates);
+      // Like the local case, schedule_random_replica determines how to break ties.
+      executor_ip = assignment_ctx.SelectExecutorFromCandidates(
+          remote_executor_candidates, random_replica);
+    } else {
+      executor_ip = assignment_ctx.SelectRemoteExecutor();
+    }
     TBackendDescriptor executor;
     assignment_ctx.SelectExecutorOnHost(*executor_ip, &executor);
     assignment_ctx.RecordScanRangeAssignment(
@@ -842,7 +867,7 @@ Scheduler::AssignmentCtx::AssignmentCtx(const BackendConfig& executor_config,
   for (const IpAddr& ip : random_executor_order_) random_executor_rank_[ip] = i++;
 }
 
-const IpAddr* Scheduler::AssignmentCtx::SelectLocalExecutor(
+const IpAddr* Scheduler::AssignmentCtx::SelectExecutorFromCandidates(
     const std::vector<IpAddr>& data_locations, bool break_ties_by_rank) {
   DCHECK(!data_locations.empty());
   // List of candidate indexes into 'data_locations'.
@@ -872,6 +897,40 @@ const IpAddr* Scheduler::AssignmentCtx::SelectLocalExecutor(
         });
   }
   return &data_locations[*min_rank_idx];
+}
+
+void Scheduler::AssignmentCtx::GetRemoteExecutorCandidates(
+    const THdfsFileSplit* hdfs_file_split, int num_candidates,
+    vector<IpAddr>* remote_executor_candidates) {
+  // This should be given an empty vector
+  DCHECK_EQ(remote_executor_candidates->size(), 0);
+  // This function should not be used when 'num_candidates' exceeds the number
+  // of executors.
+  DCHECK_LT(num_candidates, executors_config_.NumBackends());
+  // Two different hashes of the filename can result in the same executor.
+  // The function should return distinct executors, so it may need to do more hashes
+  // than 'num_candidates'.
+  set<IpAddr> distinct_backends;
+  // Generate multiple hashes of the file split by using the hash as a seed to a PRNG.
+  // Note: This hashes both the filename and the offset to allow very large files
+  // to be spread across more executors.
+  uint32_t hash = HashUtil::Hash(hdfs_file_split->file_name.data(),
+      hdfs_file_split->file_name.length(), 0);
+  hash = HashUtil::Hash(&hdfs_file_split->offset, sizeof(hdfs_file_split->offset), hash);
+  pcg32 prng(hash);
+  // To avoid any problem scenarios, limit the total number of iterations
+  int max_iterations = num_candidates * 3;
+  for (int i = 0; i < max_iterations; ++i) {
+    // Look up nearest IpAddr
+    const IpAddr* executor_addr = executors_config_.GetHashRing()->GetNode(prng());
+    DCHECK(executor_addr != nullptr);
+    distinct_backends.insert(*executor_addr);
+    // Short-circuit if we reach the appropriate number of replicas
+    if (distinct_backends.size() == num_candidates) break;
+  }
+  for (const IpAddr& addr : distinct_backends) {
+    remote_executor_candidates->push_back(addr);
+  }
 }
 
 const IpAddr* Scheduler::AssignmentCtx::SelectRemoteExecutor() {

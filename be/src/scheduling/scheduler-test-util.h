@@ -116,6 +116,10 @@ class Cluster {
   /// Convert a host index to a hostname.
   static Hostname HostIdxToHostname(int host_idx);
 
+  /// Convert a host index to an IP address. The host index must be smaller than 2^24 and
+  /// will specify the lower 24 bits of the IPv4 address (the lower 3 octets).
+  static IpAddr HostIdxToIpAddr(int host_idx);
+
   /// Return the backend address (ip, port) for the host with index 'host_idx'.
   void GetBackendAddress(int host_idx, TNetworkAddress* addr) const;
 
@@ -160,10 +164,6 @@ class Cluster {
 
   /// Map from IP addresses to host indexes.
   std::unordered_map<IpAddr, int> ip_to_idx_;
-
-  /// Convert a host index to an IP address. The host index must be smaller than 2^24 and
-  /// will specify the lower 24 bits of the IPv4 address (the lower 3 octets).
-  static IpAddr HostIdxToIpAddr(int host_idx);
 };
 
 struct Block {
@@ -267,6 +267,7 @@ class Plan {
   void SetReplicaPreference(TReplicaPreference::type p);
 
   void SetRandomReplica(bool b) { query_options_.schedule_random_replica = b; }
+  void SetNumRemoteExecutorCandidates(int32_t num);
   const Cluster& cluster() const { return schema_.cluster(); }
 
   const std::vector<TNetworkAddress>& referenced_datanodes() const;

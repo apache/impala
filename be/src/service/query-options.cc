@@ -736,6 +736,20 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_resource_trace_ratio(val);
         break;
       }
+      case TImpalaQueryOptions::NUM_REMOTE_EXECUTOR_CANDIDATES: {
+        StringParser::ParseResult result;
+        const int64_t num_remote_executor_candidates =
+            StringParser::StringToInt<int64_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS ||
+            num_remote_executor_candidates < 0 || num_remote_executor_candidates > 16) {
+          return Status(
+              Substitute("$0 is not valid for num_remote_executor_candidates. "
+                         "Valid values are in [0, 16].", value));
+        }
+        query_options->__set_num_remote_executor_candidates(
+            num_remote_executor_candidates);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

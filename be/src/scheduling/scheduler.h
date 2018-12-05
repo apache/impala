@@ -183,8 +183,18 @@ class Scheduler {
     /// 'break_ties_by_rank' is true, then the executor rank is used to break ties.
     /// Otherwise the first executor according to their order in 'data_locations' is
     /// selected.
-    const IpAddr* SelectLocalExecutor(
+    const IpAddr* SelectExecutorFromCandidates(
         const std::vector<IpAddr>& data_locations, bool break_ties_by_rank);
+
+    /// Populate 'remote_executor_candidates' with 'num_candidates' distinct
+    /// executors. The algorithm for picking remote executor candidates is to hash
+    /// the file name / offset from 'hdfs_file_split' multiple times and look up the
+    /// closest executors stored in the BackendConfig's HashRing. Given the same file
+    /// name / offset and same set of executors, this function is deterministic. The hash
+    /// ring also limits the disruption when executors are added or removed. Note that
+    /// 'num_candidates' cannot be 0 and must be less than the total number of executors.
+    void GetRemoteExecutorCandidates(const THdfsFileSplit* hdfs_file_split,
+        int num_remote_replicas, vector<IpAddr>* remote_executor_candidates);
 
     /// Select an executor for a remote read. If there are unused executor hosts, then
     /// those will be preferred. Otherwise the one with the lowest number of assigned

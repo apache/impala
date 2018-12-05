@@ -221,6 +221,10 @@ void Plan::SetReplicaPreference(TReplicaPreference::type p) {
   query_options_.replica_preference = p;
 }
 
+void Plan::SetNumRemoteExecutorCandidates(int32_t num) {
+  query_options_.num_remote_executor_candidates = num;
+}
+
 const vector<TNetworkAddress>& Plan::referenced_datanodes() const {
   return referenced_datanodes_;
 }

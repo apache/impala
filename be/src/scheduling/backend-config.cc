@@ -19,7 +19,18 @@
 
 namespace impala{
 
-BackendConfig::BackendConfig(const std::vector<TNetworkAddress>& backends) {
+// Hand-testing shows that 25 replicas produces a reasonable balance between nodes
+// across the hash ring. See HashRingTest::MaxMinRatio() for some empirical results
+// at similar replication levels. There is nothing special about 25 (i.e. 24 or 26
+// would be similar). Increasing this results in a more even distribution.
+// TODO: This can be tuned further with real world tests
+static const uint32_t NUM_HASH_RING_REPLICAS = 25;
+
+BackendConfig::BackendConfig()
+  : backend_ip_hash_ring_(NUM_HASH_RING_REPLICAS) {}
+
+BackendConfig::BackendConfig(const std::vector<TNetworkAddress>& backends)
+  : backend_ip_hash_ring_(NUM_HASH_RING_REPLICAS) {
   // Construct backend_map and backend_ip_map.
   for (const TNetworkAddress& backend: backends) {
     IpAddr ip;
@@ -54,6 +65,9 @@ void BackendConfig::GetAllBackends(BackendList* backends) const {
 void BackendConfig::AddBackend(const TBackendDescriptor& be_desc) {
   DCHECK(!be_desc.ip_address.empty());
   BackendList& be_descs = backend_map_[be_desc.ip_address];
+  if (be_descs.empty()) {
+    backend_ip_hash_ring_.AddNode(be_desc.ip_address);
+  }
   if (find(be_descs.begin(), be_descs.end(), be_desc) == be_descs.end()) {
     be_descs.push_back(be_desc);
   }
@@ -68,6 +82,7 @@ void BackendConfig::RemoveBackend(const TBackendDescriptor& be_desc) {
     if (be_descs->empty()) {
       backend_map_.erase(be_descs_it);
       backend_ip_map_.erase(be_desc.address.hostname);
+      backend_ip_hash_ring_.RemoveNode(be_desc.ip_address);
     }
   }
 }

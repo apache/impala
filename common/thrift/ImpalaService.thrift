@@ -356,6 +356,17 @@ enum TImpalaQueryOptions {
   // executors of a query. Must be between 0 and 1 inclusive, 0 means no query will be
   // traced, 1 means all queries will be traced.
   RESOURCE_TRACE_RATIO,
+
+  // The maximum number of executor candidates to consider when scheduling remote
+  // HDFS ranges. When non-zero, the scheduler generates a consistent set of
+  // executor candidates based on the filename and offset. This algorithm is designed
+  // to avoid changing file to node mappings when nodes come and go. It then picks from
+  // among the candidates by the same method used for local scan ranges. Limiting the
+  // number of nodes that can read a single file provides a type of simulated locality.
+  // This increases the efficiency of file-related caches (e.g. the HDFS file handle
+  // cache). If set to 0, the number of executor candidates is unlimited, and remote
+  // ranges will be scheduled across all executors.
+  NUM_REMOTE_EXECUTOR_CANDIDATES,
 }
 
 // The summary of a DML statement.

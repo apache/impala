@@ -26,6 +26,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/scheduling")
 add_library(Scheduling STATIC
   admission-controller.cc
   backend-config.cc
+  hash-ring.cc
   query-schedule.cc
   request-pool-service.cc
   scheduler-test-util.cc
@@ -35,3 +36,4 @@ add_dependencies(Scheduling gen-deps)
 
 ADD_BE_LSAN_TEST(scheduler-test)
 ADD_BE_LSAN_TEST(backend-config-test)
+ADD_BE_LSAN_TEST(hash-ring-test)

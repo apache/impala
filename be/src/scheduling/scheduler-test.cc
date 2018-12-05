@@ -118,7 +118,7 @@ TEST_F(SchedulerTest, ScanTableTwice) {
 /// TODO: This test can be removed once we have the non-random backend round-robin by
 /// rank.
 /// Schedule randomly over 3 backends and ensure that each backend is at least used once.
-TEST_F(SchedulerTest, RandomReads) {
+TEST_F(SchedulerTest, LocalReadRandomReplica) {
   Cluster cluster;
   cluster.AddHosts(3, true, true);
 
@@ -186,8 +186,9 @@ TEST_F(SchedulerTest, TestMediumSizedCluster) {
   EXPECT_EQ(16, result.NumDiskAssignments());
 }
 
-/// Verify that remote placement and scheduling work as expected.
-TEST_F(SchedulerTest, RemoteOnlyPlacement) {
+/// Verify that remote placement and scheduling work as expected when
+/// num_remote_executor_candidates=0. (i.e. that it is random and covers all nodes).
+TEST_F(SchedulerTest, NoRemoteExecutorCandidates) {
   Cluster cluster;
   for (int i = 0; i < 100; ++i) cluster.AddHost(i < 30, true);
 
@@ -196,6 +197,7 @@ TEST_F(SchedulerTest, RemoteOnlyPlacement) {
 
   Plan plan(schema);
   plan.AddTableScan("T1");
+  plan.SetNumRemoteExecutorCandidates(0);
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
@@ -204,6 +206,105 @@ TEST_F(SchedulerTest, RemoteOnlyPlacement) {
   EXPECT_EQ(10, result.NumTotalAssignments());
   EXPECT_EQ(10, result.NumRemoteAssignments());
   EXPECT_EQ(Block::DEFAULT_BLOCK_SIZE, result.MaxNumAssignedBytesPerHost());
+}
+
+/// Tests scheduling with num_remote_executor_candidates > 0. Specifically, it verifies
+/// that repeated scheduling of a block happens on the appropriate number of distinct
+/// nodes for varying values of num_remote_executor_candidates. This includes cases
+/// where the num_remote_executor_candidates exceeds the number of Impala executors.
+TEST_F(SchedulerTest, RemoteExecutorCandidates) {
+  Cluster cluster;
+  int num_data_nodes = 3;
+  int num_impala_nodes = 5;
+  // Set of datanodes
+  cluster.AddHosts(num_data_nodes, false, true);
+  // Set of Impala hosts
+  cluster.AddHosts(num_impala_nodes, true, false);
+
+  Schema schema(cluster);
+  schema.AddSingleBlockTable("T1", {0, 1, 2});
+
+  // Test a range of number of remote executor candidates, including cases where the
+  // number of remote executor candidates exceeds the number of Impala nodes.
+  for (int num_candidates = 1; num_candidates <= num_impala_nodes + 1; ++num_candidates) {
+    Plan plan(schema);
+    plan.AddTableScan("T1");
+    plan.SetRandomReplica(true);
+    plan.SetNumRemoteExecutorCandidates(num_candidates);
+
+    Result result(plan);
+    SchedulerWrapper scheduler(plan);
+    for (int i = 0; i < 100; ++i) ASSERT_OK(scheduler.Compute(&result));
+
+    ASSERT_EQ(100, result.NumAssignments());
+    EXPECT_EQ(100, result.NumTotalAssignments());
+    EXPECT_EQ(100 * Block::DEFAULT_BLOCK_SIZE, result.NumTotalAssignedBytes());
+    if (num_candidates < num_impala_nodes) {
+      EXPECT_EQ(num_candidates, result.NumDistinctBackends());
+    } else {
+      EXPECT_EQ(num_impala_nodes, result.NumDistinctBackends());
+    }
+    EXPECT_GE(result.MinNumAssignedBytesPerHost(), Block::DEFAULT_BLOCK_SIZE);
+    // If there is only one remote executor candidate, then all scan ranges will be
+    // assigned to one backend.
+    if (num_candidates == 1) {
+      EXPECT_EQ(result.MinNumAssignedBytesPerHost(), 100 * Block::DEFAULT_BLOCK_SIZE);
+    }
+  }
+}
+
+/// Verify basic consistency of remote executor candidates. Specifically, it schedules
+/// a set of blocks, then removes an executor that did not have any blocks assigned to
+/// it, and verifies that rerunning the scheduling results in the same assignments.
+TEST_F(SchedulerTest, RemoteExecutorCandidateConsistency) {
+  Cluster cluster;
+  int num_data_nodes = 3;
+  int num_impala_nodes = 50;
+
+  // Set of Impala hosts
+  cluster.AddHosts(num_impala_nodes, true, false);
+  // Set of datanodes
+  cluster.AddHosts(num_data_nodes, false, true);
+
+  // Replica placement is unimportant for this test. All blocks will be on
+  // all datanodes, but Impala is runnning remotely.
+  Schema schema(cluster);
+  schema.AddMultiBlockTable("T1", 25, ReplicaPlacement::RANDOM, 3);
+
+  Plan plan(schema);
+  plan.AddTableScan("T1");
+  plan.SetRandomReplica(false);
+  plan.SetNumRemoteExecutorCandidates(3);
+
+  Result result_base(plan);
+  SchedulerWrapper scheduler(plan);
+  ASSERT_OK(scheduler.Compute(&result_base));
+  EXPECT_EQ(25, result_base.NumTotalAssignments());
+  EXPECT_EQ(25 * Block::DEFAULT_BLOCK_SIZE, result_base.NumTotalAssignedBytes());
+
+  // There are 25 blocks and 50 Impala hosts. There will be Impala hosts without
+  // any assigned bytes. Removing one of them should not change the outcome.
+  Result result_empty_removed(plan);
+  // Find an Impala host that was not assigned any bytes and remove it
+  bool removed_one = false;
+  for (int i = 0; i < num_impala_nodes; ++i) {
+    if (result_base.NumTotalAssignedBytes(i) == 0) {
+      scheduler.RemoveBackend(cluster.hosts()[i]);
+      removed_one = true;
+      break;
+    }
+  }
+  ASSERT_TRUE(removed_one);
+  // Rerun the scheduling with the node removed.
+  ASSERT_OK(scheduler.Compute(&result_empty_removed));
+  EXPECT_EQ(25, result_empty_removed.NumTotalAssignments());
+  EXPECT_EQ(25 * Block::DEFAULT_BLOCK_SIZE, result_empty_removed.NumTotalAssignedBytes());
+
+  // Verify that the outcome is identical.
+  for (int i = 0; i < num_impala_nodes; ++i) {
+    EXPECT_EQ(result_base.NumRemoteAssignedBytes(i),
+              result_empty_removed.NumRemoteAssignedBytes(i));
+  }
 }
 
 /// Add a table with 1000 scan ranges over 10 hosts and ensure that the right number of
@@ -296,6 +397,8 @@ TEST_F(SchedulerTest, EmptyStatestoreMessage) {
 
   Plan plan(schema);
   plan.AddTableScan("T1");
+  // Test only applies when num_remote_executor_candidates=0.
+  plan.SetNumRemoteExecutorCandidates(0);
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
@@ -329,6 +432,8 @@ TEST_F(SchedulerTest, TestSendUpdates) {
 
   Plan plan(schema);
   plan.AddTableScan("T1");
+  // Test only applies when num_remote_executor_candidates=0.
+  plan.SetNumRemoteExecutorCandidates(0);
 
   Result result(plan);
   SchedulerWrapper scheduler(plan);
