@@ -225,35 +225,37 @@ class TestImpalaShellInteractive(object):
     Verifies that a connect command by the user is honoured.
     """
 
-    def get_num_open_sessions(impala_service):
-      """Helper method to retrieve the number of open sessions"""
-      return impala_service.get_metric_value('impala-server.num-open-beeswax-sessions')
+    def wait_for_num_open_sessions(impala_service, num, err):
+      """Helper method to wait for the number of open sessions to reach 'num'."""
+      assert impala_service.wait_for_metric_value(
+          'impala-server.num-open-beeswax-sessions', num) == num, err
 
     hostname = socket.getfqdn()
     initial_impala_service = ImpaladService(hostname)
     target_impala_service = ImpaladService(hostname, webserver_port=25001,
         beeswax_port=21001, be_port=22001)
-    # Get the initial state for the number of sessions.
-    num_sessions_initial = get_num_open_sessions(initial_impala_service)
-    num_sessions_target = get_num_open_sessions(target_impala_service)
+    # This test is running serially, so there shouldn't be any open sessions, but wait
+    # here in case a session from a previous test hasn't been fully closed yet.
+    wait_for_num_open_sessions(
+        initial_impala_service, 0, "21000 should not have any remaining open sessions.")
+    wait_for_num_open_sessions(
+        target_impala_service, 0, "21001 should not have any remaining open sessions.")
     # Connect to localhost:21000 (default)
     p = ImpalaShell()
-    sleep(5)
+
     # Make sure we're connected <hostname>:21000
-    assert get_num_open_sessions(initial_impala_service) == num_sessions_initial + 1, \
-        "Not connected to %s:21000" % hostname
+    wait_for_num_open_sessions(
+        initial_impala_service, 1, "Not connected to %s:21000" % hostname)
     p.send_cmd("connect %s:21001" % hostname)
 
-    # Wait for a little while
-    sleep(5)
     # The number of sessions on the target impalad should have been incremented.
-    assert get_num_open_sessions(target_impala_service) == num_sessions_target + 1, \
-        "Not connected to %s:21001" % hostname
+    wait_for_num_open_sessions(
+        target_impala_service, 1, "Not connected to %s:21001" % hostname)
     assert "[%s:21001] default>" % hostname in p.get_result().stdout
 
     # The number of sessions on the initial impalad should have been decremented.
-    assert get_num_open_sessions(initial_impala_service) == num_sessions_initial, \
-        "Connection to %s:21000 should have been closed" % hostname
+    wait_for_num_open_sessions(initial_impala_service, 0,
+        "Connection to %s:21000 should have been closed" % hostname)
 
   @pytest.mark.execute_serially
   def test_ddl_queries_are_closed(self):
