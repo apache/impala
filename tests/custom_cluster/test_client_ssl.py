@@ -84,11 +84,11 @@ class TestClientSsl(CustomClusterTestSuite):
 
     # Test cancelling a query
     impalad = ImpaladService(socket.getfqdn())
-    impalad.wait_for_num_in_flight_queries(0)
+    assert impalad.wait_for_num_in_flight_queries(0)
     p = ImpalaShell(args="--ssl")
     p.send_cmd("SET DEBUG_ACTION=0:OPEN:WAIT")
     p.send_cmd("select count(*) from functional.alltypes")
-    impalad.wait_for_num_in_flight_queries(1)
+    assert impalad.wait_for_num_in_flight_queries(1)
 
     LOG = logging.getLogger('test_client_ssl')
     LOG.info("Cancelling query")
@@ -216,13 +216,13 @@ class TestClientSsl(CustomClusterTestSuite):
   def _validate_positive_cases(self, ca_cert=""):
     shell_options = "--ssl -q 'select 1 + 2'"
 
-    result = run_impala_shell_cmd(shell_options)
+    result = run_impala_shell_cmd(shell_options, wait_until_connected=False)
     for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
       assert msg in result.stderr
 
     if ca_cert != "":
       shell_options = shell_options + (" --ca_cert=%s" % ca_cert)
-      result = run_impala_shell_cmd(shell_options)
+      result = run_impala_shell_cmd(shell_options, wait_until_connected=False)
       for msg in [self.SSL_ENABLED, self.CONNECTED, self.FETCHED]:
         assert msg in result.stderr
 

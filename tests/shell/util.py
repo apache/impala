@@ -22,7 +22,7 @@ import os
 import pytest
 import re
 import shlex
-import shutil
+import time
 from subprocess import Popen, PIPE
 
 IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
@@ -85,13 +85,16 @@ def assert_pattern(pattern, result, text, message):
   m = re.search(pattern, text, re.MULTILINE)
   assert m and m.group(0) == result, message
 
-def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None):
+
+def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None,
+                         wait_until_connected=True):
   """Runs the Impala shell on the commandline.
 
   'shell_args' is a string which represents the commandline options.
   Returns a ImpalaShellResult.
   """
-  result = run_impala_shell_cmd_no_expect(shell_args, stdin_input)
+  result = run_impala_shell_cmd_no_expect(shell_args, stdin_input,
+                                          expect_success and wait_until_connected)
   if expect_success:
     assert result.rc == 0, "Cmd %s was expected to succeed: %s" % (shell_args,
                                                                    result.stderr)
@@ -99,7 +102,9 @@ def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None):
     assert result.rc != 0, "Cmd %s was expected to fail" % shell_args
   return result
 
-def run_impala_shell_cmd_no_expect(shell_args, stdin_input=None):
+
+def run_impala_shell_cmd_no_expect(shell_args, stdin_input=None,
+                                   wait_until_connected=True):
   """Runs the Impala shell on the commandline.
 
   'shell_args' is a string which represents the commandline options.
@@ -107,10 +112,10 @@ def run_impala_shell_cmd_no_expect(shell_args, stdin_input=None):
 
   Does not assert based on success or failure of command.
   """
-  p = ImpalaShell(shell_args)
+  p = ImpalaShell(shell_args, wait_until_connected=wait_until_connected)
   result = p.get_result(stdin_input)
-  cmd = "%s %s" % (SHELL_CMD, shell_args)
   return result
+
 
 class ImpalaShellResult(object):
   def __init__(self):
@@ -118,12 +123,23 @@ class ImpalaShellResult(object):
     self.stdout = str()
     self.stderr = str()
 
+
 class ImpalaShell(object):
   """A single instance of the Impala shell. The proces is started when this object is
      constructed, and then users should repeatedly call send_cmd(), followed eventually by
-     get_result() to retrieve the process output."""
-  def __init__(self, args=None, env=None):
+     get_result() to retrieve the process output. This constructor will wait until
+     Impala shell is connected for the specified timeout unless wait_util_connected is
+     set to False or --quiet is passed into the args"""
+  def __init__(self, args=None, env=None, wait_until_connected=True, timeout=60):
     self.shell_process = self._start_new_shell_process(args, env=env)
+    # When --quiet option is passed to Impala shell, we should not wait until we see
+    # "Connected to" because it will never be printed to stderr.
+    if wait_until_connected and (args is None or "--quiet" not in args):
+      start_time = time.time()
+      connected = False
+      while time.time() - start_time < timeout and not connected:
+        connected = "Connected to" in self.shell_process.stderr.readline()
+      assert connected, "Impala shell is not connected"
 
   def pid(self):
     return self.shell_process.pid

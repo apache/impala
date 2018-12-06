@@ -56,7 +56,7 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
 
     # wait for the USE command to finish
     impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 1)
-    impalad.wait_for_num_in_flight_queries(0)
+    assert impalad.wait_for_num_in_flight_queries(0)
 
     self._start_impala_cluster([])
 
@@ -79,7 +79,7 @@ class TestShellInteractiveReconnect(CustomClusterTestSuite):
 
     # wait for the USE command to finish
     impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 1)
-    impalad.wait_for_num_in_flight_queries(0)
+    assert impalad.wait_for_num_in_flight_queries(0)
 
     # Disconnect
     self.cluster.impalads[0].kill()

@@ -142,7 +142,7 @@ class TestImpalaShell(ImpalaTestSuite):
     assert "Query: use `parquet`" in result.stderr, result.stderr
 
   def test_unsecure_message(self):
-    results = run_impala_shell_cmd("")
+    results = run_impala_shell_cmd("", wait_until_connected=False)
     assert "Starting Impala Shell without Kerberos authentication" in results.stderr
 
   def test_print_header(self, populated_table):
@@ -473,7 +473,7 @@ class TestImpalaShell(ImpalaTestSuite):
 
     # Testing config file related warning and error messages
     args = '--config_file=%s/impalarc_with_warnings' % QUERY_FILE_PATH
-    result = run_impala_shell_cmd(args, expect_success=True)
+    result = run_impala_shell_cmd(args, expect_success=True, wait_until_connected=False)
     assert "WARNING: Option 'config_file' can be only set from shell." in result.stderr
     err_msg = ("WARNING: Unable to read configuration file correctly. "
                "Ignoring unrecognized config option: 'invalid_option'\n")

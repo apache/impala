@@ -721,7 +721,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     """Checks if the num of queries accounted by query_locations and in-flight are as
     expected"""
     # Wait for queries to start/un-register.
-    self.impalad_test_service.wait_for_num_in_flight_queries(expected_num)
+    assert self.impalad_test_service.wait_for_num_in_flight_queries(expected_num)
     query_locations = self.impalad_test_service.get_query_locations()
     for host, num_q in query_locations.items():
       assert num_q == expected_num, "There should be {0} running queries on either " \

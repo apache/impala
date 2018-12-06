@@ -170,7 +170,7 @@ class TestImpalaShellInteractive(object):
   @pytest.mark.execute_serially
   def test_cancellation(self):
     impalad = ImpaladService(socket.getfqdn())
-    impalad.wait_for_num_in_flight_queries(0)
+    assert impalad.wait_for_num_in_flight_queries(0)
     command = "select sleep(10000);"
     p = ImpalaShell()
     p.send_cmd(command)
@@ -207,7 +207,8 @@ class TestImpalaShellInteractive(object):
   def test_disconnected_shell(self):
     """Test that the shell presents a disconnected prompt if it can't connect
     """
-    result = run_impala_shell_interactive('asdf;', shell_args='-i foo')
+    result = run_impala_shell_interactive('asdf;', shell_args='-i foo',
+                                          wait_until_connected=False)
     assert ImpalaShellClass.DISCONNECTED_PROMPT in result.stdout
 
   def test_bash_cmd_timing(self):
@@ -751,7 +752,7 @@ class TestImpalaShellInteractive(object):
       assert "Fetched 0 row" in result.stderr
 
 
-def run_impala_shell_interactive(input_lines, shell_args=None):
+def run_impala_shell_interactive(input_lines, shell_args=None, wait_until_connected=True):
   """Runs a command in the Impala shell interactively."""
   # if argument "input_lines" is a string, makes it into a list
   if type(input_lines) is str:
@@ -760,7 +761,7 @@ def run_impala_shell_interactive(input_lines, shell_args=None):
   # since piping defaults to ascii
   my_env = os.environ
   my_env['PYTHONIOENCODING'] = 'utf-8'
-  p = ImpalaShell(args=shell_args, env=my_env)
+  p = ImpalaShell(args=shell_args, env=my_env, wait_until_connected=wait_until_connected)
   for line in input_lines:
     p.send_cmd(line)
   return p.get_result()
