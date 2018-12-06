@@ -263,8 +263,8 @@ class ImpaladService(BaseImpalaService):
         return
       sleep(interval)
     assert target_state == query_state, \
-        'Did not reach query state in time target={0} actual={1}'.format(
-            target_state, query_state)
+        'Query {0} did not reach query state in time target={1} actual={2}'.format(
+            query_handle.get_handle().id, target_state, query_state)
     return
 
   def wait_for_query_status(self, client, query_id, expected_content,
